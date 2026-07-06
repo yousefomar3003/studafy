@@ -6,12 +6,5 @@
   "4": "ADR-000: Monorepo tooling — Bun workspaces + Turborepo",
   "5": "package.json",
   "6": "index.ts",
-  "7": "index.ts",
-  "8": "compilerOptions",
-  "9": "compilerOptions",
-  "10": "package.json",
-  "11": "@studafy/tsconfig",
-  "12": "packages.json",
-  "13": "tsconfig.json",
-  "14": "tsconfig.json"
+  "7": "index.ts"
 }

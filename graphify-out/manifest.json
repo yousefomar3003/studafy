@@ -1,27 +1,27 @@
 {
   ".claude/settings.local.json": {
-    "mtime": 1783354447.9598858,
-    "ast_hash": "fa27dcb196c3d050201385a6f99d56a7",
+    "mtime": 1783355338.0462272,
+    "ast_hash": "b2684a91e5a747c0d7cdcae47e488485",
     "semantic_hash": ""
   },
   "apps/web/package.json": {
-    "mtime": 1783352748.0375984,
-    "ast_hash": "ed5ca12062d44728d15d2e771c6a909a",
+    "mtime": 1783379286.1038818,
+    "ast_hash": "edcd06199baa7a99da9a6cfa60e56765",
     "semantic_hash": ""
   },
   "apps/web/src/index.ts": {
-    "mtime": 1783352748.0399044,
-    "ast_hash": "f3529da3d87166f6b96a61766f1dcfe0",
+    "mtime": 1783378749.983405,
+    "ast_hash": "fa8d0596184c338d0cec93d9e89b500e",
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1783352749.001621,
-    "ast_hash": "6f2b2161f003e6300238f6a7dcccf460",
+    "mtime": 1783379286.1116543,
+    "ast_hash": "dad73df3875df9ba450008e6e76e4df3",
     "semantic_hash": ""
   },
   "packages/ui/package.json": {
-    "mtime": 1783352749.0080695,
-    "ast_hash": "6ed97be9c79acda6e7294ee649cdc76d",
+    "mtime": 1783379286.1238322,
+    "ast_hash": "aaeb1736d420f50d5098e5371280d3d2",
     "semantic_hash": ""
   },
   "packages/ui/src/index.ts": {
@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "turbo.json": {
-    "mtime": 1783352749.0114346,
-    "ast_hash": "8a0ad2ab270f9a9d0f7eff8c42b8c79a",
+    "mtime": 1783379286.1268647,
+    "ast_hash": "29b1fef29b0098eb6bcb5a2c913c71ba",
     "semantic_hash": ""
   },
   "README.md": {
@@ -42,6 +42,61 @@
   "docs/adr/0000-monorepo-tooling-choice.md": {
     "mtime": 1783352748.046969,
     "ast_hash": "689ed199ec5b4c0ffe5ae9ee23ce37c4",
+    "semantic_hash": ""
+  },
+  ".claude/settings.json": {
+    "mtime": 1783358567.5798235,
+    "ast_hash": "c4d7214429dd1632abf7b2490caa4699",
+    "semantic_hash": ""
+  },
+  "apps/web/tsconfig.json": {
+    "mtime": 1783379286.1061141,
+    "ast_hash": "6ead39fe4398558a2a0b6a354cf6c550",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/api.json": {
+    "mtime": 1783379286.115816,
+    "ast_hash": "8080f0afab4a0194ffa68cb2c08bafd9",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/base.json": {
+    "mtime": 1783379286.1168184,
+    "ast_hash": "4962762c81819835110edb8762170af7",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/package.json": {
+    "mtime": 1783379286.117813,
+    "ast_hash": "2310a4b1d069925c283522681b456196",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/packages.json": {
+    "mtime": 1783379286.1198554,
+    "ast_hash": "5412e075e72d573fc2b37f6641f115a8",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/web.json": {
+    "mtime": 1783379286.1208518,
+    "ast_hash": "fd4c53f9f31835aa4378129cc107102d",
+    "semantic_hash": ""
+  },
+  "packages/ui/tsconfig.json": {
+    "mtime": 1783379286.1248324,
+    "ast_hash": "7ed0328b037e275f8014bddd8af59f66",
+    "semantic_hash": ""
+  },
+  ".serena/project.local.yml": {
+    "mtime": 1783355693.9502325,
+    "ast_hash": "80d87878a5dcaa57ac055afdac265ad1",
+    "semantic_hash": ""
+  },
+  ".serena/project.yml": {
+    "mtime": 1783356879.3609085,
+    "ast_hash": "b79029bf7ecb77a1ff381a023116c708",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/README.md": {
+    "mtime": 1783379286.1136417,
+    "ast_hash": "f4f0f03096fd82ce3f6d1c384fb803a7",
     "semantic_hash": ""
   }
 }

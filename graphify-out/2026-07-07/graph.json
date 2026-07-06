@@ -1,0 +1,812 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_package",
+      "community": 3,
+      "norm_label": "package.json"
+    },
+    {
+      "label": "name",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "apps_web_package_name",
+      "community": 3,
+      "norm_label": "name"
+    },
+    {
+      "label": "version",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "apps_web_package_version",
+      "community": 3,
+      "norm_label": "version"
+    },
+    {
+      "label": "private",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "apps_web_package_private",
+      "community": 3,
+      "norm_label": "private"
+    },
+    {
+      "label": "scripts",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "apps_web_package_scripts",
+      "community": 3,
+      "norm_label": "scripts"
+    },
+    {
+      "label": "build",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "apps_web_package_scripts_build",
+      "community": 3,
+      "norm_label": "build"
+    },
+    {
+      "label": "index.ts",
+      "file_type": "code",
+      "source_file": "apps/web/src/index.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_src_index",
+      "community": 6,
+      "norm_label": "index.ts"
+    },
+    {
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "package",
+      "community": 0,
+      "norm_label": "package.json"
+    },
+    {
+      "label": "name",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "package_name",
+      "community": 0,
+      "norm_label": "name"
+    },
+    {
+      "label": "version",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "package_version",
+      "community": 0,
+      "norm_label": "version"
+    },
+    {
+      "label": "private",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "package_private",
+      "community": 0,
+      "norm_label": "private"
+    },
+    {
+      "label": "workspaces",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "package_workspaces",
+      "community": 0,
+      "norm_label": "workspaces"
+    },
+    {
+      "label": "scripts",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "package_scripts",
+      "community": 0,
+      "norm_label": "scripts"
+    },
+    {
+      "label": "build",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "package_scripts_build",
+      "community": 0,
+      "norm_label": "build"
+    },
+    {
+      "label": "packageManager",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "package_packagemanager",
+      "community": 0,
+      "norm_label": "packagemanager"
+    },
+    {
+      "label": "devDependencies",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "package_devdependencies",
+      "community": 1,
+      "norm_label": "devdependencies"
+    },
+    {
+      "label": "turbo",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "package_devdependencies_turbo",
+      "community": 1,
+      "norm_label": "turbo"
+    },
+    {
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_ui_package",
+      "community": 5,
+      "norm_label": "package.json"
+    },
+    {
+      "label": "name",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_ui_package_name",
+      "community": 5,
+      "norm_label": "name"
+    },
+    {
+      "label": "version",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_ui_package_version",
+      "community": 5,
+      "norm_label": "version"
+    },
+    {
+      "label": "private",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "packages_ui_package_private",
+      "community": 5,
+      "norm_label": "private"
+    },
+    {
+      "label": "scripts",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_ui_package_scripts",
+      "community": 5,
+      "norm_label": "scripts"
+    },
+    {
+      "label": "build",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "packages_ui_package_scripts_build",
+      "community": 5,
+      "norm_label": "build"
+    },
+    {
+      "label": "index.ts",
+      "file_type": "code",
+      "source_file": "packages/ui/src/index.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_ui_src_index",
+      "community": 7,
+      "norm_label": "index.ts"
+    },
+    {
+      "label": "turbo.json",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "turbo",
+      "community": 1,
+      "norm_label": "turbo.json"
+    },
+    {
+      "label": "$schema",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "turbo_schema",
+      "community": 1,
+      "norm_label": "$schema"
+    },
+    {
+      "label": "tasks",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "turbo_tasks",
+      "community": 1,
+      "norm_label": "tasks"
+    },
+    {
+      "label": "build",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "turbo_tasks_build",
+      "community": 1,
+      "norm_label": "build"
+    },
+    {
+      "label": "dependsOn",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "turbo_build_dependson",
+      "community": 1,
+      "norm_label": "dependson"
+    },
+    {
+      "label": "outputs",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "turbo_build_outputs",
+      "community": 1,
+      "norm_label": "outputs"
+    },
+    {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "readme",
+      "community": 2,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "studafy",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "readme_studafy",
+      "community": 2,
+      "norm_label": "studafy"
+    },
+    {
+      "label": "Repo layout",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "readme_repo_layout",
+      "community": 2,
+      "norm_label": "repo layout"
+    },
+    {
+      "label": "Requirements",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "readme_requirements",
+      "community": 2,
+      "norm_label": "requirements"
+    },
+    {
+      "label": "Getting started",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "readme_getting_started",
+      "community": 2,
+      "norm_label": "getting started"
+    },
+    {
+      "label": "Adding a workspace",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L34",
+      "_origin": "ast",
+      "id": "readme_adding_a_workspace",
+      "community": 2,
+      "norm_label": "adding a workspace"
+    },
+    {
+      "label": "0000-monorepo-tooling-choice.md",
+      "file_type": "document",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_adr_0000_monorepo_tooling_choice",
+      "community": 2,
+      "norm_label": "0000-monorepo-tooling-choice.md"
+    },
+    {
+      "label": "ADR-000: Monorepo tooling \u2014 Bun workspaces + Turborepo",
+      "file_type": "document",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_adr_0000_monorepo_tooling_choice_adr_000_monorepo_tooling_bun_workspaces_turborepo",
+      "community": 4,
+      "norm_label": "adr-000: monorepo tooling \u2014 bun workspaces + turborepo"
+    },
+    {
+      "label": "Status",
+      "file_type": "document",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "docs_adr_0000_monorepo_tooling_choice_status",
+      "community": 4,
+      "norm_label": "status"
+    },
+    {
+      "label": "Context",
+      "file_type": "document",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "docs_adr_0000_monorepo_tooling_choice_context",
+      "community": 4,
+      "norm_label": "context"
+    },
+    {
+      "label": "Decision",
+      "file_type": "document",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "docs_adr_0000_monorepo_tooling_choice_decision",
+      "community": 4,
+      "norm_label": "decision"
+    },
+    {
+      "label": "Alternatives considered",
+      "file_type": "document",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L30",
+      "_origin": "ast",
+      "id": "docs_adr_0000_monorepo_tooling_choice_alternatives_considered",
+      "community": 4,
+      "norm_label": "alternatives considered"
+    },
+    {
+      "label": "Consequences",
+      "file_type": "document",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L42",
+      "_origin": "ast",
+      "id": "docs_adr_0000_monorepo_tooling_choice_consequences",
+      "community": 4,
+      "norm_label": "consequences"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "apps_web_package",
+      "target": "apps_web_package_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_web_package",
+      "target": "apps_web_package_private",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_package",
+      "target": "apps_web_package_scripts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_web_package",
+      "target": "apps_web_package_version",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_package_scripts",
+      "target": "apps_web_package_scripts_build",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "package",
+      "target": "package_devdependencies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "package",
+      "target": "package_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "package",
+      "target": "package_packagemanager",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "package",
+      "target": "package_private",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "package",
+      "target": "package_scripts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "package",
+      "target": "package_version",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "package",
+      "target": "package_workspaces",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "package_scripts",
+      "target": "package_scripts_build",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_turbo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "context": "import",
+      "source": "package_devdependencies_turbo",
+      "target": "turbo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_ui_package",
+      "target": "packages_ui_package_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_ui_package",
+      "target": "packages_ui_package_private",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_ui_package",
+      "target": "packages_ui_package_scripts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_ui_package",
+      "target": "packages_ui_package_version",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_ui_package_scripts",
+      "target": "packages_ui_package_scripts_build",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "turbo",
+      "target": "turbo_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "turbo",
+      "target": "turbo_tasks",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "turbo_tasks",
+      "target": "turbo_tasks_build",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "turbo_tasks_build",
+      "target": "turbo_build_dependson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "turbo_tasks_build",
+      "target": "turbo_build_outputs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "readme",
+      "target": "docs_adr_0000_monorepo_tooling_choice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "readme",
+      "target": "readme_studafy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "readme_studafy",
+      "target": "readme_adding_a_workspace",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "readme_studafy",
+      "target": "readme_getting_started",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "readme_studafy",
+      "target": "readme_repo_layout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "readme_studafy",
+      "target": "readme_requirements",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_adr_0000_monorepo_tooling_choice",
+      "target": "docs_adr_0000_monorepo_tooling_choice_adr_000_monorepo_tooling_bun_workspaces_turborepo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "docs_adr_0000_monorepo_tooling_choice_adr_000_monorepo_tooling_bun_workspaces_turborepo",
+      "target": "docs_adr_0000_monorepo_tooling_choice_alternatives_considered",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "docs_adr_0000_monorepo_tooling_choice_adr_000_monorepo_tooling_bun_workspaces_turborepo",
+      "target": "docs_adr_0000_monorepo_tooling_choice_consequences",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "docs_adr_0000_monorepo_tooling_choice_adr_000_monorepo_tooling_bun_workspaces_turborepo",
+      "target": "docs_adr_0000_monorepo_tooling_choice_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "docs_adr_0000_monorepo_tooling_choice_adr_000_monorepo_tooling_bun_workspaces_turborepo",
+      "target": "docs_adr_0000_monorepo_tooling_choice_decision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0000-monorepo-tooling-choice.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "docs_adr_0000_monorepo_tooling_choice_adr_000_monorepo_tooling_bun_workspaces_turborepo",
+      "target": "docs_adr_0000_monorepo_tooling_choice_status",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "a382665b2b3a185a178ef2f4c21a082d2ca9f81a"
+}

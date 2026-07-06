@@ -1,0 +1,47 @@
+{
+  ".claude/settings.local.json": {
+    "mtime": 1783354447.9598858,
+    "ast_hash": "fa27dcb196c3d050201385a6f99d56a7",
+    "semantic_hash": ""
+  },
+  "apps/web/package.json": {
+    "mtime": 1783352748.0375984,
+    "ast_hash": "ed5ca12062d44728d15d2e771c6a909a",
+    "semantic_hash": ""
+  },
+  "apps/web/src/index.ts": {
+    "mtime": 1783352748.0399044,
+    "ast_hash": "f3529da3d87166f6b96a61766f1dcfe0",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1783352749.001621,
+    "ast_hash": "6f2b2161f003e6300238f6a7dcccf460",
+    "semantic_hash": ""
+  },
+  "packages/ui/package.json": {
+    "mtime": 1783352749.0080695,
+    "ast_hash": "6ed97be9c79acda6e7294ee649cdc76d",
+    "semantic_hash": ""
+  },
+  "packages/ui/src/index.ts": {
+    "mtime": 1783352749.010431,
+    "ast_hash": "f609ad95040ed2e363eb3322ca1d89d5",
+    "semantic_hash": ""
+  },
+  "turbo.json": {
+    "mtime": 1783352749.0114346,
+    "ast_hash": "8a0ad2ab270f9a9d0f7eff8c42b8c79a",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1783352748.026329,
+    "ast_hash": "b71fa2e24c4894153269208831318b5c",
+    "semantic_hash": ""
+  },
+  "docs/adr/0000-monorepo-tooling-choice.md": {
+    "mtime": 1783352748.046969,
+    "ast_hash": "689ed199ec5b4c0ffe5ae9ee23ce37c4",
+    "semantic_hash": ""
+  }
+}
