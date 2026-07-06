@@ -6,11 +6,11 @@ these presets instead of hand-rolling `compilerOptions`.
 ## Presets
 
 | File            | Use for                                  |
-| --------------- | ----------------------------------------- |
-| `base.json`     | Shared defaults (not used directly)        |
-| `api.json`      | Node/Bun backend services (`apps/api`)     |
-| `web.json`      | Browser/frontend apps (`apps/web`)         |
-| `packages.json` | Internal shared libraries (`packages/*`)   |
+| --------------- | ---------------------------------------- |
+| `base.json`     | Shared defaults (not used directly)      |
+| `api.json`      | Node/Bun backend services (`apps/api`)   |
+| `web.json`      | Browser/frontend apps (`apps/web`)       |
+| `packages.json` | Internal shared libraries (`packages/*`) |
 
 All presets enforce `strict: true` and target `ES2022` with `moduleResolution: bundler`.
 

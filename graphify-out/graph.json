@@ -74,20 +74,40 @@
       "norm_label": "check-types"
     },
     {
+      "label": "lint",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "apps_web_package_scripts_lint",
+      "community": 3,
+      "norm_label": "lint"
+    },
+    {
       "label": "devDependencies",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L9",
+      "source_location": "L10",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies",
       "community": 3,
       "norm_label": "devdependencies"
     },
     {
+      "label": "@studafy/config",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "apps_web_package_devdependencies_studafy_config",
+      "community": 3,
+      "norm_label": "@studafy/config"
+    },
+    {
       "label": "@studafy/tsconfig",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L10",
+      "source_location": "L12",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies_studafy_tsconfig",
       "community": 3,
@@ -97,7 +117,7 @@
       "label": "typescript",
       "file_type": "code",
       "source_file": "apps/web/package.json",
-      "source_location": "L11",
+      "source_location": "L13",
       "_origin": "ast",
       "id": "apps_web_package_devdependencies_typescript",
       "community": 3,
@@ -144,6 +164,16 @@
       "norm_label": "include"
     },
     {
+      "label": "eslint.config.js",
+      "file_type": "code",
+      "source_file": "eslint.config.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "eslint_config",
+      "community": 19,
+      "norm_label": "eslint.config.js"
+    },
+    {
       "label": "package.json",
       "file_type": "code",
       "source_file": "package.json",
@@ -184,10 +214,20 @@
       "norm_label": "private"
     },
     {
-      "label": "workspaces",
+      "label": "type",
       "file_type": "code",
       "source_file": "package.json",
       "source_location": "L5",
+      "_origin": "ast",
+      "id": "package_type",
+      "community": 0,
+      "norm_label": "type"
+    },
+    {
+      "label": "workspaces",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L6",
       "_origin": "ast",
       "id": "package_workspaces",
       "community": 0,
@@ -197,7 +237,7 @@
       "label": "scripts",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L9",
+      "source_location": "L10",
       "_origin": "ast",
       "id": "package_scripts",
       "community": 0,
@@ -207,7 +247,7 @@
       "label": "build",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L10",
+      "source_location": "L11",
       "_origin": "ast",
       "id": "package_scripts_build",
       "community": 0,
@@ -217,17 +257,47 @@
       "label": "typecheck",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L11",
+      "source_location": "L12",
       "_origin": "ast",
       "id": "package_scripts_typecheck",
       "community": 0,
       "norm_label": "typecheck"
     },
     {
-      "label": "packageManager",
+      "label": "lint",
       "file_type": "code",
       "source_file": "package.json",
       "source_location": "L13",
+      "_origin": "ast",
+      "id": "package_scripts_lint",
+      "community": 0,
+      "norm_label": "lint"
+    },
+    {
+      "label": "format",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "package_scripts_format",
+      "community": 0,
+      "norm_label": "format"
+    },
+    {
+      "label": "format:check",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "package_scripts_format_check",
+      "community": 0,
+      "norm_label": "format:check"
+    },
+    {
+      "label": "packageManager",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L17",
       "_origin": "ast",
       "id": "package_packagemanager",
       "community": 0,
@@ -237,31 +307,291 @@
       "label": "devDependencies",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L14",
+      "source_location": "L18",
       "_origin": "ast",
       "id": "package_devdependencies",
       "community": 0,
       "norm_label": "devdependencies"
     },
     {
+      "label": "@studafy/config",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "package_devdependencies_studafy_config",
+      "community": 0,
+      "norm_label": "@studafy/config"
+    },
+    {
+      "label": "eslint",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "package_devdependencies_eslint",
+      "community": 0,
+      "norm_label": "eslint"
+    },
+    {
+      "label": "prettier",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "package_devdependencies_prettier",
+      "community": 0,
+      "norm_label": "prettier"
+    },
+    {
       "label": "turbo",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L15",
+      "source_location": "L22",
       "_origin": "ast",
       "id": "package_devdependencies_turbo",
-      "community": 0,
+      "community": 1,
       "norm_label": "turbo"
     },
     {
       "label": "typescript",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L16",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "package_devdependencies_typescript",
       "community": 0,
       "norm_label": "typescript"
+    },
+    {
+      "label": "eslint.config.js",
+      "file_type": "code",
+      "source_file": "packages/config/eslint.config.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_config_eslint_config",
+      "community": 19,
+      "norm_label": "eslint.config.js"
+    },
+    {
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_config_package",
+      "community": 15,
+      "norm_label": "package.json"
+    },
+    {
+      "label": "name",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_config_package_name",
+      "community": 15,
+      "norm_label": "name"
+    },
+    {
+      "label": "version",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_config_package_version",
+      "community": 15,
+      "norm_label": "version"
+    },
+    {
+      "label": "private",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "packages_config_package_private",
+      "community": 15,
+      "norm_label": "private"
+    },
+    {
+      "label": "type",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_config_package_type",
+      "community": 15,
+      "norm_label": "type"
+    },
+    {
+      "label": "files",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "packages_config_package_files",
+      "community": 15,
+      "norm_label": "files"
+    },
+    {
+      "label": "exports",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "packages_config_package_exports",
+      "community": 15,
+      "norm_label": "exports"
+    },
+    {
+      "label": "./eslint",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "packages_config_package_exports_eslint",
+      "community": 15,
+      "norm_label": "./eslint"
+    },
+    {
+      "label": "./prettier",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "packages_config_package_exports_prettier",
+      "community": 15,
+      "norm_label": "./prettier"
+    },
+    {
+      "label": "peerDependencies",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "packages_config_package_peerdependencies",
+      "community": 15,
+      "norm_label": "peerdependencies"
+    },
+    {
+      "label": "eslint",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "packages_config_package_peerdependencies_eslint",
+      "community": 15,
+      "norm_label": "eslint"
+    },
+    {
+      "label": "prettier",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "packages_config_package_peerdependencies_prettier",
+      "community": 15,
+      "norm_label": "prettier"
+    },
+    {
+      "label": "typescript",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "packages_config_package_peerdependencies_typescript",
+      "community": 15,
+      "norm_label": "typescript"
+    },
+    {
+      "label": "dependencies",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "packages_config_package_dependencies",
+      "community": 16,
+      "norm_label": "dependencies"
+    },
+    {
+      "label": "@eslint/js",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "packages_config_package_dependencies_eslint_js",
+      "community": 16,
+      "norm_label": "@eslint/js"
+    },
+    {
+      "label": "eslint-config-prettier",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "packages_config_package_dependencies_eslint_config_prettier",
+      "community": 16,
+      "norm_label": "eslint-config-prettier"
+    },
+    {
+      "label": "eslint-import-resolver-typescript",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L22",
+      "_origin": "ast",
+      "id": "packages_config_package_dependencies_eslint_import_resolver_typescript",
+      "community": 16,
+      "norm_label": "eslint-import-resolver-typescript"
+    },
+    {
+      "label": "eslint-plugin-import-x",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "packages_config_package_dependencies_eslint_plugin_import_x",
+      "community": 16,
+      "norm_label": "eslint-plugin-import-x"
+    },
+    {
+      "label": "eslint-plugin-security",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "packages_config_package_dependencies_eslint_plugin_security",
+      "community": 16,
+      "norm_label": "eslint-plugin-security"
+    },
+    {
+      "label": "globals",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "packages_config_package_dependencies_globals",
+      "community": 16,
+      "norm_label": "globals"
+    },
+    {
+      "label": "typescript-eslint",
+      "file_type": "code",
+      "source_file": "packages/config/package.json",
+      "source_location": "L26",
+      "_origin": "ast",
+      "id": "packages_config_package_dependencies_typescript_eslint",
+      "community": 16,
+      "norm_label": "typescript-eslint"
+    },
+    {
+      "label": "prettier.config.js",
+      "file_type": "code",
+      "source_file": "packages/config/prettier.config.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_config_prettier_config",
+      "community": 20,
+      "norm_label": "prettier.config.js"
     },
     {
       "label": "api.json",
@@ -764,20 +1094,40 @@
       "norm_label": "check-types"
     },
     {
+      "label": "lint",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "packages_ui_package_scripts_lint",
+      "community": 5,
+      "norm_label": "lint"
+    },
+    {
       "label": "devDependencies",
       "file_type": "code",
       "source_file": "packages/ui/package.json",
-      "source_location": "L9",
+      "source_location": "L10",
       "_origin": "ast",
       "id": "packages_ui_package_devdependencies",
       "community": 5,
       "norm_label": "devdependencies"
     },
     {
+      "label": "@studafy/config",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "packages_ui_package_devdependencies_studafy_config",
+      "community": 5,
+      "norm_label": "@studafy/config"
+    },
+    {
       "label": "@studafy/tsconfig",
       "file_type": "code",
       "source_file": "packages/ui/package.json",
-      "source_location": "L10",
+      "source_location": "L12",
       "_origin": "ast",
       "id": "packages_ui_package_devdependencies_studafy_tsconfig",
       "community": 5,
@@ -787,7 +1137,7 @@
       "label": "typescript",
       "file_type": "code",
       "source_file": "packages/ui/package.json",
-      "source_location": "L11",
+      "source_location": "L13",
       "_origin": "ast",
       "id": "packages_ui_package_devdependencies_typescript",
       "community": 5,
@@ -832,6 +1182,16 @@
       "id": "packages_ui_tsconfig_include",
       "community": 14,
       "norm_label": "include"
+    },
+    {
+      "label": "prettier.config.js",
+      "file_type": "code",
+      "source_file": "prettier.config.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "prettier_config",
+      "community": 20,
+      "norm_label": "prettier.config.js"
     },
     {
       "label": "turbo.json",
@@ -920,6 +1280,36 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "turbo_check_types_outputs",
+      "community": 1,
+      "norm_label": "outputs"
+    },
+    {
+      "label": "lint",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "turbo_tasks_lint",
+      "community": 1,
+      "norm_label": "lint"
+    },
+    {
+      "label": "dependsOn",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "turbo_lint_dependson",
+      "community": 1,
+      "norm_label": "dependson"
+    },
+    {
+      "label": "outputs",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "turbo_lint_outputs",
       "community": 1,
       "norm_label": "outputs"
     },
@@ -1054,6 +1444,156 @@
       "norm_label": "consequences"
     },
     {
+      "label": "0001-shared-lint-format-config.md",
+      "file_type": "document",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_adr_0001_shared_lint_format_config",
+      "community": 18,
+      "norm_label": "0001-shared-lint-format-config.md"
+    },
+    {
+      "label": "ADR-001: Shared lint/format config as a root-inherited package",
+      "file_type": "document",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_adr_0001_shared_lint_format_config_adr_001_shared_lint_format_config_as_a_root_inherited_package",
+      "community": 18,
+      "norm_label": "adr-001: shared lint/format config as a root-inherited package"
+    },
+    {
+      "label": "Status",
+      "file_type": "document",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "docs_adr_0001_shared_lint_format_config_status",
+      "community": 18,
+      "norm_label": "status"
+    },
+    {
+      "label": "Context",
+      "file_type": "document",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "docs_adr_0001_shared_lint_format_config_context",
+      "community": 18,
+      "norm_label": "context"
+    },
+    {
+      "label": "Decision",
+      "file_type": "document",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "docs_adr_0001_shared_lint_format_config_decision",
+      "community": 18,
+      "norm_label": "decision"
+    },
+    {
+      "label": "Alternatives considered",
+      "file_type": "document",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L39",
+      "_origin": "ast",
+      "id": "docs_adr_0001_shared_lint_format_config_alternatives_considered",
+      "community": 18,
+      "norm_label": "alternatives considered"
+    },
+    {
+      "label": "Consequences",
+      "file_type": "document",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L54",
+      "_origin": "ast",
+      "id": "docs_adr_0001_shared_lint_format_config_consequences",
+      "community": 18,
+      "norm_label": "consequences"
+    },
+    {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "packages/config/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_config_readme",
+      "community": 17,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "@studafy/config",
+      "file_type": "document",
+      "source_file": "packages/config/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_config_readme_studafy_config",
+      "community": 17,
+      "norm_label": "@studafy/config"
+    },
+    {
+      "label": "How it's wired up",
+      "file_type": "document",
+      "source_file": "packages/config/README.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "packages_config_readme_how_it_s_wired_up",
+      "community": 17,
+      "norm_label": "how it's wired up"
+    },
+    {
+      "label": "Overriding for a specific package (documented exception)",
+      "file_type": "document",
+      "source_file": "packages/config/README.md",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "packages_config_readme_overriding_for_a_specific_package_documented_exception",
+      "community": 17,
+      "norm_label": "overriding for a specific package (documented exception)"
+    },
+    {
+      "label": "Rule catalog",
+      "file_type": "document",
+      "source_file": "packages/config/README.md",
+      "source_location": "L36",
+      "_origin": "ast",
+      "id": "packages_config_readme_rule_catalog",
+      "community": 17,
+      "norm_label": "rule catalog"
+    },
+    {
+      "label": "ESLint",
+      "file_type": "document",
+      "source_file": "packages/config/README.md",
+      "source_location": "L38",
+      "_origin": "ast",
+      "id": "packages_config_readme_eslint",
+      "community": 17,
+      "norm_label": "eslint"
+    },
+    {
+      "label": "Prettier",
+      "file_type": "document",
+      "source_file": "packages/config/README.md",
+      "source_location": "L50",
+      "_origin": "ast",
+      "id": "packages_config_readme_prettier",
+      "community": 17,
+      "norm_label": "prettier"
+    },
+    {
+      "label": "Consuming this package",
+      "file_type": "document",
+      "source_file": "packages/config/README.md",
+      "source_location": "L62",
+      "_origin": "ast",
+      "id": "packages_config_readme_consuming_this_package",
+      "community": 17,
+      "norm_label": "consuming this package"
+    },
+    {
       "label": "README.md",
       "file_type": "document",
       "source_file": "packages/tsconfig/README.md",
@@ -1119,7 +1659,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L9",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "apps_web_package",
       "target": "apps_web_package_devdependencies",
@@ -1189,7 +1729,27 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L10",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_web_package_scripts",
+      "target": "apps_web_package_scripts_lint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "apps_web_package_devdependencies",
+      "target": "apps_web_package_devdependencies_studafy_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "apps_web_package_devdependencies",
       "target": "apps_web_package_devdependencies_studafy_tsconfig",
@@ -1199,7 +1759,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/package.json",
-      "source_location": "L11",
+      "source_location": "L13",
       "weight": 1.0,
       "source": "apps_web_package_devdependencies",
       "target": "apps_web_package_devdependencies_typescript",
@@ -1226,10 +1786,21 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "re_exports",
+      "context": "export",
+      "confidence": "EXTRACTED",
+      "source_file": "eslint.config.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "eslint_config",
+      "target": "packages_config_eslint_config",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L14",
+      "source_location": "L18",
       "weight": 1.0,
       "source": "package",
       "target": "package_devdependencies",
@@ -1249,7 +1820,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L13",
+      "source_location": "L17",
       "weight": 1.0,
       "source": "package",
       "target": "package_packagemanager",
@@ -1269,10 +1840,20 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L9",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "package",
       "target": "package_scripts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "package",
+      "target": "package_type",
       "confidence_score": 1.0
     },
     {
@@ -1289,7 +1870,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L5",
+      "source_location": "L6",
       "weight": 1.0,
       "source": "package",
       "target": "package_workspaces",
@@ -1299,7 +1880,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L10",
+      "source_location": "L11",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_build",
@@ -1309,7 +1890,37 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L11",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "package_scripts",
+      "target": "package_scripts_format",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "package_scripts",
+      "target": "package_scripts_format_check",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "package_scripts",
+      "target": "package_scripts_lint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_typecheck",
@@ -1319,7 +1930,37 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L15",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_eslint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_prettier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_studafy_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L22",
       "weight": 1.0,
       "source": "package_devdependencies",
       "target": "package_devdependencies_turbo",
@@ -1329,7 +1970,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L16",
+      "source_location": "L23",
       "weight": 1.0,
       "source": "package_devdependencies",
       "target": "package_devdependencies_typescript",
@@ -1339,11 +1980,222 @@
       "relation": "imports",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L15",
+      "source_location": "L22",
       "weight": 1.0,
       "context": "import",
       "source": "package_devdependencies_turbo",
       "target": "turbo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "packages_config_package",
+      "target": "packages_config_package_dependencies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "packages_config_package",
+      "target": "packages_config_package_exports",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_config_package",
+      "target": "packages_config_package_files",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_config_package",
+      "target": "packages_config_package_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "packages_config_package",
+      "target": "packages_config_package_peerdependencies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_config_package",
+      "target": "packages_config_package_private",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_config_package",
+      "target": "packages_config_package_type",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_config_package",
+      "target": "packages_config_package_version",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "packages_config_package_exports",
+      "target": "packages_config_package_exports_eslint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "packages_config_package_exports",
+      "target": "packages_config_package_exports_prettier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "packages_config_package_peerdependencies",
+      "target": "packages_config_package_peerdependencies_eslint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "packages_config_package_peerdependencies",
+      "target": "packages_config_package_peerdependencies_prettier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "packages_config_package_peerdependencies",
+      "target": "packages_config_package_peerdependencies_typescript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "packages_config_package_dependencies",
+      "target": "packages_config_package_dependencies_eslint_config_prettier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "packages_config_package_dependencies",
+      "target": "packages_config_package_dependencies_eslint_import_resolver_typescript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "packages_config_package_dependencies",
+      "target": "packages_config_package_dependencies_eslint_js",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "packages_config_package_dependencies",
+      "target": "packages_config_package_dependencies_eslint_plugin_import_x",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "packages_config_package_dependencies",
+      "target": "packages_config_package_dependencies_eslint_plugin_security",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "packages_config_package_dependencies",
+      "target": "packages_config_package_dependencies_globals",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/package.json",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "packages_config_package_dependencies",
+      "target": "packages_config_package_dependencies_typescript_eslint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "export",
+      "confidence": "EXTRACTED",
+      "source_file": "prettier.config.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "prettier_config",
+      "target": "packages_config_prettier_config",
       "confidence_score": 1.0
     },
     {
@@ -1730,7 +2582,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "packages/ui/package.json",
-      "source_location": "L9",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "packages_ui_package",
       "target": "packages_ui_package_devdependencies",
@@ -1800,7 +2652,27 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "packages/ui/package.json",
-      "source_location": "L10",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "packages_ui_package_scripts",
+      "target": "packages_ui_package_scripts_lint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "packages_ui_package_devdependencies",
+      "target": "packages_ui_package_devdependencies_studafy_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "packages_ui_package_devdependencies",
       "target": "packages_ui_package_devdependencies_studafy_tsconfig",
@@ -1810,7 +2682,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "packages/ui/package.json",
-      "source_location": "L11",
+      "source_location": "L13",
       "weight": 1.0,
       "source": "packages_ui_package_devdependencies",
       "target": "packages_ui_package_devdependencies_typescript",
@@ -1880,6 +2752,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "turbo.json",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "turbo_tasks",
+      "target": "turbo_tasks_lint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
       "source_location": "L5",
       "weight": 1.0,
       "source": "turbo_tasks_build",
@@ -1914,6 +2796,26 @@
       "weight": 1.0,
       "source": "turbo_tasks_check_types",
       "target": "turbo_check_types_outputs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "turbo_tasks_lint",
+      "target": "turbo_lint_dependson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "turbo_tasks_lint",
+      "target": "turbo_lint_outputs",
       "confidence_score": 1.0
     },
     {
@@ -2039,6 +2941,136 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_adr_0001_shared_lint_format_config",
+      "target": "docs_adr_0001_shared_lint_format_config_adr_001_shared_lint_format_config_as_a_root_inherited_package",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "docs_adr_0001_shared_lint_format_config_adr_001_shared_lint_format_config_as_a_root_inherited_package",
+      "target": "docs_adr_0001_shared_lint_format_config_alternatives_considered",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "docs_adr_0001_shared_lint_format_config_adr_001_shared_lint_format_config_as_a_root_inherited_package",
+      "target": "docs_adr_0001_shared_lint_format_config_consequences",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "docs_adr_0001_shared_lint_format_config_adr_001_shared_lint_format_config_as_a_root_inherited_package",
+      "target": "docs_adr_0001_shared_lint_format_config_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "docs_adr_0001_shared_lint_format_config_adr_001_shared_lint_format_config_as_a_root_inherited_package",
+      "target": "docs_adr_0001_shared_lint_format_config_decision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0001-shared-lint-format-config.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "docs_adr_0001_shared_lint_format_config_adr_001_shared_lint_format_config_as_a_root_inherited_package",
+      "target": "docs_adr_0001_shared_lint_format_config_status",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "packages_config_readme",
+      "target": "packages_config_readme_studafy_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/README.md",
+      "source_location": "L62",
+      "weight": 1.0,
+      "source": "packages_config_readme_studafy_config",
+      "target": "packages_config_readme_consuming_this_package",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/README.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "packages_config_readme_studafy_config",
+      "target": "packages_config_readme_how_it_s_wired_up",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/README.md",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "packages_config_readme_studafy_config",
+      "target": "packages_config_readme_overriding_for_a_specific_package_documented_exception",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/README.md",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "packages_config_readme_studafy_config",
+      "target": "packages_config_readme_rule_catalog",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/README.md",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "packages_config_readme_rule_catalog",
+      "target": "packages_config_readme_eslint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/config/README.md",
+      "source_location": "L50",
+      "weight": 1.0,
+      "source": "packages_config_readme_rule_catalog",
+      "target": "packages_config_readme_prettier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "packages/tsconfig/README.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -2088,5 +3120,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "94e1ae1c1a69ebf1aee071782887bc849169072d"
+  "built_at_commit": "bb81ba7224b80b65b8243190c066bf5809809e73"
 }

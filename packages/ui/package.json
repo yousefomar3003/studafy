@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "build": "bun build ./src/index.ts --outdir dist",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@studafy/config": "workspace:*",
     "@studafy/tsconfig": "workspace:*",
     "typescript": "^5.9.3"
   }

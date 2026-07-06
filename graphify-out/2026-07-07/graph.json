@@ -64,6 +64,46 @@
       "norm_label": "build"
     },
     {
+      "label": "check-types",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "apps_web_package_scripts_check_types",
+      "community": 3,
+      "norm_label": "check-types"
+    },
+    {
+      "label": "devDependencies",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "apps_web_package_devdependencies",
+      "community": 3,
+      "norm_label": "devdependencies"
+    },
+    {
+      "label": "@studafy/tsconfig",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "apps_web_package_devdependencies_studafy_tsconfig",
+      "community": 3,
+      "norm_label": "@studafy/tsconfig"
+    },
+    {
+      "label": "typescript",
+      "file_type": "code",
+      "source_file": "apps/web/package.json",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "apps_web_package_devdependencies_typescript",
+      "community": 3,
+      "norm_label": "typescript"
+    },
+    {
       "label": "index.ts",
       "file_type": "code",
       "source_file": "apps/web/src/index.ts",
@@ -72,6 +112,36 @@
       "id": "apps_web_src_index",
       "community": 6,
       "norm_label": "index.ts"
+    },
+    {
+      "label": "tsconfig.json",
+      "file_type": "code",
+      "source_file": "apps/web/tsconfig.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "apps_web_tsconfig",
+      "community": 13,
+      "norm_label": "tsconfig.json"
+    },
+    {
+      "label": "extends",
+      "file_type": "code",
+      "source_file": "apps/web/tsconfig.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "apps_web_tsconfig_extends",
+      "community": 13,
+      "norm_label": "extends"
+    },
+    {
+      "label": "include",
+      "file_type": "code",
+      "source_file": "apps/web/tsconfig.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "apps_web_tsconfig_include",
+      "community": 13,
+      "norm_label": "include"
     },
     {
       "label": "package.json",
@@ -144,10 +214,20 @@
       "norm_label": "build"
     },
     {
+      "label": "typecheck",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "package_scripts_typecheck",
+      "community": 0,
+      "norm_label": "typecheck"
+    },
+    {
       "label": "packageManager",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L12",
+      "source_location": "L13",
       "_origin": "ast",
       "id": "package_packagemanager",
       "community": 0,
@@ -157,21 +237,461 @@
       "label": "devDependencies",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L13",
+      "source_location": "L14",
       "_origin": "ast",
       "id": "package_devdependencies",
-      "community": 1,
+      "community": 0,
       "norm_label": "devdependencies"
     },
     {
       "label": "turbo",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L14",
+      "source_location": "L15",
       "_origin": "ast",
       "id": "package_devdependencies_turbo",
-      "community": 1,
+      "community": 0,
       "norm_label": "turbo"
+    },
+    {
+      "label": "typescript",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "package_devdependencies_typescript",
+      "community": 0,
+      "norm_label": "typescript"
+    },
+    {
+      "label": "api.json",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_tsconfig_api",
+      "community": 9,
+      "norm_label": "api.json"
+    },
+    {
+      "label": "$schema",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_tsconfig_api_schema",
+      "community": 9,
+      "norm_label": "$schema"
+    },
+    {
+      "label": "extends",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_tsconfig_api_extends",
+      "community": 9,
+      "norm_label": "extends"
+    },
+    {
+      "label": "compilerOptions",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "packages_tsconfig_api_compileroptions",
+      "community": 9,
+      "norm_label": "compileroptions"
+    },
+    {
+      "label": "lib",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_tsconfig_api_compileroptions_lib",
+      "community": 9,
+      "norm_label": "lib"
+    },
+    {
+      "label": "module",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "packages_tsconfig_api_compileroptions_module",
+      "community": 9,
+      "norm_label": "module"
+    },
+    {
+      "label": "moduleResolution",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "packages_tsconfig_api_compileroptions_moduleresolution",
+      "community": 9,
+      "norm_label": "moduleresolution"
+    },
+    {
+      "label": "base.json",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base",
+      "community": 4,
+      "norm_label": "base.json"
+    },
+    {
+      "label": "$schema",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_schema",
+      "community": 4,
+      "norm_label": "$schema"
+    },
+    {
+      "label": "compilerOptions",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions",
+      "community": 4,
+      "norm_label": "compileroptions"
+    },
+    {
+      "label": "strict",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_strict",
+      "community": 4,
+      "norm_label": "strict"
+    },
+    {
+      "label": "target",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_target",
+      "community": 4,
+      "norm_label": "target"
+    },
+    {
+      "label": "module",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_module",
+      "community": 4,
+      "norm_label": "module"
+    },
+    {
+      "label": "moduleResolution",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_moduleresolution",
+      "community": 4,
+      "norm_label": "moduleresolution"
+    },
+    {
+      "label": "esModuleInterop",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_esmoduleinterop",
+      "community": 4,
+      "norm_label": "esmoduleinterop"
+    },
+    {
+      "label": "skipLibCheck",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_skiplibcheck",
+      "community": 4,
+      "norm_label": "skiplibcheck"
+    },
+    {
+      "label": "forceConsistentCasingInFileNames",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_forceconsistentcasinginfilenames",
+      "community": 4,
+      "norm_label": "forceconsistentcasinginfilenames"
+    },
+    {
+      "label": "isolatedModules",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_isolatedmodules",
+      "community": 4,
+      "norm_label": "isolatedmodules"
+    },
+    {
+      "label": "resolveJsonModule",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_resolvejsonmodule",
+      "community": 4,
+      "norm_label": "resolvejsonmodule"
+    },
+    {
+      "label": "noEmit",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_noemit",
+      "community": 4,
+      "norm_label": "noemit"
+    },
+    {
+      "label": "baseUrl",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_baseurl",
+      "community": 4,
+      "norm_label": "baseurl"
+    },
+    {
+      "label": "paths",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_compileroptions_paths",
+      "community": 4,
+      "norm_label": "paths"
+    },
+    {
+      "label": "@/*",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "packages_tsconfig_base_paths",
+      "community": 4,
+      "norm_label": "@/*"
+    },
+    {
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_tsconfig_package",
+      "community": 10,
+      "norm_label": "package.json"
+    },
+    {
+      "label": "name",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_tsconfig_package_name",
+      "community": 10,
+      "norm_label": "name"
+    },
+    {
+      "label": "version",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_tsconfig_package_version",
+      "community": 10,
+      "norm_label": "version"
+    },
+    {
+      "label": "private",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "packages_tsconfig_package_private",
+      "community": 10,
+      "norm_label": "private"
+    },
+    {
+      "label": "files",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_tsconfig_package_files",
+      "community": 10,
+      "norm_label": "files"
+    },
+    {
+      "label": "peerDependencies",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "packages_tsconfig_package_peerdependencies",
+      "community": 10,
+      "norm_label": "peerdependencies"
+    },
+    {
+      "label": "typescript",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "packages_tsconfig_package_peerdependencies_typescript",
+      "community": 10,
+      "norm_label": "typescript"
+    },
+    {
+      "label": "packages.json",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/packages.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_tsconfig_packages",
+      "community": 12,
+      "norm_label": "packages.json"
+    },
+    {
+      "label": "$schema",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/packages.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_tsconfig_packages_schema",
+      "community": 12,
+      "norm_label": "$schema"
+    },
+    {
+      "label": "extends",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/packages.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_tsconfig_packages_extends",
+      "community": 12,
+      "norm_label": "extends"
+    },
+    {
+      "label": "compilerOptions",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/packages.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "packages_tsconfig_packages_compileroptions",
+      "community": 12,
+      "norm_label": "compileroptions"
+    },
+    {
+      "label": "lib",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/packages.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_tsconfig_packages_compileroptions_lib",
+      "community": 12,
+      "norm_label": "lib"
+    },
+    {
+      "label": "web.json",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_tsconfig_web",
+      "community": 8,
+      "norm_label": "web.json"
+    },
+    {
+      "label": "$schema",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_tsconfig_web_schema",
+      "community": 8,
+      "norm_label": "$schema"
+    },
+    {
+      "label": "extends",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_tsconfig_web_extends",
+      "community": 8,
+      "norm_label": "extends"
+    },
+    {
+      "label": "compilerOptions",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "packages_tsconfig_web_compileroptions",
+      "community": 8,
+      "norm_label": "compileroptions"
+    },
+    {
+      "label": "lib",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_tsconfig_web_compileroptions_lib",
+      "community": 8,
+      "norm_label": "lib"
+    },
+    {
+      "label": "jsx",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "packages_tsconfig_web_compileroptions_jsx",
+      "community": 8,
+      "norm_label": "jsx"
+    },
+    {
+      "label": "incremental",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "packages_tsconfig_web_compileroptions_incremental",
+      "community": 8,
+      "norm_label": "incremental"
+    },
+    {
+      "label": "noEmit",
+      "file_type": "code",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "packages_tsconfig_web_compileroptions_noemit",
+      "community": 8,
+      "norm_label": "noemit"
     },
     {
       "label": "package.json",
@@ -234,6 +754,46 @@
       "norm_label": "build"
     },
     {
+      "label": "check-types",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "packages_ui_package_scripts_check_types",
+      "community": 5,
+      "norm_label": "check-types"
+    },
+    {
+      "label": "devDependencies",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "packages_ui_package_devdependencies",
+      "community": 5,
+      "norm_label": "devdependencies"
+    },
+    {
+      "label": "@studafy/tsconfig",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "packages_ui_package_devdependencies_studafy_tsconfig",
+      "community": 5,
+      "norm_label": "@studafy/tsconfig"
+    },
+    {
+      "label": "typescript",
+      "file_type": "code",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "packages_ui_package_devdependencies_typescript",
+      "community": 5,
+      "norm_label": "typescript"
+    },
+    {
       "label": "index.ts",
       "file_type": "code",
       "source_file": "packages/ui/src/index.ts",
@@ -242,6 +802,36 @@
       "id": "packages_ui_src_index",
       "community": 7,
       "norm_label": "index.ts"
+    },
+    {
+      "label": "tsconfig.json",
+      "file_type": "code",
+      "source_file": "packages/ui/tsconfig.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_ui_tsconfig",
+      "community": 14,
+      "norm_label": "tsconfig.json"
+    },
+    {
+      "label": "extends",
+      "file_type": "code",
+      "source_file": "packages/ui/tsconfig.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_ui_tsconfig_extends",
+      "community": 14,
+      "norm_label": "extends"
+    },
+    {
+      "label": "include",
+      "file_type": "code",
+      "source_file": "packages/ui/tsconfig.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_ui_tsconfig_include",
+      "community": 14,
+      "norm_label": "include"
     },
     {
       "label": "turbo.json",
@@ -300,6 +890,36 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "turbo_build_outputs",
+      "community": 1,
+      "norm_label": "outputs"
+    },
+    {
+      "label": "check-types",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "turbo_tasks_check_types",
+      "community": 1,
+      "norm_label": "check-types"
+    },
+    {
+      "label": "dependsOn",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "turbo_check_types_dependson",
+      "community": 1,
+      "norm_label": "dependson"
+    },
+    {
+      "label": "outputs",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "turbo_check_types_outputs",
       "community": 1,
       "norm_label": "outputs"
     },
@@ -380,7 +1000,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_adr_0000_monorepo_tooling_choice_adr_000_monorepo_tooling_bun_workspaces_turborepo",
-      "community": 4,
+      "community": 2,
       "norm_label": "adr-000: monorepo tooling \u2014 bun workspaces + turborepo"
     },
     {
@@ -390,7 +1010,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "docs_adr_0000_monorepo_tooling_choice_status",
-      "community": 4,
+      "community": 2,
       "norm_label": "status"
     },
     {
@@ -400,7 +1020,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "docs_adr_0000_monorepo_tooling_choice_context",
-      "community": 4,
+      "community": 2,
       "norm_label": "context"
     },
     {
@@ -410,7 +1030,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "docs_adr_0000_monorepo_tooling_choice_decision",
-      "community": 4,
+      "community": 2,
       "norm_label": "decision"
     },
     {
@@ -420,7 +1040,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "docs_adr_0000_monorepo_tooling_choice_alternatives_considered",
-      "community": 4,
+      "community": 2,
       "norm_label": "alternatives considered"
     },
     {
@@ -430,11 +1050,81 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "docs_adr_0000_monorepo_tooling_choice_consequences",
-      "community": 4,
+      "community": 2,
       "norm_label": "consequences"
+    },
+    {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_tsconfig_readme",
+      "community": 11,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "@studafy/tsconfig",
+      "file_type": "document",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_tsconfig_readme_studafy_tsconfig",
+      "community": 11,
+      "norm_label": "@studafy/tsconfig"
+    },
+    {
+      "label": "Presets",
+      "file_type": "document",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "packages_tsconfig_readme_presets",
+      "community": 11,
+      "norm_label": "presets"
+    },
+    {
+      "label": "Usage",
+      "file_type": "document",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "packages_tsconfig_readme_usage",
+      "community": 11,
+      "norm_label": "usage"
+    },
+    {
+      "label": "Path aliases",
+      "file_type": "document",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L56",
+      "_origin": "ast",
+      "id": "packages_tsconfig_readme_path_aliases",
+      "community": 11,
+      "norm_label": "path aliases"
+    },
+    {
+      "label": "Repo-wide type check",
+      "file_type": "document",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L61",
+      "_origin": "ast",
+      "id": "packages_tsconfig_readme_repo_wide_type_check",
+      "community": 11,
+      "norm_label": "repo-wide type check"
     }
   ],
   "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_web_package",
+      "target": "apps_web_package_devdependencies",
+      "confidence_score": 1.0
+    },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
@@ -488,8 +1178,58 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_package_scripts",
+      "target": "apps_web_package_scripts_check_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "apps_web_package_devdependencies",
+      "target": "apps_web_package_devdependencies_studafy_tsconfig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/package.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "apps_web_package_devdependencies",
+      "target": "apps_web_package_devdependencies_typescript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/tsconfig.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "apps_web_tsconfig",
+      "target": "apps_web_tsconfig_extends",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/tsconfig.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_web_tsconfig",
+      "target": "apps_web_tsconfig_include",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L13",
+      "source_location": "L14",
       "weight": 1.0,
       "source": "package",
       "target": "package_devdependencies",
@@ -509,7 +1249,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L12",
+      "source_location": "L13",
       "weight": 1.0,
       "source": "package",
       "target": "package_packagemanager",
@@ -569,21 +1309,431 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L14",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "package_scripts",
+      "target": "package_scripts_typecheck",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L15",
       "weight": 1.0,
       "source": "package_devdependencies",
       "target": "package_devdependencies_turbo",
       "confidence_score": 1.0
     },
     {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_typescript",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "imports",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L14",
+      "source_location": "L15",
       "weight": 1.0,
       "context": "import",
       "source": "package_devdependencies_turbo",
       "target": "turbo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_tsconfig_api",
+      "target": "packages_tsconfig_api_compileroptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_tsconfig_api",
+      "target": "packages_tsconfig_api_extends",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_tsconfig_api",
+      "target": "packages_tsconfig_api_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_tsconfig_api_compileroptions",
+      "target": "packages_tsconfig_api_compileroptions_lib",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_tsconfig_api_compileroptions",
+      "target": "packages_tsconfig_api_compileroptions_module",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/api.json",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "packages_tsconfig_api_compileroptions",
+      "target": "packages_tsconfig_api_compileroptions_moduleresolution",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base",
+      "target": "packages_tsconfig_base_compileroptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base",
+      "target": "packages_tsconfig_base_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_baseurl",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_esmoduleinterop",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_forceconsistentcasinginfilenames",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_isolatedmodules",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_module",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_moduleresolution",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_noemit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_paths",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_resolvejsonmodule",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_skiplibcheck",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_strict",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions",
+      "target": "packages_tsconfig_base_compileroptions_target",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/base.json",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "packages_tsconfig_base_compileroptions_paths",
+      "target": "packages_tsconfig_base_paths",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_tsconfig_package",
+      "target": "packages_tsconfig_package_files",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_tsconfig_package",
+      "target": "packages_tsconfig_package_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "packages_tsconfig_package",
+      "target": "packages_tsconfig_package_peerdependencies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_tsconfig_package",
+      "target": "packages_tsconfig_package_private",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_tsconfig_package",
+      "target": "packages_tsconfig_package_version",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/package.json",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "packages_tsconfig_package_peerdependencies",
+      "target": "packages_tsconfig_package_peerdependencies_typescript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/packages.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_tsconfig_packages",
+      "target": "packages_tsconfig_packages_compileroptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/packages.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_tsconfig_packages",
+      "target": "packages_tsconfig_packages_extends",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/packages.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_tsconfig_packages",
+      "target": "packages_tsconfig_packages_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/packages.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_tsconfig_packages_compileroptions",
+      "target": "packages_tsconfig_packages_compileroptions_lib",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_tsconfig_web",
+      "target": "packages_tsconfig_web_compileroptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_tsconfig_web",
+      "target": "packages_tsconfig_web_extends",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_tsconfig_web",
+      "target": "packages_tsconfig_web_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "packages_tsconfig_web_compileroptions",
+      "target": "packages_tsconfig_web_compileroptions_incremental",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_tsconfig_web_compileroptions",
+      "target": "packages_tsconfig_web_compileroptions_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_tsconfig_web_compileroptions",
+      "target": "packages_tsconfig_web_compileroptions_lib",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/web.json",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "packages_tsconfig_web_compileroptions",
+      "target": "packages_tsconfig_web_compileroptions_noemit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "packages_ui_package",
+      "target": "packages_ui_package_devdependencies",
       "confidence_score": 1.0
     },
     {
@@ -639,6 +1789,56 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "packages_ui_package_scripts",
+      "target": "packages_ui_package_scripts_check_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "packages_ui_package_devdependencies",
+      "target": "packages_ui_package_devdependencies_studafy_tsconfig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/package.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "packages_ui_package_devdependencies",
+      "target": "packages_ui_package_devdependencies_typescript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/tsconfig.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_ui_tsconfig",
+      "target": "packages_ui_tsconfig_extends",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/ui/tsconfig.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_ui_tsconfig",
+      "target": "packages_ui_tsconfig_include",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "turbo.json",
       "source_location": "L2",
       "weight": 1.0,
@@ -670,6 +1870,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "turbo.json",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "turbo_tasks",
+      "target": "turbo_tasks_check_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
       "source_location": "L5",
       "weight": 1.0,
       "source": "turbo_tasks_build",
@@ -684,6 +1894,26 @@
       "weight": 1.0,
       "source": "turbo_tasks_build",
       "target": "turbo_build_outputs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "turbo_tasks_check_types",
+      "target": "turbo_check_types_dependson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "turbo_tasks_check_types",
+      "target": "turbo_check_types_outputs",
       "confidence_score": 1.0
     },
     {
@@ -805,8 +2035,58 @@
       "source": "docs_adr_0000_monorepo_tooling_choice_adr_000_monorepo_tooling_bun_workspaces_turborepo",
       "target": "docs_adr_0000_monorepo_tooling_choice_status",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "packages_tsconfig_readme",
+      "target": "packages_tsconfig_readme_studafy_tsconfig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "packages_tsconfig_readme_studafy_tsconfig",
+      "target": "packages_tsconfig_readme_path_aliases",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_tsconfig_readme_studafy_tsconfig",
+      "target": "packages_tsconfig_readme_presets",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L61",
+      "weight": 1.0,
+      "source": "packages_tsconfig_readme_studafy_tsconfig",
+      "target": "packages_tsconfig_readme_repo_wide_type_check",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/tsconfig/README.md",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "packages_tsconfig_readme_studafy_tsconfig",
+      "target": "packages_tsconfig_readme_usage",
+      "confidence_score": 1.0
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "a382665b2b3a185a178ef2f4c21a082d2ca9f81a"
+  "built_at_commit": "94e1ae1c1a69ebf1aee071782887bc849169072d"
 }
