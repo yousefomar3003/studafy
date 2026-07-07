@@ -1,16 +1,16 @@
 # Graph Report - studafy  (2026-07-07)
 
 ## Corpus Check
-- 52 files · ~8,734 words
+- 56 files · ~9,666 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 296 nodes · 316 edges · 32 communities (25 shown, 7 thin omitted)
+- 317 nodes · 333 edges · 36 communities (29 shown, 7 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a13514a1`
+- Built from commit: `7ac496df`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -42,18 +42,20 @@
 - [[_COMMUNITY_Schema conventions|Schema conventions]]
 - [[_COMMUNITY_tsconfig.json|tsconfig.json]]
 - [[_COMMUNITY_tsconfig.build.json|tsconfig.build.json]]
+- [[_COMMUNITY_Commit messages|Commit messages]]
+- [[_COMMUNITY_ADR-003 Git hooks via Lefthook + commitlint for Conventional Commits|ADR-003: Git hooks via Lefthook + commitlint for Conventional Commits]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `compilerOptions` - 13 edges
-2. `scripts` - 7 edges
+2. `scripts` - 8 edges
 3. `scripts` - 6 edges
 4. `ROLES` - 6 edges
 5. `ADR-000: Monorepo tooling — Bun workspaces + Turborepo` - 6 edges
 6. `ADR-001: Shared lint/format config as a root-inherited package` - 6 edges
 7. `ADR-002: Fixed-role authorization model` - 6 edges
-8. `Schema conventions` - 6 edges
-9. `scripts` - 5 edges
-10. `compilerOptions` - 5 edges
+8. `ADR-003: Git hooks via Lefthook + commitlint for Conventional Commits` - 6 edges
+9. `Schema conventions` - 6 edges
+10. `scripts` - 5 edges
 
 ## Surprising Connections (you probably didn't know these)
 - None detected - all connections are within the same source files.
@@ -61,15 +63,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (32 total, 7 thin omitted)
+## Communities (36 total, 7 thin omitted)
 
 ### Community 0 - "package.json"
-Cohesion: 0.14
-Nodes (13): name, packageManager, private, scripts, build, format, format:check, lint (+5 more)
+Cohesion: 0.13
+Nodes (14): name, packageManager, private, scripts, build, format, format:check, lint (+6 more)
 
 ### Community 1 - "turbo.json"
-Cohesion: 0.10
-Nodes (20): devDependencies, eslint, prettier, @studafy/config, turbo, typescript, dependsOn, outputs (+12 more)
+Cohesion: 0.08
+Nodes (24): devDependencies, @commitlint/cli, @commitlint/config-conventional, eslint, lefthook, lint-staged, prettier, @studafy/config (+16 more)
 
 ### Community 2 - "studafy"
 Cohesion: 0.15
@@ -143,8 +145,16 @@ Nodes (21): default, dependencies, @studafy/constants, zod, devDependencies, @st
 Cohesion: 0.29
 Nodes (6): Errors (`error.ts`), Naming, Pagination (`pagination.ts`), Primitives (`base.ts`), Schema conventions, Testing
 
+### Community 32 - "Commit messages"
+Cohesion: 0.29
+Nodes (6): Bypassing hooks in an emergency, Commit messages, Contributing, Getting started, How the hooks work, Troubleshooting
+
+### Community 33 - "ADR-003: Git hooks via Lefthook + commitlint for Conventional Commits"
+Cohesion: 0.29
+Nodes (6): ADR-003: Git hooks via Lefthook + commitlint for Conventional Commits, Alternatives considered, Consequences, Context, Decision, Status
+
 ## Knowledge Gaps
-- **179 isolated node(s):** `name`, `version`, `private`, `build`, `check-types` (+174 more)
+- **193 isolated node(s):** `name`, `version`, `private`, `build`, `check-types` (+188 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -152,13 +162,13 @@ Nodes (6): Errors (`error.ts`), Naming, Pagination (`pagination.ts`), Primitives
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `turbo.json` to `package.json`?**
-  _High betweenness centrality (0.008) - this node is a cross-community bridge._
+  _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **What connects `name`, `version`, `private` to the rest of the system?**
-  _179 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _193 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
-  _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.13333333333333333 - nodes in this community are weakly interconnected._
 - **Should `turbo.json` be split into smaller, more focused modules?**
-  _Cohesion score 0.09523809523809523 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08 - nodes in this community are weakly interconnected._
 - **Should `ADR-000: Monorepo tooling — Bun workspaces + Turborepo` be split into smaller, more focused modules?**
   _Cohesion score 0.125 - nodes in this community are weakly interconnected._
 - **Should `package.json` be split into smaller, more focused modules?**
