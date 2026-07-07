@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1783381440.7630627,
-    "ast_hash": "ce4508467d5e047cf1f6a4913c53fa67",
+    "mtime": 1783385747.6121302,
+    "ast_hash": "d0dbcc4d74e3647d7d05ee7cb3cc689e",
     "semantic_hash": ""
   },
   "packages/ui/package.json": {
@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "turbo.json": {
-    "mtime": 1783381441.3370743,
-    "ast_hash": "fe8e7ab07f20bb30fd953d97a3bc4c09",
+    "mtime": 1783385727.3906543,
+    "ast_hash": "7fb7b2becf106d72b46b5f9df520b411",
     "semantic_hash": ""
   },
   "README.md": {
@@ -135,8 +135,78 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1783383613.8539352,
-    "ast_hash": "cd26ca3d78a472818667f5253f8cb616",
+    "mtime": 1783386690.5480604,
+    "ast_hash": "923b386b3d9bbf974c31d6327796961c",
+    "semantic_hash": ""
+  },
+  "packages/constants/package.json": {
+    "mtime": 1783386708.385156,
+    "ast_hash": "221a04454ab4514280fd6a8bcb6394f7",
+    "semantic_hash": ""
+  },
+  "packages/constants/scripts/generate-permission-matrix.ts": {
+    "mtime": 1783386616.1471062,
+    "ast_hash": "4b311314ea2c28ecb02b31979f356873",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/errors.test.ts": {
+    "mtime": 1783386626.6143684,
+    "ast_hash": "7def47249b851b342da6ccaf477c6203",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/errors.ts": {
+    "mtime": 1783385492.3508575,
+    "ast_hash": "e35ffa949598334b977b4b5aa3cc3d24",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/events.ts": {
+    "mtime": 1783385500.4965563,
+    "ast_hash": "1328f07cf58963d865e95587183fc01d",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/index.ts": {
+    "mtime": 1783385515.2842152,
+    "ast_hash": "dc696fbd9e5bfd1487d1e4e9d32bdf8f",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/notifications.ts": {
+    "mtime": 1783385508.4585247,
+    "ast_hash": "cd6ca7a05faed510b514f43c62de0d0c",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/permissions.test.ts": {
+    "mtime": 1783386583.817377,
+    "ast_hash": "bf0bb7857d334036ded2427b9790921d",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/permissions.ts": {
+    "mtime": 1783385626.5688274,
+    "ast_hash": "8cfea8f24f6c015df59ed97fe8a0ff58",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/roles.ts": {
+    "mtime": 1783385483.9141576,
+    "ast_hash": "044d235e1ff48c5ec46d62ae95b1f83d",
+    "semantic_hash": ""
+  },
+  "packages/constants/tsconfig.build.json": {
+    "mtime": 1783386412.5327437,
+    "ast_hash": "997ecffb0ddde0ac7975cd3620a17faf",
+    "semantic_hash": ""
+  },
+  "packages/constants/tsconfig.json": {
+    "mtime": 1783385475.996529,
+    "ast_hash": "1af5f1f8c39dd130885a4127a84f08ee",
+    "semantic_hash": ""
+  },
+  "docs/adr/0002-fixed-roles-authorization.md": {
+    "mtime": 1783385704.0485513,
+    "ast_hash": "2e74c1e2e6d0c7e0f33ee650ea09f6d1",
+    "semantic_hash": ""
+  },
+  "packages/constants/docs/permission-matrix.md": {
+    "mtime": 1783386730.4348824,
+    "ast_hash": "03dc35fe2b6814352da54ab32affba10",
     "semantic_hash": ""
   }
 }

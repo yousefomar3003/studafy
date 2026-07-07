@@ -1,16 +1,16 @@
 # Graph Report - studafy  (2026-07-07)
 
 ## Corpus Check
-- 40 files · ~7,276 words
+- 52 files · ~8,734 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 234 nodes · 233 edges · 27 communities (22 shown, 5 thin omitted)
+- 296 nodes · 316 edges · 32 communities (25 shown, 7 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ffb9d1a4`
+- Built from commit: `a13514a1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -37,18 +37,23 @@
 - [[_COMMUNITY_tsconfig.json|tsconfig.json]]
 - [[_COMMUNITY_tsconfig.build.json|tsconfig.build.json]]
 - [[_COMMUNITY_permission-matrix|permission-matrix.md]]
+- [[_COMMUNITY_index.ts|index.ts]]
+- [[_COMMUNITY_package.json|package.json]]
+- [[_COMMUNITY_Schema conventions|Schema conventions]]
+- [[_COMMUNITY_tsconfig.json|tsconfig.json]]
+- [[_COMMUNITY_tsconfig.build.json|tsconfig.build.json]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `compilerOptions` - 13 edges
 2. `scripts` - 7 edges
 3. `scripts` - 6 edges
-4. `ADR-000: Monorepo tooling — Bun workspaces + Turborepo` - 6 edges
-5. `ADR-001: Shared lint/format config as a root-inherited package` - 6 edges
-6. `ADR-002: Fixed-role authorization model` - 6 edges
-7. `ROLES` - 5 edges
-8. `compilerOptions` - 5 edges
-9. `tasks` - 5 edges
-10. `studafy` - 5 edges
+4. `ROLES` - 6 edges
+5. `ADR-000: Monorepo tooling — Bun workspaces + Turborepo` - 6 edges
+6. `ADR-001: Shared lint/format config as a root-inherited package` - 6 edges
+7. `ADR-002: Fixed-role authorization model` - 6 edges
+8. `Schema conventions` - 6 edges
+9. `scripts` - 5 edges
+10. `compilerOptions` - 5 edges
 
 ## Surprising Connections (you probably didn't know these)
 - None detected - all connections are within the same source files.
@@ -56,7 +61,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (27 total, 5 thin omitted)
+## Communities (32 total, 7 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.14
@@ -107,7 +112,7 @@ Cohesion: 0.10
 Nodes (20): dependencies, eslint-config-prettier, eslint-import-resolver-typescript, @eslint/js, eslint-plugin-import-x, eslint-plugin-security, globals, typescript-eslint (+12 more)
 
 ### Community 16 - "dependencies"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (20): buildMarkdown(), main(), ERROR_CODES, ErrorCode, DOMAIN_EVENTS, DomainEvent, NOTIFICATION_TYPES, NotificationType (+12 more)
 
 ### Community 17 - "@studafy/config"
@@ -126,18 +131,30 @@ Nodes (19): default, devDependencies, @studafy/config, @studafy/tsconfig, @types
 Cohesion: 0.29
 Nodes (6): ADR-002: Fixed-role authorization model, Alternatives considered, Consequences, Context, Decision, Status
 
+### Community 27 - "index.ts"
+Cohesion: 0.16
+Nodes (18): RFC-4122, RFC-9457, dateSchema, DateString, dateTimeSchema, DateTimeString, Money, moneySchema (+10 more)
+
+### Community 28 - "package.json"
+Cohesion: 0.10
+Nodes (21): default, dependencies, @studafy/constants, zod, devDependencies, @studafy/config, @studafy/tsconfig, @types/bun (+13 more)
+
+### Community 29 - "Schema conventions"
+Cohesion: 0.29
+Nodes (6): Errors (`error.ts`), Naming, Pagination (`pagination.ts`), Primitives (`base.ts`), Schema conventions, Testing
+
 ## Knowledge Gaps
-- **151 isolated node(s):** `name`, `version`, `private`, `build`, `check-types` (+146 more)
+- **179 isolated node(s):** `name`, `version`, `private`, `build`, `check-types` (+174 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `turbo.json` to `package.json`?**
-  _High betweenness centrality (0.013) - this node is a cross-community bridge._
+  _High betweenness centrality (0.008) - this node is a cross-community bridge._
 - **What connects `name`, `version`, `private` to the rest of the system?**
-  _151 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _179 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
 - **Should `turbo.json` be split into smaller, more focused modules?**
@@ -147,4 +164,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.09523809523809523 - nodes in this community are weakly interconnected._
 - **Should `dependencies` be split into smaller, more focused modules?**
-  _Cohesion score 0.12807881773399016 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.12043010752688173 - nodes in this community are weakly interconnected._

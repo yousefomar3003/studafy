@@ -1,16 +1,16 @@
 # Graph Report - studafy  (2026-07-07)
 
 ## Corpus Check
-- 26 files · ~4,099 words
+- 40 files · ~7,276 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 166 nodes · 146 edges · 22 communities (20 shown, 2 thin omitted)
+- 234 nodes · 233 edges · 27 communities (22 shown, 5 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `17667116`
+- Built from commit: `ffb9d1a4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,18 +32,23 @@
 - [[_COMMUNITY_dependencies|dependencies]]
 - [[_COMMUNITY_@studafyconfig|@studafy/config]]
 - [[_COMMUNITY_ADR-001 Shared lintformat config as a root-inherited package|ADR-001: Shared lint/format config as a root-inherited package]]
+- [[_COMMUNITY_package.json|package.json]]
+- [[_COMMUNITY_ADR-002 Fixed-role authorization model|ADR-002: Fixed-role authorization model]]
+- [[_COMMUNITY_tsconfig.json|tsconfig.json]]
+- [[_COMMUNITY_tsconfig.build.json|tsconfig.build.json]]
+- [[_COMMUNITY_permission-matrix|permission-matrix.md]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `compilerOptions` - 13 edges
-2. `scripts` - 6 edges
-3. `ADR-000: Monorepo tooling — Bun workspaces + Turborepo` - 6 edges
-4. `ADR-001: Shared lint/format config as a root-inherited package` - 6 edges
-5. `compilerOptions` - 5 edges
-6. `studafy` - 5 edges
-7. `@studafy/config` - 5 edges
-8. `@studafy/tsconfig` - 5 edges
-9. `scripts` - 4 edges
-10. `compilerOptions` - 4 edges
+2. `scripts` - 7 edges
+3. `scripts` - 6 edges
+4. `ADR-000: Monorepo tooling — Bun workspaces + Turborepo` - 6 edges
+5. `ADR-001: Shared lint/format config as a root-inherited package` - 6 edges
+6. `ADR-002: Fixed-role authorization model` - 6 edges
+7. `ROLES` - 5 edges
+8. `compilerOptions` - 5 edges
+9. `tasks` - 5 edges
+10. `studafy` - 5 edges
 
 ## Surprising Connections (you probably didn't know these)
 - None detected - all connections are within the same source files.
@@ -51,15 +56,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (22 total, 2 thin omitted)
+## Communities (27 total, 5 thin omitted)
 
 ### Community 0 - "package.json"
-Cohesion: 0.11
-Nodes (17): devDependencies, eslint, prettier, @studafy/config, typescript, name, packageManager, private (+9 more)
+Cohesion: 0.14
+Nodes (13): name, packageManager, private, scripts, build, format, format:check, lint (+5 more)
 
 ### Community 1 - "turbo.json"
-Cohesion: 0.15
-Nodes (12): turbo, dependsOn, outputs, dependsOn, outputs, dependsOn, outputs, $schema (+4 more)
+Cohesion: 0.10
+Nodes (20): devDependencies, eslint, prettier, @studafy/config, turbo, typescript, dependsOn, outputs (+12 more)
 
 ### Community 2 - "studafy"
 Cohesion: 0.15
@@ -98,12 +103,12 @@ Cohesion: 0.40
 Nodes (4): compilerOptions, lib, extends, $schema
 
 ### Community 15 - "package.json"
-Cohesion: 0.15
-Nodes (12): exports, ./eslint, ./prettier, files, name, peerDependencies, eslint, prettier (+4 more)
+Cohesion: 0.10
+Nodes (20): dependencies, eslint-config-prettier, eslint-import-resolver-typescript, @eslint/js, eslint-plugin-import-x, eslint-plugin-security, globals, typescript-eslint (+12 more)
 
 ### Community 16 - "dependencies"
-Cohesion: 0.25
-Nodes (8): dependencies, eslint-config-prettier, eslint-import-resolver-typescript, @eslint/js, eslint-plugin-import-x, eslint-plugin-security, globals, typescript-eslint
+Cohesion: 0.13
+Nodes (20): buildMarkdown(), main(), ERROR_CODES, ErrorCode, DOMAIN_EVENTS, DomainEvent, NOTIFICATION_TYPES, NotificationType (+12 more)
 
 ### Community 17 - "@studafy/config"
 Cohesion: 0.25
@@ -113,21 +118,33 @@ Nodes (7): Consuming this package, ESLint, How it's wired up, Overriding for a s
 Cohesion: 0.29
 Nodes (6): ADR-001: Shared lint/format config as a root-inherited package, Alternatives considered, Consequences, Context, Decision, Status
 
+### Community 22 - "package.json"
+Cohesion: 0.11
+Nodes (19): default, devDependencies, @studafy/config, @studafy/tsconfig, @types/bun, typescript, exports, main (+11 more)
+
+### Community 23 - "ADR-002: Fixed-role authorization model"
+Cohesion: 0.29
+Nodes (6): ADR-002: Fixed-role authorization model, Alternatives considered, Consequences, Context, Decision, Status
+
 ## Knowledge Gaps
-- **116 isolated node(s):** `name`, `version`, `private`, `build`, `check-types` (+111 more)
+- **151 isolated node(s):** `name`, `version`, `private`, `build`, `check-types` (+146 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `devDependencies` connect `package.json` to `turbo.json`?**
-  _High betweenness centrality (0.021) - this node is a cross-community bridge._
-- **Why does `turbo` connect `turbo.json` to `package.json`?**
-  _High betweenness centrality (0.016) - this node is a cross-community bridge._
+- **Why does `devDependencies` connect `turbo.json` to `package.json`?**
+  _High betweenness centrality (0.013) - this node is a cross-community bridge._
 - **What connects `name`, `version`, `private` to the rest of the system?**
-  _116 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _151 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
-  _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
+- **Should `turbo.json` be split into smaller, more focused modules?**
+  _Cohesion score 0.09523809523809523 - nodes in this community are weakly interconnected._
 - **Should `ADR-000: Monorepo tooling — Bun workspaces + Turborepo` be split into smaller, more focused modules?**
   _Cohesion score 0.125 - nodes in this community are weakly interconnected._
+- **Should `package.json` be split into smaller, more focused modules?**
+  _Cohesion score 0.09523809523809523 - nodes in this community are weakly interconnected._
+- **Should `dependencies` be split into smaller, more focused modules?**
+  _Cohesion score 0.12807881773399016 - nodes in this community are weakly interconnected._
