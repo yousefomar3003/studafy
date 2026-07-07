@@ -1,16 +1,16 @@
 # Graph Report - studafy  (2026-07-07)
 
 ## Corpus Check
-- 25 files · ~4,036 words
+- 26 files · ~4,099 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 165 nodes · 146 edges · 21 communities (19 shown, 2 thin omitted)
+- 166 nodes · 146 edges · 22 communities (20 shown, 2 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `bb81ba72`
+- Built from commit: `17667116`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -51,7 +51,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (21 total, 2 thin omitted)
+## Communities (22 total, 2 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.11

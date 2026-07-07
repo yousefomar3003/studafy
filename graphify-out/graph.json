@@ -274,10 +274,20 @@
       "norm_label": "lint"
     },
     {
-      "label": "format",
+      "label": "test",
       "file_type": "code",
       "source_file": "package.json",
       "source_location": "L14",
+      "_origin": "ast",
+      "id": "package_scripts_test",
+      "community": 0,
+      "norm_label": "test"
+    },
+    {
+      "label": "format",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L15",
       "_origin": "ast",
       "id": "package_scripts_format",
       "community": 0,
@@ -287,7 +297,7 @@
       "label": "format:check",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L15",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "package_scripts_format_check",
       "community": 0,
@@ -297,7 +307,7 @@
       "label": "packageManager",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L17",
+      "source_location": "L18",
       "_origin": "ast",
       "id": "package_packagemanager",
       "community": 0,
@@ -307,47 +317,47 @@
       "label": "devDependencies",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L18",
+      "source_location": "L19",
       "_origin": "ast",
       "id": "package_devdependencies",
-      "community": 0,
+      "community": 1,
       "norm_label": "devdependencies"
     },
     {
       "label": "@studafy/config",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L19",
+      "source_location": "L20",
       "_origin": "ast",
       "id": "package_devdependencies_studafy_config",
-      "community": 0,
+      "community": 1,
       "norm_label": "@studafy/config"
     },
     {
       "label": "eslint",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L20",
+      "source_location": "L21",
       "_origin": "ast",
       "id": "package_devdependencies_eslint",
-      "community": 0,
+      "community": 1,
       "norm_label": "eslint"
     },
     {
       "label": "prettier",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L21",
+      "source_location": "L22",
       "_origin": "ast",
       "id": "package_devdependencies_prettier",
-      "community": 0,
+      "community": 1,
       "norm_label": "prettier"
     },
     {
       "label": "turbo",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L22",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "package_devdependencies_turbo",
       "community": 1,
@@ -357,10 +367,10 @@
       "label": "typescript",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L23",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "package_devdependencies_typescript",
-      "community": 0,
+      "community": 1,
       "norm_label": "typescript"
     },
     {
@@ -510,7 +520,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "packages_config_package_dependencies",
-      "community": 16,
+      "community": 15,
       "norm_label": "dependencies"
     },
     {
@@ -520,7 +530,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "packages_config_package_dependencies_eslint_js",
-      "community": 16,
+      "community": 15,
       "norm_label": "@eslint/js"
     },
     {
@@ -530,7 +540,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "packages_config_package_dependencies_eslint_config_prettier",
-      "community": 16,
+      "community": 15,
       "norm_label": "eslint-config-prettier"
     },
     {
@@ -540,7 +550,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "packages_config_package_dependencies_eslint_import_resolver_typescript",
-      "community": 16,
+      "community": 15,
       "norm_label": "eslint-import-resolver-typescript"
     },
     {
@@ -550,7 +560,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "packages_config_package_dependencies_eslint_plugin_import_x",
-      "community": 16,
+      "community": 15,
       "norm_label": "eslint-plugin-import-x"
     },
     {
@@ -560,7 +570,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "packages_config_package_dependencies_eslint_plugin_security",
-      "community": 16,
+      "community": 15,
       "norm_label": "eslint-plugin-security"
     },
     {
@@ -570,7 +580,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "packages_config_package_dependencies_globals",
-      "community": 16,
+      "community": 15,
       "norm_label": "globals"
     },
     {
@@ -580,7 +590,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "packages_config_package_dependencies_typescript_eslint",
-      "community": 16,
+      "community": 15,
       "norm_label": "typescript-eslint"
     },
     {
@@ -592,6 +602,556 @@
       "id": "packages_config_prettier_config",
       "community": 20,
       "norm_label": "prettier.config.js"
+    },
+    {
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_package",
+      "community": 22,
+      "norm_label": "package.json"
+    },
+    {
+      "label": "name",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_constants_package_name",
+      "community": 22,
+      "norm_label": "name"
+    },
+    {
+      "label": "version",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_constants_package_version",
+      "community": 22,
+      "norm_label": "version"
+    },
+    {
+      "label": "private",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "packages_constants_package_private",
+      "community": 22,
+      "norm_label": "private"
+    },
+    {
+      "label": "type",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_constants_package_type",
+      "community": 22,
+      "norm_label": "type"
+    },
+    {
+      "label": "main",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "packages_constants_package_main",
+      "community": 22,
+      "norm_label": "main"
+    },
+    {
+      "label": "types",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "packages_constants_package_types",
+      "community": 22,
+      "norm_label": "types"
+    },
+    {
+      "label": "exports",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "packages_constants_package_exports",
+      "community": 22,
+      "norm_label": "exports"
+    },
+    {
+      "label": "default",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "packages_constants_package_default",
+      "community": 22,
+      "norm_label": "default"
+    },
+    {
+      "label": "scripts",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "packages_constants_package_scripts",
+      "community": 22,
+      "norm_label": "scripts"
+    },
+    {
+      "label": "build",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "packages_constants_package_scripts_build",
+      "community": 22,
+      "norm_label": "build"
+    },
+    {
+      "label": "check-types",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "packages_constants_package_scripts_check_types",
+      "community": 22,
+      "norm_label": "check-types"
+    },
+    {
+      "label": "lint",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "packages_constants_package_scripts_lint",
+      "community": 22,
+      "norm_label": "lint"
+    },
+    {
+      "label": "test",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "packages_constants_package_scripts_test",
+      "community": 22,
+      "norm_label": "test"
+    },
+    {
+      "label": "docs:generate",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "packages_constants_package_scripts_docs_generate",
+      "community": 22,
+      "norm_label": "docs:generate"
+    },
+    {
+      "label": "devDependencies",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "packages_constants_package_devdependencies",
+      "community": 22,
+      "norm_label": "devdependencies"
+    },
+    {
+      "label": "@studafy/config",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L22",
+      "_origin": "ast",
+      "id": "packages_constants_package_devdependencies_studafy_config",
+      "community": 22,
+      "norm_label": "@studafy/config"
+    },
+    {
+      "label": "@studafy/tsconfig",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "packages_constants_package_devdependencies_studafy_tsconfig",
+      "community": 22,
+      "norm_label": "@studafy/tsconfig"
+    },
+    {
+      "label": "@types/bun",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "packages_constants_package_devdependencies_types_bun",
+      "community": 22,
+      "norm_label": "@types/bun"
+    },
+    {
+      "label": "typescript",
+      "file_type": "code",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "packages_constants_package_devdependencies_typescript",
+      "community": 22,
+      "norm_label": "typescript"
+    },
+    {
+      "label": "generate-permission-matrix.ts",
+      "file_type": "code",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_scripts_generate_permission_matrix",
+      "community": 16,
+      "norm_label": "generate-permission-matrix.ts"
+    },
+    {
+      "label": "buildMarkdown()",
+      "file_type": "code",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "packages_constants_scripts_generate_permission_matrix_buildmarkdown",
+      "community": 16,
+      "norm_label": "buildmarkdown()"
+    },
+    {
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L43",
+      "_origin": "ast",
+      "id": "packages_constants_scripts_generate_permission_matrix_main",
+      "community": 16,
+      "norm_label": "main()"
+    },
+    {
+      "label": "errors.test.ts",
+      "file_type": "code",
+      "source_file": "packages/constants/src/errors.test.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_src_errors_test",
+      "community": 16,
+      "norm_label": "errors.test.ts"
+    },
+    {
+      "label": "errors.ts",
+      "file_type": "code",
+      "source_file": "packages/constants/src/errors.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_src_errors",
+      "community": 16,
+      "norm_label": "errors.ts"
+    },
+    {
+      "label": "ERROR_CODES",
+      "file_type": "code",
+      "source_file": "packages/constants/src/errors.ts",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_constants_src_errors_error_codes",
+      "community": 16,
+      "norm_label": "error_codes"
+    },
+    {
+      "label": "ErrorCode",
+      "file_type": "code",
+      "source_file": "packages/constants/src/errors.ts",
+      "source_location": "L36",
+      "_origin": "ast",
+      "id": "packages_constants_src_errors_errorcode",
+      "community": 16,
+      "norm_label": "errorcode"
+    },
+    {
+      "label": "events.ts",
+      "file_type": "code",
+      "source_file": "packages/constants/src/events.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_src_events",
+      "community": 16,
+      "norm_label": "events.ts"
+    },
+    {
+      "label": "DOMAIN_EVENTS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/events.ts",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "packages_constants_src_events_domain_events",
+      "community": 16,
+      "norm_label": "domain_events"
+    },
+    {
+      "label": "DomainEvent",
+      "file_type": "code",
+      "source_file": "packages/constants/src/events.ts",
+      "source_location": "L39",
+      "_origin": "ast",
+      "id": "packages_constants_src_events_domainevent",
+      "community": 16,
+      "norm_label": "domainevent"
+    },
+    {
+      "label": "index.ts",
+      "file_type": "code",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_src_index",
+      "community": 16,
+      "norm_label": "index.ts"
+    },
+    {
+      "label": "notifications.ts",
+      "file_type": "code",
+      "source_file": "packages/constants/src/notifications.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_src_notifications",
+      "community": 16,
+      "norm_label": "notifications.ts"
+    },
+    {
+      "label": "NOTIFICATION_TYPES",
+      "file_type": "code",
+      "source_file": "packages/constants/src/notifications.ts",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "packages_constants_src_notifications_notification_types",
+      "community": 16,
+      "norm_label": "notification_types"
+    },
+    {
+      "label": "NotificationType",
+      "file_type": "code",
+      "source_file": "packages/constants/src/notifications.ts",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "packages_constants_src_notifications_notificationtype",
+      "community": 16,
+      "norm_label": "notificationtype"
+    },
+    {
+      "label": "permissions.test.ts",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.test.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_test",
+      "community": 16,
+      "norm_label": "permissions.test.ts"
+    },
+    {
+      "label": "permissions.ts",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions",
+      "community": 16,
+      "norm_label": "permissions.ts"
+    },
+    {
+      "label": "PERMISSIONS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_permissions",
+      "community": 16,
+      "norm_label": "permissions"
+    },
+    {
+      "label": "Permission",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L118",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_permission",
+      "community": 16,
+      "norm_label": "permission"
+    },
+    {
+      "label": "ALL_PERMISSIONS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L120",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_all_permissions",
+      "community": 16,
+      "norm_label": "all_permissions"
+    },
+    {
+      "label": "ORG_ADMIN_PERMISSIONS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L122",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_org_admin_permissions",
+      "community": 16,
+      "norm_label": "org_admin_permissions"
+    },
+    {
+      "label": "INSTRUCTOR_PERMISSIONS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L132",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_instructor_permissions",
+      "community": 16,
+      "norm_label": "instructor_permissions"
+    },
+    {
+      "label": "TEACHING_ASSISTANT_PERMISSIONS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L184",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_teaching_assistant_permissions",
+      "community": 16,
+      "norm_label": "teaching_assistant_permissions"
+    },
+    {
+      "label": "STUDENT_PERMISSIONS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L203",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_student_permissions",
+      "community": 16,
+      "norm_label": "student_permissions"
+    },
+    {
+      "label": "GUEST_PERMISSIONS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L223",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_guest_permissions",
+      "community": 16,
+      "norm_label": "guest_permissions"
+    },
+    {
+      "label": "SUPPORT_AGENT_PERMISSIONS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L225",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_support_agent_permissions",
+      "community": 16,
+      "norm_label": "support_agent_permissions"
+    },
+    {
+      "label": "ROLE_PERMISSIONS",
+      "file_type": "code",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L243",
+      "_origin": "ast",
+      "id": "packages_constants_src_permissions_role_permissions",
+      "community": 16,
+      "norm_label": "role_permissions"
+    },
+    {
+      "label": "roles.ts",
+      "file_type": "code",
+      "source_file": "packages/constants/src/roles.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_src_roles",
+      "community": 16,
+      "norm_label": "roles.ts"
+    },
+    {
+      "label": "ROLES",
+      "file_type": "code",
+      "source_file": "packages/constants/src/roles.ts",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "packages_constants_src_roles_roles",
+      "community": 16,
+      "norm_label": "roles"
+    },
+    {
+      "label": "Role",
+      "file_type": "code",
+      "source_file": "packages/constants/src/roles.ts",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "packages_constants_src_roles_role",
+      "community": 16,
+      "norm_label": "role"
+    },
+    {
+      "label": "tsconfig.build.json",
+      "file_type": "code",
+      "source_file": "packages/constants/tsconfig.build.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_tsconfig_build",
+      "community": 25,
+      "norm_label": "tsconfig.build.json"
+    },
+    {
+      "label": "extends",
+      "file_type": "code",
+      "source_file": "packages/constants/tsconfig.build.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_constants_tsconfig_build_extends",
+      "community": 25,
+      "norm_label": "extends"
+    },
+    {
+      "label": "exclude",
+      "file_type": "code",
+      "source_file": "packages/constants/tsconfig.build.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_constants_tsconfig_build_exclude",
+      "community": 25,
+      "norm_label": "exclude"
+    },
+    {
+      "label": "tsconfig.json",
+      "file_type": "code",
+      "source_file": "packages/constants/tsconfig.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_tsconfig",
+      "community": 24,
+      "norm_label": "tsconfig.json"
+    },
+    {
+      "label": "extends",
+      "file_type": "code",
+      "source_file": "packages/constants/tsconfig.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "packages_constants_tsconfig_extends",
+      "community": 24,
+      "norm_label": "extends"
+    },
+    {
+      "label": "include",
+      "file_type": "code",
+      "source_file": "packages/constants/tsconfig.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_constants_tsconfig_include",
+      "community": 24,
+      "norm_label": "include"
     },
     {
       "label": "api.json",
@@ -1314,6 +1874,36 @@
       "norm_label": "outputs"
     },
     {
+      "label": "test",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "turbo_tasks_test",
+      "community": 1,
+      "norm_label": "test"
+    },
+    {
+      "label": "dependsOn",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "turbo_test_dependson",
+      "community": 1,
+      "norm_label": "dependson"
+    },
+    {
+      "label": "outputs",
+      "file_type": "code",
+      "source_file": "turbo.json",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "turbo_test_outputs",
+      "community": 1,
+      "norm_label": "outputs"
+    },
+    {
       "label": "AGENTS.md",
       "file_type": "document",
       "source_file": "AGENTS.md",
@@ -1524,6 +2114,76 @@
       "norm_label": "consequences"
     },
     {
+      "label": "0002-fixed-roles-authorization.md",
+      "file_type": "document",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_adr_0002_fixed_roles_authorization",
+      "community": 23,
+      "norm_label": "0002-fixed-roles-authorization.md"
+    },
+    {
+      "label": "ADR-002: Fixed-role authorization model",
+      "file_type": "document",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_adr_0002_fixed_roles_authorization_adr_002_fixed_role_authorization_model",
+      "community": 23,
+      "norm_label": "adr-002: fixed-role authorization model"
+    },
+    {
+      "label": "Status",
+      "file_type": "document",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "docs_adr_0002_fixed_roles_authorization_status",
+      "community": 23,
+      "norm_label": "status"
+    },
+    {
+      "label": "Context",
+      "file_type": "document",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "docs_adr_0002_fixed_roles_authorization_context",
+      "community": 23,
+      "norm_label": "context"
+    },
+    {
+      "label": "Decision",
+      "file_type": "document",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "docs_adr_0002_fixed_roles_authorization_decision",
+      "community": 23,
+      "norm_label": "decision"
+    },
+    {
+      "label": "Alternatives considered",
+      "file_type": "document",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L36",
+      "_origin": "ast",
+      "id": "docs_adr_0002_fixed_roles_authorization_alternatives_considered",
+      "community": 23,
+      "norm_label": "alternatives considered"
+    },
+    {
+      "label": "Consequences",
+      "file_type": "document",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L56",
+      "_origin": "ast",
+      "id": "docs_adr_0002_fixed_roles_authorization_consequences",
+      "community": 23,
+      "norm_label": "consequences"
+    },
+    {
       "label": "README.md",
       "file_type": "document",
       "source_file": "packages/config/README.md",
@@ -1602,6 +2262,26 @@
       "id": "packages_config_readme_consuming_this_package",
       "community": 17,
       "norm_label": "consuming this package"
+    },
+    {
+      "label": "permission-matrix.md",
+      "file_type": "document",
+      "source_file": "packages/constants/docs/permission-matrix.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "packages_constants_docs_permission_matrix",
+      "community": 26,
+      "norm_label": "permission-matrix.md"
+    },
+    {
+      "label": "Permission matrix",
+      "file_type": "document",
+      "source_file": "packages/constants/docs/permission-matrix.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "packages_constants_docs_permission_matrix_permission_matrix",
+      "community": 26,
+      "norm_label": "permission matrix"
     },
     {
       "label": "README.md",
@@ -1810,7 +2490,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L18",
+      "source_location": "L19",
       "weight": 1.0,
       "source": "package",
       "target": "package_devdependencies",
@@ -1830,7 +2510,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L17",
+      "source_location": "L18",
       "weight": 1.0,
       "source": "package",
       "target": "package_packagemanager",
@@ -1900,7 +2580,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L14",
+      "source_location": "L15",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_format",
@@ -1910,7 +2590,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L15",
+      "source_location": "L16",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_format_check",
@@ -1930,6 +2610,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "package_scripts",
+      "target": "package_scripts_test",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
       "source_location": "L12",
       "weight": 1.0,
       "source": "package_scripts",
@@ -1940,7 +2630,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L20",
+      "source_location": "L21",
       "weight": 1.0,
       "source": "package_devdependencies",
       "target": "package_devdependencies_eslint",
@@ -1950,7 +2640,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L21",
+      "source_location": "L22",
       "weight": 1.0,
       "source": "package_devdependencies",
       "target": "package_devdependencies_prettier",
@@ -1960,7 +2650,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L19",
+      "source_location": "L20",
       "weight": 1.0,
       "source": "package_devdependencies",
       "target": "package_devdependencies_studafy_config",
@@ -1970,7 +2660,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L22",
+      "source_location": "L23",
       "weight": 1.0,
       "source": "package_devdependencies",
       "target": "package_devdependencies_turbo",
@@ -1980,7 +2670,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L23",
+      "source_location": "L24",
       "weight": 1.0,
       "source": "package_devdependencies",
       "target": "package_devdependencies_typescript",
@@ -1990,7 +2680,7 @@
       "relation": "imports",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L22",
+      "source_location": "L23",
       "weight": 1.0,
       "context": "import",
       "source": "package_devdependencies_turbo",
@@ -2206,6 +2896,798 @@
       "weight": 1.0,
       "source": "prettier_config",
       "target": "packages_config_prettier_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "packages_constants_package",
+      "target": "packages_constants_package_devdependencies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "packages_constants_package",
+      "target": "packages_constants_package_exports",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_constants_package",
+      "target": "packages_constants_package_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_constants_package",
+      "target": "packages_constants_package_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_package",
+      "target": "packages_constants_package_private",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "packages_constants_package",
+      "target": "packages_constants_package_scripts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_constants_package",
+      "target": "packages_constants_package_type",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "packages_constants_package",
+      "target": "packages_constants_package_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_constants_package",
+      "target": "packages_constants_package_version",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "packages_constants_package_exports",
+      "target": "packages_constants_package_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "packages_constants_package_exports",
+      "target": "packages_constants_package_default",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "packages_constants_package_scripts",
+      "target": "packages_constants_package_scripts_build",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "packages_constants_package_scripts",
+      "target": "packages_constants_package_scripts_check_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "packages_constants_package_scripts",
+      "target": "packages_constants_package_scripts_docs_generate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "packages_constants_package_scripts",
+      "target": "packages_constants_package_scripts_lint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "packages_constants_package_scripts",
+      "target": "packages_constants_package_scripts_test",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "packages_constants_package_devdependencies",
+      "target": "packages_constants_package_devdependencies_studafy_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "packages_constants_package_devdependencies",
+      "target": "packages_constants_package_devdependencies_studafy_tsconfig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "packages_constants_package_devdependencies",
+      "target": "packages_constants_package_devdependencies_types_bun",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/package.json",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "packages_constants_package_devdependencies",
+      "target": "packages_constants_package_devdependencies_typescript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "packages_constants_scripts_generate_permission_matrix",
+      "target": "packages_constants_scripts_generate_permission_matrix_buildmarkdown",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L43",
+      "weight": 1.0,
+      "source": "packages_constants_scripts_generate_permission_matrix",
+      "target": "packages_constants_scripts_generate_permission_matrix_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_scripts_generate_permission_matrix",
+      "target": "packages_constants_src_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_scripts_generate_permission_matrix",
+      "target": "packages_constants_src_permissions_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_scripts_generate_permission_matrix",
+      "target": "packages_constants_src_permissions_role_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_constants_scripts_generate_permission_matrix",
+      "target": "packages_constants_src_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_constants_scripts_generate_permission_matrix",
+      "target": "packages_constants_src_roles_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/scripts/generate-permission-matrix.ts",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "packages_constants_scripts_generate_permission_matrix_main",
+      "target": "packages_constants_scripts_generate_permission_matrix_buildmarkdown",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/errors.test.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_src_errors_test",
+      "target": "packages_constants_src_errors",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/errors.test.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_src_errors_test",
+      "target": "packages_constants_src_errors_error_codes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/errors.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_constants_src_errors",
+      "target": "packages_constants_src_errors_error_codes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/errors.ts",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "packages_constants_src_errors",
+      "target": "packages_constants_src_errors_errorcode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_errors",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_errors_error_codes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_errors_errorcode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/events.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_constants_src_events",
+      "target": "packages_constants_src_events_domain_events",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/events.ts",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "packages_constants_src_events",
+      "target": "packages_constants_src_events_domainevent",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_events",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_events_domain_events",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_events_domainevent",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_notifications",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_notifications_notification_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_notifications_notificationtype",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_permissions_permission",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_permissions_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_permissions_role_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_roles_role",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "re_exports",
+      "context": "re-export",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/index.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "packages_constants_src_index",
+      "target": "packages_constants_src_roles_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/notifications.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "packages_constants_src_notifications",
+      "target": "packages_constants_src_notifications_notification_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/notifications.ts",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "packages_constants_src_notifications",
+      "target": "packages_constants_src_notifications_notificationtype",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.test.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions_test",
+      "target": "packages_constants_src_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.test.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions_test",
+      "target": "packages_constants_src_permissions_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.test.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions_test",
+      "target": "packages_constants_src_permissions_role_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.test.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions_test",
+      "target": "packages_constants_src_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.test.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions_test",
+      "target": "packages_constants_src_roles_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L120",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_all_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L223",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_guest_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L132",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_instructor_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L122",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_org_admin_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L118",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_permission",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L243",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_role_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L203",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_student_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L225",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_support_agent_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L184",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_permissions_teaching_assistant_permissions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_roles_role",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/permissions.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "packages_constants_src_permissions",
+      "target": "packages_constants_src_roles_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/roles.ts",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "packages_constants_src_roles",
+      "target": "packages_constants_src_roles_role",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/src/roles.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "packages_constants_src_roles",
+      "target": "packages_constants_src_roles_roles",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/tsconfig.build.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_constants_tsconfig_build",
+      "target": "packages_constants_tsconfig_build_exclude",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/tsconfig.build.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_constants_tsconfig_build",
+      "target": "packages_constants_tsconfig_build_extends",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/tsconfig.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "packages_constants_tsconfig",
+      "target": "packages_constants_tsconfig_extends",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/constants/tsconfig.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_constants_tsconfig",
+      "target": "packages_constants_tsconfig_include",
       "confidence_score": 1.0
     },
     {
@@ -2772,6 +4254,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "turbo.json",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "turbo_tasks",
+      "target": "turbo_tasks_test",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
       "source_location": "L5",
       "weight": 1.0,
       "source": "turbo_tasks_build",
@@ -2826,6 +4318,26 @@
       "weight": 1.0,
       "source": "turbo_tasks_lint",
       "target": "turbo_lint_outputs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "turbo_tasks_test",
+      "target": "turbo_test_dependson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "turbo.json",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "turbo_tasks_test",
+      "target": "turbo_test_outputs",
       "confidence_score": 1.0
     },
     {
@@ -3011,6 +4523,66 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_adr_0002_fixed_roles_authorization",
+      "target": "docs_adr_0002_fixed_roles_authorization_adr_002_fixed_role_authorization_model",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "docs_adr_0002_fixed_roles_authorization_adr_002_fixed_role_authorization_model",
+      "target": "docs_adr_0002_fixed_roles_authorization_alternatives_considered",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "docs_adr_0002_fixed_roles_authorization_adr_002_fixed_role_authorization_model",
+      "target": "docs_adr_0002_fixed_roles_authorization_consequences",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "docs_adr_0002_fixed_roles_authorization_adr_002_fixed_role_authorization_model",
+      "target": "docs_adr_0002_fixed_roles_authorization_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "docs_adr_0002_fixed_roles_authorization_adr_002_fixed_role_authorization_model",
+      "target": "docs_adr_0002_fixed_roles_authorization_decision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0002-fixed-roles-authorization.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "docs_adr_0002_fixed_roles_authorization_adr_002_fixed_role_authorization_model",
+      "target": "docs_adr_0002_fixed_roles_authorization_status",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "packages/config/README.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -3081,6 +4653,16 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "packages/constants/docs/permission-matrix.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "packages_constants_docs_permission_matrix",
+      "target": "packages_constants_docs_permission_matrix_permission_matrix",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "packages/tsconfig/README.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -3130,5 +4712,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "1766711612ee68981b5ae6e0bdf42239d0744446"
+  "built_at_commit": "ffb9d1a4ec35d39502074810b5264505f7ab1d5b"
 }

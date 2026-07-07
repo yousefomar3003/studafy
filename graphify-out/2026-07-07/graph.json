@@ -1314,6 +1314,16 @@
       "norm_label": "outputs"
     },
     {
+      "label": "AGENTS.md",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "agents",
+      "community": 21,
+      "norm_label": "agents.md"
+    },
+    {
       "label": "README.md",
       "file_type": "document",
       "source_file": "README.md",
@@ -3120,5 +3130,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "bb81ba7224b80b65b8243190c066bf5809809e73"
+  "built_at_commit": "1766711612ee68981b5ae6e0bdf42239d0744446"
 }

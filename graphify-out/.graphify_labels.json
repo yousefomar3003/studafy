@@ -20,5 +20,10 @@
   "18": "ADR-001: Shared lint/format config as a root-inherited package",
   "19": "eslint.config.js",
   "20": "prettier.config.js",
-  "21": "AGENTS.md"
+  "21": "AGENTS.md",
+  "22": "package.json",
+  "23": "ADR-002: Fixed-role authorization model",
+  "24": "tsconfig.json",
+  "25": "tsconfig.build.json",
+  "26": "permission-matrix.md"
 }
