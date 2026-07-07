@@ -19,5 +19,6 @@
   "17": "@studafy/config",
   "18": "ADR-001: Shared lint/format config as a root-inherited package",
   "19": "eslint.config.js",
-  "20": "prettier.config.js"
+  "20": "prettier.config.js",
+  "21": "AGENTS.md"
 }

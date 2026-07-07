@@ -5,43 +5,43 @@
     "semantic_hash": ""
   },
   "apps/web/package.json": {
-    "mtime": 1783379286.1038818,
-    "ast_hash": "edcd06199baa7a99da9a6cfa60e56765",
+    "mtime": 1783381440.371104,
+    "ast_hash": "93120389c544759e09218c0a738cb1dc",
     "semantic_hash": ""
   },
   "apps/web/src/index.ts": {
-    "mtime": 1783378749.983405,
+    "mtime": 1783381480.3815134,
     "ast_hash": "fa8d0596184c338d0cec93d9e89b500e",
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1783379286.1116543,
-    "ast_hash": "dad73df3875df9ba450008e6e76e4df3",
+    "mtime": 1783381440.7630627,
+    "ast_hash": "ce4508467d5e047cf1f6a4913c53fa67",
     "semantic_hash": ""
   },
   "packages/ui/package.json": {
-    "mtime": 1783379286.1238322,
-    "ast_hash": "aaeb1736d420f50d5098e5371280d3d2",
+    "mtime": 1783381441.2658803,
+    "ast_hash": "0ca7420a15993a40cf9a591204dc22cd",
     "semantic_hash": ""
   },
   "packages/ui/src/index.ts": {
-    "mtime": 1783352749.010431,
-    "ast_hash": "f609ad95040ed2e363eb3322ca1d89d5",
+    "mtime": 1783381441.2911808,
+    "ast_hash": "eac66d95c765cf9cb003f01205749357",
     "semantic_hash": ""
   },
   "turbo.json": {
-    "mtime": 1783379286.1268647,
-    "ast_hash": "29b1fef29b0098eb6bcb5a2c913c71ba",
+    "mtime": 1783381441.3370743,
+    "ast_hash": "fe8e7ab07f20bb30fd953d97a3bc4c09",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1783352748.026329,
-    "ast_hash": "b71fa2e24c4894153269208831318b5c",
+    "mtime": 1783381441.3286471,
+    "ast_hash": "137946d85e74b57e56e24ccd60c0be2b",
     "semantic_hash": ""
   },
   "docs/adr/0000-monorepo-tooling-choice.md": {
-    "mtime": 1783352748.046969,
-    "ast_hash": "689ed199ec5b4c0ffe5ae9ee23ce37c4",
+    "mtime": 1783381440.6494596,
+    "ast_hash": "7ffbfa37b651b50db5114945850c863a",
     "semantic_hash": ""
   },
   ".claude/settings.json": {
@@ -50,38 +50,38 @@
     "semantic_hash": ""
   },
   "apps/web/tsconfig.json": {
-    "mtime": 1783379286.1061141,
-    "ast_hash": "6ead39fe4398558a2a0b6a354cf6c550",
+    "mtime": 1783381440.4915266,
+    "ast_hash": "2c5e709a867f0e50a654706b400a0156",
     "semantic_hash": ""
   },
   "packages/tsconfig/api.json": {
-    "mtime": 1783379286.115816,
-    "ast_hash": "8080f0afab4a0194ffa68cb2c08bafd9",
+    "mtime": 1783381441.1473978,
+    "ast_hash": "c7a5670bb5997366d01bd5eeb4f2daaf",
     "semantic_hash": ""
   },
   "packages/tsconfig/base.json": {
-    "mtime": 1783379286.1168184,
-    "ast_hash": "4962762c81819835110edb8762170af7",
+    "mtime": 1783381441.165371,
+    "ast_hash": "f1696046da70f562974e98b89247c4e2",
     "semantic_hash": ""
   },
   "packages/tsconfig/package.json": {
-    "mtime": 1783379286.117813,
-    "ast_hash": "2310a4b1d069925c283522681b456196",
+    "mtime": 1783381441.1775243,
+    "ast_hash": "bc771140a17b2b40a40b5826167a7789",
     "semantic_hash": ""
   },
   "packages/tsconfig/packages.json": {
-    "mtime": 1783379286.1198554,
-    "ast_hash": "5412e075e72d573fc2b37f6641f115a8",
+    "mtime": 1783381441.1888602,
+    "ast_hash": "dfc7e4981601e203644e0fa1b98bc29a",
     "semantic_hash": ""
   },
   "packages/tsconfig/web.json": {
-    "mtime": 1783379286.1208518,
-    "ast_hash": "fd4c53f9f31835aa4378129cc107102d",
+    "mtime": 1783381441.249619,
+    "ast_hash": "4b2b9365e32b3c74561f98be8ab58679",
     "semantic_hash": ""
   },
   "packages/ui/tsconfig.json": {
-    "mtime": 1783379286.1248324,
-    "ast_hash": "7ed0328b037e275f8014bddd8af59f66",
+    "mtime": 1783381441.2981791,
+    "ast_hash": "1af5f1f8c39dd130885a4127a84f08ee",
     "semantic_hash": ""
   },
   ".serena/project.local.yml": {
@@ -95,8 +95,43 @@
     "semantic_hash": ""
   },
   "packages/tsconfig/README.md": {
-    "mtime": 1783379286.1136417,
-    "ast_hash": "f4f0f03096fd82ce3f6d1c384fb803a7",
+    "mtime": 1783381441.2406006,
+    "ast_hash": "c78a2cd7ed773b56331ba672f8002af5",
+    "semantic_hash": ""
+  },
+  "eslint.config.js": {
+    "mtime": 1783381078.7370088,
+    "ast_hash": "fe69fed498746d5279eff8abe19a90dd",
+    "semantic_hash": ""
+  },
+  "packages/config/eslint.config.js": {
+    "mtime": 1783381010.9103687,
+    "ast_hash": "5ac9ac70ad944ff9d4937fa188ad6818",
+    "semantic_hash": ""
+  },
+  "packages/config/package.json": {
+    "mtime": 1783380967.054153,
+    "ast_hash": "4466b987761a858ff7e32a54cb5183c3",
+    "semantic_hash": ""
+  },
+  "packages/config/prettier.config.js": {
+    "mtime": 1783381044.0249815,
+    "ast_hash": "aeb10d0d0e905b6de2a16c85a628d07e",
+    "semantic_hash": ""
+  },
+  "prettier.config.js": {
+    "mtime": 1783381093.5312505,
+    "ast_hash": "4c0daea9d77515ab23cd2cb6a52525f3",
+    "semantic_hash": ""
+  },
+  "docs/adr/0001-shared-lint-format-config.md": {
+    "mtime": 1783381209.279584,
+    "ast_hash": "3442d59b165f1186a3e4057e8a806e51",
+    "semantic_hash": ""
+  },
+  "packages/config/README.md": {
+    "mtime": 1783381441.049778,
+    "ast_hash": "95fafd4e42cdd1153c17b841ad33ca5c",
     "semantic_hash": ""
   }
 }
