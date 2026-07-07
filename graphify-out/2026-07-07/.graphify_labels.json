@@ -25,5 +25,10 @@
   "23": "ADR-002: Fixed-role authorization model",
   "24": "tsconfig.json",
   "25": "tsconfig.build.json",
-  "26": "permission-matrix.md"
+  "26": "permission-matrix.md",
+  "27": "index.ts",
+  "28": "package.json",
+  "29": "Schema conventions",
+  "30": "tsconfig.json",
+  "31": "tsconfig.build.json"
 }

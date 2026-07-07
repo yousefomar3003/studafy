@@ -164,6 +164,16 @@
       "norm_label": "include"
     },
     {
+      "label": "commitlint.config.js",
+      "file_type": "code",
+      "source_file": "commitlint.config.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "commitlint_config",
+      "community": 34,
+      "norm_label": "commitlint.config.js"
+    },
+    {
       "label": "eslint.config.js",
       "file_type": "code",
       "source_file": "eslint.config.js",
@@ -172,6 +182,16 @@
       "id": "eslint_config",
       "community": 19,
       "norm_label": "eslint.config.js"
+    },
+    {
+      "label": "lint-staged.config.js",
+      "file_type": "code",
+      "source_file": "lint-staged.config.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "lint_staged_config",
+      "community": 35,
+      "norm_label": "lint-staged.config.js"
     },
     {
       "label": "package.json",
@@ -244,10 +264,20 @@
       "norm_label": "scripts"
     },
     {
-      "label": "build",
+      "label": "prepare",
       "file_type": "code",
       "source_file": "package.json",
       "source_location": "L11",
+      "_origin": "ast",
+      "id": "package_scripts_prepare",
+      "community": 0,
+      "norm_label": "prepare"
+    },
+    {
+      "label": "build",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L12",
       "_origin": "ast",
       "id": "package_scripts_build",
       "community": 0,
@@ -257,7 +287,7 @@
       "label": "typecheck",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L12",
+      "source_location": "L13",
       "_origin": "ast",
       "id": "package_scripts_typecheck",
       "community": 0,
@@ -267,7 +297,7 @@
       "label": "lint",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L13",
+      "source_location": "L14",
       "_origin": "ast",
       "id": "package_scripts_lint",
       "community": 0,
@@ -277,7 +307,7 @@
       "label": "test",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L14",
+      "source_location": "L15",
       "_origin": "ast",
       "id": "package_scripts_test",
       "community": 0,
@@ -287,7 +317,7 @@
       "label": "format",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L15",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "package_scripts_format",
       "community": 0,
@@ -297,7 +327,7 @@
       "label": "format:check",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L16",
+      "source_location": "L17",
       "_origin": "ast",
       "id": "package_scripts_format_check",
       "community": 0,
@@ -307,7 +337,7 @@
       "label": "packageManager",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L18",
+      "source_location": "L19",
       "_origin": "ast",
       "id": "package_packagemanager",
       "community": 0,
@@ -317,17 +347,37 @@
       "label": "devDependencies",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L19",
+      "source_location": "L20",
       "_origin": "ast",
       "id": "package_devdependencies",
       "community": 1,
       "norm_label": "devdependencies"
     },
     {
+      "label": "@commitlint/cli",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "package_devdependencies_commitlint_cli",
+      "community": 1,
+      "norm_label": "@commitlint/cli"
+    },
+    {
+      "label": "@commitlint/config-conventional",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L22",
+      "_origin": "ast",
+      "id": "package_devdependencies_commitlint_config_conventional",
+      "community": 1,
+      "norm_label": "@commitlint/config-conventional"
+    },
+    {
       "label": "@studafy/config",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L20",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "package_devdependencies_studafy_config",
       "community": 1,
@@ -337,17 +387,37 @@
       "label": "eslint",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L21",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "package_devdependencies_eslint",
       "community": 1,
       "norm_label": "eslint"
     },
     {
+      "label": "lefthook",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "package_devdependencies_lefthook",
+      "community": 1,
+      "norm_label": "lefthook"
+    },
+    {
+      "label": "lint-staged",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L26",
+      "_origin": "ast",
+      "id": "package_devdependencies_lint_staged",
+      "community": 1,
+      "norm_label": "lint-staged"
+    },
+    {
       "label": "prettier",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L22",
+      "source_location": "L27",
       "_origin": "ast",
       "id": "package_devdependencies_prettier",
       "community": 1,
@@ -357,7 +427,7 @@
       "label": "turbo",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L23",
+      "source_location": "L28",
       "_origin": "ast",
       "id": "package_devdependencies_turbo",
       "community": 1,
@@ -367,7 +437,7 @@
       "label": "typescript",
       "file_type": "code",
       "source_file": "package.json",
-      "source_location": "L24",
+      "source_location": "L29",
       "_origin": "ast",
       "id": "package_devdependencies_typescript",
       "community": 1,
@@ -2464,6 +2534,76 @@
       "norm_label": "agents.md"
     },
     {
+      "label": "CONTRIBUTING.md",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "contributing",
+      "community": 32,
+      "norm_label": "contributing.md"
+    },
+    {
+      "label": "Contributing",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "contributing_contributing",
+      "community": 32,
+      "norm_label": "contributing"
+    },
+    {
+      "label": "Getting started",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "contributing_getting_started",
+      "community": 32,
+      "norm_label": "getting started"
+    },
+    {
+      "label": "Commit messages",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "contributing_commit_messages",
+      "community": 32,
+      "norm_label": "commit messages"
+    },
+    {
+      "label": "How the hooks work",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L49",
+      "_origin": "ast",
+      "id": "contributing_how_the_hooks_work",
+      "community": 32,
+      "norm_label": "how the hooks work"
+    },
+    {
+      "label": "Bypassing hooks in an emergency",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L62",
+      "_origin": "ast",
+      "id": "contributing_bypassing_hooks_in_an_emergency",
+      "community": 32,
+      "norm_label": "bypassing hooks in an emergency"
+    },
+    {
+      "label": "Troubleshooting",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L68",
+      "_origin": "ast",
+      "id": "contributing_troubleshooting",
+      "community": 32,
+      "norm_label": "troubleshooting"
+    },
+    {
       "label": "README.md",
       "file_type": "document",
       "source_file": "README.md",
@@ -2731,6 +2871,76 @@
       "_origin": "ast",
       "id": "docs_adr_0002_fixed_roles_authorization_consequences",
       "community": 23,
+      "norm_label": "consequences"
+    },
+    {
+      "label": "0003-git-hooks-conventional-commits.md",
+      "file_type": "document",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_adr_0003_git_hooks_conventional_commits",
+      "community": 33,
+      "norm_label": "0003-git-hooks-conventional-commits.md"
+    },
+    {
+      "label": "ADR-003: Git hooks via Lefthook + commitlint for Conventional Commits",
+      "file_type": "document",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_adr_0003_git_hooks_conventional_commits_adr_003_git_hooks_via_lefthook_commitlint_for_conventional_commits",
+      "community": 33,
+      "norm_label": "adr-003: git hooks via lefthook + commitlint for conventional commits"
+    },
+    {
+      "label": "Status",
+      "file_type": "document",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "docs_adr_0003_git_hooks_conventional_commits_status",
+      "community": 33,
+      "norm_label": "status"
+    },
+    {
+      "label": "Context",
+      "file_type": "document",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "docs_adr_0003_git_hooks_conventional_commits_context",
+      "community": 33,
+      "norm_label": "context"
+    },
+    {
+      "label": "Decision",
+      "file_type": "document",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "docs_adr_0003_git_hooks_conventional_commits_decision",
+      "community": 33,
+      "norm_label": "decision"
+    },
+    {
+      "label": "Alternatives considered",
+      "file_type": "document",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L33",
+      "_origin": "ast",
+      "id": "docs_adr_0003_git_hooks_conventional_commits_alternatives_considered",
+      "community": 33,
+      "norm_label": "alternatives considered"
+    },
+    {
+      "label": "Consequences",
+      "file_type": "document",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L46",
+      "_origin": "ast",
+      "id": "docs_adr_0003_git_hooks_conventional_commits_consequences",
+      "community": 33,
       "norm_label": "consequences"
     },
     {
@@ -3110,7 +3320,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L19",
+      "source_location": "L20",
       "weight": 1.0,
       "source": "package",
       "target": "package_devdependencies",
@@ -3130,7 +3340,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L18",
+      "source_location": "L19",
       "weight": 1.0,
       "source": "package",
       "target": "package_packagemanager",
@@ -3190,7 +3400,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L11",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_build",
@@ -3200,7 +3410,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L15",
+      "source_location": "L16",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_format",
@@ -3210,7 +3420,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L16",
+      "source_location": "L17",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_format_check",
@@ -3220,7 +3430,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L13",
+      "source_location": "L14",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_lint",
@@ -3230,7 +3440,17 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L14",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "package_scripts",
+      "target": "package_scripts_prepare",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L15",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_test",
@@ -3240,7 +3460,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L12",
+      "source_location": "L13",
       "weight": 1.0,
       "source": "package_scripts",
       "target": "package_scripts_typecheck",
@@ -3253,7 +3473,7 @@
       "source_location": "L21",
       "weight": 1.0,
       "source": "package_devdependencies",
-      "target": "package_devdependencies_eslint",
+      "target": "package_devdependencies_commitlint_cli",
       "confidence_score": 1.0
     },
     {
@@ -3263,27 +3483,7 @@
       "source_location": "L22",
       "weight": 1.0,
       "source": "package_devdependencies",
-      "target": "package_devdependencies_prettier",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "package.json",
-      "source_location": "L20",
-      "weight": 1.0,
-      "source": "package_devdependencies",
-      "target": "package_devdependencies_studafy_config",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "package.json",
-      "source_location": "L23",
-      "weight": 1.0,
-      "source": "package_devdependencies",
-      "target": "package_devdependencies_turbo",
+      "target": "package_devdependencies_commitlint_config_conventional",
       "confidence_score": 1.0
     },
     {
@@ -3293,6 +3493,66 @@
       "source_location": "L24",
       "weight": 1.0,
       "source": "package_devdependencies",
+      "target": "package_devdependencies_eslint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_lefthook",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_lint_staged",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_prettier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_studafy_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "package_devdependencies",
+      "target": "package_devdependencies_turbo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L29",
+      "weight": 1.0,
+      "source": "package_devdependencies",
       "target": "package_devdependencies_typescript",
       "confidence_score": 1.0
     },
@@ -3300,7 +3560,7 @@
       "relation": "imports",
       "confidence": "EXTRACTED",
       "source_file": "package.json",
-      "source_location": "L23",
+      "source_location": "L28",
       "weight": 1.0,
       "context": "import",
       "source": "package_devdependencies_turbo",
@@ -5764,6 +6024,66 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "contributing",
+      "target": "contributing_contributing",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "contributing_contributing",
+      "target": "contributing_commit_messages",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "contributing_contributing",
+      "target": "contributing_getting_started",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L62",
+      "weight": 1.0,
+      "source": "contributing_commit_messages",
+      "target": "contributing_bypassing_hooks_in_an_emergency",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "contributing_commit_messages",
+      "target": "contributing_how_the_hooks_work",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "contributing_commit_messages",
+      "target": "contributing_troubleshooting",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
@@ -6006,6 +6326,66 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_adr_0003_git_hooks_conventional_commits",
+      "target": "docs_adr_0003_git_hooks_conventional_commits_adr_003_git_hooks_via_lefthook_commitlint_for_conventional_commits",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "docs_adr_0003_git_hooks_conventional_commits_adr_003_git_hooks_via_lefthook_commitlint_for_conventional_commits",
+      "target": "docs_adr_0003_git_hooks_conventional_commits_alternatives_considered",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "docs_adr_0003_git_hooks_conventional_commits_adr_003_git_hooks_via_lefthook_commitlint_for_conventional_commits",
+      "target": "docs_adr_0003_git_hooks_conventional_commits_consequences",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "docs_adr_0003_git_hooks_conventional_commits_adr_003_git_hooks_via_lefthook_commitlint_for_conventional_commits",
+      "target": "docs_adr_0003_git_hooks_conventional_commits_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "docs_adr_0003_git_hooks_conventional_commits_adr_003_git_hooks_via_lefthook_commitlint_for_conventional_commits",
+      "target": "docs_adr_0003_git_hooks_conventional_commits_decision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/adr/0003-git-hooks-conventional-commits.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "docs_adr_0003_git_hooks_conventional_commits_adr_003_git_hooks_via_lefthook_commitlint_for_conventional_commits",
+      "target": "docs_adr_0003_git_hooks_conventional_commits_status",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "packages/config/README.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -6195,5 +6575,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "a13514a14bc21baba2192c1484d955640a0fbd1c"
+  "built_at_commit": "7ac496dfffcf7bc405812487b168f68a0f4206db"
 }

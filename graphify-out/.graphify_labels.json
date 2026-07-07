@@ -30,5 +30,9 @@
   "28": "package.json",
   "29": "Schema conventions",
   "30": "tsconfig.json",
-  "31": "tsconfig.build.json"
+  "31": "tsconfig.build.json",
+  "32": "Commit messages",
+  "33": "ADR-003: Git hooks via Lefthook + commitlint for Conventional Commits",
+  "34": "commitlint.config.js",
+  "35": "lint-staged.config.js"
 }

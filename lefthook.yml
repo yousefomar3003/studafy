@@ -1,0 +1,13 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint-staged:
+      run: node_modules/.bin/lint-staged
+    check-types:
+      glob: "*.{ts,tsx,mts,cts}"
+      run: node_modules/.bin/turbo run check-types --filter="[HEAD]"
+
+commit-msg:
+  commands:
+    commitlint:
+      run: node_modules/.bin/commitlint --edit {1}

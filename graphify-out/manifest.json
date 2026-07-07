@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1783430887.704249,
-    "ast_hash": "9b4e52892727373b1e771cf7d0f3b0be",
+    "mtime": 1783436478.5698519,
+    "ast_hash": "2bc881dde33be2b3d5b0a1986834e3ab",
     "semantic_hash": ""
   },
   "packages/ui/package.json": {
@@ -235,7 +235,7 @@
     "semantic_hash": ""
   },
   "packages/shared-schemas/src/index.ts": {
-    "mtime": 1783433919.8090835,
+    "mtime": 1783436323.329922,
     "ast_hash": "2d832ab1af979ae26411ea348e1ecff2",
     "semantic_hash": ""
   },
@@ -262,6 +262,31 @@
   "packages/shared-schemas/docs/schema-conventions.md": {
     "mtime": 1783433919.7920291,
     "ast_hash": "7de16de4c5ec227f1fd0da8e6e745c50",
+    "semantic_hash": ""
+  },
+  "commitlint.config.js": {
+    "mtime": 1783435651.791685,
+    "ast_hash": "f6a970d64044907aff77af4bfeae3fc0",
+    "semantic_hash": ""
+  },
+  "lint-staged.config.js": {
+    "mtime": 1783435638.5515392,
+    "ast_hash": "721a8345fd2c799e18b8ab1f3ec905c9",
+    "semantic_hash": ""
+  },
+  "CONTRIBUTING.md": {
+    "mtime": 1783436478.2395146,
+    "ast_hash": "665b14500b3cdf9b1f197a47ed309b56",
+    "semantic_hash": ""
+  },
+  "docs/adr/0003-git-hooks-conventional-commits.md": {
+    "mtime": 1783436176.9289615,
+    "ast_hash": "b01b826df06f6f09e7d6b7296453d6ed",
+    "semantic_hash": ""
+  },
+  "lefthook.yml": {
+    "mtime": 1783436159.8732545,
+    "ast_hash": "5c7e8aca5cfe8fd1ad98f2387424ac7f",
     "semantic_hash": ""
   }
 }
