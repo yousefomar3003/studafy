@@ -1,0 +1,14 @@
+{
+  "name": "@studafy/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "bun run build:dev && bun run build:staging && bun run build:prod",
+    "build:dev": "flutter build apk --debug --flavor dev -t lib/main_dev.dart",
+    "build:staging": "flutter build apk --debug --flavor staging -t lib/main_staging.dart",
+    "build:prod": "flutter build apk --debug --flavor prod -t lib/main_prod.dart",
+    "check-types": "flutter analyze",
+    "lint": "flutter analyze",
+    "test": "flutter test"
+  }
+}
