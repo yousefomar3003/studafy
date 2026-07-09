@@ -8,6 +8,12 @@
     "web.json",
     "packages.json"
   ],
+  "exports": {
+    "./base.json": "./base.json",
+    "./api.json": "./api.json",
+    "./web.json": "./web.json",
+    "./packages.json": "./packages.json"
+  },
   "peerDependencies": {
     "typescript": "^5"
   }

@@ -8,6 +8,7 @@
         "@commitlint/cli": "21.2.0",
         "@commitlint/config-conventional": "21.2.0",
         "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
         "eslint": "10.6.0",
         "lefthook": "2.1.9",
         "lint-staged": "17.0.8",
