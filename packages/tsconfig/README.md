@@ -55,8 +55,13 @@ All presets enforce `strict: true` and target `ES2022` with `moduleResolution: b
 
 ## Path aliases
 
-`base.json` sets `baseUrl: "."` with `@/*` mapped to `./src/*`, so every workspace can import
-its own source with `import { thing } from "@/thing"` regardless of file nesting depth.
+There are none. `base.json` previously declared `baseUrl: "."` with `@/*` mapped to `./src/*`, but
+no workspace ever imported through it, and no bundler was configured with a matching alias — so the
+mapping would not have resolved at runtime. TypeScript 7 also deprecates `baseUrl`. Both keys were
+removed; use relative imports within a package, and the package name across packages.
+
+A workspace that genuinely wants an alias must declare `paths` in its own `tsconfig.json` (where it
+resolves relative to that file) _and_ teach its bundler the same alias.
 
 ## Repo-wide type check
 
