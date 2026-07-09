@@ -229,6 +229,92 @@ selected tab is in the page tab order (roving tabindex).
 </Table>
 ```
 
+### DataGrid
+
+A dense, virtualized table built on Table's own primitives (real `<table>` semantics, not an ARIA
+grid pattern). Fixed-height rows let a windowed `<tbody>` — two spacer rows plus whatever is near
+the viewport — stand in correctly for the full row count, which is what makes 1,000+ rows scroll
+smoothly. Cell content is clipped to a single line to guarantee that fixed height holds.
+
+| Prop                                                     | Type                              | Notes                                                                       |
+| -------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------- |
+| `caption`                                                | `string`                          | Required, names the grid                                                    |
+| `columns`                                                | `readonly DataGridColumn<TRow>[]` | `{ id, header, renderCell, sortable?, width?, align? }`                     |
+| `rows`                                                   | `readonly TRow[]`                 | The current page. DataGrid never sorts or paginates it — see below          |
+| `getRowId`                                               | `(row: TRow) => string`           | Required                                                                    |
+| `rowHeight` / `height` / `overscan`                      | `number`                          | Defaults `44` / `480` / `8`. `rowHeight` must match the rendered row height |
+| `sort` / `defaultSort` / `onSortChange`                  | `DataGridSort \| null`            | Controlled or uncontrolled, like every other primitive                      |
+| `selectable`, `selectedRowIds`, `onSelectedRowIdsChange` |                                   | Renders a checkbox column                                                   |
+| `loading`, `empty`                                       |                                   | Forwarded straight to `TableBody`                                           |
+
+**Sorting never reorders `rows`.** Clicking a sortable header cycles `none → asc → desc → none` and
+calls `onSortChange` — the actual sort has to happen wherever the data comes from, because paired
+with cursor pagination it can only be correct server-side; a client-side sort would just reorder
+one page.
+
+**Selection is scoped to the loaded page.** The header checkbox selects or clears every row
+currently in `rows`, not "every row across every page" — DataGrid has no idea how many pages
+exist, only the app does.
+
+```tsx
+<DataGrid
+  caption="Enrollments"
+  columns={[
+    { id: "student", header: "Student", renderCell: (row) => row.student, sortable: true },
+    { id: "score", header: "Score", renderCell: (row) => `${row.score}%`, align: "end" },
+  ]}
+  rows={rows}
+  getRowId={(row) => row.id}
+  sort={sort}
+  onSortChange={setSort}
+/>
+```
+
+#### useCursorPagination
+
+Drives a single page of a cursor-paginated list against any API shaped like `{ items, nextCursor }`
+— the response-side counterpart to `@studafy/shared-schemas`' `paginationQuerySchema`
+(`{ limit, cursor? }`). No dependency on that package is added; the hook just shape-matches it.
+
+```tsx
+const { items, loading, hasNextPage, hasPreviousPage, goToNextPage, goToPreviousPage } =
+  useCursorPagination(fetchPage);
+```
+
+`fetchPage`'s identity is the cache key: memoize it with `useCallback` over the filters and sort
+state it captures, and changing it resets back to the first page. Cursors are forward-only, so
+"previous" is answered by replaying a stack of cursors already visited, not by asking the server —
+there is no server request that means "go back".
+
+### FilterBar
+
+Search, a date range, and removable filter chips. FilterBar holds UI state only: it does not read
+or write the URL, and it does not decide what a chip means — it just renders the ones it is given
+and reports removals.
+
+| Prop                                                 | Notes                                                              |
+| ---------------------------------------------------- | ------------------------------------------------------------------ |
+| `search`, `defaultSearch`, `onSearchChange`          | Controlled or uncontrolled, like Input                             |
+| `dateRange`, `defaultDateRange`, `onDateRangeChange` | `{ from?, to? }`, ISO dates                                        |
+| `chips`, `onRemoveChip`                              | `{ id, label }[]`; omitting `onRemoveChip` hides the remove button |
+| `onClearAll`, `clearAllLabel`                        | Rendered whenever `onClearAll` is passed, chips or not             |
+
+```tsx
+<FilterBar
+  search={search}
+  onSearchChange={setSearch}
+  dateRange={dateRange}
+  onDateRangeChange={setDateRange}
+  chips={activeChips}
+  onRemoveChip={(id) => removeFilter(id)}
+  onClearAll={activeChips.length > 0 ? clearAllFilters : undefined}
+/>
+```
+
+Bookmarkable filtered views are a page concern, not FilterBar's: pair it with the pure
+`serializeFilterBarState(state)` / `parseFilterBarState(params)` functions and your router's own
+search params, rather than having the component touch `window.location` itself.
+
 ## Accessibility guidelines
 
 Every component targets **WCAG 2.2 AA** and is covered by an `axe-core` assertion in its test file.

@@ -23,6 +23,8 @@
 @import "./components/card/card.css";
 @import "./components/checkbox/checkbox.css";
 @import "./components/chip/chip.css";
+@import "./components/data-grid/data-grid.css";
+@import "./components/filter-bar/filter-bar.css";
 @import "./components/input/input.css";
 @import "./components/modal/modal.css";
 @import "./components/radio/radio.css";

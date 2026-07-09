@@ -22,6 +22,26 @@ export type { CheckboxProps } from "./components/checkbox";
 export { Chip } from "./components/chip";
 export type { ChipProps, ChipVariant } from "./components/chip";
 
+export { DataGrid, useCursorPagination } from "./components/data-grid";
+export type {
+  CursorPage,
+  DataGridAlign,
+  DataGridColumn,
+  DataGridProps,
+  DataGridSort,
+  DataGridSortDirection,
+  FetchCursorPage,
+  UseCursorPaginationResult,
+} from "./components/data-grid";
+
+export { FilterBar, parseFilterBarState, serializeFilterBarState } from "./components/filter-bar";
+export type {
+  DateRangeValue,
+  FilterBarChip,
+  FilterBarProps,
+  FilterBarState,
+} from "./components/filter-bar";
+
 export { Input } from "./components/input";
 export type { InputProps } from "./components/input";
 
