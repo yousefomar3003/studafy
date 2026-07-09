@@ -3,3 +3,24 @@ dist/
 storybook-static/
 .turbo/
 *.tsbuildinfo
+
+# Terraform — see infra/terraform/README.md
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+# Local overrides used for offline planning; never committed.
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# Variable files may carry secrets, so they are ignored by default. The committed
+# environment overlays are non-secret by construction and re-included explicitly.
+*.tfvars
+*.tfvars.json
+!infra/terraform/environments/**/*.tfvars
+# .terraform.lock.hcl is deliberately NOT ignored: it pins provider checksums.
