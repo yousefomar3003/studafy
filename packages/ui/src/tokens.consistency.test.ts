@@ -1,7 +1,7 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import { semanticColor } from "./theme";
+import { focusRing, motion, semanticColor, zIndex } from "./theme";
 
 /**
  * tokens.css is hand-authored to mirror theme.ts (see the header comment in both files).
@@ -86,6 +86,66 @@ describe("tokens.css matches theme.ts", () => {
 
       expect(actualLight).toBe(expectedLight.toLowerCase());
       expect(actualDark).toBe(expectedDark.toLowerCase());
+    }
+  });
+});
+
+/**
+ * Motion, z-index and focus-ring tokens are theme-independent, so they only ever live in the base
+ * `:root` block. `--focus-ring-color` is deliberately excluded: it aliases `--color-accent`, whose
+ * value is theme-dependent and already covered by the semantic-color test above.
+ */
+const themeIndependentVarNames: Record<string, string> = {
+  "duration-fast": motion.duration.fast,
+  "duration-base": motion.duration.base,
+  "duration-slow": motion.duration.slow,
+
+  "easing-standard": motion.easing.standard,
+  "easing-emphasized": motion.easing.emphasized,
+  "easing-exit": motion.easing.exit,
+
+  "z-base": String(zIndex.base),
+  "z-dropdown": String(zIndex.dropdown),
+  "z-sticky": String(zIndex.sticky),
+  "z-overlay": String(zIndex.overlay),
+  "z-modal": String(zIndex.modal),
+  "z-toast": String(zIndex.toast),
+  "z-tooltip": String(zIndex.tooltip),
+
+  "focus-ring-width": focusRing.width,
+  "focus-ring-offset": focusRing.offset,
+};
+
+describe("tokens.css mirrors the theme-independent tokens", () => {
+  test("every motion, z-index and focus-ring variable resolves to the theme.ts value", async () => {
+    const css = await Bun.file(new URL("./tokens.css", import.meta.url)).text();
+    // `extractBlock` matches the first `:root {`, which is the base block. The later
+    // `prefers-reduced-motion` override is indented and therefore never matched here — correct,
+    // since we are asserting the unreduced values.
+    const declarations = extractBlock(css, ":root {");
+
+    for (const [varName, expected] of Object.entries(themeIndependentVarNames)) {
+      // eslint-disable-next-line security/detect-object-injection -- `varName` is drawn only from the fixed themeIndependentVarNames map, never external input
+      const declared = declarations[varName];
+      expect(declared, `tokens.css is missing --${varName}`).toBeDefined();
+      expect(resolveVar(declared, declarations)).toBe(expected);
+    }
+  });
+
+  test("focus ring colour aliases the theme-aware accent", async () => {
+    const css = await Bun.file(new URL("./tokens.css", import.meta.url)).text();
+    const declarations = extractBlock(css, ":root {");
+
+    expect(declarations["focus-ring-color"]).toBe("var(--color-accent)");
+  });
+
+  test("durations collapse under prefers-reduced-motion", async () => {
+    const css = await Bun.file(new URL("./tokens.css", import.meta.url)).text();
+    const reduced = extractBlock(css, "@media (prefers-reduced-motion: reduce)");
+
+    for (const name of ["duration-fast", "duration-base", "duration-slow"]) {
+      // eslint-disable-next-line security/detect-object-injection -- `name` is drawn only from the fixed literal array above, never external input
+      expect(reduced[name]).toBe("1ms");
     }
   });
 });
