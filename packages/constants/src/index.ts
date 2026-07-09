@@ -6,5 +6,7 @@ export { NOTIFICATION_TYPES } from "./notifications";
 export type { NotificationType } from "./notifications";
 export { PERMISSIONS, ROLE_PERMISSIONS } from "./permissions";
 export type { Permission } from "./permissions";
+export { QUEUE_NAMES } from "./queues";
+export type { QueueName } from "./queues";
 export { ROLES } from "./roles";
 export type { Role } from "./roles";
