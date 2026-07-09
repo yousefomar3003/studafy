@@ -379,4 +379,51 @@ export const elevation = {
   },
 } as const;
 
-export const theme = { color, semanticColor, font, space, radius, elevation } as const;
+/**
+ * Motion. Durations collapse to 1ms under `prefers-reduced-motion: reduce` (see tokens.css), so
+ * components may transition freely without each one re-implementing the media query.
+ */
+export const motion = {
+  duration: {
+    fast: "120ms",
+    base: "200ms",
+    slow: "320ms",
+  },
+  easing: {
+    standard: "cubic-bezier(0.2, 0, 0, 1)",
+    emphasized: "cubic-bezier(0.3, 0, 0, 1)",
+    exit: "cubic-bezier(0.4, 0, 1, 1)",
+  },
+} as const;
+
+/** Stacking order for layered surfaces. Gaps of 100 leave room for app-level layers between. */
+export const zIndex = {
+  base: 0,
+  dropdown: 1000,
+  sticky: 1100,
+  overlay: 1200,
+  modal: 1300,
+  toast: 1400,
+  tooltip: 1500,
+} as const;
+
+/**
+ * Focus ring geometry. The color is deliberately absent here: in CSS it aliases
+ * `--color-accent`, which is already theme-aware, so the ring flips with dark mode for free.
+ */
+export const focusRing = {
+  width: "2px",
+  offset: "2px",
+} as const;
+
+export const theme = {
+  color,
+  semanticColor,
+  font,
+  space,
+  radius,
+  elevation,
+  motion,
+  zIndex,
+  focusRing,
+} as const;

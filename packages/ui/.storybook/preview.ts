@@ -1,6 +1,7 @@
 import { withThemeByDataAttribute } from "@storybook/addon-themes";
 
-import "../src/tokens.css";
+// Aggregates tokens.css plus every component stylesheet — the same entry applications import.
+import "../src/styles.css";
 
 export default {
   parameters: {

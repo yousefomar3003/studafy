@@ -154,6 +154,38 @@
   --elevation-2: 0 2px 4px rgba(2, 6, 23, 0.08), 0 1px 2px rgba(2, 6, 23, 0.06);
   --elevation-3: 0 4px 8px rgba(2, 6, 23, 0.1), 0 2px 4px rgba(2, 6, 23, 0.06);
   --elevation-4: 0 8px 16px rgba(2, 6, 23, 0.12), 0 4px 8px rgba(2, 6, 23, 0.08);
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --easing-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --easing-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Z-index layering */
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-overlay: 1200;
+  --z-modal: 1300;
+  --z-toast: 1400;
+  --z-tooltip: 1500;
+
+  /* Focus ring — the color aliases the theme-aware accent, so it needs no dark override */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: var(--color-accent);
+}
+
+/* Collapse motion at the token level, so every consumer of a duration token honours the setting. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 1ms;
+    --duration-base: 1ms;
+    --duration-slow: 1ms;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
