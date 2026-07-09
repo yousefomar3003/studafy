@@ -10,6 +10,8 @@ Monorepo for the Studafy platform, managed with Bun workspaces and Turborepo.
 │   └── web/
 ├── packages/         shared libraries consumed by apps (each a Bun workspace)
 │   └── ui/
+├── infra/            infrastructure as code (not a Bun workspace)
+│   └── terraform/
 ├── docs/
 │   └── adr/          architecture decision records
 ├── bunfig.toml        Bun install/runtime config
@@ -40,3 +42,10 @@ up new workspaces automatically.
 
 See [ADR-000](docs/adr/0000-monorepo-tooling-choice.md) for why this repo uses
 Bun workspaces and Turborepo.
+
+## Infrastructure
+
+Cloud infrastructure is managed with Terraform under [`infra/terraform`](infra/terraform),
+which has its own [README](infra/terraform/README.md) covering remote state, environment
+overlays and module conventions. See
+[ADR-004](docs/adr/0004-infrastructure-as-code.md) for the reasoning behind that layout.
