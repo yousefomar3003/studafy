@@ -6,9 +6,10 @@ with native state locking.
 This directory is **not** a Bun workspace — it is not matched by the `apps/*` / `packages/*`
 globs in the root `package.json`, and Turbo does not run tasks against it.
 
-> **Status:** this is the IaC baseline. It declares no cloud resources yet — only the root
-> module, the remote-state backend and the shared `naming` module. `terraform apply` against a
-> configured backend produces outputs and nothing else. Resources land in follow-up work.
+> **Status:** the `naming` and `network` modules are live — a VPC, subnets, security groups
+> and a bastion host per environment. No compute or data tier exists yet (no ALB, no
+> ECS/EC2, no RDS/ElastiCache); those land in follow-up work and consume this module's
+> outputs (`db_subnet_group_name`, `app_security_group_id`, etc.).
 
 ## Folder structure
 
@@ -22,7 +23,8 @@ infra/terraform/
 ├── outputs.tf               root outputs
 ├── .terraform.lock.hcl      provider checksums — committed
 ├── modules/
-│   └── naming/              canonical name prefix + tag set
+│   ├── naming/              canonical name prefix + tag set
+│   └── network/             VPC, subnets, security groups, bastion
 └── environments/
     ├── dev/     { backend.hcl, dev.tfvars }
     ├── staging/ { backend.hcl, staging.tfvars }
