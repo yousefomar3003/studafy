@@ -33,3 +33,40 @@ variable "extra_tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "vpc_cidr" {
+  description = "IPv4 CIDR for this environment's VPC. Kept non-overlapping across environments so they can be VPC-peered later without renumbering."
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "az_count" {
+  description = "Number of availability zones the network module spreads subnets across (2 or 3)."
+  type        = number
+  default     = 2
+}
+
+variable "single_nat_gateway" {
+  description = "true: one shared NAT gateway (cheaper). false: one NAT gateway per AZ (highly available)."
+  type        = bool
+  default     = true
+}
+
+variable "bastion_allowed_ssh_cidrs" {
+  description = <<-EOT
+    CIDRs allowed to SSH into this environment's bastion. Deliberately has no default —
+    supply per environment via TF_VAR_bastion_allowed_ssh_cidrs, the same way application
+    secrets are passed (see README.md). Not committed to *.tfvars because it is
+    operator/office-specific, not a stable environment fact.
+  EOT
+  type        = list(string)
+}
+
+variable "bastion_key_name" {
+  description = <<-EOT
+    Name of an existing EC2 key pair for this environment's bastion. Supply via
+    TF_VAR_bastion_key_name; not committed to *.tfvars. Create the key pair out of band
+    first — Terraform does not create it (see modules/network/README.md).
+  EOT
+  type        = string
+}
