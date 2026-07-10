@@ -1,7 +1,11 @@
 # One ECR repository per long-running service (api, realtime, workers — the three services
-# ADR-004 already commits to a container deployment shape for; apps/web builds to a static bundle
-# and apps/mobile is not containerized, so neither gets a repository here), plus the identities
-# and signing key the supply-chain acceptance criteria hang off:
+# ADR-004 already commits to a container deployment shape for; apps/mobile is a native app, not
+# containerized, so it doesn't get one). apps/web now has a Dockerfile too
+# (infra/docker/web.Dockerfile) alongside its existing CDN-hosted static-bundle path — it's
+# deliberately still not in image_repository_names' default below because which of those two
+# deployment shapes actually ships hasn't been decided; see infra/docker/README.md's "Known gaps"
+# and docs/runbooks/supply-chain-security.md. Plus the identities and signing key the
+# supply-chain acceptance criteria hang off:
 #
 #   - module.registry.ci_push_role_arn   — assumed by CI via GitHub OIDC, push-only, no compute
 #     tier exists yet to assume it as anything other than a CI job (infra/terraform/README.md).

@@ -1,0 +1,67 @@
+# apps/api — Hono HTTP API on Bun.
+#
+# Build from the repo root so the build stage can reach bun.lock and the workspace packages
+# turbo resolves the build graph against:
+#   docker build -f infra/docker/api.Dockerfile -t studafy/api .
+#
+# apps/api has no workspace runtime dependencies (see apps/api/package.json), so `bun build`
+# produces a single self-contained apps/api/dist/index.js — the runtime stage copies only that
+# file and never installs node_modules, which is what keeps the final image small.
+
+ARG BUN_VERSION=1.3.14
+
+FROM oven/bun:${BUN_VERSION}-alpine AS build
+WORKDIR /app
+
+# Full source is copied in one layer (see .dockerignore for what's excluded). A manifest-only
+# COPY-then-source-COPY split was considered for finer-grained layer caching, but it requires
+# enumerating every apps/*/package.json and packages/*/package.json path in every one of the four
+# Dockerfiles and re-editing all of them whenever a workspace member is added or removed — the
+# cache mount below already makes repeat installs fast without that duplication.
+COPY . .
+
+# --ignore-scripts: the root package.json's "prepare" script runs `lefthook install`, which
+# expects a .git directory that .dockerignore deliberately excludes from the build context (and
+# which a container has no use for regardless). No dependency in this workspace needs an install
+# script to become usable — esbuild (via vite) resolves its platform binary through
+# optionalDependencies, not postinstall; verified locally with the same flag before adding it
+# here.
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile --ignore-scripts
+
+# turbo's task graph (dependsOn: ["^build"] in turbo.json) builds apps/api's workspace
+# dependencies before apps/api itself; today that's none, but the filter stays correct if that
+# changes rather than silently going stale.
+RUN bunx turbo run build --filter=@studafy/api
+
+FROM oven/bun:${BUN_VERSION}-alpine AS runtime
+WORKDIR /app
+
+# Fixed uid/gid rather than relying on whatever non-root user (if any) ships in the upstream
+# image, so the runtime identity is a property of this Dockerfile, not of oven/bun's internals.
+# WORKDIR itself is chowned, not just the dist/ copied into it: Bun's `--target bun` bundle
+# output writes to its current working directory on startup (confirmed empirically — a root-owned
+# CWD makes even a plain `bun dist/index.js` fail with "bun is unable to write files: AccessDenied"
+# before the app's own code runs), so the directory the process starts in must be writable by the
+# user it runs as, independent of which files happen to live there.
+RUN addgroup -g 10001 -S app \
+    && adduser -u 10001 -S -D -H -G app app \
+    && chown app:app /app
+
+COPY --from=build --chown=app:app /app/apps/api/dist ./dist
+
+USER app
+
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000
+
+EXPOSE 3000
+
+# No curl/wget dependency: bun's own fetch is always present in this image, so the check needs
+# nothing the alpine base doesn't already have. Liveness only (mirrors /healthz's own contract,
+# see apps/api/src/health.ts) — it does not assert readiness (/readyz).
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD bun -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["bun", "dist/index.js"]

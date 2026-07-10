@@ -45,8 +45,8 @@ convention.
 
 ## CI: build, push, sign
 
-Once a Dockerfile exists for a service (none does yet — see "Known gaps" below) and CI assumes
-`ci_push_role_arn`:
+Dockerfiles for `apps/api`, `apps/realtime` and `apps/workers` live in `infra/docker/` — see
+`infra/docker/README.md` for what each image contains. Once CI assumes `ci_push_role_arn`:
 
 ```bash
 REPO_URL="$(terraform -chdir=infra/terraform output -json registry_repository_urls | jq -r '.api')"
@@ -55,7 +55,12 @@ DIGEST_TAG="${REPO_URL}:$(git rev-parse --short HEAD)"
 aws ecr get-login-password --region "$(terraform -chdir=infra/terraform output -raw aws_region)" \
   | docker login --username AWS --password-stdin "${REPO_URL%%/*}"
 
-docker build -t "$DIGEST_TAG" apps/api
+# Build context is the repo root, not apps/api: apps/realtime and apps/workers depend on
+# packages/constants, and apps/web (nginx, not in this registry — see infra/docker/README.md's
+# "Known gaps") depends on packages/ui, neither of which exists inside apps/<name>/ alone. Using
+# the repo root uniformly for all four keeps the same invocation shape regardless of which image
+# is being built. See infra/docker/README.md for the full build/stage breakdown.
+docker build -f infra/docker/api.Dockerfile -t "$DIGEST_TAG" .
 docker push "$DIGEST_TAG"
 
 DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$DIGEST_TAG" | cut -d@ -f2)"
@@ -119,12 +124,15 @@ key spec, not an omitted setting). To rotate manually:
 
 ## Known gaps
 
-- No Dockerfile exists yet for `apps/api`, `apps/realtime` or `apps/workers` — the commands above
-  are what CI will run once one does, not a working pipeline today. Same status as
-  `modules/redis`'s "no compute tier exists yet" gap.
 - No `.github/workflows` file wires any of this together yet. `ci_push_role_arn`,
   `deploy_pull_role_arn`, `repository_urls` and `signing_key_alias` are the four outputs that
   workflow will consume once it's written — that's a separate, CI-scoped ticket.
-- `apps/web` (static bundle) and `apps/mobile` (native app) are deliberately not in
-  `image_repository_names` — neither is containerized, and adding a repository for either would be
-  provisioning ahead of a decision that hasn't been made.
+- `apps/web` and `apps/mobile` are not in `image_repository_names`. `apps/mobile` is a native app,
+  not containerized, and that's not in question. `apps/web` is more unsettled than this module's
+  original comment (still on `modules/registry/main.tf`) assumed: it now has a Dockerfile
+  (`infra/docker/web.Dockerfile`, nginx serving the static build) alongside its existing
+  CDN-hosted static-bundle path (`modules/cdn`) — two live deployment shapes, only one of which
+  has a registry repository. Adding `"web"` to `image_repository_names` is a one-line change
+  _if_ the containerized path is the one that ships; see `infra/docker/README.md`'s "Known gaps"
+  for the full context. Not resolved here — provisioning a repository ahead of that decision would
+  be the same "guessing at infrastructure" this doc already avoids elsewhere.
