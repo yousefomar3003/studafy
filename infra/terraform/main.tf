@@ -60,6 +60,38 @@ module "pgbouncer" {
   depends_on = [module.postgres]
 }
 
+module "secrets" {
+  source = "./modules/secrets"
+
+  name_prefix = module.naming.name_prefix
+
+  # api's runtime connects to Postgres through PgBouncer, not the master credential directly
+  # (docs/runbooks/postgres-conventions.md's "Master credential" section); realtime's and
+  # workers' entries match docs/runbooks/redis-conventions.md's DB-assignment table (workers =
+  # queues, realtime = pub/sub, api = none yet) and module.pgbouncer's own service_pools (all
+  # three services already get a connection budget there, ahead of the app code that will use it
+  # — same "ready before the code catches up" precedent).
+  services = {
+    api      = { shared_secret_arns = [module.pgbouncer.connection_secret_arn] }
+    realtime = { shared_secret_arns = [module.redis.auth_secret_arn] }
+    workers  = { shared_secret_arns = [module.redis.auth_secret_arn, module.pgbouncer.connection_secret_arn] }
+  }
+  app_secret_values = var.secrets_app_secret_values
+
+  postgres_connection_secret_arn = module.postgres.connection_secret_arn
+  postgres_rotation_days         = var.postgres_rotation_days
+
+  vpc_subnet_ids     = module.network.private_app_subnet_ids
+  security_group_ids = [module.network.secrets_rotation_security_group_id]
+
+  # module.postgres.connection_secret_arn only forces the secret *container* to exist first, not
+  # its *version* — the rotation Lambda's first invocation reads the version. Same reasoning as
+  # module.pgbouncer's own depends_on. module.redis and module.pgbouncer need no equivalent entry
+  # here: their ARNs are only used as opaque strings in an IAM policy document above, which never
+  # needs their secret *versions* to exist first.
+  depends_on = [module.postgres]
+}
+
 module "storage" {
   source = "./modules/storage"
 

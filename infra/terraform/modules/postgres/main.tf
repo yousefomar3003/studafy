@@ -108,6 +108,11 @@ resource "aws_secretsmanager_secret" "postgres" {
 resource "aws_secretsmanager_secret_version" "postgres" {
   secret_id = aws_secretsmanager_secret.postgres.id
   secret_string = jsonencode({
+    # "engine" isn't consumed by any caller in this repo today — it exists solely because
+    # modules/secrets's rotation Lambda (AWS's published SecretsManagerRDSPostgreSQLRotationSingleUser)
+    # requires it in exactly this shape and raises KeyError without it:
+    # https://github.com/aws-samples/aws-secrets-manager-rotation-lambdas/blob/master/SecretsManagerRDSPostgreSQLRotationSingleUser/lambda_function.py
+    engine   = "postgres"
     host     = aws_db_instance.this.address
     port     = var.port
     dbname   = var.database_name
@@ -115,4 +120,15 @@ resource "aws_secretsmanager_secret_version" "postgres" {
     password = random_password.master.result
     sslmode  = "require"
   })
+
+  # Seeds the secret's first version only. Once modules/secrets attaches rotation
+  # (aws_secretsmanager_secret_rotation) to this secret's ARN, AWS's published rotation Lambda
+  # calls PutSecretValue directly against the live database — a write this resource has no way to
+  # observe. Without ignore_changes, the next `terraform apply` would see secret_string still
+  # equal to random_password.master.result (Terraform state never learns about the Lambda's own
+  # write) and silently overwrite the rotated password back to the original one, locking out every
+  # connection using the current credential. See docs/runbooks/secrets-conventions.md.
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
 }

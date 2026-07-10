@@ -63,6 +63,11 @@ output "pgbouncer_security_group_id" {
   value       = aws_security_group.pgbouncer.id
 }
 
+output "secrets_rotation_security_group_id" {
+  description = "Security group ID to attach to the Secrets Manager RDS rotation Lambda (modules/secrets)."
+  value       = aws_security_group.secrets_rotation.id
+}
+
 output "bastion_security_group_id" {
   description = "Security group ID of the bastion."
   value       = aws_security_group.bastion.id
