@@ -1,4 +1,0 @@
-{
-  "extends": "@studafy/tsconfig/packages.json",
-  "include": ["src"]
-}

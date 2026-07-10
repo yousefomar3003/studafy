@@ -1,8 +1,0 @@
-dist
-.turbo
-node_modules
-graphify-out
-bun.lock
-*.tsbuildinfo
-.claude
-.serena
