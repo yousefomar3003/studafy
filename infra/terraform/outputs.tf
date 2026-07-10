@@ -77,3 +77,23 @@ output "storage_backups_archive_bucket_arn" {
   description = "ARN of the backups-archive bucket, for scoping the IAM policy on the backup job's role."
   value       = module.storage.backups_archive_bucket_arn
 }
+
+output "registry_repository_urls" {
+  description = "Map of service name -> full ECR repository URL. See modules/registry/README.md and docs/runbooks/supply-chain-security.md."
+  value       = module.registry.repository_urls
+}
+
+output "registry_ci_push_role_arn" {
+  description = "IAM role CI assumes via GitHub OIDC to build, push and cosign-sign images."
+  value       = module.registry.ci_push_role_arn
+}
+
+output "registry_deploy_pull_role_arn" {
+  description = "IAM role a GitHub Actions run deploying to this environment assumes to pull and cosign-verify images."
+  value       = module.registry.deploy_pull_role_arn
+}
+
+output "registry_signing_key_alias" {
+  description = "KMS alias for the cosign signing key. Pass to cosign as awskms:///<this value>."
+  value       = module.registry.signing_key_alias
+}
