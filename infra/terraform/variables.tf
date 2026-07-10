@@ -88,6 +88,38 @@ variable "bastion_key_name" {
   type        = string
 }
 
+variable "edge_domain_name" {
+  description = <<-EOT
+    Public hostname the load balancer (module.edge) serves for this environment, e.g.
+    "api.studafy.com". staging and prod values are not guesses — they match what
+    apps/mobile/lib/src/core/config/app_environment.dart already hardcodes as the API base URL
+    for those flavors.
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$", var.edge_domain_name))
+    error_message = "edge_domain_name must be a bare hostname (e.g. \"api.studafy.com\"), no scheme, no path."
+  }
+}
+
+variable "route53_zone_name" {
+  description = "Name of the existing public Route 53 hosted zone edge_domain_name lives in, e.g. \"studafy.com\". Looked up by module.edge, not created by Terraform."
+  type        = string
+}
+
+variable "edge_create_dns_record" {
+  description = "Whether module.edge manages the alias A record for edge_domain_name. See modules/edge/variables.tf's create_dns_record for when to set this false."
+  type        = bool
+  default     = true
+}
+
+variable "edge_enable_deletion_protection" {
+  description = "Whether the ALB rejects deletion until this is turned off first. false by default (dev/staging); override true in prod.tfvars."
+  type        = bool
+  default     = false
+}
+
 variable "web_origin" {
   description = <<-EOT
     Scheme+host of the apps/web frontend for this environment, e.g. "https://app.studafy.com" or

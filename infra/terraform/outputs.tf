@@ -97,3 +97,33 @@ output "registry_signing_key_alias" {
   description = "KMS alias for the cosign signing key. Pass to cosign as awskms:///<this value>."
   value       = module.registry.signing_key_alias
 }
+
+output "edge_alb_dns_name" {
+  description = "Default AWS DNS name of the load balancer — target for a TLS scan/testssl.sh run (see modules/edge/README.md)."
+  value       = module.edge.alb_dns_name
+}
+
+output "edge_alb_arn" {
+  description = "ARN of the load balancer."
+  value       = module.edge.alb_arn
+}
+
+output "edge_domain_name" {
+  description = "Public hostname the load balancer serves. Same value as var.edge_domain_name, echoed here for scripting against `terraform output`."
+  value       = module.edge.domain_name
+}
+
+output "edge_https_listener_arn" {
+  description = "ARN of the HTTPS listener. A future compute-tier module attaches target groups/listener rules here."
+  value       = module.edge.https_listener_arn
+}
+
+output "edge_certificate_arn" {
+  description = "ARN of the validated ACM certificate bound to the HTTPS listener."
+  value       = module.edge.certificate_arn
+}
+
+output "edge_web_acl_arn" {
+  description = "ARN of the WAFv2 web ACL in front of the load balancer."
+  value       = module.edge.web_acl_arn
+}
