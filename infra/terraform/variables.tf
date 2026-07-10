@@ -101,9 +101,9 @@ variable "secrets_app_secret_values" {
     here still gets its container created, holding an empty JSON object rather than being absent —
     see modules/secrets/README.md.
   EOT
-  type      = map(map(string))
-  default   = {}
-  sensitive = true
+  type        = map(map(string))
+  default     = {}
+  sensitive   = true
 }
 
 variable "redis_port" {
@@ -202,6 +202,18 @@ variable "edge_enable_deletion_protection" {
   default     = false
 }
 
+variable "edge_idle_timeout" {
+  description = <<-EOT
+    Seconds an idle connection is kept open by the ALB before it closes it. modules/edge's own
+    default (60s) is fine for plain HTTP, but apps/realtime's /ws upgrade route (module.compute's
+    listener rule) now shares this same ALB — a WebSocket connection that only exchanges a
+    heartbeat every few minutes would otherwise be cut mid-session. Raise this in staging/prod's
+    tfvars once realtime is actually wired to the listener.
+  EOT
+  type        = number
+  default     = 60
+}
+
 variable "cdn_domain_name" {
   description = <<-EOT
     Public hostname module.cdn's CloudFront distribution serves the apps/web bundle at, e.g.
@@ -283,6 +295,52 @@ variable "dns_dmarc_ruf" {
   description = "Forensic DMARC report destination for dns_ses_domain, as a \"mailto:\" URI. null (default) omits ruf= from the record. See modules/dns/variables.tf's dmarc_ruf."
   type        = string
   default     = null
+}
+
+variable "mariadb_port" {
+  description = "TCP port the ERPNext plane's MariaDB instance listens on. Shared between module.network (security group rule) and module.mariadb (engine port) so the two can never drift apart — same convention as db_port/redis_port/pgbouncer_port above."
+  type        = number
+  default     = 3306
+
+  validation {
+    condition     = var.mariadb_port > 0 && var.mariadb_port <= 65535
+    error_message = "mariadb_port must be a valid TCP port (1-65535)."
+  }
+}
+
+variable "mariadb_instance_class" {
+  description = "RDS instance class for both members of the MariaDB HA pair. db.t4g.micro is dev-appropriate only — no researched staging/prod sizing exists yet, same honesty gap as postgres_instance_class."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "mariadb_deletion_protection" {
+  description = "Whether the MariaDB instance rejects deletion until this is turned off first. false by default; override true in staging/prod.tfvars."
+  type        = bool
+  default     = false
+}
+
+variable "mariadb_skip_final_snapshot" {
+  description = "true: destroy takes no final snapshot. false: destroy snapshots to a fixed name first — set false in staging/prod.tfvars. Same re-create caveat as postgres_skip_final_snapshot."
+  type        = bool
+  default     = true
+}
+
+variable "erpnext_port" {
+  description = "TCP port the ERPNext plane's frontend (nginx) listens on. Shared between module.network (security group rule) and module.erpnext (ALB target group / container port) so the two can never drift apart."
+  type        = number
+  default     = 8080
+
+  validation {
+    condition     = var.erpnext_port > 0 && var.erpnext_port <= 65535
+    error_message = "erpnext_port must be a valid TCP port (1-65535)."
+  }
+}
+
+variable "erpnext_image_tag" {
+  description = "Tag of module.registry's erpnext ECR repository to deploy for the backend/websocket/queue/scheduler roles. Bumping this and re-applying is how an ERPNext image update ships — see modules/erpnext/README.md's Known gaps for why there's no rolling-deploy script for this plane."
+  type        = string
+  default     = "latest"
 }
 
 variable "web_origin" {

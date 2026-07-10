@@ -1,15 +1,16 @@
-# Image build doc: apps/api, apps/workers, apps/realtime, apps/web
+# Image build doc: apps/api, apps/workers, apps/realtime, apps/web, ERPNext
 
-Four Dockerfiles, one per deployable, plus a `.dockerignore` at the repo root (Docker only reads
+Five Dockerfiles, one per deployable, plus a `.dockerignore` at the repo root (Docker only reads
 `.dockerignore` from the build context root, and all four images build with the repo root as
 context — see "Why the build context is the repo root" below).
 
-| Service         | Dockerfile                         | Runtime base             | Listens on | Measured size\* |
-| --------------- | ---------------------------------- | ------------------------ | ---------- | --------------- |
-| `apps/api`      | `infra/docker/api.Dockerfile`      | `oven/bun:1.3.14-alpine` | 3000       | 147MB           |
-| `apps/workers`  | `infra/docker/workers.Dockerfile`  | `oven/bun:1.3.14-alpine` | —          | 148MB           |
-| `apps/realtime` | `infra/docker/realtime.Dockerfile` | `oven/bun:1.3.14-alpine` | 3001       | 147MB           |
-| `apps/web`      | `infra/docker/web.Dockerfile`      | `nginx:1.27-alpine`      | 8080       | 93MB            |
+| Service         | Dockerfile                         | Runtime base                | Listens on                       | Measured size\*                                           |
+| --------------- | ---------------------------------- | --------------------------- | -------------------------------- | --------------------------------------------------------- |
+| `apps/api`      | `infra/docker/api.Dockerfile`      | `oven/bun:1.3.14-alpine`    | 3000                             | 147MB                                                     |
+| `apps/workers`  | `infra/docker/workers.Dockerfile`  | `oven/bun:1.3.14-alpine`    | —                                | 148MB                                                     |
+| `apps/realtime` | `infra/docker/realtime.Dockerfile` | `oven/bun:1.3.14-alpine`    | 3001                             | 147MB                                                     |
+| `apps/web`      | `infra/docker/web.Dockerfile`      | `nginx:1.27-alpine`         | 8080                             | 93MB                                                      |
+| ERPNext plane   | `infra/docker/erpnext.Dockerfile`  | `frappe/erpnext:version-15` | none (role-dependent, see below) | not measured — not built in this ticket, see "Known gaps" |
 
 \* `docker images` size on this machine, x86_64, with the base images current as of 2026-07-10.
 Expect a few MB of drift as upstream Alpine/nginx/Bun patch releases land — see "Image size" below
@@ -169,8 +170,25 @@ provisions, `docs/runbooks/supply-chain-security.md` documents the `cosign sign`
 flow against those repositories' KMS signing key. That doc is updated alongside this one — see
 "Known gaps" below for exactly what changed.
 
+## ERPNext plane
+
+`infra/docker/erpnext.Dockerfile` doesn't follow the two-stage Bun shape above — see the
+Dockerfile's own header comment for why (no slim final artifact to build toward; it layers the
+Education app onto the official `frappe/erpnext` image in place). It has no single listen port or
+`ENTRYPOINT`: `infra/terraform/modules/erpnext`'s task-definition templates run four different
+commands against this one image (gunicorn for `backend`, node for `websocket`, `bench worker`/
+`bench schedule` for `queue`/`scheduler`) — the `frontend` role uses a separate, unmodified
+upstream image (`frappe/erpnext-nginx`) instead, since nginx doesn't need the Education app. See
+`infra/terraform/modules/erpnext/README.md`.
+
 ## Known gaps
 
+- **`infra/docker/erpnext.Dockerfile` has not been built or scanned.** Same "not exercised against
+  a live account" caveat as the Terraform modules that consume it
+  (`infra/terraform/modules/erpnext/README.md`) — no `docker build`, no trivy scan, no cosign
+  signing has been run against it in this ticket. Image size, the exact `bench get-app`/`bench
+build` output, and whether the pinned `version-15` tags of `frappe/erpnext` and
+  `frappe/education` are actually compatible with each other are all unverified.
 - **`apps/web` has no ECR repository.** `infra/terraform/modules/registry`'s
   `image_repository_names` default is `["api", "realtime", "workers"]`, with an explicit comment
   that `apps/web` "builds to a static bundle... so neither gets a repository here" — written

@@ -97,6 +97,28 @@ variable "pgbouncer_port" {
   }
 }
 
+variable "mariadb_port" {
+  description = "TCP port the ERPNext plane's MariaDB instance listens on. MariaDB's own conventional default, distinct from db_port (Postgres) so the two engines can never be confused in a security-group rule."
+  type        = number
+  default     = 3306
+
+  validation {
+    condition     = var.mariadb_port > 0 && var.mariadb_port <= 65535
+    error_message = "mariadb_port must be a valid TCP port (1-65535)."
+  }
+}
+
+variable "erpnext_port" {
+  description = "TCP port the ERPNext plane's frontend (nginx) listens on. Only the app tier may reach it (apps/api is the integration gateway) — see the erpnext security group."
+  type        = number
+  default     = 8080
+
+  validation {
+    condition     = var.erpnext_port > 0 && var.erpnext_port <= 65535
+    error_message = "erpnext_port must be a valid TCP port (1-65535)."
+  }
+}
+
 variable "bastion_allowed_ssh_cidrs" {
   description = "CIDRs allowed to SSH into the bastion (e.g. office/VPN egress IPs). Required and deliberately has no default: an operator must make an explicit choice rather than inherit an open one. 0.0.0.0/0 is rejected outright."
   type        = list(string)

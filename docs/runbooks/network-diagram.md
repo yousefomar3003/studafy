@@ -15,15 +15,15 @@ flowchart TB
         subgraph azA["Availability zone A"]
             direction TB
             pubA["public subnet\nALB · NAT gateway · bastion"]
-            appA["private-app subnet\n(future compute)"]
-            dataA["private-data subnet\nDB · Redis"]
+            appA["private-app subnet\napi/realtime/workers · ERPNext plane (staging/prod)"]
+            dataA["private-data subnet\nDB · Redis · MariaDB (staging/prod)"]
         end
 
         subgraph azB["Availability zone B"]
             direction TB
             pubB["public subnet\nALB · NAT gateway (if not single_nat_gateway)"]
-            appB["private-app subnet\n(future compute)"]
-            dataB["private-data subnet\nDB · Redis"]
+            appB["private-app subnet\napi/realtime/workers · ERPNext plane (staging/prod)"]
+            dataB["private-data subnet\nDB · Redis · MariaDB (staging/prod)"]
         end
 
         igw["Internet gateway"]
@@ -76,6 +76,12 @@ Only `alb` accepts traffic from the internet. Every other group accepts traffic 
 named security group in this diagram — never from a CIDR block (except the bastion's SSH
 ingress, which is a CIDR allowlist by necessity, and DNS/HTTPS egress rules, which target the
 VPC resolver or `app_egress_cidr_blocks`).
+
+**staging/prod only** (the ERPNext plane, `local.erpnext_plane_enabled` in `infra/terraform/main.tf`):
+two more groups follow the identical rule — `erpnext`'s only ingress source is `app` (apps/api is
+the ERPNext plane's integration gateway, not the ALB and not the internet), and `mariadb`'s only
+ingress sources are `erpnext` and the bastion. Full diagram:
+[`infra/terraform/modules/network/README.md`](../../infra/terraform/modules/network/README.md#security-groups).
 
 ## CIDR allocation
 

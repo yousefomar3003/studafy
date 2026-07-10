@@ -30,3 +30,8 @@ route53_zone_name = "studafy.com"
 # Kept as an explicit value rather than parsed out of web_origin (see variables.tf's
 # cdn_domain_name), matching the edge_domain_name / web_origin split already in this file.
 cdn_domain_name = "staging.studafy.com"
+
+# apps/realtime's /ws upgrade route (module.compute's listener rule) now shares this ALB with
+# apps/api — module.edge's own 60s default would cut an idle-but-open WebSocket mid-session.
+# 1 hour is a starting point, not a measured value against real client heartbeat behavior.
+edge_idle_timeout = 3600

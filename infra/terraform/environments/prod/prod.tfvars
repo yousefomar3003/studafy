@@ -42,6 +42,13 @@ cdn_enable_deletion_protection = true
 postgres_deletion_protection = true
 postgres_skip_final_snapshot = false
 
+# Same reasoning, same protection, for the ERPNext plane's MariaDB instance.
+mariadb_deletion_protection = true
+mariadb_skip_final_snapshot = false
+
+# Same WebSocket-idle-connection reasoning as staging.tfvars.
+edge_idle_timeout = 3600
+
 # prod is the sole owner of the studafy.com hosted zone (module.dns) — dev/staging only read it
 # via a data lookup, same as module.edge already did before this zone was Terraform-managed. If
 # studafy.com already resolves today (created by hand, pre-Terraform), see
