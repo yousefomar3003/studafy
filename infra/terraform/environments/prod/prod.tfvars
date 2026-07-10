@@ -28,3 +28,8 @@ route53_zone_name = "studafy.com"
 
 # ALB shouldn't disappear from a stray `terraform destroy`/console click in prod.
 edge_enable_deletion_protection = true
+
+# Postgres shouldn't disappear from a stray `terraform destroy`/console click either, and
+# destroy should leave a recoverable snapshot behind instead of discarding data outright.
+postgres_deletion_protection = true
+postgres_skip_final_snapshot = false

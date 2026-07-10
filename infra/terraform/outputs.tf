@@ -53,6 +53,21 @@ output "redis_auth_secret_arn" {
   value       = module.redis.auth_secret_arn
 }
 
+output "postgres_db_instance_id" {
+  description = "RDS instance identifier — pass to `aws rds reboot-db-instance --force-failover` for the dev failover drill (see modules/postgres/README.md)."
+  value       = module.postgres.db_instance_id
+}
+
+output "postgres_address" {
+  description = "Postgres write endpoint (host only). Combine with the credential in postgres_connection_secret_arn to connect."
+  value       = module.postgres.address
+}
+
+output "postgres_connection_secret_arn" {
+  description = "Secrets Manager ARN holding host, port, dbname, username, password and sslmode. Grant secretsmanager:GetSecretValue to the roles that need it — the password itself is never a Terraform output."
+  value       = module.postgres.connection_secret_arn
+}
+
 output "storage_app_files_bucket_id" {
   description = "Name of the app-files bucket. Pass to `aws s3api`/`aws s3` commands when verifying lifecycle rules and CORS (see modules/storage/README.md)."
   value       = module.storage.app_files_bucket_id

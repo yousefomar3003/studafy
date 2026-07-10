@@ -13,6 +13,7 @@ module "network" {
   vpc_cidr                  = var.vpc_cidr
   az_count                  = var.az_count
   single_nat_gateway        = var.single_nat_gateway
+  db_port                   = var.db_port
   redis_port                = var.redis_port
   bastion_allowed_ssh_cidrs = var.bastion_allowed_ssh_cidrs
   bastion_key_name          = var.bastion_key_name
@@ -26,6 +27,18 @@ module "redis" {
   security_group_ids = [module.network.redis_security_group_id]
   port               = var.redis_port
   node_type          = var.redis_node_type
+}
+
+module "postgres" {
+  source = "./modules/postgres"
+
+  name_prefix          = module.naming.name_prefix
+  db_subnet_group_name = module.network.db_subnet_group_name
+  security_group_ids   = [module.network.db_security_group_id]
+  port                 = var.db_port
+  instance_class       = var.postgres_instance_class
+  deletion_protection  = var.postgres_deletion_protection
+  skip_final_snapshot  = var.postgres_skip_final_snapshot
 }
 
 module "storage" {

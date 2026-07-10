@@ -52,6 +52,35 @@ variable "single_nat_gateway" {
   default     = true
 }
 
+variable "db_port" {
+  description = "TCP port Postgres listens on. Shared between module.network (security group rule) and module.postgres (engine port) so the two can never drift apart — the network module's own db_port default exists only for callers that don't also provision this module."
+  type        = number
+  default     = 5432
+
+  validation {
+    condition     = var.db_port > 0 && var.db_port <= 65535
+    error_message = "db_port must be a valid TCP port (1-65535)."
+  }
+}
+
+variable "postgres_instance_class" {
+  description = "RDS instance class for both members of the Postgres HA pair. db.t4g.micro is dev-appropriate only — no researched staging/prod sizing exists yet (same honesty gap as aws_region and redis_node_type above)."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "postgres_deletion_protection" {
+  description = "Whether the Postgres instance rejects deletion until this is turned off first. false by default (dev); override true in staging/prod.tfvars."
+  type        = bool
+  default     = false
+}
+
+variable "postgres_skip_final_snapshot" {
+  description = "true: destroy takes no final snapshot (dev, disposable). false: destroy snapshots to a fixed name first (see modules/postgres/variables.tf for the re-create caveat) — set false in staging/prod.tfvars."
+  type        = bool
+  default     = true
+}
+
 variable "redis_port" {
   description = "TCP port Redis listens on. Shared between module.network (security group rule) and module.redis (engine port) so the two can never drift apart — the network module's own redis_port default exists only for callers that don't also provision this module."
   type        = number
