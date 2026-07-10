@@ -24,3 +24,9 @@ web_origin = "http://localhost:5173"
 # stack is first applied for real, or point it at a zone dev actually owns.
 edge_domain_name  = "dev-api.studafy.com"
 route53_zone_name = "studafy.com"
+
+# Unused: module.cdn is not instantiated for dev (infra/terraform/main.tf's count) — dev serves
+# apps/web from the local Vite dev server (web_origin above), not a deployed bundle. Set only
+# because cdn_domain_name is a required root variable regardless of which modules consume it; not
+# a real host, and applying dev never touches it.
+cdn_domain_name = "dev.studafy.com"
