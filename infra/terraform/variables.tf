@@ -149,6 +149,63 @@ variable "edge_enable_deletion_protection" {
   default     = false
 }
 
+variable "dns_manage_zone" {
+  description = <<-EOT
+    Whether this environment's state owns the aws_route53_zone resource for route53_zone_name
+    (true) or only looks it up read-only (false, default) — see modules/dns/variables.tf's
+    manage_zone. Set true in exactly one environment's tfvars (prod.tfvars); setting it true in
+    more than one creates a second, competing public hosted zone with the same name.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "dns_protect_apex_from_spoofing" {
+  description = "Whether module.dns publishes \"v=spf1 -all\" and a reject-policy DMARC record on the bare route53_zone_name apex. Only takes effect when dns_manage_zone is true. See modules/dns/variables.tf."
+  type        = bool
+  default     = true
+}
+
+variable "dns_create_email_records" {
+  description = "Whether module.dns provisions the SES domain identity, DKIM, custom MAIL FROM and DMARC records for dns_ses_domain. false (default) — set true where an environment actually sends transactional email (prod.tfvars)."
+  type        = bool
+  default     = false
+}
+
+variable "dns_ses_domain" {
+  description = "Dedicated subdomain transactional email is sent from, e.g. \"mail.studafy.com\". Required whenever dns_create_email_records is true — see modules/dns/variables.tf's ses_domain for why this is never route53_zone_name itself."
+  type        = string
+  default     = null
+}
+
+variable "dns_mail_from_subdomain" {
+  description = "Label prepended to dns_ses_domain for SES's custom MAIL FROM domain, e.g. \"bounce\" -> \"bounce.mail.studafy.com\". See modules/dns/variables.tf's mail_from_subdomain."
+  type        = string
+  default     = "bounce"
+}
+
+variable "dns_dmarc_policy" {
+  description = "DMARC enforcement policy published for dns_ses_domain: none, quarantine or reject. This ticket's acceptance criteria call for \"quarantine\"; see modules/dns/variables.tf's dmarc_policy before tightening to \"reject\"."
+  type        = string
+  default     = "quarantine"
+}
+
+variable "dns_dmarc_rua" {
+  description = <<-EOT
+    Aggregate DMARC report destination for dns_ses_domain, as a "mailto:" URI, e.g.
+    "mailto:dmarc-reports@studafy.com". Required whenever dns_create_email_records is true — see
+    modules/dns/variables.tf's dmarc_rua for why this has no default.
+  EOT
+  type        = string
+  default     = null
+}
+
+variable "dns_dmarc_ruf" {
+  description = "Forensic DMARC report destination for dns_ses_domain, as a \"mailto:\" URI. null (default) omits ruf= from the record. See modules/dns/variables.tf's dmarc_ruf."
+  type        = string
+  default     = null
+}
+
 variable "web_origin" {
   description = <<-EOT
     Scheme+host of the apps/web frontend for this environment, e.g. "https://app.studafy.com" or

@@ -33,3 +33,22 @@ edge_enable_deletion_protection = true
 # destroy should leave a recoverable snapshot behind instead of discarding data outright.
 postgres_deletion_protection = true
 postgres_skip_final_snapshot = false
+
+# prod is the sole owner of the studafy.com hosted zone (module.dns) — dev/staging only read it
+# via a data lookup, same as module.edge already did before this zone was Terraform-managed. If
+# studafy.com already resolves today (created by hand, pre-Terraform), see
+# modules/dns/README.md's import note before the first apply of this flag.
+dns_manage_zone = true
+
+# prod is the only environment with a transactional-email requirement recorded anywhere in this
+# repo so far (apps/workers/docs/queue-catalog.md's `notifications` queue is not yet wired to a
+# sender). mail.studafy.com is a placeholder subdomain, not a confirmed name — update it if a
+# different sending subdomain is chosen before this is first applied for real.
+dns_create_email_records = true
+dns_ses_domain           = "mail.studafy.com"
+
+# Placeholder: no mail-receiving infrastructure exists anywhere in this repo yet, so this address
+# does not resolve to a real inbox today. Point it at wherever DMARC aggregate reports should
+# actually land (a shared inbox, or a DMARC report analyzer's ingestion address) before relying
+# on the "DMARC reports received" acceptance criterion.
+dns_dmarc_rua = "mailto:dmarc-reports@studafy.com"

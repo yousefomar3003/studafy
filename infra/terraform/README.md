@@ -6,15 +6,18 @@ with native state locking.
 This directory is **not** a Bun workspace — it is not matched by the `apps/*` / `packages/*`
 globs in the root `package.json`, and Turbo does not run tasks against it.
 
-> **Status:** `naming`, `network`, `redis`, `postgres`, `storage`, `registry` and `edge` are live —
-> a VPC, subnets, security groups and a bastion host per environment, a Redis 7 HA pair with TLS
-> and AUTH-token-in-Secrets-Manager, a Postgres 16 HA pair (RDS Multi-AZ) with TLS enforced,
+> **Status:** `naming`, `network`, `redis`, `postgres`, `storage`, `registry`, `edge` and `dns` are
+> live — a VPC, subnets, security groups and a bastion host per environment, a Redis 7 HA pair with
+> TLS and AUTH-token-in-Secrets-Manager, a Postgres 16 HA pair (RDS Multi-AZ) with TLS enforced,
 > encrypted gp3 storage, and its master credential in Secrets Manager, two private S3 buckets
 > (`app-files`, `backups-archive`) with SSE, versioning, lifecycle rules and single-origin CORS,
 > per-service ECR repositories with a cosign/KMS signing key and GitHub-OIDC-federated push/pull
-> IAM roles, and an internet-facing ALB with a DNS-validated ACM certificate, HTTP→HTTPS redirect,
+> IAM roles, an internet-facing ALB with a DNS-validated ACM certificate, HTTP→HTTPS redirect,
 > and a WAFv2 web ACL (OWASP core rule set, SQLi rule set, rate limits on `/auth` and
-> `/schools/register`). No compute tier exists yet (no ECS/EC2); that lands in follow-up work and
+> `/schools/register`), and a Terraform-owned public Route 53 zone (prod-owned, `dev`/`staging`
+> read-only) with a dedicated SES sending subdomain authenticated by SPF, DKIM and a
+> `p=quarantine` DMARC record — see `docs/runbooks/deliverability.md`. No compute tier exists yet
+> (no ECS/EC2); that lands in follow-up work and
 > consumes `module.network`'s `app_security_group_id`, `module.postgres`'s
 > `connection_secret_arn`, and `module.edge`'s `https_listener_arn`. Because no compute tier exists
 > yet, `module.edge` creates no target group and its HTTPS listener's default action is a fixed
@@ -44,7 +47,8 @@ infra/terraform/
 │   ├── postgres/            Postgres 16 HA pair (RDS Multi-AZ), TLS, master credential in Secrets Manager
 │   ├── storage/             app-files + backups-archive S3 buckets, SSE, versioning, CORS, lifecycle
 │   ├── registry/            Per-service ECR repos, cosign/KMS signing key, GitHub-OIDC push/pull IAM roles
-│   └── edge/                ALB, DNS-validated ACM cert, HTTP->HTTPS redirect, WAFv2 (OWASP core + SQLi + rate limits)
+│   ├── edge/                ALB, DNS-validated ACM cert, HTTP->HTTPS redirect, WAFv2 (OWASP core + SQLi + rate limits)
+│   └── dns/                 Route 53 zone (prod-owned), SES sending subdomain: SPF, DKIM, DMARC (p=quarantine)
 └── environments/
     ├── dev/     { backend.hcl, dev.tfvars }
     ├── staging/ { backend.hcl, staging.tfvars }
