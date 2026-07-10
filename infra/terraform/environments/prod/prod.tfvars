@@ -19,3 +19,12 @@ single_nat_gateway = false # one NAT gateway per AZ: no single point of failure 
 # anywhere in this repo (unlike apps/mobile, which already hardcodes api.studafy.com). Named
 # by analogy with that host. Update before this environment's first real deploy.
 web_origin = "https://app.studafy.com"
+
+# Not a guess: apps/mobile/lib/src/core/config/app_environment.dart already hardcodes this exact
+# host as the prod API base URL. edge_domain_name here just gives Terraform the same value the
+# mobile app already assumes exists.
+edge_domain_name  = "api.studafy.com"
+route53_zone_name = "studafy.com"
+
+# ALB shouldn't disappear from a stray `terraform destroy`/console click in prod.
+edge_enable_deletion_protection = true
