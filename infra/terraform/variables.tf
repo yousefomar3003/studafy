@@ -149,6 +149,32 @@ variable "edge_enable_deletion_protection" {
   default     = false
 }
 
+variable "cdn_domain_name" {
+  description = <<-EOT
+    Public hostname module.cdn's CloudFront distribution serves the apps/web bundle at, e.g.
+    "app.studafy.com" or "staging.studafy.com". Deliberately its own variable rather than parsed
+    out of web_origin — matches the existing edge_domain_name / web_origin split, where two
+    related-but-distinct hosts are each an explicit value. In practice this equals web_origin's
+    host portion for the same environment, because module.cdn's whole purpose is serving that
+    origin's static files; environments/<env>/<env>.tfvars sets both by hand rather than deriving
+    one from the other. Unused when var.environment is "dev" (module.cdn is not instantiated for
+    dev — see main.tf) but still required input, since root variables are evaluated regardless of
+    which modules end up using them.
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$", var.cdn_domain_name))
+    error_message = "cdn_domain_name must be a bare hostname (e.g. \"app.studafy.com\"), no scheme, no path."
+  }
+}
+
+variable "cdn_enable_deletion_protection" {
+  description = "Whether module.cdn's CloudFront distribution rejects deletion until this is turned off first (retain_on_delete). false by default (dev/staging); override true in prod.tfvars. Ignored when var.environment is \"dev\" (module.cdn is not instantiated there)."
+  type        = bool
+  default     = false
+}
+
 variable "web_origin" {
   description = <<-EOT
     Scheme+host of the apps/web frontend for this environment, e.g. "https://app.studafy.com" or

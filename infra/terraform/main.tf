@@ -66,3 +66,23 @@ module "edge" {
   create_dns_record          = var.edge_create_dns_record
   enable_deletion_protection = var.edge_enable_deletion_protection
 }
+
+# Not instantiated for dev: the ticket this module implements ("Provision CDN for web assets")
+# scopes it to "staging/prod origins", and dev's web_origin is the local Vite dev server
+# (http://localhost:5173) — nothing built to put behind a CDN there yet.
+module "cdn" {
+  source = "./modules/cdn"
+  count  = var.environment == "dev" ? 0 : 1
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  name_prefix                = module.naming.name_prefix
+  environment                = var.environment
+  domain_name                = var.cdn_domain_name
+  route53_zone_name          = var.route53_zone_name
+  github_oidc_provider_arn   = module.registry.github_oidc_provider_arn
+  enable_deletion_protection = var.cdn_enable_deletion_protection
+}
