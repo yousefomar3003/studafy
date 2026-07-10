@@ -6,17 +6,21 @@ with native state locking.
 This directory is **not** a Bun workspace — it is not matched by the `apps/*` / `packages/*`
 globs in the root `package.json`, and Turbo does not run tasks against it.
 
-> **Status:** `naming`, `network`, `redis`, `storage` and `registry` are live — a VPC, subnets,
-> security groups and a bastion host per environment, a Redis 7 HA pair with TLS and
+> **Status:** `naming`, `network`, `redis`, `storage`, `registry` and `edge` are live — a VPC,
+> subnets, security groups and a bastion host per environment, a Redis 7 HA pair with TLS and
 > AUTH-token-in-Secrets-Manager, two private S3 buckets (`app-files`, `backups-archive`) with
-> SSE, versioning, lifecycle rules and single-origin CORS, and per-service ECR repositories with a
-> cosign/KMS signing key and GitHub-OIDC-federated push/pull IAM roles. No compute or
-> relational-data tier exists yet (no ALB, no ECS/EC2, no RDS); those land in follow-up work and
-> consume `module.network`'s outputs (`db_subnet_group_name`, `app_security_group_id`, etc.).
-> Because no compute tier exists yet, "apps connect to Redis over TLS" is verified today with a
+> SSE, versioning, lifecycle rules and single-origin CORS, per-service ECR repositories with a
+> cosign/KMS signing key and GitHub-OIDC-federated push/pull IAM roles, and an internet-facing
+> ALB with a DNS-validated ACM certificate, HTTP→HTTPS redirect, and a WAFv2 web ACL (OWASP core
+> rule set, SQLi rule set, rate limits on `/auth` and `/schools/register`). No compute or
+> relational-data tier exists yet (no ECS/EC2, no RDS); those land in follow-up work and consume
+> `module.network`'s outputs (`db_subnet_group_name`, `app_security_group_id`, etc.) and
+> `module.edge`'s `https_listener_arn`. Because no compute tier exists yet, `module.edge` creates
+> no target group and its HTTPS listener's default action is a fixed `404` — see
+> `modules/edge/README.md`. Likewise "apps connect to Redis over TLS" is verified today with a
 > manual client against the dev endpoint, not through a deployed `apps/api`/`apps/workers` — see
-> `modules/redis/README.md`. Likewise, no code in this repo yet generates a pre-signed URL against
-> `module.storage`'s buckets — see `docs/runbooks/storage-conventions.md` — and no Dockerfile or
+> `modules/redis/README.md`; no code in this repo yet generates a pre-signed URL against
+> `module.storage`'s buckets — see `docs/runbooks/storage-conventions.md`; and no Dockerfile or
 > CI workflow yet pushes into `module.registry`'s repositories — see
 > `docs/runbooks/supply-chain-security.md`.
 
@@ -36,7 +40,8 @@ infra/terraform/
 │   ├── network/             VPC, subnets, security groups, bastion
 │   ├── redis/               Redis 7 HA pair, TLS, AUTH token in Secrets Manager
 │   ├── storage/             app-files + backups-archive S3 buckets, SSE, versioning, CORS, lifecycle
-│   └── registry/            Per-service ECR repos, cosign/KMS signing key, GitHub-OIDC push/pull IAM roles
+│   ├── registry/            Per-service ECR repos, cosign/KMS signing key, GitHub-OIDC push/pull IAM roles
+│   └── edge/                ALB, DNS-validated ACM cert, HTTP->HTTPS redirect, WAFv2 (OWASP core + SQLi + rate limits)
 └── environments/
     ├── dev/     { backend.hcl, dev.tfvars }
     ├── staging/ { backend.hcl, staging.tfvars }

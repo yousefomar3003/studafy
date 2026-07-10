@@ -41,3 +41,15 @@ module "registry" {
   name_prefix = module.naming.name_prefix
   environment = var.environment
 }
+
+module "edge" {
+  source = "./modules/edge"
+
+  name_prefix                = module.naming.name_prefix
+  public_subnet_ids          = module.network.public_subnet_ids
+  alb_security_group_id      = module.network.alb_security_group_id
+  domain_name                = var.edge_domain_name
+  route53_zone_name          = var.route53_zone_name
+  create_dns_record          = var.edge_create_dns_record
+  enable_deletion_protection = var.edge_enable_deletion_protection
+}
