@@ -34,6 +34,6 @@ output "certificate_arn" {
 }
 
 output "deploy_role_arn" {
-  description = "IAM role a GitHub Actions run deploying to the '${var.environment}' GitHub Environment assumes to sync the web bundle and invalidate the distribution. See docs/runbooks/cdn-cache-policy.md for the exact deploy commands."
+  description = "IAM role a GitHub Actions run deploying to the module's `environment` GitHub Environment assumes to sync the web bundle and invalidate the distribution. See docs/runbooks/cdn-cache-policy.md for the exact deploy commands."
   value       = aws_iam_role.deploy.arn
 }

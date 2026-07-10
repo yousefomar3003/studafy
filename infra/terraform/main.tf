@@ -55,6 +55,24 @@ module "registry" {
   environment = var.environment
 }
 
+module "dns" {
+  source = "./modules/dns"
+
+  name_prefix = module.naming.name_prefix
+  aws_region  = var.aws_region
+  zone_name   = var.route53_zone_name
+
+  manage_zone                = var.dns_manage_zone
+  protect_apex_from_spoofing = var.dns_protect_apex_from_spoofing
+
+  create_email_records = var.dns_create_email_records
+  ses_domain           = var.dns_ses_domain
+  mail_from_subdomain  = var.dns_mail_from_subdomain
+  dmarc_policy         = var.dns_dmarc_policy
+  dmarc_rua            = var.dns_dmarc_rua
+  dmarc_ruf            = var.dns_dmarc_ruf
+}
+
 module "edge" {
   source = "./modules/edge"
 

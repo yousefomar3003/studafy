@@ -113,6 +113,26 @@ output "registry_signing_key_alias" {
   value       = module.registry.signing_key_alias
 }
 
+output "dns_zone_id" {
+  description = "Route 53 hosted zone ID for route53_zone_name. Pass to any future module that needs to add records into the same zone instead of doing its own data-source lookup."
+  value       = module.dns.zone_id
+}
+
+output "dns_zone_name_servers" {
+  description = "Authoritative name servers Route 53 assigned route53_zone_name. Only non-null where dns_manage_zone is true (prod). Compare against the domain registrar's delegation — see modules/dns/README.md's import note."
+  value       = module.dns.zone_name_servers
+}
+
+output "dns_ses_domain_identity_arn" {
+  description = "ARN of the verified SES domain identity for dns_ses_domain. Grant ses:SendEmail/ses:SendRawEmail scoped to this ARN on whatever role ends up sending transactional mail. Null where dns_create_email_records is false."
+  value       = module.dns.ses_domain_identity_arn
+}
+
+output "dns_ses_mail_from_domain" {
+  description = "Custom MAIL FROM domain transactional email must be sent through for SPF alignment to hold. Null where dns_create_email_records is false."
+  value       = module.dns.ses_mail_from_domain
+}
+
 output "edge_alb_dns_name" {
   description = "Default AWS DNS name of the load balancer — target for a TLS scan/testssl.sh run (see modules/edge/README.md)."
   value       = module.edge.alb_dns_name

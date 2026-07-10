@@ -14,7 +14,7 @@ output "ci_push_role_arn" {
 }
 
 output "deploy_pull_role_arn" {
-  description = "IAM role a GitHub Actions run deploying to the '${var.environment}' GitHub Environment assumes to pull and cosign-verify images. Assumable only from a workflow run tied to that named Environment."
+  description = "IAM role a GitHub Actions run deploying to the module's `environment` GitHub Environment assumes to pull and cosign-verify images. Assumable only from a workflow run tied to that named Environment."
   value       = aws_iam_role.deploy_pull.arn
 }
 
