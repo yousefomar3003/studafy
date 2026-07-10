@@ -86,6 +86,17 @@ variable "redis_port" {
   }
 }
 
+variable "pgbouncer_port" {
+  description = "TCP port PgBouncer listens on. Matches the pgbouncer project's own conventional default (distinct from Postgres's 5432, so a client that mistakenly points at the wrong port fails to connect instead of silently reaching the wrong tier)."
+  type        = number
+  default     = 6432
+
+  validation {
+    condition     = var.pgbouncer_port > 0 && var.pgbouncer_port <= 65535
+    error_message = "pgbouncer_port must be a valid TCP port (1-65535)."
+  }
+}
+
 variable "bastion_allowed_ssh_cidrs" {
   description = "CIDRs allowed to SSH into the bastion (e.g. office/VPN egress IPs). Required and deliberately has no default: an operator must make an explicit choice rather than inherit an open one. 0.0.0.0/0 is rejected outright."
   type        = list(string)

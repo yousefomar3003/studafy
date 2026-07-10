@@ -91,6 +91,22 @@ resource "aws_vpc_security_group_egress_rule" "app_to_redis" {
   referenced_security_group_id = aws_security_group.redis.id
 }
 
+# Additive, not a replacement for app_to_db: PgBouncer transaction-pooling mode is where the app
+# tier's runtime traffic is meant to go (see modules/pgbouncer), but transaction mode itself is
+# hostile to session-scoped operations — CREATE INDEX CONCURRENTLY, LISTEN/NOTIFY, prepared
+# statements, advisory locks held across statements — so migration/admin tooling running from the
+# app tier still needs the direct path to the database that app_to_db/db_from_app already provide.
+# Removing those rules the moment a pooler exists would just break that tooling; see
+# docs/runbooks/pgbouncer-conventions.md for which operations belong on which path.
+resource "aws_vpc_security_group_egress_rule" "app_to_pgbouncer" {
+  security_group_id            = aws_security_group.app.id
+  description                  = "To PgBouncer"
+  ip_protocol                  = "tcp"
+  from_port                    = var.pgbouncer_port
+  to_port                      = var.pgbouncer_port
+  referenced_security_group_id = aws_security_group.pgbouncer.id
+}
+
 # HTTPS egress for outbound API calls. Security groups filter by IP, not domain name,
 # so this is the coarsest control point available here — narrow app_egress_cidr_blocks
 # once third-party providers are chosen. Domain-level egress filtering needs a proxy
@@ -156,6 +172,15 @@ resource "aws_vpc_security_group_ingress_rule" "db_from_bastion" {
   referenced_security_group_id = aws_security_group.bastion.id
 }
 
+resource "aws_vpc_security_group_ingress_rule" "db_from_pgbouncer" {
+  security_group_id            = aws_security_group.db.id
+  description                  = "From PgBouncer"
+  ip_protocol                  = "tcp"
+  from_port                    = var.db_port
+  to_port                      = var.db_port
+  referenced_security_group_id = aws_security_group.pgbouncer.id
+}
+
 # --- Redis: reachable only from the app tier and the bastion -----------------------
 
 resource "aws_security_group" "redis" {
@@ -186,6 +211,78 @@ resource "aws_vpc_security_group_ingress_rule" "redis_from_bastion" {
   from_port                    = var.redis_port
   to_port                      = var.redis_port
   referenced_security_group_id = aws_security_group.bastion.id
+}
+
+# --- PgBouncer: reachable only from the app tier and the bastion; egresses to the db group --
+
+resource "aws_security_group" "pgbouncer" {
+  name_prefix = "${var.name_prefix}-pgbouncer-"
+  description = "PgBouncer: reachable only from the app tier and the bastion. Egresses to the database only."
+  vpc_id      = aws_vpc.this.id
+
+  tags = { Name = "${var.name_prefix}-pgbouncer" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "pgbouncer_from_app" {
+  security_group_id            = aws_security_group.pgbouncer.id
+  description                  = "From the app tier"
+  ip_protocol                  = "tcp"
+  from_port                    = var.pgbouncer_port
+  to_port                      = var.pgbouncer_port
+  referenced_security_group_id = aws_security_group.app.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "pgbouncer_from_bastion" {
+  security_group_id            = aws_security_group.pgbouncer.id
+  description                  = "From the bastion, for admin-console troubleshooting (SHOW POOLS/STATS)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.pgbouncer_port
+  to_port                      = var.pgbouncer_port
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "pgbouncer_to_db" {
+  security_group_id            = aws_security_group.pgbouncer.id
+  description                  = "To the database"
+  ip_protocol                  = "tcp"
+  from_port                    = var.db_port
+  to_port                      = var.db_port
+  referenced_security_group_id = aws_security_group.db.id
+}
+
+# HTTPS egress for the instance's own bootstrap: Secrets Manager (TLS cert + Postgres
+# credential), CloudWatch (PutMetricData for pool-saturation metrics), and OS package installs.
+# Same coarse IP-based control point as app_https above — not narrowed to AWS's published IP
+# ranges, since VPC endpoints for these services are out of scope for this module.
+resource "aws_vpc_security_group_egress_rule" "pgbouncer_https" {
+  security_group_id = aws_security_group.pgbouncer.id
+  description       = "HTTPS to Secrets Manager, CloudWatch and package repositories"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "pgbouncer_dns_tcp" {
+  security_group_id = aws_security_group.pgbouncer.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "tcp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
+}
+
+resource "aws_vpc_security_group_egress_rule" "pgbouncer_dns_udp" {
+  security_group_id = aws_security_group.pgbouncer.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "udp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
 }
 
 # --- Bastion: audited SSH jump host for DB/Redis administration --------------------
@@ -229,6 +326,15 @@ resource "aws_vpc_security_group_egress_rule" "bastion_to_redis" {
   from_port                    = var.redis_port
   to_port                      = var.redis_port
   referenced_security_group_id = aws_security_group.redis.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_to_pgbouncer" {
+  security_group_id            = aws_security_group.bastion.id
+  description                  = "To PgBouncer, for admin-console troubleshooting"
+  ip_protocol                  = "tcp"
+  from_port                    = var.pgbouncer_port
+  to_port                      = var.pgbouncer_port
+  referenced_security_group_id = aws_security_group.pgbouncer.id
 }
 
 resource "aws_vpc_security_group_egress_rule" "bastion_https" {

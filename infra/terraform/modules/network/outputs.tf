@@ -58,6 +58,11 @@ output "redis_security_group_id" {
   value       = aws_security_group.redis.id
 }
 
+output "pgbouncer_security_group_id" {
+  description = "Security group ID to attach to PgBouncer's compute."
+  value       = aws_security_group.pgbouncer.id
+}
+
 output "bastion_security_group_id" {
   description = "Security group ID of the bastion."
   value       = aws_security_group.bastion.id
