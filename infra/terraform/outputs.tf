@@ -52,3 +52,28 @@ output "redis_auth_secret_arn" {
   description = "Secrets Manager ARN holding the Redis AUTH token, endpoints, port and DB assignment. Grant secretsmanager:GetSecretValue to the roles that need it — the AUTH token itself is never a Terraform output."
   value       = module.redis.auth_secret_arn
 }
+
+output "storage_app_files_bucket_id" {
+  description = "Name of the app-files bucket. Pass to `aws s3api`/`aws s3` commands when verifying lifecycle rules and CORS (see modules/storage/README.md)."
+  value       = module.storage.app_files_bucket_id
+}
+
+output "storage_app_files_bucket_arn" {
+  description = "ARN of the app-files bucket, for scoping the IAM policy on whatever role generates pre-signed URLs."
+  value       = module.storage.app_files_bucket_arn
+}
+
+output "storage_app_files_bucket_regional_domain_name" {
+  description = "Regional virtual-hosted-style domain of app-files, for constructing pre-signed URLs."
+  value       = module.storage.app_files_bucket_regional_domain_name
+}
+
+output "storage_backups_archive_bucket_id" {
+  description = "Name of the backups-archive bucket."
+  value       = module.storage.backups_archive_bucket_id
+}
+
+output "storage_backups_archive_bucket_arn" {
+  description = "ARN of the backups-archive bucket, for scoping the IAM policy on the backup job's role."
+  value       = module.storage.backups_archive_bucket_arn
+}

@@ -14,3 +14,8 @@ vpc_cidr = "10.2.0.0/16"
 
 az_count           = 3
 single_nat_gateway = false # one NAT gateway per AZ: no single point of failure in prod
+
+# Placeholder, not a researched/confirmed domain: apps/web has no hosting decision recorded
+# anywhere in this repo (unlike apps/mobile, which already hardcodes api.studafy.com). Named
+# by analogy with that host. Update before this environment's first real deploy.
+web_origin = "https://app.studafy.com"

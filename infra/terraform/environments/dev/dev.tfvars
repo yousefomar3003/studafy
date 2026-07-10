@@ -14,3 +14,6 @@ vpc_cidr = "10.0.0.0/16"
 
 az_count           = 2
 single_nat_gateway = true # cost over HA in dev
+
+# The actual Vite dev server default (apps/web/README.md), not a guess.
+web_origin = "http://localhost:5173"
