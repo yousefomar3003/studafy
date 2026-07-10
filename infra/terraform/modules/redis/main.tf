@@ -31,7 +31,7 @@ resource "aws_elasticache_parameter_group" "this" {
 
 resource "aws_elasticache_replication_group" "this" {
   replication_group_id = "${var.name_prefix}-redis"
-  description = "Redis 7 HA pair for ${var.name_prefix}: logical db 0 = cache, db 1 = queues."
+  description          = "Redis 7 HA pair for ${var.name_prefix}: logical db 0 = cache, db 1 = queues."
 
   engine         = "redis"
   engine_version = var.engine_version

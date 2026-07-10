@@ -328,8 +328,10 @@ data "aws_iam_policy_document" "repository_policy" {
       variable = "aws:PrincipalArn"
       # ci_push also needs read access (BatchGetImage/DescribeImages) to resolve and confirm the
       # digest it just pushed (see EcrPush above) — it is exempted here for that reason, not
-      # because it's meant to pull unrelated images.
-      values = [aws_iam_role.ci_push.arn, aws_iam_role.deploy_pull.arn]
+      # because it's meant to pull unrelated images. additional_pull_role_arns is empty by default
+      # (see variables.tf) — it exists for the ECS task execution role, a third principal distinct
+      # from both ci_push and deploy_pull.
+      values = concat([aws_iam_role.ci_push.arn, aws_iam_role.deploy_pull.arn], var.additional_pull_role_arns)
     }
   }
 }

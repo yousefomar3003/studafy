@@ -107,6 +107,20 @@ resource "aws_vpc_security_group_egress_rule" "app_to_pgbouncer" {
   referenced_security_group_id = aws_security_group.pgbouncer.id
 }
 
+# apps/api is the integration gateway to the ERPNext plane — the only caller the erpnext security
+# group's ingress rule (below) allows in. No other member of the app tier calls ERPNext today, but
+# the rule is scoped to the whole app SG (not a narrower apps/api-only group) because this module
+# has never split app-tier compute by service — see app_ports' own per-service port list for the
+# same convention.
+resource "aws_vpc_security_group_egress_rule" "app_to_erpnext" {
+  security_group_id            = aws_security_group.app.id
+  description                  = "To the ERPNext plane (apps/api is the integration gateway)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.erpnext_port
+  to_port                      = var.erpnext_port
+  referenced_security_group_id = aws_security_group.erpnext.id
+}
+
 # HTTPS egress for outbound API calls. Security groups filter by IP, not domain name,
 # so this is the coarsest control point available here — narrow app_egress_cidr_blocks
 # once third-party providers are chosen. Domain-level egress filtering needs a proxy
@@ -211,6 +225,18 @@ resource "aws_vpc_security_group_ingress_rule" "redis_from_bastion" {
   from_port                    = var.redis_port
   to_port                      = var.redis_port
   referenced_security_group_id = aws_security_group.bastion.id
+}
+
+# The ERPNext plane reuses this Redis pair (separate logical DBs for its cache/queue, not a second
+# cluster — see docs/runbooks/redis-conventions.md's DB-assignment table), so it needs the same
+# ingress the app tier already has.
+resource "aws_vpc_security_group_ingress_rule" "redis_from_erpnext" {
+  security_group_id            = aws_security_group.redis.id
+  description                  = "From the ERPNext plane"
+  ip_protocol                  = "tcp"
+  from_port                    = var.redis_port
+  to_port                      = var.redis_port
+  referenced_security_group_id = aws_security_group.erpnext.id
 }
 
 # --- PgBouncer: reachable only from the app tier and the bastion; egresses to the db group --
@@ -347,7 +373,133 @@ resource "aws_vpc_security_group_egress_rule" "secrets_rotation_dns_udp" {
   ip_protocol       = "udp"
   from_port         = 53
   to_port           = 53
-  cidr_ipv4          = var.vpc_cidr
+  cidr_ipv4         = var.vpc_cidr
+}
+
+# --- MariaDB (ERPNext plane): reachable only from the erpnext tier and the bastion -------
+
+resource "aws_security_group" "mariadb" {
+  name_prefix = "${var.name_prefix}-mariadb-"
+  description = "MariaDB (ERPNext plane): reachable only from the erpnext tier and the bastion. No egress."
+  vpc_id      = aws_vpc.this.id
+
+  tags = { Name = "${var.name_prefix}-mariadb" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "mariadb_from_erpnext" {
+  security_group_id            = aws_security_group.mariadb.id
+  description                  = "From the ERPNext plane"
+  ip_protocol                  = "tcp"
+  from_port                    = var.mariadb_port
+  to_port                      = var.mariadb_port
+  referenced_security_group_id = aws_security_group.erpnext.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "mariadb_from_bastion" {
+  security_group_id            = aws_security_group.mariadb.id
+  description                  = "From the bastion"
+  ip_protocol                  = "tcp"
+  from_port                    = var.mariadb_port
+  to_port                      = var.mariadb_port
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
+# --- ERPNext (Frappe Education plane): reachable only from the app tier ------------------
+
+# The app tier is this group's only ingress source: apps/api is the integration gateway, and this
+# rule is the actual enforcement of that — not just naming. Nothing else (not the ALB, not the
+# internet, not the bastion) can reach the ERPNext frontend. modules/erpnext attaches its ECS
+# tasks' ENIs to this group and reuses it as the EFS mount targets' security group too (the
+# self-referencing NFS rule below), rather than this module creating a fourth group for a resource
+# that shares the exact same trust boundary.
+resource "aws_security_group" "erpnext" {
+  name_prefix = "${var.name_prefix}-erpnext-"
+  description = "ERPNext/Frappe Education plane: reachable only from the app tier (apps/api is the integration gateway)."
+  vpc_id      = aws_vpc.this.id
+
+  tags = { Name = "${var.name_prefix}-erpnext" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "erpnext_from_app" {
+  security_group_id            = aws_security_group.erpnext.id
+  description                  = "From the app tier (the integration gateway), to the ERPNext frontend"
+  ip_protocol                  = "tcp"
+  from_port                    = var.erpnext_port
+  to_port                      = var.erpnext_port
+  referenced_security_group_id = aws_security_group.app.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "erpnext_nfs_self" {
+  security_group_id            = aws_security_group.erpnext.id
+  description                  = "NFS for the shared EFS 'sites' volume, between ERPNext tasks and their EFS mount targets"
+  ip_protocol                  = "tcp"
+  from_port                    = 2049
+  to_port                      = 2049
+  referenced_security_group_id = aws_security_group.erpnext.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "erpnext_nfs_self" {
+  security_group_id            = aws_security_group.erpnext.id
+  description                  = "NFS for the shared EFS 'sites' volume, between ERPNext tasks and their EFS mount targets"
+  ip_protocol                  = "tcp"
+  from_port                    = 2049
+  to_port                      = 2049
+  referenced_security_group_id = aws_security_group.erpnext.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "erpnext_to_mariadb" {
+  security_group_id            = aws_security_group.erpnext.id
+  description                  = "To MariaDB"
+  ip_protocol                  = "tcp"
+  from_port                    = var.mariadb_port
+  to_port                      = var.mariadb_port
+  referenced_security_group_id = aws_security_group.mariadb.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "erpnext_to_redis" {
+  security_group_id            = aws_security_group.erpnext.id
+  description                  = "To Redis (erpnext cache/queue DB slots)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.redis_port
+  to_port                      = var.redis_port
+  referenced_security_group_id = aws_security_group.redis.id
+}
+
+# HTTPS egress for ECR image pulls, Secrets Manager and CloudWatch Logs — same coarse IP-based
+# control point as modules/pgbouncer's and the bastion's own HTTPS egress rules.
+resource "aws_vpc_security_group_egress_rule" "erpnext_https" {
+  security_group_id = aws_security_group.erpnext.id
+  description       = "HTTPS to ECR, Secrets Manager and CloudWatch"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "erpnext_dns_tcp" {
+  security_group_id = aws_security_group.erpnext.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "tcp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
+}
+
+resource "aws_vpc_security_group_egress_rule" "erpnext_dns_udp" {
+  security_group_id = aws_security_group.erpnext.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "udp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
 }
 
 # --- Bastion: audited SSH jump host for DB/Redis administration --------------------
@@ -400,6 +552,15 @@ resource "aws_vpc_security_group_egress_rule" "bastion_to_pgbouncer" {
   from_port                    = var.pgbouncer_port
   to_port                      = var.pgbouncer_port
   referenced_security_group_id = aws_security_group.pgbouncer.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_to_mariadb" {
+  security_group_id            = aws_security_group.bastion.id
+  description                  = "To MariaDB (ERPNext plane), for administration"
+  ip_protocol                  = "tcp"
+  from_port                    = var.mariadb_port
+  to_port                      = var.mariadb_port
+  referenced_security_group_id = aws_security_group.mariadb.id
 }
 
 resource "aws_vpc_security_group_egress_rule" "bastion_https" {

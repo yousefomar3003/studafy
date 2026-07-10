@@ -92,14 +92,15 @@ cosign verify --key "$KEY" "$(terraform output -json registry_repository_urls | 
 
 ## Inputs
 
-| Name                               | Type           | Default                          | Description                                                              |
-| ---------------------------------- | -------------- | -------------------------------- | ------------------------------------------------------------------------ |
-| `name_prefix`                      | `string`       | —                                | Resource name prefix, from `module.naming.name_prefix`.                  |
-| `environment`                      | `string`       | —                                | Scopes `deploy_pull`'s trust to the same-named GitHub Environment.       |
-| `github_repository`                | `string`       | `"yousefomar3003/studafy"`       | `<owner>/<repo>` allowed to assume the CI roles via OIDC.                |
-| `image_repository_names`           | `list(string)` | `["api", "realtime", "workers"]` | One repository per entry.                                                |
-| `untagged_image_expiration_days`   | `number`       | `14`                             | Lifecycle cleanup for untagged images.                                   |
-| `signing_key_deletion_window_days` | `number`       | `30`                             | KMS deletion waiting period (7-30) if the signing key is ever destroyed. |
+| Name                               | Type           | Default                                     | Description                                                                                                                 |
+| ---------------------------------- | -------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `name_prefix`                      | `string`       | —                                           | Resource name prefix, from `module.naming.name_prefix`.                                                                     |
+| `environment`                      | `string`       | —                                           | Scopes `deploy_pull`'s trust to the same-named GitHub Environment.                                                          |
+| `github_repository`                | `string`       | `"yousefomar3003/studafy"`                  | `<owner>/<repo>` allowed to assume the CI roles via OIDC.                                                                   |
+| `image_repository_names`           | `list(string)` | `["api", "realtime", "workers", "erpnext"]` | One repository per entry.                                                                                                   |
+| `additional_pull_role_arns`        | `list(string)` | `[]`                                        | Extra roles exempted from the pull-deny statement — the ECS task execution role (`modules/compute`) is the intended caller. |
+| `untagged_image_expiration_days`   | `number`       | `14`                                        | Lifecycle cleanup for untagged images.                                                                                      |
+| `signing_key_deletion_window_days` | `number`       | `30`                                        | KMS deletion waiting period (7-30) if the signing key is ever destroyed.                                                    |
 
 ## Outputs
 

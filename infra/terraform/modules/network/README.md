@@ -28,14 +28,26 @@ accepts traffic from a specific other security group in this module:
 ```
 internet ──► alb ──► app ──► db          (direct path: migrations/admin tooling)
                        ├────► redis
-                       └────► pgbouncer ──► db   (steady-state app traffic)
+                       ├────► pgbouncer ──► db   (steady-state app traffic)
+                       └────► erpnext ──► mariadb   (apps/api is the integration gateway —
+                               │           └► redis  the ERPNext plane's only ingress source)
+                               └► redis (self, EFS mount targets)
 bastion ───────────────────► db
                        ├────► redis
-                       └────► pgbouncer
+                       ├────► pgbouncer
+                       └────► mariadb
 secrets-rotation ───────────► db   (modules/secrets' rotation Lambda; not called inbound over
                                      the VPC network at all — Secrets Manager invokes it through
                                      the Lambda service API, this SG only governs its egress)
 ```
+
+`erpnext` (modules/erpnext) and `mariadb` (modules/mariadb) follow the same "reachable only from a
+named security group" rule as everything else: `erpnext`'s only ingress source is `app` —
+`apps/api` is the ERPNext plane's integration gateway, not the ALB and not the internet — and
+`mariadb`'s only ingress sources are `erpnext` and the bastion. `erpnext` also has a
+self-referencing NFS (2049) rule: its ECS tasks and their EFS mount targets (the shared Frappe
+`sites` volume) sit in this same group rather than a fifth one, since they share the exact trust
+boundary.
 
 `app`'s path to `db` is not removed now that `pgbouncer` exists — PgBouncer's transaction-pooling
 mode is hostile to session-scoped operations (`CREATE INDEX CONCURRENTLY`, `LISTEN`/`NOTIFY`,
@@ -101,6 +113,8 @@ module "network" {
 | `db_port`                   | `number`       | `5432`          | Placeholder (Postgres); no engine is chosen yet.                       |
 | `redis_port`                | `number`       | `6379`          | Matches the `ioredis` default used by `apps/workers`/`apps/realtime`.  |
 | `pgbouncer_port`            | `number`       | `6432`          | PgBouncer's conventional default port.                                 |
+| `mariadb_port`              | `number`       | `3306`          | ERPNext plane's MariaDB engine port.                                   |
+| `erpnext_port`              | `number`       | `8080`          | ERPNext frontend (nginx) port. Only the app tier may reach it.         |
 | `bastion_allowed_ssh_cidrs` | `list(string)` | —               | Required. CIDRs allowed to SSH into the bastion. `0.0.0.0/0` rejected. |
 | `bastion_key_name`          | `string`       | —               | Required. Name of an existing EC2 key pair.                            |
 | `bastion_instance_type`     | `string`       | `t3.micro`      | Bastion EC2 instance type.                                             |
@@ -110,21 +124,23 @@ module "network" {
 
 ## Outputs
 
-| Name                                       | Description                                                    |
-| ------------------------------------------ | -------------------------------------------------------------- |
-| `vpc_id`, `vpc_cidr`                       | The VPC.                                                       |
-| `public_subnet_ids`                        | One per AZ.                                                    |
-| `private_app_subnet_ids`                   | One per AZ.                                                    |
-| `private_data_subnet_ids`                  | One per AZ.                                                    |
-| `db_subnet_group_name`                     | For a future RDS module.                                       |
-| `elasticache_subnet_group_name`            | For a future ElastiCache module.                               |
-| `nat_gateway_public_ips`                   | App-tier outbound traffic always originates from one of these. |
-| `alb_security_group_id`                    | Attach to the load balancer.                                   |
-| `app_security_group_id`                    | Attach to app-tier compute.                                    |
-| `db_security_group_id`                     | Attach to the database.                                        |
-| `redis_security_group_id`                  | Attach to Redis.                                               |
-| `pgbouncer_security_group_id`              | Attach to PgBouncer's compute.                                 |
-| `secrets_rotation_security_group_id`       | Attach to the Secrets Manager RDS rotation Lambda.             |
-| `bastion_security_group_id`                | The bastion's own group.                                       |
-| `bastion_instance_id`, `bastion_public_ip` | The bastion instance.                                          |
-| `bastion_ssh_log_group_name`               | Where the SSH audit log lands.                                 |
+| Name                                       | Description                                                                      |
+| ------------------------------------------ | -------------------------------------------------------------------------------- |
+| `vpc_id`, `vpc_cidr`                       | The VPC.                                                                         |
+| `public_subnet_ids`                        | One per AZ.                                                                      |
+| `private_app_subnet_ids`                   | One per AZ.                                                                      |
+| `private_data_subnet_ids`                  | One per AZ.                                                                      |
+| `db_subnet_group_name`                     | For a future RDS module.                                                         |
+| `elasticache_subnet_group_name`            | For a future ElastiCache module.                                                 |
+| `nat_gateway_public_ips`                   | App-tier outbound traffic always originates from one of these.                   |
+| `alb_security_group_id`                    | Attach to the load balancer.                                                     |
+| `app_security_group_id`                    | Attach to app-tier compute.                                                      |
+| `db_security_group_id`                     | Attach to the database.                                                          |
+| `redis_security_group_id`                  | Attach to Redis.                                                                 |
+| `pgbouncer_security_group_id`              | Attach to PgBouncer's compute.                                                   |
+| `secrets_rotation_security_group_id`       | Attach to the Secrets Manager RDS rotation Lambda.                               |
+| `mariadb_security_group_id`                | Attach to the ERPNext plane's MariaDB instance (modules/mariadb).                |
+| `erpnext_security_group_id`                | Attach to the ERPNext plane's ECS tasks and EFS mount targets (modules/erpnext). |
+| `bastion_security_group_id`                | The bastion's own group.                                                         |
+| `bastion_instance_id`, `bastion_public_ip` | The bastion instance.                                                            |
+| `bastion_ssh_log_group_name`               | Where the SSH audit log lands.                                                   |

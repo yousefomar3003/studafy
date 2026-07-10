@@ -16,6 +16,8 @@ module "network" {
   db_port                   = var.db_port
   redis_port                = var.redis_port
   pgbouncer_port            = var.pgbouncer_port
+  mariadb_port              = var.mariadb_port
+  erpnext_port              = var.erpnext_port
   bastion_allowed_ssh_cidrs = var.bastion_allowed_ssh_cidrs
   bastion_key_name          = var.bastion_key_name
 }
@@ -60,6 +62,13 @@ module "pgbouncer" {
   depends_on = [module.postgres]
 }
 
+locals {
+  # module.mariadb/module.erpnext are staging/prod only (see their own count) — mirrors
+  # module.cdn's existing count = var.environment == "dev" ? 0 : 1 precedent, dev doesn't need
+  # the ERPNext plane.
+  erpnext_plane_enabled = var.environment != "dev"
+}
+
 module "secrets" {
   source = "./modules/secrets"
 
@@ -70,13 +79,34 @@ module "secrets" {
   # workers' entries match docs/runbooks/redis-conventions.md's DB-assignment table (workers =
   # queues, realtime = pub/sub, api = none yet) and module.pgbouncer's own service_pools (all
   # three services already get a connection budget there, ahead of the app code that will use it
-  # — same "ready before the code catches up" precedent).
-  services = {
-    api      = { shared_secret_arns = [module.pgbouncer.connection_secret_arn] }
-    realtime = { shared_secret_arns = [module.redis.auth_secret_arn] }
-    workers  = { shared_secret_arns = [module.redis.auth_secret_arn, module.pgbouncer.connection_secret_arn] }
-  }
-  app_secret_values = var.secrets_app_secret_values
+  # — same "ready before the code catches up" precedent). erpnext's entry only exists where the
+  # plane itself does (staging/prod) — its shared secrets are the ERPNext plane's own MariaDB and
+  # its Redis cache/queue DB slots (docs/runbooks/redis-conventions.md).
+  services = merge(
+    {
+      api      = { shared_secret_arns = [module.pgbouncer.connection_secret_arn] }
+      realtime = { shared_secret_arns = [module.redis.auth_secret_arn] }
+      workers  = { shared_secret_arns = [module.redis.auth_secret_arn, module.pgbouncer.connection_secret_arn] }
+    },
+    local.erpnext_plane_enabled ? {
+      erpnext = { shared_secret_arns = [module.mariadb[0].connection_secret_arn, module.redis.auth_secret_arn] }
+    } : {}
+  )
+
+  # erpnext's ADMIN_PASSWORD/ENCRYPTION_KEY are Terraform-generated (random_password below), not
+  # externally supplied like the rest of secrets_app_secret_values — merged in here rather than
+  # asked of the caller, since module.secrets is the one canonical place that owns
+  # "${name_prefix}/erpnext/app-secrets" (see modules/erpnext/README.md's "What this module does
+  # not do" for why modules/erpnext itself must not also create a secret at that same path).
+  app_secret_values = merge(
+    var.secrets_app_secret_values,
+    local.erpnext_plane_enabled ? {
+      erpnext = {
+        ADMIN_PASSWORD = random_password.erpnext_admin[0].result
+        ENCRYPTION_KEY = random_password.erpnext_encryption_key[0].result
+      }
+    } : {}
+  )
 
   postgres_connection_secret_arn = module.postgres.connection_secret_arn
   postgres_rotation_days         = var.postgres_rotation_days
@@ -92,6 +122,27 @@ module "secrets" {
   depends_on = [module.postgres]
 }
 
+# ERPNext's own generated secrets — not externally supplied (see module.secrets' app_secret_values
+# above for why these are computed here rather than asked of the caller via
+# secrets_app_secret_values). Ordinary random_password resources, same pattern modules/postgres
+# and modules/mariadb already use for their own master credentials.
+resource "random_password" "erpnext_admin" {
+  count = local.erpnext_plane_enabled ? 1 : 0
+
+  length  = 24
+  special = true
+}
+
+resource "random_password" "erpnext_encryption_key" {
+  count = local.erpnext_plane_enabled ? 1 : 0
+
+  # Frappe's encryption_key is conventionally a bench-generated base64 Fernet-style key. This is
+  # the closest Terraform can express on its own; swap for a bench-generated one before any
+  # load-bearing data depends on it — see modules/erpnext/README.md's "Known gaps".
+  length  = 32
+  special = false
+}
+
 module "storage" {
   source = "./modules/storage"
 
@@ -104,6 +155,11 @@ module "registry" {
 
   name_prefix = module.naming.name_prefix
   environment = var.environment
+
+  # The ECS task execution role is a third IAM principal (Fargate itself, pulling at task launch)
+  # distinct from ci_push/deploy_pull — see modules/registry's additional_pull_role_arns and
+  # infra/deploy/README.md's "Known gaps" #1.
+  additional_pull_role_arns = [module.compute.execution_role_arn]
 }
 
 module "dns" {
@@ -134,6 +190,7 @@ module "edge" {
   route53_zone_name          = var.route53_zone_name
   create_dns_record          = var.edge_create_dns_record
   enable_deletion_protection = var.edge_enable_deletion_protection
+  idle_timeout               = var.edge_idle_timeout
 }
 
 # Not instantiated for dev: the ticket this module implements ("Provision CDN for web assets")
@@ -154,4 +211,61 @@ module "cdn" {
   route53_zone_name          = var.route53_zone_name
   github_oidc_provider_arn   = module.registry.github_oidc_provider_arn
   enable_deletion_protection = var.cdn_enable_deletion_protection
+}
+
+# The ECS cluster, shared task-execution role, and api/realtime target groups + listener rules
+# infra/deploy/README.md and infra/terraform/README.md both called out as the missing "future
+# compute-tier module". Instantiated for every environment (dev included) — infra/deploy's own
+# environments/dev.env already assumed this scope before this module existed to fill it.
+module "compute" {
+  source = "./modules/compute"
+
+  name_prefix        = module.naming.name_prefix
+  vpc_id             = module.network.vpc_id
+  https_listener_arn = module.edge.https_listener_arn
+
+  secrets_service_iam_policy_arns = module.secrets.service_iam_policy_arns
+}
+
+# MariaDB for the ERPNext + Frappe Education plane. staging/prod only — see local.erpnext_plane_enabled.
+module "mariadb" {
+  source = "./modules/mariadb"
+  count  = local.erpnext_plane_enabled ? 1 : 0
+
+  name_prefix          = module.naming.name_prefix
+  db_subnet_group_name = module.network.db_subnet_group_name
+  security_group_ids   = [module.network.mariadb_security_group_id]
+  port                 = var.mariadb_port
+  instance_class       = var.mariadb_instance_class
+  deletion_protection  = var.mariadb_deletion_protection
+  skip_final_snapshot  = var.mariadb_skip_final_snapshot
+}
+
+# ERPNext + Frappe Education plane compute. staging/prod only. apps/api is this plane's sole
+# caller (the "integration gateway") — enforced by module.network's erpnext security group, not by
+# anything here. See modules/erpnext/README.md and docs/adr/0005-erpnext-education-plane.md.
+module "erpnext" {
+  source = "./modules/erpnext"
+  count  = local.erpnext_plane_enabled ? 1 : 0
+
+  name_prefix        = module.naming.name_prefix
+  aws_region         = var.aws_region
+  vpc_id             = module.network.vpc_id
+  cluster_arn        = module.compute.cluster_arn
+  execution_role_arn = module.compute.execution_role_arn
+
+  private_app_subnet_ids = module.network.private_app_subnet_ids
+  security_group_id      = module.network.erpnext_security_group_id
+  frontend_port          = var.erpnext_port
+
+  image_repository_url = module.registry.repository_urls["erpnext"]
+  image_tag            = var.erpnext_image_tag
+
+  mariadb_address                = module.mariadb[0].address
+  mariadb_port                   = var.mariadb_port
+  mariadb_connection_secret_arn  = module.mariadb[0].connection_secret_arn
+  redis_primary_endpoint_address = module.redis.primary_endpoint_address
+  redis_port                     = var.redis_port
+  redis_auth_secret_arn          = module.redis.auth_secret_arn
+  erpnext_secret_arn             = module.secrets.service_secret_arns["erpnext"]
 }

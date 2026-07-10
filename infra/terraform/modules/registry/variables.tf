@@ -37,7 +37,7 @@ variable "image_repository_names" {
     as new ones are scaffolded.
   EOT
   type        = list(string)
-  default     = ["api", "realtime", "workers"]
+  default     = ["api", "realtime", "workers", "erpnext"]
 
   validation {
     condition     = length(var.image_repository_names) > 0
@@ -48,6 +48,20 @@ variable "image_repository_names" {
     condition     = alltrue([for n in var.image_repository_names : can(regex("^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$", n))])
     error_message = "each image_repository_names entry must be a valid ECR repository path segment (lowercase alphanumeric, '.', '_', '-')."
   }
+}
+
+variable "additional_pull_role_arns" {
+  description = <<-EOT
+    Extra IAM role ARNs exempted from the DenyPullExceptCiPushAndDeployPull repository policy
+    statement (repository_policy.tf), alongside ci_push and deploy_pull. Exists for one reason:
+    the ECS task *execution* role (modules/compute) is a third, distinct IAM principal — it pulls
+    images at task launch on Fargate's behalf, and is neither ci_push (build-time) nor deploy_pull
+    (CI's own deploy-time identity) — so without this, every task launch would be denied by this
+    module's own least-privilege policy. See infra/deploy/README.md's "Known gaps" #1. Empty by
+    default so this module has no opinion on a compute tier that may not exist yet in every caller.
+  EOT
+  type        = list(string)
+  default     = []
 }
 
 variable "untagged_image_expiration_days" {

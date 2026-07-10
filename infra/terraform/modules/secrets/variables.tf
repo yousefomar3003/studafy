@@ -31,9 +31,9 @@ variable "app_secret_values" {
     present in var.services but absent here still gets its container created, holding "{}" — see
     main.tf's aws_secretsmanager_secret_version.app.
   EOT
-  type      = map(map(string))
-  default   = {}
-  sensitive = true
+  type        = map(map(string))
+  default     = {}
+  sensitive   = true
 }
 
 variable "postgres_connection_secret_arn" {

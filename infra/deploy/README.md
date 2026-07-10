@@ -1,12 +1,10 @@
-# Deploy manifests: `apps/api`, `apps/realtime`, `apps/workers`
+# Deploy manifests: `apps/api`, `apps/realtime`, `apps/workers`, the ERPNext plane
 
 ECS Fargate task-definition and service manifests, one per service per concern, plus the scripts
 that render and apply them. Target platform and why it's ECS (not Kubernetes or Compose), and why
 `apps/web` isn't here: see "Why ECS" and "Why not `apps/web`" below.
 
-**Read "Known gaps / prerequisites" before running anything in `scripts/`.** Two of this repo's
-existing resource policies actively block these manifests from working today, not just "nothing's
-wired up yet" — see the ECR bullet below in particular.
+**Read "Known gaps / prerequisites" before running anything in `scripts/`.**
 
 ## Layout
 
@@ -16,9 +14,16 @@ infra/deploy/
 │   ├── api/{task-definition,service}.json.tpl
 │   ├── realtime/{task-definition,service}.json.tpl
 │   └── workers/{task-definition,service}.json.tpl
+├── erpnext/seed/    — synthetic seed fixtures for the ERPNext plane's seed tenant (see its own README)
 ├── environments/{dev,staging,prod}.env    — replica counts, cpu/memory, rolling-update thresholds
-└── scripts/{render,deploy,rollback}.sh
+└── scripts/{render,deploy,rollback,populate-env,erpnext-new-site}.sh
 ```
+
+The ERPNext plane (`infra/terraform/modules/erpnext`) has no `ecs/erpnext/*.json.tpl` pair here —
+unlike api/realtime/workers, its ECS task definitions and services are Terraform-owned directly
+(`modules/erpnext/main.tf`), not rendered/applied by a script. See that module's README for why.
+`scripts/erpnext-new-site.sh` is a different kind of script entirely: a one-shot `bench new-site`
+job invocation, not a rolling service deploy.
 
 One `task-definition.json.tpl` + `service.json.tpl` pair per service, because `aws ecs
 register-task-definition` and `aws ecs create-service`/`update-service` are genuinely two separate
@@ -121,37 +126,46 @@ from the wrong ticket. Out of scope until that's resolved.
 
 ## Known gaps / prerequisites
 
-Nothing in `scripts/` can succeed yet. In order of how blocking each one is:
+Gaps 1–3 below are now closed by `infra/terraform/modules/compute` (the "future compute-tier
+module" this section used to describe as missing) — kept here, marked resolved, since this
+section is what a reader lands on when a `scripts/deploy.sh` run fails and needs to know why.
 
-1. **The ECR repository policy denies pulls to anyone but `ci_push`/`deploy_pull`.**
-   `modules/registry/main.tf`'s `DenyPullExceptCiPushAndDeployPull` statement means the ECS task
-   _execution_ role (a third IAM principal, distinct from both — the one Fargate itself assumes to
-   pull the image at task launch) will be denied, full stop, however this is deployed. This isn't
-   "not wired up yet" — it's an active `Deny` that has to be widened (add the execution role's ARN
-   to that statement's exception list) before a task can ever start. That's a `modules/registry`
-   change, out of this ticket's `infra/deploy` scope.
-2. **No ECS cluster, execution role, target group, or listener rule exists.**
-   `environments/*.env`'s `ECS_CLUSTER`, `ECS_EXECUTION_ROLE_ARN`, `PRIVATE_APP_SUBNET_IDS`,
-   `APP_SECURITY_GROUP_ID`, `API_TARGET_GROUP_ARN`, `REALTIME_TARGET_GROUP_ARN` are blank — nothing
-   in `infra/terraform` provisions them (`infra/terraform/README.md`'s status note; each is called
-   out as "future compute-tier module" in `modules/edge/README.md` and `modules/network/outputs.tf`
-   in spirit, if not literally exported yet).
-3. **`infra/terraform/outputs.tf` doesn't export `module.network.private_app_subnet_ids` or
-   `app_security_group_id` at the root** — only the module's own output does. `render.sh` doesn't
-   attempt to fetch these two dynamically for that reason; they're plain manual entries in
-   `environments/*.env` today. Adding the two root outputs is a one-line, low-risk follow-up but is
-   an `infra/terraform` change, so it isn't bundled into this `infra/deploy`-scoped ticket.
+1. ~~The ECR repository policy denies pulls to anyone but `ci_push`/`deploy_pull`.~~ **Resolved.**
+   `modules/registry`'s `additional_pull_role_arns` input is now set to
+   `[module.compute.execution_role_arn]` in the root module — the execution role is exempted from
+   `DenyPullExceptCiPushAndDeployPull` by name.
+2. ~~No ECS cluster, execution role, target group, or listener rule exists.~~ **Resolved.**
+   `modules/compute` provisions the cluster, the shared execution role, and the `api`/`realtime`
+   target groups + listener rules on `module.edge`'s HTTPS listener. Run
+   `scripts/populate-env.sh <env>` after `terraform apply` to fill `environments/<env>.env`'s
+   `ECS_CLUSTER`/`ECS_EXECUTION_ROLE_ARN`/`PRIVATE_APP_SUBNET_IDS`/`APP_SECURITY_GROUP_ID`/
+   `API_TARGET_GROUP_ARN`/`REALTIME_TARGET_GROUP_ARN` lines in place — it used to be a manual
+   `terraform output` copy-paste; now it's a script.
+3. ~~`infra/terraform/outputs.tf` doesn't export the two subnet/security-group values at the
+   root.~~ **Resolved.** `private_app_subnet_ids` and `app_security_group_id` are now root
+   outputs, which is exactly what `populate-env.sh` reads.
 4. **No task role exists for any service**, but none is referenced in `task-definition.json.tpl`
    either — none of `apps/api`/`apps/realtime`/`apps/workers` makes an AWS SDK call from
    application code today (secrets arrive via the execution role's injection, not app-level
    `GetSecretValue` calls), so `taskRoleArn` is correctly omitted, not forgotten. The moment any of
    the three starts calling AWS directly (e.g. presigned S3 URLs against `modules/storage`), it
    needs a task role — attach `secrets_service_iam_policy_arns.<service>` to it at that point
-   (`docs/runbooks/secrets-conventions.md`).
+   (`docs/runbooks/secrets-conventions.md`). Still open; unrelated to 1–3 above.
 
-Once 1–3 are resolved (compute-tier Terraform, a separate ticket), `scripts/deploy.sh` and
-`scripts/rollback.sh` are meant to work as written — they were exercised in this ticket only
-against `bash -n` and rendered-JSON validation (no AWS account to register/run against; same
+`scripts/deploy.sh` and `scripts/rollback.sh` are meant to work as written once `terraform apply`
+and `populate-env.sh` have run against a real AWS account — they were exercised in this ticket
+only against `bash -n` and rendered-JSON validation (no AWS account to register/run against; same
 "written without an account to test against" caveat `modules/pgbouncer/README.md` and
-`modules/registry/README.md` already carry). See `docs/runbooks/deploy-rollback.md` for the full
-deploy/rollback/verify walkthrough.
+`modules/registry/README.md` already carry, and that `modules/compute/README.md` and
+`modules/erpnext/README.md` now carry too). See `docs/runbooks/deploy-rollback.md` for the full
+deploy/rollback/verify walkthrough, and `docs/runbooks/environment-matrix.md` for the full
+apply-to-verify runbook across all three environments.
+
+## ERPNext + Frappe Education plane
+
+Not part of the three services above — a separate deploy path, since `bench new-site` is a one-shot
+job, not a rolling service deploy. `infra/deploy/scripts/erpnext-new-site.sh <staging|prod>
+<site-hostname> [--seed]` creates one school's site on the plane
+`infra/terraform/modules/erpnext` provisions. See that module's README for the plane's topology and
+`infra/deploy/erpnext/seed/README.md` for what `--seed` actually loads (synthetic placeholder data,
+not real anonymized records — this repo has no production data to anonymize).

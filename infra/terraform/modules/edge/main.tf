@@ -12,12 +12,12 @@
 # WAF payload test at, which is what this module's acceptance criteria actually require.
 
 resource "aws_lb" "this" {
-  name                = "${var.name_prefix}-alb"
-  internal            = false
-  load_balancer_type  = "application"
-  security_groups     = [var.alb_security_group_id]
-  subnets             = var.public_subnet_ids
-  idle_timeout        = var.idle_timeout
+  name               = "${var.name_prefix}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [var.alb_security_group_id]
+  subnets            = var.public_subnet_ids
+  idle_timeout       = var.idle_timeout
 
   enable_deletion_protection = var.enable_deletion_protection
 
@@ -42,8 +42,8 @@ resource "aws_lb" "this" {
 # reaches a target, so there is no plaintext path to anything behind this LB.
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
-  port               = 80
-  protocol           = "HTTP"
+  port              = 80
+  protocol          = "HTTP"
 
   default_action {
     type = "redirect"
@@ -58,10 +58,10 @@ resource "aws_lb_listener" "http" {
 
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.this.arn
-  port               = 443
-  protocol           = "HTTPS"
-  ssl_policy         = var.ssl_policy
-  certificate_arn    = aws_acm_certificate_validation.this.certificate_arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = var.ssl_policy
+  certificate_arn   = aws_acm_certificate_validation.this.certificate_arn
 
   default_action {
     type = "fixed-response"

@@ -23,6 +23,21 @@ output "vpc_id" {
   value       = module.network.vpc_id
 }
 
+output "private_app_subnet_ids" {
+  description = "Private app-tier subnet IDs, one per AZ. Closes infra/deploy/README.md's 'Known gaps' #3 — infra/deploy/scripts/populate-env.sh reads this to fill PRIVATE_APP_SUBNET_IDS."
+  value       = module.network.private_app_subnet_ids
+}
+
+output "app_security_group_id" {
+  description = "Security group ID for app-tier compute. Closes infra/deploy/README.md's 'Known gaps' #3 — infra/deploy/scripts/populate-env.sh reads this to fill APP_SECURITY_GROUP_ID."
+  value       = module.network.app_security_group_id
+}
+
+output "erpnext_security_group_id" {
+  description = "Security group ID for the ERPNext plane's ECS tasks. infra/deploy/scripts/erpnext-new-site.sh reads this for its run-task network configuration. Exists in every environment (module.network always creates it), even though the plane itself is staging/prod only."
+  value       = module.network.erpnext_security_group_id
+}
+
 output "nat_gateway_public_ips" {
   description = "Elastic IPs the app tier's outbound traffic originates from — share with third-party providers that need IP allowlisting."
   value       = module.network.nat_gateway_public_ips
@@ -223,4 +238,53 @@ output "cdn_domain_name" {
 output "cdn_deploy_role_arn" {
   description = "IAM role a GitHub Actions run deploying to this environment assumes to sync the web bundle and invalidate the CloudFront distribution. null in dev."
   value       = one(module.cdn[*].deploy_role_arn)
+}
+
+# --- Compute tier (modules/compute) — infra/deploy/scripts/populate-env.sh reads these ---------
+
+output "compute_ecs_cluster_name" {
+  description = "ECS cluster name. Pass as ECS_CLUSTER."
+  value       = module.compute.cluster_name
+}
+
+output "compute_ecs_execution_role_arn" {
+  description = "Shared ECS task execution role ARN. Pass as ECS_EXECUTION_ROLE_ARN."
+  value       = module.compute.execution_role_arn
+}
+
+output "compute_api_target_group_arn" {
+  description = "ALB target group ARN for apps/api. Pass as API_TARGET_GROUP_ARN."
+  value       = module.compute.api_target_group_arn
+}
+
+output "compute_realtime_target_group_arn" {
+  description = "ALB target group ARN for apps/realtime. Pass as REALTIME_TARGET_GROUP_ARN."
+  value       = module.compute.realtime_target_group_arn
+}
+
+# --- ERPNext plane (modules/mariadb, modules/erpnext) — null in dev (see local.erpnext_plane_enabled) ---
+
+output "mariadb_address" {
+  description = "MariaDB write endpoint (host only). null in dev."
+  value       = one(module.mariadb[*].address)
+}
+
+output "mariadb_connection_secret_arn" {
+  description = "Secrets Manager ARN holding MariaDB's host/port/username/password/tls. null in dev."
+  value       = one(module.mariadb[*].connection_secret_arn)
+}
+
+output "erpnext_internal_alb_dns_name" {
+  description = "AWS-assigned DNS name of the ERPNext plane's internal ALB — apps/api's only path in. Automatically resolvable in-VPC, no Route 53 record. null in dev."
+  value       = one(module.erpnext[*].internal_alb_dns_name)
+}
+
+output "erpnext_site_setup_task_definition_arn" {
+  description = "ARN of the inert site-setup task definition. Pass to infra/deploy/scripts/erpnext-new-site.sh. null in dev."
+  value       = one(module.erpnext[*].site_setup_task_definition_arn)
+}
+
+output "erpnext_cluster_service_names" {
+  description = "Map of role -> ECS service name for the five long-running ERPNext services, for `aws ecs describe-services` health checks (docs/runbooks/environment-matrix.md's verification steps). Empty map in dev."
+  value       = one(module.erpnext[*].cluster_service_names) == null ? {} : one(module.erpnext[*].cluster_service_names)
 }

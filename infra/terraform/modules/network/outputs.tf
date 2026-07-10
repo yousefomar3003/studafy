@@ -68,6 +68,16 @@ output "secrets_rotation_security_group_id" {
   value       = aws_security_group.secrets_rotation.id
 }
 
+output "mariadb_security_group_id" {
+  description = "Security group ID to attach to the ERPNext plane's MariaDB instance (modules/mariadb)."
+  value       = aws_security_group.mariadb.id
+}
+
+output "erpnext_security_group_id" {
+  description = "Security group ID to attach to the ERPNext plane's ECS tasks and EFS mount targets (modules/erpnext). Ingress is scoped to the app tier only — apps/api is the integration gateway."
+  value       = aws_security_group.erpnext.id
+}
+
 output "bastion_security_group_id" {
   description = "Security group ID of the bastion."
   value       = aws_security_group.bastion.id

@@ -8,10 +8,12 @@ the instance; it cannot enforce how callers connect to it.
 
 One Redis 7 HA pair is shared by cache and queue traffic, split by logical DB:
 
-| DB  | Purpose | Current consumers                                  |
-| --- | ------- | -------------------------------------------------- |
-| `0` | Cache   | None yet — no app in this repo does caching today. |
-| `1` | Queues  | `apps/workers` (BullMQ)                            |
+| DB  | Purpose       | Current consumers                                                                                                                                                                                                  |
+| --- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0` | Cache         | None yet — no app in this repo does caching today.                                                                                                                                                                 |
+| `1` | Queues        | `apps/workers` (BullMQ)                                                                                                                                                                                            |
+| `2` | ERPNext cache | The ERPNext + Frappe Education plane (`infra/terraform/modules/erpnext`), staging/prod only. Frappe's own RQ cache, unrelated to DB `0` — a separate job system on a separate keyspace, not this repo's own cache. |
+| `3` | ERPNext queue | Same plane, its bench worker/scheduler roles (RQ) — unrelated to DB `1`'s BullMQ queue, even though both are "queues": two different job systems that must never share keyspace.                                   |
 
 Select the DB in the connection URL path: `rediss://:<token>@<host>:6379/0` for cache,
 `.../1` for queues. Don't rely on the client default (DB 0) implicitly — state it in the URL so a
