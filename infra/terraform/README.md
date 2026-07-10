@@ -6,14 +6,17 @@ with native state locking.
 This directory is **not** a Bun workspace — it is not matched by the `apps/*` / `packages/*`
 globs in the root `package.json`, and Turbo does not run tasks against it.
 
-> **Status:** `naming`, `network`, `redis`, `postgres`, `pgbouncer`, `storage`, `registry`, `edge`,
-> `cdn` and `dns` are live —
+> **Status:** `naming`, `network`, `redis`, `postgres`, `pgbouncer`, `secrets`, `storage`,
+> `registry`, `edge`, `cdn` and `dns` are live —
 > a VPC, subnets, security groups and a bastion host per environment, a Redis 7 HA pair with TLS
 > and AUTH-token-in-Secrets-Manager, a Postgres 16 HA pair (RDS Multi-AZ) with TLS enforced,
 > encrypted gp3 storage, and its master credential in Secrets Manager, a single-instance PgBouncer
 > connection pooler in transaction-pooling mode in front of Postgres with per-service connection
 > budgets, self-signed client TLS, and pool-saturation metrics in CloudWatch — see
-> `docs/runbooks/pgbouncer-conventions.md` — two private S3 buckets
+> `docs/runbooks/pgbouncer-conventions.md` — a per-service application-secrets container in
+> Secrets Manager (`api`/`realtime`/`workers`) with a scoped read-only IAM policy per service, and
+> automatic rotation of the Postgres master credential via AWS's published RDS-Postgres rotation
+> Lambda — see `docs/runbooks/secrets-conventions.md` — two private S3 buckets
 > (`app-files`, `backups-archive`) with SSE, versioning, lifecycle rules and single-origin CORS,
 > per-service ECR repositories with a cosign/KMS signing key and GitHub-OIDC-federated push/pull
 > IAM roles, an internet-facing ALB with a DNS-validated ACM certificate, HTTP→HTTPS redirect,
@@ -35,8 +38,10 @@ globs in the root `package.json`, and Turbo does not run tasks against it.
 > reachable from the app subnet only" are verified today with a manual client against the dev
 > endpoint, not through a deployed `apps/api`/`apps/workers` — see `modules/redis/README.md` and
 > `docs/runbooks/postgres-conventions.md`; no code in this repo yet connects through
-> `module.pgbouncer` for the same reason — see `docs/runbooks/pgbouncer-conventions.md`; no code
-> in this repo yet generates a pre-signed URL against `module.storage`'s buckets — see
+> `module.pgbouncer` for the same reason — see `docs/runbooks/pgbouncer-conventions.md`; likewise,
+> no compute tier yet attaches `module.secrets`'s per-service IAM policies to anything or injects
+> a secret as a container environment variable — see `docs/runbooks/secrets-conventions.md`; no
+> code in this repo yet generates a pre-signed URL against `module.storage`'s buckets — see
 > `docs/runbooks/storage-conventions.md`; no
 > Dockerfile or CI workflow yet pushes into `module.registry`'s repositories — see
 > `docs/runbooks/supply-chain-security.md`; the same is true of `module.cdn`'s deploy role —
@@ -60,6 +65,7 @@ infra/terraform/
 │   ├── redis/               Redis 7 HA pair, TLS, AUTH token in Secrets Manager
 │   ├── postgres/            Postgres 16 HA pair (RDS Multi-AZ), TLS, master credential in Secrets Manager
 │   ├── pgbouncer/           Single-instance PgBouncer, transaction pooling, per-service pools, self-signed client TLS, pool metrics to CloudWatch
+│   ├── secrets/             Per-service app-secrets containers + IAM policies, Postgres credential rotation (SAR Lambda)
 │   ├── storage/             app-files + backups-archive S3 buckets, SSE, versioning, CORS, lifecycle
 │   ├── registry/            Per-service ECR repos, cosign/KMS signing key, GitHub-OIDC push/pull IAM roles
 │   ├── edge/                ALB, DNS-validated ACM cert, HTTP->HTTPS redirect, WAFv2 (OWASP core + SQLi + rate limits)
@@ -155,8 +161,13 @@ export AWS_SECRET_ACCESS_KEY=…
 
 In CI, use GitHub's OIDC provider to assume a role — no long-lived keys in secrets.
 
-Application secrets (`WS_JWT_SECRET`, `REDIS_URL`, …) do not belong in `*.tfvars`. Pass them as
-`TF_VAR_<name>` environment variables, or read them from a secrets manager in the configuration.
+Application secrets (`WS_JWT_SECRET`, …) do not belong in `*.tfvars`. Pass them as
+`TF_VAR_secrets_app_secret_values` — `module.secrets` writes them into a per-service Secrets
+Manager container; nothing reads them back out through `terraform output`. `REDIS_URL` and
+`DATABASE_URL` aren't secrets Terraform generates directly — they're assembled at deploy time from
+`module.redis`/`module.postgres`/`module.pgbouncer`'s own connection secrets (host, port,
+password, …), which is a future compute module's job, not this root module's. See
+`docs/runbooks/secrets-conventions.md`.
 
 ## Module conventions
 

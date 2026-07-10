@@ -32,6 +32,9 @@ internet ──► alb ──► app ──► db          (direct path: migrati
 bastion ───────────────────► db
                        ├────► redis
                        └────► pgbouncer
+secrets-rotation ───────────► db   (modules/secrets' rotation Lambda; not called inbound over
+                                     the VPC network at all — Secrets Manager invokes it through
+                                     the Lambda service API, this SG only governs its egress)
 ```
 
 `app`'s path to `db` is not removed now that `pgbouncer` exists — PgBouncer's transaction-pooling
@@ -41,6 +44,13 @@ advisory locks held across statements), so migration/admin tooling needs the dir
 
 `db` and `redis` have no egress rules at all — Terraform revokes AWS's default
 allow-all-outbound rule on creation, and this module never adds one back for those two groups.
+
+`secrets-rotation` has no ingress rules at all, unlike every other non-`alb` group in this list —
+AWS Secrets Manager invokes a rotation Lambda through the Lambda service API (outside the VPC
+entirely), never as an inbound network connection, so there is nothing for an ingress rule to
+permit. Its egress is 443 to Secrets Manager, the DB port to `db`, and DNS — the same shape as
+`pgbouncer`'s own egress rules, for the same reason (a VPC-attached compute unit that needs to
+call both an AWS API and the database).
 
 `app`'s egress is restricted to 443 (`app_egress_cidr_blocks`), the DB/Redis ports, and DNS to
 the VPC resolver — nothing else leaves the app tier. Security groups filter by IP, not by domain
@@ -114,6 +124,7 @@ module "network" {
 | `db_security_group_id`                     | Attach to the database.                                        |
 | `redis_security_group_id`                  | Attach to Redis.                                               |
 | `pgbouncer_security_group_id`              | Attach to PgBouncer's compute.                                 |
+| `secrets_rotation_security_group_id`       | Attach to the Secrets Manager RDS rotation Lambda.             |
 | `bastion_security_group_id`                | The bastion's own group.                                       |
 | `bastion_instance_id`, `bastion_public_ip` | The bastion instance.                                          |
 | `bastion_ssh_log_group_name`               | Where the SSH audit log lands.                                 |

@@ -81,6 +81,31 @@ variable "postgres_skip_final_snapshot" {
   default     = true
 }
 
+variable "postgres_rotation_days" {
+  description = "Days between automatic rotations of module.postgres's master credential via module.secrets. 30 is AWS's own commonly documented starting point for RDS rotation, not an unresearched placeholder like postgres_instance_class above."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.postgres_rotation_days >= 1
+    error_message = "postgres_rotation_days must be at least 1."
+  }
+}
+
+variable "secrets_app_secret_values" {
+  description = <<-EOT
+    Per-service application secrets (e.g. { realtime = { WS_JWT_SECRET = "..." } }), written into
+    each service's Secrets Manager container by module.secrets. Deliberately has no default and
+    must never be set in a *.tfvars file — supply via TF_VAR_secrets_app_secret_values, the same
+    convention this README already documents for WS_JWT_SECRET/REDIS_URL. A service with no entry
+    here still gets its container created, holding an empty JSON object rather than being absent —
+    see modules/secrets/README.md.
+  EOT
+  type      = map(map(string))
+  default   = {}
+  sensitive = true
+}
+
 variable "redis_port" {
   description = "TCP port Redis listens on. Shared between module.network (security group rule) and module.redis (engine port) so the two can never drift apart — the network module's own redis_port default exists only for callers that don't also provision this module."
   type        = number

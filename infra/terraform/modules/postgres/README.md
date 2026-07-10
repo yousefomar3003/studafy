@@ -16,6 +16,12 @@ failover) plus its master credential and connection info in Secrets Manager. Par
 - **It does not provision compute to connect to Postgres.** No ECS/EC2 exists yet
   (`infra/terraform/README.md`), so "reachable from the app subnet only" can today be verified with
   a manual client from the bastion, not through a deployed `apps/api`.
+- **It does not rotate the master credential.** That's `../secrets`'s job
+  (`aws_secretsmanager_secret_rotation` attached to `connection_secret_arn`) — see
+  [`docs/runbooks/secrets-conventions.md`](../../../../docs/runbooks/secrets-conventions.md). This
+  module only carries the `lifecycle.ignore_changes` on `aws_secretsmanager_secret_version.postgres`
+  that rotation requires (see `main.tf`), and the `"engine": "postgres"` key the rotation Lambda's
+  secret schema needs — neither is consumed by anything in this module itself.
 
 ## Topology
 

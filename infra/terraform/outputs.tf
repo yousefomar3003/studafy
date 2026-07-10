@@ -88,6 +88,21 @@ output "pgbouncer_log_group_name" {
   value       = module.pgbouncer.log_group_name
 }
 
+output "secrets_service_secret_arns" {
+  description = "Map of service name -> ARN of its own app-secrets container. See modules/secrets/README.md and docs/runbooks/secrets-conventions.md."
+  value       = module.secrets.service_secret_arns
+}
+
+output "secrets_service_iam_policy_arns" {
+  description = "Map of service name -> IAM managed policy ARN scoped to that service's own app-secrets container plus the shared data-tier secrets it needs. Attach to the service's compute task role once one exists."
+  value       = module.secrets.service_iam_policy_arns
+}
+
+output "secrets_postgres_rotation_lambda_arn" {
+  description = "ARN of the AWS-published RDS-Postgres rotation Lambda rotating module.postgres's master credential every postgres_rotation_days days."
+  value       = module.secrets.postgres_rotation_lambda_arn
+}
+
 output "storage_app_files_bucket_id" {
   description = "Name of the app-files bucket. Pass to `aws s3api`/`aws s3` commands when verifying lifecycle rules and CORS (see modules/storage/README.md)."
   value       = module.storage.app_files_bucket_id

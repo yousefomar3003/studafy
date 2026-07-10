@@ -285,6 +285,71 @@ resource "aws_vpc_security_group_egress_rule" "pgbouncer_dns_udp" {
   cidr_ipv4         = var.vpc_cidr
 }
 
+# --- Secrets rotation: the RDS rotation Lambda (modules/secrets) -------------------
+
+resource "aws_security_group" "secrets_rotation" {
+  name_prefix = "${var.name_prefix}-secrets-rotation-"
+  description = "Secrets rotation Lambda (modules/secrets): egresses to the database and Secrets Manager only."
+  vpc_id      = aws_vpc.this.id
+
+  tags = { Name = "${var.name_prefix}-secrets-rotation" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_security_group_egress_rule" "secrets_rotation_to_db" {
+  security_group_id            = aws_security_group.secrets_rotation.id
+  description                  = "To the database, to set the rotated password"
+  ip_protocol                  = "tcp"
+  from_port                    = var.db_port
+  to_port                      = var.db_port
+  referenced_security_group_id = aws_security_group.db.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "db_from_secrets_rotation" {
+  security_group_id            = aws_security_group.db.id
+  description                  = "From the secrets-rotation Lambda"
+  ip_protocol                  = "tcp"
+  from_port                    = var.db_port
+  to_port                      = var.db_port
+  referenced_security_group_id = aws_security_group.secrets_rotation.id
+}
+
+# HTTPS egress for the Lambda's own calls back to the Secrets Manager API (GetSecretValue,
+# PutSecretValue, UpdateSecretVersionStage — the create/set/test/finish-secret rotation steps). A
+# VPC-attached Lambda's AWS API calls route through its ENI like any other traffic in the subnet,
+# not around it — this is not optional networking, it's how the rotation Lambda reaches
+# Secrets Manager at all. Same coarse IP-based control point as modules/pgbouncer's own
+# pgbouncer_https rule.
+resource "aws_vpc_security_group_egress_rule" "secrets_rotation_https" {
+  security_group_id = aws_security_group.secrets_rotation.id
+  description       = "HTTPS to the Secrets Manager API"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "secrets_rotation_dns_tcp" {
+  security_group_id = aws_security_group.secrets_rotation.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "tcp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
+}
+
+resource "aws_vpc_security_group_egress_rule" "secrets_rotation_dns_udp" {
+  security_group_id = aws_security_group.secrets_rotation.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "udp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4          = var.vpc_cidr
+}
+
 # --- Bastion: audited SSH jump host for DB/Redis administration --------------------
 
 resource "aws_security_group" "bastion" {
