@@ -1,0 +1,95 @@
+.sf-data-grid__scroll {
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.sf-data-grid__scroll:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Sticks relative to `.sf-data-grid__scroll`, the nearest scrolling ancestor. */
+.sf-data-grid .sf-table__header-cell {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+/* A dense grid renders single-line cells at a fixed height, which is what keeps the virtualized
+   spacer math correct — a wrapped cell would make every row after it drift out of position. */
+.sf-data-grid .sf-table__cell,
+.sf-data-grid .sf-table__header-cell {
+  height: var(--sf-data-grid-row-height, 44px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sf-data-grid .sf-table__row[aria-selected="true"] {
+  background-color: var(--color-accent-subtle-bg);
+}
+
+.sf-table__cell:has(.sf-data-grid__select-checkbox),
+.sf-table__header-cell:has(.sf-data-grid__select-checkbox) {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.sf-data-grid__select-checkbox {
+  width: var(--space-16);
+  height: var(--space-16);
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.sf-data-grid__select-checkbox:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.sf-data-grid__sort-button {
+  display: inline-flex;
+  align-items: center;
+  /* 8px control spacing */
+  gap: var(--space-8);
+
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sf-data-grid__sort-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.sf-data-grid__sort-icon {
+  flex-shrink: 0;
+  opacity: 0.35;
+  transition:
+    opacity var(--duration-fast) var(--easing-standard),
+    transform var(--duration-fast) var(--easing-standard);
+}
+
+.sf-data-grid__sort-icon--asc,
+.sf-data-grid__sort-icon--desc {
+  opacity: 1;
+}
+
+.sf-data-grid__sort-icon--desc {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-data-grid__sort-icon {
+    transition: none;
+  }
+}

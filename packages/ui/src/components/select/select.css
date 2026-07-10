@@ -1,0 +1,111 @@
+.sf-select {
+  position: relative;
+}
+
+.sf-select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* 8px control spacing */
+  gap: var(--space-8);
+  width: 100%;
+
+  padding: var(--space-8) var(--space-12);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  color: var(--color-foreground);
+
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--easing-standard);
+}
+
+.sf-select__trigger:hover:not(:disabled) {
+  border-color: var(--color-muted-foreground);
+}
+
+.sf-select__trigger:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-color: var(--color-accent);
+}
+
+.sf-select__trigger:disabled {
+  cursor: not-allowed;
+  background-color: var(--color-surface);
+  color: var(--color-muted-foreground);
+  opacity: 0.7;
+}
+
+.sf-select__trigger--invalid {
+  border-color: var(--color-danger);
+}
+
+.sf-select__value--placeholder {
+  color: var(--color-muted-foreground);
+}
+
+.sf-select__arrow {
+  width: 0;
+  height: 0;
+  flex-shrink: 0;
+  border-inline: 4px solid transparent;
+  border-top: 5px solid currentcolor;
+}
+
+.sf-select__listbox {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + var(--space-4));
+  z-index: var(--z-dropdown);
+
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-4);
+  list-style: none;
+
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-3);
+}
+
+.sf-select__listbox[hidden] {
+  display: none;
+}
+
+.sf-select__option {
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-sm);
+
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  color: var(--color-foreground);
+
+  cursor: pointer;
+}
+
+/*
+ * Focus stays on the trigger, so the "active" option is styled from aria-activedescendant state
+ * rather than :focus. This is what a keyboard user actually sees moving.
+ */
+.sf-select__option--active {
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+}
+
+.sf-select__option[aria-selected="true"] {
+  font-weight: var(--font-weight-semibold);
+}
+
+.sf-select__option--disabled {
+  cursor: not-allowed;
+  color: var(--color-muted-foreground);
+  opacity: 0.6;
+}

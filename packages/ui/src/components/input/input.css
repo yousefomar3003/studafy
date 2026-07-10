@@ -1,0 +1,61 @@
+.sf-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+
+  padding-inline: var(--space-12);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+
+  transition:
+    border-color var(--duration-fast) var(--easing-standard),
+    box-shadow var(--duration-fast) var(--easing-standard);
+}
+
+/* The ring sits on the wrapper so it encloses the prefix and suffix, not just the text box. */
+.sf-input:focus-within {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-color: var(--color-accent);
+}
+
+.sf-input--invalid {
+  border-color: var(--color-danger);
+}
+
+.sf-input:has(.sf-input__control:disabled) {
+  background-color: var(--color-surface);
+  cursor: not-allowed;
+}
+
+.sf-input__control {
+  flex: 1;
+  min-width: 0;
+  padding-block: var(--space-8);
+
+  background: none;
+  border: none;
+  outline: none;
+
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  color: var(--color-foreground);
+}
+
+.sf-input__control::placeholder {
+  color: var(--color-muted-foreground);
+}
+
+.sf-input__control:disabled {
+  cursor: not-allowed;
+  color: var(--color-muted-foreground);
+}
+
+.sf-input__affix {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
