@@ -14,3 +14,8 @@ vpc_cidr = "10.1.0.0/16"
 
 az_count           = 2
 single_nat_gateway = true # cost over HA in staging
+
+# Placeholder, not a researched/confirmed domain: apps/web has no hosting decision recorded
+# anywhere in this repo (unlike apps/mobile, which already hardcodes staging-api.studafy.com).
+# Named by analogy with that host. Update before this environment's first real deploy.
+web_origin = "https://staging.studafy.com"

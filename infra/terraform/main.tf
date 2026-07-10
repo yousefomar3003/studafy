@@ -27,3 +27,10 @@ module "redis" {
   port               = var.redis_port
   node_type          = var.redis_node_type
 }
+
+module "storage" {
+  source = "./modules/storage"
+
+  name_prefix = module.naming.name_prefix
+  web_origin  = var.web_origin
+}

@@ -87,3 +87,18 @@ variable "bastion_key_name" {
   EOT
   type        = string
 }
+
+variable "web_origin" {
+  description = <<-EOT
+    Scheme+host of the apps/web frontend for this environment, e.g. "https://app.studafy.com" or
+    "http://localhost:5173" in dev. This is the only origin module.storage's CORS configuration
+    allows on the app-files bucket. Public information (it's a frontend URL), so unlike the
+    bastion variables above it is committed per environment in *.tfvars, not passed via TF_VAR_*.
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^https?://[^/]+$", var.web_origin))
+    error_message = "web_origin must be a bare scheme+host, e.g. \"https://app.studafy.com\" (no path, no trailing slash)."
+  }
+}
