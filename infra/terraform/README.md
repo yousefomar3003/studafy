@@ -6,10 +6,13 @@ with native state locking.
 This directory is **not** a Bun workspace — it is not matched by the `apps/*` / `packages/*`
 globs in the root `package.json`, and Turbo does not run tasks against it.
 
-> **Status:** the `naming` and `network` modules are live — a VPC, subnets, security groups
-> and a bastion host per environment. No compute or data tier exists yet (no ALB, no
-> ECS/EC2, no RDS/ElastiCache); those land in follow-up work and consume this module's
-> outputs (`db_subnet_group_name`, `app_security_group_id`, etc.).
+> **Status:** `naming`, `network` and `redis` are live — a VPC, subnets, security groups and a
+> bastion host per environment, plus a Redis 7 HA pair with TLS and AUTH-token-in-Secrets-Manager.
+> No compute or relational-data tier exists yet (no ALB, no ECS/EC2, no RDS); those land in
+> follow-up work and consume `module.network`'s outputs (`db_subnet_group_name`,
+> `app_security_group_id`, etc.). Because no compute tier exists yet, "apps connect to Redis over
+> TLS" is verified today with a manual client against the dev endpoint, not through a deployed
+> `apps/api`/`apps/workers` — see `modules/redis/README.md`.
 
 ## Folder structure
 
@@ -24,7 +27,8 @@ infra/terraform/
 ├── .terraform.lock.hcl      provider checksums — committed
 ├── modules/
 │   ├── naming/              canonical name prefix + tag set
-│   └── network/             VPC, subnets, security groups, bastion
+│   ├── network/             VPC, subnets, security groups, bastion
+│   └── redis/               Redis 7 HA pair, TLS, AUTH token in Secrets Manager
 └── environments/
     ├── dev/     { backend.hcl, dev.tfvars }
     ├── staging/ { backend.hcl, staging.tfvars }

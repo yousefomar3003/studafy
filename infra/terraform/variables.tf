@@ -52,6 +52,23 @@ variable "single_nat_gateway" {
   default     = true
 }
 
+variable "redis_port" {
+  description = "TCP port Redis listens on. Shared between module.network (security group rule) and module.redis (engine port) so the two can never drift apart — the network module's own redis_port default exists only for callers that don't also provision this module."
+  type        = number
+  default     = 6379
+
+  validation {
+    condition     = var.redis_port > 0 && var.redis_port <= 65535
+    error_message = "redis_port must be a valid TCP port (1-65535)."
+  }
+}
+
+variable "redis_node_type" {
+  description = "ElastiCache node type for both members of the Redis HA pair. cache.t4g.micro is dev-appropriate only — no researched staging/prod sizing exists yet (same honesty gap as aws_region above)."
+  type        = string
+  default     = "cache.t4g.micro"
+}
+
 variable "bastion_allowed_ssh_cidrs" {
   description = <<-EOT
     CIDRs allowed to SSH into this environment's bastion. Deliberately has no default —
