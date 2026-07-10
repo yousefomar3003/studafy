@@ -98,6 +98,34 @@ variable "redis_node_type" {
   default     = "cache.t4g.micro"
 }
 
+variable "pgbouncer_port" {
+  description = "TCP port PgBouncer listens on. Shared between module.network (security group rule) and module.pgbouncer (listener) so the two can never drift apart — the network module's own pgbouncer_port default exists only for callers that don't also provision this module."
+  type        = number
+  default     = 6432
+
+  validation {
+    condition     = var.pgbouncer_port > 0 && var.pgbouncer_port <= 65535
+    error_message = "pgbouncer_port must be a valid TCP port (1-65535)."
+  }
+}
+
+variable "pgbouncer_instance_type" {
+  description = "EC2 instance type for the PgBouncer host. t3.micro is dev-appropriate only — no researched staging/prod connection-volume sizing exists yet (same honesty gap as postgres_instance_class/redis_node_type above)."
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "pgbouncer_key_name" {
+  description = <<-EOT
+    Name of an existing EC2 key pair for SSH access to the PgBouncer host via the bastion.
+    Deliberately has no default — supply via TF_VAR_pgbouncer_key_name (same pattern as
+    bastion_key_name); null disables SSH access entirely and leaves the shipped CloudWatch log
+    and exported metrics as the only troubleshooting surface.
+  EOT
+  type        = string
+  default     = null
+}
+
 variable "bastion_allowed_ssh_cidrs" {
   description = <<-EOT
     CIDRs allowed to SSH into this environment's bastion. Deliberately has no default —

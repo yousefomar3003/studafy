@@ -15,6 +15,7 @@ module "network" {
   single_nat_gateway        = var.single_nat_gateway
   db_port                   = var.db_port
   redis_port                = var.redis_port
+  pgbouncer_port            = var.pgbouncer_port
   bastion_allowed_ssh_cidrs = var.bastion_allowed_ssh_cidrs
   bastion_key_name          = var.bastion_key_name
 }
@@ -39,6 +40,24 @@ module "postgres" {
   instance_class       = var.postgres_instance_class
   deletion_protection  = var.postgres_deletion_protection
   skip_final_snapshot  = var.postgres_skip_final_snapshot
+}
+
+module "pgbouncer" {
+  source = "./modules/pgbouncer"
+
+  name_prefix                    = module.naming.name_prefix
+  subnet_id                      = module.network.private_app_subnet_ids[0]
+  security_group_ids             = [module.network.pgbouncer_security_group_id]
+  postgres_connection_secret_arn = module.postgres.connection_secret_arn
+  listen_port                    = var.pgbouncer_port
+  instance_type                  = var.pgbouncer_instance_type
+  key_name                       = var.pgbouncer_key_name
+
+  # module.postgres.connection_secret_arn only forces module.postgres's secret *container* to
+  # exist first, not its secret *version* — pgbouncer's instance reads the version's value at
+  # boot. This module-level depends_on forces every postgres resource, including the secret
+  # version, to finish before pgbouncer's instance is created.
+  depends_on = [module.postgres]
 }
 
 module "storage" {

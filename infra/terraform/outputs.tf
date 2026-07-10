@@ -68,6 +68,26 @@ output "postgres_connection_secret_arn" {
   value       = module.postgres.connection_secret_arn
 }
 
+output "pgbouncer_private_ip" {
+  description = "Private IP of the PgBouncer host. Not sensitive by itself — combine with the credential in pgbouncer_connection_secret_arn to connect."
+  value       = module.pgbouncer.private_ip
+}
+
+output "pgbouncer_port" {
+  description = "TCP port PgBouncer (TLS-only) listens on. Same value as var.pgbouncer_port, echoed here for scripting against `terraform output`."
+  value       = module.pgbouncer.port
+}
+
+output "pgbouncer_connection_secret_arn" {
+  description = "Secrets Manager ARN holding PgBouncer's port, sslmode, CA certificate and stats-user credential as JSON (no host — see pgbouncer_private_ip). Grant secretsmanager:GetSecretValue to the api/workers/realtime roles that need it. Application connections still authenticate as the Postgres master user (see docs/runbooks/pgbouncer-conventions.md) — this secret's own credential is for the admin console only."
+  value       = module.pgbouncer.connection_secret_arn
+}
+
+output "pgbouncer_log_group_name" {
+  description = "CloudWatch Logs group PgBouncer's connection/disconnection/pool log is shipped to."
+  value       = module.pgbouncer.log_group_name
+}
+
 output "storage_app_files_bucket_id" {
   description = "Name of the app-files bucket. Pass to `aws s3api`/`aws s3` commands when verifying lifecycle rules and CORS (see modules/storage/README.md)."
   value       = module.storage.app_files_bucket_id

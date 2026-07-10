@@ -26,11 +26,18 @@ The ALB is the **only** group with ingress from the public internet. Everything 
 accepts traffic from a specific other security group in this module:
 
 ```
-internet ──► alb ──► app ──► db
-                       └────► redis
+internet ──► alb ──► app ──► db          (direct path: migrations/admin tooling)
+                       ├────► redis
+                       └────► pgbouncer ──► db   (steady-state app traffic)
 bastion ───────────────────► db
-                       └────► redis
+                       ├────► redis
+                       └────► pgbouncer
 ```
+
+`app`'s path to `db` is not removed now that `pgbouncer` exists — PgBouncer's transaction-pooling
+mode is hostile to session-scoped operations (`CREATE INDEX CONCURRENTLY`, `LISTEN`/`NOTIFY`,
+advisory locks held across statements), so migration/admin tooling needs the direct path. See
+[`docs/runbooks/pgbouncer-conventions.md`](../../../../docs/runbooks/pgbouncer-conventions.md).
 
 `db` and `redis` have no egress rules at all — Terraform revokes AWS's default
 allow-all-outbound rule on creation, and this module never adds one back for those two groups.
@@ -83,6 +90,7 @@ module "network" {
 | `app_egress_cidr_blocks`    | `list(string)` | `["0.0.0.0/0"]` | CIDRs the app tier may reach on 443.                                   |
 | `db_port`                   | `number`       | `5432`          | Placeholder (Postgres); no engine is chosen yet.                       |
 | `redis_port`                | `number`       | `6379`          | Matches the `ioredis` default used by `apps/workers`/`apps/realtime`.  |
+| `pgbouncer_port`            | `number`       | `6432`          | PgBouncer's conventional default port.                                 |
 | `bastion_allowed_ssh_cidrs` | `list(string)` | —               | Required. CIDRs allowed to SSH into the bastion. `0.0.0.0/0` rejected. |
 | `bastion_key_name`          | `string`       | —               | Required. Name of an existing EC2 key pair.                            |
 | `bastion_instance_type`     | `string`       | `t3.micro`      | Bastion EC2 instance type.                                             |
@@ -105,6 +113,7 @@ module "network" {
 | `app_security_group_id`                    | Attach to app-tier compute.                                    |
 | `db_security_group_id`                     | Attach to the database.                                        |
 | `redis_security_group_id`                  | Attach to Redis.                                               |
+| `pgbouncer_security_group_id`              | Attach to PgBouncer's compute.                                 |
 | `bastion_security_group_id`                | The bastion's own group.                                       |
 | `bastion_instance_id`, `bastion_public_ip` | The bastion instance.                                          |
 | `bastion_ssh_log_group_name`               | Where the SSH audit log lands.                                 |
