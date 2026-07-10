@@ -25,3 +25,8 @@ web_origin = "https://staging.studafy.com"
 # mobile app already assumes exists.
 edge_domain_name  = "staging-api.studafy.com"
 route53_zone_name = "studafy.com"
+
+# Same host as web_origin above — module.cdn serves the exact frontend web_origin points at.
+# Kept as an explicit value rather than parsed out of web_origin (see variables.tf's
+# cdn_domain_name), matching the edge_domain_name / web_origin split already in this file.
+cdn_domain_name = "staging.studafy.com"

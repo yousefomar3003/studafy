@@ -6,28 +6,33 @@ with native state locking.
 This directory is **not** a Bun workspace — it is not matched by the `apps/*` / `packages/*`
 globs in the root `package.json`, and Turbo does not run tasks against it.
 
-> **Status:** `naming`, `network`, `redis`, `postgres`, `storage`, `registry`, `edge` and `dns` are
-> live — a VPC, subnets, security groups and a bastion host per environment, a Redis 7 HA pair with
-> TLS and AUTH-token-in-Secrets-Manager, a Postgres 16 HA pair (RDS Multi-AZ) with TLS enforced,
-> encrypted gp3 storage, and its master credential in Secrets Manager, two private S3 buckets
-> (`app-files`, `backups-archive`) with SSE, versioning, lifecycle rules and single-origin CORS,
-> per-service ECR repositories with a cosign/KMS signing key and GitHub-OIDC-federated push/pull
-> IAM roles, an internet-facing ALB with a DNS-validated ACM certificate, HTTP→HTTPS redirect,
-> and a WAFv2 web ACL (OWASP core rule set, SQLi rule set, rate limits on `/auth` and
-> `/schools/register`), and a Terraform-owned public Route 53 zone (prod-owned, `dev`/`staging`
-> read-only) with a dedicated SES sending subdomain authenticated by SPF, DKIM and a
-> `p=quarantine` DMARC record — see `docs/runbooks/deliverability.md`. No compute tier exists yet
-> (no ECS/EC2); that lands in follow-up work and
-> consumes `module.network`'s `app_security_group_id`, `module.postgres`'s
+> **Status:** `naming`, `network`, `redis`, `postgres`, `storage`, `registry`, `edge`, `cdn` and
+> `dns` are live — a VPC, subnets, security groups and a bastion host per environment, a Redis 7 HA
+> pair with TLS and AUTH-token-in-Secrets-Manager, a Postgres 16 HA pair (RDS Multi-AZ) with TLS
+> enforced, encrypted gp3 storage, and its master credential in Secrets Manager, two private S3
+> buckets (`app-files`, `backups-archive`) with SSE, versioning, lifecycle rules and single-origin
+> CORS, per-service ECR repositories with a cosign/KMS signing key and GitHub-OIDC-federated
+> push/pull IAM roles, an internet-facing ALB with a DNS-validated ACM certificate, HTTP→HTTPS
+> redirect, and a WAFv2 web ACL (OWASP core rule set, SQLi rule set, rate limits on `/auth` and
+> `/schools/register`), (staging/prod only) a CloudFront distribution in front of a private S3
+> origin serving `apps/web`'s built bundle, with a 1-year-immutable cache class for content-hashed
+> assets, a no-cache class for HTML, and a GitHub-OIDC deploy role that syncs the bundle and
+> invalidates the distribution — see `docs/runbooks/cdn-cache-policy.md` — and a Terraform-owned
+> public Route 53 zone (prod-owned, `dev`/`staging` read-only) with a dedicated SES sending
+> subdomain authenticated by SPF, DKIM and a `p=quarantine` DMARC record — see
+> `docs/runbooks/deliverability.md`. No compute tier exists yet (no ECS/EC2); that lands in
+> follow-up work and consumes `module.network`'s `app_security_group_id`, `module.postgres`'s
 > `connection_secret_arn`, and `module.edge`'s `https_listener_arn`. Because no compute tier exists
 > yet, `module.edge` creates no target group and its HTTPS listener's default action is a fixed
 > `404` — see `modules/edge/README.md`. Likewise "apps connect to Redis/Postgres over TLS" and
 > "instance reachable from the app subnet only" are verified today with a manual client against the
 > dev endpoint, not through a deployed `apps/api`/`apps/workers` — see `modules/redis/README.md`
 > and `docs/runbooks/postgres-conventions.md`; no code in this repo yet generates a pre-signed URL
-> against `module.storage`'s buckets — see `docs/runbooks/storage-conventions.md`; and no
+> against `module.storage`'s buckets — see `docs/runbooks/storage-conventions.md`; no
 > Dockerfile or CI workflow yet pushes into `module.registry`'s repositories — see
-> `docs/runbooks/supply-chain-security.md`.
+> `docs/runbooks/supply-chain-security.md`; the same is true of `module.cdn`'s deploy role —
+> no `.github/workflows` file yet runs the `apps/web` build + sync + invalidate sequence it's
+> meant for — see `docs/runbooks/cdn-cache-policy.md`.
 
 ## Folder structure
 
@@ -48,6 +53,7 @@ infra/terraform/
 │   ├── storage/             app-files + backups-archive S3 buckets, SSE, versioning, CORS, lifecycle
 │   ├── registry/            Per-service ECR repos, cosign/KMS signing key, GitHub-OIDC push/pull IAM roles
 │   ├── edge/                ALB, DNS-validated ACM cert, HTTP->HTTPS redirect, WAFv2 (OWASP core + SQLi + rate limits)
+│   ├── cdn/                 CloudFront + private S3 origin for apps/web's bundle, immutable-asset/no-cache HTML classes, GitHub-OIDC deploy role (staging/prod only)
 │   └── dns/                 Route 53 zone (prod-owned), SES sending subdomain: SPF, DKIM, DMARC (p=quarantine)
 └── environments/
     ├── dev/     { backend.hcl, dev.tfvars }

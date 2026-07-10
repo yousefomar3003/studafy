@@ -162,3 +162,30 @@ output "edge_web_acl_arn" {
   description = "ARN of the WAFv2 web ACL in front of the load balancer."
   value       = module.edge.web_acl_arn
 }
+
+# module.cdn is not instantiated for dev (main.tf's count), so every output below is null there —
+# one(...) rather than [0] indexing so `terraform output` doesn't error out on an empty list.
+output "cdn_web_bundle_bucket_id" {
+  description = "Name of the private web-bundle bucket. Deploy target for `aws s3 sync`. null in dev."
+  value       = one(module.cdn[*].web_bundle_bucket_id)
+}
+
+output "cdn_distribution_id" {
+  description = "CloudFront distribution ID. Pass to `aws cloudfront create-invalidation --distribution-id`. null in dev."
+  value       = one(module.cdn[*].distribution_id)
+}
+
+output "cdn_distribution_domain_name" {
+  description = "Default *.cloudfront.net domain CloudFront assigns the distribution. null in dev."
+  value       = one(module.cdn[*].distribution_domain_name)
+}
+
+output "cdn_domain_name" {
+  description = "Public hostname the CDN serves, same value as var.cdn_domain_name. null in dev."
+  value       = one(module.cdn[*].domain_name)
+}
+
+output "cdn_deploy_role_arn" {
+  description = "IAM role a GitHub Actions run deploying to this environment assumes to sync the web bundle and invalidate the CloudFront distribution. null in dev."
+  value       = one(module.cdn[*].deploy_role_arn)
+}
