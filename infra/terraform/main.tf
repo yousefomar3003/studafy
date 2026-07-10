@@ -34,3 +34,10 @@ module "storage" {
   name_prefix = module.naming.name_prefix
   web_origin  = var.web_origin
 }
+
+module "registry" {
+  source = "./modules/registry"
+
+  name_prefix = module.naming.name_prefix
+  environment = var.environment
+}
