@@ -28,10 +28,13 @@ variable "image_repository_names" {
   description = <<-EOT
     One ECR repository is created per name in this list, as "<name_prefix>/<name>". Defaults to
     the three long-running services ADR-004 already commits to a container shape for (apps/api,
-    apps/realtime, apps/workers). apps/web builds to a static bundle and apps/mobile is not
-    containerized, so neither is in the default. A list, not hardcoded locals like
-    modules/storage's two buckets, because unlike that fixed pair, the set of containerized
-    services is expected to grow as new ones are scaffolded.
+    apps/realtime, apps/workers). apps/mobile is a native app, not containerized, so it's not in
+    the default. apps/web has a Dockerfile (infra/docker/web.Dockerfile) but is deliberately still
+    not in the default either — it also has an existing CDN-hosted static-bundle path
+    (modules/cdn), and which of the two deployment shapes ships hasn't been decided; see
+    infra/docker/README.md's "Known gaps". A list, not hardcoded locals like modules/storage's two
+    buckets, because unlike that fixed pair, the set of containerized services is expected to grow
+    as new ones are scaffolded.
   EOT
   type        = list(string)
   default     = ["api", "realtime", "workers"]

@@ -1,0 +1,45 @@
+# Shared across all four infra/docker/*.Dockerfile builds. Docker only honors a .dockerignore
+# at the root of the build context, and every Dockerfile here is built with the repo root as
+# context (`docker build -f infra/docker/<service>.Dockerfile .`) so the build stage can reach
+# workspace packages outside the app's own directory — see infra/docker/README.md.
+#
+# Keep every apps/*/package.json and packages/*/package.json: `bun install --frozen-lockfile`
+# resolves the workspace graph from bun.lock against those manifests, even for workspace members
+# a given image doesn't build (e.g. apps/mobile). Only their build artifacts and native toolchain
+# directories are excluded below.
+
+# VCS / editor / agent tooling
+.git
+.gitignore
+.claude
+.serena
+graphify-out
+
+# Dependency + build output (reinstalled and rebuilt inside the image; never trusted from host)
+**/node_modules
+**/dist
+**/build
+**/storybook-static
+**/.turbo
+**/*.tsbuildinfo
+
+# Flutter mobile app: not part of any container image built from this directory, and its native
+# toolchain directories are large. package.json is kept (workspace graph integrity, see above).
+apps/mobile/android
+apps/mobile/ios
+apps/mobile/lib
+apps/mobile/test
+apps/mobile/.dart_tool
+apps/mobile/.metadata
+
+# Docs, IaC, and CI config: irrelevant to any application image
+docs
+infra/terraform
+.github
+
+# Test/coverage output and local env files — never belongs in a build context
+coverage
+*.log
+.env
+.env.*
+!.env.example
