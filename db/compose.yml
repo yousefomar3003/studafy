@@ -1,6 +1,14 @@
 services:
   postgres:
-    image: postgres:16.4-alpine
+    # pgvector/pgvector:pg16 is the official pgvector image built on the standard Postgres 16 image,
+    # so it ships the `vector` extension plus the contrib modules the migrations use (pgcrypto,
+    # pg_trgm, pg_stat_statements). The stock postgres:16-alpine image has no pgvector, so
+    # `CREATE EXTENSION vector` would fail against it.
+    image: pgvector/pgvector:pg16
+    # Preload pg_stat_statements so the disposable local/CI database actually collects statistics and
+    # the operational extension tests can query them. On RDS this is the parameter-group setting in
+    # infra/terraform/modules/postgres (requires a reboot); here it is a container flag.
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
     environment:
       POSTGRES_USER: studafy_test
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for this disposable local database}

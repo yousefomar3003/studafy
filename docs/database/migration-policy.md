@@ -162,6 +162,12 @@ No application schema exists in this task, so no business normalization changes 
 ST-030 adds only the history primary key and unique name constraint; both enforce migration
 integrity and are not speculative application indexes.
 
+`000003_enable_required_postgresql_extensions.sql` enables the required extensions (`pgcrypto`,
+`pg_trgm`, `vector`, `pg_stat_statements`) and adds **no** application tables and **no**
+extension-backed indexes — enabling an extension does not justify an index. See the
+[extension policy](./extensions.md) for the ownership, monitoring, normalization, and pgvector/pg_trgm
+index decision frameworks.
+
 ## Creating the next migration
 
 1. Confirm the greatest version in `db/migrations` and create the next six-digit filename.

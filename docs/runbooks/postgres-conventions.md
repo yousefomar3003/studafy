@@ -47,22 +47,33 @@ Never write the password into a `*.tfvars` file, a `terraform output` consumed b
 create a least-privilege application role instead of running the app as the master user; this
 module doesn't create one today because nothing yet connects to enforce that separation.
 
-## pgvector
+## Extensions
 
-AWS's Postgres 16 extension allowlist already includes `vector` — no parameter-group change or
-`shared_preload_libraries` entry is needed to make it available. It still has to be enabled per
-database, and Terraform has no SQL access to do that (the same limit noted in
-`../../infra/terraform/modules/redis/README.md` for verifying TLS manually). Run this once per
-database, after the instance exists:
+Four extensions are enabled by migration
+[`db/migrations/000003_enable_required_postgresql_extensions.sql`](../../db/migrations/000003_enable_required_postgresql_extensions.sql),
+not by hand — the full policy (ownership, monitoring access, normalization, and indexing) is in
+[`docs/database/extensions.md`](../database/extensions.md). Terraform has no SQL access, so the
+enablement itself is a migration step, but two things are parameter-group / provider concerns and
+belong here.
+
+`vector` (pgvector), `pgcrypto`, and `pg_trgm` are on AWS's Postgres 16 extension allowlist and need
+no parameter-group change — the migration enables them per database. Verify:
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS vector;
+SELECT extname, extversion FROM pg_extension
+WHERE extname IN ('vector', 'pgcrypto', 'pg_trgm', 'pg_stat_statements') ORDER BY extname;
 ```
 
-Verify it's active:
+`pg_stat_statements` is different: it only collects statistics when its shared library is preloaded.
+The parameter group therefore sets `shared_preload_libraries = 'pg_stat_statements'`
+(`apply_method = "pending-reboot"`). Like `rds.force_ssl` it is a static parameter that applies on
+the instance's first boot because it is part of the group from creation; **changing it on an
+already-running instance requires a reboot.** `CREATE EXTENSION pg_stat_statements` succeeds without
+the preload, but the views raise on read until the library is loaded — so a green migration is not
+proof the telemetry is operational. Confirm operationality with:
 
 ```sql
-SELECT extversion FROM pg_extension WHERE extname = 'vector';
+SELECT count(*) FROM pg_stat_statements;   -- raises if not preloaded/rebooted
 ```
 
 ## Failover
