@@ -39,9 +39,14 @@ jobs:
             dockerfile: infra/docker/web.Dockerfile
             max_mb: 120
             trivy_exit_code: "1"
+          # 3072 (not 2500) because the real image, as CI's classic overlay2 Docker measures it,
+          # runs ~2683MB: full frappe/erpnext bench + the education app. Local Docker Desktop
+          # builds under-report this (containerd snapshotter image store dedups/sizes differently
+          # from the overlay2 driver ubuntu-latest uses), so don't trust a local number here --
+          # check the "image size:" line this step echoes on an actual CI run.
           - service: erpnext
             dockerfile: infra/docker/erpnext.Dockerfile
-            max_mb: 2500
+            max_mb: 3072
             trivy_exit_code: "0"
     steps:
       - uses: actions/checkout@v4
