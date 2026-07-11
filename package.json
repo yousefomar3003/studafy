@@ -13,6 +13,10 @@
     "typecheck": "turbo run check-types",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "db:migrate": "bun packages/db/src/cli.ts migrate",
+    "db:migrate:status": "bun packages/db/src/cli.ts status",
+    "db:migrate:validate": "bun packages/db/src/cli.ts validate",
+    "db:migrate:pending": "bun packages/db/src/cli.ts pending",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

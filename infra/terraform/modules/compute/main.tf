@@ -24,7 +24,7 @@ resource "aws_ecs_cluster" "this" {
 # awslogs' implicit auto-create (which would need logs:CreateLogGroup on the execution role and
 # inherit CloudWatch's no-expiry default).
 resource "aws_cloudwatch_log_group" "service" {
-  for_each = toset(["api", "realtime", "workers"])
+  for_each = toset(["api", "realtime", "workers", "migrations"])
 
   name              = "/${var.name_prefix}/ecs/${each.key}"
   retention_in_days = var.log_retention_days
@@ -66,10 +66,29 @@ resource "aws_iam_role_policy_attachment" "execution_managed" {
 # grants exactly the secretsmanager:GetSecretValue calls needed to resolve whichever ARNs a task
 # definition's `secrets` array references. See variables.tf's secrets_service_iam_policy_arns.
 resource "aws_iam_role_policy_attachment" "execution_secrets" {
-  for_each = var.secrets_service_iam_policy_arns
+  for_each = { for service, arn in var.secrets_service_iam_policy_arns : service => arn if service != "migrations" }
 
   role       = aws_iam_role.execution.name
   policy_arn = each.value
+}
+
+# The one-off migration task can resolve only the direct PostgreSQL credential. Keeping it off the
+# shared application execution role prevents a migration task definition from selecting unrelated
+# application, Redis, PgBouncer, or ERPNext secrets.
+resource "aws_iam_role" "migrations_execution" {
+  name               = "${var.name_prefix}-migrations-execution"
+  description        = "ECS execution role for the one-off SQL migration task."
+  assume_role_policy = data.aws_iam_policy_document.execution_trust.json
+}
+
+resource "aws_iam_role_policy_attachment" "migrations_execution_managed" {
+  role       = aws_iam_role.migrations_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "migrations_secret" {
+  role       = aws_iam_role.migrations_execution.name
+  policy_arn = var.secrets_service_iam_policy_arns["migrations"]
 }
 
 # --- ALB target groups and listener rules -------------------------------------------------------

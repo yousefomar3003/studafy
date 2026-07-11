@@ -4,7 +4,8 @@
 # (infra/docker/web.Dockerfile) alongside its existing CDN-hosted static-bundle path — it's
 # included in image_repository_names so releases attest it even though the primary production
 # delivery path remains the static bundle through S3 and CloudFront; see infra/docker/README.md
-# and docs/runbooks/supply-chain-security.md. Plus the identities and signing key the
+# and docs/runbooks/supply-chain-security.md. The migrations repository carries the signed,
+# one-off SQL migration task that gates service deployment. Plus the identities and signing key the
 # supply-chain acceptance criteria hang off:
 #
 #   - module.registry.ci_push_role_arn   — assumed by CI via GitHub OIDC, push-only, no compute

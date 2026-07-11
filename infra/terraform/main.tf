@@ -94,9 +94,10 @@ module "secrets" {
   # its Redis cache/queue DB slots (docs/runbooks/redis-conventions.md).
   services = merge(
     {
-      api      = { shared_secret_arns = [module.pgbouncer.connection_secret_arn] }
-      realtime = { shared_secret_arns = [module.redis.auth_secret_arn] }
-      workers  = { shared_secret_arns = [module.redis.auth_secret_arn, module.pgbouncer.connection_secret_arn] }
+      api        = { shared_secret_arns = [module.pgbouncer.connection_secret_arn] }
+      migrations = { shared_secret_arns = [module.postgres.connection_secret_arn] }
+      realtime   = { shared_secret_arns = [module.redis.auth_secret_arn] }
+      workers    = { shared_secret_arns = [module.redis.auth_secret_arn, module.pgbouncer.connection_secret_arn] }
     },
     local.erpnext_plane_enabled ? {
       erpnext = { shared_secret_arns = [module.mariadb[0].connection_secret_arn, module.redis.auth_secret_arn] }
@@ -180,7 +181,10 @@ module "registry" {
   # The ECS task execution role is a third IAM principal (Fargate itself, pulling at task launch)
   # distinct from ci_push/deploy_pull — see modules/registry's additional_pull_role_arns and
   # infra/deploy/README.md's "Known gaps" #1.
-  additional_pull_role_arns = [module.compute.execution_role_arn]
+  additional_pull_role_arns = [
+    module.compute.execution_role_arn,
+    module.compute.migrations_execution_role_arn,
+  ]
 }
 
 module "dns" {

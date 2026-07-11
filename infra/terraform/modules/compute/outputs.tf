@@ -13,6 +13,11 @@ output "execution_role_arn" {
   value       = aws_iam_role.execution.arn
 }
 
+output "migrations_execution_role_arn" {
+  description = "Dedicated ECS execution role limited to the migration image and PostgreSQL secret."
+  value       = aws_iam_role.migrations_execution.arn
+}
+
 output "api_target_group_arn" {
   description = "ALB target group ARN for apps/api. Pass as API_TARGET_GROUP_ARN."
   value       = aws_lb_target_group.api.arn
@@ -24,6 +29,6 @@ output "realtime_target_group_arn" {
 }
 
 output "log_group_names" {
-  description = "Map of service name -> CloudWatch Logs group name (api/realtime/workers)."
+  description = "Map of service name -> CloudWatch Logs group name (api/realtime/workers/migrations)."
   value       = { for k, lg in aws_cloudwatch_log_group.service : k => lg.name }
 }

@@ -1,4 +1,5 @@
 * text=auto eol=lf
+*.sql text eol=lf
 *.bat text eol=crlf
 *.png binary
 *.jpg binary

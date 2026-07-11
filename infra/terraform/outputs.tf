@@ -213,6 +213,11 @@ output "edge_web_acl_arn" {
   value       = module.edge.web_acl_arn
 }
 
+output "compute_migrations_execution_role_arn" {
+  description = "Dedicated ECS execution role for the one-off database migration task."
+  value       = module.compute.migrations_execution_role_arn
+}
+
 output "monitoring_dashboard_name" {
   description = "CloudWatch operations dashboard for RDS, Redis, and ECS."
   value       = module.monitoring.dashboard_name

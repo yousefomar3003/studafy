@@ -3,11 +3,25 @@ name: Containers
 on:
   pull_request:
     paths:
-      ["apps/**", "packages/**", "infra/docker/**", "bun.lock", ".github/workflows/containers.yml"]
+      [
+        "apps/**",
+        "packages/**",
+        "db/**",
+        "infra/docker/**",
+        "bun.lock",
+        ".github/workflows/containers.yml",
+      ]
   push:
     branches: [dev]
     paths:
-      ["apps/**", "packages/**", "infra/docker/**", "bun.lock", ".github/workflows/containers.yml"]
+      [
+        "apps/**",
+        "packages/**",
+        "db/**",
+        "infra/docker/**",
+        "bun.lock",
+        ".github/workflows/containers.yml",
+      ]
 
 permissions:
   contents: read
@@ -27,6 +41,9 @@ jobs:
           - service: workers
             dockerfile: infra/docker/workers.Dockerfile
             max_mb: 250
+          - service: migrations
+            dockerfile: infra/docker/migrations.Dockerfile
+            max_mb: 100
           - service: web
             dockerfile: infra/docker/web.Dockerfile
             max_mb: 120

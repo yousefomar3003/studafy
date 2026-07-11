@@ -5,20 +5,20 @@
 # rolling-update thresholds). Writes the rendered JSON to stdout.
 #
 # Usage:
-#   render.sh <api|realtime|workers> <dev|staging|prod> <path-to-template.json.tpl>
+#   render.sh <api|realtime|workers|migrations> <dev|staging|prod> <path-to-template.json.tpl>
 #
 # IMAGE_TAG must be exported by the caller (deploy.sh does this) — it is the one value neither
 # terraform output nor environments/<env>.env can supply, since it names a specific build.
 set -euo pipefail
 
-SERVICE="${1:?usage: render.sh <api|realtime|workers> <dev|staging|prod> <template.json.tpl>}"
+SERVICE="${1:?usage: render.sh <api|realtime|workers|migrations> <dev|staging|prod> <template.json.tpl>}"
 ENVIRONMENT="${2:?usage: render.sh <api|realtime|workers> <dev|staging|prod> <template.json.tpl>}"
 TEMPLATE="${3:?usage: render.sh <api|realtime|workers> <dev|staging|prod> <template.json.tpl>}"
 
 case "$SERVICE" in
-  api | realtime | workers) ;;
+  api | realtime | workers | migrations) ;;
   *)
-    echo "unknown service '$SERVICE' (expected api, realtime, or workers)" >&2
+    echo "unknown service '$SERVICE' (expected api, realtime, workers, or migrations)" >&2
     exit 1
     ;;
 esac
@@ -63,7 +63,9 @@ SECRET_ARN="$(terraform -chdir="$TF_DIR" output -json secrets_service_secret_arn
 REDIS_SECRET_ARN="$(terraform -chdir="$TF_DIR" output -raw redis_auth_secret_arn)"
 PGBOUNCER_SECRET_ARN="$(terraform -chdir="$TF_DIR" output -raw pgbouncer_connection_secret_arn)"
 PGBOUNCER_HOST="$(terraform -chdir="$TF_DIR" output -raw pgbouncer_private_ip)"
-export REDIS_SECRET_ARN PGBOUNCER_SECRET_ARN PGBOUNCER_HOST
+POSTGRES_SECRET_ARN="$(terraform -chdir="$TF_DIR" output -raw postgres_connection_secret_arn)"
+MIGRATIONS_EXECUTION_ROLE_ARN="$(terraform -chdir="$TF_DIR" output -raw compute_migrations_execution_role_arn)"
+export REDIS_SECRET_ARN PGBOUNCER_SECRET_ARN PGBOUNCER_HOST POSTGRES_SECRET_ARN MIGRATIONS_EXECUTION_ROLE_ARN
 
 SERVICE_UPPER="$(echo "$SERVICE" | tr '[:lower:]' '[:upper:]')"
 export "${SERVICE_UPPER}_IMAGE=${REPO_URL}:${IMAGE_TAG}"
