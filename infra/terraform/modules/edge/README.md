@@ -129,7 +129,7 @@ done
 | `public_subnet_ids`           | `list(string)` | —                                     | Required, ≥2 entries. From `module.network.public_subnet_ids`.               |
 | `alb_security_group_id`       | `string`       | —                                     | From `module.network.alb_security_group_id`.                                 |
 | `domain_name`                 | `string`       | —                                     | Public hostname, e.g. `api.studafy.com`. Must resolve inside the zone below. |
-| `route53_zone_id`             | `string`       | —                                     | Existing public hosted zone ID, from the shared bootstrap stack.            |
+| `route53_zone_id`             | `string`       | —                                     | Existing public hosted zone ID, from the shared bootstrap stack.             |
 | `create_dns_record`           | `bool`         | `true`                                | Alias `domain_name` at the ALB. Set `false` if DNS is managed elsewhere.     |
 | `ssl_policy`                  | `string`       | `ELBSecurityPolicy-TLS13-1-2-2021-06` | ALB HTTPS listener security policy.                                          |
 | `enable_deletion_protection`  | `bool`         | `false`                               | Override `true` in `prod.tfvars`.                                            |

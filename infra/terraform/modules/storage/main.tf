@@ -59,6 +59,7 @@ resource "aws_s3_bucket_versioning" "this" {
 # "nothing to migrate from, nothing built to justify the extra piece yet" reasoning as the
 # TLS-required decision in modules/redis/main.tf). Revisit if per-key access auditing or
 # customer-managed keys become a real requirement.
+#trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
   for_each = aws_s3_bucket.this
 

@@ -131,7 +131,7 @@ job runs after assuming `deploy_role_arn`.
 | `name_prefix`                        | `string` | —                          | Resource name prefix, from `module.naming.name_prefix`.                                      |
 | `environment`                        | `string` | —                          | Scopes `deploy`'s trust to the same-named GitHub Environment.                                |
 | `domain_name`                        | `string` | —                          | Public hostname, e.g. `app.studafy.com`. Matches the host portion of `var.web_origin`.       |
-| `route53_zone_id`                    | `string` | —                          | Existing public hosted zone ID, from the shared bootstrap stack.                              |
+| `route53_zone_id`                    | `string` | —                          | Existing public hosted zone ID, from the shared bootstrap stack.                             |
 | `create_dns_record`                  | `bool`   | `true`                     | Alias `domain_name` at the distribution. Set `false` if DNS is managed elsewhere.            |
 | `github_oidc_provider_arn`           | `string` | —                          | `module.registry.github_oidc_provider_arn` — this module reuses it, never creates a second.  |
 | `github_repository`                  | `string` | `"yousefomar3003/studafy"` | `<owner>/<repo>` allowed to assume `deploy` via OIDC.                                        |

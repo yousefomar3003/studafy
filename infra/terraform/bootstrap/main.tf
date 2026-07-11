@@ -26,6 +26,9 @@ resource "aws_s3_bucket_versioning" "state" {
   }
 }
 
+# SSE-S3, not SSE-KMS: same "no KMS key management set up yet" call as modules/storage — these
+# are Terraform state buckets, not a place to bootstrap a new KMS dependency into.
+#trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
   for_each = aws_s3_bucket.state
   bucket   = each.value.id
