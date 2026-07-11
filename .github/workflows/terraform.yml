@@ -36,12 +36,14 @@ jobs:
         working-directory: ${{ matrix.directory }}
       - run: terraform validate
         working-directory: ${{ matrix.directory }}
-      - uses: aquasecurity/trivy-action@master
+      - uses: aquasecurity/trivy-action@0.36.0
         with:
+          version: v0.72.0
           scan-type: config
           scan-ref: ${{ matrix.directory }}
           severity: CRITICAL,HIGH
           exit-code: "1"
+          trivyignores: .trivyignore
 
   plan:
     if: vars.AWS_TERRAFORM_PLANS_ENABLED == 'true'
