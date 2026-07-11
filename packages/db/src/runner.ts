@@ -162,11 +162,18 @@ async function applyMigration(sql: ReservedSql, migration: Migration): Promise<b
   const started = process.hrtime.bigint();
   try {
     if (migration.transactional) {
-      await sql.begin(async (transaction) => {
-        await transaction.unsafe(migration.sql);
+      // postgres@3's reserved connection has no `.begin()`; drive the transaction manually so the
+      // migration and its history row commit atomically on the same session that holds the lock.
+      await sql.unsafe("BEGIN");
+      try {
+        await sql.unsafe(migration.sql);
         const duration = (process.hrtime.bigint() - started) / 1_000_000n;
-        await recordMigration(transaction, migration, duration);
-      });
+        await recordMigration(sql, migration, duration);
+        await sql.unsafe("COMMIT");
+      } catch (error) {
+        await sql.unsafe("ROLLBACK");
+        throw error;
+      }
     } else {
       await sql.unsafe(migration.sql);
       const duration = (process.hrtime.bigint() - started) / 1_000_000n;
