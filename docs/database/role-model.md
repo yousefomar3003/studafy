@@ -127,14 +127,21 @@ ALTER DEFAULT PRIVILEGES FOR ROLE studafy_admin IN SCHEMA app
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO studafy_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE studafy_admin IN SCHEMA app
   GRANT USAGE, SELECT ON SEQUENCES TO studafy_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE studafy_admin IN SCHEMA app
+-- No IN SCHEMA here — see note below.
+ALTER DEFAULT PRIVILEGES FOR ROLE studafy_admin
   REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ```
 
-Default privileges are **not global** — they apply only to objects created afterward, by the named
-role, in the named schema, of the named type. Objects created by any other role, in any other
-schema, are unaffected. Sequence `UPDATE` (`setval`) is intentionally withheld; the application never
-rewinds a sequence.
+Default privileges are **not global in scope** — the `GRANT` entries apply only to objects created
+afterward, by the named role (`studafy_admin`), in the named schema (`app`), of the named type.
+Objects created by any other role, in any other schema, are unaffected. Sequence `UPDATE` (`setval`)
+is intentionally withheld; the application never rewinds a sequence.
+
+The function `REVOKE` deliberately omits `IN SCHEMA app`. PostgreSQL per-schema default privileges
+can only **add** to the built-in global default, never **remove** from it, so `IN SCHEMA app REVOKE
+EXECUTE ON FUNCTIONS FROM PUBLIC` is a silent no-op — PUBLIC keeps the built-in `EXECUTE`. Revoking
+PUBLIC's default `EXECUTE` must therefore be done at the role's global level. It still affects only
+functions created by `studafy_admin`, which only creates objects in `app`.
 
 ## How future migrations grant access
 

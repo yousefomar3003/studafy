@@ -189,7 +189,9 @@ integrationTest("studafy_app is denied every DDL and privilege-management operat
       `CREATE INDEX idx_ddl_probe_id ON app.ddl_probe (id)`,
     );
     await expectDenied(database, "studafy_app", `ALTER TABLE app.ddl_probe OWNER TO studafy_app`);
-    await expectDenied(database, "studafy_app", `GRANT SELECT ON app.ddl_probe TO studafy_admin`);
+    // A non-owner GRANT on a table is a no-op warning rather than an error, so privilege management
+    // is proven denied with a role grant, which errors without ADMIN OPTION on the target role.
+    await expectDenied(database, "studafy_app", `GRANT studafy_admin TO studafy_app`);
     // Migration history is off-limits to the runtime role.
     await expectDenied(
       database,

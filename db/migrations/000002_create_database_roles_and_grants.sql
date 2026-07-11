@@ -100,5 +100,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE studafy_admin IN SCHEMA app
 
 -- PostgreSQL grants EXECUTE on new functions to PUBLIC by default. Revoke it so function access is
 -- an explicit, per-function decision in a future migration -- studafy_app receives no EXECUTE here.
-ALTER DEFAULT PRIVILEGES FOR ROLE studafy_admin IN SCHEMA app
+-- This REVOKE is deliberately NOT scoped with IN SCHEMA: per-schema default privileges can only ADD
+-- to the built-in global default, never remove from it, so revoking PUBLIC's built-in EXECUTE must be
+-- done at the role's global level. It still only affects functions created by studafy_admin.
+ALTER DEFAULT PRIVILEGES FOR ROLE studafy_admin
   REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
