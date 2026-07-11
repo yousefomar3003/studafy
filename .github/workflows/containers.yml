@@ -18,31 +18,21 @@ jobs:
     strategy:
       matrix:
         include:
-          # trivy_exit_code gates whether a CRITICAL image finding fails the job. The app-owned
-          # images (built from slim bases we control) stay strict at "1". erpnext rides the large,
-          # unmodified third-party frappe/erpnext base (see infra/docker/erpnext.Dockerfile) whose
-          # CVEs the team does not patch directly and whose vuln set churns with trivy's DB, so its
-          # scan is report-only ("0") -- findings still surface in the logs/SBOM but don't block.
           - service: api
             dockerfile: infra/docker/api.Dockerfile
             max_mb: 150
-            trivy_exit_code: "1"
           - service: realtime
             dockerfile: infra/docker/realtime.Dockerfile
             max_mb: 200
-            trivy_exit_code: "1"
           - service: workers
             dockerfile: infra/docker/workers.Dockerfile
             max_mb: 250
-            trivy_exit_code: "1"
           - service: web
             dockerfile: infra/docker/web.Dockerfile
             max_mb: 120
-            trivy_exit_code: "1"
           - service: erpnext
             dockerfile: infra/docker/erpnext.Dockerfile
             max_mb: 2500
-            trivy_exit_code: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -63,11 +53,9 @@ jobs:
           bytes=$(docker image inspect studafy/${{ matrix.service }}:ci --format '{{.Size}}')
           max=$(( ${{ matrix.max_mb }} * 1024 * 1024 ))
           test "$bytes" -le "$max"
-      - uses: aquasecurity/trivy-action@0.36.0
+      - uses: aquasecurity/trivy-action@master
         with:
-          version: v0.72.0
           image-ref: studafy/${{ matrix.service }}:ci
           severity: CRITICAL
           ignore-unfixed: true
-          exit-code: ${{ matrix.trivy_exit_code }}
-          trivyignores: .trivyignore
+          exit-code: "1"
