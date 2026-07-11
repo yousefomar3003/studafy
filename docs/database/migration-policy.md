@@ -3,6 +3,10 @@
 Studafy's PostgreSQL 16 schema is defined by ordered SQL files in [`db/migrations`](../../db/migrations).
 SQL is the source of truth: do not generate schema changes from an ORM or application startup.
 
+The database role and grant model that migrations run under — `studafy_admin` (owner/migrations) and
+`studafy_app` (runtime) — is documented in [role-model.md](./role-model.md). Object-creating
+migrations must `SET ROLE studafy_admin` so ownership and default privileges apply.
+
 ## Tool and layout
 
 The repository-native `@studafy/db` CLI uses Bun 1.3.14 and the existing `postgres` 3.4.9 driver.
