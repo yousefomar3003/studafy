@@ -54,6 +54,17 @@ async function statStatementsPreloaded(database: Database): Promise<boolean> {
   return row?.loaded ?? false;
 }
 
+// Total statements recorded for this disposable database. Comparing snapshots avoids relying on
+// pg_stat_statements' representative query text, which may come from an equivalent earlier query.
+async function statStatementCalls(database: Database): Promise<number> {
+  const [row] = await database.sql<{ calls: string }[]>`
+    SELECT coalesce(sum(calls), 0)::text AS calls
+    FROM public.pg_stat_statements
+    WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
+  `;
+  return Number(row?.calls ?? "0");
+}
+
 integrationTest("installs the four required extensions with resolvable versions", async () => {
   const database = await migratedDatabase();
   try {
@@ -214,17 +225,12 @@ integrationTest("pg_stat_statements collects statistics when preloaded", async (
       return;
     }
 
-    // Run a distinctive probe, then confirm it was captured. pg_stat_statements normalizes constant
-    // literals to $1, so the marker is a column alias (an identifier, preserved verbatim in the
-    // stored query text) rather than a string literal.
-    const marker = `st032_probe_${crypto.randomUUID().replaceAll("-", "")}`;
-    await database.sql.unsafe(`SELECT 1 AS ${marker}`);
-    const [captured] = await database.sql<{ count: string }[]>`
-      SELECT count(*)::text AS count
-      FROM public.pg_stat_statements
-      WHERE query LIKE '%st032_probe_%'
-    `;
-    expect(Number(captured?.count ?? "0")).toBeGreaterThan(0);
+    // Query text is normalized and may be retained from an equivalent earlier statement. Compare
+    // database-scoped call totals instead so the assertion proves statistics are actively collected.
+    const callsBefore = await statStatementCalls(database);
+    await database.sql`SELECT 1`;
+    const callsAfter = await statStatementCalls(database);
+    expect(callsAfter).toBeGreaterThan(callsBefore);
   } finally {
     await database.cleanup();
   }
