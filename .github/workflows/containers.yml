@@ -63,7 +63,7 @@ jobs:
           bytes=$(docker image inspect studafy/${{ matrix.service }}:ci --format '{{.Size}}')
           max=$(( ${{ matrix.max_mb }} * 1024 * 1024 ))
           test "$bytes" -le "$max"
-      - uses: aquasecurity/trivy-action@0.36.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           version: v0.72.0
           image-ref: studafy/${{ matrix.service }}:ci
