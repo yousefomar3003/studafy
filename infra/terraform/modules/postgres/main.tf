@@ -29,6 +29,18 @@ resource "aws_db_parameter_group" "this" {
     apply_method = "pending-reboot"
   }
 
+  # pg_stat_statements is only operational once its shared library is preloaded at server start;
+  # CREATE EXTENSION alone does not collect statistics. shared_preload_libraries is a static
+  # parameter, so this takes effect on the instance's first boot (it is part of the group from
+  # creation) and any later change requires a reboot to apply. The `vector`, `pgcrypto`, and
+  # `pg_trgm` extensions need no preload -- they are enabled purely by the migration. See
+  # docs/database/extensions.md and db/migrations/000003_enable_required_postgresql_extensions.sql.
+  parameter {
+    name         = "shared_preload_libraries"
+    value        = "pg_stat_statements"
+    apply_method = "pending-reboot"
+  }
+
   parameter {
     name         = "statement_timeout"
     value        = tostring(var.statement_timeout_ms)

@@ -11,30 +11,27 @@ permissions:
 jobs:
   database-migrations:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16.4-alpine
-        env:
-          POSTGRES_USER: studafy_test
-          POSTGRES_PASSWORD: studafy_ci_only
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U studafy_test -d postgres"
-          --health-interval 2s
-          --health-timeout 3s
-          --health-retries 15
+    # The database is started from db/compose.yml rather than a `services:` block because it must run
+    # `pgvector/pgvector:pg16` (for the `vector` extension) with `pg_stat_statements` preloaded via a
+    # container command -- a GitHub `services:` block cannot override the container command. Reusing
+    # the compose file keeps the image and preload configuration identical to local development.
     env:
-      TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:5432/postgres?sslmode=disable
+      # Disposable, ephemeral-container-only password (matches db/compose.yml's required variable).
+      POSTGRES_PASSWORD: studafy_ci_only
+      TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
     steps:
       - uses: actions/checkout@v4
+      - name: Start PostgreSQL 16 (pgvector + pg_stat_statements preloaded)
+        run: docker compose -f db/compose.yml up -d --wait
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun test
         working-directory: packages/db
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker compose -f db/compose.yml down
 
   secret-scan:
     runs-on: ubuntu-latest
