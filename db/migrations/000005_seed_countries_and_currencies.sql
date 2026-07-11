@@ -357,7 +357,7 @@ BEGIN
       ('KES', '404', 2, 'Kenyan Shilling'),
       ('KGS', '417', 2, 'Som'),
       ('KHR', '116', 2, 'Riel'),
-      ('KMF', '174', 0, 'Comorian Franc '),
+      ('KMF', '174', 0, 'Comorian Franc'),
       ('KPW', '408', 2, 'North Korean Won'),
       ('KRW', '410', 0, 'Won'),
       ('KWD', '414', 3, 'Kuwaiti Dinar'),
