@@ -1,9 +1,9 @@
 # One ECR repository per long-running service (api, realtime, workers — the three services
 # ADR-004 already commits to a container deployment shape for; apps/mobile is a native app, not
-# containerized, so it doesn't get one). apps/web now has a Dockerfile too
+# containerized, so it doesn't get one). apps/web has a Dockerfile too
 # (infra/docker/web.Dockerfile) alongside its existing CDN-hosted static-bundle path — it's
-# deliberately still not in image_repository_names' default below because which of those two
-# deployment shapes actually ships hasn't been decided; see infra/docker/README.md's "Known gaps"
+# included in image_repository_names so releases attest it even though the primary production
+# delivery path remains the static bundle through S3 and CloudFront; see infra/docker/README.md
 # and docs/runbooks/supply-chain-security.md. Plus the identities and signing key the
 # supply-chain acceptance criteria hang off:
 #
@@ -141,16 +141,6 @@ data "aws_iam_policy_document" "signing_key" {
 # owns it because it is the first (and, as of this ticket, only) caller that needs GitHub OIDC —
 # if a second module ever needs to trust GitHub Actions, move this resource to the root module
 # rather than declaring a second one (Terraform module conventions, infra/terraform/README.md).
-resource "aws_iam_openid_connect_provider" "github_actions" {
-  url            = "https://token.actions.githubusercontent.com"
-  client_id_list = ["sts.amazonaws.com"]
-
-  # GitHub's documented root CA thumbprint. AWS no longer actually validates this value against
-  # the live TLS chain for well-known providers like this one, but the API still requires the
-  # argument, so it is supplied for correctness against older provider behavior too.
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
-}
-
 # --- CI push role -------------------------------------------------------------
 
 # repo:<owner>/<repo>:* — any branch, any workflow in this repo. Push is the lower-sensitivity
@@ -164,7 +154,7 @@ data "aws_iam_policy_document" "ci_push_trust" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github_actions.arn]
+      identifiers = [var.github_oidc_provider_arn]
     }
 
     condition {
@@ -232,7 +222,7 @@ data "aws_iam_policy_document" "deploy_pull_trust" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github_actions.arn]
+      identifiers = [var.github_oidc_provider_arn]
     }
 
     condition {

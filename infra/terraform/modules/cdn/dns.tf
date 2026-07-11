@@ -5,11 +5,6 @@
 # accepts ACM certificates from us-east-1, a hard AWS constraint, not a regional preference this
 # module is choosing.
 
-data "aws_route53_zone" "this" {
-  name         = var.route53_zone_name
-  private_zone = false
-}
-
 resource "aws_acm_certificate" "this" {
   provider = aws.us_east_1
 
@@ -32,7 +27,7 @@ resource "aws_route53_record" "cert_validation" {
     }
   }
 
-  zone_id         = data.aws_route53_zone.this.zone_id
+  zone_id         = var.route53_zone_id
   name            = each.value.name
   type            = each.value.type
   records         = [each.value.record]
@@ -50,7 +45,7 @@ resource "aws_acm_certificate_validation" "this" {
 resource "aws_route53_record" "web" {
   count = var.create_dns_record ? 1 : 0
 
-  zone_id = data.aws_route53_zone.this.zone_id
+  zone_id = var.route53_zone_id
   name    = var.domain_name
   type    = "A"
 

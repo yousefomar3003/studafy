@@ -5,7 +5,7 @@ output "zone_id" {
 
 output "zone_name_servers" {
   description = "Authoritative name servers Route 53 assigned zone_name. Only non-null when manage_zone is true. Compare these against the domain registrar's delegation after the terraform import described in main.tf — a mismatch means the registrar is not actually pointed at this Terraform-managed zone yet."
-  value       = var.manage_zone ? aws_route53_zone.this[0].name_servers : null
+  value       = null
 }
 
 output "ses_domain_identity_arn" {

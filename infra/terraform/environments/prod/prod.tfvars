@@ -15,6 +15,11 @@ vpc_cidr = "10.2.0.0/16"
 az_count           = 3
 single_nat_gateway = false # one NAT gateway per AZ: no single point of failure in prod
 
+postgres_instance_class = "db.r7g.large"
+redis_node_type         = "cache.r7g.large"
+pgbouncer_instance_type = "t3.medium"
+mariadb_instance_class  = "db.m7g.large"
+
 # Placeholder, not a researched/confirmed domain: apps/web has no hosting decision recorded
 # anywhere in this repo (unlike apps/mobile, which already hardcodes api.studafy.com). Named
 # by analogy with that host. Update before this environment's first real deploy.
@@ -53,14 +58,12 @@ edge_idle_timeout = 3600
 # via a data lookup, same as module.edge already did before this zone was Terraform-managed. If
 # studafy.com already resolves today (created by hand, pre-Terraform), see
 # modules/dns/README.md's import note before the first apply of this flag.
-dns_manage_zone = true
-
 # prod is the only environment with a transactional-email requirement recorded anywhere in this
 # repo so far (apps/workers/docs/queue-catalog.md's `notifications` queue is not yet wired to a
 # sender). mail.studafy.com is a placeholder subdomain, not a confirmed name — update it if a
 # different sending subdomain is chosen before this is first applied for real.
 dns_create_email_records = true
-dns_ses_domain           = "mail.studafy.com"
+dns_ses_domain           = "send.studafy.com"
 
 # Placeholder: no mail-receiving infrastructure exists anywhere in this repo yet, so this address
 # does not resolve to a real inbox today. Point it at wherever DMARC aggregate reports should

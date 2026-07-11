@@ -19,6 +19,7 @@ PG_USER=$(echo "$pg_secret" | jq -r .username)
 PG_PASS=$(echo "$pg_secret" | jq -r .password)
 
 STATS_PASS=$(echo "$pgb_secret" | jq -r .stats_password)
+SERVICE_USERS=$(echo "$pgb_secret" | jq -r '.service_credentials | to_entries[] | "\"\(.key)\" \"\(.value)\""')
 
 echo "$pgb_secret" | jq -r .server_cert_pem > /etc/pgbouncer/server.crt
 echo "$pgb_secret" | jq -r .server_key_pem  > /etc/pgbouncer/server.key
@@ -33,6 +34,7 @@ chown pgbouncer:pgbouncer /etc/pgbouncer/server.crt /etc/pgbouncer/server.key /e
 # method (here, scram-sha-256) the client negotiates, computed fresh per connection.
 cat > /etc/pgbouncer/userlist.txt <<USERLIST
 "$PG_USER" "$PG_PASS"
+$${SERVICE_USERS}
 "${stats_username}" "$STATS_PASS"
 USERLIST
 chmod 600 /etc/pgbouncer/userlist.txt
@@ -87,6 +89,63 @@ INI
 chown pgbouncer:pgbouncer /etc/pgbouncer/pgbouncer.ini
 
 systemctl enable --now pgbouncer
+
+# RDS rotation changes the backend password without changing the stable client credentials above.
+# Refresh the master entry and RELOAD PgBouncer every minute so rotation never requires an EC2
+# replacement or an application credential change.
+cat > /usr/local/bin/pgbouncer-refresh-credentials.sh <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+
+pg_secret=$(aws secretsmanager get-secret-value --region "__AWS_REGION__" --secret-id "__POSTGRES_SECRET_ARN__" --query SecretString --output text)
+pgb_secret=$(aws secretsmanager get-secret-value --region "__PGB_REGION__" --secret-id "__PGBOUNCER_SECRET_ARN__" --query SecretString --output text)
+
+PG_USER=$(echo "$pg_secret" | jq -r .username)
+PG_PASS=$(echo "$pg_secret" | jq -r .password)
+STATS_USER=$(echo "$pgb_secret" | jq -r .stats_username)
+STATS_PASS=$(echo "$pgb_secret" | jq -r .stats_password)
+
+tmp=$(mktemp)
+{
+  printf '"%s" "%s"\n' "$PG_USER" "$PG_PASS"
+  echo "$pgb_secret" | jq -r '.service_credentials | to_entries[] | "\"\(.key)\" \"\(.value)\""'
+  printf '"%s" "%s"\n' "$STATS_USER" "$STATS_PASS"
+} > "$tmp"
+install -o pgbouncer -g pgbouncer -m 600 "$tmp" /etc/pgbouncer/userlist.txt
+rm -f "$tmp"
+systemctl reload pgbouncer
+SCRIPT
+
+sed -i \
+  -e "s#__AWS_REGION__#${aws_region}#" \
+  -e "s#__PGB_REGION__#${aws_region}#" \
+  -e "s#__POSTGRES_SECRET_ARN__#${postgres_secret_arn}#" \
+  -e "s#__PGBOUNCER_SECRET_ARN__#${pgbouncer_secret_arn}#" \
+  /usr/local/bin/pgbouncer-refresh-credentials.sh
+chmod 700 /usr/local/bin/pgbouncer-refresh-credentials.sh
+
+cat > /etc/systemd/system/pgbouncer-refresh-credentials.service <<'UNIT'
+[Unit]
+Description=Refresh PgBouncer backend credentials from Secrets Manager
+After=network-online.target pgbouncer.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pgbouncer-refresh-credentials.sh
+UNIT
+
+cat > /etc/systemd/system/pgbouncer-refresh-credentials.timer <<'UNIT'
+[Unit]
+Description=Refresh PgBouncer credentials after RDS secret rotation
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=60
+RandomizedDelaySec=10
+
+[Install]
+WantedBy=timers.target
+UNIT
 
 cat <<CONFIG > /opt/aws/amazon-cloudwatch-agent/etc/config.json
 {
@@ -176,3 +235,4 @@ TIMER
 
 systemctl daemon-reload
 systemctl enable --now pgbouncer-metrics.timer
+systemctl enable --now pgbouncer-refresh-credentials.timer

@@ -4,12 +4,41 @@ import { z } from "zod";
  * Environment configuration for the API. It is parsed and validated once at bootstrap so that an
  * invalid environment fails fast — before the server binds a port — with a named, readable error.
  */
-export const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  HOST: z.string().min(1).default("0.0.0.0"),
-  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
-});
+export const envSchema = z
+  .object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+    HOST: z.string().min(1).default("0.0.0.0"),
+    SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
+    DATABASE_HOST: z.string().min(1).optional(),
+    DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    DATABASE_NAME: z.string().min(1).optional(),
+    DATABASE_USER: z.string().min(1).optional(),
+    DATABASE_PASSWORD: z.string().min(1).optional(),
+    DATABASE_CA_CERT: z.string().min(1).optional(),
+  })
+  .superRefine((env, context) => {
+    if (env.NODE_ENV !== "production") return;
+
+    const requiredDatabaseValues = [
+      ["DATABASE_HOST", env.DATABASE_HOST],
+      ["DATABASE_PORT", env.DATABASE_PORT],
+      ["DATABASE_NAME", env.DATABASE_NAME],
+      ["DATABASE_USER", env.DATABASE_USER],
+      ["DATABASE_PASSWORD", env.DATABASE_PASSWORD],
+      ["DATABASE_CA_CERT", env.DATABASE_CA_CERT],
+    ] as const;
+
+    for (const [key, value] of requiredDatabaseValues) {
+      if (value === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is required in production`,
+        });
+      }
+    }
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

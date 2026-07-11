@@ -3,7 +3,7 @@
 #
 #   terraform init -reconfigure -backend-config=environments/staging/backend.hcl
 
-bucket = "studafy-tfstate-staging"
+bucket = "studafy-tfstate-staging-862910165270"
 key    = "staging/terraform.tfstate"
 region = "eu-central-1"
 

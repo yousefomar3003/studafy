@@ -7,11 +7,6 @@
 # staging-api.studafy.com. A missing zone fails the plan here with a clear "no matching
 # Route 53 zone" error instead of silently provisioning nothing.
 
-data "aws_route53_zone" "this" {
-  name         = var.route53_zone_name
-  private_zone = false
-}
-
 resource "aws_acm_certificate" "this" {
   domain_name       = var.domain_name
   validation_method = "DNS"
@@ -32,7 +27,7 @@ resource "aws_route53_record" "cert_validation" {
     }
   }
 
-  zone_id         = data.aws_route53_zone.this.zone_id
+  zone_id         = var.route53_zone_id
   name            = each.value.name
   type            = each.value.type
   records         = [each.value.record]
@@ -51,7 +46,7 @@ resource "aws_acm_certificate_validation" "this" {
 resource "aws_route53_record" "app" {
   count = var.create_dns_record ? 1 : 0
 
-  zone_id = data.aws_route53_zone.this.zone_id
+  zone_id = var.route53_zone_id
   name    = var.domain_name
   type    = "A"
 

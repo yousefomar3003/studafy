@@ -29,6 +29,6 @@ output "signing_key_alias" {
 }
 
 output "github_oidc_provider_arn" {
-  description = "ARN of the GitHub Actions OIDC provider this module owns. Account-wide singleton — see the comment on aws_iam_openid_connect_provider.github_actions in main.tf before creating a second one elsewhere."
-  value       = aws_iam_openid_connect_provider.github_actions.arn
+  description = "Account-wide bootstrap OIDC provider ARN consumed by this module."
+  value       = var.github_oidc_provider_arn
 }

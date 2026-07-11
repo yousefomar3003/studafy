@@ -77,6 +77,11 @@ variable "service_pools" {
   }
 
   validation {
+    condition     = contains(keys(var.service_pools), "api")
+    error_message = "service_pools must contain api because the API runtime consumes that stable pool credential."
+  }
+
+  validation {
     condition     = alltrue([for name, _ in var.service_pools : can(regex("^[a-z][a-z0-9_]*$", name))])
     error_message = "each service_pools key must be lowercase alphanumeric/underscore, starting with a letter (used verbatim as a PgBouncer database name)."
   }

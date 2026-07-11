@@ -20,6 +20,10 @@
         {
           "name": "WS_JWT_SECRET",
           "valueFrom": "${REALTIME_APP_SECRETS_ARN}:WS_JWT_SECRET::"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "${REDIS_SECRET_ARN}:pubsub_url::"
         }
       ],
       "healthCheck": {

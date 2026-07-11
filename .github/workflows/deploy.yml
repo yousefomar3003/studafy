@@ -1,0 +1,55 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [dev, staging, prod]
+        required: true
+      image_tag:
+        description: Immutable image tag or digest created by the signed release workflow
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.AWS_DEPLOYMENTS_ENABLED == 'true'
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - uses: sigstore/cosign-installer@v3
+      - name: Install deployment utilities
+        run: sudo apt-get update && sudo apt-get install -y gettext-base jq
+      - name: Initialize environment state
+        run: terraform init -reconfigure -backend-config=environments/${{ inputs.environment }}/backend.hcl
+        working-directory: infra/terraform
+      - name: Apply reviewed infrastructure
+        run: terraform apply -auto-approve -var-file=environments/${{ inputs.environment }}/${{ inputs.environment }}.tfvars
+        working-directory: infra/terraform
+      - name: Render environment outputs
+        run: ./scripts/populate-env.sh ${{ inputs.environment }}
+        working-directory: infra/deploy
+      - name: Verify and deploy services
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          ./scripts/deploy.sh api ${{ inputs.environment }} "$IMAGE_TAG"
+          ./scripts/deploy.sh realtime ${{ inputs.environment }} "$IMAGE_TAG"
+          ./scripts/deploy.sh workers ${{ inputs.environment }} "$IMAGE_TAG"
+        working-directory: infra/deploy

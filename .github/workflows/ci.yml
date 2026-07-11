@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run format:check
+      - run: bunx turbo run lint check-types test build --filter=!@studafy/mobile
+      - run: bun run --cwd packages/ui build-storybook
+      - name: Verify Turbo cache replay
+        run: bunx turbo run build --filter=!@studafy/mobile --summarize
+
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Conventional commit gate
+        run: |
+          if printf 'bad message\n' | bunx commitlint; then
+            echo 'invalid commit unexpectedly passed' >&2
+            exit 1
+          fi
+          printf 'test: validate conventional commits\n' | bunx commitlint

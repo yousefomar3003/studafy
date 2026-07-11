@@ -5,7 +5,7 @@ import { healthRoutes } from "./health";
 import type { InflightTracker } from "./lifecycle";
 
 export interface AppOptions {
-  isReady: () => boolean;
+  isReady: () => boolean | Promise<boolean>;
   tracker: InflightTracker;
 }
 

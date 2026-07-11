@@ -26,6 +26,15 @@ Validated once at startup by [`src/env.ts`](src/env.ts). An invalid value throws
 | `PORT`                | integer `1`–`65535`                     | `3000`        |                                      |
 | `HOST`                | string                                  | `0.0.0.0`     | interface to bind                    |
 | `SHUTDOWN_TIMEOUT_MS` | integer `>= 0`                          | `10000`       | max time to drain in-flight requests |
+| `DATABASE_HOST`       | string                                  | none          | required in production               |
+| `DATABASE_PORT`       | integer `1`-`65535`                     | none          | PgBouncer listener                   |
+| `DATABASE_NAME`       | string                                  | none          | PgBouncer service pool name          |
+| `DATABASE_USER`       | string                                  | none          | injected from Secrets Manager        |
+| `DATABASE_PASSWORD`   | string                                  | none          | injected from Secrets Manager        |
+| `DATABASE_CA_CERT`    | PEM string                              | none          | verifies PgBouncer TLS               |
+
+The PostgreSQL client disables prepared statements for transaction pooling. In production,
+`/readyz` runs `SELECT 1` through PgBouncer before reporting ready.
 
 ## Commands
 

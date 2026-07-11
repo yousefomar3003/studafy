@@ -16,13 +16,13 @@ describe("loadEnv", () => {
   test("parses and coerces provided values", () => {
     expect(
       loadEnv({
-        NODE_ENV: "production",
+        NODE_ENV: "test",
         PORT: "8080",
         HOST: "127.0.0.1",
         SHUTDOWN_TIMEOUT_MS: "5000",
       }),
     ).toEqual({
-      NODE_ENV: "production",
+      NODE_ENV: "test",
       PORT: 8080,
       HOST: "127.0.0.1",
       SHUTDOWN_TIMEOUT_MS: 5000,
@@ -45,5 +45,9 @@ describe("loadEnv", () => {
 
   test("throws for an unknown NODE_ENV", () => {
     expect(() => loadEnv({ NODE_ENV: "staging" })).toThrow(EnvValidationError);
+  });
+
+  test("requires PgBouncer TLS configuration in production", () => {
+    expect(() => loadEnv({ NODE_ENV: "production" })).toThrow(EnvValidationError);
   });
 });

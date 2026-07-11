@@ -1,6 +1,8 @@
 dist
 .turbo
 node_modules
+apps/mobile
+packages/ui/storybook-static
 graphify-out
 bun.lock
 *.tsbuildinfo

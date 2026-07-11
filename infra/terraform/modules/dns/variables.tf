@@ -35,6 +35,11 @@ variable "protect_apex_from_spoofing" {
   default     = true
 }
 
+variable "zone_id" {
+  description = "Public Route 53 hosted-zone ID owned by the shared bootstrap stack."
+  type        = string
+}
+
 variable "create_email_records" {
   description = "Whether to provision the SES domain identity, DKIM, custom MAIL FROM and DMARC records for ses_domain. false (default) — most environments have no transactional-email-sending code yet; set true where they do."
   type        = bool

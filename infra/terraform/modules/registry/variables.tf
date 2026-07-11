@@ -24,6 +24,11 @@ variable "github_repository" {
   default     = "yousefomar3003/studafy"
 }
 
+variable "github_oidc_provider_arn" {
+  description = "Account-wide GitHub Actions OIDC provider ARN owned by the bootstrap stack."
+  type        = string
+}
+
 variable "image_repository_names" {
   description = <<-EOT
     One ECR repository is created per name in this list, as "<name_prefix>/<name>". Defaults to
@@ -37,7 +42,7 @@ variable "image_repository_names" {
     as new ones are scaffolded.
   EOT
   type        = list(string)
-  default     = ["api", "realtime", "workers", "erpnext"]
+  default     = ["api", "realtime", "workers", "web", "erpnext"]
 
   validation {
     condition     = length(var.image_repository_names) > 0

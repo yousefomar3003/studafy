@@ -60,6 +60,10 @@ if [ "$REPO_URL" = "null" ] || [ -z "$REPO_URL" ]; then
 fi
 
 SECRET_ARN="$(terraform -chdir="$TF_DIR" output -json secrets_service_secret_arns | jq -r --arg s "$SERVICE" '.[$s] // empty')"
+REDIS_SECRET_ARN="$(terraform -chdir="$TF_DIR" output -raw redis_auth_secret_arn)"
+PGBOUNCER_SECRET_ARN="$(terraform -chdir="$TF_DIR" output -raw pgbouncer_connection_secret_arn)"
+PGBOUNCER_HOST="$(terraform -chdir="$TF_DIR" output -raw pgbouncer_private_ip)"
+export REDIS_SECRET_ARN PGBOUNCER_SECRET_ARN PGBOUNCER_HOST
 
 SERVICE_UPPER="$(echo "$SERVICE" | tr '[:lower:]' '[:upper:]')"
 export "${SERVICE_UPPER}_IMAGE=${REPO_URL}:${IMAGE_TAG}"

@@ -38,6 +38,11 @@ variable "route53_zone_name" {
   type        = string
 }
 
+variable "route53_zone_id" {
+  description = "Public hosted-zone ID owned by the shared bootstrap stack."
+  type        = string
+}
+
 variable "create_dns_record" {
   description = "Whether to create/manage an alias A record for domain_name pointing at the ALB in route53_zone_name. Set false if domain_name's record is managed elsewhere (e.g. a different AWS account or DNS provider) — this module still provisions the LB/TLS/WAF, you just wire DNS yourself."
   type        = bool

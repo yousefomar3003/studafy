@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "build": "bun build ./src/index.ts --outdir dist",
+    "build": "bun build ./src/index.ts --outdir dist --target bun",
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
     "test": "bun test"
   },
   "dependencies": {
     "hono": "4.12.28",
+    "postgres": "3.4.9",
     "zod": "4.1.12"
   },
   "devDependencies": {

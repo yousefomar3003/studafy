@@ -3,7 +3,7 @@
 #
 #   terraform init -reconfigure -backend-config=environments/prod/backend.hcl
 
-bucket = "studafy-tfstate-prod"
+bucket = "studafy-tfstate-prod-862910165270"
 key    = "prod/terraform.tfstate"
 region = "eu-central-1"
 

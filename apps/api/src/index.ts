@@ -1,4 +1,5 @@
 import { createApp } from "./app";
+import { checkDatabase, closeDatabase, createDatabase } from "./database";
 import { loadEnv } from "./env";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 
@@ -7,7 +8,11 @@ const env = loadEnv();
 
 const state = { ready: true };
 const tracker = createInflightTracker();
-const app = createApp({ isReady: () => state.ready, tracker });
+const database = createDatabase(env);
+const app = createApp({
+  isReady: async () => state.ready && (await checkDatabase(database)),
+  tracker,
+});
 
 const server = Bun.serve({
   port: env.PORT,
@@ -32,7 +37,8 @@ const shutdown = (signal: string) => {
     },
     tracker,
     timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
-  }).then(() => {
+  }).then(async () => {
+    await closeDatabase(database);
     console.log("Shutdown complete.");
     process.exit(0);
   });

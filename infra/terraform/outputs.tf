@@ -170,7 +170,7 @@ output "dns_zone_id" {
 
 output "dns_zone_name_servers" {
   description = "Authoritative name servers Route 53 assigned route53_zone_name. Only non-null where dns_manage_zone is true (prod). Compare against the domain registrar's delegation — see modules/dns/README.md's import note."
-  value       = module.dns.zone_name_servers
+  value       = data.terraform_remote_state.bootstrap.outputs.route53_name_servers
 }
 
 output "dns_ses_domain_identity_arn" {
@@ -211,6 +211,16 @@ output "edge_certificate_arn" {
 output "edge_web_acl_arn" {
   description = "ARN of the WAFv2 web ACL in front of the load balancer."
   value       = module.edge.web_acl_arn
+}
+
+output "monitoring_dashboard_name" {
+  description = "CloudWatch operations dashboard for RDS, Redis, and ECS."
+  value       = module.monitoring.dashboard_name
+}
+
+output "monitoring_alarm_arns" {
+  description = "Action-free operational alarms; notification actions are intentionally unset."
+  value       = module.monitoring.alarm_arns
 }
 
 # module.cdn is not instantiated for dev (main.tf's count), so every output below is null there —

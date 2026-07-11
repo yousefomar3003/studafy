@@ -14,13 +14,20 @@
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
         { "name": "PORT", "value": "3000" },
-        { "name": "HOST", "value": "0.0.0.0" }
+        { "name": "HOST", "value": "0.0.0.0" },
+        { "name": "DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },
+        { "name": "DATABASE_PORT", "value": "6432" },
+        { "name": "DATABASE_NAME", "value": "api" }
       ],
-      "secrets": [],
+      "secrets": [
+        { "name": "DATABASE_USER", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_username::" },
+        { "name": "DATABASE_PASSWORD", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_password::" },
+        { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" }
+      ],
       "healthCheck": {
         "command": [
           "CMD-SHELL",
-          "bun -e \"fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+          "bun -e \"fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
         ],
         "interval": 30,
         "timeout": 3,

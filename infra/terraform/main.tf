@@ -1,3 +1,13 @@
+data "terraform_remote_state" "bootstrap" {
+  backend = "s3"
+
+  config = {
+    bucket = "studafy-tfstate-bootstrap-862910165270"
+    key    = "bootstrap/terraform.tfstate"
+    region = "eu-central-1"
+  }
+}
+
 module "naming" {
   source = "./modules/naming"
 
@@ -99,6 +109,11 @@ module "secrets" {
   # "${name_prefix}/erpnext/app-secrets" (see modules/erpnext/README.md's "What this module does
   # not do" for why modules/erpnext itself must not also create a secret at that same path).
   app_secret_values = merge(
+    {
+      realtime = {
+        WS_JWT_SECRET = random_password.realtime_jwt.result
+      }
+    },
     var.secrets_app_secret_values,
     local.erpnext_plane_enabled ? {
       erpnext = {
@@ -120,6 +135,11 @@ module "secrets" {
   # here: their ARNs are only used as opaque strings in an IAM policy document above, which never
   # needs their secret *versions* to exist first.
   depends_on = [module.postgres]
+}
+
+resource "random_password" "realtime_jwt" {
+  length  = 48
+  special = false
 }
 
 # ERPNext's own generated secrets — not externally supplied (see module.secrets' app_secret_values
@@ -153,8 +173,9 @@ module "storage" {
 module "registry" {
   source = "./modules/registry"
 
-  name_prefix = module.naming.name_prefix
-  environment = var.environment
+  name_prefix              = module.naming.name_prefix
+  environment              = var.environment
+  github_oidc_provider_arn = data.terraform_remote_state.bootstrap.outputs.github_oidc_provider_arn
 
   # The ECS task execution role is a third IAM principal (Fargate itself, pulling at task launch)
   # distinct from ci_push/deploy_pull — see modules/registry's additional_pull_role_arns and
@@ -168,9 +189,7 @@ module "dns" {
   name_prefix = module.naming.name_prefix
   aws_region  = var.aws_region
   zone_name   = var.route53_zone_name
-
-  manage_zone                = var.dns_manage_zone
-  protect_apex_from_spoofing = var.dns_protect_apex_from_spoofing
+  zone_id     = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
 
   create_email_records = var.dns_create_email_records
   ses_domain           = var.dns_ses_domain
@@ -188,6 +207,7 @@ module "edge" {
   alb_security_group_id      = module.network.alb_security_group_id
   domain_name                = var.edge_domain_name
   route53_zone_name          = var.route53_zone_name
+  route53_zone_id            = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
   create_dns_record          = var.edge_create_dns_record
   enable_deletion_protection = var.edge_enable_deletion_protection
   idle_timeout               = var.edge_idle_timeout
@@ -209,7 +229,8 @@ module "cdn" {
   environment                = var.environment
   domain_name                = var.cdn_domain_name
   route53_zone_name          = var.route53_zone_name
-  github_oidc_provider_arn   = module.registry.github_oidc_provider_arn
+  route53_zone_id            = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
+  github_oidc_provider_arn   = data.terraform_remote_state.bootstrap.outputs.github_oidc_provider_arn
   enable_deletion_protection = var.cdn_enable_deletion_protection
 }
 
@@ -225,6 +246,17 @@ module "compute" {
   https_listener_arn = module.edge.https_listener_arn
 
   secrets_service_iam_policy_arns = module.secrets.service_iam_policy_arns
+}
+
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  name_prefix                = module.naming.name_prefix
+  aws_region                 = var.aws_region
+  postgres_instance_id       = module.postgres.db_instance_id
+  mariadb_instance_id        = local.erpnext_plane_enabled ? module.mariadb[0].db_instance_id : null
+  redis_replication_group_id = module.redis.replication_group_id
+  ecs_cluster_name           = module.compute.cluster_name
 }
 
 # MariaDB for the ERPNext + Frappe Education plane. staging/prod only — see local.erpnext_plane_enabled.

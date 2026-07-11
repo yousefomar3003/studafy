@@ -25,6 +25,13 @@ resource "random_password" "stats" {
   special = false
 }
 
+resource "random_password" "service_client" {
+  for_each = var.service_pools
+
+  length  = 32
+  special = false
+}
+
 # --- Client-facing TLS: a self-signed CA plus a leaf certificate signed by it, not ACM. ACM
 # certificates' private keys are not exportable for a listener ACM doesn't itself terminate, and
 # ACM Private CA is a real-money cost/complexity jump unjustified for a KISS single-instance
@@ -107,6 +114,11 @@ resource "aws_secretsmanager_secret_version" "pgbouncer" {
     stats_username  = local.stats_username
     stats_password  = random_password.stats.result
     sslmode         = "verify-ca"
+    api_username    = "api"
+    api_password    = random_password.service_client["api"].result
+    service_credentials = {
+      for name, password in random_password.service_client : name => password.result
+    }
   })
 }
 
@@ -191,7 +203,7 @@ resource "aws_iam_instance_profile" "pgbouncer" {
 
 locals {
   user_data = templatefile("${path.module}/templates/user_data.sh.tftpl", {
-    aws_region               = data.aws_region.current.name
+    aws_region               = data.aws_region.current.region
     postgres_secret_arn      = var.postgres_connection_secret_arn
     pgbouncer_secret_arn     = aws_secretsmanager_secret.pgbouncer.arn
     listen_port              = var.listen_port

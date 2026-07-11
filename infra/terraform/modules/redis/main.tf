@@ -79,6 +79,9 @@ resource "aws_secretsmanager_secret_version" "redis" {
     tls              = true
     cache_db         = local.cache_db_index
     queue_db         = local.queue_db_index
+    cache_url        = "rediss://:${random_password.auth_token.result}@${aws_elasticache_replication_group.this.primary_endpoint_address}:${var.port}/${local.cache_db_index}"
+    queue_url        = "rediss://:${random_password.auth_token.result}@${aws_elasticache_replication_group.this.primary_endpoint_address}:${var.port}/${local.queue_db_index}"
+    pubsub_url       = "rediss://:${random_password.auth_token.result}@${aws_elasticache_replication_group.this.primary_endpoint_address}:${var.port}/${local.cache_db_index}"
   })
 }
 

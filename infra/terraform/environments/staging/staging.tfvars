@@ -15,6 +15,11 @@ vpc_cidr = "10.1.0.0/16"
 az_count           = 2
 single_nat_gateway = true # cost over HA in staging
 
+postgres_instance_class = "db.t4g.medium"
+redis_node_type         = "cache.t4g.small"
+pgbouncer_instance_type = "t3.small"
+mariadb_instance_class  = "db.t4g.medium"
+
 # Placeholder, not a researched/confirmed domain: apps/web has no hosting decision recorded
 # anywhere in this repo (unlike apps/mobile, which already hardcodes staging-api.studafy.com).
 # Named by analogy with that host. Update before this environment's first real deploy.

@@ -54,6 +54,31 @@ describe("DataGrid", () => {
     expect(screen.queryByText("Student 10")).toBeNull();
   });
 
+  test("keeps a 1,000-row dataset virtualized within the interaction budget", () => {
+    const thousandStudents: Student[] = Array.from({ length: 1000 }, (_, index) => ({
+      id: `student-${index}`,
+      name: `Student ${index}`,
+      score: index,
+    }));
+    const startedAt = performance.now();
+    const { container } = render(
+      <DataGrid
+        caption="Students"
+        columns={columns}
+        rows={thousandStudents}
+        getRowId={(row) => row.id}
+        rowHeight={40}
+        height={400}
+        overscan={4}
+      />,
+    );
+    const elapsedMs = performance.now() - startedAt;
+    const mountedRows = container.querySelectorAll("tbody tr").length;
+
+    expect(mountedRows).toBeLessThanOrEqual(20);
+    expect(elapsedMs).toBeLessThan(500);
+  });
+
   test("scrolling shifts the rendered window", () => {
     const { container } = render(
       <DataGrid

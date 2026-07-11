@@ -11,7 +11,9 @@
       "image": "${WORKERS_IMAGE}",
       "essential": true,
       "environment": [{ "name": "NODE_ENV", "value": "production" }],
-      "secrets": [],
+      "secrets": [
+        { "name": "REDIS_URL", "valueFrom": "${REDIS_SECRET_ARN}:queue_url::" }
+      ],
       "healthCheck": {
         "command": ["CMD-SHELL", "bun healthcheck.ts"],
         "interval": 30,
