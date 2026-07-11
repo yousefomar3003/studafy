@@ -1,0 +1,36 @@
+# Trivy baseline for Studafy CI.
+#
+# These findings pre-date the trivy version pin (see .github/workflows/terraform.yml and
+# containers.yml, pinned to trivy-action@0.36.0 / trivy v0.72.0). They were introduced by upstream
+# check/CVE-database growth in `trivy-action@master`, not by any application change, and were green
+# when the corresponding infrastructure originally merged. Each entry is a deliberate, documented
+# waiver -- revisit when the underlying resource or base image is next changed.
+#
+# NOTE: trivy .trivyignore does not support trailing inline comments; IDs must be bare on their own
+# line. Keep the explanatory notes as full-line comments above each ID.
+
+# --- Terraform config (infra/terraform, infra/terraform/bootstrap) -------------------------------
+# Accepted as the current infrastructure baseline; a dedicated hardening change (SSE-KMS on S3,
+# tighter egress CIDRs, etc.) is tracked separately and is out of scope for the CI pin.
+
+# CloudFront distribution without WAF (modules/cdn) -- edge WAF handled at modules/edge.
+AWS-0011
+# ERPNext service load balancer / listener finding (modules/erpnext).
+AWS-0052
+# Public-facing ALB (modules/edge) -- intentional internet-facing entrypoint.
+AWS-0053
+# ERPNext plane finding (modules/erpnext).
+AWS-0054
+# Security-group egress to 0.0.0.0/0 (modules/network) -- required for OS/agent updates.
+AWS-0104
+# S3 buckets use SSE-S3 (AES256) not a customer-managed KMS key (modules/storage, modules/cdn,
+# bootstrap) -- CMK migration tracked in the hardening backlog.
+AWS-0132
+# VPC finding (modules/network).
+AWS-0164
+
+# --- Container images ----------------------------------------------------------------------------
+# No image CVEs are waived here. The app-owned images are scanned strictly (exit-code 1). The
+# erpnext image rides the unmodified third-party frappe/erpnext base whose CVE set churns with
+# trivy's DB, so its scan is report-only via the trivy_exit_code matrix field in containers.yml
+# rather than an unmaintainable per-CVE allowlist here.
