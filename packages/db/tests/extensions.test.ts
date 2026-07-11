@@ -214,9 +214,11 @@ integrationTest("pg_stat_statements collects statistics when preloaded", async (
       return;
     }
 
-    // Run a distinctive probe statement, then confirm it was actually captured and can be queried.
-    const probe = `SELECT 'st032_probe_${crypto.randomUUID().replaceAll("-", "")}'::text`;
-    await database.sql.unsafe(probe);
+    // Run a distinctive probe, then confirm it was captured. pg_stat_statements normalizes constant
+    // literals to $1, so the marker is a column alias (an identifier, preserved verbatim in the
+    // stored query text) rather than a string literal.
+    const marker = `st032_probe_${crypto.randomUUID().replaceAll("-", "")}`;
+    await database.sql.unsafe(`SELECT 1 AS ${marker}`);
     const [captured] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count
       FROM public.pg_stat_statements
@@ -231,15 +233,26 @@ integrationTest("pg_stat_statements collects statistics when preloaded", async (
 integrationTest("monitoring and runtime roles cannot escalate", async () => {
   const database = await migratedDatabase();
   try {
-    // studafy_monitor is telemetry-only: no extension management, no admin assumption.
+    // studafy_monitor is telemetry-only: it cannot manage extensions.
     await expectDenied(database, "studafy_monitor", `CREATE EXTENSION IF NOT EXISTS citext`);
     await expectDenied(database, "studafy_monitor", `ALTER EXTENSION vector UPDATE`);
     await expectDenied(database, "studafy_monitor", `DROP EXTENSION vector`);
-    await expectDenied(database, "studafy_monitor", `SET ROLE studafy_admin`);
 
-    // studafy_app cannot assume the monitoring or administrative role.
-    await expectDenied(database, "studafy_app", `SET ROLE studafy_monitor`);
-    await expectDenied(database, "studafy_app", `SET ROLE studafy_admin`);
+    // No role can assume another. Membership is the correct probe: SET ROLE is checked against the
+    // session login (the superuser test connection), so it is not a valid escalation test here.
+    const [membership] = await database.sql<
+      { app_in_monitor: boolean; app_in_admin: boolean; monitor_in_admin: boolean }[]
+    >`
+      SELECT
+        pg_has_role('studafy_app', 'studafy_monitor', 'MEMBER') AS app_in_monitor,
+        pg_has_role('studafy_app', 'studafy_admin', 'MEMBER') AS app_in_admin,
+        pg_has_role('studafy_monitor', 'studafy_admin', 'MEMBER') AS monitor_in_admin
+    `;
+    expect(membership).toEqual({
+      app_in_monitor: false,
+      app_in_admin: false,
+      monitor_in_admin: false,
+    });
   } finally {
     await database.cleanup();
   }
