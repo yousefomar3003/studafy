@@ -1,11 +1,6 @@
 output "zone_id" {
-  description = "Route 53 hosted zone ID for zone_name. Pass this to any other module that needs to add records into the same zone instead of doing its own data-source lookup — module.edge currently does its own lookup by name (see modules/edge/dns.tf); this output exists so future modules don't have to."
+  description = "Route 53 hosted zone ID owned by the shared bootstrap stack. Pass this to any other module that needs to add records into the same zone instead of doing its own data-source lookup — module.edge currently does its own lookup by name (see modules/edge/dns.tf); this output exists so future modules don't have to."
   value       = local.zone_id
-}
-
-output "zone_name_servers" {
-  description = "Authoritative name servers Route 53 assigned zone_name. Only non-null when manage_zone is true. Compare these against the domain registrar's delegation after the terraform import described in main.tf — a mismatch means the registrar is not actually pointed at this Terraform-managed zone yet."
-  value       = null
 }
 
 output "ses_domain_identity_arn" {

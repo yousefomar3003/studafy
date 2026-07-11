@@ -38,6 +38,8 @@ resource "aws_s3_bucket_versioning" "web_bundle" {
   }
 }
 
+# SSE-S3, not SSE-KMS: same "no KMS key management set up yet" call as modules/storage.
+#trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "web_bundle" {
   bucket = aws_s3_bucket.web_bundle.id
 

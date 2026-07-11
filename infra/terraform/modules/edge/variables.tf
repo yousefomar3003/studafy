@@ -19,7 +19,7 @@ variable "alb_security_group_id" {
 }
 
 variable "domain_name" {
-  description = "Public hostname the ALB serves, e.g. \"api.studafy.com\". Must already resolve inside route53_zone_name — this module does not register a domain."
+  description = "Public hostname the ALB serves, e.g. \"api.studafy.com\". Must already resolve inside route53_zone_id's zone — this module does not register a domain."
   type        = string
 
   validation {
@@ -28,23 +28,13 @@ variable "domain_name" {
   }
 }
 
-variable "route53_zone_name" {
-  description = <<-EOT
-    Name of an existing public Route 53 hosted zone (e.g. "studafy.com") that domain_name is
-    part of. Looked up via a data source, not created here — the same "Terraform does not create
-    this, it must already exist" pattern as modules/network's bastion_key_name. If no such zone
-    exists in this AWS account, plan/apply fails on the data source lookup rather than guessing.
-  EOT
-  type        = string
-}
-
 variable "route53_zone_id" {
   description = "Public hosted-zone ID owned by the shared bootstrap stack."
   type        = string
 }
 
 variable "create_dns_record" {
-  description = "Whether to create/manage an alias A record for domain_name pointing at the ALB in route53_zone_name. Set false if domain_name's record is managed elsewhere (e.g. a different AWS account or DNS provider) — this module still provisions the LB/TLS/WAF, you just wire DNS yourself."
+  description = "Whether to create/manage an alias A record for domain_name pointing at the ALB in route53_zone_id. Set false if domain_name's record is managed elsewhere (e.g. a different AWS account or DNS provider) — this module still provisions the LB/TLS/WAF, you just wire DNS yourself."
   type        = bool
   default     = true
 }

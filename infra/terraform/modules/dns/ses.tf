@@ -1,5 +1,5 @@
-# SES domain identity for the dedicated transactional-sending subdomain. Never zone_name
-# itself (see ses_domain's description in variables.tf) — isolating the sending domain means a
+# SES domain identity for the dedicated transactional-sending subdomain. Never the bare apex
+# domain itself (see ses_domain's description in variables.tf) — isolating the sending domain means a
 # deliverability problem with transactional mail can't drag down the apex or the app domains
 # module.edge serves.
 resource "aws_ses_domain_identity" "this" {

@@ -190,10 +190,8 @@ module "registry" {
 module "dns" {
   source = "./modules/dns"
 
-  name_prefix = module.naming.name_prefix
-  aws_region  = var.aws_region
-  zone_name   = var.route53_zone_name
-  zone_id     = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
+  aws_region = var.aws_region
+  zone_id    = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
 
   create_email_records = var.dns_create_email_records
   ses_domain           = var.dns_ses_domain
@@ -210,7 +208,6 @@ module "edge" {
   public_subnet_ids          = module.network.public_subnet_ids
   alb_security_group_id      = module.network.alb_security_group_id
   domain_name                = var.edge_domain_name
-  route53_zone_name          = var.route53_zone_name
   route53_zone_id            = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
   create_dns_record          = var.edge_create_dns_record
   enable_deletion_protection = var.edge_enable_deletion_protection
@@ -232,7 +229,6 @@ module "cdn" {
   name_prefix                = module.naming.name_prefix
   environment                = var.environment
   domain_name                = var.cdn_domain_name
-  route53_zone_name          = var.route53_zone_name
   route53_zone_id            = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
   github_oidc_provider_arn   = data.terraform_remote_state.bootstrap.outputs.github_oidc_provider_arn
   enable_deletion_protection = var.cdn_enable_deletion_protection

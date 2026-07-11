@@ -18,8 +18,8 @@ exercise the acceptance criteria: [`docs/runbooks/edge-security.md`](../../../..
   response once a target group exists. HSTS is set in `apps/api` itself (see
   `docs/runbooks/edge-security.md`); this module cannot honestly claim to enforce it from
   Terraform alone.
-- **It does not create the Route 53 hosted zone.** `route53_zone_name` is looked up via a data
-  source and must already exist — same "create this out of band first" pattern as
+- **It does not create the Route 53 hosted zone.** `route53_zone_id` comes from the shared
+  bootstrap stack and must already exist — same "create this out of band first" pattern as
   `modules/network`'s `bastion_key_name`. `staging-api.studafy.com` / `api.studafy.com` are
   already hardcoded in `apps/mobile/lib/src/core/config/app_environment.dart`; this module aliases
   the ALB to whichever `domain_name` you pass, it doesn't invent one.
@@ -54,7 +54,7 @@ security group — there is exactly one place ALB network reachability is define
 ## TLS
 
 - Certificate: `aws_acm_certificate` with `validation_method = "DNS"`, validated via
-  `aws_route53_record` entries in `route53_zone_name` and an `aws_acm_certificate_validation`
+  `aws_route53_record` entries in `route53_zone_id` and an `aws_acm_certificate_validation`
   resource the HTTPS listener depends on — a listener is never created pointing at a
   still-pending certificate.
 - `ssl_policy` defaults to `ELBSecurityPolicy-TLS13-1-2-2021-06`: TLS 1.2 minimum, TLS 1.3
@@ -90,7 +90,7 @@ module "edge" {
   public_subnet_ids      = module.network.public_subnet_ids
   alb_security_group_id  = module.network.alb_security_group_id
   domain_name             = "api.studafy.com"
-  route53_zone_name       = "studafy.com"
+  route53_zone_id         = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
 }
 ```
 
@@ -129,7 +129,7 @@ done
 | `public_subnet_ids`           | `list(string)` | —                                     | Required, ≥2 entries. From `module.network.public_subnet_ids`.               |
 | `alb_security_group_id`       | `string`       | —                                     | From `module.network.alb_security_group_id`.                                 |
 | `domain_name`                 | `string`       | —                                     | Public hostname, e.g. `api.studafy.com`. Must resolve inside the zone below. |
-| `route53_zone_name`           | `string`       | —                                     | Existing public hosted zone, e.g. `studafy.com`. Looked up, not created.     |
+| `route53_zone_id`             | `string`       | —                                     | Existing public hosted zone ID, from the shared bootstrap stack.             |
 | `create_dns_record`           | `bool`         | `true`                                | Alias `domain_name` at the ALB. Set `false` if DNS is managed elsewhere.     |
 | `ssl_policy`                  | `string`       | `ELBSecurityPolicy-TLS13-1-2-2021-06` | ALB HTTPS listener security policy.                                          |
 | `enable_deletion_protection`  | `bool`         | `false`                               | Override `true` in `prod.tfvars`.                                            |

@@ -28,8 +28,7 @@ web_origin = "https://staging.studafy.com"
 # Not a guess: apps/mobile/lib/src/core/config/app_environment.dart already hardcodes this exact
 # host as the staging API base URL. edge_domain_name here just gives Terraform the same value the
 # mobile app already assumes exists.
-edge_domain_name  = "staging-api.studafy.com"
-route53_zone_name = "studafy.com"
+edge_domain_name = "staging-api.studafy.com"
 
 # Same host as web_origin above — module.cdn serves the exact frontend web_origin points at.
 # Kept as an explicit value rather than parsed out of web_origin (see variables.tf's
