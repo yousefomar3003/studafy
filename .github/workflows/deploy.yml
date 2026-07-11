@@ -49,6 +49,7 @@ jobs:
         env:
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
+          ./scripts/migrate.sh ${{ inputs.environment }} "$IMAGE_TAG"
           ./scripts/deploy.sh api ${{ inputs.environment }} "$IMAGE_TAG"
           ./scripts/deploy.sh realtime ${{ inputs.environment }} "$IMAGE_TAG"
           ./scripts/deploy.sh workers ${{ inputs.environment }} "$IMAGE_TAG"

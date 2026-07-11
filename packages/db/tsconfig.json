@@ -1,0 +1,7 @@
+{
+  "extends": "@studafy/tsconfig/packages.json",
+  "compilerOptions": {
+    "types": ["bun"]
+  },
+  "include": ["src", "tests"]
+}

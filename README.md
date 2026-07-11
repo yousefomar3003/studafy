@@ -43,6 +43,14 @@ up new workspaces automatically.
 See [ADR-000](docs/adr/0000-monorepo-tooling-choice.md) for why this repo uses
 Bun workspaces and Turborepo.
 
+## Database migrations
+
+Ordered PostgreSQL SQL files live in [`db/migrations`](db/migrations). Run them independently from
+the API with `bun run db:migrate`; inspect with `bun run db:migrate:status` and verify immutable
+checksums with `bun run db:migrate:validate`. The complete operational, normalization, indexing,
+and Expand → Migrate → Contract policy is in
+[`docs/database/migration-policy.md`](docs/database/migration-policy.md).
+
 ## Infrastructure
 
 Cloud infrastructure is managed with Terraform under [`infra/terraform`](infra/terraform),
