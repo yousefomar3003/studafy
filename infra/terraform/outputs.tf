@@ -164,12 +164,12 @@ output "registry_signing_key_alias" {
 }
 
 output "dns_zone_id" {
-  description = "Route 53 hosted zone ID for route53_zone_name. Pass to any future module that needs to add records into the same zone instead of doing its own data-source lookup."
+  description = "Route 53 hosted zone ID owned by the shared bootstrap stack. Pass to any future module that needs to add records into the same zone instead of doing its own data-source lookup."
   value       = module.dns.zone_id
 }
 
 output "dns_zone_name_servers" {
-  description = "Authoritative name servers Route 53 assigned route53_zone_name. Only non-null where dns_manage_zone is true (prod). Compare against the domain registrar's delegation — see modules/dns/README.md's import note."
+  description = "Authoritative name servers Route 53 assigned the shared hosted zone. Compare against the domain registrar's delegation — see modules/dns/README.md's import note."
   value       = data.terraform_remote_state.bootstrap.outputs.route53_name_servers
 }
 

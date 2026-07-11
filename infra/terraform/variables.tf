@@ -185,11 +185,6 @@ variable "edge_domain_name" {
   }
 }
 
-variable "route53_zone_name" {
-  description = "Name of the existing public Route 53 hosted zone edge_domain_name lives in, e.g. \"studafy.com\". Looked up by module.edge, not created by Terraform."
-  type        = string
-}
-
 variable "edge_create_dns_record" {
   description = "Whether module.edge manages the alias A record for edge_domain_name. See modules/edge/variables.tf's create_dns_record for when to set this false."
   type        = bool
@@ -240,23 +235,6 @@ variable "cdn_enable_deletion_protection" {
   default     = false
 }
 
-variable "dns_manage_zone" {
-  description = <<-EOT
-    Whether this environment's state owns the aws_route53_zone resource for route53_zone_name
-    (true) or only looks it up read-only (false, default) — see modules/dns/variables.tf's
-    manage_zone. Set true in exactly one environment's tfvars (prod.tfvars); setting it true in
-    more than one creates a second, competing public hosted zone with the same name.
-  EOT
-  type        = bool
-  default     = false
-}
-
-variable "dns_protect_apex_from_spoofing" {
-  description = "Whether module.dns publishes \"v=spf1 -all\" and a reject-policy DMARC record on the bare route53_zone_name apex. Only takes effect when dns_manage_zone is true. See modules/dns/variables.tf."
-  type        = bool
-  default     = true
-}
-
 variable "dns_create_email_records" {
   description = "Whether module.dns provisions the SES domain identity, DKIM, custom MAIL FROM and DMARC records for dns_ses_domain. false (default) — set true where an environment actually sends transactional email (prod.tfvars)."
   type        = bool
@@ -264,7 +242,7 @@ variable "dns_create_email_records" {
 }
 
 variable "dns_ses_domain" {
-  description = "Dedicated subdomain transactional email is sent from, e.g. \"mail.studafy.com\". Required whenever dns_create_email_records is true — see modules/dns/variables.tf's ses_domain for why this is never route53_zone_name itself."
+  description = "Dedicated subdomain transactional email is sent from, e.g. \"mail.studafy.com\". Required whenever dns_create_email_records is true — see modules/dns/variables.tf's ses_domain for why this is never the bare apex domain itself."
   type        = string
   default     = null
 }

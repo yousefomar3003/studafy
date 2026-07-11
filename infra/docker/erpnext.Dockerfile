@@ -27,9 +27,10 @@ WORKDIR /home/frappe/frappe-bench
 # The officially documented way to layer a third-party Frappe app onto a prebuilt bench image
 # without rebuilding it from frappe_docker's own multi-stage pipeline: `get-app` fetches the app's
 # source and installs its Python requirements into the bench's shared virtualenv; `build --app`
-# compiles its front-end assets. Branch pinned to the same major line as ERPNEXT_VERSION so the
-# two don't drift onto incompatible Frappe framework versions.
-RUN bench get-app education --branch version-15 https://github.com/frappe/education && \
+# compiles its front-end assets. frappe/education dropped the plain "version-15" branch in favor
+# of per-minor branches, so we pin to the latest v15 line (version-15.2) to stay on the same major
+# line as ERPNEXT_VERSION without drifting onto an incompatible Frappe framework version.
+RUN bench get-app education --branch version-15.2 https://github.com/frappe/education && \
     bench build --app education
 
 # infra/deploy/scripts/erpnext-new-site.sh's --seed flag runs `bench --site <hostname> execute

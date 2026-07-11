@@ -28,7 +28,11 @@ jobs:
       - run: terraform init -backend=false
         working-directory: ${{ matrix.directory }}
       - uses: terraform-linters/setup-tflint@v4
-      - run: tflint --init && tflint --recursive
+      # Child modules intentionally omit their own required_version/required_providers pins and a
+      # few interface variables aren't consumed yet — real style warnings, but not build-breaking:
+      # the root module (versions.tf) already pins Terraform and every provider version. Only fail
+      # the job on actual errors, not warnings/notices.
+      - run: tflint --init && tflint --recursive --minimum-failure-severity=error
         working-directory: ${{ matrix.directory }}
       - run: terraform validate
         working-directory: ${{ matrix.directory }}

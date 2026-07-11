@@ -37,7 +37,7 @@ rationale and the exact deploy/verify commands:
 ## Topology
 
 ```
-route53_zone_name (existing) ──alias A──► aws_cloudfront_distribution.this
+route53_zone_id (existing) ──alias A──► aws_cloudfront_distribution.this
                                                        │
                           ┌────────────────────────────┴────────────────────────────┐
                           │                                                          │
@@ -88,7 +88,7 @@ module "cdn" {
   name_prefix              = module.naming.name_prefix
   environment               = var.environment
   domain_name               = var.cdn_domain_name
-  route53_zone_name         = var.route53_zone_name
+  route53_zone_id           = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
   github_oidc_provider_arn  = module.registry.github_oidc_provider_arn
 }
 ```
@@ -131,7 +131,7 @@ job runs after assuming `deploy_role_arn`.
 | `name_prefix`                        | `string` | —                          | Resource name prefix, from `module.naming.name_prefix`.                                      |
 | `environment`                        | `string` | —                          | Scopes `deploy`'s trust to the same-named GitHub Environment.                                |
 | `domain_name`                        | `string` | —                          | Public hostname, e.g. `app.studafy.com`. Matches the host portion of `var.web_origin`.       |
-| `route53_zone_name`                  | `string` | —                          | Existing public hosted zone. Looked up, not created.                                         |
+| `route53_zone_id`                    | `string` | —                          | Existing public hosted zone ID, from the shared bootstrap stack.                              |
 | `create_dns_record`                  | `bool`   | `true`                     | Alias `domain_name` at the distribution. Set `false` if DNS is managed elsewhere.            |
 | `github_oidc_provider_arn`           | `string` | —                          | `module.registry.github_oidc_provider_arn` — this module reuses it, never creates a second.  |
 | `github_repository`                  | `string` | `"yousefomar3003/studafy"` | `<owner>/<repo>` allowed to assume `deploy` via OIDC.                                        |

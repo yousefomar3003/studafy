@@ -9,13 +9,11 @@ DMARC) for a dedicated transactional-email-sending subdomain via SES. Deliverabi
 - **It does not manage app-specific records.** The ALB alias for each environment's
   `edge_domain_name` (`api.studafy.com`, `staging-api.studafy.com`, `dev-api.studafy.com`) is
   created by `module.edge` (`modules/edge/dns.tf`), not here — one module, one owner, per record.
-  This module owns only the zone itself and the email-auth records below.
-- **It does not create a hosted zone in every environment.** `manage_zone` is `true` in exactly
-  one environment's tfvars (see `variables.tf`). The other environments do a read-only
-  `data.aws_route53_zone` lookup — the same pattern `module.edge` already used for
-  `route53_zone_name` before this module existed. Two owners of the same public zone name would
-  each believe they're authoritative, and only one can ever match the registrar's actual NS
-  delegation.
+  This module owns only the email-auth records below.
+- **It does not create or own the hosted zone.** The public hosted zone is account-wide and owned
+  by `infra/terraform/bootstrap`; every environment stack receives its ID (`zone_id`) through
+  bootstrap remote state and only adds records into it. This prevents dev/staging/prod from ever
+  creating competing zones for the same domain.
 - **It does not provision a mailbox to receive DMARC aggregate reports.** `dmarc_rua` must point
   at a real inbox (or a third-party DMARC report analyzer's ingestion address) that exists
   independently of this repo. Without one, "DMARC reports received" (this ticket's acceptance
@@ -25,21 +23,6 @@ DMARC) for a dedicated transactional-email-sending subdomain via SES. Deliverabi
   SES). This module only makes `ses_domain` authorized and authenticated to send, and grants
   nobody permission to actually call `ses:SendEmail` — that IAM role is a compute-tier concern
   for whichever service ends up sending.
-
-## First apply against a domain that already resolves
-
-If `zone_name` is already live (a hosted zone created by hand in the AWS console — the exact
-situation this ticket exists to end), setting `manage_zone = true` and running a plain
-`terraform apply` creates a **second, competing** hosted zone with a different NS delegation.
-Every record depending on the zone the registrar actually points at — MX, `module.edge`'s app
-aliases, everything — goes dark until someone notices and manually repoints the registrar.
-
-Import the existing zone instead, so Terraform adopts the live `zone_id`:
-
-```bash
-terraform import 'module.dns.aws_route53_zone.this[0]' <existing-zone-id>
-terraform plan -var-file=environments/prod/prod.tfvars   # should show a small/no diff, not a create
-```
 
 ## Email auth records
 
@@ -51,11 +34,8 @@ terraform plan -var-file=environments/prod/prod.tfvars   # should show a small/n
 | `<mail_from_subdomain>.<ses_domain>`   | TXT   | SPF for the MAIL FROM (envelope-from) domain: `v=spf1 include:amazonses.com ~all`.                                     |
 | `_dmarc.<ses_domain>`                  | TXT   | `v=DMARC1; p=<dmarc_policy>; rua=<dmarc_rua>; ...` — `p=quarantine` by default, per this ticket's acceptance criteria. |
 
-`ses_domain` is deliberately a subdomain (e.g. `mail.studafy.com`), never `zone_name` itself —
-sending reputation is isolated from the apex and from `module.edge`'s app domains. When
-`manage_zone` and `protect_apex_from_spoofing` are both true, the apex additionally gets
-`v=spf1 -all` and `_dmarc.<zone_name> = v=DMARC1; p=reject` — nothing legitimate ever originates
-from the bare apex, so there's no real mail to quarantine, only a spoofing target to close.
+`ses_domain` is deliberately a subdomain (e.g. `mail.studafy.com`), never the bare apex domain
+itself — sending reputation is isolated from the apex and from `module.edge`'s app domains.
 
 `dmarc_policy` defaults to `quarantine`, not `reject`: this is the first enforcement policy
 `ses_domain` has ever had, and jumping straight to `reject` risks silently dropping legitimate
@@ -67,14 +47,12 @@ mail if some SPF/DKIM alignment edge case hasn't shown up in `dmarc_rua` reports
 module "dns" {
   source = "./modules/dns"
 
-  name_prefix = module.naming.name_prefix
-  aws_region  = var.aws_region
-  zone_name   = var.route53_zone_name
+  aws_region = var.aws_region
+  zone_id    = data.terraform_remote_state.bootstrap.outputs.route53_zone_id
 
-  manage_zone           = var.dns_manage_zone            # true in prod.tfvars only
-  create_email_records  = var.dns_create_email_records    # true in prod.tfvars only
-  ses_domain            = var.dns_ses_domain               # e.g. "mail.studafy.com"
-  dmarc_rua              = var.dns_dmarc_rua                 # "mailto:dmarc-reports@studafy.com"
+  create_email_records = var.dns_create_email_records    # true in prod.tfvars only
+  ses_domain           = var.dns_ses_domain               # e.g. "mail.studafy.com"
+  dmarc_rua            = var.dns_dmarc_rua                # "mailto:dmarc-reports@studafy.com"
 }
 ```
 
