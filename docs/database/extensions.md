@@ -1,13 +1,18 @@
 # PostgreSQL extension policy
 
-Studafy's PostgreSQL 16 cluster enables four extensions. They are turned on by the ordered migration
+Studafy's PostgreSQL 16 cluster enables five extensions. Four are turned on by the ordered migration
 [`db/migrations/000003_enable_required_postgresql_extensions.sql`](../../db/migrations/000003_enable_required_postgresql_extensions.sql)
 using the ST-030 framework ([migration policy](./migration-policy.md)) and the ST-031 role model
-([role model](./role-model.md)). This document is the authority for why each extension is enabled,
-how it is secured, and the normalization/indexing rules that govern its use.
+([role model](./role-model.md)); `btree_gist` is turned on later, in
+[`db/migrations/000010_create_timetable_tables.sql`](../../db/migrations/000010_create_timetable_tables.sql),
+by the same rule (superuser-owned, not `studafy_admin`) since it is the first migration that needs
+it. This document is the authority for why each extension is enabled, how it is secured, and the
+normalization/indexing rules that govern its use.
 
-Enabling an extension grants a **capability**, not a schema. This ticket adds **no** application
-tables and **no** extension-backed indexes — those are separate, evidence-driven decisions (see
+Enabling an extension grants a **capability**, not a schema. `000003` added no application tables
+and no extension-backed indexes. `000010` is the first migration to actually use an extension-backed
+constraint (`EXCLUDE USING gist`, via `btree_gist`) — see [timetable-model.md](./timetable-model.md)
+for the domain design; this document covers only the extension itself (see
 [Indexing rules](#indexing-rules)).
 
 ## Required extensions
@@ -18,6 +23,7 @@ tables and **no** extension-backed indexes — those are separate, evidence-driv
 | pg_trgm            | `pg_trgm`            | Trigram similarity and index operator classes for fuzzy / ILIKE search. | No               |
 | pgvector           | `vector`             | Vector type and distance operators for embedding similarity search.     | No               |
 | pg_stat_statements | `pg_stat_statements` | Aggregated query-execution telemetry for performance observability.     | **Yes**          |
+| btree_gist         | `btree_gist`         | GiST operator support for scalar equality (uuid, smallint), required to declare `EXCLUDE USING gist` on `app.timetable_slots`. | No |
 
 - **Supported PostgreSQL version:** 16. `family = "postgres16"` in the RDS parameter group; local/CI
   use `pgvector/pgvector:pg16`.
@@ -41,6 +47,19 @@ tables and **no** extension-backed indexes — those are separate, evidence-driv
 - pgcrypto functions are pure computation; they keep the PostgreSQL default (`EXECUTE` to `PUBLIC`).
   `studafy_app` is granted nothing extra. Revisit if an authentication or key-management design ever
   introduces sensitive key material into SQL.
+
+### btree_gist — approved use case
+
+- Adds GiST support for standard scalar equality operators. It exists solely so
+  `EXCLUDE USING gist` can be declared over ordinary equality columns (`uuid`, `smallint`), used by
+  `app.timetable_slots` (`db/migrations/000010_create_timetable_tables.sql`) to reject a teacher or
+  room being double-booked at the same weekday/period within one timetable version — see
+  [timetable-model.md](./timetable-model.md).
+- Not approved for range/geometric exclusion until a design calls for one; it is installed for the
+  operator classes it provides, not a specific index.
+- Like pgcrypto/pg_trgm/vector, btree_gist opclasses are pure computation and keep the PostgreSQL
+  default (`EXECUTE`/`USAGE` to `PUBLIC`); no extra grant to `studafy_app` and no monitoring
+  implication (no telemetry view, unlike `pg_stat_statements`).
 
 ## Ownership model
 
@@ -237,8 +256,14 @@ Extensions add capabilities; they do not relax the [normalization standard](./mi
   fields and refresh strategy; do not store pre-concatenated search blobs casually.
 - **pg_stat_statements.** Operational telemetry, not application domain data. Do not copy statement
   statistics into business tables and do not expose query text through APIs.
+- **btree_gist.** Provides operator support, not a domain concept; it does not license storing
+  overlap/exclusion state as anything other than plain equality columns already in 3NF. See
+  [timetable-model.md](./timetable-model.md) for why `app.timetable_slots` uses `EXCLUDE` instead of
+  a `UNIQUE` constraint.
 
-No application/domain tables were invented in this ticket to demonstrate any extension.
+No application/domain tables were invented in the original four-extension ticket. `000010` is a
+separate, later migration that adds `app.timetable_versions` / `app.timetable_slots` and is the
+reason `btree_gist` exists in this cluster at all.
 
 ## Indexing rules
 
