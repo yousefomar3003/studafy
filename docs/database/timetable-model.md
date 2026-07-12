@@ -11,10 +11,10 @@ source of truth; APIs must not weaken them or treat RLS as a substitute for perm
 
 ## Keys and functional dependencies
 
-| Table                | Primary and candidate keys                                    | Principal dependencies                                                              |
-| --------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `timetable_versions` | `id`; `(id, school_id)`; `(school_id, term_id, name)`          | ID determines its year, term, name, approval status, and the four submit/approve columns. |
-| `timetable_slots`    | `id`                                                            | ID determines its version, class, teacher, room, weekday, and period.                    |
+| Table                | Primary and candidate keys                            | Principal dependencies                                                                    |
+| -------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `timetable_versions` | `id`; `(id, school_id)`; `(school_id, term_id, name)` | ID determines its year, term, name, approval status, and the four submit/approve columns. |
+| `timetable_slots`    | `id`                                                  | ID determines its version, class, teacher, room, weekday, and period.                     |
 
 `timetable_slots` has no further natural/candidate key: the two `EXCLUDE` constraints (see below)
 are integrity guards over overlapping combinations, not an alternate identity for the row, so they
@@ -58,8 +58,8 @@ The state machine is not just the enum — it is enforced by
 `ck_timetable_versions_submission_state` is the complementary **static** invariant: for whichever
 status a row is in, right now, the presence of `submitted_at`/`submitted_by_user_id` and
 `approved_at`/`approved_by_user_id` is pinned exactly to that status, and `approved_at >=
-submitted_at` when both are set. The trigger enforces valid *transitions*; the check constraint
-enforces the resulting *state* is never inconsistent, including for any write path the trigger did
+submitted_at` when both are set. The trigger enforces valid _transitions_; the check constraint
+enforces the resulting _state_ is never inconsistent, including for any write path the trigger did
 not anticipate. `approved` is deliberately terminal for a given version: producing a new schedule
 means creating a new `timetable_versions` row (a new draft), not reopening an approved one. Only one
 version per `(school_id, term_id)` may be `approved` at a time (`uq_timetable_versions_one_approved_per_term`,
@@ -70,7 +70,7 @@ a partial unique index, mirroring `uq_academic_years_one_active_per_school` in `
 Two triggers on `timetable_slots` complete the model:
 
 - `enforce_timetable_slot_class_term()` (`BEFORE INSERT OR UPDATE OF class_id, timetable_version_id,
-  school_id`) locks and reads the parent version and the referenced class, then rejects the write if
+school_id`) locks and reads the parent version and the referenced class, then rejects the write if
   the class's `(term_id, academic_year_id)` does not match the version's — the same
   lock-then-check shape as `000009`'s `enforce_term_within_academic_year`. Composite foreign keys
   alone cannot express this cross-row rule.
@@ -99,7 +99,7 @@ the constraint type. `btree_gist` (enabled by this same migration; see
 for `uuid` and `smallint` that `EXCLUDE` needs.
 
 - `ex_timetable_slots_teacher_weekday_period`: no two rows in the same `(school_id,
-  timetable_version_id)` may share `(teacher_id, weekday, period)`.
+timetable_version_id)` may share `(teacher_id, weekday, period)`.
 - `ex_timetable_slots_room_weekday_period`: same, for `room_id`.
 
 Both are scoped by `timetable_version_id`, not just `school_id`: two different drafts (or a draft and
