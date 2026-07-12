@@ -32,9 +32,10 @@ integrationTest("initializes an empty database and is idempotent", async () => {
     expect(statusLog).toContain("applied  000003_enable_required_postgresql_extensions.sql");
     expect(statusLog).toContain("applied  000004_create_global_tables.sql");
     expect(statusLog).toContain("applied  000005_seed_countries_and_currencies.sql");
+    expect(statusLog).toContain("applied  000006_create_rls_helper.sql");
     const validationLog: string[] = [];
     await runMigrationCommand("validate", { env, log: (line) => validationLog.push(line) });
-    expect(validationLog).toContain("validated 5 applied migration(s)");
+    expect(validationLog).toContain("validated 6 applied migration(s)");
   } finally {
     await database.cleanup();
   }

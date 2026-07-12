@@ -50,7 +50,7 @@ per-request `statement_timeout` override, a `search_path` override — must be i
 ```sql
 BEGIN;
 SET LOCAL statement_timeout = '5s';
-SET LOCAL app.tenant_id = '42';
+SET LOCAL app.school_id = '00000000-0000-4000-8000-000000000001';
 -- ... the transaction's actual queries ...
 COMMIT;
 ```
