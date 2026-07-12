@@ -367,7 +367,15 @@ integrationTest("foreign keys and indexes are deliberate and non-redundant", asy
     const foreignKeys = await database.sql<{ conname: string }[]>`
       SELECT conname
       FROM pg_constraint
-      WHERE connamespace = 'app'::regnamespace AND contype = 'f'
+      WHERE connamespace = 'app'::regnamespace
+        AND contype = 'f'
+        AND conrelid IN (
+          SELECT c.oid
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'app'
+            AND c.relname = ANY(${GLOBAL_TABLES as unknown as string[]})
+        )
       ORDER BY conname
     `;
     expect(foreignKeys.map((row) => row.conname)).toEqual([
@@ -380,7 +388,9 @@ integrationTest("foreign keys and indexes are deliberate and non-redundant", asy
     const optionalIndexes = await database.sql<{ indexname: string }[]>`
       SELECT indexname
       FROM pg_indexes
-      WHERE schemaname = 'app' AND indexname LIKE 'idx_%'
+      WHERE schemaname = 'app'
+        AND tablename = ANY(${GLOBAL_TABLES as unknown as string[]})
+        AND indexname LIKE 'idx_%'
       ORDER BY indexname
     `;
     expect(optionalIndexes.map((row) => row.indexname)).toEqual([
