@@ -63,7 +63,7 @@ async function referenceIds(
   return { countryId: country.id, currencyId: currency.id };
 }
 
-integrationTest("applies six migrations and seeds deterministic reference data", async () => {
+integrationTest("applies all migrations and seeds deterministic reference data", async () => {
   const database = await migratedDatabase();
   try {
     const [history] = await database.sql<{ count: string }[]>`
@@ -75,7 +75,7 @@ integrationTest("applies six migrations and seeds deterministic reference data",
     const [currencies] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM app.currencies
     `;
-    expect(history?.count).toBe("6");
+    expect(history?.count).toBe("7");
     expect(countries?.count).toBe("248");
     expect(currencies?.count).toBe("157");
 
@@ -84,7 +84,7 @@ integrationTest("applies six migrations and seeds deterministic reference data",
     expect(second.pending).toHaveLength(0);
     const validation: string[] = [];
     await runMigrationCommand("validate", { env, log: (line) => validation.push(line) });
-    expect(validation).toContain("validated 6 applied migration(s)");
+    expect(validation).toContain("validated 7 applied migration(s)");
   } finally {
     await database.cleanup();
   }
@@ -367,7 +367,15 @@ integrationTest("foreign keys and indexes are deliberate and non-redundant", asy
     const foreignKeys = await database.sql<{ conname: string }[]>`
       SELECT conname
       FROM pg_constraint
-      WHERE connamespace = 'app'::regnamespace AND contype = 'f'
+      WHERE connamespace = 'app'::regnamespace
+        AND contype = 'f'
+        AND conrelid IN (
+          SELECT c.oid
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'app'
+            AND c.relname = ANY(${GLOBAL_TABLES as unknown as string[]})
+        )
       ORDER BY conname
     `;
     expect(foreignKeys.map((row) => row.conname)).toEqual([
@@ -380,7 +388,9 @@ integrationTest("foreign keys and indexes are deliberate and non-redundant", asy
     const optionalIndexes = await database.sql<{ indexname: string }[]>`
       SELECT indexname
       FROM pg_indexes
-      WHERE schemaname = 'app' AND indexname LIKE 'idx_%'
+      WHERE schemaname = 'app'
+        AND tablename = ANY(${GLOBAL_TABLES as unknown as string[]})
+        AND indexname LIKE 'idx_%'
       ORDER BY indexname
     `;
     expect(optionalIndexes.map((row) => row.indexname)).toEqual([

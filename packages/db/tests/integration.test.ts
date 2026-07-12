@@ -19,12 +19,12 @@ integrationTest("initializes an empty database and is idempotent", async () => {
     const env = runnerEnv(database.url, repositoryMigrations);
     const first = await runMigrationCommand("migrate", { env, log: () => undefined });
     const second = await runMigrationCommand("migrate", { env, log: () => undefined });
-    expect(first.applied).toHaveLength(6);
-    expect(second.applied).toHaveLength(6);
+    expect(first.applied).toHaveLength(7);
+    expect(second.applied).toHaveLength(7);
     const [count] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM public.schema_migrations
     `;
-    expect(count?.count).toBe("6");
+    expect(count?.count).toBe("7");
     const statusLog: string[] = [];
     await runMigrationCommand("status", { env, log: (line) => statusLog.push(line) });
     expect(statusLog).toContain("applied  000001_initial_noop.sql");
@@ -33,9 +33,10 @@ integrationTest("initializes an empty database and is idempotent", async () => {
     expect(statusLog).toContain("applied  000004_create_global_tables.sql");
     expect(statusLog).toContain("applied  000005_seed_countries_and_currencies.sql");
     expect(statusLog).toContain("applied  000006_create_rls_helper.sql");
+    expect(statusLog).toContain("applied  000007_create_users_and_identity_tables.sql");
     const validationLog: string[] = [];
     await runMigrationCommand("validate", { env, log: (line) => validationLog.push(line) });
-    expect(validationLog).toContain("validated 6 applied migration(s)");
+    expect(validationLog).toContain("validated 7 applied migration(s)");
   } finally {
     await database.cleanup();
   }
