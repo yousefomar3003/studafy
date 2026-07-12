@@ -1,5 +1,8 @@
 # Authentication data model
 
+Student, teacher, and guardian relationship extensions are documented in
+[`profile-data-model.md`](./profile-data-model.md).
+
 The authentication and identity tables are the first **tenant-scoped** tables in the `app`
 schema. Unlike the global data (`docs/api/global-data-erd.md`), every table here carries a
 canonical `school_id`, references `app.schools(id)`, and runs under the canonical
