@@ -19,12 +19,12 @@ integrationTest("initializes an empty database and is idempotent", async () => {
     const env = runnerEnv(database.url, repositoryMigrations);
     const first = await runMigrationCommand("migrate", { env, log: () => undefined });
     const second = await runMigrationCommand("migrate", { env, log: () => undefined });
-    expect(first.applied).toHaveLength(5);
-    expect(second.applied).toHaveLength(5);
+    expect(first.applied).toHaveLength(6);
+    expect(second.applied).toHaveLength(6);
     const [count] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM public.schema_migrations
     `;
-    expect(count?.count).toBe("5");
+    expect(count?.count).toBe("6");
     const statusLog: string[] = [];
     await runMigrationCommand("status", { env, log: (line) => statusLog.push(line) });
     expect(statusLog).toContain("applied  000001_initial_noop.sql");

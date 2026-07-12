@@ -93,7 +93,7 @@ integrationTest("is idempotent and keeps migration history valid on a second run
     const [migrations] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM public.schema_migrations
     `;
-    expect(migrations?.count).toBe("5");
+    expect(migrations?.count).toBe("6");
 
     const [extensions] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM pg_extension WHERE extname = ANY(${
