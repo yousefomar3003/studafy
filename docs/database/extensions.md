@@ -17,13 +17,13 @@ for the domain design; this document covers only the extension itself (see
 
 ## Required extensions
 
-| Extension          | Exact name           | Why it is enabled                                                       | Preload required |
-| ------------------ | -------------------- | ----------------------------------------------------------------------- | ---------------- |
-| pgcrypto           | `pgcrypto`           | Cryptographic hashing (`digest`, `hmac`) and secure random bytes.       | No               |
-| pg_trgm            | `pg_trgm`            | Trigram similarity and index operator classes for fuzzy / ILIKE search. | No               |
-| pgvector           | `vector`             | Vector type and distance operators for embedding similarity search.     | No               |
-| pg_stat_statements | `pg_stat_statements` | Aggregated query-execution telemetry for performance observability.     | **Yes**          |
-| btree_gist         | `btree_gist`         | GiST operator support for scalar equality (uuid, smallint), required to declare `EXCLUDE USING gist` on `app.timetable_slots`. | No |
+| Extension          | Exact name           | Why it is enabled                                                                                                              | Preload required |
+| ------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
+| pgcrypto           | `pgcrypto`           | Cryptographic hashing (`digest`, `hmac`) and secure random bytes.                                                              | No               |
+| pg_trgm            | `pg_trgm`            | Trigram similarity and index operator classes for fuzzy / ILIKE search.                                                        | No               |
+| pgvector           | `vector`             | Vector type and distance operators for embedding similarity search.                                                            | No               |
+| pg_stat_statements | `pg_stat_statements` | Aggregated query-execution telemetry for performance observability.                                                            | **Yes**          |
+| btree_gist         | `btree_gist`         | GiST operator support for scalar equality (uuid, smallint), required to declare `EXCLUDE USING gist` on `app.timetable_slots`. | No               |
 
 - **Supported PostgreSQL version:** 16. `family = "postgres16"` in the RDS parameter group; local/CI
   use `pgvector/pgvector:pg16`.
