@@ -84,7 +84,7 @@ integrationTest("applies all migrations and seeds deterministic reference data",
     expect(second.pending).toHaveLength(0);
     const validation: string[] = [];
     await runMigrationCommand("validate", { env, log: (line) => validation.push(line) });
-    expect(validation).toContain("validated 7 applied migration(s)");
+    expect(validation).toContain("validated 8 applied migration(s)");
   } finally {
     await database.cleanup();
   }
