@@ -121,10 +121,12 @@ async function createTimetableFixture(
       INSERT INTO app.teachers (school_id, user_id, employee_number, employment_status)
       VALUES (${school}, ${teacherUserB!.id}, ${`EMP-B-${suffix}`}, 'active') RETURNING id
     `;
+    // status is 'planned', not 'active': uq_academic_years_one_active_per_school allows only one
+    // active year per school, and the cross-term test calls this fixture twice for one school.
     const [year] = await tx<{ id: string }[]>`
       INSERT INTO app.academic_years (school_id, code, name, starts_on, ends_on, status)
       VALUES (${school}, ${`AY-${suffix}`}, ${`Academic Year ${suffix}`},
-        '2026-08-01', '2027-06-30', 'active') RETURNING id
+        '2026-08-01', '2027-06-30', 'planned') RETURNING id
     `;
     const [term] = await tx<{ id: string }[]>`
       INSERT INTO app.terms
