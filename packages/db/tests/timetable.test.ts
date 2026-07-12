@@ -210,7 +210,9 @@ integrationTest(
       `;
       expect(tables.map((row) => row.name)).toEqual([...TIMETABLE_TABLES].sort());
       expect(
-        tables.every((row) => row.owner === "studafy_admin" && row.rls && row.forced && row.appCrud),
+        tables.every(
+          (row) => row.owner === "studafy_admin" && row.rls && row.forced && row.appCrud,
+        ),
       ).toBe(true);
 
       const policies = await database.sql<{ tableName: string; name: string }[]>`
@@ -392,11 +394,13 @@ integrationTest(
           SET status = 'pending', submitted_by_user_id = ${fixture.user}
           WHERE id = ${fixture.version}
         `;
-        const [row] = await tx<{
-          status: string;
-          submittedAt: Date | null;
-          submittedBy: string | null;
-        }[]>`
+        const [row] = await tx<
+          {
+            status: string;
+            submittedAt: Date | null;
+            submittedBy: string | null;
+          }[]
+        >`
           SELECT status, submitted_at AS "submittedAt", submitted_by_user_id AS "submittedBy"
           FROM app.timetable_versions WHERE id = ${fixture.version}
         `;
