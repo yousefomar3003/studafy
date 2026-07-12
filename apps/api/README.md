@@ -36,6 +36,18 @@ Validated once at startup by [`src/env.ts`](src/env.ts). An invalid value throws
 The PostgreSQL client disables prepared statements for transaction pooling. In production,
 `/readyz` runs `SELECT 1` through PgBouncer before reporting ready.
 
+## Tenant database transactions
+
+Future school-scoped handlers must authenticate the principal, authorize its school membership,
+and then wrap all tenant queries in one database transaction. Set the canonical tenant context
+inside that transaction with `SELECT set_config('app.school_id', $1, true)` (or `SET LOCAL`), using
+the authorized school UUID rather than a client-provided value. Commit or roll back before the
+connection returns to PgBouncer. Never use session-level `SET`: transaction pooling can hand that
+physical connection to another request and leak its tenant context.
+
+The API currently has no tenant domain handlers or authorization integration, so this README records
+the contract for the ticket that adds them; ST-034 implements and tests the database boundary only.
+
 ## Commands
 
 ```sh

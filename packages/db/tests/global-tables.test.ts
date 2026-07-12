@@ -63,7 +63,7 @@ async function referenceIds(
   return { countryId: country.id, currencyId: currency.id };
 }
 
-integrationTest("applies five migrations and seeds deterministic reference data", async () => {
+integrationTest("applies six migrations and seeds deterministic reference data", async () => {
   const database = await migratedDatabase();
   try {
     const [history] = await database.sql<{ count: string }[]>`
@@ -75,7 +75,7 @@ integrationTest("applies five migrations and seeds deterministic reference data"
     const [currencies] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM app.currencies
     `;
-    expect(history?.count).toBe("5");
+    expect(history?.count).toBe("6");
     expect(countries?.count).toBe("248");
     expect(currencies?.count).toBe("157");
 
@@ -84,7 +84,7 @@ integrationTest("applies five migrations and seeds deterministic reference data"
     expect(second.pending).toHaveLength(0);
     const validation: string[] = [];
     await runMigrationCommand("validate", { env, log: (line) => validation.push(line) });
-    expect(validation).toContain("validated 5 applied migration(s)");
+    expect(validation).toContain("validated 6 applied migration(s)");
   } finally {
     await database.cleanup();
   }
