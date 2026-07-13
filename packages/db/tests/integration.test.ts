@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { expect, test } from "bun:test";
 import postgres from "postgres";
 
+import { discoverMigrations } from "../src/discovery";
 import { MigrationExecutionError, MigrationValidationError } from "../src/errors";
 import { ADVISORY_LOCK_KEY, runMigrationCommand } from "../src/runner";
 
@@ -16,30 +17,23 @@ const cli = resolve(import.meta.dir, "../src/cli.ts");
 integrationTest("initializes an empty database and is idempotent", async () => {
   const database = await testDatabase();
   try {
+    const expectedMigrations = await discoverMigrations(repositoryMigrations);
+    const expectedFilenames = expectedMigrations.map((migration) => migration.filename);
     const env = runnerEnv(database.url, repositoryMigrations);
     const first = await runMigrationCommand("migrate", { env, log: () => undefined });
     const second = await runMigrationCommand("migrate", { env, log: () => undefined });
-    expect(first.applied).toHaveLength(10);
-    expect(second.applied).toHaveLength(10);
+    expect(first.applied.map((migration) => migration.filename)).toEqual(expectedFilenames);
+    expect(second.applied.map((migration) => migration.filename)).toEqual(expectedFilenames);
     const [count] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM public.schema_migrations
     `;
-    expect(count?.count).toBe("10");
+    expect(count?.count).toBe(expectedMigrations.length.toString());
     const statusLog: string[] = [];
     await runMigrationCommand("status", { env, log: (line) => statusLog.push(line) });
-    expect(statusLog).toContain("applied  000001_initial_noop.sql");
-    expect(statusLog).toContain("applied  000002_create_database_roles_and_grants.sql");
-    expect(statusLog).toContain("applied  000003_enable_required_postgresql_extensions.sql");
-    expect(statusLog).toContain("applied  000004_create_global_tables.sql");
-    expect(statusLog).toContain("applied  000005_seed_countries_and_currencies.sql");
-    expect(statusLog).toContain("applied  000006_create_rls_helper.sql");
-    expect(statusLog).toContain("applied  000007_create_users_and_identity_tables.sql");
-    expect(statusLog).toContain("applied  000008_create_student_and_teacher_profile_tables.sql");
-    expect(statusLog).toContain("applied  000009_create_academic_structure_tables.sql");
-    expect(statusLog).toContain("applied  000010_create_timetable_tables.sql");
+    expect(statusLog).toEqual(expectedFilenames.map((filename) => `applied  ${filename}`));
     const validationLog: string[] = [];
     await runMigrationCommand("validate", { env, log: (line) => validationLog.push(line) });
-    expect(validationLog).toContain("validated 10 applied migration(s)");
+    expect(validationLog).toContain(`validated ${expectedMigrations.length} applied migration(s)`);
   } finally {
     await database.cleanup();
   }
