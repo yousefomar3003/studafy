@@ -706,20 +706,14 @@ integrationTest(
       await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         await tx`
-          INSERT INTO app.grade_submissions
-            (school_id, gradebook_id, student_id, status, submitted_by_user_id, submitted_at)
-          SELECT ${school}, ${fixture.gradebook}, ${fixture.student},
-            'submitted', ${fixture.staffUser}, '2026-09-01'
-        `;
-        const [sub] = await tx<{ id: string }[]>`
-          SELECT id FROM app.grade_submissions
-          WHERE school_id = ${fixture.school ?? school}
-            AND gradebook_id = ${fixture.gradebook} AND student_id = ${fixture.student}
-          LIMIT 1
+          UPDATE app.grade_submissions
+          SET status = 'submitted', submitted_by_user_id = ${fixture.staffUser},
+            submitted_at = '2026-09-01'
+          WHERE id = ${fixture.submission}
         `;
         await tx`
           INSERT INTO app.grades (school_id, grade_submission_id, score, max_score, weight, label)
-          SELECT ${school}, ${sub!.id}, g, 100, 1, 'Grade ' || g
+          SELECT ${school}, ${fixture.submission}, g, 100, 1, 'Grade ' || g
           FROM generate_series(1, 40) AS g
         `;
       });
