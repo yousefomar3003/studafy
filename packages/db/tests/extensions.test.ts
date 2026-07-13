@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 
 import { expect, test } from "bun:test";
 
+import { discoverMigrations } from "../src/discovery";
 import { runMigrationCommand } from "../src/runner";
 
 import { integrationEnabled, runnerEnv, testDatabase } from "./helpers";
@@ -86,6 +87,7 @@ integrationTest("installs the four required extensions with resolvable versions"
 integrationTest("is idempotent and keeps migration history valid on a second run", async () => {
   const database = await migratedDatabase();
   try {
+    const expectedMigrations = await discoverMigrations(repositoryMigrations);
     const env = runnerEnv(database.url, repositoryMigrations);
     const second = await runMigrationCommand("migrate", { env, log: () => undefined });
     expect(second.pending).toHaveLength(0);
@@ -93,7 +95,7 @@ integrationTest("is idempotent and keeps migration history valid on a second run
     const [migrations] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM public.schema_migrations
     `;
-    expect(migrations?.count).toBe("10");
+    expect(migrations?.count).toBe(expectedMigrations.length.toString());
 
     const [extensions] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM pg_extension WHERE extname = ANY(${
@@ -104,7 +106,7 @@ integrationTest("is idempotent and keeps migration history valid on a second run
 
     const validation: string[] = [];
     await runMigrationCommand("validate", { env, log: (line) => validation.push(line) });
-    expect(validation).toContain("validated 10 applied migration(s)");
+    expect(validation).toContain(`validated ${expectedMigrations.length} applied migration(s)`);
   } finally {
     await database.cleanup();
   }

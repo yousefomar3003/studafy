@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { expect, test } from "bun:test";
 
+import { discoverMigrations } from "../src/discovery";
 import { runMigrationCommand } from "../src/runner";
 
 import { integrationEnabled, runnerEnv, testDatabase } from "./helpers";
@@ -66,6 +67,7 @@ async function referenceIds(
 integrationTest("applies all migrations and seeds deterministic reference data", async () => {
   const database = await migratedDatabase();
   try {
+    const expectedMigrations = await discoverMigrations(repositoryMigrations);
     const [history] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM public.schema_migrations
     `;
@@ -75,7 +77,7 @@ integrationTest("applies all migrations and seeds deterministic reference data",
     const [currencies] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM app.currencies
     `;
-    expect(history?.count).toBe("10");
+    expect(history?.count).toBe(expectedMigrations.length.toString());
     expect(countries?.count).toBe("248");
     expect(currencies?.count).toBe("157");
 
@@ -84,7 +86,7 @@ integrationTest("applies all migrations and seeds deterministic reference data",
     expect(second.pending).toHaveLength(0);
     const validation: string[] = [];
     await runMigrationCommand("validate", { env, log: (line) => validation.push(line) });
-    expect(validation).toContain("validated 10 applied migration(s)");
+    expect(validation).toContain(`validated ${expectedMigrations.length} applied migration(s)`);
   } finally {
     await database.cleanup();
   }
