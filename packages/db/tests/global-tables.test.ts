@@ -75,7 +75,7 @@ integrationTest("applies all migrations and seeds deterministic reference data",
     const [currencies] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM app.currencies
     `;
-    expect(history?.count).toBe("10");
+    expect(history?.count).toBe("11");
     expect(countries?.count).toBe("248");
     expect(currencies?.count).toBe("157");
 
