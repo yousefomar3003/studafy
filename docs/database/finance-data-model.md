@@ -1,6 +1,6 @@
 # Finance read-model, id-mapping, and sync outbox
 
-Migration `000011_create_finance_cache_tables.sql` adds five school-owned tables under the `app`
+Migration `000015_create_finance_cache_tables.sql` adds five school-owned tables under the `app`
 schema: `invoice_cache`, `payment_cache`, `fee_schedule_cache`, `erpnext_id_mappings`, and
 `finance_sync_outbox`. SQL constraints are the source of truth; APIs must not weaken them or treat
 RLS as a substitute for permission checks.

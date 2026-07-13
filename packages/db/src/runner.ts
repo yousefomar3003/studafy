@@ -1,15 +1,14 @@
-import postgres from "postgres";
-
-import { loadMigrationConfig, redact, type MigrationConfig } from "./config";
+import { createClient } from "./client";
+import { loadMigrationConfig, redact } from "./config";
 import { discoverMigrations } from "./discovery";
 import { MigrationExecutionError, MigrationLockError, MigrationValidationError } from "./errors";
 
 import type { AppliedMigration, Migration, MigrationCommand, MigrationStatus } from "./types";
+import type postgres from "postgres";
 
 export const ADVISORY_LOCK_KEY = 6004517954832980272n;
 export const TOOL_VERSION = "0.1.0";
 
-type Sql = postgres.Sql;
 type ReservedSql = postgres.ReservedSql;
 type TransactionSql = postgres.TransactionSql;
 type QuerySql = ReservedSql | TransactionSql;
@@ -26,27 +25,6 @@ interface HistoryRow {
 export interface RunnerOptions {
   env?: Record<string, string | undefined>;
   log?: (message: string) => void;
-}
-
-function createClient(config: MigrationConfig): Sql {
-  const options = {
-    ssl: config.ssl,
-    max: 1,
-    prepare: false,
-    connect_timeout: 10,
-    idle_timeout: 10,
-    target_session_attrs: "primary" as const,
-    connection: { application_name: "studafy-migrations" },
-  };
-  if (config.url) return postgres(config.url, options);
-  return postgres({
-    ...options,
-    host: config.host,
-    port: config.port,
-    database: config.database,
-    username: config.username,
-    password: config.password,
-  });
 }
 
 async function acquireLock(sql: ReservedSql): Promise<void> {
@@ -193,7 +171,7 @@ export async function runMigrationCommand(
   const config = loadMigrationConfig(options.env);
   const migrations = await discoverMigrations(config.migrationsDir);
   const log = options.log ?? console.log;
-  const client = createClient(config);
+  const client = createClient(config, "studafy-migrations");
   let reserved: ReservedSql | undefined;
   let locked = false;
 
