@@ -75,7 +75,7 @@ integrationTest("applies all migrations and seeds deterministic reference data",
     const [currencies] = await database.sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM app.currencies
     `;
-    expect(history?.count).toBe("10");
+    expect(history?.count).toBe("11");
     expect(countries?.count).toBe("248");
     expect(currencies?.count).toBe("157");
 
@@ -84,7 +84,7 @@ integrationTest("applies all migrations and seeds deterministic reference data",
     expect(second.pending).toHaveLength(0);
     const validation: string[] = [];
     await runMigrationCommand("validate", { env, log: (line) => validation.push(line) });
-    expect(validation).toContain("validated 10 applied migration(s)");
+    expect(validation).toContain("validated 11 applied migration(s)");
   } finally {
     await database.cleanup();
   }
