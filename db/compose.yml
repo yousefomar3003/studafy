@@ -20,5 +20,15 @@ services:
       interval: 2s
       timeout: 3s
       retries: 15
+    # Docker gives a container 64 MB of /dev/shm by default, and PostgreSQL puts the shared memory for
+    # PARALLEL workers there. Building the HNSW index over the 100,000-chunk benchmark corpus (ST-047)
+    # asks for a ~530 MB parallel-worker segment and dies with "could not resize shared memory segment
+    # ... No space left on device" against the default. This is not a Postgres tuning question -- the
+    # server is configured correctly -- it is the container's shm being too small for it.
+    shm_size: 1gb
+    # The data directory is a tmpfs: this database is disposable, and keeping it in RAM makes the test
+    # suite (which creates and drops a database per test) far faster. The size is raised from the default
+    # (half of host RAM, but capped low in some CI runners) because the benchmark corpus is genuinely
+    # large: 100,000 x 1536 float4 embeddings is ~600 MB of vectors before the HNSW graph is built.
     tmpfs:
-      - /var/lib/postgresql/data
+      - /var/lib/postgresql/data:size=4g
