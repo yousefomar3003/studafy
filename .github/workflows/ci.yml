@@ -34,6 +34,11 @@ jobs:
           ATTENDANCE_BENCHMARK: "1"
         run: bun test tests/attendance-benchmark.test.ts
         working-directory: packages/db
+      - name: Notification send benchmark (device resolution + 10-notification batch)
+        env:
+          NOTIFICATIONS_BENCHMARK: "1"
+        run: bun test tests/notifications-benchmark.test.ts
+        working-directory: packages/db
       # Exercises the deployable attendance maintenance subcommand against a freshly migrated database:
       # 12 months reaches beyond the migration's fixed initial range, and the second run proves
       # idempotency. Production scheduling remains an explicit in-VPC infrastructure follow-up.
