@@ -18,6 +18,7 @@
     "db:migrate:validate": "bun packages/db/src/cli.ts validate",
     "db:migrate:pending": "bun packages/db/src/cli.ts pending",
     "db:attendance:partitions": "bun packages/db/src/cli.ts attendance-partitions",
+    "db:audit:partitions": "bun packages/db/src/cli.ts audit-partitions",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

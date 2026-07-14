@@ -39,10 +39,15 @@ jobs:
           NOTIFICATIONS_BENCHMARK: "1"
         run: bun test tests/notifications-benchmark.test.ts
         working-directory: packages/db
-      # Exercises the deployable attendance maintenance subcommand against a freshly migrated database:
-      # 12 months reaches beyond the migration's fixed initial range, and the second run proves
+      - name: Audit log append benchmark (100-log batch)
+        env:
+          AUDIT_LOGS_BENCHMARK: "1"
+        run: bun test tests/audit-logs-benchmark.test.ts
+        working-directory: packages/db
+      # Exercises the deployable partition maintenance subcommands against a freshly migrated database:
+      # 12 months reaches beyond each migration's fixed initial range, and the second run of each proves
       # idempotency. Production scheduling remains an explicit in-VPC infrastructure follow-up.
-      - name: Attendance partition maintenance (and idempotency)
+      - name: Partition maintenance (attendance + audit logs, and idempotency)
         env:
           DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
           DATABASE_SSL_MODE: disable
@@ -50,6 +55,8 @@ jobs:
           bun run db:migrate
           bun run db:attendance:partitions 12
           bun run db:attendance:partitions 12
+          bun run db:audit:partitions 12
+          bun run db:audit:partitions 12
           bun run db:migrate:validate
       - name: Stop PostgreSQL
         if: always()
