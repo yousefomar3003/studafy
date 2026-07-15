@@ -10,3 +10,4 @@ export class MigrationDiscoveryError extends MigrationError {}
 export class MigrationValidationError extends MigrationError {}
 export class MigrationLockError extends MigrationError {}
 export class MigrationExecutionError extends MigrationError {}
+export class SeedError extends MigrationError {}

@@ -11,6 +11,7 @@ import {
   parseMonthsAhead,
 } from "./partitions";
 import { runMigrationCommand } from "./runner";
+import { runSeedCommand, discoverSeedFiles } from "./seed";
 
 import type { PartitionFamily } from "./partitions";
 import type { MigrationCommand } from "./types";
@@ -27,7 +28,7 @@ const partitionCommands = new Map<string, PartitionFamily>([
 ]);
 
 const USAGE =
-  "Usage: db-migrate <migrate|status|validate|pending|" +
+  "Usage: db-migrate <migrate|status|validate|pending|seed|" +
   "attendance-partitions [months-ahead 0-24]|audit-partitions [months-ahead 0-24]|rls-coverage>";
 
 async function runRlsCoverageCommand(): Promise<number> {
@@ -47,11 +48,17 @@ async function runRlsCoverageCommand(): Promise<number> {
 export async function main(args: string[] = Bun.argv.slice(2)): Promise<number> {
   const requested = args[0];
   const rlsCoverage = requested === "rls-coverage";
+  const isSeed = requested === "seed";
   const family = requested === undefined ? undefined : partitionCommands.get(requested);
   const command = requested as MigrationCommand | undefined;
   let monthsAhead: number | undefined;
 
-  if (rlsCoverage) {
+  if (isSeed) {
+    if (args.length !== 1) {
+      console.error("Usage: db-migrate seed");
+      return 2;
+    }
+  } else if (rlsCoverage) {
     if (args.length !== 1) {
       console.error("Usage: db-migrate rls-coverage");
       return 2;
@@ -68,7 +75,9 @@ export async function main(args: string[] = Bun.argv.slice(2)): Promise<number> 
   }
 
   try {
-    if (rlsCoverage) {
+    if (isSeed) {
+      await runSeedCommand();
+    } else if (rlsCoverage) {
       return await runRlsCoverageCommand();
     } else if (family) {
       await ensureMonthlyPartitions(family, monthsAhead!);
