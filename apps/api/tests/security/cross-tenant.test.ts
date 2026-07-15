@@ -60,6 +60,12 @@ interface ProbeRelation {
 interface TenantRelation {
   name: string;
   rows: number;
+  // Extra predicate that makes the table's school_id-leading tenant index usable by the forced
+  // index-plan probe. Empty for tables whose school_id index is non-partial (the common case);
+  // for a table indexed only through a partial index (e.g. app.outbox_events'
+  // `(school_id, id) WHERE relayed_at IS NULL`), this carries that index's partial predicate so the
+  // probe queries along the access path the schema actually indexes rather than a whole-table scan.
+  extraPredicate: string;
 }
 
 let database: TestDatabase | undefined;
@@ -468,15 +474,35 @@ async function assertNormalizationAttack(value: SeededFixture): Promise<void> {
 
 async function tenantRelations(): Promise<TenantRelation[]> {
   return database!.sql<TenantRelation[]>`
-    SELECT c.relname AS name, greatest(c.reltuples, 0)::integer AS rows
+    SELECT
+      c.relname AS name,
+      greatest(c.reltuples, 0)::integer AS rows,
+      COALESCE(tenant_index.predicate, '') AS "extraPredicate"
     FROM pg_catalog.pg_class AS c
     JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
     JOIN pg_catalog.pg_attribute AS a
       ON a.attrelid = c.oid AND a.attname = 'school_id'
      AND a.attnum > 0 AND NOT a.attisdropped
+    LEFT JOIN LATERAL (
+      -- The school_id-leading index the planner can drive for a tenant scan, preferring a
+      -- non-partial one; its partial predicate (empty when non-partial) lets the probe match the
+      -- index's WHERE so a legitimately partial-indexed table is not misread as a seq-scan fallback.
+      SELECT COALESCE(pg_catalog.pg_get_expr(i.indpred, i.indrelid), '') AS predicate
+      FROM pg_catalog.pg_index AS i
+      WHERE i.indrelid = c.oid
+        AND i.indisvalid AND i.indisready
+        AND i.indkey[0] = a.attnum
+      ORDER BY (i.indpred IS NULL) DESC
+      LIMIT 1
+    ) AS tenant_index ON true
     WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p')
     ORDER BY c.relname
   `;
+}
+
+function tenantProbeQuery(relation: TenantRelation): string {
+  const scope = relation.extraPredicate ? ` WHERE ${relation.extraPredicate}` : "";
+  return `SELECT 1 FROM app.${quoteIdentifier(relation.name)}${scope} LIMIT 1`;
 }
 
 async function assertIndexPlans(value: SeededFixture): Promise<void> {
@@ -488,7 +514,7 @@ async function assertIndexPlans(value: SeededFixture): Promise<void> {
     async (transaction) => {
       await transaction.unsafe("SET LOCAL enable_seqscan = off");
       for (const relation of relations) {
-        const query = `SELECT 1 FROM app.${quoteIdentifier(relation.name)} LIMIT 1`;
+        const query = tenantProbeQuery(relation);
         const rows = await transaction.unsafe<
           { "QUERY PLAN": [{ Plan: Parameters<typeof inspectPlan>[0] }] }[]
         >(`EXPLAIN (FORMAT JSON) ${query}`);
@@ -529,7 +555,7 @@ async function assertIndexPlans(value: SeededFixture): Promise<void> {
       for (const relation of largeRelations) {
         const rows = await transaction.unsafe<
           { "QUERY PLAN": [{ Plan: Parameters<typeof inspectPlan>[0] }] }[]
-        >(`EXPLAIN (FORMAT JSON) SELECT 1 FROM app.${quoteIdentifier(relation.name)} LIMIT 1`);
+        >(`EXPLAIN (FORMAT JSON) ${tenantProbeQuery(relation)}`);
         const root = rows[0]?.["QUERY PLAN"]?.[0]?.Plan;
         if (!root) throw new Error(`EXPLAIN returned no natural plan for app.${relation.name}`);
         expect(
