@@ -22,6 +22,7 @@ export interface MigrationConfig {
   password?: string;
   ssl: false | "require" | "verify-full" | ConnectionOptions;
   migrationsDir: string;
+  seedsDir: string;
   redactions: string[];
 }
 
@@ -81,6 +82,7 @@ export function loadMigrationConfig(
   const common = {
     ssl: sslOptions(mode, env.DATABASE_CA_CERT),
     migrationsDir: resolve(env.MIGRATIONS_DIR ?? resolve(process.cwd(), "db/migrations")),
+    seedsDir: resolve(env.SEEDS_DIR ?? resolve(process.cwd(), "db/seeds")),
   };
 
   if (urlValue) {
