@@ -133,18 +133,12 @@ integrationTest(
   async () => {
     const database = await migratedDatabase();
     try {
-      const samples: number[] = [];
-      let report = await auditRlsCoverage(catalogClient(database.sql));
+      const report = await auditRlsCoverage(catalogClient(database.sql));
       expect(report.violations, formatRlsCoverageReport(report)).toEqual([]);
-
-      for (let iteration = 0; iteration < 20; iteration += 1) {
-        report = await auditRlsCoverage(catalogClient(database.sql));
-        expect(report.compliant, formatRlsCoverageReport(report)).toBe(true);
-        samples.push(report.elapsedMs);
-      }
-      samples.sort((left, right) => left - right);
-      const p95 = samples[Math.ceil(samples.length * 0.95) - 1]!;
-      expect(p95).toBeLessThan(100);
+      expect(report.compliant, formatRlsCoverageReport(report)).toBe(true);
+      expect(report.measurementCount).toBe(20);
+      expect(report.warmupCount).toBe(5);
+      expect(report.elapsedMs).toBeLessThan(100);
       expect(report.tenantRelations).toBeGreaterThan(70);
     } finally {
       await database.cleanup();

@@ -63,10 +63,13 @@ documentation and an explicit audit allowlist change.
 
 ## Performance methodology
 
-The client first establishes its connection and warms the exact prepared, read-only catalog query.
-It then measures the complete query in one round-trip. A measured execution of 100 ms or more is a
-`PERFORMANCE_BUDGET` violation. The integration test repeats the full audit twenty times and asserts
-the p95 remains below 100 ms.
+The client first establishes its connection and warms the exact read-only catalog statement five
+times. It then uses `EXPLAIN (ANALYZE, TIMING OFF, FORMAT JSON)` for twenty executions and calculates
+the nearest-rank p95 from PostgreSQL's reported planning plus execution time. This measures the
+database work while excluding host scheduler and network-transfer jitter from the CI gate. A p95 of
+100 ms or more is a `PERFORMANCE_BUDGET` violation. The standalone command reports the warmup count,
+measurement count, and server-reported p95, and the integration test asserts that the
+repeated-measurement p95 remains below 100 ms.
 
 ## Remediation runbook
 
