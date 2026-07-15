@@ -68,6 +68,15 @@ jobs:
             trivy_exit_code: "0"
     steps:
       - uses: actions/checkout@v4
+      # erpnext's image (~2.7 GB) exhausts ubuntu-latest's default free disk when trivy exports
+      # it for analysis.  Pre-installed toolchains (Android SDK, .NET, GHC, Boost) are irrelevant
+      # to a Docker build and together account for ~25 GB — removing them gives trivy enough room.
+      - name: Free disk space
+        if: matrix.service == 'erpnext'
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost
+          docker system prune -af
+          df -h
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
