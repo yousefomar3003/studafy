@@ -1,6 +1,6 @@
 # Domain events outbox
 
-Migration `000017_create_outbox_events_table.sql` adds one school-owned table under the `app`
+Migration `000022_create_outbox_events_table.sql` adds one school-owned table under the `app`
 schema: `outbox_events`. SQL constraints are the source of truth; APIs must not weaken them or
 treat RLS as a substitute for permission checks.
 
