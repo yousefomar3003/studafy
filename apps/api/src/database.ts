@@ -1,8 +1,14 @@
 import postgres from "postgres";
 
 import type { Env } from "./env";
+import type { TransactionSql } from "postgres";
 
 export type Database = ReturnType<typeof postgres>;
+
+export interface TenantDatabaseContext {
+  schoolId: string;
+  userId?: string;
+}
 
 export function createDatabase(env: Env): Database | null {
   if (!env.DATABASE_HOST) return null;
@@ -33,4 +39,21 @@ export async function checkDatabase(database: Database | null): Promise<boolean>
 
 export async function closeDatabase(database: Database | null): Promise<void> {
   await database?.end({ timeout: 5 });
+}
+
+export async function withTenantTransaction<T>(
+  database: Database,
+  context: TenantDatabaseContext,
+  operation: (transaction: TransactionSql) => Promise<T>,
+): Promise<T> {
+  let result: T | undefined;
+  await database.begin(async (transaction) => {
+    await transaction.unsafe("SET LOCAL ROLE studafy_app");
+    await transaction`SELECT set_config('app.school_id', ${context.schoolId}, true)`;
+    if (context.userId !== undefined) {
+      await transaction`SELECT set_config('app.user_id', ${context.userId}, true)`;
+    }
+    result = await operation(transaction);
+  });
+  return result as T;
 }

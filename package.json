@@ -20,6 +20,7 @@
     "db:attendance:partitions": "bun packages/db/src/cli.ts attendance-partitions",
     "db:audit:partitions": "bun packages/db/src/cli.ts audit-partitions",
     "db:test:rls-coverage": "bun packages/db/src/cli.ts rls-coverage",
+    "test:security": "bun run --cwd apps/api test:security",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

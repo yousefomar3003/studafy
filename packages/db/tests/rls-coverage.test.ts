@@ -158,6 +158,7 @@ integrationTest(
 
         expect(hasViolation(report, "RLS_ENABLED", "st050_bad_rls")).toBe(true);
         expect(hasViolation(report, "RLS_FORCED", "st050_bad_rls")).toBe(true);
+        expect(hasViolation(report, "TENANT_OWNERSHIP_IMMUTABLE", "st050_bad_rls")).toBe(true);
         expect(hasViolation(report, "TENANT_POLICY", "st050_bad_policy")).toBe(true);
         expect(hasViolation(report, "SCHOOL_LEADING_INDEX", "st050_bad_index")).toBe(true);
         expect(hasViolation(report, "SCHOOL_ID_SHAPE", "st050_bad_school_fk")).toBe(true);

@@ -8,7 +8,8 @@
     "build": "bun build ./src/index.ts --outdir dist --target bun",
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "bun test"
+    "test": "bun test",
+    "test:security": "bun test ./tests/security --timeout 90000"
   },
   "dependencies": {
     "hono": "4.12.28",
