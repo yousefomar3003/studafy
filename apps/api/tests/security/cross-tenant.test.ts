@@ -11,6 +11,7 @@ import { withTenantTransaction } from "../../src/database";
 
 import { formatProbeDiagnostic, inspectPlan, quoteIdentifier } from "./probe-support";
 
+import type { ProbeDiagnostic } from "./probe-support";
 import type { CatalogClient } from "../../../../db/policies/rls-coverage";
 import type { TransactionSql } from "postgres";
 
@@ -19,6 +20,9 @@ const repositoryMigrations = resolve(import.meta.dir, "../../../../db/migrations
 const PROBE_BUDGET_MS = 500;
 const CONCURRENCY = 32;
 const POOL_SIZE = 4;
+// Dedicated multi-connection pool so the write/mutation/insert probes run concurrently instead of
+// one blocking transaction at a time; opened once in beforeAll (outside the gated timing window).
+const PROBE_POOL_SIZE = 16;
 const JULY = "2026-07-15 12:00:00+00";
 
 type TestDatabase = Awaited<ReturnType<typeof testDatabase>>;
@@ -70,6 +74,7 @@ interface TenantRelation {
 
 let database: TestDatabase | undefined;
 let fixture: SeededFixture | undefined;
+let probePool: ReturnType<typeof postgres> | undefined;
 
 function errorCode(error: unknown): string {
   return typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
@@ -347,113 +352,128 @@ function probeRelations(value: TenantFixture): ProbeRelation[] {
 
 async function assertCrossTenantCrud(value: SeededFixture): Promise<void> {
   const relations = probeRelations(value.b);
-  for (const relation of relations) {
-    const table = `app.${quoteIdentifier(relation.table)}`;
-    const diagnostic = {
-      operation: "cross-tenant CRUD",
-      relation: table,
-      primaryKey: relation.primaryKey,
-      expectedTenant: value.a.school,
-      observedTenant: value.b.school,
-    };
-    const rows = await withTenantTransaction(
-      database!.sql,
-      { schoolId: value.a.school, userId: value.a.user },
-      (transaction) => transaction.unsafe(`SELECT 1 FROM ${table} WHERE ${relation.predicate}`),
-    );
-    expect(
-      rows.length,
-      formatProbeDiagnostic({ ...diagnostic, operation: "read", rowCount: rows.length }),
-    ).toBe(0);
+  const tenantA = { schoolId: value.a.school, userId: value.a.user };
+  const diagnosticFor = (relation: ProbeRelation): ProbeDiagnostic => ({
+    operation: "cross-tenant CRUD",
+    relation: `app.${quoteIdentifier(relation.table)}`,
+    primaryKey: relation.primaryKey,
+    expectedTenant: value.a.school,
+    observedTenant: value.b.school,
+  });
 
-    try {
-      const update = await withTenantTransaction(
-        database!.sql,
-        { schoolId: value.a.school, userId: value.a.user },
-        (transaction) =>
+  // Reads never raise -- tenant A simply sees zero of tenant B's rows -- so pipeline every relation's
+  // read through one transaction instead of a BEGIN/SET/COMMIT round-trip per relation.
+  const reads = await withTenantTransaction(database!.sql, tenantA, (transaction) =>
+    Promise.all(
+      relations.map((relation) =>
+        transaction.unsafe(
+          `SELECT 1 FROM app.${quoteIdentifier(relation.table)} WHERE ${relation.predicate}`,
+        ),
+      ),
+    ),
+  );
+  relations.forEach((relation, index) => {
+    const rowCount = reads[index]!.length;
+    expect(
+      rowCount,
+      formatProbeDiagnostic({ ...diagnosticFor(relation), operation: "read", rowCount }),
+    ).toBe(0);
+  });
+
+  // Writes either affect zero rows or are denied outright; keep each in its own transaction so a
+  // denial cannot poison a sibling, but spread them across the pool to run concurrently.
+  await Promise.all(
+    relations.map(async (relation) => {
+      const table = `app.${quoteIdentifier(relation.table)}`;
+      const diagnostic = diagnosticFor(relation);
+      try {
+        const update = await withTenantTransaction(probePool!, tenantA, (transaction) =>
           transaction.unsafe(
             `UPDATE ${table} SET school_id = school_id WHERE ${relation.predicate}`,
           ),
-      );
-      expect(
-        update.count,
-        formatProbeDiagnostic({ ...diagnostic, operation: "update", rowCount: update.count }),
-      ).toBe(0);
-    } catch (error) {
-      expect(
-        ["42501"],
-        formatProbeDiagnostic({ ...diagnostic, operation: "update", sqlState: errorCode(error) }),
-      ).toContain(errorCode(error));
-    }
+        );
+        expect(
+          update.count,
+          formatProbeDiagnostic({ ...diagnostic, operation: "update", rowCount: update.count }),
+        ).toBe(0);
+      } catch (error) {
+        expect(
+          ["42501"],
+          formatProbeDiagnostic({ ...diagnostic, operation: "update", sqlState: errorCode(error) }),
+        ).toContain(errorCode(error));
+      }
 
-    try {
-      const deleted = await withTenantTransaction(
-        database!.sql,
-        { schoolId: value.a.school, userId: value.a.user },
-        (transaction) => transaction.unsafe(`DELETE FROM ${table} WHERE ${relation.predicate}`),
-      );
-      expect(
-        deleted.count,
-        formatProbeDiagnostic({ ...diagnostic, operation: "delete", rowCount: deleted.count }),
-      ).toBe(0);
-    } catch (error) {
-      expect(
-        ["42501"],
-        formatProbeDiagnostic({ ...diagnostic, operation: "delete", sqlState: errorCode(error) }),
-      ).toContain(errorCode(error));
-    }
-  }
+      try {
+        const deleted = await withTenantTransaction(probePool!, tenantA, (transaction) =>
+          transaction.unsafe(`DELETE FROM ${table} WHERE ${relation.predicate}`),
+        );
+        expect(
+          deleted.count,
+          formatProbeDiagnostic({ ...diagnostic, operation: "delete", rowCount: deleted.count }),
+        ).toBe(0);
+      } catch (error) {
+        expect(
+          ["42501"],
+          formatProbeDiagnostic({ ...diagnostic, operation: "delete", sqlState: errorCode(error) }),
+        ).toContain(errorCode(error));
+      }
+    }),
+  );
 
-  for (const relation of probeRelations(value.a)) {
-    const table = `app.${quoteIdentifier(relation.table)}`;
-    try {
-      await database!.sql.unsafe(
-        `UPDATE ${table} SET school_id = $1::uuid WHERE ${relation.predicate}`,
-        [value.b.school],
-      );
-      throw new Error(`tenant ownership mutation unexpectedly succeeded for ${table}`);
-    } catch (error) {
-      expect(
-        errorCode(error),
-        formatProbeDiagnostic({
-          operation: "tenant mutation",
-          relation: table,
-          primaryKey: relation.primaryKey,
-          expectedTenant: value.a.school,
-          observedTenant: value.b.school,
-          sqlState: errorCode(error),
-        }),
-      ).toBe("42501");
-    }
-  }
+  // Ownership is structurally immutable: even a direct, non-RLS UPDATE flipping school_id must be
+  // rejected by the trigger. Run the whole battery concurrently across the pool.
+  await Promise.all(
+    probeRelations(value.a).map(async (relation) => {
+      const table = `app.${quoteIdentifier(relation.table)}`;
+      try {
+        await probePool!.unsafe(
+          `UPDATE ${table} SET school_id = $1::uuid WHERE ${relation.predicate}`,
+          [value.b.school],
+        );
+        throw new Error(`tenant ownership mutation unexpectedly succeeded for ${table}`);
+      } catch (error) {
+        expect(
+          errorCode(error),
+          formatProbeDiagnostic({
+            operation: "tenant mutation",
+            relation: table,
+            primaryKey: relation.primaryKey,
+            expectedTenant: value.a.school,
+            observedTenant: value.b.school,
+            sqlState: errorCode(error),
+          }),
+        ).toBe("42501");
+      }
+    }),
+  );
 
-  for (const statement of [
-    `INSERT INTO app.users (school_id, email, normalized_email, status) VALUES ('${value.b.school}', 'st051-cross-user@example.test', 'st051-cross-user@example.test', 'active')`,
-    `INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status) VALUES ('${value.b.school}', '${value.b.user}', 'ST051-CROSS', 'Cross', 'Tenant', 'enrolled')`,
-    `INSERT INTO app.attendance_sessions (school_id, class_id, session_date, status, taken_by_user_id, created_at, updated_at) VALUES ('${value.b.school}', '${value.b.classId}', '2026-07-16', 'open', '${value.b.user}', '${JULY}'::timestamptz, '${JULY}'::timestamptz)`,
-    `INSERT INTO app.attendance_records (school_id, attendance_session_id, session_created_at, student_id, status, recorded_by_user_id, created_at, updated_at) VALUES ('${value.b.school}', '${value.b.attendanceSession}', '${value.b.attendanceSessionCreatedAt.toISOString()}', '${value.b.secondaryStudent}', 'present', '${value.b.user}', '${JULY}'::timestamptz, '${JULY}'::timestamptz)`,
-    `INSERT INTO app.outbox_events (school_id, event_name, payload) VALUES ('${value.b.school}', 'security.attacked', '{}'::jsonb)`,
-    `INSERT INTO app.notifications (school_id, user_id, notification_type, title, body) VALUES ('${value.b.school}', '${value.b.user}', 'SUPPORT_MESSAGE', 'cross', 'cross')`,
-    `INSERT INTO app.user_devices (school_id, user_id, fcm_token, platform) VALUES ('${value.b.school}', '${value.b.user}', 'st051-cross-token', 'web')`,
-    `INSERT INTO app.audit_logs (school_id, actor_id, action, target_table, target_id, new_values, created_at) VALUES ('${value.b.school}', '${value.b.user}', 'insert', 'users', '${value.b.user}', '{"cross":true}'::jsonb, '${JULY}'::timestamptz)`,
-    `INSERT INTO app.materials (school_id, class_id, uploaded_by_user_id, last_edited_by_user_id, title, storage_key, original_file_name, mime_type, size_bytes) VALUES ('${value.b.school}', '${value.b.classId}', '${value.b.user}', '${value.b.user}', 'Cross material', 'permanent/${value.b.school}/probe/cross-material', 'cross.pdf', 'application/pdf', 128)`,
-    `INSERT INTO app.material_chunks (school_id, material_id, chunk_index, content, embedding, embedding_model) VALUES ('${value.b.school}', '${value.b.material}', 1, 'cross chunk', array_fill(0::real, ARRAY[1536])::public.vector, 'text-embedding-3-small')`,
-    `INSERT INTO app.ai_conversations (school_id, student_id, model) VALUES ('${value.b.school}', '${value.b.student}', 'cross')`,
-    `INSERT INTO app.ai_messages (school_id, conversation_id, question, answer, prompt_tokens, completion_tokens, total_tokens, expires_at) VALUES ('${value.b.school}', '${value.b.conversation}', 'cross?', 'blocked', 1, 1, 2, CURRENT_TIMESTAMP + INTERVAL '1 day')`,
-    `INSERT INTO app.ai_message_citations (school_id, ai_message_id, material_chunk_id, citation_order) VALUES ('${value.b.school}', '${value.b.message}', '${value.b.materialChunk}', 2)`,
-    `INSERT INTO app.ai_usage_meters (school_id, student_id, ai_subscription_id, total_tokens) VALUES ('${value.b.school}', '${value.b.secondaryStudent}', '${value.b.secondarySubscription}', 1)`,
-  ]) {
-    try {
-      await withTenantTransaction(
-        database!.sql,
-        { schoolId: value.a.school, userId: value.a.user },
-        (transaction) => transaction.unsafe(statement),
-      );
-      throw new Error("cross-tenant insert unexpectedly succeeded");
-    } catch (error) {
-      expect(errorCode(error)).toBe("42501");
-    }
-  }
+  await Promise.all(
+    [
+      `INSERT INTO app.users (school_id, email, normalized_email, status) VALUES ('${value.b.school}', 'st051-cross-user@example.test', 'st051-cross-user@example.test', 'active')`,
+      `INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status) VALUES ('${value.b.school}', '${value.b.user}', 'ST051-CROSS', 'Cross', 'Tenant', 'enrolled')`,
+      `INSERT INTO app.attendance_sessions (school_id, class_id, session_date, status, taken_by_user_id, created_at, updated_at) VALUES ('${value.b.school}', '${value.b.classId}', '2026-07-16', 'open', '${value.b.user}', '${JULY}'::timestamptz, '${JULY}'::timestamptz)`,
+      `INSERT INTO app.attendance_records (school_id, attendance_session_id, session_created_at, student_id, status, recorded_by_user_id, created_at, updated_at) VALUES ('${value.b.school}', '${value.b.attendanceSession}', '${value.b.attendanceSessionCreatedAt.toISOString()}', '${value.b.secondaryStudent}', 'present', '${value.b.user}', '${JULY}'::timestamptz, '${JULY}'::timestamptz)`,
+      `INSERT INTO app.outbox_events (school_id, event_name, payload) VALUES ('${value.b.school}', 'security.attacked', '{}'::jsonb)`,
+      `INSERT INTO app.notifications (school_id, user_id, notification_type, title, body) VALUES ('${value.b.school}', '${value.b.user}', 'SUPPORT_MESSAGE', 'cross', 'cross')`,
+      `INSERT INTO app.user_devices (school_id, user_id, fcm_token, platform) VALUES ('${value.b.school}', '${value.b.user}', 'st051-cross-token', 'web')`,
+      `INSERT INTO app.audit_logs (school_id, actor_id, action, target_table, target_id, new_values, created_at) VALUES ('${value.b.school}', '${value.b.user}', 'insert', 'users', '${value.b.user}', '{"cross":true}'::jsonb, '${JULY}'::timestamptz)`,
+      `INSERT INTO app.materials (school_id, class_id, uploaded_by_user_id, last_edited_by_user_id, title, storage_key, original_file_name, mime_type, size_bytes) VALUES ('${value.b.school}', '${value.b.classId}', '${value.b.user}', '${value.b.user}', 'Cross material', 'permanent/${value.b.school}/probe/cross-material', 'cross.pdf', 'application/pdf', 128)`,
+      `INSERT INTO app.material_chunks (school_id, material_id, chunk_index, content, embedding, embedding_model) VALUES ('${value.b.school}', '${value.b.material}', 1, 'cross chunk', array_fill(0::real, ARRAY[1536])::public.vector, 'text-embedding-3-small')`,
+      `INSERT INTO app.ai_conversations (school_id, student_id, model) VALUES ('${value.b.school}', '${value.b.student}', 'cross')`,
+      `INSERT INTO app.ai_messages (school_id, conversation_id, question, answer, prompt_tokens, completion_tokens, total_tokens, expires_at) VALUES ('${value.b.school}', '${value.b.conversation}', 'cross?', 'blocked', 1, 1, 2, CURRENT_TIMESTAMP + INTERVAL '1 day')`,
+      `INSERT INTO app.ai_message_citations (school_id, ai_message_id, material_chunk_id, citation_order) VALUES ('${value.b.school}', '${value.b.message}', '${value.b.materialChunk}', 2)`,
+      `INSERT INTO app.ai_usage_meters (school_id, student_id, ai_subscription_id, total_tokens) VALUES ('${value.b.school}', '${value.b.secondaryStudent}', '${value.b.secondarySubscription}', 1)`,
+    ].map(async (statement) => {
+      try {
+        await withTenantTransaction(probePool!, tenantA, (transaction) =>
+          transaction.unsafe(statement),
+        );
+        throw new Error("cross-tenant insert unexpectedly succeeded");
+      } catch (error) {
+        expect(errorCode(error)).toBe("42501");
+      }
+    }),
+  );
 }
 
 async function assertNormalizationAttack(value: SeededFixture): Promise<void> {
@@ -513,37 +533,34 @@ async function assertIndexPlans(value: SeededFixture): Promise<void> {
     { schoolId: value.a.school, userId: value.a.user },
     async (transaction) => {
       await transaction.unsafe("SET LOCAL enable_seqscan = off");
-      for (const relation of relations) {
-        const query = tenantProbeQuery(relation);
-        const rows = await transaction.unsafe<
-          { "QUERY PLAN": [{ Plan: Parameters<typeof inspectPlan>[0] }] }[]
-        >(`EXPLAIN (FORMAT JSON) ${query}`);
-        const root = rows[0]?.["QUERY PLAN"]?.[0]?.Plan;
+      // Pipeline every relation's EXPLAIN on the one transaction connection rather than paying a
+      // serial round-trip each; the forced enable_seqscan=off still applies to all of them.
+      const plans = await Promise.all(
+        relations.map((relation) =>
+          transaction.unsafe<{ "QUERY PLAN": [{ Plan: Parameters<typeof inspectPlan>[0] }] }[]>(
+            `EXPLAIN (FORMAT JSON) ${tenantProbeQuery(relation)}`,
+          ),
+        ),
+      );
+      relations.forEach((relation, index) => {
+        const root = plans[index]?.[0]?.["QUERY PLAN"]?.[0]?.Plan;
         if (!root) throw new Error(`EXPLAIN returned no plan for app.${relation.name}`);
         const inspection = inspectPlan(root);
-        expect(
-          inspection.sequentialRelations,
-          formatProbeDiagnostic({
-            operation: "forced index plan",
-            relation: `app.${relation.name}`,
-            primaryKey: "n/a",
-            expectedTenant: value.a.school,
-            plan: root,
-          }),
-        ).toEqual([]);
+        const diagnostic: ProbeDiagnostic = {
+          operation: "forced index plan",
+          relation: `app.${relation.name}`,
+          primaryKey: "n/a",
+          expectedTenant: value.a.school,
+          plan: root,
+        };
+        expect(inspection.sequentialRelations, formatProbeDiagnostic(diagnostic)).toEqual([]);
         expect(
           inspection.nodeTypes.some((type) =>
             ["Index Scan", "Index Only Scan", "Bitmap Index Scan"].includes(type),
           ),
-          formatProbeDiagnostic({
-            operation: "forced index plan",
-            relation: `app.${relation.name}`,
-            primaryKey: "n/a",
-            expectedTenant: value.a.school,
-            plan: root,
-          }),
+          formatProbeDiagnostic(diagnostic),
         ).toBe(true);
-      }
+      });
     },
   );
 
@@ -552,11 +569,15 @@ async function assertIndexPlans(value: SeededFixture): Promise<void> {
     database!.sql,
     { schoolId: value.a.school, userId: value.a.user },
     async (transaction) => {
-      for (const relation of largeRelations) {
-        const rows = await transaction.unsafe<
-          { "QUERY PLAN": [{ Plan: Parameters<typeof inspectPlan>[0] }] }[]
-        >(`EXPLAIN (FORMAT JSON) ${tenantProbeQuery(relation)}`);
-        const root = rows[0]?.["QUERY PLAN"]?.[0]?.Plan;
+      const plans = await Promise.all(
+        largeRelations.map((relation) =>
+          transaction.unsafe<{ "QUERY PLAN": [{ Plan: Parameters<typeof inspectPlan>[0] }] }[]>(
+            `EXPLAIN (FORMAT JSON) ${tenantProbeQuery(relation)}`,
+          ),
+        ),
+      );
+      largeRelations.forEach((relation, index) => {
+        const root = plans[index]?.[0]?.["QUERY PLAN"]?.[0]?.Plan;
         if (!root) throw new Error(`EXPLAIN returned no natural plan for app.${relation.name}`);
         expect(
           inspectPlan(root).sequentialRelations,
@@ -568,7 +589,7 @@ async function assertIndexPlans(value: SeededFixture): Promise<void> {
             plan: root,
           }),
         ).toEqual([]);
-      }
+      });
     },
   );
 }
@@ -678,10 +699,12 @@ describe("NFR-05 cross-tenant isolation", () => {
       seedTenant(database.sql, schoolB, "b"),
     ]);
     await database.sql.unsafe("ANALYZE");
+    probePool = postgres(database.url, { max: PROBE_POOL_SIZE, ssl: false, prepare: false });
     fixture = { a, b, setupMs: performance.now() - setupStarted };
   }, 90_000);
 
   afterAll(async () => {
+    await probePool?.end({ timeout: 1 });
     await database?.cleanup();
   });
 
