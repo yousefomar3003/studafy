@@ -12,7 +12,12 @@ import { integrationEnabled, runnerEnv, testDatabase } from "./helpers";
 
 import type { MigrationConfig } from "../src/config";
 
-const integrationTest = test.skipIf(!integrationEnabled);
+// The seed integration test creates a disposable database, runs all 25 migrations, seeds 40+
+// tables, and verifies index health — it needs a generous timeout budget (60 s) that conflicts
+// with the main CI suite's 10-second --timeout flag. Gating on SEED_INTEGRATION keeps it
+// skipped in the main `bun test` step so it only runs in the dedicated CI step.
+const seedIntegration = Boolean(process.env.SEED_INTEGRATION);
+const integrationTest = test.skipIf(!integrationEnabled || !seedIntegration);
 const repositoryMigrations = resolve(import.meta.dir, "../../../db/migrations");
 
 // The acceptance target from the ticket.
