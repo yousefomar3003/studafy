@@ -10,7 +10,12 @@ import type { TransactionSql } from "postgres";
 
 const integrationTest = test.skipIf(!integrationEnabled);
 const repositoryMigrations = resolve(import.meta.dir, "../../../db/migrations");
-const TENANT_TABLES = ["ai_conversations", "ai_messages", "ai_usage_meters"] as const;
+const TENANT_TABLES = [
+  "ai_conversations",
+  "ai_message_citations",
+  "ai_messages",
+  "ai_usage_meters",
+] as const;
 
 type Database = Awaited<ReturnType<typeof testDatabase>>;
 type Role = "studafy_admin" | "studafy_app";
@@ -156,7 +161,7 @@ integrationTest(
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'app' AND c.relname = ANY(${TENANT_TABLES as unknown as string[]})
       `;
-      expect(tenantPolicies).toHaveLength(3);
+      expect(tenantPolicies).toHaveLength(TENANT_TABLES.length);
       expect(tenantPolicies.every((policy) => policy.name === "tenant_isolation")).toBe(true);
 
       // Functions exist and are executable by studafy_app.

@@ -1,14 +1,17 @@
--- Reference mirror of the tenant isolation installed on app.ai_conversations, app.ai_messages, and
--- app.ai_usage_meters by migration 000021. This file is documentation: the runner only executes
--- db/migrations. It is kept faithful to the migration so a reviewer can read the security posture
--- of the AI chat and usage tracking without reading the whole migration.
+-- Reference mirror of the tenant isolation installed on app.ai_conversations, app.ai_messages,
+-- app.ai_message_citations, and app.ai_usage_meters by migrations 000021 and 000022. This file is
+-- documentation: the runner only executes db/migrations.
 
 -- ---------------------------------------------------------------------------------------------------
 -- 1. Grants. Ordinary CRUD for the runtime role.
 -- ---------------------------------------------------------------------------------------------------
 
-REVOKE ALL PRIVILEGES ON TABLE app.ai_conversations, app.ai_messages, app.ai_usage_meters FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE app.ai_conversations, app.ai_messages, app.ai_usage_meters TO studafy_app;
+REVOKE ALL PRIVILEGES ON TABLE
+  app.ai_conversations, app.ai_messages, app.ai_message_citations, app.ai_usage_meters
+FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  app.ai_conversations, app.ai_messages, app.ai_message_citations, app.ai_usage_meters
+TO studafy_app;
 
 REVOKE ALL ON FUNCTION app.upsert_ai_usage_tokens(uuid, uuid, bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION app.upsert_ai_usage_tokens(uuid, uuid, bigint) TO studafy_app;
@@ -17,10 +20,11 @@ REVOKE ALL ON FUNCTION app.delete_expired_ai_messages(integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION app.delete_expired_ai_messages(integer) TO studafy_app;
 
 -- ---------------------------------------------------------------------------------------------------
--- 2. The canonical ST-034 tenant policy on all three tables.
+-- 2. The canonical ST-034 tenant policy on all four tables.
 -- ---------------------------------------------------------------------------------------------------
 
 SELECT app.apply_tenant_isolation('app', 'ai_conversations');
+SELECT app.apply_tenant_isolation('app', 'ai_message_citations');
 SELECT app.apply_tenant_isolation('app', 'ai_messages');
 SELECT app.apply_tenant_isolation('app', 'ai_usage_meters');
 
@@ -40,6 +44,12 @@ SELECT app.apply_tenant_isolation('app', 'ai_usage_meters');
 -- ai_messages.conversation_id is backed by:
 --   fk_ai_messages_conversation FOREIGN KEY (conversation_id, school_id)
 --     REFERENCES app.ai_conversations (id, school_id) ON UPDATE RESTRICT ON DELETE RESTRICT
+--
+-- ai_message_citations.ai_message_id and material_chunk_id are backed by:
+--   FOREIGN KEY (ai_message_id, school_id)
+--     REFERENCES app.ai_messages (id, school_id) ON UPDATE RESTRICT ON DELETE CASCADE
+--   FOREIGN KEY (material_chunk_id, school_id)
+--     REFERENCES app.material_chunks (id, school_id) ON UPDATE RESTRICT ON DELETE CASCADE
 --
 -- ai_usage_meters.student_id is backed by:
 --   fk_ai_usage_meters_student FOREIGN KEY (student_id, school_id)
@@ -81,12 +91,11 @@ SELECT app.apply_tenant_isolation('app', 'ai_usage_meters');
 -- cycle. The function is SECURITY INVOKER and reads app.school_id from the transaction context.
 
 -- ---------------------------------------------------------------------------------------------------
--- 6. cited_chunk_ids: intentional lack of FK.
+-- 6. Ordered, normalized citations.
 -- ---------------------------------------------------------------------------------------------------
 
--- ai_messages.cited_chunk_ids is a uuid[], not an array of FK references. material_chunks rows
--- are deleted via CASCADE when their parent material is removed. A cited_chunk_ids value that
--- points at a deleted chunk is stale but harmless: the citation is informational (rendered as
--- "page 12, 'Photosynthesis'"), and a missing chunk does not break the message or the query.
--- Enabling FK integrity on array elements would require a trigger or a separate join table, both
--- disproportionate to the benefit. The array is validated as NOT NULL at the column level.
+-- Migration 000022 replaces ai_messages.cited_chunk_ids with app.ai_message_citations. Its primary
+-- key (school_id, ai_message_id, citation_order) preserves one-based answer order and permits a chunk
+-- to be cited more than once at distinct positions. Both relationships are composite tenant FKs, so
+-- a citation cannot cross schools. Deleting a message or a derived material chunk cascades only its
+-- junction rows; the answer itself remains when a cited chunk is removed.

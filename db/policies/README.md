@@ -6,9 +6,11 @@ tables are deliberately outside this model.
 
 ## Classify the table first
 
-The global tables are `app.schools`, `app.plans`, `app.plan_prices`, `app.countries`,
-`app.currencies`, and `app.platform_settings`. They contain no `school_id`, receive no tenant policy
-or tenant index, and are rejected by the helper.
+The approved global tables are `app.schools`, `app.plans`, `app.plan_prices`, `app.countries`,
+`app.currencies`, `app.platform_settings`, and `app.billing_events`. They contain no `school_id` and
+receive no tenant policy or tenant index. `billing_events` is the global, privileged webhook-ingress
+log documented in the subscription data model; the original six reference tables are also rejected
+by the helper. Adding another global table requires an explicit review and ST-050 allowlist change.
 
 A tenant table must be in `app`, owned by `studafy_admin`, and use a non-null UUID `school_id` with a
 single-column foreign key to `app.schools(id)`. Use explicit `ON UPDATE` and `ON DELETE` actions;
@@ -94,6 +96,18 @@ speculative partial, and duplicate-prefix indexes. Record the query pattern, col
 uniqueness, RLS interaction, write cost, and `EXPLAIN` evidence for every added index.
 
 ## Verification and troubleshooting
+
+Run the read-only database-wide compliance audit against a fully migrated database:
+
+```bash
+bun run db:test:rls-coverage
+```
+
+The command dynamically audits ordinary tables, partitioned parents, and partition leaves. It exits
+`0` on compliance, `1` for a security/normalization/performance violation, and `2` when configuration
+or database access prevents the audit. See
+[`docs/testing/rls-policy-coverage.md`](../../docs/testing/rls-policy-coverage.md) for the complete
+rules, approved flexible-payload columns, diagnostic SQL, and remediation runbook.
 
 Inspect `pg_class.relrowsecurity` and `relforcerowsecurity`, and use `pg_policy` plus
 `pg_get_expr()` to verify `tenant_isolation`. Test every new table as `studafy_app` with two schools,
