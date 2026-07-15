@@ -297,6 +297,7 @@ integrationTest(
         ORDER BY indexname
       `;
       expect(indexes.map((row) => row.name)).toEqual([
+        "idx_notification_preferences_school_user_type_channel",
         "idx_notifications_school_user_created",
         "idx_notifications_school_user_unread",
         "idx_user_devices_school_user_platform_last_seen",

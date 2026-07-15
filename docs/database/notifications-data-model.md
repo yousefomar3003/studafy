@@ -156,17 +156,19 @@ running as the sender.
   backs both the registration upsert and `app.claim_device_token`.
 - **`pk_notification_preferences (user_id, notification_type, channel)`** -- the send-time question
   ("has this user disabled this type on this channel?") _is_ a lookup on this key.
+- **`idx_notification_preferences_school_user_type_channel (school_id, user_id, notification_type, channel)`**
+  -- ST-050's database-wide invariant requires every RLS-protected table to expose a B-tree with
+  `school_id` as the leading key. It also gives the preference lookup an exact tenant-aware path.
 
 Every composite index leads with `school_id` so the permissive tenant predicate is satisfied from the
 index rather than by a recheck, with `user_id` immediately after it for the restrictive predicate.
 Every GUC comparison casts to `uuid`, matching the column type exactly, so no index is disqualified
 by an implicit coercion.
 
-`notification_preferences` deliberately gets **no** index beyond its primary key, and that key is
-_not_ `school_id`-leading. `user_id` is a globally unique uuid and is the selective column; the
-`school_id` in the tenant predicate is a recheck against the two dozen rows the key has already
-located, not a scan. A second, `school_id`-leading index would duplicate that work for no query.
-`uq_user_devices_user_token` is likewise not given a redundant partner.
+Migration `000024_add_notification_preferences_school_index.sql` supersedes the original exception
+for `notification_preferences`. The index is created concurrently because an established database
+holds 24 preference rows per user. `uq_user_devices_user_token` still needs no redundant partner;
+the partial school-leading device index already covers its documented live-device query boundary.
 
 ## Index verification
 
@@ -201,21 +203,16 @@ Sort (actual time=0.120..0.121 rows=3 loops=1)
 Execution Time: 0.150 ms
 
 -- 4. Preference lookup
-Result (actual time=0.108..0.114 rows=1 loops=1)
-  ->  Bitmap Heap Scan on notification_preferences (actual time=0.030..0.036 rows=1 loops=1)
-        Recheck Cond: (user_id = '9006...'::uuid)
-        Filter: ((school_id = (current_setting('app.school_id'::text))::uuid) AND (notification_type = 'GRADE_POSTED') AND (channel = 'push'))
-        Rows Removed by Filter: 23
-        ->  Bitmap Index Scan on pk_notification_preferences (actual time=0.010..0.010 rows=24 loops=1)
-              Index Cond: (user_id = '9006...'::uuid)
-Execution Time: 0.145 ms
+Index Scan using idx_notification_preferences_school_user_type_channel on notification_preferences
+  Index Cond: ((school_id = (current_setting('app.school_id'::text))::uuid)
+               AND (user_id = '9006...'::uuid)
+               AND (notification_type = 'GRADE_POSTED')
+               AND (channel = 'push'))
 ```
 
-Two things worth reading off these plans. The RLS predicates appear as a **One-Time Filter**, not a
-per-row one: `app.current_user_id()` is `STABLE`, so it is evaluated once per query rather than once
-per candidate row. And plan 4 confirms the reasoning above for leaving `notification_preferences`
-without a `school_id`-leading index -- the primary key locates the user's 24 rows, and the tenant and
-type/channel predicates are a recheck over those 24, discarding 23.
+The restrictive `app.current_user_id()` predicate is `STABLE`, so PostgreSQL evaluates it once per
+query. Plan 4 is the expected ST-050 index shape; the database-wide catalog test independently
+asserts that the index is valid, ready, B-tree, and `school_id`-leading.
 
 ## Batch write benchmark
 
