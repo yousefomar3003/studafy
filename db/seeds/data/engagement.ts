@@ -47,6 +47,7 @@ export async function seedEngagement(sql: Sql, ctx: FullCtx): Promise<void> {
           fcm_token: `mock-fcm-${notifiedStudents[0]!.userId}`,
           platform: "ios",
           last_seen: seedDate(-1),
+          created_at: seedDate(-2),
         },
         {
           id: uuid(),
@@ -55,6 +56,7 @@ export async function seedEngagement(sql: Sql, ctx: FullCtx): Promise<void> {
           fcm_token: `mock-fcm-${orgAdmin.userId}`,
           platform: "web",
           last_seen: seedDate(-1),
+          created_at: seedDate(-2),
         },
       ],
       "id",
@@ -63,6 +65,7 @@ export async function seedEngagement(sql: Sql, ctx: FullCtx): Promise<void> {
       "fcm_token",
       "platform",
       "last_seen",
+      "created_at",
     )}
   `;
 
