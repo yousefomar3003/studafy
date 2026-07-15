@@ -375,9 +375,19 @@ integrationTest(
           function_name: "sync_attendance_record_key",
         },
         {
+          table_name: "attendance_records",
+          trigger_name: "trg_tenant_school_id_immutable",
+          function_name: "reject_tenant_school_id_mutation",
+        },
+        {
           table_name: "attendance_sessions",
           trigger_name: "trg_attendance_sessions_sync_business_key",
           function_name: "sync_attendance_session_key",
+        },
+        {
+          table_name: "attendance_sessions",
+          trigger_name: "trg_tenant_school_id_immutable",
+          function_name: "reject_tenant_school_id_mutation",
         },
       ]);
 

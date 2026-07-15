@@ -130,7 +130,7 @@ async function seedTenant(
     const [student] = await transaction<{ id: string }[]>`
       INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status)
       VALUES (${school}, ${studentUser!.id}, ${`ST051-${suffix.toUpperCase()}`}, 'Security', 'Probe',
-        'active') RETURNING id
+        'enrolled') RETURNING id
     `;
     const secondaryEmail = `st051-secondary-${suffix}@example.test`;
     const [secondaryUser] = await transaction<{ id: string }[]>`
@@ -140,7 +140,7 @@ async function seedTenant(
     const [secondaryStudent] = await transaction<{ id: string }[]>`
       INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status)
       VALUES (${school}, ${secondaryUser!.id}, ${`ST051-SECONDARY-${suffix.toUpperCase()}`},
-        'Secondary', 'Probe', 'active') RETURNING id
+        'Secondary', 'Probe', 'enrolled') RETURNING id
     `;
     const [teacher] = await transaction<{ id: string }[]>`
       INSERT INTO app.teachers (school_id, user_id, employee_number, employment_status)
@@ -423,7 +423,7 @@ async function assertCrossTenantCrud(value: SeededFixture): Promise<void> {
 
   for (const statement of [
     `INSERT INTO app.users (school_id, email, normalized_email, status) VALUES ('${value.b.school}', 'st051-cross-user@example.test', 'st051-cross-user@example.test', 'active')`,
-    `INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status) VALUES ('${value.b.school}', '${value.b.user}', 'ST051-CROSS', 'Cross', 'Tenant', 'active')`,
+    `INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status) VALUES ('${value.b.school}', '${value.b.user}', 'ST051-CROSS', 'Cross', 'Tenant', 'enrolled')`,
     `INSERT INTO app.attendance_sessions (school_id, class_id, session_date, status, taken_by_user_id, created_at, updated_at) VALUES ('${value.b.school}', '${value.b.classId}', '2026-07-16', 'open', '${value.b.user}', '${JULY}'::timestamptz, '${JULY}'::timestamptz)`,
     `INSERT INTO app.attendance_records (school_id, attendance_session_id, session_created_at, student_id, status, recorded_by_user_id, created_at, updated_at) VALUES ('${value.b.school}', '${value.b.attendanceSession}', '${value.b.attendanceSessionCreatedAt.toISOString()}', '${value.b.secondaryStudent}', 'present', '${value.b.user}', '${JULY}'::timestamptz, '${JULY}'::timestamptz)`,
     `INSERT INTO app.outbox_events (school_id, event_name, payload) VALUES ('${value.b.school}', 'security.attacked', '{}'::jsonb)`,
