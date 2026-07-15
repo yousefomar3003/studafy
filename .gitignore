@@ -24,3 +24,6 @@ terraform.rc
 *.tfvars.json
 !infra/terraform/environments/**/*.tfvars
 # .terraform.lock.hcl is deliberately NOT ignored: it pins provider checksums.
+
+# Environment
+.env
