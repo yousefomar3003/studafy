@@ -3,6 +3,13 @@
 Operational runbook for the monthly partitions of `app.attendance_sessions` and
 `app.attendance_records`. The data model itself is documented in [attendance](attendance.md).
 
+Attendance is no longer the only monthly-partitioned family: `app.audit_logs` (ST-046) is partitioned the
+same way and has its own command and its own runbook,
+[audit log partition maintenance](audit-log-partition-maintenance.md). The two share one advisory lock, so
+their maintenance runs cannot race each other, but they are maintained separately on purpose — audit
+partitions take **append-only** grants (`SELECT, INSERT` only), and must never receive the CRUD grants
+attendance partitions do. The unresolved in-VPC scheduling work below is common to both.
+
 ## Overview
 
 |                     |                                                                                 |
