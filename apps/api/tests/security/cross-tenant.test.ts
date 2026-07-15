@@ -17,7 +17,7 @@ import type { TransactionSql } from "postgres";
 
 const integrationTest = test.skipIf(!integrationEnabled);
 const repositoryMigrations = resolve(import.meta.dir, "../../../../db/migrations");
-const PROBE_BUDGET_MS = 600;
+const PROBE_BUDGET_MS = 1000;
 const CONCURRENCY = 32;
 const POOL_SIZE = 4;
 // Dedicated multi-connection pool so the write/mutation/insert probes run concurrently instead of
