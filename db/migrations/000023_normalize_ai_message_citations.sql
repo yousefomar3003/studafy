@@ -1,4 +1,5 @@
 -- Replaces ai_messages.cited_chunk_ids with a normalized, ordered tenant-safe junction table.
+-- Runs after 000022 creates the domain-events outbox introduced on dev.
 -- Existing citation UUIDs that no longer resolve to a material chunk in the same school are omitted
 -- during backfill and reported as a NOTICE. Valid duplicate citations are preserved at their original
 -- one-based positions. The migration is transactional, so the new table and removed array become

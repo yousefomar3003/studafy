@@ -1,5 +1,5 @@
 -- Reference mirror of the tenant isolation installed on app.ai_conversations, app.ai_messages,
--- app.ai_message_citations, and app.ai_usage_meters by migrations 000021 and 000022. This file is
+-- app.ai_message_citations, and app.ai_usage_meters by migrations 000021 and 000023. This file is
 -- documentation: the runner only executes db/migrations.
 
 -- ---------------------------------------------------------------------------------------------------
@@ -94,7 +94,7 @@ SELECT app.apply_tenant_isolation('app', 'ai_usage_meters');
 -- 6. Ordered, normalized citations.
 -- ---------------------------------------------------------------------------------------------------
 
--- Migration 000022 replaces ai_messages.cited_chunk_ids with app.ai_message_citations. Its primary
+-- Migration 000023 replaces ai_messages.cited_chunk_ids with app.ai_message_citations. Its primary
 -- key (school_id, ai_message_id, citation_order) preserves one-based answer order and permits a chunk
 -- to be cited more than once at distinct positions. Both relationships are composite tenant FKs, so
 -- a citation cannot cross schools. Deleting a message or a derived material chunk cascades only its

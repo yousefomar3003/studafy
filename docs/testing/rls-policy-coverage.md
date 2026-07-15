@@ -54,12 +54,13 @@ not hiding relationships. The exact reviewed payload exceptions are:
 - `billing_events.payload`;
 - `fee_schedule_cache.erpnext_payload`, `invoice_cache.erpnext_payload`, and
   `payment_cache.erpnext_payload`;
-- `finance_sync_outbox.payload`; and
-- `notifications.metadata`.
+- `finance_sync_outbox.payload`;
+- `notifications.metadata`; and
+- `outbox_events.payload`.
 
-These hold polymorphic audit state or external/flexible provider payloads. Tenant identity and
-relational routing remain normal constrained columns. Adding another exception requires data-model
-documentation and an explicit audit allowlist change.
+These hold polymorphic audit state, internal event envelopes, or external/flexible provider
+payloads. Tenant identity and relational routing remain normal constrained columns. Adding another
+exception requires data-model documentation and an explicit audit allowlist change.
 
 ## Performance methodology
 

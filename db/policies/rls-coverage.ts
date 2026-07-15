@@ -76,6 +76,7 @@ approved_flexible_columns(table_name, column_name) AS (
     ('finance_sync_outbox', 'payload'),
     ('invoice_cache', 'erpnext_payload'),
     ('notifications', 'metadata'),
+    ('outbox_events', 'payload'),
     ('payment_cache', 'erpnext_payload')
 ),
 relations AS (

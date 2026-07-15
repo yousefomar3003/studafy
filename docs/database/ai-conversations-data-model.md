@@ -6,7 +6,7 @@ direct foreign key to `app.schools(id)`, and a school-leading B-tree.
 
 ## Normalized citations
 
-Migration `000022_normalize_ai_message_citations.sql` replaces the historical
+Migration `000023_normalize_ai_message_citations.sql` replaces the historical
 `ai_messages.cited_chunk_ids uuid[]` column with an ordered junction:
 
 | Column              | Meaning                                                        |

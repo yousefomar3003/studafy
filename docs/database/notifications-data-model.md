@@ -165,7 +165,7 @@ index rather than by a recheck, with `user_id` immediately after it for the rest
 Every GUC comparison casts to `uuid`, matching the column type exactly, so no index is disqualified
 by an implicit coercion.
 
-Migration `000023_add_notification_preferences_school_index.sql` supersedes the original exception
+Migration `000024_add_notification_preferences_school_index.sql` supersedes the original exception
 for `notification_preferences`. The index is created concurrently because an established database
 holds 24 preference rows per user. `uq_user_devices_user_token` still needs no redundant partner;
 the partial school-leading device index already covers its documented live-device query boundary.

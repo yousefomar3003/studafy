@@ -31,7 +31,7 @@ async function migrationFilesThrough(maximumVersion: number): Promise<Record<str
 integrationTest(
   "citation normalization preserves valid order and duplicates while omitting invalid tenant links",
   async () => {
-    const fixture = await migrationFixture(await migrationFilesThrough(21));
+    const fixture = await migrationFixture(await migrationFilesThrough(22));
     const database = await testDatabase();
     try {
       await runMigrationCommand("migrate", {
@@ -48,7 +48,7 @@ integrationTest(
       const chunkB = crypto.randomUUID();
       const staleChunk = crypto.randomUUID();
 
-      // Build the smallest pre-000022 historical fixture. Trigger-backed foreign keys unrelated to
+      // Build the smallest pre-000023 historical fixture. Trigger-backed foreign keys unrelated to
       // citation normalization are disabled only on this reserved superuser test connection; the
       // school, message, and chunk rows referenced by the new constraints all physically exist.
       const reserved = await database.sql.reserve();
@@ -91,8 +91,8 @@ integrationTest(
       }
 
       for (const name of [
-        "000022_normalize_ai_message_citations.sql",
-        "000023_add_notification_preferences_school_index.sql",
+        "000023_normalize_ai_message_citations.sql",
+        "000024_add_notification_preferences_school_index.sql",
       ]) {
         // Both destinations live under the fresh test-only migration fixture directory.
         // eslint-disable-next-line security/detect-non-literal-fs-filename
