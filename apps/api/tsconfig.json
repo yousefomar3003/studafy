@@ -1,4 +1,4 @@
 {
   "extends": "@studafy/tsconfig/api.json",
-  "include": ["src"]
+  "include": ["src", "tests"]
 }

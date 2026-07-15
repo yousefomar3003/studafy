@@ -226,6 +226,36 @@ violations AS (
   UNION ALL
 
   SELECT
+    'TENANT_OWNERSHIP_IMMUTABLE', tenant.schema_name, tenant.table_name, 'school_id',
+    'no enabled BEFORE UPDATE OF school_id trigger using app.reject_tenant_school_id_mutation()',
+    'Install the canonical tenant-ownership trigger in a forward migration.',
+    format(
+      'SELECT app.apply_tenant_ownership_immutability(%L::name, %L::name);',
+      tenant.schema_name, tenant.table_name
+    )
+  FROM tenant_relations AS tenant
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS trigger_catalog
+    JOIN pg_catalog.pg_proc AS trigger_function
+      ON trigger_function.oid = trigger_catalog.tgfoid
+    JOIN pg_catalog.pg_namespace AS function_schema
+      ON function_schema.oid = trigger_function.pronamespace
+    WHERE trigger_catalog.tgrelid = tenant.oid
+      AND NOT trigger_catalog.tgisinternal
+      AND trigger_catalog.tgenabled <> 'D'
+      AND function_schema.nspname = 'app'
+      AND trigger_function.proname = 'reject_tenant_school_id_mutation'
+      AND trigger_function.pronargs = 0
+      AND (trigger_catalog.tgtype & 1) = 1
+      AND (trigger_catalog.tgtype & 2) = 2
+      AND (trigger_catalog.tgtype & 16) = 16
+      AND tenant.school_attnum = ANY(trigger_catalog.tgattr::smallint[])
+  )
+
+  UNION ALL
+
+  SELECT
     'TENANT_POLICY', tenant.schema_name, tenant.table_name, 'school_id',
     coalesce((
       SELECT string_agg(

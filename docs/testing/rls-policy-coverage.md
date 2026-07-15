@@ -35,6 +35,8 @@ Every tenant relation must have:
 - no other permissive policy, because permissive policies combine with `OR` (additional restrictive
   policies are allowed); and
 - a valid, ready B-tree whose leftmost key is `school_id`.
+- an enabled canonical `BEFORE UPDATE OF school_id` trigger that rejects tenant-ownership changes,
+  including changes attempted by a superuser or `BYPASSRLS` role.
 
 HNSW, GIN, and GiST indexes do not satisfy the relational tenant path. A documented partial B-tree
 does qualify when its predicate is the relation's normal query boundary. A plain, non-unique,

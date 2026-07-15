@@ -39,9 +39,9 @@ The PostgreSQL client disables prepared statements for transaction pooling. In p
 ## Tenant database transactions
 
 Future school-scoped handlers must authenticate the principal, authorize its school membership,
-and then wrap all tenant queries in one database transaction. Set the canonical tenant context
-inside that transaction with `SELECT set_config('app.school_id', $1, true)` (or `SET LOCAL`), using
-the authorized school UUID rather than a client-provided value. Commit or roll back before the
+and then wrap all tenant queries with `withTenantTransaction`. The helper assumes the restricted
+`studafy_app` role and sets `app.school_id` (and optional `app.user_id`) transaction-locally using the
+authorized context rather than a client-provided value. Commit or roll back happens before the
 connection returns to PgBouncer. Never use session-level `SET`: transaction pooling can hand that
 physical connection to another request and leak its tenant context.
 
@@ -56,6 +56,7 @@ bun run build        # bundle to dist/
 bun run check-types  # tsc --noEmit
 bun run lint         # eslint .
 bun test             # run the test suite
+bun run test:security # run the NFR-05 database probe (requires TEST_DATABASE_URL)
 ```
 
 Quick check once running:
