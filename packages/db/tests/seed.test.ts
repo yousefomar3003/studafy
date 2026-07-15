@@ -28,6 +28,7 @@ function localConfig(overrides: Partial<MigrationConfig> = {}): MigrationConfig 
     url: "postgresql://studafy_test:pw@localhost:5432/postgres",
     ssl: false,
     migrationsDir: "db/migrations",
+    seedsDir: "db/seeds",
     redactions: [],
     ...overrides,
   };
