@@ -56,6 +56,16 @@ jobs:
           bun run db:test:rls-coverage
       - run: bun test --max-concurrency=2 --timeout=10000
         working-directory: packages/db
+      # The seed integration test creates a disposable database, runs all migrations, seeds 40+
+      # tables, and verifies index health — it needs its own timeout budget rather than the
+      # 10-second default used by the unit/integration suite above.
+      - name: Seed integration test (demo tenant + index health)
+        env:
+          DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+          DATABASE_SSL_MODE: disable
+          SEED_INTEGRATION: "1"
+        run: bun test tests/seed.test.ts --timeout 90000
+        working-directory: packages/db
       - name: Attendance 40-record benchmark
         env:
           ATTENDANCE_BENCHMARK: "1"
