@@ -2,6 +2,12 @@ import postgres from "postgres";
 
 import type { MigrationConfig } from "./config";
 
+// Re-exported so code outside this package's node_modules (notably db/seeds) can name the driver's
+// connection types without resolving the `postgres` module from its own directory.
+export type Sql = postgres.Sql;
+export type ReservedSql = postgres.ReservedSql;
+export type TransactionSql = postgres.TransactionSql;
+
 // Shared by the migration runner and the attendance partition maintenance command: both are
 // administrative, single-connection, primary-only tools that must never be pooled or prepared.
 export function createClient(config: MigrationConfig, applicationName: string): postgres.Sql {
