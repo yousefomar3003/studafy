@@ -1,12 +1,17 @@
 import { Hono } from "hono";
 
 import { healthRoutes } from "./health";
-import { problemErrorHandler, problemNotFound } from "./problem";
-import { requestContext } from "./request-context";
+import {
+  requestIdMiddleware,
+  localeMiddleware,
+  loggerMiddleware,
+  errorHandlerMiddleware,
+  notFoundHandler,
+} from "./middleware";
 
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
-import type { AppEnv } from "./request-context";
+import type { AppEnv } from "./middleware/requestId";
 
 export interface AppOptions {
   isReady: () => boolean | Promise<boolean>;
@@ -45,9 +50,14 @@ export function createApp({
     }
   });
 
-  // Next, so it is the outermost middleware that has a request id: routes and app.onError alike
-  // unwind back through it, which is what stamps X-Request-Id on error responses too.
-  app.use("*", requestContext({ logger, generateRequestId }));
+  // Request ID middleware: generates unique ID per request, creates child logger, stamps X-Request-Id
+  app.use("*", requestIdMiddleware({ logger, generateRequestId }));
+
+  // Locale middleware: parses Accept-Language header and attaches locale to request context
+  app.use("*", localeMiddleware());
+
+  // Structured logger middleware: logs request/response lifecycle (excludes health checks)
+  app.use("*", loggerMiddleware({ logger, excludePaths: ["/healthz", "/readyz"] }));
 
   // The ALB in front of this service (infra/terraform/modules/edge) terminates TLS and forwards
   // plaintext to us; its listener actions can't inject response headers, so HSTS has to be set
@@ -62,8 +72,8 @@ export function createApp({
   // One error envelope for the whole app, for both the ways a request can fail: no route matched it,
   // or a handler threw. Registered last for readability only: Hono attaches these to the app rather
   // than to the middleware chain, so registration order does not affect either.
-  app.notFound(problemNotFound);
-  app.onError(problemErrorHandler(logger));
+  app.notFound(notFoundHandler);
+  app.onError(errorHandlerMiddleware(logger));
 
   return app;
 }
