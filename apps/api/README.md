@@ -48,6 +48,9 @@ Every request is assigned a UUIDv4 `request_id`, returned as `X-Request-Id`, bou
 and embedded in any `application/problem+json` error body. Logs are pino-shaped NDJSON on stdout.
 An inbound `X-Request-Id` is **ignored** — the id keys the audit trail, so it is never client-chosen.
 
+Every failed request carries that envelope, including one no route matched: unmatched paths return
+`application/problem+json` with `code: "RESOURCE_NOT_FOUND"`, not Hono's default `text/plain` 404.
+
 Full conventions, the request-to-audit-partition lifecycle, and the list of what does not exist yet
 live in [`docs/architecture/SAD_28_logging_conventions.md`](../../docs/architecture/SAD_28_logging_conventions.md).
 

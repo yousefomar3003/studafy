@@ -139,6 +139,14 @@ jobs:
           REQUEST_CONTEXT_BENCHMARK: "1"
         run: bun test tests/benchmark/request-context-benchmark.test.ts
         working-directory: apps/api
+      # Asserts the ST-055 acceptance target, as the same kind of delta and for the same reasons: the
+      # baseline arm is an identical app falling through to Hono's built-in text/plain 404, so what is
+      # measured is the problem+json envelope alone. Needs no database.
+      - name: Unmatched-route problem+json benchmark (<1ms over baseline)
+        env:
+          NOT_FOUND_BENCHMARK: "1"
+        run: bun test tests/benchmark/not-found-benchmark.test.ts
+        working-directory: apps/api
       - run: bun run --cwd packages/ui build-storybook
       - name: Verify Turbo cache replay
         run: bunx turbo run build --filter=!@studafy/mobile --summarize

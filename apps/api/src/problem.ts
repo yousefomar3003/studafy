@@ -6,7 +6,7 @@ import { z, ZodError } from "zod";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./request-context";
 import type { ErrorCode } from "@studafy/constants";
-import type { ErrorHandler } from "hono";
+import type { ErrorHandler, NotFoundHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 /**
@@ -84,6 +84,7 @@ function buildProblem(
   code: ErrorCode,
   requestId: string,
   detail?: string,
+  instance?: string,
 ): ApiProblem {
   return {
     // Set explicitly: problemDetailsSchema declares .default("about:blank"), but a Zod default
@@ -92,6 +93,7 @@ function buildProblem(
     title: STATUS_TITLES.get(status) ?? "Error",
     status,
     ...(detail === undefined ? {} : { detail }),
+    ...(instance === undefined ? {} : { instance }),
     code,
     request_id: requestId,
   };
@@ -127,3 +129,41 @@ export function problemErrorHandler(rootLogger: Logger): ErrorHandler<AppEnv> {
     });
   };
 }
+
+/**
+ * The same envelope for a path no route matched, so a 404 is not the one response shape a client has
+ * to special-case. Hono's built-in fallback is `text/plain`, and only *thrown* errors reach
+ * problemErrorHandler above — an unmatched route throws nothing.
+ *
+ * X-Request-Id is not set here: requestContext stamps it after next(), and its `app.use("*")`
+ * matches even when no route does, so a 404 unwinds back through it like any other response.
+ *
+ * Deliberately not a factory taking a logger, because this emits no log line. requestContext already
+ * logs "request completed" with the status, method, path, and request id — everything an operator
+ * needs. problemErrorHandler logs because an exception carries a stack and a cause that would
+ * otherwise be lost; there is no error object here and nothing to add. A second line per unmatched
+ * route would only double the log volume of the least valuable traffic there is — scanners probing
+ * /wp-admin and /.env — and there is no sampling or retention beyond awslogs to absorb it.
+ */
+export const problemNotFound: NotFoundHandler<AppEnv> = (c) => {
+  const requestId = c.get("requestId") ?? crypto.randomUUID();
+  // c.req.path, never c.req.url: `path` excludes the query string, and this value is echoed to the
+  // client twice below. requestContext already keeps a query string out of the log line because it
+  // can carry a token or a PII filter; reflecting one into a response body is strictly worse. It
+  // stays percent-encoded, and JSON.stringify escapes it, so it reaches the body inert.
+  const path = c.req.path;
+
+  return c.body(
+    JSON.stringify(
+      buildProblem(
+        404,
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        requestId,
+        `The requested path ${path} does not exist.`,
+        path,
+      ),
+    ),
+    404,
+    { "content-type": PROBLEM_CONTENT_TYPE },
+  );
+};

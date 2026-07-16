@@ -11,14 +11,17 @@ import { apiProblemSchema } from "./problem";
 
 import type { AppEnv } from "./request-context";
 
-const buildApp = (routes: (app: Hono<AppEnv>) => void) => {
+/** RFC 4122 version 4, variant 1 — the shape crypto.randomUUID() produces. */
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+const buildApp = (routes?: (app: Hono<AppEnv>) => void) => {
   const lines: string[] = [];
   const app = createApp({
     isReady: () => true,
     tracker: createInflightTracker(),
     logger: createLogger({ destination: (line) => lines.push(line) }),
   });
-  routes(app);
+  routes?.(app);
   return { app, lines };
 };
 
@@ -175,6 +178,88 @@ describe("validation errors", () => {
     expect(res.status).toBe(400);
     expect(body.code).toBe("VALIDATION_FAILED");
     expect(body.detail).toInclude("age");
+  });
+});
+
+describe("unmatched routes", () => {
+  test("yield the problem+json envelope rather than Hono's text/plain 404", async () => {
+    const { app } = buildApp();
+
+    const res = await app.request("/v1/invalid-route-path");
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    // Exactly this, with no charset parameter, and identical to every other error the API emits:
+    // a 404 must not be the one response shape a client special-cases.
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    expect(body).toEqual({
+      type: "about:blank",
+      title: "Not Found",
+      status: 404,
+      detail: "The requested path /v1/invalid-route-path does not exist.",
+      instance: "/v1/invalid-route-path",
+      code: "RESOURCE_NOT_FOUND",
+      request_id: res.headers.get("X-Request-Id"),
+    });
+  });
+
+  test("carry a request id that is a v4 uuid and matches the body", async () => {
+    const { app } = buildApp();
+
+    const res = await app.request("/v1/invalid-route-path");
+    const body = (await res.json()) as { request_id: string };
+
+    expect(res.headers.get("X-Request-Id")).toMatch(UUID_V4);
+    expect(body.request_id).toBe(res.headers.get("X-Request-Id")!);
+  });
+
+  test("produce a body satisfying the shared schema", async () => {
+    const { app } = buildApp();
+
+    const body = await (await app.request("/v1/invalid-route-path")).json();
+
+    expect(apiProblemSchema.safeParse(body).success).toBe(true);
+  });
+
+  test("a query string is never echoed into the body", async () => {
+    // The envelope reflects the path back to the caller, so the query string has to be excluded at
+    // the source (c.req.path, not c.req.url). requestContext already keeps it out of the log line
+    // because it can carry a token or a PII filter; a response body is a worse place to leak one.
+    const { app } = buildApp();
+
+    const res = await app.request("/v1/invalid-route-path?token=super-secret&filter=pii");
+    const raw = await res.text();
+
+    expect(raw).not.toInclude("super-secret");
+    expect(raw).not.toInclude("filter=pii");
+    expect(JSON.parse(raw).instance).toBe("/v1/invalid-route-path");
+  });
+
+  test("a known path with an unrouted method gets the same envelope", async () => {
+    // Hono answers a method mismatch with the same 404 as an unknown path, so this reaches the
+    // notFound handler too rather than falling back to text/plain.
+    const { app } = buildApp();
+
+    const res = await app.request("/healthz", { method: "POST" });
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    expect(apiProblemSchema.safeParse(await res.json()).success).toBe(true);
+  });
+
+  test("emit no failure log line, only the completion line requestContext already writes", async () => {
+    // An unmatched route is not an application error: there is no error object, and the completion
+    // line already carries the status, method, path, and request id. A second line here would double
+    // the log volume of scanner traffic and add nothing an operator does not already have.
+    const { app, lines } = buildApp();
+
+    await app.request("/v1/invalid-route-path");
+
+    const records = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(records.filter((record) => record.msg === "request failed")).toBeEmpty();
+    const completed = records.filter((record) => record.msg === "request completed");
+    expect(completed).toHaveLength(1);
+    expect(completed[0]).toMatchObject({ status: 404, path: "/v1/invalid-route-path" });
   });
 });
 
