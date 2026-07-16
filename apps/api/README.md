@@ -26,6 +26,9 @@ Validated once at startup by [`src/env.ts`](src/env.ts). An invalid value throws
 | `PORT`                | integer `1`–`65535`                     | `3000`        |                                      |
 | `HOST`                | string                                  | `0.0.0.0`     | interface to bind                    |
 | `SHUTDOWN_TIMEOUT_MS` | integer `>= 0`                          | `10000`       | max time to drain in-flight requests |
+| `LOG_LEVEL`           | `trace`…`fatal`                         | `info`        | volume knob; below it costs nothing  |
+| `SERVICE_NAME`        | string                                  | `api`         | `service` field on every log line    |
+| `RELEASE_VERSION`     | string                                  | `unknown`     | `IMAGE_TAG` in deployments           |
 | `DATABASE_HOST`       | string                                  | none          | required in production               |
 | `DATABASE_PORT`       | integer `1`-`65535`                     | none          | PgBouncer listener                   |
 | `DATABASE_NAME`       | string                                  | none          | PgBouncer service pool name          |
@@ -35,6 +38,18 @@ Validated once at startup by [`src/env.ts`](src/env.ts). An invalid value throws
 
 The PostgreSQL client disables prepared statements for transaction pooling. In production,
 `/readyz` runs `SELECT 1` through PgBouncer before reporting ready.
+
+`RELEASE_VERSION` is deliberately **not** required in production: `unknown` in a log line is a
+diagnosable state, whereas a container refusing to boot over a logging field is an outage.
+
+## Logging and request tracing
+
+Every request is assigned a UUIDv4 `request_id`, returned as `X-Request-Id`, bound to a child logger,
+and embedded in any `application/problem+json` error body. Logs are pino-shaped NDJSON on stdout.
+An inbound `X-Request-Id` is **ignored** — the id keys the audit trail, so it is never client-chosen.
+
+Full conventions, the request-to-audit-partition lifecycle, and the list of what does not exist yet
+live in [`docs/architecture/SAD_28_logging_conventions.md`](../../docs/architecture/SAD_28_logging_conventions.md).
 
 ## Tenant database transactions
 
@@ -62,9 +77,13 @@ bun run test:security # run the NFR-05 database probe (requires TEST_DATABASE_UR
 Quick check once running:
 
 ```sh
-curl -i localhost:3000/healthz   # 200 {"status":"ok"}
+curl -i localhost:3000/healthz   # 200 {"status":"ok"}, plus an X-Request-Id header
 curl -i localhost:3000/readyz    # 200 {"status":"ready"}
 ```
+
+`bun test` from this directory needs the workspace packages built first (`@studafy/constants` and
+`@studafy/shared-schemas` are consumed from `dist/`). `bun run test` from the repository root handles
+that ordering for you.
 
 ## Graceful shutdown
 

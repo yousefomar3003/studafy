@@ -15,6 +15,9 @@
         { "name": "NODE_ENV", "value": "production" },
         { "name": "PORT", "value": "3000" },
         { "name": "HOST", "value": "0.0.0.0" },
+        { "name": "LOG_LEVEL", "value": "info" },
+        { "name": "SERVICE_NAME", "value": "api" },
+        { "name": "RELEASE_VERSION", "value": "${IMAGE_TAG}" },
         { "name": "DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },
         { "name": "DATABASE_PORT", "value": "6432" },
         { "name": "DATABASE_NAME", "value": "api" }
