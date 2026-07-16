@@ -130,6 +130,15 @@ jobs:
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run format:check
       - run: bunx turbo run lint check-types test build --filter=!@studafy/mobile
+      # Asserts the ST-054 acceptance target. Measures the request-context middleware as a delta
+      # against an identical app without it, so shared-runner noise cancels rather than accumulating
+      # into the budget -- unlike an absolute wall-clock budget, which is why this one does not need
+      # the periodic widening the NFR-05 probe budget required. Needs no database.
+      - name: Request-context middleware benchmark (<1ms over baseline)
+        env:
+          REQUEST_CONTEXT_BENCHMARK: "1"
+        run: bun test tests/benchmark/request-context-benchmark.test.ts
+        working-directory: apps/api
       - run: bun run --cwd packages/ui build-storybook
       - name: Verify Turbo cache replay
         run: bunx turbo run build --filter=!@studafy/mobile --summarize

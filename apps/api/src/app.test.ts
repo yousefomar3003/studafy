@@ -3,9 +3,13 @@ import { describe, expect, test } from "bun:test";
 
 import { createApp } from "./app";
 import { createInflightTracker } from "./lifecycle";
+import { createLogger } from "./logger";
+
+// A logger writing nowhere: these tests assert on responses, and a run must not emit NDJSON.
+const silentLogger = () => createLogger({ destination: () => undefined });
 
 const buildApp = (isReady: () => boolean) =>
-  createApp({ isReady, tracker: createInflightTracker() });
+  createApp({ isReady, tracker: createInflightTracker(), logger: silentLogger() });
 
 describe("security headers", () => {
   test("every response sets Strict-Transport-Security", async () => {

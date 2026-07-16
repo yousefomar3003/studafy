@@ -12,6 +12,8 @@
     "test:security": "bun test ./tests/security --timeout 90000"
   },
   "dependencies": {
+    "@studafy/constants": "workspace:*",
+    "@studafy/shared-schemas": "workspace:*",
     "hono": "4.12.28",
     "postgres": "3.4.9",
     "zod": "4.1.12"

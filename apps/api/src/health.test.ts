@@ -3,9 +3,14 @@ import { describe, expect, test } from "bun:test";
 
 import { createApp } from "./app";
 import { createInflightTracker } from "./lifecycle";
+import { createLogger } from "./logger";
 
 const buildApp = (isReady: () => boolean) =>
-  createApp({ isReady, tracker: createInflightTracker() });
+  createApp({
+    isReady,
+    tracker: createInflightTracker(),
+    logger: createLogger({ destination: () => undefined }),
+  });
 
 describe("health routes", () => {
   test("GET /healthz returns 200 ok", async () => {
