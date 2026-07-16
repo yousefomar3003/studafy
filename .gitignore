@@ -27,3 +27,6 @@ terraform.rc
 
 # Environment
 .env
+
+# Database backups
+backups/
