@@ -1,0 +1,17 @@
+{
+  "AUTH_INVALID_CREDENTIALS": "Invalid credentials provided",
+  "AUTH_TOKEN_EXPIRED": "Authentication token has expired",
+  "AUTH_TOKEN_INVALID": "Invalid authentication token",
+  "AUTH_SESSION_NOT_FOUND": "Session not found",
+  "AUTHZ_FORBIDDEN": "Access denied",
+  "AUTHZ_ROLE_NOT_FOUND": "Required role not found",
+  "AUTHZ_PERMISSION_NOT_FOUND": "Required permission not found",
+  "VALIDATION_FAILED": "Validation failed",
+  "VALIDATION_REQUIRED_FIELD_MISSING": "Required field is missing",
+  "RESOURCE_NOT_FOUND": "Resource not found",
+  "RESOURCE_ALREADY_DELETED": "Resource has already been deleted",
+  "CONFLICT_DUPLICATE_ENTRY": "Duplicate entry detected",
+  "CONFLICT_STATE_MISMATCH": "Request conflicts with current state",
+  "RATE_LIMIT_EXCEEDED": "Too many requests",
+  "INTERNAL_ERROR": "An unexpected error occurred"
+}

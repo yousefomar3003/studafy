@@ -1,0 +1,17 @@
+{
+  "AUTH_INVALID_CREDENTIALS": "بيانات الاعتماد غير صالحة",
+  "AUTH_TOKEN_EXPIRED": "انتهت صلاحية رمز المصادقة",
+  "AUTH_TOKEN_INVALID": "رمز المصادقة غير صالح",
+  "AUTH_SESSION_NOT_FOUND": "لم يتم العثور على الجلسة",
+  "AUTHZ_FORBIDDEN": "تم رفض الوصول",
+  "AUTHZ_ROLE_NOT_FOUND": "لم يتم العثور على الدور المطلوب",
+  "AUTHZ_PERMISSION_NOT_FOUND": "لم يتم العثور على الصلاحية المطلوبة",
+  "VALIDATION_FAILED": "فشل التحقق من الصحة",
+  "VALIDATION_REQUIRED_FIELD_MISSING": "الحقل المطلوب مفقود",
+  "RESOURCE_NOT_FOUND": "لم يتم العثور على المورد",
+  "RESOURCE_ALREADY_DELETED": "تم حذف المورد بالفعل",
+  "CONFLICT_DUPLICATE_ENTRY": "تم اكتشاف إدخال مكرر",
+  "CONFLICT_STATE_MISMATCH": "الطلب يتعارض مع الحالة الحالية",
+  "RATE_LIMIT_EXCEEDED": "تم تجاوز حد الطلبات",
+  "INTERNAL_ERROR": "حدث خطأ غير متوقع"
+}

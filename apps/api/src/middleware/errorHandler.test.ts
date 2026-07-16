@@ -4,12 +4,13 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import { createApp } from "./app";
-import { createInflightTracker } from "./lifecycle";
-import { createLogger } from "./logger";
-import { apiProblemSchema } from "./middleware/errorHandler";
+import { createApp } from "../app";
+import { createInflightTracker } from "../lifecycle";
+import { createLogger } from "../logger";
 
-import type { AppEnv } from "./request-context";
+import { apiProblemSchema } from "./errorHandler";
+
+import type { AppEnv } from "./requestId";
 
 /** RFC 4122 version 4, variant 1 — the shape crypto.randomUUID() produces. */
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -42,7 +43,6 @@ describe("problem+json envelope", () => {
     const body = await res.json();
 
     expect(res.status).toBe(403);
-    // Exactly this, with no charset parameter: RFC 9457 defines none.
     expect(res.headers.get("content-type")).toBe("application/problem+json");
     expect(body).toEqual({
       type: "about:blank",
@@ -55,8 +55,6 @@ describe("problem+json envelope", () => {
   });
 
   test("every mapped status produces a body satisfying the shared schema", async () => {
-    // apiProblemSchema is the contract. It is deliberately not parsed in production — onError runs
-    // inside Hono's catch, so a throw there would re-enter onError — which makes this the oracle.
     for (const status of [400, 401, 403, 404, 409, 429, 500] as const) {
       const { app } = buildApp((a) =>
         a.get("/x", () => {
@@ -109,8 +107,6 @@ describe("internal errors do not leak", () => {
   });
 
   test("the same error IS fully recorded on the log line", async () => {
-    // The split that makes the bare body acceptable: the operator loses nothing, and request_id is
-    // the handle that joins this line to the client's copy.
     const { app, lines } = buildApp((a) =>
       a.get("/leak", () => {
         throw new Error("password=hunter2");
@@ -162,9 +158,6 @@ describe("internal errors do not leak", () => {
 
 describe("validation errors", () => {
   test("a ZodError maps to 400 VALIDATION_FAILED with a detail", async () => {
-    // Also the guard for a silent dependency hazard: if apps/api and @studafy/shared-schemas ever
-    // stop resolving to one copy of zod, `error instanceof ZodError` quietly stops matching and
-    // every validation error becomes a 500. This test is what fails when that happens.
     const { app } = buildApp((a) =>
       a.get("/validate", () => {
         z.object({ age: z.number() }).parse({ age: "not a number" });
@@ -220,9 +213,6 @@ describe("unmatched routes", () => {
   });
 
   test("a query string is never echoed into the body", async () => {
-    // The envelope reflects the path back to the caller, so the query string has to be excluded at
-    // the source (c.req.path, not c.req.url). requestContext already keeps it out of the log line
-    // because it can carry a token or a PII filter; a response body is a worse place to leak one.
     const { app } = buildApp();
 
     const res = await app.request("/v1/invalid-route-path?token=super-secret&filter=pii");
@@ -234,8 +224,6 @@ describe("unmatched routes", () => {
   });
 
   test("a known path with an unrouted method gets the same envelope", async () => {
-    // Hono answers a method mismatch with the same 404 as an unknown path, so this reaches the
-    // notFound handler too rather than falling back to text/plain.
     const { app } = buildApp();
 
     const res = await app.request("/healthz", { method: "POST" });
@@ -246,9 +234,6 @@ describe("unmatched routes", () => {
   });
 
   test("emit no failure log line, only the completion line requestContext already writes", async () => {
-    // An unmatched route is not an application error: there is no error object, and the completion
-    // line already carries the status, method, path, and request id. A second line here would double
-    // the log volume of scanner traffic and add nothing an operator does not already have.
     const { app, lines } = buildApp();
 
     await app.request("/v1/invalid-route-path");
@@ -271,10 +256,87 @@ describe("log injection through the error path", () => {
 
     await app.request("/x");
 
-    // An error message is attacker-reachable wherever it echoes input, so it gets the same
-    // guarantee as any other field.
     expect(lines.every((line) => line.slice(0, -1).split("\n").length === 1)).toBe(true);
     expect(lines.join("")).not.toInclude('\n{"level":30,"msg":"FORGED"}');
     expect(failureLog(lines).level).toBe(50);
+  });
+});
+
+describe("locale-aware error messages", () => {
+  test("returns English error message for Accept-Language: en", async () => {
+    const { app } = buildApp((a) =>
+      a.get("/auth-error", () => {
+        throw new HTTPException(401, { message: "Invalid credentials" });
+      }),
+    );
+
+    const res = await app.request("/auth-error", {
+      headers: { "Accept-Language": "en" },
+    });
+    const body = (await res.json()) as { detail: string; code: string };
+
+    expect(res.status).toBe(401);
+    expect(body.code).toBe("AUTH_TOKEN_INVALID");
+    expect(body.detail).toBe("Invalid credentials");
+  });
+
+  test("500 errors do not expose detail to the client", async () => {
+    const { app } = buildApp((a) =>
+      a.get("/unknown-error", () => {
+        throw new Error("Unknown error");
+      }),
+    );
+
+    const res = await app.request("/unknown-error", {
+      headers: { "Accept-Language": "ar" },
+    });
+    const body = (await res.json()) as { detail: string; code: string };
+
+    expect(res.status).toBe(500);
+    expect(body.code).toBe("INTERNAL_ERROR");
+    expect(body.detail).toBeUndefined();
+  });
+
+  test("500 errors do not expose detail even with Accept-Language: en", async () => {
+    const { app } = buildApp((a) =>
+      a.get("/unknown-error", () => {
+        throw new Error("Unknown error");
+      }),
+    );
+
+    const res = await app.request("/unknown-error", {
+      headers: { "Accept-Language": "en" },
+    });
+    const body = (await res.json()) as { detail: string; code: string };
+
+    expect(res.status).toBe(500);
+    expect(body.code).toBe("INTERNAL_ERROR");
+    expect(body.detail).toBeUndefined();
+  });
+
+  test("returns Arabic 404 message when Accept-Language is ar", async () => {
+    const { app } = buildApp();
+
+    const res = await app.request("/nonexistent", {
+      headers: { "Accept-Language": "ar" },
+    });
+    const body = (await res.json()) as { detail: string; code: string };
+
+    expect(res.status).toBe(404);
+    expect(body.code).toBe("RESOURCE_NOT_FOUND");
+    expect(body.detail).toContain("لم يتم العثور على المورد");
+  });
+
+  test("returns English 404 message when Accept-Language is en", async () => {
+    const { app } = buildApp();
+
+    const res = await app.request("/nonexistent", {
+      headers: { "Accept-Language": "en" },
+    });
+    const body = (await res.json()) as { detail: string; code: string };
+
+    expect(res.status).toBe(404);
+    expect(body.code).toBe("RESOURCE_NOT_FOUND");
+    expect(body.detail).toContain("Resource not found");
   });
 });
