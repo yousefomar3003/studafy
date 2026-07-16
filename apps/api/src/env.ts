@@ -26,6 +26,7 @@ export const envSchema = z
     DATABASE_USER: z.string().min(1).optional(),
     DATABASE_PASSWORD: z.string().min(1).optional(),
     DATABASE_CA_CERT: z.string().min(1).optional(),
+    REDIS_URL: z.string().min(1).optional(),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;
