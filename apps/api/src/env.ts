@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { LOG_LEVEL_NAMES } from "./logger";
+
 /**
  * Environment configuration for the API. It is parsed and validated once at bootstrap so that an
  * invalid environment fails fast — before the server binds a port — with a named, readable error.
@@ -10,6 +12,14 @@ export const envSchema = z
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     HOST: z.string().min(1).default("0.0.0.0"),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
+    // Derived from the logger's own level names, so an added level cannot drift out of the
+    // environment contract. The dependency runs one way: env knows the logger, never the reverse.
+    LOG_LEVEL: z.enum(LOG_LEVEL_NAMES).default("info"),
+    SERVICE_NAME: z.string().min(1).default("api"),
+    // Names the running build in every log line. Deliberately absent from the production block
+    // below: "unknown" is a diagnosable log value, whereas a container that refuses to boot over a
+    // logging field is an outage. Deployments set it from IMAGE_TAG.
+    RELEASE_VERSION: z.string().min(1).default("unknown"),
     DATABASE_HOST: z.string().min(1).optional(),
     DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
     DATABASE_NAME: z.string().min(1).optional(),
