@@ -1,0 +1,292 @@
+{
+  "apps/web/package.json": {
+    "mtime": 1783430887.5252316,
+    "ast_hash": "cd82fd583d47146377ad6f8363d8e5ed",
+    "semantic_hash": ""
+  },
+  "apps/web/src/index.ts": {
+    "mtime": 1783430887.5289497,
+    "ast_hash": "f3529da3d87166f6b96a61766f1dcfe0",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1783436478.5698519,
+    "ast_hash": "2bc881dde33be2b3d5b0a1986834e3ab",
+    "semantic_hash": ""
+  },
+  "packages/ui/package.json": {
+    "mtime": 1783430887.768131,
+    "ast_hash": "4ae6b9822729edf46c921bf19359f982",
+    "semantic_hash": ""
+  },
+  "packages/ui/src/index.ts": {
+    "mtime": 1783430887.7724252,
+    "ast_hash": "f609ad95040ed2e363eb3322ca1d89d5",
+    "semantic_hash": ""
+  },
+  "turbo.json": {
+    "mtime": 1783430887.7766283,
+    "ast_hash": "02aa4fa464a60cbe632a0f337d8a5b83",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1783430887.5206485,
+    "ast_hash": "b71fa2e24c4894153269208831318b5c",
+    "semantic_hash": ""
+  },
+  "docs/adr/0000-monorepo-tooling-choice.md": {
+    "mtime": 1783430887.5379913,
+    "ast_hash": "689ed199ec5b4c0ffe5ae9ee23ce37c4",
+    "semantic_hash": ""
+  },
+  ".claude/settings.json": {
+    "mtime": 1783430887.4944377,
+    "ast_hash": "c4d7214429dd1632abf7b2490caa4699",
+    "semantic_hash": ""
+  },
+  "apps/web/tsconfig.json": {
+    "mtime": 1783430887.530807,
+    "ast_hash": "6ead39fe4398558a2a0b6a354cf6c550",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/api.json": {
+    "mtime": 1783430887.755629,
+    "ast_hash": "8080f0afab4a0194ffa68cb2c08bafd9",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/base.json": {
+    "mtime": 1783430887.7579377,
+    "ast_hash": "4962762c81819835110edb8762170af7",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/package.json": {
+    "mtime": 1783430887.7591588,
+    "ast_hash": "2310a4b1d069925c283522681b456196",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/packages.json": {
+    "mtime": 1783430887.7618766,
+    "ast_hash": "5412e075e72d573fc2b37f6641f115a8",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/web.json": {
+    "mtime": 1783430887.7648797,
+    "ast_hash": "fd4c53f9f31835aa4378129cc107102d",
+    "semantic_hash": ""
+  },
+  "packages/ui/tsconfig.json": {
+    "mtime": 1783430887.773618,
+    "ast_hash": "7ed0328b037e275f8014bddd8af59f66",
+    "semantic_hash": ""
+  },
+  ".serena/project.yml": {
+    "mtime": 1783430887.5014598,
+    "ast_hash": "b79029bf7ecb77a1ff381a023116c708",
+    "semantic_hash": ""
+  },
+  "packages/tsconfig/README.md": {
+    "mtime": 1783430887.753618,
+    "ast_hash": "27205de9d47b0584a3255cdd6aeeb7d1",
+    "semantic_hash": ""
+  },
+  "eslint.config.js": {
+    "mtime": 1783430887.5445018,
+    "ast_hash": "6a5674f05af71bfe2829cc90f453fe15",
+    "semantic_hash": ""
+  },
+  "packages/config/eslint.config.js": {
+    "mtime": 1783430887.7103634,
+    "ast_hash": "1191820d0a39676211891ddca3763d67",
+    "semantic_hash": ""
+  },
+  "packages/config/package.json": {
+    "mtime": 1783430887.712682,
+    "ast_hash": "2fa1f2515552fbe1b0be0823dbd3c2a6",
+    "semantic_hash": ""
+  },
+  "packages/config/prettier.config.js": {
+    "mtime": 1783430887.715056,
+    "ast_hash": "2927e970ba14c9d5e351292e8645a116",
+    "semantic_hash": ""
+  },
+  "prettier.config.js": {
+    "mtime": 1783430887.775655,
+    "ast_hash": "cc2b4d3d80096d5f3ceb5c4bbaf1e743",
+    "semantic_hash": ""
+  },
+  "docs/adr/0001-shared-lint-format-config.md": {
+    "mtime": 1783430887.5394964,
+    "ast_hash": "a0dafebef53479b18b99de3644c8f51b",
+    "semantic_hash": ""
+  },
+  "packages/config/README.md": {
+    "mtime": 1783430887.7080827,
+    "ast_hash": "9fe584b9548f6a2ae9f5034b57c44063",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1783430887.518523,
+    "ast_hash": "305aa46e433a94b2054d66bbced2a876",
+    "semantic_hash": ""
+  },
+  "packages/constants/package.json": {
+    "mtime": 1783430887.722076,
+    "ast_hash": "9c4f8a10584e483cdc27cc07fd6a2d65",
+    "semantic_hash": ""
+  },
+  "packages/constants/scripts/generate-permission-matrix.ts": {
+    "mtime": 1783430887.725108,
+    "ast_hash": "5d3113d9b2c44dbede6cd11a6ff7e479",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/errors.test.ts": {
+    "mtime": 1783430887.7280998,
+    "ast_hash": "96cabb5ab169bd9426f00bd5b19c4901",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/errors.ts": {
+    "mtime": 1783430887.731101,
+    "ast_hash": "5e67acf187b19257166d1716d404a076",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/events.ts": {
+    "mtime": 1783430887.7331026,
+    "ast_hash": "7fa1b7832e22233ee86b1f702dea8c67",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/index.ts": {
+    "mtime": 1783430887.7351,
+    "ast_hash": "7ce7dd27655e118c42e0433fa3b369b5",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/notifications.ts": {
+    "mtime": 1783430887.7382605,
+    "ast_hash": "a308348b87e018c102eb41b822501532",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/permissions.test.ts": {
+    "mtime": 1783430887.7402637,
+    "ast_hash": "731e29b0b25fb110c7467a89b236f659",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/permissions.ts": {
+    "mtime": 1783430887.7422624,
+    "ast_hash": "c9cc19bc876351752cb1f00329347470",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/roles.ts": {
+    "mtime": 1783430887.7444148,
+    "ast_hash": "a76c3460d9bc9243c4fc2c93315ad768",
+    "semantic_hash": ""
+  },
+  "packages/constants/tsconfig.build.json": {
+    "mtime": 1783430887.7474084,
+    "ast_hash": "fc8cc9b679a21e830e3161e160332c17",
+    "semantic_hash": ""
+  },
+  "packages/constants/tsconfig.json": {
+    "mtime": 1783430887.7506907,
+    "ast_hash": "7ed0328b037e275f8014bddd8af59f66",
+    "semantic_hash": ""
+  },
+  "docs/adr/0002-fixed-roles-authorization.md": {
+    "mtime": 1783430887.5424962,
+    "ast_hash": "56a18086bf2d5dc74f08c9aa52e54f1f",
+    "semantic_hash": ""
+  },
+  "packages/constants/docs/permission-matrix.md": {
+    "mtime": 1783430887.7210655,
+    "ast_hash": "80cd3cf1c12b42c31200eda253222e66",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/events.test.ts": {
+    "mtime": 1783431397.34395,
+    "ast_hash": "c9009c6367ac587d6f47158a2a7fbf1f",
+    "semantic_hash": ""
+  },
+  "packages/constants/src/roles.test.ts": {
+    "mtime": 1783431390.842312,
+    "ast_hash": "4b296fcfb1a717a9732ee16ff87fa681",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/package.json": {
+    "mtime": 1783433919.7930317,
+    "ast_hash": "23f9bcdea902488683f2c99367568b7e",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/src/base.test.ts": {
+    "mtime": 1783433919.7960393,
+    "ast_hash": "726ea54d528b36704bebb56d49bc145a",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/src/base.ts": {
+    "mtime": 1783433919.7994733,
+    "ast_hash": "d4aba0fe8e574f8cf321af83a5944468",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/src/error.test.ts": {
+    "mtime": 1783433919.804553,
+    "ast_hash": "98f81a1e97bb4909de2061cff50d5750",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/src/error.ts": {
+    "mtime": 1783433919.807565,
+    "ast_hash": "d8f3d3afd1b12ad91ecc6a9ff5fda022",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/src/index.ts": {
+    "mtime": 1783436323.329922,
+    "ast_hash": "2d832ab1af979ae26411ea348e1ecff2",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/src/pagination.test.ts": {
+    "mtime": 1783433919.8101933,
+    "ast_hash": "e6bb3da70a9da2ccfc5446ca40ea6d21",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/src/pagination.ts": {
+    "mtime": 1783433919.8124921,
+    "ast_hash": "4741479194ccab537b7dc3c1418e5225",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/tsconfig.build.json": {
+    "mtime": 1783433919.81449,
+    "ast_hash": "fc8cc9b679a21e830e3161e160332c17",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/tsconfig.json": {
+    "mtime": 1783433919.8166885,
+    "ast_hash": "7ed0328b037e275f8014bddd8af59f66",
+    "semantic_hash": ""
+  },
+  "packages/shared-schemas/docs/schema-conventions.md": {
+    "mtime": 1783433919.7920291,
+    "ast_hash": "7de16de4c5ec227f1fd0da8e6e745c50",
+    "semantic_hash": ""
+  },
+  "commitlint.config.js": {
+    "mtime": 1783435651.791685,
+    "ast_hash": "f6a970d64044907aff77af4bfeae3fc0",
+    "semantic_hash": ""
+  },
+  "lint-staged.config.js": {
+    "mtime": 1783435638.5515392,
+    "ast_hash": "721a8345fd2c799e18b8ab1f3ec905c9",
+    "semantic_hash": ""
+  },
+  "CONTRIBUTING.md": {
+    "mtime": 1783436478.2395146,
+    "ast_hash": "665b14500b3cdf9b1f197a47ed309b56",
+    "semantic_hash": ""
+  },
+  "docs/adr/0003-git-hooks-conventional-commits.md": {
+    "mtime": 1783436176.9289615,
+    "ast_hash": "b01b826df06f6f09e7d6b7296453d6ed",
+    "semantic_hash": ""
+  },
+  "lefthook.yml": {
+    "mtime": 1783436159.8732545,
+    "ast_hash": "5c7e8aca5cfe8fd1ad98f2387424ac7f",
+    "semantic_hash": ""
+  }
+}
