@@ -7,6 +7,10 @@ import securityPlugin from "eslint-plugin-security";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import noSessionSet from "./rules/no-session-set.js";
+
+const studafyPlugin = { rules: { "no-session-set": noSessionSet } };
+
 export default defineConfig([
   {
     ignores: [
@@ -36,7 +40,11 @@ export default defineConfig([
     settings: {
       "import-x/resolver-next": [createTypeScriptImportResolver(), createNodeResolver()],
     },
+    plugins: {
+      studafy: studafyPlugin,
+    },
     rules: {
+      "studafy/no-session-set": "error",
       eqeqeq: ["error", "smart"],
       "no-var": "error",
       "prefer-const": "error",

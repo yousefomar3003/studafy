@@ -53,6 +53,7 @@ integrationTest(
       // school, message, and chunk rows referenced by the new constraints all physically exist.
       const reserved = await database.sql.reserve();
       try {
+        // eslint-disable-next-line studafy/no-session-set -- reserved superuser connection, not pooled
         await reserved.unsafe("SET session_replication_role = replica");
         await reserved`
           INSERT INTO app.schools (id, slug, name, country_id, default_currency_id)
@@ -86,6 +87,7 @@ integrationTest(
           )
         `;
       } finally {
+        // eslint-disable-next-line studafy/no-session-set -- restore after trigger bypass
         await reserved.unsafe("SET session_replication_role = origin");
         reserved.release();
       }
