@@ -28,3 +28,4 @@ export {
   apiProblemSchema,
   type ApiProblem,
 } from "./errorHandler";
+export { rateLimiterMiddleware, extractClientIp, type RateLimiterOptions } from "./rateLimiter";

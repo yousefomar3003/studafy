@@ -27,6 +27,7 @@ const app = createApp({
   isReady: async () => state.ready && (await checkDatabase(database)) && (await checkRedis(redis)),
   tracker,
   logger,
+  redis,
 });
 
 const server = Bun.serve({

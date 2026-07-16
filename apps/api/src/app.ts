@@ -6,12 +6,14 @@ import {
   localeMiddleware,
   loggerMiddleware,
   errorHandlerMiddleware,
+  rateLimiterMiddleware,
   notFoundHandler,
 } from "./middleware";
 
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
+import type { RedisClient } from "./redis";
 
 export interface AppOptions {
   isReady: () => boolean | Promise<boolean>;
@@ -24,6 +26,8 @@ export interface AppOptions {
   logger: Logger;
   /** Seam for deterministic request ids in tests. Defaults to crypto.randomUUID. */
   generateRequestId?: () => string;
+  /** Redis client for rate limiting and caching. Pass `null` to disable rate limiting. */
+  redis?: RedisClient | null;
 }
 
 /**
@@ -36,6 +40,7 @@ export function createApp({
   tracker,
   logger,
   generateRequestId,
+  redis,
 }: AppOptions): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
@@ -58,6 +63,13 @@ export function createApp({
 
   // Structured logger middleware: logs request/response lifecycle (excludes health checks)
   app.use("*", loggerMiddleware({ logger, excludePaths: ["/healthz", "/readyz"] }));
+
+  // Rate limiter middleware: token-bucket rate limiting via Redis. Registered after the logger
+  // so rate-limited requests are still logged for observability, but before routes so they
+  // short-circuit before any handler runs.
+  if (redis) {
+    app.use("*", rateLimiterMiddleware({ redis }));
+  }
 
   // The ALB in front of this service (infra/terraform/modules/edge) terminates TLS and forwards
   // plaintext to us; its listener actions can't inject response headers, so HSTS has to be set
