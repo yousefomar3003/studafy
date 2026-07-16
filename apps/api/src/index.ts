@@ -3,6 +3,7 @@ import { checkDatabase, closeDatabase, createDatabase } from "./database";
 import { loadEnv } from "./env";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
+import { checkRedis, closeRedis, createRedisClient } from "./redis";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a port.
 const env = loadEnv();
@@ -21,8 +22,9 @@ const logger = createLogger({
 const state = { ready: true };
 const tracker = createInflightTracker();
 const database = createDatabase(env);
+const redis = env.REDIS_URL ? createRedisClient({ url: env.REDIS_URL, logger }) : null;
 const app = createApp({
-  isReady: async () => state.ready && (await checkDatabase(database)),
+  isReady: async () => state.ready && (await checkDatabase(database)) && (await checkRedis(redis)),
   tracker,
   logger,
 });
@@ -34,7 +36,7 @@ const server = Bun.serve({
 });
 
 logger.info(
-  { host: server.hostname, port: server.port, database: database !== null },
+  { host: server.hostname, port: server.port, database: database !== null, redis: redis !== null },
   "api listening",
 );
 
@@ -54,6 +56,7 @@ const shutdown = (signal: string) => {
     tracker,
     timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
   }).then(async () => {
+    await closeRedis(redis);
     await closeDatabase(database);
     logger.info({ signal }, "shutdown complete");
     process.exit(0);
