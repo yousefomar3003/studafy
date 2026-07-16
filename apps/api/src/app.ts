@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 
 import { healthRoutes } from "./health";
-import { problemErrorHandler } from "./problem";
+import { problemErrorHandler, problemNotFound } from "./problem";
 import { requestContext } from "./request-context";
 
 import type { InflightTracker } from "./lifecycle";
@@ -59,8 +59,10 @@ export function createApp({
 
   app.route("/", healthRoutes(isReady));
 
-  // One error envelope for the whole app. Registered last for readability only: Hono attaches this
-  // to the app rather than to the middleware chain, so registration order does not affect it.
+  // One error envelope for the whole app, for both the ways a request can fail: no route matched it,
+  // or a handler threw. Registered last for readability only: Hono attaches these to the app rather
+  // than to the middleware chain, so registration order does not affect either.
+  app.notFound(problemNotFound);
   app.onError(problemErrorHandler(logger));
 
   return app;

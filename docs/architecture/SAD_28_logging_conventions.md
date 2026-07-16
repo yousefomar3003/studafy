@@ -115,8 +115,10 @@ U+2028 and U+2029 are deliberately left unescaped: they are legal in JSON string
 
 ## Errors: `application/problem+json`
 
-Every thrown error becomes an RFC 9457 problem document carrying the `request_id`
-([`apps/api/src/problem.ts`](../../apps/api/src/problem.ts)):
+Every failed request becomes an RFC 9457 problem document carrying the `request_id`
+([`apps/api/src/problem.ts`](../../apps/api/src/problem.ts)) — both ways a request can fail: a handler
+threw (`app.onError`), or no route matched it (`app.notFound`, ST-055). There is no third shape, and in
+particular a 404 is not the one response a client has to special-case.
 
 ```json
 {
@@ -132,6 +134,31 @@ Every thrown error becomes an RFC 9457 problem document carrying the `request_id
 `code` reuses `ERROR_CODES` from `@studafy/constants`; **error codes are never redeclared**. The envelope
 is `problemDetailsSchema` from `@studafy/shared-schemas`, extended with `request_id` — the one extension
 member RFC 9457 §3.2 permits.
+
+An unmatched route is the same document, and the only path that populates `instance`:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "The requested path /v1/invalid-route-path does not exist.",
+  "instance": "/v1/invalid-route-path",
+  "code": "RESOURCE_NOT_FOUND",
+  "request_id": "3f2b..."
+}
+```
+
+**`instance` and `detail` here are `c.req.path`, never `c.req.url`.** This is the only place the API
+reflects client-controlled input back to the caller, and `path` excludes the query string. The same
+reasoning that keeps a query string off the log line applies harder to a response body: it can carry a
+token or a PII filter. The value stays percent-encoded and is escaped by `JSON.stringify`.
+
+`app.notFound` emits **no log line**. The `request completed` line already carries the status, method,
+path, and request id, and there is no error object to record beyond it — unlike `onError`, which logs
+because a stack and a cause would otherwise be lost. Unmatched routes are mostly scanners probing
+`/wp-admin` and `/.env`; a second line each would double the log volume of the least valuable traffic
+there is.
 
 **The split to preserve: the log line is the operator's copy and carries the whole error; the body is the
 client's and carries a status, a code, and the request id.** A 5xx body includes nothing from the error —
@@ -191,8 +218,6 @@ Stated plainly, because the gaps matter more than the parts that work:
   boundary that could make honouring one safe. This id keys the audit trail, so a caller choosing its own
   would be able to pick the identifier for its own audit row. If upstream correlation is ever needed, log
   the caller's value under a separate, explicitly untrusted, length-capped key — never this one.
-- **Unmatched routes return Hono's default `text/plain` 404,** not problem+json; only thrown errors reach
-  `onError`. They do still carry `X-Request-Id`. Unifying this is a follow-up.
 - **Non-`Error` throws bypass `onError` entirely.** Hono's compose catches with
   `if (err instanceof Error && onError)`, so `throw "boom"` yields a bodyless 500 with no `X-Request-Id`
   and no log line. Throw `Error` subclasses.

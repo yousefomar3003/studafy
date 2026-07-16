@@ -26,9 +26,37 @@ contradicts this, a follow-up migration reconciles it; `000018` is not edited af
 | `new_values`   | `jsonb` NULL       | Subsequent record state                                                        |
 | `client_ip`    | `inet` NULL        | Where the request came from                                                    |
 | `user_agent`   | `text` NULL        | What issued it                                                                 |
+| `request_id`   | `uuid` NULL        | Which API request produced it (`000026`). NULL for non-HTTP writes             |
 | `created_at`   | `timestamptz`      | When it was recorded. **The partition key**                                    |
 
 Primary key: `(id, created_at)`. Candidate key: `uq_audit_logs_id_school_created (id, school_id, created_at)`.
+
+### `request_id` (`000026`, ST-054)
+
+The correlation key joining one audit row to the API log lines for the request that produced it.
+`apps/api` mints a UUIDv4 per request, logs it as `request_id`, returns it as `X-Request-Id`, and sets it
+as the transaction-local `app.request_id` GUC — so a client quoting a header in a bug report leads to the
+log lines and to the audit rows in one step. See
+[SAD 28](../architecture/SAD_28_logging_conventions.md) for the request lifecycle.
+
+Three properties of this column that are load-bearing and easy to get wrong:
+
+- **NULL is permanent, not a placeholder for a later `NOT NULL`.** The migrations CLI, the workers, and
+  the scheduled partition-maintenance job all legitimately write with no HTTP request behind them. A NULL
+  `request_id` is a correct and expected state for those rows, forever. Do not add `NOT NULL`.
+- **It is not a foreign key,** and cannot be: there is no `requests` table. It points at a log line in
+  CloudWatch, which the database cannot constrain, so a `request_id` naming a request that never existed
+  is not caught here. This costs nothing in tenant safety — `request_id` is never a routing or ownership
+  column, `school_id` remains `NOT NULL` and holds the boundary alone, and RLS scopes any lookup by
+  `request_id` to one school regardless of what the value is.
+- **Any reader must pass `missing_ok`:** `current_setting('app.request_id', true)`. The GUC is unset by
+  construction for every non-HTTP write, and without the second argument `current_setting` raises `42704`
+  on each of them. This is the exact trap `app.current_user_id()` (`000014`) already sits in.
+
+There is **no writer yet.** Nothing in this repository inserts an `app.audit_logs` row, so this column is
+NULL on every row that exists today. That is the expand half of the expand/migrate/contract policy in
+[migration policy](migration-policy.md): `000026` ships the destination alongside ST-054's transport (the
+GUC), so the ticket that adds the audit writer only has to add the `INSERT`.
 
 ### There is no `updated_at`
 
@@ -55,6 +83,13 @@ constrained columns (`actor_id`, `school_id`, `action`, `target_table`, `target_
 `action` is an enum (`app.audit_action`), not free text, so its domain is enforced by the database rather
 than by convention. `client_ip` is `inet`, not text, so a malformed address cannot be stored.
 
+`request_id` is likewise a single `uuid` atom — not a delimited string, not an array, and not a nested
+document. One request typically produces several audit rows, and that one-to-many is modeled the
+relational way: the value repeats across the child rows that share it. The alternative — an array of row
+ids hung off a request — is exactly the nested list 1NF forbids, and there is no request entity to hang it
+off in any case. `uuid` rather than `text` also means a malformed id cannot be stored, the same reasoning
+`client_ip` gets.
+
 The two `jsonb` columns are the deliberate exception, and they are discussed in
 [safe payload storage](#safe-payload-storage-a-deliberate-denormalization) below. They are _not_ a 1NF
 violation of the envelope: they hold the record states the event is _about_, not the attributes of the
@@ -67,10 +102,19 @@ partial dependency on `id` alone or `created_at` alone, because neither is indep
 without `created_at` does not identify a row (see [the uniqueness
 limitation](#the-uniqueness-limitation)), and `created_at` is shared by any number of concurrent events.
 
+`request_id` is no exception: it depends on the whole key, because it records which HTTP request produced
+_this_ row. It is not partially dependent on `id` or on `created_at`, and it is not shared with any other
+key — one request commonly produces several audit rows, which is a repeated value, not a partial
+dependency.
+
 Nothing transient or session-scoped that is functionally independent of the event is stored here. There
-is no session token, no request-correlation state, no partially-materialized permission set — those
-belong to the request, not to the audited fact. `client_ip` and `user_agent` are retained because they
-are properties _of the recorded event_, which is exactly what an auditor needs to answer "was this us?".
+is no session token and no partially-materialized permission set — those are request _state_, they are
+not about the audited fact, and they would be functionally independent of the key. The test is not
+"did this come from a request?" but "is this a property _of the recorded event_?" — which is exactly why
+`client_ip`, `user_agent`, and `request_id` are all retained: each answers something an auditor asks of
+the event itself. `client_ip` and `user_agent` answer "was this us?"; `request_id` answers "what else did
+that same request do?", and it is the only column that can, since it is the sole handle back to the log
+lines and to the sibling rows of one transaction.
 
 ### 3NF — no transitive dependencies
 
@@ -88,6 +132,14 @@ that can now disagree with `app.users`.
 > then"), the correct answer is not to denormalize this table. It is to audit `app.users` itself — every
 > change to a user already produces an `audit_logs` row with `target_table = 'users'` and the prior name
 > in `old_values` — and reconstruct the name at any instant from that history.
+
+`request_id` introduces no transitive dependency. It determines no other column here, and no column here
+determines it. The discipline that keeps it that way is the same one applied to `actor_id` above: **none
+of the request's other attributes are copied alongside it.** There is no `request_path`, no
+`request_method`, no `response_status`. Those are functionally dependent on `request_id`, so storing them
+would be the transitive dependency `id → request_id → request_path` — and they already exist, once, on
+the log line keyed by that same id. Copying them here would create a second, unmaintained copy that can
+disagree with the log, which is the `actor_email` mistake wearing different clothes.
 
 ### Safe payload storage (a deliberate denormalization)
 
@@ -143,7 +195,7 @@ probe every partition (see below).
 
 ## RLS and grants
 
-The canonical ST-034 policy, installed by `app.apply_tenant_isolation('app', 'audit_logs')`:
+`app.apply_tenant_isolation('app', 'audit_logs')` installs the canonical ST-034 policy:
 
 ```sql
 CREATE POLICY tenant_isolation ON app.audit_logs AS PERMISSIVE FOR ALL TO PUBLIC
@@ -153,6 +205,20 @@ CREATE POLICY tenant_isolation ON app.audit_logs AS PERMISSIVE FOR ALL TO PUBLIC
 
 RLS is **enabled and forced** on the parent and, separately, on every partition — RLS does not cascade,
 and `studafy_app` can name a partition directly.
+
+> **As of `000025`, that helper does two things, not one.** `app.apply_tenant_isolation` is now a wrapper
+> over `app.apply_tenant_isolation_policy` (the policy above) **and**
+> `app.apply_tenant_ownership_immutability`, which installs a `trg_tenant_school_id_immutable` trigger
+> rejecting any `UPDATE` that changes `school_id`. `000025` also retrofitted that trigger across every
+> `app` relation carrying a `school_id`, and `app.audit_logs` is one of them. Tenant ownership is a
+> physical invariant there, not merely an RLS convention: a `BYPASSRLS` role or a disabled policy must
+> still be unable to move a row between schools.
+>
+> On **this** table the ownership trigger is redundant by construction and can never fire: it is
+> `BEFORE UPDATE OF school_id`, and `trg_audit_logs_append_only` (below) already rejects every `UPDATE`
+> from every role, owner included. It is present because the retrofit applies uniformly to every tenant
+> table, not because an append-only table needs it. It is recorded here because the physical catalog has
+> it and this document is meant to match the catalog — not because it changes what this table does.
 
 Append-only is enforced at two independent layers. See
 [the runbook](audit-log-partition-maintenance.md#append-only-is-not-negotiable) for the operator's view.
@@ -224,6 +290,30 @@ school and time. All three are load-bearing.
 **No standalone index on `school_id`** is created — it is the leftmost prefix of all three above and would
 be pure write amplification. `idx_audit_logs_school_actor` additionally backs the actor foreign key's
 parent-update check, so it earns its keep twice.
+
+### `request_id` is deliberately unindexed
+
+**No index covers `request_id`, and none was added by `000026`.** It appears in none of the three indexes
+above, so a `request_id` predicate can only be a filter applied after a scan, never an index condition.
+
+This is a documented omission rather than an oversight. The indexing standard in
+[migration policy](migration-policy.md) requires every index to have a named query, integrity, join,
+filter, sort, or pagination purpose, and requires an intentional omission to be recorded. **There is no
+such query: no writer, no reader, no endpoint** — the column is NULL on every row that exists. An index
+here would be precisely the speculative index the standard forbids, and this is the most write-heavy
+table in the schema, where every index is a permanent tax on the hot path that `000018` already justifies
+three times over.
+
+| Index                                      | Status          | Why                                                |
+| ------------------------------------------ | --------------- | -------------------------------------------------- |
+| `(request_id)`                             | **not created** | Tenant-blind; wrong shape even once a query exists |
+| `(school_id, request_id, created_at DESC)` | **not created** | Right shape, but no query names it yet             |
+
+When a real lookup arrives it will not want a bare `request_id` index anyway. A tenant-blind index is
+school-last, prunes no monthly partition, and contradicts the school-leading shape the ST-050 RLS
+coverage check expects of every tenant-scoped table. The index that query will want is
+`idx_audit_logs_school_request_created (school_id, request_id, created_at DESC)`, and it belongs to the
+ticket that can name the query and measure it — not to this one.
 
 ## Why every audit query needs a time range
 
@@ -310,6 +400,12 @@ WHERE school_id = … AND target_id = …
 This applies to lookup by `id` too: `WHERE id = '…'` cannot prune. Carry `created_at` alongside the id —
 which is what [the uniqueness limitation](#the-uniqueness-limitation) requires anyway.
 
+It applies to `request_id` with particular force, because that is the one lookup whose caller usually
+_has_ the timestamp and may not think to use it. "Show me everything request `3f2b…` did" arrives from a
+log line or a bug report, and both carry the time the request happened. Without a `created_at` bound that
+query scans every partition **and** — since nothing indexes `request_id` — filters rather than seeks
+inside each one. Bound it to the day the log line is from.
+
 ## Batch append benchmark
 
 The ST-046 acceptance target: appending **100 audit logs in a single batch transaction in under 20 ms**.
@@ -344,6 +440,9 @@ referencing a _partitioned_ table.
 - **No application writer yet.** This ticket delivers the data model, not the code that appends to it. The
   `auditLog:read` / `auditLog:export` permissions in `packages/constants/src/permissions.ts` still have no
   read API behind them.
+- **`request_id` is NULL on every row** until that writer exists, and it is
+  [unindexed by design](#request_id-is-deliberately-unindexed). It is also not a foreign key and never can
+  be — nothing constrains it to a request that actually happened.
 - **Production partition scheduling is not deployed** — shared with attendance. See the runbook.
 - **Retention is out of scope.** Nothing is ever dropped automatically, and the append-only trigger makes
   row-level deletion impossible by design. See the runbook's retention section, which lists the questions
