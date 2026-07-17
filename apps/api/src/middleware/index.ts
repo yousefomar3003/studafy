@@ -29,3 +29,12 @@ export {
   type ApiProblem,
 } from "./errorHandler";
 export { rateLimiterMiddleware, extractClientIp, type RateLimiterOptions } from "./rateLimiter";
+export {
+  auditAction,
+  emitAuditLog,
+  redactPayload,
+  SENSITIVE_KEYS,
+  type AuditAction,
+  type AuditEntry,
+  type AuditMeta,
+} from "./auditEmitter";

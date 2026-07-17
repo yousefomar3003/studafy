@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { ERPNEXT_DOC_EVENT_MAP } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
+import { auditAction, emitAuditLog } from "../middleware/auditEmitter";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
 
@@ -200,9 +201,23 @@ export function erpNextWebhookRoutes(db: Database, logger: Logger): OpenAPIHono<
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   /**
-   * Signature verification runs as middleware, ahead of the request validator, to keep the order
-   * this endpoint has always had: authenticate, then parse. The validator would otherwise parse an
-   * unsigned caller's JSON and hand it schema feedback before we ever check who it is.
+   * ST-065's audit declaration, and ST-060's signature check, in one middleware chain.
+   *
+   * They are registered with `use` rather than as `routes.post(path, ...middleware, handler)`
+   * arguments because `routes.openapi(route, handler)` takes no middleware list — the path and verb
+   * now live in webhookRoute's createRoute config. The behaviour is identical: Hono composes
+   * path-matched `use` middleware ahead of the route handler either way.
+   *
+   * auditAction only records intent (it sets auditMeta on the context); the row is written by
+   * emitAuditLog inside the mutation's own transaction below. It runs first so the declaration
+   * holds for the whole request regardless of how the request ends.
+   */
+  routes.use("/erpnext/webhooks", auditAction("insert", "erpnext_webhook_dedup"));
+
+  /**
+   * Signature verification runs ahead of the request validator, to keep the order this endpoint has
+   * always had: authenticate, then parse. The validator would otherwise parse an unsigned caller's
+   * JSON and hand it schema feedback before we ever check who it is.
    *
    * Reading the body here is what makes that possible and is safe: c.req.text() caches, and the
    * validator's later c.req.json() reads the same bytes. The signature covers the exact bytes
@@ -260,6 +275,14 @@ export function erpNextWebhookRoutes(db: Database, logger: Logger): OpenAPIHono<
         if (dedupResult.length === 0) {
           return;
         }
+
+        await emitAuditLog(tx, {
+          action: "insert",
+          targetTable: "erpnext_webhook_dedup",
+          targetId: String(dedupResult[0].id),
+          newValues: { event_id: body.event_id, doc_type: body.doctype, action: body.action },
+          userAgent: c.req.header("user-agent"),
+        });
 
         await tx`
           INSERT INTO app.outbox_events (school_id, event_name, payload)
