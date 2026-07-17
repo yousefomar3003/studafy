@@ -151,6 +151,28 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+      # The generated TypeScript client (@studafy/api-client) is committed for the same reason the
+      # OpenAPI document is: a contract change lands in the pull-request diff and is reviewed like
+      # code. Regenerating here and failing on a dirty tree is what keeps the committed client honest
+      # -- it cannot drift from the spec, and no hand-edit to the generated types can survive. Runs
+      # after the OpenAPI drift step above, which refreshes apps/api/openapi.json on disk -- the file
+      # the client is generated from.
+      - name: Regenerate the API client and fail on drift
+        run: |
+          bun run client:generate
+          if ! git diff --quiet -- packages/api-client/src/generated-types.ts; then
+            {
+              echo '## API client drift'
+              echo
+              echo 'packages/api-client/src/generated-types.ts does not match apps/api/openapi.json.'
+              echo 'Run `bun run client:generate` and commit the result.'
+              echo
+              echo '```diff'
+              git --no-pager diff -- packages/api-client/src/generated-types.ts
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
       # oasdiff needs the base revision of the document to compare against. actions/checkout fetches
       # depth 1, so the base branch is not in the object store; fetch the single commit rather than
       # paying for full history. The file is written inside the workspace, not $RUNNER_TEMP, because
@@ -197,6 +219,16 @@ jobs:
           OPENAPI_BENCHMARK: "1"
         run: bun test tests/benchmark/openapi-generate-benchmark.test.ts
         working-directory: apps/api
+      # Asserts the ST-061 acceptance target: codegen synthesizes types for every route, tsc verifies
+      # them, and the distribution bundle is exported -- all in under 3s. Another absolute wall clock
+      # for the same reason as the OpenAPI one: producing the typed distribution is the whole program.
+      # Median of five single-process spawns; see the test file header for why the type step is scoped
+      # to the standard library rather than a full-package tsc. Needs no database.
+      - name: API client build benchmark (<3s)
+        env:
+          CLIENT_BUILD_BENCHMARK: "1"
+        run: bun test tests/benchmark/client-build-benchmark.test.ts
+        working-directory: packages/api-client
       # Asserts the ST-054 acceptance target. Measures the request-context middleware as a delta
       # against an identical app without it, so shared-runner noise cancels rather than accumulating
       # into the budget -- unlike an absolute wall-clock budget, which is why this one does not need

@@ -1,16 +1,16 @@
-# Graph Report - studafy  (2026-07-17)
+# Graph Report - studafy  (2026-07-16)
 
 ## Corpus Check
-- 569 files · ~310,791 words
+- 501 files · ~266,773 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2814 nodes · 4283 edges · 223 communities (196 shown, 27 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 17 edges (avg confidence: 0.76)
+- 2418 nodes · 3447 edges · 203 communities (173 shown, 30 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 7 edges (avg confidence: 0.71)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1f9d7a91`
+- Built from commit: `daa86f39`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -34,7 +34,6 @@
 - [[_COMMUNITY_dependencies|dependencies]]
 - [[_COMMUNITY_@studafyconfig|@studafy/config]]
 - [[_COMMUNITY_ADR-001 Shared lintformat config as a root-inherited package|ADR-001: Shared lint/format config as a root-inherited package]]
-- [[_COMMUNITY_eslint.config.js|eslint.config.js]]
 - [[_COMMUNITY_AGENTS|AGENTS.md]]
 - [[_COMMUNITY_package.json|package.json]]
 - [[_COMMUNITY_ADR-002 Fixed-role authorization model|ADR-002: Fixed-role authorization model]]
@@ -200,63 +199,43 @@
 - [[_COMMUNITY_README|README.md]]
 - [[_COMMUNITY_main.ts|main.ts]]
 - [[_COMMUNITY_MOCK_STUDENT_KEYS|MOCK_STUDENT_KEYS]]
-- [[_COMMUNITY_logger.ts|logger.ts]]
-- [[_COMMUNITY_db-conformance.test.ts|db-conformance.test.ts]]
-- [[_COMMUNITY_emitter.test.ts|emitter.test.ts]]
-- [[_COMMUNITY_audit-coverage.test.ts|audit-coverage.test.ts]]
-- [[_COMMUNITY_modal.stories.tsx|modal.stories.tsx]]
-- [[_COMMUNITY_Logging and tracing conventions|Logging and tracing conventions]]
-- [[_COMMUNITY_card.tsx|card.tsx]]
-- [[_COMMUNITY_card.stories.tsx|card.stories.tsx]]
-- [[_COMMUNITY_Domain Event Emitter — Implementation Plan|Domain Event Emitter — Implementation Plan]]
-- [[_COMMUNITY_migration-policy|migration-policy.md]]
-- [[_COMMUNITY_openapi-generate-benchmark.test.ts|openapi-generate-benchmark.test.ts]]
-- [[_COMMUNITY_healthcheck.ts|healthcheck.ts]]
-- [[_COMMUNITY_params.ts|params.ts]]
-- [[_COMMUNITY_button.tsx|button.tsx]]
-- [[_COMMUNITY_pg_stat_statements — monitoring policy|pg_stat_statements — monitoring policy]]
-- [[_COMMUNITY_Why every audit query needs a time range|Why every audit query needs a time range]]
-- [[_COMMUNITY_What owns what|What owns what]]
-- [[_COMMUNITY_Indexing rules|Indexing rules]]
-- [[_COMMUNITY_Ownership model|Ownership model]]
-- [[_COMMUNITY_build|build]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `runMigrationCommand()` - 62 edges
-2. `testDatabase()` - 51 edges
-3. `runnerEnv()` - 50 edges
-4. `createApp()` - 35 edges
-5. `createLogger()` - 34 edges
-6. `integrationEnabled` - 31 edges
-7. `createInflightTracker()` - 30 edges
-8. `AppEnv` - 20 edges
-9. `uuid()` - 19 edges
-10. `scripts` - 19 edges
+1. `runMigrationCommand()` - 59 edges
+2. `testDatabase()` - 48 edges
+3. `runnerEnv()` - 47 edges
+4. `integrationEnabled` - 28 edges
+5. `uuid()` - 19 edges
+6. `seedDate()` - 18 edges
+7. `scripts` - 18 edges
+8. `loadMigrationConfig()` - 18 edges
+9. `seedDemoTenant()` - 17 edges
+10. `cx()` - 16 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `assertCrossTenantCrud()` --indirect_call--> `error()`  [INFERRED]
+  apps/api/tests/security/cross-tenant.test.ts → infra/docker/workers/healthcheck.ts
+- `assertNormalizationAttack()` --indirect_call--> `error()`  [INFERRED]
+  apps/api/tests/security/cross-tenant.test.ts → infra/docker/workers/healthcheck.ts
+- `runRlsCoverageCommand()` --calls--> `auditRlsCoverage()`  [EXTRACTED]
+  packages/db/src/cli.ts → db/policies/rls-coverage.ts
+- `runRlsCoverageCommand()` --calls--> `formatRlsCoverageReport()`  [EXTRACTED]
+  packages/db/src/cli.ts → db/policies/rls-coverage.ts
 - `checkIndexHealth()` --calls--> `createClient()`  [EXTRACTED]
   db/seeds/index-health.ts → packages/db/src/client.ts
-- `seedDemoTenant()` --calls--> `createClient()`  [EXTRACTED]
-  db/seeds/seed.ts → packages/db/src/client.ts
-- `seedDemoTenant()` --calls--> `loadMigrationConfig()`  [EXTRACTED]
-  db/seeds/seed.ts → packages/db/src/config.ts
-- `seedDemoTenant()` --calls--> `redact()`  [EXTRACTED]
-  db/seeds/seed.ts → packages/db/src/config.ts
-- `createApp()` --indirect_call--> `notFoundHandler()`  [INFERRED]
-  apps/api/src/app.ts → apps/api/src/middleware/errorHandler.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (223 total, 27 thin omitted)
+## Communities (203 total, 30 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.11
-Nodes (19): scripts, build, db:attendance:partitions, db:audit:partitions, db:migrate, db:migrate:pending, db:migrate:status, db:migrate:validate (+11 more)
+Nodes (18): scripts, build, db:attendance:partitions, db:audit:partitions, db:migrate, db:migrate:pending, db:migrate:status, db:migrate:validate (+10 more)
 
 ### Community 1 - "turbo.json"
 Cohesion: 0.20
-Nodes (9): turbo, dependsOn, outputs, $schema, tasks, check-types, test, dependsOn (+1 more)
+Nodes (10): dependsOn, outputs, dependsOn, outputs, tasks, build, check-types, test (+2 more)
 
 ### Community 2 - "studafy"
 Cohesion: 0.08
@@ -275,8 +254,8 @@ Cohesion: 0.05
 Nodes (44): default, devDependencies, axe-core, eslint, globals, @happy-dom/global-registrator, react, react-dom (+36 more)
 
 ### Community 6 - "index.ts"
-Cohesion: 0.09
-Nodes (36): withTenantTx(), asAdmin(), assertCrossTenantCrud(), assertIndexPlans(), assertNormalizationAttack(), assertPoolIsolation(), createSchools(), errorCode() (+28 more)
+Cohesion: 0.06
+Nodes (44): withTenantTransaction(), asAdmin(), assertCrossTenantCrud(), assertIndexPlans(), assertNormalizationAttack(), assertPoolIsolation(), createSchools(), errorCode() (+36 more)
 
 ### Community 7 - "index.ts"
 Cohesion: 0.08
@@ -287,8 +266,8 @@ Cohesion: 0.25
 Nodes (7): compilerOptions, incremental, jsx, lib, noEmit, extends, $schema
 
 ### Community 9 - "compilerOptions"
-Cohesion: 0.14
-Nodes (11): DarkTheme, Default, Disabled, Focus, FullWidth, Interactive, Loading, meta (+3 more)
+Cohesion: 0.05
+Nodes (39): Button, ButtonProps, ButtonVariant, DarkTheme, Default, Disabled, Focus, FullWidth (+31 more)
 
 ### Community 10 - "package.json"
 Cohesion: 0.17
@@ -300,11 +279,11 @@ Nodes (5): Path aliases, Presets, Repo-wide type check, @studafy/tsconfig, Usage
 
 ### Community 12 - "packages.json"
 Cohesion: 0.08
-Nodes (24): AppOptions, checkDatabase(), closeDatabase(), createDatabase(), Database, TenantContext, Env, envSchema (+16 more)
+Nodes (26): AppOptions, createApp(), buildApp(), checkDatabase(), closeDatabase(), createDatabase(), Database, TenantDatabaseContext (+18 more)
 
 ### Community 13 - "tsconfig.json"
-Cohesion: 0.14
-Nodes (23): checkIndexHealth(), formatIndexHealthReport(), main(), main(), DISCRETE_KEYS, loadMigrationConfig(), parseSslMode(), redact() (+15 more)
+Cohesion: 0.12
+Nodes (33): ensureAttendancePartitions(), ensureAuditLogPartitions(), commands, main(), partitionCommands, runRlsCoverageCommand(), createClient(), DISCRETE_KEYS (+25 more)
 
 ### Community 14 - "tsconfig.json"
 Cohesion: 0.29
@@ -315,44 +294,44 @@ Cohesion: 0.08
 Nodes (29): EMPTY_DATE_RANGE, FilterBar(), FilterBarChip, FilterBarProps, DateRangeValue, FilterBarState, parseFilterBarState(), serializeFilterBarState() (+21 more)
 
 ### Community 16 - "dependencies"
-Cohesion: 0.10
-Nodes (23): buildMarkdown(), main(), ERROR_CODES, ErrorCode, DOMAIN_EVENTS, DomainEvent, ERPNEXT_DOC_EVENT_MAP, NOTIFICATION_TYPES (+15 more)
+Cohesion: 0.11
+Nodes (22): buildMarkdown(), main(), ERROR_CODES, ErrorCode, DOMAIN_EVENTS, DomainEvent, NOTIFICATION_TYPES, NotificationType (+14 more)
 
 ### Community 17 - "@studafy/config"
 Cohesion: 0.08
 Nodes (18): AppProviders(), createQueryClient(), AccountPage, OnboardingPage, PortalPage, routes, ErrorBoundary, ErrorBoundaryState (+10 more)
 
 ### Community 18 - "ADR-001: Shared lint/format config as a root-inherited package"
-Cohesion: 0.07
-Nodes (23): integrationTest, repositoryMigrations, TestDatabase, benchmarkTest, repositoryMigrations, benchmarkTest, repositoryMigrations, integrationEnabled (+15 more)
+Cohesion: 0.10
+Nodes (25): benchmarkTest, repositoryMigrations, migratedDatabase(), benchmarkTest, repositoryMigrations, databaseUrl(), integrationEnabled, migrationFixture() (+17 more)
 
 ### Community 21 - "AGENTS.md"
 Cohesion: 0.06
 Nodes (29): Audit trails, CIDR allocation, Environment differences, Network diagram, Security group boundaries, Auth and TLS, Known gaps (not covered by the `pgbouncer` module's ticket), Out of scope: indexing and normalization (+21 more)
 
 ### Community 22 - "package.json"
-Cohesion: 0.07
-Nodes (38): main(), createRedisConnection(), Env, envSchema, EnvValidationError, loadEnv(), connection, env (+30 more)
+Cohesion: 0.13
+Nodes (17): main(), createRedisConnection(), Env, envSchema, EnvValidationError, loadEnv(), connection, env (+9 more)
 
 ### Community 23 - "ADR-002: Fixed-role authorization model"
-Cohesion: 0.15
-Nodes (31): seedAcademics(), seedAi(), seedAssessments(), seedEngagement(), seedFinance(), CHUNKS, seedMaterials(), seedSchool() (+23 more)
+Cohesion: 0.20
+Nodes (22): seedAcademics(), seedAi(), seedAssessments(), seedEngagement(), seedFinance(), CHUNKS, seedMaterials(), seedSchool() (+14 more)
 
 ### Community 24 - "tsconfig.json"
-Cohesion: 0.11
-Nodes (21): assertSeedAllowed(), FORBIDDEN_HOST_PATTERNS, GuardEnv, LOCAL_HOSTS, resolveHost(), SeedSafetyError, explain(), INDEX_SCAN_NODES (+13 more)
+Cohesion: 0.12
+Nodes (22): assertSeedAllowed(), FORBIDDEN_HOST_PATTERNS, GuardEnv, LOCAL_HOSTS, resolveHost(), SeedSafetyError, checkIndexHealth(), explain() (+14 more)
 
 ### Community 25 - "tsconfig.build.json"
 Cohesion: 0.08
 Nodes (25): Accessibility guidelines, Best practices, Button, Card, Checkbox, Chip, Components, Composition (+17 more)
 
 ### Community 26 - "permission-matrix.md"
-Cohesion: 0.08
-Nodes (33): ariaSortFor(), cellStyle(), DataGrid(), DataGridAlign, DataGridColumn, DataGridProps, DataGridSort, DataGridSortDirection (+25 more)
+Cohesion: 0.10
+Nodes (20): columns, DarkTheme, Default, Empty, Enrollment, Loading, meta, rows (+12 more)
 
 ### Community 27 - "index.ts"
 Cohesion: 0.16
-Nodes (18): dateSchema, DateString, dateTimeSchema, DateTimeString, Money, moneySchema, RFC-4122, Uuid (+10 more)
+Nodes (18): RFC-4122, RFC-9457, dateSchema, DateString, dateTimeSchema, DateTimeString, Money, moneySchema (+10 more)
 
 ### Community 28 - "package.json"
 Cohesion: 0.10
@@ -371,16 +350,16 @@ Cohesion: 0.08
 Nodes (23): Authentication data model, Cleanup and retention, Device metadata policy, Extending this model, Fields intentionally not included, Index rationale, Invitation lifecycle and token-hash strategy, Normalization review (+15 more)
 
 ### Community 36 - "PostgreSQL extension policy"
-Cohesion: 0.13
-Nodes (15): btree_gist — approved use case, CI validation, Environment coverage, Environment verification procedure, Failure modes, Local development setup, Normalization rules, Ownership model (+7 more)
+Cohesion: 0.08
+Nodes (24): Access control, btree_gist — approved use case, CI validation, Environment coverage, Environment verification procedure, Failure modes, Indexing rules, Local development setup (+16 more)
 
 ### Community 37 - "data-grid.tsx"
-Cohesion: 0.06
-Nodes (34): Authentication Errors (401 Unauthorized), Authorization Errors (403 Forbidden), Conflict Errors (409 Conflict), Error Code Mapping, Error Message Leaking, Error Taxonomy, Localization, Rate Limiting (429 Too Many Requests) (+26 more)
+Cohesion: 0.14
+Nodes (18): ariaSortFor(), cellStyle(), DataGrid(), DataGridAlign, DataGridColumn, DataGridProps, DataGridSort, DataGridSortDirection (+10 more)
 
 ### Community 38 - "select.tsx"
-Cohesion: 0.13
-Nodes (17): Select(), SelectOption, SelectProps, options, trigger(), triggerText(), ClassValue, cx() (+9 more)
+Cohesion: 0.14
+Nodes (15): Select(), SelectOption, SelectProps, options, trigger(), triggerText(), firstEnabledIndex(), lastEnabledIndex() (+7 more)
 
 ### Community 39 - "package.json"
 Cohesion: 0.09
@@ -388,19 +367,19 @@ Nodes (21): dependencies, hono, ioredis, @studafy/constants, zod, devDependencie
 
 ### Community 40 - "package.json"
 Cohesion: 0.09
-Nodes (22): dependencies, bullmq, ioredis, postgres, @studafy/constants, zod, devDependencies, @studafy/config (+14 more)
+Nodes (21): dependencies, bullmq, ioredis, @studafy/constants, zod, devDependencies, @studafy/config, @studafy/tsconfig (+13 more)
 
 ### Community 41 - "package.json"
-Cohesion: 0.07
-Nodes (27): dependencies, hono, @hono/zod-openapi, ioredis, postgres, @scalar/hono-api-reference, @studafy/constants, @studafy/shared-schemas (+19 more)
+Cohesion: 0.10
+Nodes (20): dependencies, hono, postgres, zod, devDependencies, @studafy/config, @studafy/tsconfig, @types/bun (+12 more)
 
 ### Community 42 - "dependencies"
-Cohesion: 0.13
-Nodes (23): createApp(), buildApp(), silentLogger(), ROUTE_CLASS_MAP, buildApp(), createInflightTracker(), createLogger(), LEVEL_THRESHOLDS (+15 more)
+Cohesion: 0.10
+Nodes (20): dependencies, eslint-config-prettier, eslint-import-resolver-typescript, @eslint/js, eslint-plugin-import-x, eslint-plugin-security, globals, typescript-eslint (+12 more)
 
 ### Community 43 - "runner.ts"
-Cohesion: 0.11
-Nodes (26): checksum(), discoverMigrations(), transactionalPolicy(), acquireLock(), applyMigration(), HistoryRow, initializeMetadata(), loadHistory() (+18 more)
+Cohesion: 0.15
+Nodes (19): acquireLock(), applyMigration(), HistoryRow, initializeMetadata(), loadHistory(), metadataExists(), QuerySql, recordMigration() (+11 more)
 
 ### Community 44 - "AppDelegate"
 Cohesion: 0.11
@@ -423,16 +402,16 @@ Cohesion: 0.16
 Nodes (17): seedPeople(), USERS_CREATED_AT, USERS_VERIFIED_AT, displayName(), MOCK_PERSONAS, MockPersona, MockPersonaGroup, MockRelationship (+9 more)
 
 ### Community 49 - "extensions.test.ts"
-Cohesion: 0.20
-Nodes (8): asRole(), Database, expectDenied(), integrationTest, migratedDatabase(), repositoryMigrations, REQUIRED_EXTENSIONS, Role
+Cohesion: 0.14
+Nodes (13): checksum(), discoverMigrations(), transactionalPolicy(), checkMigrationsCurrent(), directories, asRole(), Database, expectDenied() (+5 more)
 
 ### Community 50 - "Demo Data"
 Cohesion: 0.11
 Nodes (17): Academic, AI, Assessments, Attendance, Demo Data, Demo Seed Data, Files, Finance (+9 more)
 
 ### Community 51 - "Database role and grant model"
-Cohesion: 0.13
-Nodes (15): Credential handling, Database role and grant model, Default privileges, How future migrations grant access, How to verify privileges, Local and CI test setup, Login vs group-role decision, Managed PostgreSQL (RDS) limitations and assumptions (+7 more)
+Cohesion: 0.11
+Nodes (18): Credential handling, Database role and grant model, Default privileges, How future migrations grant access, How to verify privileges, Local and CI test setup, Login vs group-role decision, Managed PostgreSQL (RDS) limitations and assumptions (+10 more)
 
 ### Community 52 - "`cdn`"
 Cohesion: 0.11
@@ -455,8 +434,8 @@ Cohesion: 0.24
 Nodes (12): Bindings, createApp(), handleClientMessage(), raw(), send(), buildApp(), AuthClaims, healthRoutes() (+4 more)
 
 ### Community 57 - "Notification, preference, and device data model"
-Cohesion: 0.15
-Nodes (13): Batch write benchmark, Default preferences, Index rationale, Index verification, Keys and functional dependencies, Known gaps, Notification, preference, and device data model, RLS and grants (+5 more)
+Cohesion: 0.12
+Nodes (15): Notification data model, What the diagram does not say on its own, Batch write benchmark, Default preferences, Index rationale, Index verification, Keys and functional dependencies, Known gaps (+7 more)
 
 ### Community 58 - "`edge`"
 Cohesion: 0.12
@@ -467,8 +446,8 @@ Cohesion: 0.12
 Nodes (16): dependencies, postgres, devDependencies, @studafy/config, @studafy/tsconfig, @types/bun, typescript, name (+8 more)
 
 ### Community 60 - "attendance.test.ts"
-Cohesion: 0.15
-Nodes (17): asRole(), createFixture(), createRecord(), createSchool(), createSession(), Database, expectDenied(), explainRelations() (+9 more)
+Cohesion: 0.17
+Nodes (16): asRole(), createFixture(), createRecord(), createSchool(), createSession(), Database, expectDenied(), explainRelations() (+8 more)
 
 ### Community 61 - "select.stories.tsx"
 Cohesion: 0.12
@@ -479,12 +458,12 @@ Cohesion: 0.23
 Nodes (10): connect(), envelope(), main(), Received, waitUntil(), createRedisSubscriber(), Env, envSchema (+2 more)
 
 ### Community 63 - "Audit log data model"
-Cohesion: 0.13
-Nodes (15): 1NF — atomic values, no packed blob, 2NF — full dependency on the whole key, 3NF — no transitive dependencies, Audit log data model, Batch append benchmark, Index rationale, Keys and functional dependencies, Known gaps (+7 more)
+Cohesion: 0.12
+Nodes (16): Audit log data model, Batch append benchmark, Bounded query — prunes to one partition, Index rationale, Keys and functional dependencies, Known gaps, Redundancy review, RLS and grants (+8 more)
 
 ### Community 64 - "Redis usage conventions"
-Cohesion: 0.08
-Nodes (21): Cache key conventions, Construction, Examples, Key format, Rules, Single-flight (dogpile protection), TTL guidelines, AUTH token (+13 more)
+Cohesion: 0.12
+Nodes (14): AUTH token, DB assignment, Eviction policy: noeviction, instance-wide, Failover, Known gaps (not covered by the `infra/terraform/modules/redis` ticket), Redis usage conventions, TLS, Inputs (+6 more)
 
 ### Community 65 - "audit-logs.test.ts"
 Cohesion: 0.17
@@ -499,8 +478,8 @@ Cohesion: 0.17
 Nodes (12): Chip, ChipProps, ChipVariant, DarkTheme, Disabled, Filled, Focus, Interactive (+4 more)
 
 ### Community 68 - "table.tsx"
-Cohesion: 0.19
-Nodes (15): Table, TableBody, TableBodyProps, TableCell, TableCellProps, TableFooter, TableHeader, TableHeaderCell (+7 more)
+Cohesion: 0.24
+Nodes (14): Table, TableBody, TableBodyProps, TableCell, TableCellProps, TableFooter, TableHeader, TableHeaderCell (+6 more)
 
 ### Community 69 - "protocol.ts"
 Cohesion: 0.21
@@ -511,8 +490,8 @@ Cohesion: 0.13
 Nodes (13): Classify the table first, Fail-closed tenant context, Indexing, Install the policy, Normalization and relational integrity, Tenant Row-Level Security policy authoring, Verification and troubleshooting, Classification and RLS rules (+5 more)
 
 ### Community 71 - "support.ts"
-Cohesion: 0.12
-Nodes (25): AuditEntry, AuditMeta, redactPayload(), SENSITIVE_KEYS, ApiProblem, buildProblem(), errorHandlerMiddleware(), mapError() (+17 more)
+Cohesion: 0.18
+Nodes (12): AcademicsCtx, PeopleCtx, SEED_EPOCH, SeededClass, SeededCourse, SeededEnrollment, SeededRoom, SeededSubject (+4 more)
 
 ### Community 72 - "app_config.dart"
 Cohesion: 0.14
@@ -527,7 +506,7 @@ Cohesion: 0.14
 Nodes (12): Email deliverability (R-08), Known gaps, `p=quarantine`, not `p=reject`, Verifying "DMARC reports received", Verifying "test invitation email passes Gmail/Outlook auth checks", What "authenticated" actually requires, Why a dedicated sending subdomain, `dns` (+4 more)
 
 ### Community 75 - "toast.tsx"
-Cohesion: 0.15
+Cohesion: 0.23
 Nodes (11): ToastContext, ToastContextValue, ToastOptions, ToastVariant, useToast(), isAssertive(), ToastItem(), ToastItemProps (+3 more)
 
 ### Community 76 - "lifecycle.ts"
@@ -539,12 +518,12 @@ Cohesion: 0.15
 Nodes (9): RawSocket, app, env, redisSubscriber, rooms, server, state, tracker (+1 more)
 
 ### Community 78 - "Domain events outbox"
-Cohesion: 0.29
-Nodes (7): Concurrency: exactly-once relay, Domain events outbox, Index rationale, Known gaps, RLS and grants, Schema, What it is
+Cohesion: 0.15
+Nodes (10): Adding a queue, Queue catalog, Verifying locally, Concurrency: exactly-once relay, Domain events outbox, Index rationale, Known gaps, RLS and grants (+2 more)
 
 ### Community 79 - "Audit log partition maintenance"
-Cohesion: 0.11
-Nodes (18): Append-only is not negotiable, Audit log partition maintenance, Backdated imports, Benchmark procedure, Failure modes, Future-dated records, How new partitions inherit security, Known limitations (+10 more)
+Cohesion: 0.15
+Nodes (13): Append-only is not negotiable, Audit log partition maintenance, Benchmark procedure, How new partitions inherit security, Known limitations, Monitoring and alerting, Overview, Partition key (+5 more)
 
 ### Community 80 - "Image build doc: apps/api, apps/workers, apps/realtime, apps/web, ERPNext"
 Cohesion: 0.15
@@ -554,13 +533,9 @@ Nodes (12): Build, ERPNext plane, Healthcheck instructions, How each image is bu
 Cohesion: 0.22
 Nodes (12): asRole(), createConversation(), createSchool(), createStudent(), createSubscription(), Database, expectDenied(), integrationTest (+4 more)
 
-### Community 82 - "axe.ts"
-Cohesion: 0.12
-Nodes (4): columns, Student, students, expectNoA11yViolations()
-
 ### Community 83 - "modal.tsx"
-Cohesion: 0.20
-Nodes (11): Modal, ModalBody, ModalFooter, ModalProps, ModalRoot, ModalSectionProps, FOCUSABLE_SELECTOR, getFocusableElements() (+3 more)
+Cohesion: 0.23
+Nodes (6): Modal, ModalBody, ModalFooter, ModalProps, ModalRoot, ModalSectionProps
 
 ### Community 84 - "toast.stories.tsx"
 Cohesion: 0.15
@@ -575,8 +550,8 @@ Cohesion: 0.17
 Nodes (11): name, private, scripts, build, build:dev, build:prod, build:staging, check-types (+3 more)
 
 ### Community 87 - "Attendance partition maintenance"
-Cohesion: 0.12
-Nodes (17): Attendance partition maintenance, Backdated imports, Benchmark procedure, Failure modes, Future-dated records, How new partitions inherit security, Known limitations, Missing partition (+9 more)
+Cohesion: 0.17
+Nodes (12): Attendance partition maintenance, Benchmark procedure, How new partitions inherit security, Known limitations, Monitoring and alerting, Overview, Partition key vs business date, Recommended schedule (+4 more)
 
 ### Community 88 - "academic-structure.test.ts"
 Cohesion: 0.21
@@ -607,8 +582,8 @@ Cohesion: 0.21
 Nodes (11): asRole(), createSchool(), createTimetableFixture(), Database, expectDenied(), integrationTest, migratedDatabase(), repositoryMigrations (+3 more)
 
 ### Community 95 - "checkbox.stories.tsx"
-Cohesion: 0.14
-Nodes (14): Checkbox, CheckboxProps, Checked, DarkTheme, Disabled, DisabledChecked, Error, Focus (+6 more)
+Cohesion: 0.17
+Nodes (11): Checked, DarkTheme, Disabled, DisabledChecked, Error, Focus, Indeterminate, Interactive (+3 more)
 
 ### Community 96 - "home_screen.dart"
 Cohesion: 0.22
@@ -627,8 +602,8 @@ Cohesion: 0.20
 Nodes (9): asRole(), Database, expectDenied(), GLOBAL_TABLES, integrationTest, migratedDatabase(), referenceSeed, repositoryMigrations (+1 more)
 
 ### Community 100 - "identity.test.ts"
-Cohesion: 0.11
-Nodes (18): RlsCoverageReport, testDatabase(), asRole(), createSchools(), createUser(), Database, expectRoleDenied(), IDENTITY_TABLES (+10 more)
+Cohesion: 0.24
+Nodes (10): asRole(), createSchools(), createUser(), Database, expectRoleDenied(), IDENTITY_TABLES, integrationTest, migratedDatabase() (+2 more)
 
 ### Community 101 - "profiles.test.ts"
 Cohesion: 0.24
@@ -670,12 +645,8 @@ Nodes (9): Deploy manifests: `apps/api`, `apps/realtime`, `apps/workers`, the ER
 Cohesion: 0.20
 Nodes (10): devDependencies, @commitlint/cli, @commitlint/config-conventional, eslint, lefthook, lint-staged, prettier, @studafy/config (+2 more)
 
-### Community 111 - "toast.test.tsx"
-Cohesion: 0.13
-Nodes (24): cacheKey, getCache(), inflight, resetInflight(), setCache(), singleFlight(), createTestClient(), silentLogger (+16 more)
-
 ### Community 112 - "ADR-005: ERPNext + Frappe Education plane for staging"
-Cohesion: 0.25
+Cohesion: 0.22
 Nodes (6): ADR-005: ERPNext + Frappe Education plane for staging, Alternatives considered, Consequences, Context, Decision, Status
 
 ### Community 113 - "SQL migration policy"
@@ -687,8 +658,8 @@ Cohesion: 0.28
 Nodes (8): asRole(), createSchool(), Database, expectDenied(), integrationTest, migratedDatabase(), repositoryMigrations, Role
 
 ### Community 115 - "checkbox.tsx"
-Cohesion: 0.11
-Nodes (20): ApiProblem, apiProblemSchema, buildProblem(), mapError(), MappedError, problemErrorHandler(), problemNotFound(), STATUS_ERROR_CODES (+12 more)
+Cohesion: 0.33
+Nodes (3): Checkbox, CheckboxProps, mergeRefs()
 
 ### Community 116 - "app_router.dart"
 Cohesion: 0.25
@@ -739,8 +710,8 @@ Cohesion: 0.29
 Nodes (6): app_config.dart, ../../app.dart, app_environment.dart, bootstrapApp, ../di/app_providers.dart, package:flutter/widgets.dart
 
 ### Community 128 - "@studafy/api"
-Cohesion: 0.18
-Nodes (8): Commands, Environment, Graceful shutdown, Logging and request tracing, Routes, @studafy/api, Tenant database transactions, Global data ERD
+Cohesion: 0.29
+Nodes (6): Commands, Environment, Graceful shutdown, Routes, @studafy/api, Tenant database transactions
 
 ### Community 129 - "widget_test.dart"
 Cohesion: 0.29
@@ -798,10 +769,6 @@ Nodes (6): Failure response, GUC leakage attack and mitigation, Index execution 
 Cohesion: 0.29
 Nodes (6): name, packageManager, private, type, version, workspaces
 
-### Community 145 - "material-chunks-benchmark.test.ts"
-Cohesion: 0.17
-Nodes (17): healthOkSchema, healthRoutes(), healthzRoute, readyDrainingSchema, readyOkSchema, readyzRoute, Logger, AppEnv (+9 more)
-
 ### Community 146 - "app_info_tile.dart"
 Cohesion: 0.33
 Nodes (5): AppInfoTile, build, label, value, StatelessWidget
@@ -819,8 +786,8 @@ Cohesion: 0.60
 Nodes (3): gradlew script, die(), warn()
 
 ### Community 150 - "@studafy/workers"
-Cohesion: 0.20
-Nodes (8): Adding a queue, Queue catalog, Verifying locally, Architecture, Commands, Environment, Graceful shutdown, @studafy/workers
+Cohesion: 0.40
+Nodes (5): Architecture, Commands, Environment, Graceful shutdown, @studafy/workers
 
 ### Community 151 - "packages.json"
 Cohesion: 0.40
@@ -831,16 +798,16 @@ Cohesion: 0.40
 Nodes (4): Academic structure data model, Domain boundaries, Lifecycle and invariants, Tenant isolation
 
 ### Community 154 - "Failure modes"
-Cohesion: 0.13
-Nodes (14): main(), createUnusableDatabase(), build(), Problem, RFC-9457, VALID_BODY, OPENAPI_DOCUMENT_CONFIG, buildOpenApiDocument() (+6 more)
+Cohesion: 0.40
+Nodes (5): Backdated imports, Failure modes, Future-dated records, Missing partition, Year boundary
 
 ### Community 155 - "Failure modes"
-Cohesion: 0.11
-Nodes (18): apiProblemOpenApiSchema, registerOpenApiComponents(), schoolSchema, schoolStatusSchema, RFC-9457, userSchema, userStatusSchema, OkEntry (+10 more)
+Cohesion: 0.40
+Nodes (5): Backdated imports, Failure modes, Future-dated records, Missing partition, Year boundary
 
 ### Community 156 - "Normalization review"
-Cohesion: 0.10
-Nodes (20): dependencies, eslint-config-prettier, eslint-import-resolver-typescript, @eslint/js, eslint-plugin-import-x, eslint-plugin-security, globals, typescript-eslint (+12 more)
+Cohesion: 0.40
+Nodes (5): 1NF — atomic values, no packed blob, 2NF — full dependency on the whole key, 3NF — no transitive dependencies, Normalization review, Safe payload storage (a deliberate denormalization)
 
 ### Community 157 - "DNS migration: registrar DNS to Route 53"
 Cohesion: 0.40
@@ -859,8 +826,8 @@ Cohesion: 0.40
 Nodes (4): compilerOptions, types, extends, include
 
 ### Community 161 - "use-focus-trap.ts"
-Cohesion: 0.25
-Nodes (14): ensureAttendancePartitions(), ensureAuditLogPartitions(), commands, main(), partitionCommands, createClient(), acquireLock(), ATTENDANCE_PARTITIONS (+6 more)
+Cohesion: 0.60
+Nodes (3): FOCUSABLE_SELECTOR, getFocusableElements(), useFocusTrap()
 
 ### Community 162 - "app_theme.dart"
 Cohesion: 0.50
@@ -874,113 +841,29 @@ Nodes (3): AI conversations, messages, citations, and usage, Normalized citation
 Cohesion: 0.50
 Nodes (3): Contents, ERPNext seed fixtures, Known gaps
 
-### Community 177 - "turbo.json"
-Cohesion: 0.18
-Nodes (12): verifyWebhookSignature(), erpNextWebhookRoutes(), projectToCache(), resolveEventName(), webhookAcceptedSchema, webhookBodySchema, webhookRoute, auditAction (+4 more)
-
 ### Community 179 - "lint"
 Cohesion: 0.67
 Nodes (3): dependsOn, outputs, lint
 
-### Community 186 - "global-data-erd.md"
-Cohesion: 0.18
-Nodes (6): ErpNextClient, ErpNextClientOptions, ErpNextError, ErpNextRequestOptions, ErpNextResponse, TODO: Implement actual ERPNext API endpoints when the integration is built.
-
-### Community 203 - "logger.ts"
-Cohesion: 0.18
-Nodes (10): build(), fragment(), fragments(), LOG_LEVELS, LogFields, LoggerOptions, LogLevel, LogMethod (+2 more)
-
-### Community 204 - "db-conformance.test.ts"
-Cohesion: 0.13
-Nodes (10): Column, document, GLOBAL_MIGRATION, JsonSchema, MIGRATIONS, OMITTED_USER_COLUMNS, schemas, schoolComponent (+2 more)
-
-### Community 205 - "emitter.test.ts"
-Cohesion: 0.35
-Nodes (7): emit(), integrationTest, repositoryMigrations, TestDatabase, EventPayloadMap, eventPayloadSchemas, uid
-
-### Community 206 - "audit-coverage.test.ts"
-Cohesion: 0.27
-Nodes (10): collectSourceFiles(), EXCLUDE_PATTERNS, EXEMPT_ROUTES, EXPECTED_MUTATING_ROUTES, findMutatingRoutes(), hasAuditActionForPath(), MUTATING_METHODS, MutatingRoute (+2 more)
-
-### Community 207 - "modal.stories.tsx"
-Cohesion: 0.18
-Nodes (9): DarkTheme, Default, Focus, InitialFocus, Interactive, meta, NonDismissable, Story (+1 more)
-
-### Community 208 - "Logging and tracing conventions"
-Cohesion: 0.20
-Nodes (10): Child loggers and the auth seam, Errors: `application/problem+json`, Levels, Log injection is structurally impossible, and stays that way only if you follow one rule, Logging and tracing conventions, Performance, Record format, Request lifecycle, from Hono entry to the audit partition (+2 more)
-
-### Community 209 - "card.tsx"
-Cohesion: 0.36
-Nodes (8): Card, CardBody, CardElevation, CardFooter, CardHeader, CardProps, CardRoot, CardSectionProps
-
-### Community 210 - "card.stories.tsx"
-Cohesion: 0.20
-Nodes (8): DarkTheme, Default, Elevations, Focus, Interactive, meta, Static, Story
-
-### Community 211 - "Domain Event Emitter — Implementation Plan"
-Cohesion: 0.20
-Nodes (9): Context, Design, Domain Event Emitter — Implementation Plan, Emitter (`emitter.ts`), Files to create, Payload schemas (`schemas.ts`), Scope, Tests (`emitter.test.ts`) (+1 more)
-
-### Community 213 - "openapi-generate-benchmark.test.ts"
-Cohesion: 0.29
-Nodes (6): benchmarkTest, CWD, EXPECTED_PATHS, percentile(), report(), SCRIPT
-
-### Community 214 - "healthcheck.ts"
-Cohesion: 0.29
-Nodes (3): timer, url, databaseUrl()
-
-### Community 215 - "params.ts"
-Cohesion: 0.60
-Nodes (4): paginationQueryParams, schoolIdPathParams, sortByQueryParams(), tenantResourcePathParams
-
-### Community 216 - "button.tsx"
-Cohesion: 0.60
-Nodes (3): Button, ButtonProps, ButtonVariant
-
-### Community 217 - "pg_stat_statements — monitoring policy"
-Cohesion: 0.40
-Nodes (5): Access control, pg_stat_statements — monitoring policy, Preload requirement (infrastructure-controlled), Query-text sensitivity and privacy, Reset and retention behavior
-
-### Community 218 - "Why every audit query needs a time range"
-Cohesion: 0.50
-Nodes (4): Bounded query — prunes to one partition, The rule, The same query without a time range, Why every audit query needs a time range
-
-### Community 219 - "What owns what"
-Cohesion: 0.50
-Nodes (4): `request_id` (`000026`, ST-054), There is no `updated_at`, `timestamptz`, not `timestamptz(3)`, What owns what
-
-### Community 220 - "Indexing rules"
-Cohesion: 0.50
-Nodes (4): Indexing rules, pg_trgm index decision framework, pgvector index decision framework, Verifying any future extension-backed index
-
-### Community 221 - "Ownership model"
-Cohesion: 0.67
-Nodes (3): Ownership model, Why `BYPASSRLS` is prohibited, Why the application role must not own tables
-
-### Community 222 - "build"
-Cohesion: 0.67
-Nodes (3): dependsOn, outputs, build
-
 ## Knowledge Gaps
-- **1420 isolated node(s):** `name`, `version`, `private`, `type`, `dev` (+1415 more)
+- **1268 isolated node(s):** `name`, `version`, `private`, `type`, `dev` (+1263 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **27 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **30 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `runMigrationCommand()` connect `runner.ts` to `index.ts`, `tsconfig.json`, `ADR-001: Shared lint/format config as a root-inherited package`, `tsconfig.json`, `use-focus-trap.ts`, `turbo.json`, `extensions.test.ts`, `attendance.test.ts`, `audit-logs.test.ts`, `notifications.test.ts`, `emitter.test.ts`, `ai-conversations.test.ts`, `academic-structure.test.ts`, `assessment-content.test.ts`, `grades-workflow.test.ts`, `material-chunks.test.ts`, `rls.test.ts`, `subscriptions.test.ts`, `timetable.test.ts`, `finance.test.ts`, `global-tables.test.ts`, `identity.test.ts`, `profiles.test.ts`, `outbox-events.test.ts`?**
-  _High betweenness centrality (0.014) - this node is a cross-community bridge._
-- **Why does `testDatabase()` connect `identity.test.ts` to `index.ts`, `ADR-001: Shared lint/format config as a root-inherited package`, `tsconfig.json`, `runner.ts`, `turbo.json`, `extensions.test.ts`, `attendance.test.ts`, `audit-logs.test.ts`, `notifications.test.ts`, `emitter.test.ts`, `ai-conversations.test.ts`, `healthcheck.ts`, `academic-structure.test.ts`, `assessment-content.test.ts`, `grades-workflow.test.ts`, `material-chunks.test.ts`, `rls.test.ts`, `subscriptions.test.ts`, `timetable.test.ts`, `finance.test.ts`, `global-tables.test.ts`, `profiles.test.ts`, `outbox-events.test.ts`?**
+- **Why does `ConnectionTracker` connect `lifecycle.ts` to `app.ts`, `index.ts`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
+- **Why does `runMigrationCommand()` connect `runner.ts` to `index.ts`, `tsconfig.json`, `material-chunks-benchmark.test.ts`, `ADR-001: Shared lint/format config as a root-inherited package`, `tsconfig.json`, `extensions.test.ts`, `attendance.test.ts`, `audit-logs.test.ts`, `notifications.test.ts`, `ai-conversations.test.ts`, `academic-structure.test.ts`, `assessment-content.test.ts`, `grades-workflow.test.ts`, `material-chunks.test.ts`, `rls.test.ts`, `subscriptions.test.ts`, `timetable.test.ts`, `finance.test.ts`, `global-tables.test.ts`, `identity.test.ts`, `profiles.test.ts`, `outbox-events.test.ts`?**
   _High betweenness centrality (0.007) - this node is a cross-community bridge._
-- **Are the 2 inferred relationships involving `createApp()` (e.g. with `notFoundHandler()` and `openApiValidationHook()`) actually correct?**
-  _`createApp()` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `name`, `version`, `private` to the rest of the system?**
-  _1423 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1270 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
-  _Cohesion score 0.10526315789473684 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._
 - **Should `studafy` be split into smaller, more focused modules?**
   _Cohesion score 0.07692307692307693 - nodes in this community are weakly interconnected._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.06666666666666667 - nodes in this community are weakly interconnected._
+- **Should `package.json` be split into smaller, more focused modules?**
+  _Cohesion score 0.045454545454545456 - nodes in this community are weakly interconnected._

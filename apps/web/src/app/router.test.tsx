@@ -1,15 +1,29 @@
 import { cleanup, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
+import { AppProviders } from "./providers";
 import { routes } from "./routes";
+
+// These tests assert routing, not data. Stub the API client so the /portal page's health query
+// resolves in-memory instead of reaching for a server that is not running under the test.
+mock.module("../lib/api", () => ({
+  api: { GET: () => Promise.resolve({ data: { status: "ok" } }) },
+}));
 
 afterEach(cleanup);
 
 const renderAt = (path: string) => {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  return render(<RouterProvider router={router} />);
+  // Wrap in the real app providers: pages such as /portal now consume the API client via a query,
+  // which needs the QueryClientProvider. The health request fails harmlessly against no server here;
+  // these tests assert routing, not data.
+  return render(
+    <AppProviders>
+      <RouterProvider router={router} />
+    </AppProviders>,
+  );
 };
 
 describe("app shell", () => {
