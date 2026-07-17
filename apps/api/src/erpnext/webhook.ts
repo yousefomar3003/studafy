@@ -2,6 +2,8 @@ import { ERPNEXT_DOC_EVENT_MAP } from "@studafy/constants";
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { auditAction, emitAuditLog } from "../middleware/auditEmitter";
+
 import { verifyWebhookSignature } from "./signature";
 
 import type { Database } from "../db";
@@ -138,7 +140,7 @@ async function projectToCache(
 export function erpNextWebhookRoutes(db: Database, logger: Logger): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
-  routes.post("/erpnext/webhooks", async (c) => {
+  routes.post("/erpnext/webhooks", auditAction("insert", "erpnext_webhook_dedup"), async (c) => {
     const rawBody = await c.req.text();
     const signature = c.req.header("x-erpnext-signature") ?? null;
     const webhookSecret = process.env.ERPNEXT_WEBHOOK_SECRET;
@@ -186,6 +188,14 @@ export function erpNextWebhookRoutes(db: Database, logger: Logger): Hono<AppEnv>
         if (dedupResult.length === 0) {
           return;
         }
+
+        await emitAuditLog(tx, {
+          action: "insert",
+          targetTable: "erpnext_webhook_dedup",
+          targetId: String(dedupResult[0].id),
+          newValues: { event_id: body.event_id, doc_type: body.doctype, action: body.action },
+          userAgent: c.req.header("user-agent"),
+        });
 
         await tx`
           INSERT INTO app.outbox_events (school_id, event_name, payload)
