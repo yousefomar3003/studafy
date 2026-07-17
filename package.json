@@ -23,6 +23,7 @@
     "db:seed": "bun db/seeds/seed.ts",
     "db:seed:index-check": "bun db/seeds/index-health.ts",
     "test:security": "bun run --cwd apps/api test:security",
+    "openapi:generate": "bun run --cwd apps/api openapi:generate",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

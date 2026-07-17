@@ -9,9 +9,12 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
     "test": "bun test",
-    "test:security": "bun test ./tests/security --timeout 90000"
+    "test:security": "bun test ./tests/security --timeout 90000",
+    "openapi:generate": "bun run scripts/generate-openapi.ts && prettier --write openapi.json"
   },
   "dependencies": {
+    "@hono/zod-openapi": "1.5.1",
+    "@scalar/hono-api-reference": "0.11.11",
     "@studafy/constants": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
     "hono": "4.12.28",
@@ -20,6 +23,7 @@
     "zod": "4.1.12"
   },
   "devDependencies": {
+    "@seriousme/openapi-schema-validator": "2.9.0",
     "@studafy/config": "workspace:*",
     "@studafy/tsconfig": "workspace:*",
     "@types/bun": "1.3.14",

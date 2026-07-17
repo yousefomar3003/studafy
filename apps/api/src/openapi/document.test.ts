@@ -1,0 +1,264 @@
+import path from "node:path";
+
+import { Validator } from "@seriousme/openapi-schema-validator";
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
+import { describe, expect, test } from "bun:test";
+
+import { createApp } from "../app";
+import { createUnusableDatabase } from "../db/unusable";
+import { createInflightTracker } from "../lifecycle";
+import { createLogger } from "../logger";
+
+import { buildOpenApiDocument } from "./document";
+import { PROBLEM_STATUSES } from "./responses";
+
+/**
+ * ST-060: document-wide invariants.
+ *
+ * These are the actual guarantee behind the contract requirements. standardResponses' type signature
+ * makes forgetting the X-Request-Id header or the problem+json envelope awkward, but a hand-written
+ * object literal still satisfies RouteConfig — so the enforcement has to be a walk of the generated
+ * document, which is what this file is.
+ *
+ * The sample is three operations, and that is worth being honest about: "every operation documents
+ * problem+json" is currently three assertions. The value is as a ratchet — the fourth operation
+ * cannot be added without satisfying them.
+ */
+
+const COMMITTED_SPEC = path.join(import.meta.dir, "..", "..", "openapi.json");
+
+/** The extension the generator prepends. Not part of the document zod-to-openapi builds. */
+const BANNER_KEY = "x-generated-by";
+
+const document = buildOpenApiDocument();
+
+/**
+ * The document as JSON — exactly what the generator writes to disk and the server puts on the wire.
+ *
+ * Every assertion below runs against this rather than the in-memory object, and that is deliberate:
+ * JSON.stringify drops undefined-valued keys and anything non-serializable, so this is the artifact
+ * itself rather than an object that merely resembles it. It also gives the validator the plain
+ * index-signature object it expects.
+ */
+const serialized = JSON.parse(JSON.stringify(document)) as Record<string, never>;
+
+interface Operation {
+  operationId?: string;
+  tags?: string[];
+  security?: unknown[];
+  responses: Record<string, ResponseObject>;
+}
+
+interface ResponseObject {
+  headers?: Record<string, { required?: boolean; schema?: { format?: string } }>;
+  content?: Record<string, { schema?: { $ref?: string } }>;
+}
+
+/** Every (path, method, operation) in the document, so a test can walk it without nesting loops. */
+const operations: { path: string; method: string; operation: Operation }[] = Object.entries(
+  document.paths ?? {},
+).flatMap(([routePath, item]) =>
+  Object.entries(item as Record<string, Operation>)
+    // A path item can hold non-operation members (parameters, summary); only verbs are operations.
+    .filter(([method]) =>
+      ["get", "put", "post", "delete", "patch", "options", "head"].includes(method),
+    )
+    .map(([method, operation]) => ({ path: routePath, method, operation })),
+);
+
+describe("structure", () => {
+  test("is a structurally valid OpenAPI 3.1 document", async () => {
+    const validator = new Validator();
+
+    const result = await validator.validate(serialized);
+
+    // The errors are the useful part of a failure; toBe(true) alone would say only "no".
+    expect(result.errors ?? [], JSON.stringify(result.errors, null, 2)).toEqual([]);
+    expect(result.valid).toBe(true);
+    // `valid` alone would also pass a 3.0 document. The ticket asks for 3.1 specifically, and the
+    // nullable type unions the components rely on are 3.1-only syntax.
+    expect(validator.version).toBe("3.1");
+  });
+
+  test("declares OpenAPI 3.1.0", () => {
+    expect(document.openapi).toBe("3.1.0");
+  });
+
+  // A plain Hono sub-app mounted on an OpenAPIHono keeps serving traffic while contributing nothing
+  // to the document, silently. This is the guard against that regression.
+  test("contains every mounted route", () => {
+    expect(Object.keys(document.paths ?? {}).sort()).toEqual(
+      ["/erpnext/webhooks", "/healthz", "/readyz"].sort(),
+    );
+  });
+
+  test("has at least one operation", () => {
+    expect(operations.length).toBeGreaterThan(0);
+  });
+});
+
+describe("every operation", () => {
+  test("documents an application/problem+json error response", () => {
+    for (const { path: p, method, operation } of operations) {
+      const problems = Object.entries(operation.responses).filter(
+        ([, response]) => response.content?.["application/problem+json"] !== undefined,
+      );
+
+      expect(
+        problems.length,
+        `${method.toUpperCase()} ${p} documents no problem+json response`,
+      ).toBeGreaterThan(0);
+
+      for (const [status, response] of problems) {
+        expect(
+          response.content?.["application/problem+json"]?.schema?.$ref,
+          `${method.toUpperCase()} ${p} ${status} does not reference the shared ProblemDetails`,
+        ).toBe("#/components/schemas/ProblemDetails");
+      }
+    }
+  });
+
+  // requestIdMiddleware stamps this unconditionally, after next(), including on responses built by
+  // app.onError — so every declared response must say so.
+  test("declares the X-Request-Id header on every response", () => {
+    for (const { path: p, method, operation } of operations) {
+      for (const [status, response] of Object.entries(operation.responses)) {
+        const header = response.headers?.["X-Request-Id"];
+
+        expect(
+          header,
+          `${method.toUpperCase()} ${p} ${status} is missing X-Request-Id`,
+        ).toBeDefined();
+        expect(
+          header!.required,
+          `${method.toUpperCase()} ${p} ${status} X-Request-Id is optional`,
+        ).toBe(true);
+        expect(header!.schema?.format).toBe("uuid");
+      }
+    }
+  });
+
+  test("has an operationId", () => {
+    for (const { path: p, method, operation } of operations) {
+      expect(operation.operationId, `${method.toUpperCase()} ${p} has no operationId`).toBeTruthy();
+    }
+  });
+
+  test("has a unique operationId", () => {
+    const ids = operations.map(({ operation }) => operation.operationId);
+
+    expect(ids.length).toBe(new Set(ids).size);
+  });
+
+  test("uses only tags the document declares", () => {
+    const declared = new Set((document.tags ?? []).map((tag) => tag.name));
+
+    for (const { path: p, method, operation } of operations) {
+      for (const tag of operation.tags ?? []) {
+        expect(declared.has(tag), `${method.toUpperCase()} ${p} uses undeclared tag "${tag}"`).toBe(
+          true,
+        );
+      }
+    }
+  });
+
+  // Documenting a failure the server has no code path to produce is as much a lie as omitting one it
+  // does. PROBLEM_STATUSES is derived from errorHandlerMiddleware's own status maps.
+  test("documents only problem statuses errorHandlerMiddleware can emit", () => {
+    for (const { path: p, method, operation } of operations) {
+      for (const [status, response] of Object.entries(operation.responses)) {
+        if (response.content?.["application/problem+json"] === undefined) continue;
+
+        expect(
+          (PROBLEM_STATUSES as readonly number[]).includes(Number(status)),
+          `${method.toUpperCase()} ${p} documents problem+json for un-emittable status ${status}`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+describe("security", () => {
+  test("declares the bearerAuth scheme", () => {
+    expect(document.components?.securitySchemes?.bearerAuth).toMatchObject({
+      type: "http",
+      scheme: "bearer",
+    });
+  });
+
+  // No route in this app authenticates anything. A root-level requirement would document an
+  // enforcement that does not exist, and every operation says so explicitly rather than by omission.
+  test("requires no authentication anywhere, because none is implemented", () => {
+    expect(document.security).toBeUndefined();
+
+    for (const { path: p, method, operation } of operations) {
+      expect(
+        operation.security,
+        `${method.toUpperCase()} ${p} does not state its security`,
+      ).toEqual([]);
+    }
+  });
+});
+
+describe("the committed artifact", () => {
+  // The drift gate lives in CI, but a developer should not need a pull request to discover they
+  // forgot to regenerate. This is the same check, in `bun test`.
+  test("matches what the routes currently generate", async () => {
+    const committed = (await Bun.file(COMMITTED_SPEC).json()) as Record<string, unknown>;
+
+    const { [BANNER_KEY]: banner, ...spec } = committed;
+
+    expect(banner, "the generator's do-not-edit banner is missing").toBeString();
+    expect(spec, "apps/api/openapi.json is stale — run `bun run openapi:generate`").toEqual(
+      serialized,
+    );
+  });
+
+  test("is what the server serves at /openapi.json", async () => {
+    const app = createApp({
+      isReady: () => true,
+      tracker: createInflightTracker(),
+      logger: createLogger({ destination: () => undefined }),
+      redis: null,
+      database: createUnusableDatabase(),
+      docsEnabled: true,
+    });
+
+    const res = await app.request("/openapi.json");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(serialized);
+  });
+});
+
+describe("the reference site", () => {
+  const build = (docsEnabled: boolean) =>
+    createApp({
+      isReady: () => true,
+      tracker: createInflightTracker(),
+      logger: createLogger({ destination: () => undefined }),
+      redis: null,
+      database: createUnusableDatabase(),
+      docsEnabled,
+    });
+
+  test("is served when enabled", async () => {
+    const res = await build(true).request("/docs");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+  });
+
+  // Production passes docsEnabled: false. Scalar's page loads its bundle from a CDN, and the 404
+  // here is what keeps production from depending on a third party to render a page it does not need.
+  test("is absent when disabled, and 404s through the problem+json handler", async () => {
+    const res = await build(false).request("/docs");
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+  });
+
+  test("does not serve the document when disabled", async () => {
+    expect((await build(false).request("/openapi.json")).status).toBe(404);
+  });
+});

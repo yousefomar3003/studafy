@@ -130,6 +130,73 @@ jobs:
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run format:check
       - run: bunx turbo run lint check-types test build --filter=!@studafy/mobile
+      # The OpenAPI document is committed so a contract change appears in the pull-request diff and
+      # gets reviewed like code. Regenerating here and failing on a dirty tree is what makes the
+      # committed file trustworthy: it cannot drift from the routes without this step going red.
+      # Runs after the turbo step because the generator imports @studafy/shared-schemas from its
+      # built dist/.
+      - name: Regenerate the OpenAPI document and fail on drift
+        run: |
+          bun run openapi:generate
+          if ! git diff --quiet -- apps/api/openapi.json; then
+            {
+              echo '## OpenAPI drift'
+              echo
+              echo 'apps/api/openapi.json does not match the routes it is generated from.'
+              echo 'Run `bun run openapi:generate` and commit the result.'
+              echo
+              echo '```diff'
+              git --no-pager diff -- apps/api/openapi.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      # oasdiff needs the base revision of the document to compare against. actions/checkout fetches
+      # depth 1, so the base branch is not in the object store; fetch the single commit rather than
+      # paying for full history. The file is written inside the workspace, not $RUNNER_TEMP, because
+      # the step below is a Docker action and only $GITHUB_WORKSPACE is bind-mounted into it.
+      #
+      # The exists guard is not hypothetical: the pull request that introduces this workflow has no
+      # document on its base branch, and `git show` would take the job down.
+      - name: Fetch the base OpenAPI document
+        if: github.event_name == 'pull_request'
+        id: base_spec
+        run: |
+          git fetch --depth=1 origin "$GITHUB_BASE_REF"
+          mkdir -p .oasdiff
+          if git cat-file -e FETCH_HEAD:apps/api/openapi.json 2>/dev/null; then
+            git show FETCH_HEAD:apps/api/openapi.json > .oasdiff/base.json
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo 'No OpenAPI document on the base branch yet; skipping the breaking-change check.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      # Classifies contract changes against the base branch and fails on a breaking one.
+      #
+      # review: false and github-token: "" are load-bearing, not cosmetic. The action defaults to
+      # review: true, which uploads both documents to oasdiff.com, and defaults github-token to
+      # github.token so it tries to post a pull-request comment -- which would need
+      # `permissions: pull-requests: write`, a privilege no workflow here grants. Turning both off
+      # keeps every document inside CI and keeps the token read-only; a breaking change surfaces as
+      # a red job and a step summary instead.
+      - name: Detect breaking API changes
+        if: github.event_name == 'pull_request' && steps.base_spec.outputs.exists == 'true'
+        uses: oasdiff/oasdiff-action/breaking@v0.1.6
+        with:
+          base: .oasdiff/base.json
+          revision: apps/api/openapi.json
+          fail-on: ERR
+          review: false
+          github-token: ""
+      # Asserts the ST-060 acceptance target. Unlike the two benchmarks below, this one is an
+      # absolute wall clock: there is no baseline arm to subtract, because generating the document is
+      # the whole program. Median of five spawns, several times the budget in headroom -- see the
+      # file header. Needs no database.
+      - name: OpenAPI generation benchmark (<2s)
+        env:
+          OPENAPI_BENCHMARK: "1"
+        run: bun test tests/benchmark/openapi-generate-benchmark.test.ts
+        working-directory: apps/api
       # Asserts the ST-054 acceptance target. Measures the request-context middleware as a delta
       # against an identical app without it, so shared-runner noise cancels rather than accumulating
       # into the budget -- unlike an absolute wall-clock budget, which is why this one does not need
