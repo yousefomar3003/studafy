@@ -192,6 +192,7 @@
               "RESOURCE_ALREADY_DELETED",
               "CONFLICT_DUPLICATE_ENTRY",
               "CONFLICT_STATE_MISMATCH",
+              "CONFLICT_IDEMPOTENCY_KEY_MISMATCH",
               "RATE_LIMIT_EXCEEDED",
               "INTERNAL_ERROR"
             ]
