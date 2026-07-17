@@ -6,10 +6,6 @@ import { GENERATED_TYPES_PATH } from "../openapi-typescript.config";
 
 import { generateClientTypes } from "./build-api-client";
 
-/** Repository root — two levels above this package (packages/api-client → studafy/). */
-const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
-const PRETTIER_CONFIG = path.join(REPO_ROOT, "prettier.config.js");
-
 /**
  * Fails the build when the committed generated types no longer match the OpenAPI document they are
  * generated from — i.e. someone edited src/generated-types.ts by hand, or changed the spec without
@@ -30,22 +26,11 @@ async function main(): Promise<void> {
   const freshPath = path.join(scratch, "generated-types.ts");
 
   try {
+    // The generated file is the raw, deterministic openapi-typescript output (LF newlines, a pure
+    // function of the spec + pinned tool version), committed as-is and Prettier-ignored. So the fresh
+    // copy is compared to the committed one byte for byte, with no formatting step to diverge across
+    // platforms.
     await generateClientTypes(freshPath);
-
-    // Reproduce the `generate` script's pipeline exactly: it formats the committed file with
-    // Prettier, so the fresh copy must be formatted with the same repo config before comparison, or
-    // formatting-only differences would masquerade as drift. The config is passed explicitly because
-    // the scratch file lives outside the repo where Prettier could not otherwise discover it.
-    const format = Bun.spawnSync(
-      ["bunx", "prettier", "--config", PRETTIER_CONFIG, "--write", freshPath],
-      { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
-    );
-    if (format.exitCode !== 0) {
-      console.error("Failed to format regenerated types for comparison:");
-      console.error(format.stderr.toString());
-      process.exitCode = 1;
-      return;
-    }
 
     const diff = Bun.spawnSync(
       ["git", "--no-pager", "diff", "--no-index", "--", compareTarget, freshPath],

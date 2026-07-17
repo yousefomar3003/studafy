@@ -7,340 +7,325 @@
  */
 
 export interface paths {
-  readonly "/erpnext/webhooks": {
-    readonly parameters: {
-      readonly query?: never;
-      readonly header?: never;
-      readonly path?: never;
-      readonly cookie?: never;
+    readonly "/erpnext/webhooks": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Ingest an ERPNext document event
+         * @description Accepts a signed document event from ERPNext, records it for deduplication, enqueues an outbox event, and projects the document into the finance cache.
+         *
+         *     Deduplicated on (school_id, event_id): redelivering an event already seen answers 200 without re-processing it, so ERPNext's at-least-once delivery is safe to retry.
+         *
+         *     An event whose doctype/action pair maps to no known event also answers 200 — it is delivered, understood, and deliberately ignored. Answering an error would make ERPNext retry forever.
+         */
+        readonly post: operations["ingestErpNextWebhook"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
     };
-    readonly get?: never;
-    readonly put?: never;
-    /**
-     * Ingest an ERPNext document event
-     * @description Accepts a signed document event from ERPNext, records it for deduplication, enqueues an outbox event, and projects the document into the finance cache.
-     *
-     *     Deduplicated on (school_id, event_id): redelivering an event already seen answers 200 without re-processing it, so ERPNext's at-least-once delivery is safe to retry.
-     *
-     *     An event whose doctype/action pair maps to no known event also answers 200 — it is delivered, understood, and deliberately ignored. Answering an error would make ERPNext retry forever.
-     */
-    readonly post: operations["ingestErpNextWebhook"];
-    readonly delete?: never;
-    readonly options?: never;
-    readonly head?: never;
-    readonly patch?: never;
-    readonly trace?: never;
-  };
-  readonly "/healthz": {
-    readonly parameters: {
-      readonly query?: never;
-      readonly header?: never;
-      readonly path?: never;
-      readonly cookie?: never;
+    readonly "/healthz": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Liveness probe
+         * @description Reports that the process is alive. Answers unconditionally — it never checks a dependency, because a liveness probe that fails on a downstream outage would have the orchestrator restart a healthy process.
+         */
+        readonly get: operations["getLiveness"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
     };
-    /**
-     * Liveness probe
-     * @description Reports that the process is alive. Answers unconditionally — it never checks a dependency, because a liveness probe that fails on a downstream outage would have the orchestrator restart a healthy process.
-     */
-    readonly get: operations["getLiveness"];
-    readonly put?: never;
-    readonly post?: never;
-    readonly delete?: never;
-    readonly options?: never;
-    readonly head?: never;
-    readonly patch?: never;
-    readonly trace?: never;
-  };
-  readonly "/readyz": {
-    readonly parameters: {
-      readonly query?: never;
-      readonly header?: never;
-      readonly path?: never;
-      readonly cookie?: never;
+    readonly "/readyz": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Readiness probe
+         * @description Reports whether this instance should receive traffic. Answers 503 while draining so the load balancer stops routing new requests before in-flight ones finish.
+         */
+        readonly get: operations["getReadiness"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
     };
-    /**
-     * Readiness probe
-     * @description Reports whether this instance should receive traffic. Answers 503 while draining so the load balancer stops routing new requests before in-flight ones finish.
-     */
-    readonly get: operations["getReadiness"];
-    readonly put?: never;
-    readonly post?: never;
-    readonly delete?: never;
-    readonly options?: never;
-    readonly head?: never;
-    readonly patch?: never;
-    readonly trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-  schemas: {
-    readonly ErpNextWebhook: {
-      /** @description ERPNext document action, e.g. 'on_submit'. */
-      readonly action: string;
-      /** @description The ERPNext document. Must carry school_id (or custom_school_id) — the payload is otherwise untenanted and cannot be routed to a tenant. */
-      readonly data: {
-        readonly [key: string]: unknown;
-      };
-      /** @description ERPNext DocType, e.g. 'Sales Invoice'. */
-      readonly doctype: string;
-      /** @description ERPNext's unique id for this delivery. Used to deduplicate redeliveries. */
-      readonly event_id: string;
+    schemas: {
+        readonly ErpNextWebhook: {
+            /** @description ERPNext document action, e.g. 'on_submit'. */
+            readonly action: string;
+            /** @description The ERPNext document. Must carry school_id (or custom_school_id) — the payload is otherwise untenanted and cannot be routed to a tenant. */
+            readonly data: {
+                readonly [key: string]: unknown;
+            };
+            /** @description ERPNext DocType, e.g. 'Sales Invoice'. */
+            readonly doctype: string;
+            /** @description ERPNext's unique id for this delivery. Used to deduplicate redeliveries. */
+            readonly event_id: string;
+        };
+        readonly ErpNextWebhookAccepted: {
+            /** @enum {boolean} */
+            readonly ok: true;
+        };
+        readonly HealthOk: {
+            /** @enum {string} */
+            readonly status: "ok";
+        };
+        readonly ProblemDetails: {
+            /** @enum {string} */
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "RATE_LIMIT_EXCEEDED" | "INTERNAL_ERROR";
+            readonly detail?: string;
+            readonly instance?: string;
+            /** Format: uuid */
+            readonly request_id: string;
+            readonly status: number;
+            readonly title: string;
+            /** @default about:blank */
+            readonly type: string;
+        };
+        readonly ReadyDraining: {
+            /** @enum {string} */
+            readonly status: "shutting_down";
+        };
+        readonly ReadyOk: {
+            /** @enum {string} */
+            readonly status: "ready";
+        };
+        readonly School: {
+            /** Format: uuid */
+            readonly country_id: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: uuid */
+            readonly default_currency_id: string;
+            /**
+             * Format: uuid
+             * @description Primary key. This is the tenant identifier.
+             */
+            readonly id: string;
+            /** @description Display name. */
+            readonly name: string;
+            /**
+             * @description URL-safe unique identifier.
+             * @example springfield-high
+             */
+            readonly slug: string;
+            /**
+             * @description Lifecycle state of the school tenant.
+             * @enum {string}
+             */
+            readonly status: "pending" | "active" | "suspended" | "archived";
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly User: {
+            /** Format: date-time */
+            readonly created_at: string;
+            /** @description Optional human-readable name. */
+            readonly display_name: string | null;
+            /**
+             * @description Contact address as supplied. Unique per school after normalization.
+             * @example student@example.edu
+             */
+            readonly email: string;
+            /**
+             * Format: date-time
+             * @description Null until the address is verified.
+             */
+            readonly email_verified_at: string | null;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /**
+             * Format: date-time
+             * @description Null until first login.
+             */
+            readonly last_login_at: string | null;
+            /**
+             * Format: uuid
+             * @description Owning school tenant. Immutable — enforced by a database trigger, not policy.
+             */
+            readonly school_id: string;
+            /**
+             * @description Lifecycle state of the user within its school.
+             * @enum {string}
+             */
+            readonly status: "invited" | "active" | "suspended" | "archived";
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
     };
-    readonly ErpNextWebhookAccepted: {
-      /** @enum {boolean} */
-      readonly ok: true;
-    };
-    readonly HealthOk: {
-      /** @enum {string} */
-      readonly status: "ok";
-    };
-    readonly ProblemDetails: {
-      /** @enum {string} */
-      readonly code:
-        | "AUTH_INVALID_CREDENTIALS"
-        | "AUTH_TOKEN_EXPIRED"
-        | "AUTH_TOKEN_INVALID"
-        | "AUTH_SESSION_NOT_FOUND"
-        | "AUTHZ_FORBIDDEN"
-        | "AUTHZ_ROLE_NOT_FOUND"
-        | "AUTHZ_PERMISSION_NOT_FOUND"
-        | "VALIDATION_FAILED"
-        | "VALIDATION_REQUIRED_FIELD_MISSING"
-        | "RESOURCE_NOT_FOUND"
-        | "RESOURCE_ALREADY_DELETED"
-        | "CONFLICT_DUPLICATE_ENTRY"
-        | "CONFLICT_STATE_MISMATCH"
-        | "RATE_LIMIT_EXCEEDED"
-        | "INTERNAL_ERROR";
-      readonly detail?: string;
-      readonly instance?: string;
-      /** Format: uuid */
-      readonly request_id: string;
-      readonly status: number;
-      readonly title: string;
-      /** @default about:blank */
-      readonly type: string;
-    };
-    readonly ReadyDraining: {
-      /** @enum {string} */
-      readonly status: "shutting_down";
-    };
-    readonly ReadyOk: {
-      /** @enum {string} */
-      readonly status: "ready";
-    };
-    readonly School: {
-      /** Format: uuid */
-      readonly country_id: string;
-      /** Format: date-time */
-      readonly created_at: string;
-      /** Format: uuid */
-      readonly default_currency_id: string;
-      /**
-       * Format: uuid
-       * @description Primary key. This is the tenant identifier.
-       */
-      readonly id: string;
-      /** @description Display name. */
-      readonly name: string;
-      /**
-       * @description URL-safe unique identifier.
-       * @example springfield-high
-       */
-      readonly slug: string;
-      /**
-       * @description Lifecycle state of the school tenant.
-       * @enum {string}
-       */
-      readonly status: "pending" | "active" | "suspended" | "archived";
-      /** Format: date-time */
-      readonly updated_at: string;
-    };
-    readonly User: {
-      /** Format: date-time */
-      readonly created_at: string;
-      /** @description Optional human-readable name. */
-      readonly display_name: string | null;
-      /**
-       * @description Contact address as supplied. Unique per school after normalization.
-       * @example student@example.edu
-       */
-      readonly email: string;
-      /**
-       * Format: date-time
-       * @description Null until the address is verified.
-       */
-      readonly email_verified_at: string | null;
-      /**
-       * Format: uuid
-       * @description Primary key.
-       */
-      readonly id: string;
-      /**
-       * Format: date-time
-       * @description Null until first login.
-       */
-      readonly last_login_at: string | null;
-      /**
-       * Format: uuid
-       * @description Owning school tenant. Immutable — enforced by a database trigger, not policy.
-       */
-      readonly school_id: string;
-      /**
-       * @description Lifecycle state of the user within its school.
-       * @enum {string}
-       */
-      readonly status: "invited" | "active" | "suspended" | "archived";
-      /** Format: date-time */
-      readonly updated_at: string;
-    };
-  };
-  responses: never;
-  parameters: never;
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
+    responses: never;
+    parameters: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-  readonly ingestErpNextWebhook: {
-    readonly parameters: {
-      readonly query?: never;
-      readonly header: {
-        /** @description Hex-encoded HMAC-SHA256 of the raw request body, keyed with the shared webhook secret. Verified before the body is parsed; compared with a timing-safe equality. */
-        readonly "x-erpnext-signature": string;
-      };
-      readonly path?: never;
-      readonly cookie?: never;
+    readonly ingestErpNextWebhook: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                /** @description Hex-encoded HMAC-SHA256 of the raw request body, keyed with the shared webhook secret. Verified before the body is parsed; compared with a timing-safe equality. */
+                readonly "x-erpnext-signature": string;
+            };
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ErpNextWebhook"];
+            };
+        };
+        readonly responses: {
+            /** @description Event accepted, deduplicated, or knowingly ignored. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ErpNextWebhookAccepted"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
     };
-    readonly requestBody: {
-      readonly content: {
-        readonly "application/json": components["schemas"]["ErpNextWebhook"];
-      };
+    readonly getLiveness: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The process is alive. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["HealthOk"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
     };
-    readonly responses: {
-      /** @description Event accepted, deduplicated, or knowingly ignored. */
-      readonly 200: {
-        headers: {
-          /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
-          readonly "X-Request-Id": string;
-          readonly [name: string]: unknown;
+    readonly getReadiness: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
         };
-        content: {
-          readonly "application/json": components["schemas"]["ErpNextWebhookAccepted"];
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Ready for traffic. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ReadyOk"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Draining. The load balancer should stop routing here. */
+            readonly 503: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ReadyDraining"];
+                };
+            };
         };
-      };
-      /** @description The request was malformed or failed schema validation. */
-      readonly 400: {
-        headers: {
-          /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
-          readonly "X-Request-Id": string;
-          readonly [name: string]: unknown;
-        };
-        content: {
-          readonly "application/problem+json": components["schemas"]["ProblemDetails"];
-        };
-      };
-      /** @description Authentication is missing or invalid. */
-      readonly 401: {
-        headers: {
-          /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
-          readonly "X-Request-Id": string;
-          readonly [name: string]: unknown;
-        };
-        content: {
-          readonly "application/problem+json": components["schemas"]["ProblemDetails"];
-        };
-      };
-      /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
-      readonly 500: {
-        headers: {
-          /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
-          readonly "X-Request-Id": string;
-          readonly [name: string]: unknown;
-        };
-        content: {
-          readonly "application/problem+json": components["schemas"]["ProblemDetails"];
-        };
-      };
     };
-  };
-  readonly getLiveness: {
-    readonly parameters: {
-      readonly query?: never;
-      readonly header?: never;
-      readonly path?: never;
-      readonly cookie?: never;
-    };
-    readonly requestBody?: never;
-    readonly responses: {
-      /** @description The process is alive. */
-      readonly 200: {
-        headers: {
-          /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
-          readonly "X-Request-Id": string;
-          readonly [name: string]: unknown;
-        };
-        content: {
-          readonly "application/json": components["schemas"]["HealthOk"];
-        };
-      };
-      /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
-      readonly 500: {
-        headers: {
-          /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
-          readonly "X-Request-Id": string;
-          readonly [name: string]: unknown;
-        };
-        content: {
-          readonly "application/problem+json": components["schemas"]["ProblemDetails"];
-        };
-      };
-    };
-  };
-  readonly getReadiness: {
-    readonly parameters: {
-      readonly query?: never;
-      readonly header?: never;
-      readonly path?: never;
-      readonly cookie?: never;
-    };
-    readonly requestBody?: never;
-    readonly responses: {
-      /** @description Ready for traffic. */
-      readonly 200: {
-        headers: {
-          /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
-          readonly "X-Request-Id": string;
-          readonly [name: string]: unknown;
-        };
-        content: {
-          readonly "application/json": components["schemas"]["ReadyOk"];
-        };
-      };
-      /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
-      readonly 500: {
-        headers: {
-          /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
-          readonly "X-Request-Id": string;
-          readonly [name: string]: unknown;
-        };
-        content: {
-          readonly "application/problem+json": components["schemas"]["ProblemDetails"];
-        };
-      };
-      /** @description Draining. The load balancer should stop routing here. */
-      readonly 503: {
-        headers: {
-          /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
-          readonly "X-Request-Id": string;
-          readonly [name: string]: unknown;
-        };
-        content: {
-          readonly "application/json": components["schemas"]["ReadyDraining"];
-        };
-      };
-    };
-  };
 }
