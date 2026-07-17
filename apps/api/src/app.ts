@@ -9,6 +9,7 @@ import {
   loggerMiddleware,
   errorHandlerMiddleware,
   rateLimiterMiddleware,
+  idempotencyMiddleware,
   notFoundHandler,
 } from "./middleware";
 import { registerOpenApiComponents } from "./openapi/components";
@@ -95,6 +96,13 @@ export function createApp({
   // short-circuit before any handler runs.
   if (redis) {
     app.use("*", rateLimiterMiddleware({ redis }));
+  }
+
+  // Idempotency key middleware: captures and replays POST responses for financial and import
+  // endpoints. Only triggers on requests with an `Idempotency-Key` header; all others pass through.
+  if (redis) {
+    app.use("/api/finance/*", idempotencyMiddleware({ redis }));
+    app.use("/api/imports/*", idempotencyMiddleware({ redis }));
   }
 
   // The ALB in front of this service (infra/terraform/modules/edge) terminates TLS and forwards
