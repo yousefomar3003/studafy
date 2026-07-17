@@ -9,6 +9,8 @@ describe("loadEnv", () => {
       NODE_ENV: "development",
       REDIS_URL: "redis://localhost:6379",
       SHUTDOWN_TIMEOUT_MS: 10_000,
+      DATABASE_URL: "postgres://localhost:5432/studafy",
+      SCHOOL_IDS: "",
     });
   });
 
@@ -23,6 +25,8 @@ describe("loadEnv", () => {
       NODE_ENV: "production",
       REDIS_URL: "redis://redis.internal:6380",
       SHUTDOWN_TIMEOUT_MS: 30_000,
+      DATABASE_URL: "postgres://localhost:5432/studafy",
+      SCHOOL_IDS: "",
     });
   });
 

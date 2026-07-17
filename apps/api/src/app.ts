@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { erpNextWebhookRoutes } from "./erpnext/webhook";
 import { healthRoutes } from "./health";
 import {
   requestIdMiddleware,
@@ -10,6 +11,7 @@ import {
   notFoundHandler,
 } from "./middleware";
 
+import type { Database } from "./db";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
@@ -28,6 +30,8 @@ export interface AppOptions {
   generateRequestId?: () => string;
   /** Redis client for rate limiting and caching. Pass `null` to disable rate limiting. */
   redis?: RedisClient | null;
+  /** Database client for routes that need it (webhook ingestion). Pass `null` to disable. */
+  database?: Database | null;
 }
 
 /**
@@ -41,6 +45,7 @@ export function createApp({
   logger,
   generateRequestId,
   redis,
+  database,
 }: AppOptions): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
@@ -80,6 +85,12 @@ export function createApp({
   });
 
   app.route("/", healthRoutes(isReady));
+
+  // ERPNext webhook ingestion — mounted only when a database is available. The route is public
+  // (no auth middleware) because ERPNext authenticates via HMAC signature, not a session token.
+  if (database) {
+    app.route("/", erpNextWebhookRoutes(database, logger));
+  }
 
   // One error envelope for the whole app, for both the ways a request can fail: no route matched it,
   // or a handler threw. Registered last for readability only: Hono attaches these to the app rather

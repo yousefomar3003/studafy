@@ -34,6 +34,24 @@ export const DOMAIN_EVENTS = {
 
   CERTIFICATE_ISSUED: "certificate.issued",
   CERTIFICATE_REVOKED: "certificate.revoked",
+
+  // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
+  // by the API, then relayed by the outbox-relay worker like any other domain event.
+  ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",
+  ERPNEXT_FEE_DUE: "erpnext.feeDue",
+  ERPNEXT_PAYMENT_RECEIVED: "erpnext.paymentReceived",
+  ERPNEXT_CREDIT_NOTE_ISSUED: "erpnext.creditNoteIssued",
 } as const;
+
+/**
+ * ERPNext webhook doc-events that map to outbox event names. The webhook ingestion layer uses
+ * this to translate the external `doc_event` + `action` pair into an internal event_name.
+ */
+export const ERPNEXT_DOC_EVENT_MAP: Record<string, DomainEvent | undefined> = {
+  "Sales Invoice-submitted": DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED,
+  "Fee Schedule-submitted": DOMAIN_EVENTS.ERPNEXT_FEE_DUE,
+  "Payment Entry-submitted": DOMAIN_EVENTS.ERPNEXT_PAYMENT_RECEIVED,
+  "Sales Invoice-return": DOMAIN_EVENTS.ERPNEXT_CREDIT_NOTE_ISSUED,
+};
 
 export type DomainEvent = (typeof DOMAIN_EVENTS)[keyof typeof DOMAIN_EVENTS];

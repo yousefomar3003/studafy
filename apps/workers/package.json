@@ -15,6 +15,7 @@
     "@studafy/constants": "workspace:*",
     "bullmq": "5.79.3",
     "ioredis": "5.10.1",
+    "postgres": "3.4.9",
     "zod": "4.1.12"
   },
   "devDependencies": {

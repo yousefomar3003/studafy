@@ -28,6 +28,7 @@ const app = createApp({
   tracker,
   logger,
   redis,
+  database,
 });
 
 const server = Bun.serve({
