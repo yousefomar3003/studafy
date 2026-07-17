@@ -9,6 +9,8 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
+  DATABASE_URL: z.string().min(1).default("postgres://localhost:5432/studafy"),
+  SCHOOL_IDS: z.string().min(1).default(""),
 });
 
 export type Env = z.infer<typeof envSchema>;

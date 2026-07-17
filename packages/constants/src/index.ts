@@ -1,4 +1,4 @@
-export { DOMAIN_EVENTS } from "./events";
+export { DOMAIN_EVENTS, ERPNEXT_DOC_EVENT_MAP } from "./events";
 export type { DomainEvent } from "./events";
 export { ERROR_CODES } from "./errors";
 export type { ErrorCode } from "./errors";
