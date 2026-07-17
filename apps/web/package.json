@@ -12,6 +12,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@studafy/api-client": "workspace:*",
     "@studafy/ui": "workspace:*",
     "@tanstack/react-query": "5.101.2",
     "react": "18.3.1",
