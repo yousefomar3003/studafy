@@ -37,7 +37,12 @@ async function runCheckDrift(env: Record<string, string> = {}): Promise<{
 
 describe("client type drift detection", () => {
   test("passes when the committed types match the spec", async () => {
-    const { exitCode, stdout } = await runCheckDrift();
+    const { exitCode, stdout, stderr } = await runCheckDrift();
+    // Surface the change vector if this ever fails, so CI shows what diverged (e.g. an OS-specific
+    // codegen difference) instead of only "expected 0, got 1".
+    if (exitCode !== 0) {
+      console.error(stderr);
+    }
     expect(exitCode).toBe(0);
     expect(stdout).toContain("in sync");
   }, 30_000);

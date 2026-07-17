@@ -31,11 +31,24 @@ export async function generateClientTypes(outPath: string): Promise<string> {
   >[0];
 
   const ast = await openapiTS(spec, OPENAPI_TS_OPTIONS);
-  const contents = `${GENERATED_BANNER}\n${astToString(ast)}`;
+  const contents = normalize(`${GENERATED_BANNER}\n${astToString(ast)}`);
 
   await mkdir(path.dirname(outPath), { recursive: true });
   await writeFile(outPath, contents);
   return contents;
+}
+
+/**
+ * Makes the emitted bytes identical on every OS, so the committed artifact and a CI regeneration
+ * compare equal regardless of where each ran. Normalizes newlines to LF, strips trailing whitespace
+ * (the TypeScript printer can leave it on blank JSDoc lines, and it is not otherwise visible in a
+ * diff), and ends the file with exactly one newline.
+ */
+function normalize(source: string): string {
+  return `${source
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n+$/, "")}\n`;
 }
 
 async function main(): Promise<void> {
