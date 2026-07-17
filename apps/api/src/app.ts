@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { OpenAPIHono } from "@hono/zod-openapi";
 
 import { healthRoutes } from "./health";
 import {
@@ -9,6 +9,8 @@ import {
   rateLimiterMiddleware,
   notFoundHandler,
 } from "./middleware";
+import { registerOpenApi } from "./openapi/registry";
+import { studentRoutes } from "./routes/students";
 
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
@@ -41,8 +43,8 @@ export function createApp({
   logger,
   generateRequestId,
   redis,
-}: AppOptions): Hono<AppEnv> {
-  const app = new Hono<AppEnv>();
+}: AppOptions): OpenAPIHono<AppEnv> {
+  const app = new OpenAPIHono<AppEnv>();
 
   // Outermost, and it must stay there: its `finally` has to be the last thing to run so shutdown
   // drains a request even when everything inside it fails.
@@ -79,7 +81,12 @@ export function createApp({
     c.header("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   });
 
+  // OpenAPI spec (/doc), Scalar docs (/docs), and ProblemDetails component registration.
+  // Placed after middleware so the doc endpoints are protected by the same stack.
+  registerOpenApi(app);
+
   app.route("/", healthRoutes(isReady));
+  app.route("/", studentRoutes());
 
   // One error envelope for the whole app, for both the ways a request can fail: no route matched it,
   // or a handler threw. Registered last for readability only: Hono attaches these to the app rather

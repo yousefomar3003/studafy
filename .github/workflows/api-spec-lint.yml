@@ -1,0 +1,107 @@
+name: API Spec Lint
+
+on:
+  pull_request:
+    paths:
+      - "apps/api/src/**"
+      - "packages/shared-schemas/**"
+      - "packages/constants/**"
+      - ".github/workflows/api-spec-lint.yml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  spec-validation:
+    name: openapi-spec-validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile --ignore-scripts
+
+      # 1. Validate the committed spec against the OpenAPI 3.1.0 meta-schema.
+      - name: Validate spec against OpenAPI 3.1.0 meta-schema
+        run: bun run openapi:lint
+        working-directory: apps/api
+
+      # 2. Check if the committed spec matches the generated one (--check does not write).
+      # If it fails, generate the diff for the PR comment below.
+      - name: Validate spec matches committed version
+        id: check
+        continue-on-error: true
+        run: bun run openapi:check
+        working-directory: apps/api
+
+      # Generate spec to a temp file for diffing (only when check failed)
+      - name: Generate spec for diff
+        if: steps.check.outcome == 'failure'
+        run: |
+          cp apps/api/openapi.json apps/api/openapi.json.committed
+          bun run openapi:build
+        working-directory: apps/api
+
+      - name: Diff spec
+        if: steps.check.outcome == 'failure'
+        id: diff
+        run: |
+          diff_output=$(diff -u apps/api/openapi.json.committed apps/api/openapi.json 2>&1 || true)
+          rm -f apps/api/openapi.json.committed
+          if [ -n "$diff_output" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "## OpenAPI Spec Changes Detected"
+              echo ""
+              echo "The generated OpenAPI spec differs from the committed version."
+              echo "Run \`bun run openapi:build\` in \`apps/api/\` and commit the updated \`openapi.json\`."
+              echo ""
+              echo '<details><summary>Show diff</summary>'
+              echo ""
+              echo '```diff'
+              echo "$diff_output"
+              echo '```'
+              echo '</details>'
+            } > diff.md
+          fi
+
+      # Post diff as PR comment
+      - name: Post spec diff
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('diff.md', 'utf8');
+            const marker = '<!-- api-spec-lint -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: marker + '\n' + body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: marker + '\n' + body,
+              });
+            }
+
+      # Fail the build if the spec is out of date
+      - name: Fail on spec drift
+        if: steps.check.outcome == 'failure'
+        run: |
+          echo "::error::OpenAPI spec is out of date. Run 'bun run openapi:build' in apps/api/ and commit openapi.json."
+          exit 1

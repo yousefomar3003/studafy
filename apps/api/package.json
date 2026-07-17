@@ -6,12 +6,17 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "build": "bun build ./src/index.ts --outdir dist --target bun",
+    "openapi:build": "bun run src/openapi/build.ts",
+    "openapi:check": "bun run src/openapi/build.ts --check",
+    "openapi:lint": "redocly lint openapi.json --skip-rule no-unused-components",
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
     "test": "bun test",
     "test:security": "bun test ./tests/security --timeout 90000"
   },
   "dependencies": {
+    "@hono/zod-openapi": "1.5.1",
+    "@scalar/hono-api-reference": "0.11.11",
     "@studafy/constants": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
     "hono": "4.12.28",
@@ -20,9 +25,11 @@
     "zod": "4.1.12"
   },
   "devDependencies": {
+    "@redocly/cli": "1.28.5",
     "@studafy/config": "workspace:*",
     "@studafy/tsconfig": "workspace:*",
     "@types/bun": "1.3.14",
+    "bun-types": "1.3.14",
     "typescript": "^5.9.3"
   }
 }
