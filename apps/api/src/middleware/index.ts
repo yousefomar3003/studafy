@@ -29,6 +29,7 @@ export {
   type ApiProblem,
 } from "./errorHandler";
 export { rateLimiterMiddleware, extractClientIp, type RateLimiterOptions } from "./rateLimiter";
+export { idempotencyMiddleware, type IdempotencyOptions } from "./idempotency";
 export {
   auditAction,
   emitAuditLog,
