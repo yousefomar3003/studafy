@@ -1,4 +1,5 @@
-import { Hono } from "hono";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { Scalar } from "@scalar/hono-api-reference";
 
 import { erpNextWebhookRoutes } from "./erpnext/webhook";
 import { healthRoutes } from "./health";
@@ -10,6 +11,9 @@ import {
   rateLimiterMiddleware,
   notFoundHandler,
 } from "./middleware";
+import { registerOpenApiComponents } from "./openapi/components";
+import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
+import { openApiValidationHook } from "./openapi/hook";
 
 import type { Database } from "./db";
 import type { InflightTracker } from "./lifecycle";
@@ -32,12 +36,23 @@ export interface AppOptions {
   redis?: RedisClient | null;
   /** Database client for routes that need it (webhook ingestion). Pass `null` to disable. */
   database?: Database | null;
+  /**
+   * Mount the interactive reference (`/docs`) and the served document (`/openapi.json`).
+   *
+   * Injected rather than read from NODE_ENV in here, like isReady and tracker, so a test can
+   * exercise both arms without mutating the environment. Defaults to off: these are developer
+   * tooling, and the default should be the one that exposes nothing.
+   */
+  docsEnabled?: boolean;
 }
 
 /**
  * Build the Hono application. It is deliberately free of any port binding so it can be exercised
  * directly via `app.request(...)` in tests. Every request is counted by the in-flight tracker so
  * shutdown can drain active work.
+ *
+ * Returns an OpenAPIHono — a Hono subclass, so every existing caller is unaffected — because the
+ * OpenAPI document is generated from this app's own route registry. See src/openapi/document.ts.
  */
 export function createApp({
   isReady,
@@ -46,8 +61,14 @@ export function createApp({
   generateRequestId,
   redis,
   database,
-}: AppOptions): Hono<AppEnv> {
-  const app = new Hono<AppEnv>();
+  docsEnabled = false,
+}: AppOptions): OpenAPIHono<AppEnv> {
+  // The defaultHook makes request-validation failures throw into errorHandlerMiddleware instead of
+  // being answered by @hono/zod-validator's own un-enveloped 400. Sub-apps inherit it through
+  // route(), but each one passes it explicitly too, so it is also correct when unit-tested alone.
+  const app = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  registerOpenApiComponents(app);
 
   // Outermost, and it must stay there: its `finally` has to be the last thing to run so shutdown
   // drains a request even when everything inside it fails.
@@ -90,6 +111,18 @@ export function createApp({
   // (no auth middleware) because ERPNext authenticates via HMAC signature, not a session token.
   if (database) {
     app.route("/", erpNextWebhookRoutes(database, logger));
+  }
+
+  // The document and the reference site that reads it. Off by default and disabled in production:
+  // Scalar's page pulls its bundle from a CDN, and production has no reason to depend on a third
+  // party for a page it does not need. Registered from the same OPENAPI_DOCUMENT_CONFIG that
+  // scripts/generate-openapi.ts uses, so the served document and the committed one cannot disagree.
+  //
+  // Both are registered after the routes they describe: OpenAPIHono.route() copies a sub-app's
+  // definitions into this app's registry at mount time, and doc31 reads that registry.
+  if (docsEnabled) {
+    app.doc31("/openapi.json", OPENAPI_DOCUMENT_CONFIG);
+    app.get("/docs", Scalar({ url: "/openapi.json", pageTitle: "Studafy API" }));
   }
 
   // One error envelope for the whole app, for both the ways a request can fail: no route matched it,
