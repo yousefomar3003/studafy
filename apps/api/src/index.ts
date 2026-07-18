@@ -3,6 +3,7 @@ import { checkDatabase, closeDatabase, createDatabase } from "./database";
 import { loadEnv } from "./env";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
+import { KeyStore } from "./modules/auth";
 import { checkRedis, closeRedis, createRedisClient } from "./redis";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a port.
@@ -23,12 +24,19 @@ const state = { ready: true };
 const tracker = createInflightTracker();
 const database = createDatabase(env);
 const redis = env.REDIS_URL ? createRedisClient({ url: env.REDIS_URL, logger }) : null;
+
+const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
+  logger.info({ kid }, "jwt key rotated");
+});
+await keyStore.init();
+
 const app = createApp({
   isReady: async () => state.ready && (await checkDatabase(database)) && (await checkRedis(redis)),
   tracker,
   logger,
   redis,
   database,
+  keyStore,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",
@@ -61,6 +69,7 @@ const shutdown = (signal: string) => {
     tracker,
     timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
   }).then(async () => {
+    keyStore.destroy();
     await closeRedis(redis);
     await closeDatabase(database);
     logger.info({ signal }, "shutdown complete");

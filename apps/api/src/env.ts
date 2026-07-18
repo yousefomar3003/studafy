@@ -28,6 +28,15 @@ export const envSchema = z
     DATABASE_CA_CERT: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1).optional(),
     ERPNEXT_WEBHOOK_SECRET: z.string().min(1).optional(),
+    // JWT access-token signing
+    JWT_ISSUER: z.string().min(1).default("studafy"),
+    JWT_AUDIENCE: z.string().min(1).default("studafy-api"),
+    JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+    JWT_KEY_ROTATION_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(7 * 24 * 60 * 60 * 1000),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;
