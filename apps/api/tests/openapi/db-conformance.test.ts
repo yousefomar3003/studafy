@@ -94,7 +94,7 @@ function parseMaxLength(sql: string, column: string): number {
 const usersSql = await Bun.file(USERS_MIGRATION).text();
 const globalSql = await Bun.file(GLOBAL_MIGRATION).text();
 
-const document = buildOpenApiDocument();
+const document = await buildOpenApiDocument();
 const schemas = document.components?.schemas as Record<string, Record<string, never>>;
 
 /** Narrow the emitted JSON Schema enough to read without `any` at every access. */
