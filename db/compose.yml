@@ -1,4 +1,14 @@
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
   postgres:
     # pgvector/pgvector:pg16 is the official pgvector image built on the standard Postgres 16 image,
     # so it ships the `vector` extension plus the contrib modules the migrations use (pgcrypto,
