@@ -163,7 +163,7 @@ method, client IP, user agent, `request_id` — and never contains the token val
 
 ## Performance
 
-The acceptance target is **< 0.5 ms** for the whole chain. Measured overhead is **~0.03 ms**, a ~16×
+The acceptance target is **< 0.5 ms** for the whole chain. Measured overhead is **~0.03 ms**, a ~16x
 margin.
 
 ```bash
