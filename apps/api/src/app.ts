@@ -11,6 +11,9 @@ import {
   rateLimiterMiddleware,
   idempotencyMiddleware,
   notFoundHandler,
+  corsMiddleware,
+  csrfMiddleware,
+  securityHeadersMiddleware,
 } from "./middleware";
 import { jwksRoutes } from "./modules/auth";
 import { registerOpenApiComponents } from "./openapi/components";
@@ -90,6 +93,22 @@ export function createApp({
   // Request ID middleware: generates unique ID per request, creates child logger, stamps X-Request-Id
   app.use("*", requestIdMiddleware({ logger, generateRequestId }));
 
+  // CORS middleware: first of the security chain, so a preflight is answered and a disallowed
+  // origin is dropped before any downstream middleware claims a connection or a lock.
+  app.use("*", corsMiddleware());
+
+  // Security headers: CSP, HSTS, X-Frame-Options, and friends on every response.
+  //
+  // HSTS lives here rather than at the edge because the ALB in front of this service
+  // (infra/terraform/modules/edge) terminates TLS and forwards plaintext to us; its listener
+  // actions can't inject response headers, so HSTS has to be set here or nowhere. See
+  // docs/runbooks/edge-security.md.
+  app.use("*", securityHeadersMiddleware());
+
+  // CSRF: double-submit cookie check on state-mutating requests that are not Bearer-authenticated.
+  // After CORS so preflights are already answered and never reach it.
+  app.use("/api/*", csrfMiddleware());
+
   // Locale middleware: parses Accept-Language header and attaches locale to request context
   app.use("*", localeMiddleware());
 
@@ -109,14 +128,6 @@ export function createApp({
     app.use("/api/finance/*", idempotencyMiddleware({ redis }));
     app.use("/api/imports/*", idempotencyMiddleware({ redis }));
   }
-
-  // The ALB in front of this service (infra/terraform/modules/edge) terminates TLS and forwards
-  // plaintext to us; its listener actions can't inject response headers, so HSTS has to be set
-  // here or nowhere. See docs/runbooks/edge-security.md.
-  app.use("*", async (c, next) => {
-    await next();
-    c.header("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-  });
 
   app.route("/", healthRoutes(isReady));
 

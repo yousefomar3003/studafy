@@ -13,6 +13,9 @@ const buildApp = (isReady: () => boolean) =>
   createApp({ isReady, tracker: createInflightTracker(), logger: silentLogger() });
 
 describe("security headers", () => {
+  // The full matrix is asserted in tests/security/security-headers.test.ts. This case stays here
+  // because it is the wiring check: it fails if securityHeadersMiddleware is ever dropped from
+  // createApp, which is the regression docs/runbooks/edge-security.md depends on not happening.
   test("every response sets Strict-Transport-Security", async () => {
     const res = await buildApp(() => true).request("/healthz");
     expect(res.headers.get("Strict-Transport-Security")).toBe(

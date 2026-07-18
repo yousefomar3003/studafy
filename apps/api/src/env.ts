@@ -3,12 +3,61 @@ import { z } from "zod";
 import { LOG_LEVEL_NAMES } from "./logger";
 
 /**
+ * Split a comma-separated origin list into trimmed, non-empty entries.
+ *
+ * Exported so the security config parses the variable exactly the way the schema validated it —
+ * one parser, so a value that passes bootstrap validation cannot be read back differently.
+ */
+export function parseOriginList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+/**
+ * True when the value is a bare origin: scheme, host, optional port, and nothing else.
+ *
+ * Rejects trailing paths and wildcards. The allowlist is compared by exact match, so an entry
+ * carrying a path would never match a real `Origin` header and would sit in the config looking
+ * like protection it does not provide.
+ */
+export function isAbsoluteOrigin(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  if (url.username !== "" || url.password !== "") return false;
+  if (url.pathname !== "/" || url.search !== "" || url.hash !== "") return false;
+  if (value.includes("*")) return false;
+  // new URL() normalizes a trailing slash in, so compare against the origin it derived rather than
+  // the raw string, which may or may not have carried one.
+  return value.replace(/\/$/, "") === url.origin;
+}
+
+/**
  * Environment configuration for the API. It is parsed and validated once at bootstrap so that an
  * invalid environment fails fast — before the server binds a port — with a named, readable error.
  */
 export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    // The deployment tier, which NODE_ENV cannot express: staging runs a production build
+    // (NODE_ENV=production) against non-production origins and secrets. Terraform already models
+    // the three tiers (infra/terraform/environments/{dev,staging,prod}), so the application needs a
+    // matching axis to resolve its CORS allowlist against.
+    APP_ENV: z.enum(["development", "staging", "production"]).default("development"),
+    // Comma-separated absolute origins permitted by the CORS allowlist. Deliberately data, not a
+    // compiled-in table: the previous hardcoded map had already drifted from infra, listing
+    // studafy.com/www.studafy.com while prod.tfvars provisions app.studafy.com. Required in
+    // staging/production by the refinement below, so a deployed tier cannot fall back to the
+    // localhost defaults and quietly accept credentialed cross-origin requests it should not.
+    CORS_ALLOWED_ORIGINS: z.string().optional(),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     HOST: z.string().min(1).default("0.0.0.0"),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
@@ -39,6 +88,29 @@ export const envSchema = z
       .default(7 * 24 * 60 * 60 * 1000),
   })
   .superRefine((env, context) => {
+    // Checked before the NODE_ENV gate below: this constraint keys off the deployment tier, and a
+    // staging box may legitimately run with either NODE_ENV.
+    if (env.APP_ENV !== "development") {
+      const origins = parseOriginList(env.CORS_ALLOWED_ORIGINS);
+      if (origins.length === 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["CORS_ALLOWED_ORIGINS"],
+          message: `CORS_ALLOWED_ORIGINS is required and must be non-empty when APP_ENV is ${env.APP_ENV}`,
+        });
+      }
+
+      for (const origin of origins) {
+        if (!isAbsoluteOrigin(origin)) {
+          context.addIssue({
+            code: "custom",
+            path: ["CORS_ALLOWED_ORIGINS"],
+            message: `"${origin}" is not a bare absolute origin (expected scheme://host[:port], no path and no wildcard)`,
+          });
+        }
+      }
+    }
+
     if (env.NODE_ENV !== "production") return;
 
     const requiredDatabaseValues = [

@@ -23,6 +23,14 @@ jobs:
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile --ignore-scripts
+      # The security suite imports the Hono app, which reaches @studafy/constants and
+      # @studafy/shared-schemas through their built dist/ -- and dist/ is gitignored, so it
+      # only exists once something builds it. This job invokes `bun test` directly rather than
+      # through turbo, so turbo's `test -> ^build` dependency never fires; without this step the
+      # app-level tests die at import time. `@studafy/api^...` selects the API's workspace
+      # dependencies without rebuilding the API itself, and stays correct if it gains another.
+      - name: Build the workspace packages the API imports
+        run: bunx turbo run build --filter=@studafy/api^...
       - name: Run NFR-05 cross-tenant security probe
         run: bun run test:security
       - name: Stop disposable PostgreSQL

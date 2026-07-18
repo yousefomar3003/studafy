@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "test": "bun test",
     "test:security": "bun test ./tests/security --timeout 90000",
+    "test:cross-tenant": "bun test ./tests/security/cross-tenant.test.ts ./tests/security/probe-support.test.ts --timeout 90000",
     "openapi:generate": "bun run scripts/generate-openapi.ts && prettier --write openapi.json"
   },
   "dependencies": {
