@@ -39,3 +39,11 @@ export {
   type AuditEntry,
   type AuditMeta,
 } from "./auditEmitter";
+export { corsMiddleware, type CorsOptions } from "./cors";
+export { csrfMiddleware, type CsrfOptions } from "./csrf";
+export {
+  securityHeadersMiddleware,
+  type SecurityHeadersOptions,
+  type CspDirectives,
+  type HstsOptions,
+} from "./securityHeaders";

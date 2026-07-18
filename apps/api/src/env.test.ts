@@ -8,6 +8,7 @@ describe("loadEnv", () => {
   test("applies defaults for an empty environment", () => {
     expect(loadEnv({})).toEqual({
       NODE_ENV: "development",
+      APP_ENV: "development",
       PORT: 3000,
       HOST: "0.0.0.0",
       SHUTDOWN_TIMEOUT_MS: 10_000,
@@ -21,6 +22,8 @@ describe("loadEnv", () => {
     expect(
       loadEnv({
         NODE_ENV: "test",
+        APP_ENV: "staging",
+        CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
         PORT: "8080",
         HOST: "127.0.0.1",
         SHUTDOWN_TIMEOUT_MS: "5000",
@@ -30,6 +33,8 @@ describe("loadEnv", () => {
       }),
     ).toEqual({
       NODE_ENV: "test",
+      APP_ENV: "staging",
+      CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
       PORT: 8080,
       HOST: "127.0.0.1",
       SHUTDOWN_TIMEOUT_MS: 5000,
@@ -59,6 +64,45 @@ describe("loadEnv", () => {
 
   test("requires PgBouncer TLS configuration in production", () => {
     expect(() => loadEnv({ NODE_ENV: "production" })).toThrow(EnvValidationError);
+  });
+
+  test("requires a non-empty CORS_ALLOWED_ORIGINS in every deployed tier", () => {
+    // NODE_ENV stays at its default here on purpose: the constraint keys off the deployment tier,
+    // not the build mode, so a staging box must be held to it either way.
+    expect(() => loadEnv({ APP_ENV: "staging" })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ APP_ENV: "production", CORS_ALLOWED_ORIGINS: "" })).toThrow(
+      EnvValidationError,
+    );
+    expect(() => loadEnv({ APP_ENV: "production", CORS_ALLOWED_ORIGINS: " , ," })).toThrow(
+      EnvValidationError,
+    );
+  });
+
+  test("does not require CORS_ALLOWED_ORIGINS in development", () => {
+    expect(loadEnv({ APP_ENV: "development" }).CORS_ALLOWED_ORIGINS).toBeUndefined();
+  });
+
+  test("rejects origins that are not bare absolute origins", () => {
+    const reject = (origins: string) =>
+      expect(() => loadEnv({ APP_ENV: "production", CORS_ALLOWED_ORIGINS: origins })).toThrow(
+        EnvValidationError,
+      );
+
+    reject("https://*.studafy.com"); // wildcards never match an Origin header
+    reject("https://studafy.com/app"); // a path can never equal an origin
+    reject("studafy.com"); // scheme-less
+    reject("ftp://studafy.com");
+    reject("https://good.studafy.com,https://bad.studafy.com/path"); // one bad entry fails the list
+  });
+
+  test("accepts a comma-separated origin list with surrounding whitespace", () => {
+    expect(
+      loadEnv({
+        APP_ENV: "production",
+        CORS_ALLOWED_ORIGINS: " https://app.studafy.com , https://api.studafy.com ",
+        NODE_ENV: "development",
+      }).CORS_ALLOWED_ORIGINS,
+    ).toBe(" https://app.studafy.com , https://api.studafy.com ");
   });
 
   test("throws for an unknown LOG_LEVEL", () => {

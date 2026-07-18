@@ -50,9 +50,15 @@ called "response header policy" the way CloudFront has one. Options considered:
   the ticket asks for LB + TLS + WAF, not a CDN, and adding one is a bigger architectural decision
   than this ticket should make unilaterally.
 - **Set it in the application**, since that's the only layer that actually controls the response.
-  This is what's implemented: `apps/api/src/app.ts` sets
+  This is what's implemented: `apps/api/src/middleware/securityHeaders.ts` sets
   `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` on every response via
-  Hono middleware, verified by `apps/api/src/app.test.ts`.
+  Hono middleware, registered in `apps/api/src/app.ts` and verified by
+  `apps/api/tests/security/security-headers.test.ts`.
+
+  As of ST-067 that middleware also carries the rest of the response header matrix (CSP,
+  X-Frame-Options, Referrer-Policy, and the Cross-Origin-* family) — see
+  [docs/security/web_defense_matrix.md](../security/web_defense_matrix.md). HSTS was previously an
+  inline `app.use` in `app.ts`; it moved so there is exactly one place that owns response headers.
 
 Consequence: HSTS is only actually served once a request reaches `apps/api` — i.e. once a compute
 tier exists and is wired to `module.edge`'s `https_listener_arn` (it doesn't exist yet, see the
