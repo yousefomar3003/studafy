@@ -14,6 +14,10 @@ describe("loadEnv", () => {
       LOG_LEVEL: "info",
       SERVICE_NAME: "api",
       RELEASE_VERSION: "unknown",
+      JWT_ISSUER: "studafy",
+      JWT_AUDIENCE: "studafy-api",
+      JWT_ACCESS_TTL_SECONDS: 900,
+      JWT_KEY_ROTATION_INTERVAL_MS: 7 * 24 * 60 * 60 * 1000,
     });
   });
 
@@ -36,6 +40,10 @@ describe("loadEnv", () => {
       LOG_LEVEL: "debug",
       SERVICE_NAME: "api-canary",
       RELEASE_VERSION: "sha-abc123",
+      JWT_ISSUER: "studafy",
+      JWT_AUDIENCE: "studafy-api",
+      JWT_ACCESS_TTL_SECONDS: 900,
+      JWT_KEY_ROTATION_INTERVAL_MS: 7 * 24 * 60 * 60 * 1000,
     });
   });
 

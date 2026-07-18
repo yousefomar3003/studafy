@@ -2,6 +2,7 @@ import { createApp } from "../app";
 import { createUnusableDatabase } from "../db/unusable";
 import { createInflightTracker } from "../lifecycle";
 import { createLogger } from "../logger";
+import { KeyStore } from "../modules/auth";
 
 import { OPENAPI_DOCUMENT_CONFIG } from "./config";
 
@@ -17,7 +18,10 @@ import { OPENAPI_DOCUMENT_CONFIG } from "./config";
  * `if (database)`, so null would silently emit a document missing a real endpoint, while a real
  * client would open a connection just to enumerate routes. See src/db/unusable.ts.
  */
-export function buildOpenApiDocument() {
+export async function buildOpenApiDocument() {
+  const keyStore = new KeyStore(60_000);
+  await keyStore.init();
+
   const app = createApp({
     isReady: () => true,
     tracker: createInflightTracker(),
@@ -28,9 +32,11 @@ export function buildOpenApiDocument() {
     // would be one more connection opened to draw a picture.
     redis: null,
     database: createUnusableDatabase(),
+    keyStore,
     // /docs and /openapi.json are tooling for reading the API, not part of the API's contract.
     docsEnabled: false,
   });
 
+  keyStore.destroy();
   return app.getOpenAPI31Document(OPENAPI_DOCUMENT_CONFIG);
 }

@@ -27,7 +27,7 @@ async function main(): Promise<void> {
     // `x-` members are legal in OpenAPI 3.1 and are ignored by tooling that does not know them.
     "x-generated-by":
       "apps/api/scripts/generate-openapi.ts — do not hand-edit; CI checks for drift",
-    ...buildOpenApiDocument(),
+    ...(await buildOpenApiDocument()),
   };
 
   // Trailing newline: the file is committed, and Prettier reformats it in the same script.

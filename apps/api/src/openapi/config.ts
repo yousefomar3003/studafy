@@ -35,6 +35,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
   ],
   tags: [
     {
+      name: "Auth",
+      description:
+        "Authentication and authorization endpoints. The JWKS endpoint is public and " +
+        "unauthenticated — clients fetch it to verify access tokens.",
+    },
+    {
       name: "Health",
       description:
         "Liveness and readiness probes. Never authenticated — an orchestrator has no credentials.",

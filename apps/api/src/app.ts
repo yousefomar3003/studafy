@@ -12,6 +12,7 @@ import {
   idempotencyMiddleware,
   notFoundHandler,
 } from "./middleware";
+import { jwksRoutes } from "./modules/auth";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -20,6 +21,7 @@ import type { Database } from "./db";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
+import type { KeyStore } from "./modules/auth";
 import type { RedisClient } from "./redis";
 
 export interface AppOptions {
@@ -37,6 +39,8 @@ export interface AppOptions {
   redis?: RedisClient | null;
   /** Database client for routes that need it (webhook ingestion). Pass `null` to disable. */
   database?: Database | null;
+  /** JWT key store for signing and JWKS endpoint. Pass `null` to disable auth routes. */
+  keyStore?: KeyStore | null;
   /**
    * Mount the interactive reference (`/docs`) and the served document (`/openapi.json`).
    *
@@ -62,6 +66,7 @@ export function createApp({
   generateRequestId,
   redis,
   database,
+  keyStore,
   docsEnabled = false,
 }: AppOptions): OpenAPIHono<AppEnv> {
   // The defaultHook makes request-validation failures throw into errorHandlerMiddleware instead of
@@ -119,6 +124,11 @@ export function createApp({
   // (no auth middleware) because ERPNext authenticates via HMAC signature, not a session token.
   if (database) {
     app.route("/", erpNextWebhookRoutes(database, logger));
+  }
+
+  // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.
+  if (keyStore) {
+    app.route("/", jwksRoutes(keyStore));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:

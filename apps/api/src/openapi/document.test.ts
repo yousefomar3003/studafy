@@ -8,6 +8,7 @@ import { createApp } from "../app";
 import { createUnusableDatabase } from "../db/unusable";
 import { createInflightTracker } from "../lifecycle";
 import { createLogger } from "../logger";
+import { KeyStore } from "../modules/auth";
 
 import { buildOpenApiDocument } from "./document";
 import { PROBLEM_STATUSES } from "./responses";
@@ -30,7 +31,7 @@ const COMMITTED_SPEC = path.join(import.meta.dir, "..", "..", "openapi.json");
 /** The extension the generator prepends. Not part of the document zod-to-openapi builds. */
 const BANNER_KEY = "x-generated-by";
 
-const document = buildOpenApiDocument();
+const document = await buildOpenApiDocument();
 
 /**
  * The document as JSON — exactly what the generator writes to disk and the server puts on the wire.
@@ -88,7 +89,7 @@ describe("structure", () => {
   // to the document, silently. This is the guard against that regression.
   test("contains every mounted route", () => {
     expect(Object.keys(document.paths ?? {}).sort()).toEqual(
-      ["/erpnext/webhooks", "/healthz", "/readyz"].sort(),
+      ["/.well-known/jwks.json", "/erpnext/webhooks", "/healthz", "/readyz"].sort(),
     );
   });
 
@@ -215,12 +216,15 @@ describe("the committed artifact", () => {
   });
 
   test("is what the server serves at /openapi.json", async () => {
+    const keyStore = new KeyStore(60_000);
+    await keyStore.init();
     const app = createApp({
       isReady: () => true,
       tracker: createInflightTracker(),
       logger: createLogger({ destination: () => undefined }),
       redis: null,
       database: createUnusableDatabase(),
+      keyStore,
       docsEnabled: true,
     });
 
@@ -228,6 +232,7 @@ describe("the committed artifact", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(serialized);
+    keyStore.destroy();
   });
 });
 
