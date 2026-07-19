@@ -60,27 +60,47 @@ SET ROLE studafy_admin;
 -- carry verification scans that do go through the policy. Without the line below the whole migration
 -- aborts on the first of them.
 --
--- The nil uuid is a deliberate choice rather than a placeholder tenant: it matches no school, so a
--- policy-filtered scan sees zero rows. On this table that is also the true state -- app.refresh_tokens
--- has never had a writer, as the column additions further down depend on and explain. The assertion
--- immediately below turns that from an assumption into a checked precondition, so the GUC cannot
--- quietly narrow a validation scan that should have seen rows. If the table is somehow non-empty,
--- this migration refuses to run instead of validating a constraint against an RLS-filtered subset.
-DO $tenant_context$
+-- Two mechanisms, because they cover different things.
+--
+-- NO FORCE is the one that matters. RLS applies to a table's owner only when FORCE is set, so
+-- clearing it for the length of this transaction lets studafy_admin -- which owns the table and is
+-- running this migration -- perform the DDL below without any policy being consulted. FORCE is
+-- restored at the end. The whole migration is transactional, so a failure anywhere rolls the flag
+-- back with everything else; and ALTER TABLE takes ACCESS EXCLUSIVE, so no other session can read
+-- the table through the window in which it is cleared.
+--
+-- Setting a GUC instead was the obvious first idea and is not sufficient on its own. It would make
+-- current_setting resolve, but to a nil uuid that matches no school -- so any scan it enables reads
+-- an RLS-filtered *subset*, which is precisely the wrong thing when the scan's purpose is to
+-- validate a constraint over every row. It would also make the emptiness assertion below vacuous:
+-- filtered to nothing, count(*) is 0 whether or not the table holds data. NO FORCE has neither
+-- problem, because it removes the filter rather than satisfying it.
+--
+-- set_config is kept anyway, for the other tenant tables this migration's foreign keys reference
+-- (app.users, app.user_devices) rather than for app.refresh_tokens itself. Clearing FORCE on those
+-- is not this migration's business, and a resolvable GUC costs nothing.
+SELECT set_config('app.school_id', '00000000-0000-0000-0000-000000000000', true);
+
+ALTER TABLE app.refresh_tokens NO FORCE ROW LEVEL SECURITY;
+
+-- Now that policies are out of the way, this count is the real one. The NOT NULL columns below are
+-- added with no backfill, which is only sound because app.refresh_tokens has never had a writer --
+-- it was created by 000007 in anticipation of ST-071 and nothing ever inserted into it. This turns
+-- that from an assumption into a checked precondition: if the table holds data anywhere, the
+-- migration aborts instead of failing halfway through with a less legible constraint violation.
+DO $assert_empty$
 DECLARE
   existing bigint;
 BEGIN
   SELECT count(*) INTO existing FROM app.refresh_tokens;
   IF existing > 0 THEN
     RAISE EXCEPTION
-      'app.refresh_tokens holds % row(s); 000029 assumes it is empty because it adds NOT NULL '
-      'columns with no backfill and validates foreign keys under a tenant-scoped GUC', existing
+      'app.refresh_tokens holds % row(s); 000029 adds NOT NULL columns with no backfill and '
+      'assumes the relation has never had a writer', existing
       USING ERRCODE = '23502';
   END IF;
 END
-$tenant_context$;
-
-SELECT set_config('app.school_id', '00000000-0000-0000-0000-000000000000', true);
+$assert_empty$;
 
 -- The client surface a session was established from. Mirrors AUTH_CHANNELS in
 -- apps/api/src/modules/auth/channels.ts label-for-label, the same way app.notification_type mirrors
@@ -257,5 +277,26 @@ CREATE POLICY refresh_tokens_owner ON app.refresh_tokens
   AS RESTRICTIVE FOR ALL TO studafy_app
   USING (user_id = app.current_user_id())
   WITH CHECK (user_id = app.current_user_id());
+
+-- Restore what NO FORCE cleared at the top. This is the single most important line in the file:
+-- leaving FORCE off would exempt studafy_admin from tenant_isolation permanently, which is the exact
+-- hole 000006 exists to close, and nothing in the application would misbehave to reveal it. The
+-- assertion after it is not ceremony -- it is what turns "we remembered" into something the
+-- migration proves before it commits.
+ALTER TABLE app.refresh_tokens FORCE ROW LEVEL SECURITY;
+
+DO $assert_forced$
+DECLARE
+  forced boolean;
+BEGIN
+  SELECT relforcerowsecurity INTO forced
+  FROM pg_catalog.pg_class WHERE oid = 'app.refresh_tokens'::regclass;
+
+  IF NOT forced THEN
+    RAISE EXCEPTION 'app.refresh_tokens must leave this migration with FORCE ROW LEVEL SECURITY set'
+      USING ERRCODE = '42501';
+  END IF;
+END
+$assert_forced$;
 
 RESET ROLE;
