@@ -21,7 +21,7 @@ import type { Sql } from "postgres";
  * in the same transaction that inserted the child, did the audit row commit with the revocation, did
  * the loser of a race roll its child back — and a status code cannot distinguish "rotated correctly"
  * from "rotated and left the family in a half-updated state". The routes get their own coverage in
- * delivery.test.ts, which is where the HTTP-shaped questions live.
+ * session-http.test.ts, which is where the HTTP-shaped questions live.
  *
  * Every test builds its own tenant. Sharing one would make the reuse tests order-dependent, since
  * the first one to detect a breach revokes a family the next would want intact.

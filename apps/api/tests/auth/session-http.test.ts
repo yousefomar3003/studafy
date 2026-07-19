@@ -84,6 +84,27 @@ async function post(path: string, init?: RequestInit): Promise<Response> {
   return app.request(path, { method: "POST", ...init });
 }
 
+/**
+ * Headers for a web-channel request: the refresh cookie, and nothing else.
+ *
+ * No CSRF double-submit pair, because `/api/auth/refresh` and `/api/auth/logout` are in
+ * csrfMiddleware's exempt list. The check could not cover them usefully: a client calls these
+ * precisely when its access token is gone, so the Bearer exemption frequently does not apply, and a
+ * mobile client carrying no cookie at all would be rejected by a defence meant for browsers. What
+ * protects the browser case is the refresh cookie's own SameSite=Strict attribute, which keeps it
+ * off every cross-site request. See the rationale on EXEMPT_PATHS in src/middleware/csrf.ts.
+ */
+function webHeaders(
+  refreshToken: string,
+  extra: Record<string, string> = {},
+): Record<string, string> {
+  return {
+    "content-type": "application/json",
+    cookie: `session=${refreshToken}`,
+    ...extra,
+  };
+}
+
 /** Parse the one Set-Cookie header for the session cookie, if present. */
 function sessionCookie(res: Response): string | undefined {
   return res.headers.getSetCookie().find((cookie) => cookie.startsWith("session="));
@@ -136,7 +157,7 @@ describe("delivery", () => {
     });
 
     const res = await post("/api/auth/refresh", {
-      headers: { "content-type": "application/json", cookie: `session=${seed.token}` },
+      headers: webHeaders(seed.token),
     });
 
     expect(res.status).toBe(200);
@@ -181,7 +202,7 @@ describe("delivery", () => {
     });
 
     const res = await post("/api/auth/refresh", {
-      headers: { "content-type": "application/json", cookie: `session=${web.token}` },
+      headers: webHeaders(web.token),
       body: JSON.stringify({ refresh_token: attacker.token }),
     });
 
@@ -202,14 +223,12 @@ describe("delivery", () => {
     });
 
     const res = await post("/api/auth/refresh", {
-      headers: {
-        "content-type": "application/json",
-        cookie: `session=${seed.token}`,
+      headers: webHeaders(seed.token, {
         // Headers a header-sniffing implementation would have honoured.
         "x-client-type": "mobile",
         "x-client-platform": "ios",
         "user-agent": "okhttp/4.9.0",
-      },
+      }),
     });
 
     expect(res.status).toBe(200);
@@ -271,7 +290,7 @@ describe("logout", () => {
     });
 
     const res = await post("/api/auth/logout", {
-      headers: { "content-type": "application/json", cookie: `session=${seed.token}` },
+      headers: webHeaders(seed.token),
     });
 
     expect(res.status).toBe(200);
