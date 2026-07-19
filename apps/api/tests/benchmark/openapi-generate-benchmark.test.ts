@@ -38,7 +38,7 @@ const MEASURED_ITERATIONS = 5;
 const TARGET_MS = 2_000;
 
 /** Routes the document must contain, so a script that wrote nothing cannot pass by doing nothing. */
-const EXPECTED_PATHS = ["/healthz", "/readyz", "/erpnext/webhooks"];
+const EXPECTED_PATHS = ["/.well-known/jwks.json", "/healthz", "/readyz", "/erpnext/webhooks"];
 
 const SCRIPT = path.join(import.meta.dir, "..", "..", "scripts", "generate-openapi.ts");
 const CWD = path.join(import.meta.dir, "..", "..");
