@@ -16,7 +16,7 @@ export interface SignOptions {
 
 /**
  * Mint a signed RS256 access token. The token carries the application claims (sub,
- * school_id, roles, entitlements_ver, jti) plus the standard registered claims
+ * school_id, roles, entitlements_ver, channel, jti) plus the standard registered claims
  * (iss, aud, iat, exp, nbf).
  *
  * The `jti` is a v4 UUID generated per call — callers do not supply it.
@@ -33,6 +33,7 @@ export async function signAccessToken(
     school_id: params.school_id,
     roles: params.roles,
     entitlements_ver: params.entitlements_ver,
+    channel: params.channel,
   })
     .setProtectedHeader({ alg: "RS256", kid: key.kid })
     .setSubject(params.sub)

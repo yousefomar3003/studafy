@@ -42,6 +42,8 @@ const app = createApp({
   redis,
   database,
   keyStore,
+  jwtIssuer: env.JWT_ISSUER,
+  jwtAudience: env.JWT_AUDIENCE,
   securityEventSink,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.

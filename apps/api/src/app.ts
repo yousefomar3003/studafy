@@ -15,8 +15,9 @@ import {
   corsMiddleware,
   csrfMiddleware,
   securityHeadersMiddleware,
+  jwtAuthMiddleware,
 } from "./middleware";
-import { jwksRoutes } from "./modules/auth";
+import { createJtiDenylist, jwksRoutes } from "./modules/auth";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -44,8 +45,18 @@ export interface AppOptions {
   redis?: RedisClient | null;
   /** Database client for routes that need it (webhook ingestion). Pass `null` to disable. */
   database?: Database | null;
-  /** JWT key store for signing and JWKS endpoint. Pass `null` to disable auth routes. */
+  /**
+   * JWT key store for signing and JWKS endpoint.
+   *
+   * Pass `null` to disable both the JWKS route and the authentication middleware — without keys
+   * there is nothing to verify against, and mounting the middleware anyway would answer every
+   * `/api/*` request with a 503.
+   */
   keyStore?: KeyStore | null;
+  /** Required `iss` claim on access tokens. Threaded from env.JWT_ISSUER. */
+  jwtIssuer?: string;
+  /** Required `aud` claim on access tokens. Threaded from env.JWT_AUDIENCE. */
+  jwtAudience?: string;
   /**
    * Where CORS and CSRF rejections are persisted (app.security_events).
    *
@@ -80,6 +91,8 @@ export function createApp({
   redis,
   database,
   keyStore,
+  jwtIssuer = "studafy",
+  jwtAudience = "studafy-api",
   securityEventSink,
   docsEnabled = false,
 }: AppOptions): OpenAPIHono<AppEnv> {
@@ -126,6 +139,28 @@ export function createApp({
 
   // Structured logger middleware: logs request/response lifecycle (excludes health checks)
   app.use("*", loggerMiddleware({ logger, excludePaths: ["/healthz", "/readyz"] }));
+
+  // JWT authentication: deny-by-default on every /api/* route, with an explicit exemption list
+  // inside the middleware for endpoints that authenticate by other means (the ERPNext webhook uses
+  // an HMAC signature). A new route under /api is therefore protected the moment it is mounted —
+  // nobody has to remember to opt in.
+  //
+  // Placed after the logger so a rejected request is still logged, and deliberately *before* the
+  // rate limiter: buildRateLimitKey (src/config/rateLimits.ts) keys authenticated traffic on
+  // schoolId:userId and falls back to the client IP when no auth context exists, so mounting it
+  // after the limiter would silently collapse every user behind a shared NAT into one bucket.
+  // It also runs after csrfMiddleware, which already exempts Bearer-authenticated requests.
+  if (keyStore) {
+    app.use(
+      "/api/*",
+      jwtAuthMiddleware({
+        keyStore,
+        denylist: redis ? createJtiDenylist(redis) : null,
+        issuer: jwtIssuer,
+        audience: jwtAudience,
+      }),
+    );
+  }
 
   // Rate limiter middleware: token-bucket rate limiting via Redis. Registered after the logger
   // so rate-limited requests are still logged for observability, but before routes so they

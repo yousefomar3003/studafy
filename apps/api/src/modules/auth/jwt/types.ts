@@ -1,3 +1,4 @@
+import type { AuthChannel } from "../channels";
 import type { Role } from "@studafy/constants";
 
 /**
@@ -18,6 +19,8 @@ export interface AccessTokenClaims {
   entitlements_ver: number;
   /** Unique token identifier — a v4 UUID, unique across the whole platform. */
   jti: string;
+  /** The client surface this token was minted for. See ../channels.ts. */
+  channel: AuthChannel;
 }
 
 /**
@@ -38,4 +41,5 @@ export interface SignAccessTokenParams {
   school_id: string;
   roles: Role[];
   entitlements_ver: number;
+  channel: AuthChannel;
 }

@@ -3,6 +3,7 @@ import { problemDetailsSchema } from "@studafy/shared-schemas";
 import { HTTPException } from "hono/http-exception";
 import { z, ZodError } from "zod";
 
+import { AuthException } from "./jwtAuth";
 import { getLocalizedMessage } from "./locale";
 
 import type { Logger } from "../logger";
@@ -44,6 +45,7 @@ const STATUS_TITLES = new Map<number, string>([
   [409, "Conflict"],
   [429, "Too Many Requests"],
   [500, "Internal Server Error"],
+  [503, "Service Unavailable"],
 ]);
 
 const STATUS_ERROR_CODES = new Map<number, ErrorCode>([
@@ -62,6 +64,13 @@ interface MappedError {
 }
 
 function mapError(error: unknown): MappedError {
+  // Checked before the HTTPException branch it extends: authentication carries a code the status
+  // alone cannot express — 401 maps to AUTH_TOKEN_INVALID by default, which would misreport an
+  // expired token and send a client that only needs to refresh into a re-login loop.
+  if (error instanceof AuthException) {
+    return { status: 401, code: error.code, detail: error.message };
+  }
+
   if (error instanceof HTTPException) {
     const code = STATUS_ERROR_CODES.get(error.status) ?? ERROR_CODES.INTERNAL_ERROR;
     // 4xx messages are safe to echo (authored in this codebase). 5xx messages may expose
@@ -137,6 +146,10 @@ export function errorHandlerMiddleware(rootLogger: Logger): ErrorHandler<AppEnv>
       // c.body, not c.json: c.json hard-codes application/json. No charset parameter — RFC 9457
       // defines none, and RFC 8259 already fixes JSON as UTF-8.
       "content-type": PROBLEM_CONTENT_TYPE,
+      // RFC 6750 §3 requires a challenge on a 401 from a bearer-protected resource. It is added
+      // here rather than in jwtAuth.ts because a header staged on the context is discarded when a
+      // middleware throws — this is the frame where the 401 response is actually constructed.
+      ...(status === 401 ? { "www-authenticate": "Bearer" } : {}),
     });
   };
 }
