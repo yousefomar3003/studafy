@@ -96,5 +96,5 @@ export function authenticatedRequest(
   const headers = new Headers(init?.headers);
   headers.set(HEADER_SCHOOL_ID, auth.schoolId);
   headers.set(HEADER_USER_ID, auth.userId);
-  return app.request(path, { method, headers, ...init });
+  return Promise.resolve(app.request(path, { method, headers, ...init }));
 }

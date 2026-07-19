@@ -320,8 +320,8 @@ export async function createRoom(
     await tx.unsafe("SET LOCAL ROLE studafy_app");
 
     const [room] = await tx<{ id: string; code: string }[]>`
-      INSERT INTO app.rooms (school_id, code, name, room_type, capacity)
-      VALUES (${schoolId}, ${code}, ${`Room ${code}`}, 'physical', ${overrides?.capacity ?? 30})
+      INSERT INTO app.rooms (school_id, code, name, room_type, capacity, building)
+      VALUES (${schoolId}, ${code}, ${`Room ${code}`}, 'physical', ${overrides?.capacity ?? 30}, 'Main Building')
       RETURNING id, code
     `;
 
