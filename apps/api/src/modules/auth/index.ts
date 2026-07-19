@@ -16,6 +16,16 @@ export {
 } from "./denylist";
 export { AUTH_CHANNELS, type AuthChannel } from "./channels";
 export {
+  createInvitationService,
+  generateToken,
+  hashToken,
+  DEFAULT_INVITATION_EXPIRY_DAYS,
+  type InvitationServiceOptions,
+  type CreateInvitationParams,
+  type CreateInvitationResult,
+} from "./invitation/service";
+export { invitationRoutes } from "./invitation/route";
+export {
   mintOpaqueToken,
   parseOpaqueToken,
   hashSecret,

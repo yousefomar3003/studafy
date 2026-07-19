@@ -8,6 +8,8 @@ export const DOMAIN_EVENTS = {
   USER_SUSPENDED: "user.suspended",
   USER_INVITED: "user.invited",
 
+  INVITATION_SENT: "invitation.sent",
+
   ORGANIZATION_CREATED: "organization.created",
   ORGANIZATION_UPDATED: "organization.updated",
 

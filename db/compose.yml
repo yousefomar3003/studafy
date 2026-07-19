@@ -2,7 +2,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "127.0.0.1:6380:6379"
+      - "127.0.0.1:6390:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s
@@ -21,7 +21,7 @@ services:
     command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
     environment:
       POSTGRES_USER: studafy_test
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for this disposable local database}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studafy_test}
       POSTGRES_DB: postgres
     ports:
       - "127.0.0.1:54329:5432"

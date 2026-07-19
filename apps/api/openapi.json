@@ -35,6 +35,10 @@
     {
       "name": "ERPNext",
       "description": "Inbound webhook ingestion from ERPNext. Authenticated by an HMAC signature over the raw request body, not by a session token."
+    },
+    {
+      "name": "Invitations",
+      "description": "User invitation management. Authenticated. Invitations are bound to an email and role, carry a one-time-use token, and emit an event for email dispatch."
     }
   ],
   "components": {
@@ -308,6 +312,76 @@
           }
         },
         "required": ["keys"]
+      },
+      "CreateInvitationResponse": {
+        "type": "object",
+        "properties": {
+          "invitation": {
+            "$ref": "#/components/schemas/Invitation"
+          },
+          "token": {
+            "type": "string",
+            "description": "One-time-use invitation token (hex-encoded, 256-bit). This is the only time the raw token is returned. Store it securely and pass it to the invitee — it cannot be retrieved later.",
+            "example": "a1b2c3d4e5f6..."
+          }
+        },
+        "required": ["invitation", "token"]
+      },
+      "Invitation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique invitation identifier."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Invited email address."
+          },
+          "role": {
+            "type": "string",
+            "description": "Role to be assigned on acceptance."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Expiry timestamp (ISO 8601)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Issuance timestamp (ISO 8601)."
+          }
+        },
+        "required": ["id", "email", "role", "expires_at", "created_at"]
+      },
+      "CreateInvitation": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "format": "email",
+            "description": "Email address to send the invitation to.",
+            "example": "newuser@example.com"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["ORG_ADMIN", "INSTRUCTOR", "TEACHING_ASSISTANT", "STUDENT", "GUEST"],
+            "description": "Role to assign when the invitation is accepted.",
+            "example": "STUDENT"
+          },
+          "expiry_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "description": "Number of days until the invitation expires. Defaults to 7. Must be between 1 and 365.",
+            "example": 7
+          }
+        },
+        "required": ["email", "role"]
       },
       "TokenPair": {
         "type": "object",
@@ -705,6 +779,185 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JsonWebKeySet"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invitations": {
+      "post": {
+        "tags": ["Invitations"],
+        "operationId": "createInvitation",
+        "summary": "Create a user invitation",
+        "description": "Issues a new invitation for a given email and role. Returns a one-time-use token that must be delivered to the invitee (e.g. via email). The raw token is never persisted server-side; only its SHA-256 hash is stored. An `invitation.sent` event is emitted into the outbox for downstream email dispatch.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invitation created. The raw token is included in this response only.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateInvitationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was malformed or failed schema validation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the resource.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded. Back off and retry.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }

@@ -48,6 +48,7 @@ const EXEMPT_ROUTES = ["/healthz", "/readyz"];
  * failure names what to do.
  */
 const EXPECTED_MUTATING_ROUTES = [
+  "POST /api/invitations",
   "POST /erpnext/webhooks",
   // Session lifecycle (ST-071). All four mutate app.refresh_tokens. The revocation paths write
   // their audit rows from inside the service transaction rather than from the route, so that a

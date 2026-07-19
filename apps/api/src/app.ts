@@ -23,6 +23,7 @@ import {
   jwksRoutes,
   sessionRoutes,
 } from "./modules/auth";
+import { invitationRoutes } from "./modules/auth/invitation/route";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -198,6 +199,11 @@ export function createApp({
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.
   if (keyStore) {
     app.route("/", jwksRoutes(keyStore));
+  }
+
+  // Invitation routes — requires database for persistence and outbox event emission.
+  if (database) {
+    app.route("/", invitationRoutes(database, logger));
   }
 
   // Session lifecycle (ST-071). Needs both a key store to mint access tokens and a database to hold

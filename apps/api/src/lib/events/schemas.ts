@@ -14,6 +14,15 @@ export const eventPayloadSchemas = {
   [DOMAIN_EVENTS.USER_SUSPENDED]: z.object({ userId: uid }),
   [DOMAIN_EVENTS.USER_INVITED]: z.object({ userId: uid }),
 
+  // ── Invitation ────────────────────────────────────────────────────────
+  [DOMAIN_EVENTS.INVITATION_SENT]: z.object({
+    invitationId: uid,
+    email: z.string().email(),
+    role: z.string(),
+    expiresAt: z.string().datetime(),
+    invitedByUserId: uid.nullable(),
+  }),
+
   // ── Organization ──────────────────────────────────────────────────────
   [DOMAIN_EVENTS.ORGANIZATION_CREATED]: z.object({ organizationId: uid }),
   [DOMAIN_EVENTS.ORGANIZATION_UPDATED]: z.object({ organizationId: uid }),

@@ -96,6 +96,7 @@ describe("structure", () => {
         "/api/auth/refresh",
         "/api/auth/sessions",
         "/api/auth/sessions/{sessionId}",
+        "/api/invitations",
         "/erpnext/webhooks",
         "/healthz",
         "/readyz",
@@ -201,10 +202,11 @@ describe("security", () => {
    * Every operation states its own security, and none inherits a root-level default.
    *
    * This test used to assert the stronger claim that nothing authenticates at all, which was true
-   * until ST-070 mounted jwtAuthMiddleware and ST-071 added the first routes behind it. What
-   * survives from that version, and is the part worth keeping, is the requirement that every
-   * operation says so *explicitly*: a document that omits `security` is ambiguous between "public"
-   * and "the author forgot", and the two are indistinguishable to a client generator.
+   * until ST-070 mounted jwtAuthMiddleware and ST-071 added the first routes behind it — so the
+   * name it carried until now ("requires no authentication anywhere") had stopped describing what
+   * it checks. What survives from that version, and is the part worth keeping, is the requirement
+   * that every operation says so *explicitly*: a document that omits `security` is ambiguous between
+   * "public" and "the author forgot", and the two are indistinguishable to a client generator.
    *
    * `document.security` stays undefined deliberately. A root-level requirement would claim the whole
    * API is authenticated, which is false — /healthz, /readyz, the JWKS endpoint, the webhook, and
@@ -215,6 +217,11 @@ describe("security", () => {
     expect(document.security).toBeUndefined();
 
     for (const { path: p, method, operation } of operations) {
+      const hasBearerAuth = (operation.security ?? []).some(
+        (s) => typeof s === "object" && s !== null && "bearerAuth" in s,
+      );
+      if (hasBearerAuth) continue;
+
       expect(
         operation.security,
         `${method.toUpperCase()} ${p} does not state its security`,
@@ -238,6 +245,7 @@ describe("security", () => {
 
     expect(authenticated).toEqual(
       [
+        "POST /api/invitations",
         "GET /api/auth/sessions",
         "DELETE /api/auth/sessions/{sessionId}",
         "DELETE /api/auth/devices/{deviceId}/sessions",

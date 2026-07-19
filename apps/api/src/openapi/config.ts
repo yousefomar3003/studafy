@@ -51,5 +51,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Inbound webhook ingestion from ERPNext. Authenticated by an HMAC signature over the raw " +
         "request body, not by a session token.",
     },
+    {
+      name: "Invitations",
+      description:
+        "User invitation management. Authenticated. Invitations are bound to an email and role, " +
+        "carry a one-time-use token, and emit an event for email dispatch.",
+    },
   ],
 };
