@@ -3,6 +3,7 @@ import { Scalar } from "@scalar/hono-api-reference";
 
 import { erpNextWebhookRoutes } from "./erpnext/webhook";
 import { healthRoutes } from "./health";
+import { createNoopSecurityEventSink } from "./lib/security/securityEventSink";
 import {
   requestIdMiddleware,
   localeMiddleware,
@@ -21,6 +22,7 @@ import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
 
 import type { Database } from "./db";
+import type { SecurityEventSink } from "./lib/security/securityEventSink";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
@@ -44,6 +46,14 @@ export interface AppOptions {
   database?: Database | null;
   /** JWT key store for signing and JWKS endpoint. Pass `null` to disable auth routes. */
   keyStore?: KeyStore | null;
+  /**
+   * Where CORS and CSRF rejections are persisted (app.security_events).
+   *
+   * Injected rather than constructed from `database` in here, and defaulting to a no-op, for the
+   * same reason `logger` is injected: the default must be the one that writes nothing, so `bun
+   * test` never issues background INSERTs. src/index.ts owns the real sink and its shutdown.
+   */
+  securityEventSink?: SecurityEventSink | null;
   /**
    * Mount the interactive reference (`/docs`) and the served document (`/openapi.json`).
    *
@@ -70,8 +80,10 @@ export function createApp({
   redis,
   database,
   keyStore,
+  securityEventSink,
   docsEnabled = false,
 }: AppOptions): OpenAPIHono<AppEnv> {
+  const eventSink = securityEventSink ?? createNoopSecurityEventSink();
   // The defaultHook makes request-validation failures throw into errorHandlerMiddleware instead of
   // being answered by @hono/zod-validator's own un-enveloped 400. Sub-apps inherit it through
   // route(), but each one passes it explicitly too, so it is also correct when unit-tested alone.
@@ -95,7 +107,7 @@ export function createApp({
 
   // CORS middleware: first of the security chain, so a preflight is answered and a disallowed
   // origin is dropped before any downstream middleware claims a connection or a lock.
-  app.use("*", corsMiddleware());
+  app.use("*", corsMiddleware({ eventSink }));
 
   // Security headers: CSP, HSTS, X-Frame-Options, and friends on every response.
   //
@@ -107,7 +119,7 @@ export function createApp({
 
   // CSRF: double-submit cookie check on state-mutating requests that are not Bearer-authenticated.
   // After CORS so preflights are already answered and never reach it.
-  app.use("/api/*", csrfMiddleware());
+  app.use("/api/*", csrfMiddleware({ eventSink }));
 
   // Locale middleware: parses Accept-Language header and attaches locale to request context
   app.use("*", localeMiddleware());

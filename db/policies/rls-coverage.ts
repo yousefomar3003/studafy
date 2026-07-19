@@ -65,7 +65,11 @@ approved_globals(table_name) AS (
     ('plan_prices'),
     ('plans'),
     ('platform_settings'),
-    ('schools')
+    ('schools'),
+    -- Boundary rejections raised before authentication (ST-067). Global by construction: the
+    -- requests it records never established a tenant, so there is no school_id to isolate by.
+    -- See db/migrations/000028_create_security_events_table.sql for the full rationale.
+    ('security_events')
 ),
 approved_flexible_columns(table_name, column_name) AS (
   VALUES

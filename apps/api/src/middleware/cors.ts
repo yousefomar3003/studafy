@@ -16,6 +16,9 @@
 import { getSecurityConfig } from "../config/security";
 import { validateOrigin } from "../lib/security/origins";
 
+import { extractClientIp } from "./rateLimiter";
+
+import type { SecurityEventSink } from "../lib/security/securityEventSink";
 import type { MiddlewareHandler } from "hono";
 
 const ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"];
@@ -37,6 +40,33 @@ export interface CorsOptions {
   allowedHeaders?: string[];
   exposedHeaders?: string[];
   maxAge?: number;
+  /** Where rejections are persisted. Omitted in tests and when no database is configured. */
+  eventSink?: SecurityEventSink;
+}
+
+/**
+ * Hand a refused origin to the async sink. Fire-and-forget by contract: record() buffers in memory
+ * and returns, so an origin probe still costs no database I/O on the request path.
+ *
+ * The refused origin IS persisted, unlike CSRF token values — it is attacker-supplied and is the
+ * single most useful field for attributing a probe.
+ */
+function recordOriginRejection(
+  c: Parameters<MiddlewareHandler>[0],
+  origin: string | undefined,
+  path: string,
+  method: string,
+  eventSink?: SecurityEventSink,
+): void {
+  eventSink?.record({
+    eventType: "cors_origin_rejected",
+    path,
+    method,
+    origin: origin ?? null,
+    clientIp: extractClientIp(c),
+    userAgent: c.req.header("User-Agent"),
+    requestId: c.get("requestId"),
+  });
 }
 
 /**
@@ -51,15 +81,19 @@ export function corsMiddleware(options?: CorsOptions): MiddlewareHandler {
   const exposedHeaders = options?.exposedHeaders ?? EXPOSED_HEADERS;
   const maxAge = options?.maxAge ?? MAX_AGE;
 
+  const eventSink = options?.eventSink;
+
   return async (c, next) => {
     const origin = c.req.header("Origin");
     const method = c.req.method;
+    const path = c.req.path;
 
     // Handle preflight requests
     if (method === "OPTIONS") {
       const validationResult = validateOrigin(origin, allowedOrigins);
 
       if (!validationResult.allowed || !origin) {
+        recordOriginRejection(c, origin, path, method, eventSink);
         return c.body(null, 403);
       }
 
@@ -82,6 +116,7 @@ export function corsMiddleware(options?: CorsOptions): MiddlewareHandler {
       if (!validationResult.allowed) {
         // Don't set CORS headers - browser will block the response
         // Continue processing but without CORS headers
+        recordOriginRejection(c, origin, path, method, eventSink);
         await next();
         return;
       }
