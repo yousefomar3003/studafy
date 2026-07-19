@@ -16,8 +16,20 @@ COPY . .
 # --ignore-scripts: see infra/docker/api.Dockerfile — same reasoning, no dependency here needs a
 # postinstall script (including vite's esbuild, which resolves its platform binary through
 # optionalDependencies, not postinstall).
+# Retried, because this step reaches the network and the registry is not perfectly reliable. CI has
+# failed here with "Fail extracting tarball" on storybook — a packages/ui devDependency that no
+# image in this repo uses at runtime, but which every image installs anyway because
+# --frozen-lockfile resolves the whole workspace graph. With fail-fast on the build matrix, one bad
+# download turns into six red jobs and a human re-running until the dice land.
+#
+# Three attempts, 0/5/15s backoff. A genuine lockfile mismatch still fails, just three times slower
+# — the right trade, since that case is rare and loud while the flake is common and silent.
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile --ignore-scripts
+    for delay in 0 5 15; do \
+      [ "$delay" = 0 ] || { echo "bun install failed; retrying in ${delay}s"; sleep "$delay"; }; \
+      bun install --frozen-lockfile --ignore-scripts && exit 0; \
+    done; \
+    echo "bun install failed after 3 attempts" >&2; exit 1
 
 # turbo builds @studafy/ui first (turbo.json: dependsOn ["^build"]) because
 # apps/web/package.json declares it as a dependency, then apps/web's `vite build` itself.

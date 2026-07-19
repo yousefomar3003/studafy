@@ -26,8 +26,21 @@ COPY . .
 # script to become usable — esbuild (via vite) resolves its platform binary through
 # optionalDependencies, not postinstall; verified locally with the same flag before adding it
 # here.
+#
+# Retried, because this step reaches the network and the registry is not perfectly reliable. CI has
+# failed here with "Fail extracting tarball" on storybook — a packages/ui devDependency that no
+# image in this repo uses at runtime, but which every image installs anyway because
+# --frozen-lockfile resolves the whole workspace graph. With fail-fast on the build matrix, one bad
+# download turns into six red jobs and a human re-running until the dice land.
+#
+# Three attempts, 0/5/15s backoff. A genuine lockfile mismatch still fails, just three times slower
+# — the right trade, since that case is rare and loud while the flake is common and silent.
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile --ignore-scripts
+    for delay in 0 5 15; do \
+      [ "$delay" = 0 ] || { echo "bun install failed; retrying in ${delay}s"; sleep "$delay"; }; \
+      bun install --frozen-lockfile --ignore-scripts && exit 0; \
+    done; \
+    echo "bun install failed after 3 attempts" >&2; exit 1
 
 # turbo's task graph (dependsOn: ["^build"] in turbo.json) builds apps/api's workspace
 # dependencies before apps/api itself; today that's none, but the filter stays correct if that
