@@ -51,6 +51,8 @@ jobs:
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Build the workspace packages the API imports
+        run: bunx turbo run build --filter=@studafy/api^...
       - name: Run API integration tests
         run: bun run test:integration
         working-directory: apps/api

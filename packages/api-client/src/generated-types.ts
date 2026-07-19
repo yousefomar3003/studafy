@@ -7,6 +7,26 @@
  */
 
 export interface paths {
+    readonly "/.well-known/jwks.json": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * JSON Web Key Set
+         * @description Returns the public RSA keys used to verify RS256 access tokens. Clients should cache this response and refresh periodically.
+         */
+        readonly get: operations["getJsonWebKeySet"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/erpnext/webhooks": {
         readonly parameters: {
             readonly query?: never;
@@ -94,6 +114,18 @@ export interface components {
         readonly HealthOk: {
             /** @enum {string} */
             readonly status: "ok";
+        };
+        readonly JsonWebKeySet: {
+            readonly keys: readonly {
+                /** @enum {string} */
+                readonly alg: "RS256";
+                readonly e: string;
+                readonly kid: string;
+                readonly kty: string;
+                readonly n: string;
+                /** @enum {string} */
+                readonly use: "sig";
+            }[];
         };
         readonly ProblemDetails: {
             /** @enum {string} */
@@ -189,6 +221,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    readonly getJsonWebKeySet: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The current JSON Web Key Set. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["JsonWebKeySet"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     readonly ingestErpNextWebhook: {
         readonly parameters: {
             readonly query?: never;
