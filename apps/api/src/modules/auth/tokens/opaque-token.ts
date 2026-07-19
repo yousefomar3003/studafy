@@ -6,26 +6,36 @@
  * and is verified by looking it up. That is what makes server-side revocation possible, which is the
  * entire reason the two token types differ (see docs/architecture/SAD_13_session_model.md).
  *
- * A token is two parts joined by a dot:
+ * A token is three parts joined by dots:
  *
- *     <locator>.<secret>
- *      │         └── 256 bits of CSPRNG output, base64url. The credential.
- *      └── a random uuid. Not a tenant id, not a user id, not derived from the secret.
+ *     <school_uuid>.<user_uuid>.<secret>
+ *      │             │           └── 256 bits of CSPRNG output, base64url. The credential.
+ *      │             └── owner of the session
+ *      └── tenant the session belongs to
  *
- * The split exists because of an ordering problem in the data layer, not for cryptographic reasons.
- * A refresh request carries no access token, so there is no verified `school_id`, and
- * src/db/tenant-tx.ts cannot open a transaction without one. The locator resolves to a tenant
- * through a small global directory (`app.refresh_token_locators`) before any tenant-scoped query
- * runs. Putting the school id in the token instead would have published it to every client and let a
- * caller choose which RLS scope the lookup opens; a random locator matches nothing unless it was
- * issued. The full rationale, including why a SECURITY DEFINER function cannot do this, is in
- * db/migrations/000029_add_refresh_token_session_columns.sql.
+ * The two ids are there to solve an ordering problem in the data layer, not for any cryptographic
+ * reason. A refresh request carries no access token, so there is no verified `school_id`, and
+ * src/db/tenant-tx.ts cannot open a transaction without one — every policy from 000006 compares
+ * against `current_setting('app.school_id')` with no `missing_ok`, so an unset GUC raises rather
+ * than matching nothing. The restrictive `refresh_tokens_owner` policy makes the same true of
+ * `app.user_id`. Both have to be known before the row that holds them can be read.
+ *
+ * **This discloses nothing.** The access token issued to the same client already carries `school_id`
+ * and `sub` as claims. Nor does it hand a caller a scope to attack: forged ids open a transaction
+ * scoped to that tenant and user, where the presented secret still has to hash to a stored
+ * `token_hash` owned by them. Wrong ids find nothing.
+ *
+ * Two other designs were tried and are recorded in
+ * db/migrations/000029_add_refresh_token_session_columns.sql — a `SECURITY DEFINER` lookup (blocked
+ * by `FORCE ROW LEVEL SECURITY` and the deliberate absence of any `BYPASSRLS` role) and a global
+ * locator directory (rejected by db/policies/rls-coverage.ts, which permits no relation that is both
+ * global and carries `school_id`).
  *
  * Only the secret is hashed, and only the hash is stored. Nothing in this module writes, logs, or
  * returns anything that would let a stored row be turned back into a usable token.
  */
 
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 /** Bytes of entropy in the secret half. 256 bits, per ST-071. */
 const SECRET_BYTES = 32;
@@ -39,68 +49,65 @@ const SEPARATOR = ".";
 /** A freshly minted token, split into the parts the caller needs to store versus return. */
 export interface MintedToken {
   /**
-   * The full `<locator>.<secret>` string. Handed to the client exactly once and never persisted in
-   * any form — this is the only moment it exists outside the client.
+   * The full `<school_uuid>.<user_uuid>.<secret>` string. Handed to the client exactly once and
+   * never persisted in any form — this is the only moment it exists outside the client.
    */
   token: string;
-  /** The locator half. Stored in the clear: it is a random id, not a credential. */
-  locator: string;
   /** SHA-256 of the secret half. The only representation of the secret that is ever stored. */
   secretHash: Buffer;
 }
 
 /**
- * Mint a new opaque refresh token.
+ * Mint a new opaque refresh token for a session.
  *
  * `crypto.getRandomValues` rather than `Math.random` or a uuid for the secret: this is a bearer
  * credential, so it needs a CSPRNG, and 256 bits puts guessing far outside reach regardless of how
  * many tokens are live. A uuid would give only 122 bits and is not specified to be
  * cryptographically random.
  */
-export function mintOpaqueToken(): MintedToken {
+export function mintOpaqueToken(schoolId: string, userId: string): MintedToken {
   const secretBytes = new Uint8Array(SECRET_BYTES);
   crypto.getRandomValues(secretBytes);
 
-  const locator = randomUUID();
   const secret = toBase64Url(secretBytes);
 
   return {
-    token: `${locator}${SEPARATOR}${secret}`,
-    locator,
+    token: `${schoolId}${SEPARATOR}${userId}${SEPARATOR}${secret}`,
     secretHash: hashSecret(secret),
   };
 }
 
-/** The two halves of a token that parsed cleanly. */
+/** The three parts of a token that parsed cleanly. */
 export interface ParsedToken {
-  locator: string;
+  schoolId: string;
+  userId: string;
   secret: string;
 }
 
 /**
- * Split a presented token into its halves, or return `null` if it is not well-formed.
+ * Split a presented token into its parts, or return `null` if it is not well-formed.
  *
  * Returns `null` rather than throwing because a malformed token is an ordinary client error on an
  * unauthenticated endpoint, not an exceptional condition — the caller turns it into the same 401 as
  * a well-formed token that does not resolve, and deliberately not a distinguishable one. Telling a
  * caller apart "malformed" from "unknown" would let them probe the token format.
  *
- * The locator is checked against the uuid shape before it is ever used in a query. That is a
- * validation boundary rather than an injection defence (the query is parameterised either way): it
- * means a garbage locator is rejected in-process instead of costing a database round trip, which
- * matters on an endpoint reachable without authentication.
+ * Both ids are checked against the uuid shape before either is used in a query. That is a validation
+ * boundary rather than an injection defence — the query is parameterised either way — but it matters
+ * for two reasons on an endpoint reachable without authentication: a garbage token is rejected
+ * in-process instead of costing a database round trip, and the ids are about to be fed to
+ * `set_config` as the tenant and user context, so they must be known-shaped before they get there.
  */
 export function parseOpaqueToken(token: string): ParsedToken | null {
-  const separator = token.indexOf(SEPARATOR);
-  if (separator === -1) return null;
+  const parts = token.split(SEPARATOR);
+  if (parts.length !== 3) return null;
 
-  const locator = token.slice(0, separator);
-  const secret = token.slice(separator + 1);
+  const [schoolId, userId, secret] = parts as [string, string, string];
 
-  if (!UUID_PATTERN.test(locator)) return null;
+  if (!UUID_PATTERN.test(schoolId) || !UUID_PATTERN.test(userId)) return null;
   if (secret.length === 0 || !BASE64URL_PATTERN.test(secret)) return null;
 
-  return { locator, secret };
+  return { schoolId, userId, secret };
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;

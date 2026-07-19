@@ -80,28 +80,6 @@ async function expectRoleDenied(
   });
 }
 
-/**
- * Register a refresh-token locator and return it, so a token row can reference one.
- *
- * Since 000029 every app.refresh_tokens row carries a NOT NULL `locator` with a foreign key into the
- * global app.refresh_token_locators directory — the relation an unauthenticated refresh request
- * reads to discover which tenant a token belongs to, before any tenant transaction can open. Tests
- * that insert token rows directly have to register the locator first, in the same order the service
- * does.
- */
-async function registerLocator(
-  tx: TransactionSql,
-  schoolId: string,
-  userId: string,
-): Promise<string> {
-  const locator = crypto.randomUUID();
-  await tx`
-    INSERT INTO app.refresh_token_locators (locator, school_id, user_id)
-    VALUES (${locator}, ${schoolId}, ${userId})
-  `;
-  return locator;
-}
-
 // Two schools in the same country/currency provide the two tenants every isolation test needs.
 async function createSchools(database: Database): Promise<{ schoolA: string; schoolB: string }> {
   const [references] = await database.sql<{ country_id: string; currency_id: string }[]>`
@@ -465,42 +443,35 @@ integrationTest(
       const firstTokenId = await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         await tx`SELECT set_config('app.user_id', ${userA}, true)`;
-        const locator = await registerLocator(tx, schoolA, userA);
         const [row] = await tx<{ id: string }[]>`
           INSERT INTO app.refresh_tokens
-            (school_id, user_id, token_hash, locator, channel, family_id, expires_at, device_name)
+            (school_id, user_id, token_hash, channel, family_id, expires_at, device_name)
           VALUES
-            (${schoolA}, ${userA}, digest('refresh-token-1', 'sha256'), ${locator}, 'mobile',
+            (${schoolA}, ${userA}, digest('refresh-token-1', 'sha256'), 'mobile',
              ${familyId}, CURRENT_TIMESTAMP + interval '30 days', 'Pixel 8')
           RETURNING id
         `;
         return row!.id;
       });
-      // Duplicate token_hash. Every other column is valid, including a freshly registered locator,
-      // so uq_refresh_tokens_token_hash is the only thing left that can reject this.
-      const dupLocator = await asRole(database, "studafy_app", (tx) =>
-        registerLocator(tx, schoolA, userA),
-      );
+      // Duplicate token_hash. Every other column is valid, so uq_refresh_tokens_token_hash is the
+      // only thing left that can reject this.
       await expectRoleDenied(
         database,
         "studafy_app",
         `INSERT INTO app.refresh_tokens
-           (school_id, user_id, token_hash, locator, channel, family_id, expires_at)
-         VALUES ('${schoolA}', '${userA}', digest('refresh-token-1', 'sha256'), '${dupLocator}',
+           (school_id, user_id, token_hash, channel, family_id, expires_at)
+         VALUES ('${schoolA}', '${userA}', digest('refresh-token-1', 'sha256'),
                  'mobile', '${familyId}', CURRENT_TIMESTAMP + interval '30 days')`,
         schoolA,
         userA,
       );
       // expires_at before issued_at.
-      const expiredLocator = await asRole(database, "studafy_app", (tx) =>
-        registerLocator(tx, schoolA, userA),
-      );
       await expectRoleDenied(
         database,
         "studafy_app",
         `INSERT INTO app.refresh_tokens
-           (school_id, user_id, token_hash, locator, channel, family_id, expires_at)
-         VALUES ('${schoolA}', '${userA}', digest('refresh-token-2', 'sha256'), '${expiredLocator}',
+           (school_id, user_id, token_hash, channel, family_id, expires_at)
+         VALUES ('${schoolA}', '${userA}', digest('refresh-token-2', 'sha256'),
                  'mobile', '${familyId}', CURRENT_TIMESTAMP - interval '1 day')`,
         schoolA,
         userA,
@@ -519,12 +490,11 @@ integrationTest(
       await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         await tx`SELECT set_config('app.user_id', ${userA}, true)`;
-        const childLocator = await registerLocator(tx, schoolA, userA);
         await tx`
           INSERT INTO app.refresh_tokens
-            (school_id, user_id, token_hash, locator, channel, family_id, parent_token_id, expires_at)
+            (school_id, user_id, token_hash, channel, family_id, parent_token_id, expires_at)
           VALUES
-            (${schoolA}, ${userA}, digest('refresh-token-2', 'sha256'), ${childLocator}, 'mobile',
+            (${schoolA}, ${userA}, digest('refresh-token-2', 'sha256'), 'mobile',
              ${familyId}, ${firstTokenId}, CURRENT_TIMESTAMP + interval '30 days')
         `;
         const family = await tx<{ count: string }[]>`
@@ -683,11 +653,10 @@ integrationTest(
       await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         await tx`SELECT set_config('app.user_id', ${userA}, true)`;
-        const planLocator = await registerLocator(tx, schoolA, userA);
         await tx`
           INSERT INTO app.refresh_tokens
-            (school_id, user_id, token_hash, locator, channel, family_id, expires_at)
-          VALUES (${schoolA}, ${userA}, digest('rt-plan', 'sha256'), ${planLocator}, 'web',
+            (school_id, user_id, token_hash, channel, family_id, expires_at)
+          VALUES (${schoolA}, ${userA}, digest('rt-plan', 'sha256'), 'web',
                   ${familyId}, CURRENT_TIMESTAMP + interval '30 days')
         `;
         await tx`
@@ -698,35 +667,22 @@ integrationTest(
 
       // Filler rows, so the planner can tell the selective family index from the user index instead
       // of picking arbitrarily on a one-row fixture.
-      //
-      // Seeded as studafy_admin rather than studafy_app, and that is a property of 000029 rather
-      // than a convenience: studafy_app holds INSERT but deliberately no SELECT on
-      // app.refresh_token_locators, so it cannot read back the locators it just wrote — nor use
-      // INSERT ... RETURNING, which needs SELECT on the returned column. Generating both sides in
-      // one data-modifying statement therefore requires the owner. That the runtime role cannot do
-      // this is the point of the grant.
       await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         await tx`
-          WITH seeded AS (
-            INSERT INTO app.refresh_token_locators (locator, school_id, user_id)
-            SELECT gen_random_uuid(), ${schoolA}, ${userA}
-            FROM generate_series(1, 250)
-            RETURNING locator
-          )
           INSERT INTO app.refresh_tokens
-            (school_id, user_id, token_hash, locator, channel, family_id, expires_at)
+            (school_id, user_id, token_hash, channel, family_id, expires_at)
           SELECT
             ${schoolA},
             ${userA},
-            digest('rt-plan-filler-' || row_number() OVER (), 'sha256'),
-            seeded.locator,
+            digest('rt-plan-filler-' || number, 'sha256'),
             'web',
             gen_random_uuid(),
             CURRENT_TIMESTAMP + interval '30 days'
-          FROM seeded
+          FROM generate_series(1, 250) AS series(number)
         `;
       });
+
       await asRole(database, "studafy_admin", (tx) =>
         tx.unsafe("ANALYZE app.refresh_tokens").then(() => undefined),
       );
@@ -768,22 +724,21 @@ integrationTest(
 );
 
 /**
- * ST-071 session objects: the locator directory, the channel enum, the per-user fence.
+ * ST-071 session objects: the channel enum and the per-user fence.
  *
  * Kept separate from the schema test above because these assert a security boundary rather than a
- * shape. The three things that must hold, and that nothing else checks:
+ * shape. The fence is the point: app.refresh_tokens shipped with tenant isolation only, so any
+ * authenticated session in a school could read and revoke every other user's sessions in that
+ * school. 000029 adds a RESTRICTIVE policy on top, and restrictive policies AND with the permissive
+ * one, so a row is reachable only when both the school and the user match.
  *
- *   1. studafy_app can write the locator directory but cannot read it in bulk. It is a global,
- *      un-RLS'd relation carrying (school_id, user_id) pairs, so a SELECT grant would let any tenant
- *      enumerate every other tenant's. Reads go through a SECURITY DEFINER function that answers for
- *      one locator at a time.
- *   2. That function works at all. It is SECURITY DEFINER against a table with no row-level
- *      security, which is exactly why it can answer without a tenant context — the same approach
- *      against app.refresh_tokens would be filtered by an unset GUC and fail closed.
- *   3. refresh_tokens_owner fences rows to their owning user, not merely to their tenant.
+ * The fence is also why the wire token carries the user id: app.current_user_id() raises on an unset
+ * GUC rather than matching nothing, so the owner has to be known before the row can be read. The
+ * last assertion here pins that failure mode, because a fence that failed *open* on a missing GUC
+ * would be worse than no fence at all.
  */
 integrationTest(
-  "installs the ST-071 session objects with the locator directory sealed",
+  "installs the ST-071 session objects with a per-user fence that fails closed",
   async () => {
     const database = await migratedDatabase();
     try {
@@ -791,8 +746,8 @@ integrationTest(
       const userA = await createUser(database, schoolA, "owner@example.com");
       const userB = await createUser(database, schoolA, "other@example.com");
 
-      // 1. app.auth_channel mirrors AUTH_CHANNELS in apps/api/src/modules/auth/channels.ts.
-      //    Label order is asserted, not just membership, so the two cannot drift.
+      // app.auth_channel mirrors AUTH_CHANNELS in apps/api/src/modules/auth/channels.ts. Label order
+      // is asserted, not just membership, so the two cannot drift.
       const [channelEnum] = await database.sql<{ values: string[] }[]>`
         SELECT array_agg(e.enumlabel ORDER BY e.enumsortorder)::text[] AS values
         FROM pg_type t
@@ -802,57 +757,22 @@ integrationTest(
       `;
       expect(channelEnum?.values).toEqual(["web", "mobile", "api"]);
 
-      // 2. The directory is global by design and carries no row-level security.
-      const [directory] = await database.sql<{ rls: boolean; forced: boolean }[]>`
+      // FORCE survived the migration. 000029 clears it to run its DDL and restores it at the end;
+      // if that restore were ever dropped, studafy_admin would be exempt from tenant_isolation on
+      // this table permanently and nothing in the application would misbehave to reveal it.
+      const [flags] = await database.sql<{ rls: boolean; forced: boolean }[]>`
         SELECT relrowsecurity AS rls, relforcerowsecurity AS forced
-        FROM pg_class WHERE oid = 'app.refresh_token_locators'::regclass
+        FROM pg_class WHERE oid = 'app.refresh_tokens'::regclass
       `;
-      expect(directory).toEqual({ rls: false, forced: false });
+      expect(flags).toEqual({ rls: true, forced: true });
 
-      // 3. studafy_app may insert into it...
-      const locator = await asRole(database, "studafy_app", async (tx) => {
-        await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
-        return registerLocator(tx, schoolA, userA);
-      });
-
-      // ...but may not read it. Without this, one tenant could enumerate every other tenant's
-      // (school_id, user_id) pairs from a table with nothing stopping it.
-      await expectRoleDenied(
-        database,
-        "studafy_app",
-        "SELECT locator FROM app.refresh_token_locators",
-        schoolA,
-        userA,
-      );
-
-      // 4. The definer function is the only read path, and it answers with no tenant GUC set at all
-      //    — which is the entire reason it exists.
-      const resolved = await asRole(
-        database,
-        "studafy_app",
-        (tx) =>
-          tx<{ school_id: string; user_id: string }[]>`
-          SELECT school_id, user_id FROM app.resolve_refresh_token_locator(${locator})
-        `,
-      );
-      expect(Array.from(resolved)).toEqual([{ school_id: schoolA, user_id: userA }]);
-
-      // An unknown locator resolves to nothing rather than raising.
-      const missing = await asRole(
-        database,
-        "studafy_app",
-        (tx) => tx`SELECT * FROM app.resolve_refresh_token_locator(${crypto.randomUUID()})`,
-      );
-      expect(missing).toHaveLength(0);
-
-      // 5. Tokens are fenced to their owner, not just to their tenant.
       await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         await tx`SELECT set_config('app.user_id', ${userA}, true)`;
         await tx`
           INSERT INTO app.refresh_tokens
-            (school_id, user_id, token_hash, locator, channel, family_id, expires_at)
-          VALUES (${schoolA}, ${userA}, digest('owned-token', 'sha256'), ${locator}, 'web',
+            (school_id, user_id, token_hash, channel, family_id, expires_at)
+          VALUES (${schoolA}, ${userA}, digest('owned-token', 'sha256'), 'web',
                   ${crypto.randomUUID()}, CURRENT_TIMESTAMP + interval '30 days')
         `;
       });
@@ -861,9 +781,7 @@ integrationTest(
       const seenByOther = await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         await tx`SELECT set_config('app.user_id', ${userB}, true)`;
-        return tx<{ count: string }[]>`
-          SELECT count(*)::text AS count FROM app.refresh_tokens
-        `;
+        return tx<{ count: string }[]>`SELECT count(*)::text AS count FROM app.refresh_tokens`;
       });
       expect(seenByOther[0]?.count).toBe("0");
 
@@ -871,15 +789,13 @@ integrationTest(
       const seenByOwner = await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         await tx`SELECT set_config('app.user_id', ${userA}, true)`;
-        return tx<{ count: string }[]>`
-          SELECT count(*)::text AS count FROM app.refresh_tokens
-        `;
+        return tx<{ count: string }[]>`SELECT count(*)::text AS count FROM app.refresh_tokens`;
       });
       expect(seenByOwner[0]?.count).toBe("1");
 
-      // 6. The fence fails closed rather than open when app.user_id is missing: app.current_user_id()
-      //    raises 42704 on an unset GUC. Every withTenantTx call touching this table must pass a
-      //    userId, and this is what makes forgetting loud instead of silent.
+      // Fails closed, not open, when app.user_id is missing: app.current_user_id() raises 42704 on an
+      // unset GUC. Every withTenantTx call touching this table must pass a userId, and this is what
+      // makes forgetting loud instead of silently returning somebody else's rows.
       await expectRoleDenied(
         database,
         "studafy_app",

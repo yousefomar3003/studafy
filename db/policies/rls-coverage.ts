@@ -69,13 +69,7 @@ approved_globals(table_name) AS (
     -- Boundary rejections raised before authentication (ST-067). Global by construction: the
     -- requests it records never established a tenant, so there is no school_id to isolate by.
     -- See db/migrations/000028_create_security_events_table.sql for the full rationale.
-    ('security_events'),
-    -- Maps an opaque refresh-token locator to its tenant (ST-071). Global by construction: a
-    -- refresh request carries no access token, so it has no school_id yet, and this relation exists
-    -- precisely to supply one. Isolating it by the column it returns would make it unreadable. It
-    -- holds no credential material -- the token digest stays in app.refresh_tokens, behind RLS.
-    -- See db/migrations/000029_add_refresh_token_session_columns.sql for the full rationale.
-    ('refresh_token_locators')
+    ('security_events')
 ),
 approved_flexible_columns(table_name, column_name) AS (
   VALUES

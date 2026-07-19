@@ -562,11 +562,10 @@ export async function createUserDevice(
 }
 
 export interface RefreshSessionRecord {
-  /** The full `<locator>.<secret>` string a client would present. */
+  /** The full `<school>.<user>.<secret>` string a client would present. */
   token: string;
   sessionId: string;
   familyId: string;
-  locator: string;
 }
 
 export interface RefreshSessionOverrides {
@@ -574,6 +573,16 @@ export interface RefreshSessionOverrides {
   deviceId?: string | null;
   familyId?: string;
   parentTokenId?: string | null;
+  /**
+   * When the session was established. Defaults to a day ago, not to now.
+   *
+   * This matters more than it looks. app.refresh_tokens carries
+   * ck_refresh_tokens_expires_after_issued and ck_refresh_tokens_revoked_after_issued, so a row
+   * whose issued_at defaults to CURRENT_TIMESTAMP cannot also carry a past expires_at or revoked_at
+   * -- which is exactly what a test for an expired or already-revoked token needs. Backdating the
+   * issuance by default leaves room to place every other timestamp on either side of it.
+   */
+  issuedAt?: Date;
   /** Defaults to 30 days out. Pass a past Date to build an already-expired token. */
   expiresAt?: Date;
   /** Set to pre-age a token into the consumed state, so presenting it is a reuse. */
@@ -587,12 +596,12 @@ export interface RefreshSessionOverrides {
  * Insert a refresh-token session directly, returning the presentable token.
  *
  * Deliberately not a call to `issueTokenPair`: the tests that need this one need states the service
- * will never produce on purpose — already expired, already rotated, already revoked — and the point
+ * will never produce on purpose -- already expired, already rotated, already revoked -- and the point
  * of those tests is what `rotateRefreshToken` does when it meets such a row. Building them through
  * the happy path would mean rotating a token several times to age it, which tests the thing under
  * test in order to set up the thing under test.
  *
- * Writes as studafy_admin because it must set `rotated_at` and `revoked_at` to arbitrary values and
+ * Writes as studafy_admin because it must set rotated_at and revoked_at to arbitrary values and
  * bypass the per-user RLS fence that the production path satisfies with a real GUC.
  */
 export async function createRefreshSession(
@@ -602,31 +611,29 @@ export async function createRefreshSession(
   overrides?: RefreshSessionOverrides,
 ): Promise<RefreshSessionRecord> {
   const { mintOpaqueToken } = await import("../../src/modules/auth/tokens/opaque-token");
-  const minted = mintOpaqueToken();
+  const minted = mintOpaqueToken(schoolId, userId);
 
   const familyId = overrides?.familyId ?? crypto.randomUUID();
+  const issuedAt = overrides?.issuedAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
   const expiresAt = overrides?.expiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const channel = overrides?.channel ?? "web";
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
 
-    await tx`
-      INSERT INTO app.refresh_token_locators (locator, school_id, user_id)
-      VALUES (${minted.locator}, ${schoolId}, ${userId})
-    `;
-
     const [row] = await tx<{ id: string; family_id: string }[]>`
       INSERT INTO app.refresh_tokens (
-        school_id, user_id, token_hash, locator, family_id, parent_token_id,
-        device_id, channel, user_agent, ip_address, expires_at, rotated_at, revoked_at
+        school_id, user_id, token_hash, family_id, parent_token_id,
+        device_id, channel, user_agent, ip_address,
+        issued_at, expires_at, rotated_at, revoked_at
       ) VALUES (
-        ${schoolId}, ${userId}, ${minted.secretHash}, ${minted.locator}, ${familyId},
+        ${schoolId}, ${userId}, ${minted.secretHash}, ${familyId},
         ${overrides?.parentTokenId ?? null},
         ${overrides?.deviceId ?? null},
         ${channel}::app.auth_channel,
         ${overrides?.userAgent ?? null},
         ${overrides?.ipAddress ?? null},
+        ${issuedAt},
         ${expiresAt},
         ${overrides?.rotatedAt ?? null},
         ${overrides?.revokedAt ?? null}
@@ -634,11 +641,6 @@ export async function createRefreshSession(
       RETURNING id, family_id
     `;
 
-    return {
-      token: minted.token,
-      sessionId: row!.id,
-      familyId: row!.family_id,
-      locator: minted.locator,
-    };
+    return { token: minted.token, sessionId: row!.id, familyId: row!.family_id };
   });
 }

@@ -26,7 +26,7 @@ import { withTenantTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { AuthException } from "../../../middleware/jwtAuth";
 import { signAccessToken } from "../jwt/sign";
-import { mintOpaqueToken, parseOpaqueToken, verifySecret } from "../tokens/opaque-token";
+import { hashSecret, mintOpaqueToken, parseOpaqueToken } from "../tokens/opaque-token";
 
 import type { Database } from "../../../db/client";
 import type { Logger } from "../../../logger";
@@ -60,7 +60,7 @@ export interface DeviceContext {
 /** What a caller gets back from issuance or rotation. The refresh token exists here and nowhere else. */
 export interface IssuedTokenPair {
   accessToken: string;
-  /** Full `<locator>.<secret>` string. Returned once; only its digest is stored. */
+  /** Full `<school>.<user>.<secret>` string. Returned once; only its digest is stored. */
   refreshToken: string;
   sessionId: string;
   familyId: string;
@@ -99,7 +99,7 @@ export async function issueTokenPair(
 ): Promise<IssuedTokenPair> {
   const roles = await readUserRoles(tx, params.userId);
 
-  const minted = mintOpaqueToken();
+  const minted = mintOpaqueToken(params.schoolId, params.userId);
   const device = params.device ?? {};
   const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
   // Generated here rather than by a gen_random_uuid() default so the value is a plain bound
@@ -107,22 +107,14 @@ export async function issueTokenPair(
   // postgres.js template composition gets subtle, and this is not the place to be clever.
   const familyId = params.familyId ?? randomUUID();
 
-  // The locator directory is global (no RLS) and the token row is tenant-isolated, but both writes
-  // land in this one transaction, so a locator can never point at a token row that does not exist.
-  await tx`
-    INSERT INTO app.refresh_token_locators (locator, school_id, user_id)
-    VALUES (${minted.locator}, ${params.schoolId}, ${params.userId})
-  `;
-
   const [row] = await tx<{ id: string; family_id: string }[]>`
     INSERT INTO app.refresh_tokens (
-      school_id, user_id, token_hash, locator, family_id, parent_token_id,
+      school_id, user_id, token_hash, family_id, parent_token_id,
       device_id, channel, device_name, user_agent, ip_address, expires_at
     ) VALUES (
       current_setting('app.school_id')::uuid,
       ${params.userId},
       ${minted.secretHash},
-      ${minted.locator},
       ${familyId},
       ${params.parentTokenId ?? null},
       ${device.deviceId ?? null},
@@ -198,12 +190,12 @@ export interface RotateParams {
  *
  * The sequence is fixed by the RLS ordering problem described in
  * db/migrations/000029_add_refresh_token_session_columns.sql: the tenant must be known before any
- * tenant-scoped query can run, so the locator directory is read first, outside any tenant
- * transaction, and everything after happens inside one.
+ * tenant-scoped query can run, so the tenant and user are read out of the token itself and
+ * everything happens inside one fully fenced transaction.
  *
  * Every rejection below is the same 401 with a code the client can act on, and deliberately reveals
  * nothing about which check failed beyond expired-versus-not. A caller probing tokens learns only
- * "no" — not whether the locator existed, whether the secret was close, or whether the session
+ * "no" — not whether the ids named a real tenant, whether the secret was close, or whether the session
  * belongs to a real user.
  */
 export async function rotateRefreshToken(
@@ -216,34 +208,31 @@ export async function rotateRefreshToken(
     throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
   }
 
-  // --- 1. Resolve the tenant (no tenant context exists yet) ------------------
-  const owner = await resolveLocator(database, parsed.locator);
-  if (!owner) {
-    throw new AuthException(ERROR_CODES.AUTH_SESSION_NOT_FOUND, "Invalid refresh token");
-  }
-
+  // --- 1. Tenant context comes from the token itself -------------------------
+  //
+  // Unverified at this point, and that is fine: they are used only to scope the lookup, and the
+  // lookup still has to find a row whose token_hash matches the presented secret *within* that
+  // scope. Wrong ids find nothing. See opaque-token.ts for why they are in the token at all.
   const tenant = {
-    schoolId: owner.school_id,
-    userId: owner.user_id,
+    schoolId: parsed.schoolId,
+    userId: parsed.userId,
     requestId: params.requestId,
   };
 
   // --- 2. Load the session row ----------------------------------------------
   //
-  // Fully fenced: both GUCs come from the directory, so this runs under studafy_app with
-  // tenant_isolation and refresh_tokens_owner both in force. Nothing in this subsystem runs elevated.
+  // Fully fenced: this runs under studafy_app with tenant_isolation and refresh_tokens_owner both in
+  // force. Nothing in this subsystem runs elevated.
   const session = await withTenantTx(database, tenant, (tx) =>
-    loadSessionByLocator(tx, parsed.locator),
+    loadSessionByHash(tx, hashSecret(parsed.secret)),
   );
 
+  // Finding a row *is* the verification: the lookup matched on the digest of the presented secret,
+  // under a unique index, inside the caller's own tenant and user scope. There is no separate
+  // comparison step because there is nothing left to compare — and note this ordering means a caller
+  // cannot learn that a session exists, or that it was revoked, without holding the secret.
   if (!session) {
     throw new AuthException(ERROR_CODES.AUTH_SESSION_NOT_FOUND, "Invalid refresh token");
-  }
-
-  // Constant-time, and checked before any lifecycle branch: a caller must not be able to learn that
-  // a session exists, or that it was revoked, without holding the secret.
-  if (!verifySecret(parsed.secret, session.token_hash)) {
-    throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
   }
 
   // --- 3. Reuse detection ---------------------------------------------------
@@ -305,7 +294,7 @@ export async function rotateRefreshToken(
     // loser of a genuine double-submit and a real attacker are indistinguishable at this point, and
     // resolving that ambiguity in favour of the family is the entire premise of rotation.
     const current = await withTenantTx(database, tenant, (tx) =>
-      loadSessionByLocator(tx, parsed.locator),
+      loadSessionByHash(tx, hashSecret(parsed.secret)),
     );
     if (current) {
       await handleReuse(database, tenant, current, params.log);
@@ -379,7 +368,7 @@ async function handleReuse(
 
   // Logged at error, not warn: this is the one event in the session subsystem that means a
   // credential is in the wrong hands. No token material, in any form — not the presented token, not
-  // the locator, not the digest. The family id is the correlation key, and it is not a credential.
+  // not the digest. The family id is the correlation key, and it is not a credential.
   log?.error(
     {
       event: "refresh_token_reuse_detected",
@@ -440,7 +429,7 @@ export async function listActiveSessions(
     ORDER BY family_id, issued_at DESC
   `;
 
-  // token_hash and locator are absent from the projection by design, not by oversight: this response
+  // token_hash is absent from the projection by design, not by oversight: this response
   // is handed to a client, and either one would turn a session list into a set of credentials.
   return rows.map((row) => ({
     id: row.id,
@@ -502,20 +491,16 @@ export async function revokeSessionByToken(
   const parsed = parseOpaqueToken(presentedToken);
   if (!parsed) return;
 
-  const owner = await resolveLocator(database, parsed.locator);
-  if (!owner) return;
+  const tenant = { schoolId: parsed.schoolId, userId: parsed.userId, requestId };
 
-  const tenant = { schoolId: owner.school_id, userId: owner.user_id, requestId };
-
+  // Matching on the digest is what makes this safe to expose unauthenticated: the ids in the token
+  // only scope the search, and a caller who knows someone's school and user ids but not their secret
+  // finds nothing to revoke. Otherwise a pair of identifiers the access token already publishes
+  // would become a denial-of-service primitive.
   const session = await withTenantTx(database, tenant, (tx) =>
-    loadSessionByLocator(tx, parsed.locator),
+    loadSessionByHash(tx, hashSecret(parsed.secret)),
   );
   if (!session) return;
-
-  // Still verified, even though the outcome is a revocation the session's owner would want. Skipping
-  // it would let anyone who learns a locator — from a log, a proxy, a crash dump — end that session
-  // at will, turning a leaked non-credential into a denial-of-service primitive.
-  if (!verifySecret(parsed.secret, session.token_hash)) return;
 
   await withTenantTx(database, tenant, async (tx) => {
     const revoked = await tx`
@@ -561,33 +546,17 @@ interface SessionRow {
   revoked_at: Date | null;
 }
 
-function loadSessionByLocator(
-  tx: TransactionSql,
-  locator: string,
-): Promise<SessionRow | undefined> {
+/**
+ * Find a session by the digest of its secret.
+ *
+ * Runs inside a tenant transaction, so tenant_isolation and refresh_tokens_owner both apply on top
+ * of the `token_hash` match. uq_refresh_tokens_token_hash makes it a unique index point-lookup.
+ */
+function loadSessionByHash(tx: TransactionSql, tokenHash: Buffer): Promise<SessionRow | undefined> {
   return tx<SessionRow[]>`
     SELECT id, school_id, user_id, token_hash, family_id, device_id, channel,
            device_name, user_agent, ip_address, expires_at, rotated_at, revoked_at
       FROM app.refresh_tokens
-     WHERE locator = ${locator}
+     WHERE token_hash = ${tokenHash}
   `.then((rows) => rows[0]);
-}
-
-/**
- * Resolve a locator to the tenant and user that own it.
- *
- * This is the one query in the subsystem that runs without a tenant context, because it is the query
- * that establishes one. It reaches `app.refresh_token_locators` through a SECURITY DEFINER function
- * rather than directly: `studafy_app` holds no SELECT grant on that table, so the only thing
- * reachable is a single-locator answer. See the migration header for why the directory exists at all
- * and why the same approach cannot work against `app.refresh_tokens`.
- */
-async function resolveLocator(
-  database: Database,
-  locator: string,
-): Promise<{ school_id: string; user_id: string } | undefined> {
-  const rows = await database<{ school_id: string; user_id: string }[]>`
-    SELECT school_id, user_id FROM app.resolve_refresh_token_locator(${locator})
-  `;
-  return rows[0];
 }

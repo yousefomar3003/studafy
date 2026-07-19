@@ -24,7 +24,7 @@ same gap for their own sections.
 
 |                    | Access token                                        | Refresh token                                |
 | ------------------ | --------------------------------------------------- | -------------------------------------------- |
-| Format             | RS256 JWT                                           | Opaque `<locator>.<secret>`                  |
+| Format             | RS256 JWT                                           | Opaque `<school>.<user>.<secret>`            |
 | Carries claims     | Yes — `sub`, `school_id`, `roles`, `channel`, `jti` | No                                           |
 | Verified by        | Signature, offline                                  | Database lookup                              |
 | Lifetime           | 15 min (`JWT_ACCESS_TTL_SECONDS`)                   | 30 days, sliding (`JWT_REFRESH_TTL_SECONDS`) |
@@ -35,15 +35,15 @@ The split is the usual one and worth stating plainly: a JWT is fast because noth
 prove it valid, which is exactly why it cannot be withdrawn. The refresh token is the opposite trade
 — every use costs a lookup, and in exchange a session can be ended the instant it needs to be.
 
-## The wire format, and why it has two parts
+## The wire format, and why it carries two ids
 
 ```
-9f3a1c2e-...-c21e . Xk7__pQ2mF1nR8sTvW4yZ6bC9dE0gH3jK5lM7oP1qS8
-└─ locator ──────┘  └─ secret ─────────────────────────────────┘
-   random uuid         256 bits of CSPRNG output, base64url
+22222222-2222-...-2222 . 11111111-1111-...-1111 . Xk7__pQ2mF1nR8sTvW4yZ6bC9dE0gH3jK5lM7oP1qS8
+└─ school_id ─────────┘  └─ user_id ───────────┘  └─ secret ─────────────────────────────────┘
+                                                     256 bits of CSPRNG output, base64url
 ```
 
-The secret alone would be a perfectly good credential. The locator exists to solve an _ordering_
+The secret alone would be a perfectly good credential. The two ids are there to solve an _ordering_
 problem in the data layer, not a cryptographic one.
 
 A refresh request carries no access token — that is the situation it exists to resolve — so it has
@@ -51,51 +51,49 @@ no verified `school_id`. But [`withTenantTx`](../../apps/api/src/db/tenant-tx.ts
 transaction without one, and every policy created by
 [`000006`](../../db/migrations/000006_create_rls_helper.sql) compares rows against
 `current_setting('app.school_id')` with no `missing_ok`, so an unset GUC **raises** rather than
-matching nothing. The token has to resolve to a tenant before any tenant-scoped query can run.
+matching nothing. The restrictive `refresh_tokens_owner` policy makes the same true of
+`app.user_id`. Both have to be known _before_ the row that holds them can be read.
 
-**A `SECURITY DEFINER` function against `app.refresh_tokens` cannot do this.**
-`apply_tenant_isolation` creates `tenant_isolation` as `PERMISSIVE FOR ALL TO PUBLIC` _and_ applies
-`FORCE ROW LEVEL SECURITY`, so the owning role is subject to the policy too — and this schema
-deliberately has no `BYPASSRLS` role anywhere (`000002` refuses to proceed if either role carries the
-attribute, `000022` states it, and `packages/db/tests/rls.test.ts` asserts it stays false). A definer
-function owned by `studafy_admin` would be filtered by the same unset GUC and fail closed. That is
-the isolation guarantee working as designed, not an obstacle to engineer around.
-
-So the lookup moved outside the tenant tables instead of weakening them:
+**This discloses nothing.** The access token issued to the same client already carries `school_id`
+and `sub` as claims. Nor does it hand a caller a scope to attack: forged ids open a transaction
+scoped to that tenant and user, where the presented secret still has to hash to a stored
+`token_hash` owned by them. Wrong ids find nothing.
 
 ```mermaid
 sequenceDiagram
     participant C as Client
     participant R as POST /api/auth/refresh
-    participant D as app.refresh_token_locators<br/>(global, no RLS)
     participant T as app.refresh_tokens<br/>(tenant + owner RLS)
 
-    C->>R: locator.secret
+    C->>R: school.user.secret
     R->>R: parse; reject malformed in-process
-    R->>D: resolve_refresh_token_locator(locator)
-    D-->>R: school_id, user_id
     Note over R,T: withTenantTx(school_id, user_id) — studafy_app, all policies in force
-    R->>T: SELECT … WHERE locator = $1
-    R->>R: timing-safe compare sha256(secret)
+    R->>T: SELECT … WHERE token_hash = sha256(secret)
+    Note right of R: finding a row IS the verification
     R->>T: INSERT child; UPDATE parent … AND rotated_at IS NULL
     R-->>C: new pair
 ```
 
-**The locator is not the tenant id.** Putting `school_id` in the token would publish it to every
-client and let a caller choose which RLS scope the lookup opens. A random locator resolves to nothing
-unless it was issued.
+### Two designs that do not work
 
-**The directory holds no credential material.** Only `(locator, school_id, user_id, created_at)` —
-the digest stays in `app.refresh_tokens`, behind RLS. And `studafy_app` holds `INSERT` but
-deliberately **no `SELECT`** on it, so the runtime cannot read it in bulk; the only read path is the
-`SECURITY DEFINER` function, which answers for one locator at a time. That function works where the
-same approach against `refresh_tokens` cannot, for exactly one reason: the directory is global, so
-there is no row-level security to force.
+Recorded so they are not attempted again; the migration header carries the same note.
 
-This is the same reasoning [`000028`](../../db/migrations/000028_create_security_events_table.sql)
-applied to `app.security_events`, and which its header points at explicitly: a code path that runs
-before a tenant exists gets its own relation rather than a nullable `school_id` on a tenant-isolated
-one.
+**A `SECURITY DEFINER` function reading `app.refresh_tokens`.** `apply_tenant_isolation` creates
+`tenant_isolation` as `PERMISSIVE FOR ALL TO PUBLIC` _and_ applies `FORCE ROW LEVEL SECURITY`, so the
+owning role is subject to the policy too — and this schema deliberately has no `BYPASSRLS` role
+(`000002` refuses to proceed if either role carries the attribute, `000022` states it, and
+`packages/db/tests/rls.test.ts` asserts it stays false). The function would be filtered by the same
+unset GUC and fail closed. That is the isolation guarantee working as designed.
+
+**A global directory mapping an opaque locator to `(school_id, user_id)`**, so the token would carry
+no tenant identifier. This is the shape [`000028`](../../db/migrations/000028_create_security_events_table.sql)
+used for `app.security_events`, and it does not transfer: `security_events` carries no `school_id` at
+all, whereas a directory whose whole purpose is to _return_ one must.
+[`db/policies/rls-coverage.ts`](../../db/policies/rls-coverage.ts) rejects exactly that combination —
+`GLOBAL_SCOPE_DRIFT`, _"approved global table unexpectedly contains school_id"_ — and `000028`'s own
+header names it in advance as "the worst of both worlds". A table in this schema either carries
+`school_id` and is tenant-isolated, or carries none and is global. There is no third category, and
+inventing one for this feature would weaken the invariant that makes NFR-05 provable.
 
 ## Session state
 
@@ -143,8 +141,9 @@ Two ordering details carry weight:
 - **Reuse is checked before expiry.** A replayed token that has also aged out is still a theft
   signal; reporting it as merely "expired" would let an attacker who sat on a stolen token past its
   lifetime avoid tripping the alarm entirely.
-- **The secret is verified before any lifecycle branch.** Otherwise a caller holding only a leaked
-  locator could learn that a session exists, or that it was revoked, without the credential.
+- **The secret is what finds the row, so no lifecycle state is reachable without it.** The lookup
+  matches on the digest, so a caller holding only a school and user id — both of which the access
+  token already publishes — cannot learn that a session exists, or that it was revoked.
 
 ### Concurrency
 
@@ -215,8 +214,7 @@ the query as well as to the caller.
 `app.refresh_tokens` is 3NF with no serialized blobs — device metadata is explicit scalar columns
 (`device_name`, `user_agent`, `ip_address`), per `000007`.
 
-`000029` adds `locator` (unique, FK to the directory), `device_id` (composite FK to
-`app.user_devices`, **nullable**), and `channel`. `device_id` is nullable because `app.user_devices`
+`000029` adds `device_id` (composite FK to `app.user_devices`, **nullable**) and `channel`. `device_id` is nullable because `app.user_devices`
 is an FCM push-token registry rather than a session-fingerprint table: a browser login that never
 granted push has no row there, and forcing the link would mean minting a synthetic push registration
 per browser session, corrupting that table's meaning for the notification code that owns it.
@@ -241,18 +239,14 @@ uses for `user_devices`.
 
 ### Indexes
 
-| Index                                               | Query it serves                          |
-| --------------------------------------------------- | ---------------------------------------- |
-| `uq_refresh_tokens_token_hash`                      | Unique B-tree on the digest (`000007`)   |
-| `uq_refresh_tokens_locator`                         | The point lookup every rotation performs |
-| `idx_refresh_tokens_school_family`                  | Family revocation                        |
-| `idx_refresh_tokens_school_user`                    | A user's tokens; backs the composite FK  |
-| `idx_refresh_tokens_school_parent` / `_replaced_by` | Chain traversal; back the self FKs       |
-| `idx_refresh_tokens_school_device`                  | Per-device enumeration and termination   |
-| `idx_refresh_tokens_school_user_active`             | Live-session listing (partial)           |
-
-`app.refresh_token_locators` carries no index beyond its primary key, and that is the complete set
-rather than an omission: the only query it ever serves is a point lookup by locator.
+| Index                                               | Query it serves                                                                   |
+| --------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `uq_refresh_tokens_token_hash`                      | Unique B-tree on the digest — the point lookup every rotation performs (`000007`) |
+| `idx_refresh_tokens_school_family`                  | Family revocation                                                                 |
+| `idx_refresh_tokens_school_user`                    | A user's tokens; backs the composite FK                                           |
+| `idx_refresh_tokens_school_parent` / `_replaced_by` | Chain traversal; back the self FKs                                                |
+| `idx_refresh_tokens_school_device`                  | Per-device enumeration and termination                                            |
+| `idx_refresh_tokens_school_user_active`             | Live-session listing (partial)                                                    |
 
 ## Performance
 
@@ -271,9 +265,8 @@ baseline arm to subtract, and its cost is dominated by database round trips rath
 overhead, so it follows the precedent of the absolute budgets in `packages/db/tests` (see
 [`docs/database/attendance.md`](../database/attendance.md)).
 
-Covered: token parse, one SHA-256 digest, the locator resolution round trip, the tenant transaction
-that reads the session and inserts the child and consumes the parent, and the RSA signature that
-mints the access token. Excluded: client network RTT, a property of deployment topology.
+Covered: token parse, one SHA-256 digest, the tenant transaction that reads the session and inserts
+the child and consumes the parent, and the RSA signature that mints the access token. Excluded: client network RTT, a property of deployment topology.
 
 Reproduce:
 
@@ -285,8 +278,8 @@ TEST_DATABASE_URL=... REFRESH_ROTATION_BENCHMARK=1 \
 ## Logging
 
 No token material reaches a log sink in any form — not the presented token, not the secret, not the
-digest, and not the locator. The locator is not a credential, but logging it would still turn a log
-sink into a session-lookup index.
+digest. The school and user ids in a token are not credentials and appear in log lines as ordinary
+correlation fields; the secret never does.
 
 Correlation keys are `family_id` and `session_id`. A reuse breach logs at **error**; a theft signal
 that lands at `warn` gets lost among ordinary 401s.

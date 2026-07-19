@@ -180,9 +180,11 @@ describe("normal rotation", () => {
         expect(child.device_id).toBe(device.id);
 
         const [observed] = await sql<{ user_agent: string; ip_address: string }[]>`
-        SELECT user_agent, ip_address::text FROM app.refresh_tokens WHERE id = ${rotated.sessionId}
+        SELECT user_agent, host(ip_address) AS ip_address
+          FROM app.refresh_tokens WHERE id = ${rotated.sessionId}
       `;
         expect(observed!.user_agent).toBe("new-agent/2.0");
+        // host() strips the prefix length: an inet column renders as "203.0.113.9/32" otherwise.
         expect(observed!.ip_address).toBe("203.0.113.9");
       } finally {
         destroy();
@@ -217,7 +219,7 @@ describe("reuse detection", () => {
       // Replay the original — the token an attacker would have captured first.
       await expect(
         rotateRefreshToken(sql, config, { presentedToken: seed.token }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
 
       const after = await familyRows(seed.familyId);
       expect(after).toHaveLength(3);
@@ -226,7 +228,7 @@ describe("reuse detection", () => {
       // Including the live tip: the legitimate holder is logged out too, which is the point.
       await expect(
         rotateRefreshToken(sql, config, { presentedToken: second.refreshToken }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
     } finally {
       destroy();
     }
@@ -244,7 +246,7 @@ describe("reuse detection", () => {
       const requestId = crypto.randomUUID();
       await expect(
         rotateRefreshToken(sql, config, { presentedToken: seed.token, requestId }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
 
       const [audit] = await sql<
         {
@@ -287,7 +289,7 @@ describe("reuse detection", () => {
       await rotateRefreshToken(sql, config, { presentedToken: seed.token });
       await expect(
         rotateRefreshToken(sql, config, { presentedToken: seed.token }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
 
       const [row] = await sql<{ revoked_at: Date | null }[]>`
         SELECT revoked_at FROM app.user_devices WHERE id = ${device.id}
@@ -379,8 +381,9 @@ describe("rejections", () => {
       const seed = await createRefreshSession(sql, tenant.schoolId, user.id);
       const other = await createRefreshSession(sql, tenant.schoolId, user.id);
 
-      // Real locator, real secret — from different tokens. Neither half alone is sufficient.
-      const forged = `${seed.locator}.${other.token.split(".")[1]}`;
+      // Correct tenant and user, secret from a different session. The ids scope the search; only the
+      // secret proves anything, so this must find nothing.
+      const forged = `${tenant.schoolId}.${user.id}.${other.token.split(".")[2]}`;
 
       await expect(
         rotateRefreshToken(sql, config, { presentedToken: forged }),
@@ -404,7 +407,7 @@ describe("rejections", () => {
       for (const presented of [
         "not-a-token",
         "",
-        "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0.Xk7pQ2abc",
+        `${tenant.schoolId}.${tenant.users.STUDENT.id}.Xk7pQ2abc`,
       ]) {
         await expect(
           rotateRefreshToken(sql, config, { presentedToken: presented }),

@@ -309,7 +309,9 @@ describe("logout", () => {
   integrationTest("answers identically for an unknown token, revealing nothing", async () => {
     const unknown = await post("/api/auth/logout", {
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ refresh_token: "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0.Xk7pQ2abc" }),
+      body: JSON.stringify({
+        refresh_token: `${tenant.schoolId}.${tenant.users.STUDENT.id}.Xk7pQ2abc`,
+      }),
     });
     const absent = await post("/api/auth/logout", {
       headers: { "content-type": "application/json" },
@@ -421,9 +423,9 @@ describe("logging", () => {
     expect(written).not.toContain(seed.token);
     expect(written).not.toContain(secret);
     expect(written).not.toContain(rotated.refreshToken);
-    // The locator is not a credential, but logging it would still make a log sink a session-lookup
-    // index, so it stays out too.
-    expect(written).not.toContain(seed.locator);
+    // The secret half of the child token, checked separately: a log line that truncated the token
+    // would still leak the only part that matters.
+    expect(written).not.toContain(rotated.refreshToken.split(".")[2]);
   });
 
   integrationTest("records a reuse breach at error level with the family as the key", async () => {
