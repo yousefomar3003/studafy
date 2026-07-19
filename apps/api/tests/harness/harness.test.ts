@@ -13,15 +13,13 @@ import {
   migrateDatabase,
 } from ".";
 
-import type { TestDatabase } from ".";
+import type { TestApp, TestDatabase } from ".";
 import type { TenantFixture } from "./factories";
-import type { AppEnv } from "../../src/middleware/requestId";
-import type { OpenAPIHono } from "@hono/zod-openapi";
 
 const integrationTest = test.skipIf(!integrationEnabled);
 
 let database: TestDatabase | undefined;
-let app: OpenAPIHono<AppEnv> | undefined;
+let harness: TestApp | undefined;
 let tenant: TenantFixture | undefined;
 
 describe("integration test harness", () => {
@@ -31,20 +29,23 @@ describe("integration test harness", () => {
     database = await createTestDatabase();
     await migrateDatabase(database.url);
     tenant = await createFullTenant(database.sql);
-    app = createTestApp({ database: database.sql });
+    const created = createTestApp({ database: database.sql });
+    await created.ready;
+    harness = created;
   }, 60_000);
 
   afterAll(async () => {
+    harness?.keyStore.destroy();
     await database?.cleanup();
   });
 
   integrationTest("health check returns 200", async () => {
-    const res = await app!.request("/healthz");
+    const res = await harness!.app.request("/healthz");
     expect(res.status).toBe(200);
   });
 
   integrationTest("ready check returns 200", async () => {
-    const res = await app!.request("/readyz");
+    const res = await harness!.app.request("/readyz");
     expect(res.status).toBe(200);
   });
 
@@ -83,7 +84,7 @@ describe("integration test harness", () => {
   });
 
   integrationTest("authenticated request injects school/user context", async () => {
-    const res = await authenticatedRequest(app!, "GET", "/healthz", {
+    const res = await authenticatedRequest(harness!, "GET", "/healthz", {
       schoolId: tenant!.schoolId,
       userId: tenant!.users.ORG_ADMIN.id,
     });

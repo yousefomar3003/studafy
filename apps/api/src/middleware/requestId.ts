@@ -1,3 +1,4 @@
+import type { AuthContext } from "./authContext";
 import type { Logger } from "../logger";
 import type { MiddlewareHandler } from "hono";
 
@@ -74,11 +75,13 @@ export function requestIdMiddleware({
   };
 }
 
-/** Types for request context variables. */
-export interface AuthContext {
-  schoolId: string;
-  userId: string;
-}
+/**
+ * Types for request context variables.
+ *
+ * AuthContext itself lives in ./authContext.ts — it is defined by what jwtAuth.ts hydrates, not by
+ * this middleware — and is re-exported here so the import sites that predate it keep working.
+ */
+export type { AuthContext } from "./authContext";
 
 export interface AppVariables {
   requestId: string;

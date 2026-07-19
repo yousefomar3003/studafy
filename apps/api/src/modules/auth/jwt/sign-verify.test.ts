@@ -2,6 +2,8 @@
 import { describe, expect, test } from "bun:test";
 import { jwtVerify } from "jose";
 
+import { AUTH_CHANNELS } from "../channels";
+
 import { KeyStore } from "./key-store";
 import { signAccessToken } from "./sign";
 import { verifyAccessToken, TokenVerificationError } from "./verify";
@@ -18,6 +20,7 @@ const signParams = {
   school_id: "22222222-2222-2222-2222-222222222222",
   roles: ["INSTRUCTOR", "STUDENT"] as Role[],
   entitlements_ver: 3,
+  channel: AUTH_CHANNELS.WEB,
 };
 
 let store: KeyStore;
@@ -83,6 +86,7 @@ describe("signAccessToken", () => {
     expect(payload.school_id).toBe(signParams.school_id);
     expect(payload.roles).toEqual(signParams.roles);
     expect(payload.entitlements_ver).toBe(signParams.entitlements_ver);
+    expect(payload.channel).toBe(signParams.channel);
     expect(payload.iss).toBe(ISSUER);
     expect(payload.aud).toBe(AUDIENCE);
     expect(payload.iat).toBeNumber();

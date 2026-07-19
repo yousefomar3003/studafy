@@ -39,6 +39,8 @@ export {
   type AuditEntry,
   type AuditMeta,
 } from "./auditEmitter";
+export { jwtAuthMiddleware, AuthException, type JwtAuthOptions } from "./jwtAuth";
+export { requireAuth } from "./authContext";
 export { corsMiddleware, type CorsOptions } from "./cors";
 export { csrfMiddleware, type CsrfOptions } from "./csrf";
 export {

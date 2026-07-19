@@ -38,6 +38,10 @@ export {
 export {
   createTestApp,
   authenticatedRequest,
+  mintTestToken,
+  TEST_JWT_ISSUER,
+  TEST_JWT_AUDIENCE,
   type TestAuthContext,
   type TestAppOptions,
+  type TestApp,
 } from "./request";
