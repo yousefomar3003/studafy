@@ -45,13 +45,27 @@ export interface JwtAuthOptions {
    * Path prefixes below the mount point that skip authentication entirely.
    *
    * Defaults to the webhook prefix, which authenticates by HMAC signature rather than by session
-   * token (see src/erpnext/webhook.ts). Kept as an explicit list rather than an opt-in flag on
-   * each route so that the set of unauthenticated endpoints is enumerable in one place.
+   * token (see src/erpnext/webhook.ts), plus the two session-lifecycle endpoints that authenticate
+   * with a refresh token instead (see modules/auth/routes/session-routes.ts). Kept as an explicit
+   * list rather than an opt-in flag on each route so that the set of unauthenticated endpoints is
+   * enumerable in one place.
    */
   publicPaths?: string[];
 }
 
-const DEFAULT_PUBLIC_PATHS = ["/api/webhooks"];
+/**
+ * Every endpoint under /api that does not authenticate with a bearer access token.
+ *
+ * `/api/auth/refresh` and `/api/auth/logout` are here because a client reaches them precisely when
+ * its access token is expired or gone — requiring one would make them unreachable exactly when they
+ * are needed. Their credential is the refresh token, verified against app.refresh_tokens by the
+ * session service, so they are not unauthenticated so much as authenticated by other means.
+ *
+ * Note these are exact paths, not prefixes like /api/webhooks: the rest of /api/auth (session
+ * enumeration and termination) must stay behind the boundary, and a `/api/auth` prefix would open
+ * all of it. isPublicPath below matches accordingly.
+ */
+const DEFAULT_PUBLIC_PATHS = ["/api/webhooks", "/api/auth/refresh", "/api/auth/logout"];
 
 // ---------------------------------------------------------------------------
 // Failure taxonomy
@@ -114,6 +128,19 @@ export class AuthException extends HTTPException {
  * tests/auth/short-circuit.test.ts holds this ordering by counting denylist lookups — a status
  * code alone cannot tell the two arrangements apart.
  */
+/**
+ * Whether a path is exempt from authentication.
+ *
+ * An entry matches the path exactly, or as a path-segment prefix — never as a bare string prefix.
+ * The difference is load-bearing now that the list holds exact endpoints as well as trees:
+ * `"/api/auth/refresh"` must not exempt `/api/auth/refresh-everything`, and a plain `startsWith`
+ * would. Segment-aware matching keeps `/api/webhooks` covering `/api/webhooks/erpnext` while making
+ * an entry incapable of opening a sibling route that merely shares its opening characters.
+ */
+function isPublicPath(path: string, publicPaths: readonly string[]): boolean {
+  return publicPaths.some((entry) => path === entry || path.startsWith(`${entry}/`));
+}
+
 export function jwtAuthMiddleware({
   keyStore,
   denylist,
@@ -122,7 +149,7 @@ export function jwtAuthMiddleware({
   publicPaths = DEFAULT_PUBLIC_PATHS,
 }: JwtAuthOptions): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    if (publicPaths.some((prefix) => c.req.path.startsWith(prefix))) {
+    if (isPublicPath(c.req.path, publicPaths)) {
       await next();
       return;
     }

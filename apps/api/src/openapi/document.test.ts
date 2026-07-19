@@ -89,7 +89,17 @@ describe("structure", () => {
   // to the document, silently. This is the guard against that regression.
   test("contains every mounted route", () => {
     expect(Object.keys(document.paths ?? {}).sort()).toEqual(
-      ["/.well-known/jwks.json", "/erpnext/webhooks", "/healthz", "/readyz"].sort(),
+      [
+        "/.well-known/jwks.json",
+        "/api/auth/devices/{deviceId}/sessions",
+        "/api/auth/logout",
+        "/api/auth/refresh",
+        "/api/auth/sessions",
+        "/api/auth/sessions/{sessionId}",
+        "/erpnext/webhooks",
+        "/healthz",
+        "/readyz",
+      ].sort(),
     );
   });
 
@@ -187,17 +197,52 @@ describe("security", () => {
     });
   });
 
-  // No route in this app authenticates anything. A root-level requirement would document an
-  // enforcement that does not exist, and every operation says so explicitly rather than by omission.
-  test("requires no authentication anywhere, because none is implemented", () => {
+  /**
+   * Every operation states its own security, and none inherits a root-level default.
+   *
+   * This test used to assert the stronger claim that nothing authenticates at all, which was true
+   * until ST-070 mounted jwtAuthMiddleware and ST-071 added the first routes behind it. What
+   * survives from that version, and is the part worth keeping, is the requirement that every
+   * operation says so *explicitly*: a document that omits `security` is ambiguous between "public"
+   * and "the author forgot", and the two are indistinguishable to a client generator.
+   *
+   * `document.security` stays undefined deliberately. A root-level requirement would claim the whole
+   * API is authenticated, which is false — /healthz, /readyz, the JWKS endpoint, the webhook, and
+   * the two refresh-token endpoints are all reachable without a bearer token — and a reader would
+   * have to diff each operation's override against it to find out which.
+   */
+  test("states security explicitly on every operation, with no root-level default", () => {
     expect(document.security).toBeUndefined();
 
     for (const { path: p, method, operation } of operations) {
       expect(
         operation.security,
         `${method.toUpperCase()} ${p} does not state its security`,
-      ).toEqual([]);
+      ).toBeDefined();
     }
+  });
+
+  /**
+   * The authenticated set matches what jwtAuthMiddleware actually enforces.
+   *
+   * Pinned rather than derived, because the document and the middleware are two independent
+   * statements of the same fact and the point is to catch them disagreeing. A route that gains
+   * `security: [{ bearerAuth: [] }]` without being moved behind the boundary — or, far worse, one
+   * dropped from DEFAULT_PUBLIC_PATHS while still documented as public — fails here.
+   */
+  test("marks exactly the routes behind the authentication boundary", () => {
+    const authenticated = operations
+      .filter(({ operation }) => (operation.security ?? []).length > 0)
+      .map(({ method, path: p }) => `${method.toUpperCase()} ${p}`)
+      .sort();
+
+    expect(authenticated).toEqual(
+      [
+        "GET /api/auth/sessions",
+        "DELETE /api/auth/sessions/{sessionId}",
+        "DELETE /api/auth/devices/{deviceId}/sessions",
+      ].sort(),
+    );
   });
 });
 

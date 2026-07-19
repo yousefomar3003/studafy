@@ -1,0 +1,593 @@
+/**
+ * Refresh-token issuance, rotation, and reuse detection — the session lifecycle (ST-071).
+ *
+ * A session is one row in `app.refresh_tokens` per token, chained by `family_id`. Every refresh
+ * consumes the presented token and issues a new one into the same family, so a token is valid
+ * exactly once. Re-presenting a token that was already consumed is the signal this whole design
+ * exists for: it means two parties hold the same token, which only happens after a theft, so the
+ * entire family is revoked and the legitimate holder is logged out along with the attacker. Losing a
+ * session is the correct outcome — an attacker who keeps rotating silently forever is not.
+ *
+ * The functions here divide along a deliberate line. `issueTokenPair` and the revocation helpers
+ * take a `TransactionSql` first, following the convention set by src/lib/events/emitter.ts and
+ * middleware/auditEmitter.ts: the caller owns the transaction, so issuance can be composed into a
+ * larger unit of work (a future login route mints a token and updates last_login_at atomically).
+ * `rotateRefreshToken` takes the `Database` instead, because it must resolve a tenant before a
+ * tenant transaction can exist — it owns its own transaction by necessity.
+ *
+ * See docs/architecture/SAD_13_session_model.md for the state machine and the threat model.
+ */
+
+import { randomUUID } from "node:crypto";
+
+import { ERROR_CODES } from "@studafy/constants";
+
+import { withTenantTx } from "../../../db/tenant-tx";
+import { emitAuditLog } from "../../../middleware/auditEmitter";
+import { AuthException } from "../../../middleware/jwtAuth";
+import { signAccessToken } from "../jwt/sign";
+import { mintOpaqueToken, parseOpaqueToken, verifySecret } from "../tokens/opaque-token";
+
+import type { Database } from "../../../db/client";
+import type { Logger } from "../../../logger";
+import type { AuthChannel } from "../channels";
+import type { KeyStore } from "../jwt/key-store";
+import type { Role } from "@studafy/constants";
+import type { TransactionSql } from "postgres";
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+export interface SessionTokenConfig {
+  keyStore: KeyStore;
+  issuer: string;
+  audience: string;
+  /** Access-token lifetime. Threaded from env.JWT_ACCESS_TTL_SECONDS. */
+  accessTtlSeconds: number;
+  /** Refresh-token lifetime, applied fresh on every rotation. Threaded from env.JWT_REFRESH_TTL_SECONDS. */
+  refreshTtlSeconds: number;
+}
+
+/** Device metadata captured from the request. Explicit scalars, never a serialized blob. */
+export interface DeviceContext {
+  deviceId?: string | null;
+  deviceName?: string | null;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+}
+
+/** What a caller gets back from issuance or rotation. The refresh token exists here and nowhere else. */
+export interface IssuedTokenPair {
+  accessToken: string;
+  /** Full `<locator>.<secret>` string. Returned once; only its digest is stored. */
+  refreshToken: string;
+  sessionId: string;
+  familyId: string;
+  channel: AuthChannel;
+  refreshExpiresAt: Date;
+  accessExpiresInSeconds: number;
+}
+
+// ---------------------------------------------------------------------------
+// Issuance
+// ---------------------------------------------------------------------------
+
+export interface IssueTokenPairParams {
+  userId: string;
+  schoolId: string;
+  channel: AuthChannel;
+  device?: DeviceContext;
+  /** Continue an existing rotation chain. Omit to start a new session. */
+  familyId?: string;
+  /** The token this one replaces. Set only when rotating. */
+  parentTokenId?: string;
+}
+
+/**
+ * Mint an access/refresh pair and persist the refresh token's digest.
+ *
+ * Roles are read from `app.user_roles` rather than accepted from the caller. They are an authority
+ * claim, and the one place they can be sourced from without becoming forgeable is the table that
+ * defines them — a login route that passed in a role list would be one bug away from privilege
+ * escalation.
+ */
+export async function issueTokenPair(
+  tx: TransactionSql,
+  config: SessionTokenConfig,
+  params: IssueTokenPairParams,
+): Promise<IssuedTokenPair> {
+  const roles = await readUserRoles(tx, params.userId);
+
+  const minted = mintOpaqueToken();
+  const device = params.device ?? {};
+  const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
+  // Generated here rather than by a gen_random_uuid() default so the value is a plain bound
+  // parameter in both statements below — mixing a SQL fragment into a parameter list is where
+  // postgres.js template composition gets subtle, and this is not the place to be clever.
+  const familyId = params.familyId ?? randomUUID();
+
+  // The locator directory is global (no RLS) and the token row is tenant-isolated, but both writes
+  // land in this one transaction, so a locator can never point at a token row that does not exist.
+  await tx`
+    INSERT INTO app.refresh_token_locators (locator, school_id, user_id)
+    VALUES (${minted.locator}, ${params.schoolId}, ${params.userId})
+  `;
+
+  const [row] = await tx<{ id: string; family_id: string }[]>`
+    INSERT INTO app.refresh_tokens (
+      school_id, user_id, token_hash, locator, family_id, parent_token_id,
+      device_id, channel, device_name, user_agent, ip_address, expires_at
+    ) VALUES (
+      current_setting('app.school_id')::uuid,
+      ${params.userId},
+      ${minted.secretHash},
+      ${minted.locator},
+      ${familyId},
+      ${params.parentTokenId ?? null},
+      ${device.deviceId ?? null},
+      ${params.channel},
+      ${device.deviceName ?? null},
+      ${device.userAgent ?? null},
+      ${device.ipAddress ?? null},
+      ${expiresAt}
+    )
+    RETURNING id, family_id
+  `;
+
+  const accessToken = await signAccessToken(
+    config.keyStore,
+    {
+      sub: params.userId,
+      school_id: params.schoolId,
+      roles,
+      entitlements_ver: 1,
+      channel: params.channel,
+    },
+    {
+      issuer: config.issuer,
+      audience: config.audience,
+      ttlSeconds: config.accessTtlSeconds,
+    },
+  );
+
+  return {
+    accessToken,
+    refreshToken: minted.token,
+    sessionId: row!.id,
+    familyId: row!.family_id,
+    channel: params.channel,
+    refreshExpiresAt: expiresAt,
+    accessExpiresInSeconds: config.accessTtlSeconds,
+  };
+}
+
+/**
+ * Every role the user holds in the current tenant.
+ *
+ * A user with no roles cannot be issued a token. That is a data-integrity failure rather than an
+ * authorization outcome — `app.user_roles` is populated when a user is activated — and returning an
+ * empty array would mint a token that authenticates but authorizes nothing, which is far harder to
+ * diagnose downstream than a refusal here.
+ */
+async function readUserRoles(tx: TransactionSql, userId: string): Promise<Role[]> {
+  const rows = await tx<{ role: Role }[]>`
+    SELECT role FROM app.user_roles WHERE user_id = ${userId} ORDER BY role
+  `;
+
+  if (rows.length === 0) {
+    throw new AuthException(ERROR_CODES.AUTH_SESSION_NOT_FOUND, "User has no roles in this tenant");
+  }
+
+  return rows.map((row) => row.role);
+}
+
+// ---------------------------------------------------------------------------
+// Rotation
+// ---------------------------------------------------------------------------
+
+export interface RotateParams {
+  presentedToken: string;
+  requestId?: string;
+  device?: DeviceContext;
+  log?: Logger;
+}
+
+/**
+ * Consume a refresh token and issue its replacement.
+ *
+ * The sequence is fixed by the RLS ordering problem described in
+ * db/migrations/000029_add_refresh_token_session_columns.sql: the tenant must be known before any
+ * tenant-scoped query can run, so the locator directory is read first, outside any tenant
+ * transaction, and everything after happens inside one.
+ *
+ * Every rejection below is the same 401 with a code the client can act on, and deliberately reveals
+ * nothing about which check failed beyond expired-versus-not. A caller probing tokens learns only
+ * "no" — not whether the locator existed, whether the secret was close, or whether the session
+ * belongs to a real user.
+ */
+export async function rotateRefreshToken(
+  database: Database,
+  config: SessionTokenConfig,
+  params: RotateParams,
+): Promise<IssuedTokenPair> {
+  const parsed = parseOpaqueToken(params.presentedToken);
+  if (!parsed) {
+    throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
+  }
+
+  // --- 1. Resolve the tenant (no tenant context exists yet) ------------------
+  const owner = await resolveLocator(database, parsed.locator);
+  if (!owner) {
+    throw new AuthException(ERROR_CODES.AUTH_SESSION_NOT_FOUND, "Invalid refresh token");
+  }
+
+  const tenant = {
+    schoolId: owner.school_id,
+    userId: owner.user_id,
+    requestId: params.requestId,
+  };
+
+  // --- 2. Load the session row ----------------------------------------------
+  //
+  // Fully fenced: both GUCs come from the directory, so this runs under studafy_app with
+  // tenant_isolation and refresh_tokens_owner both in force. Nothing in this subsystem runs elevated.
+  const session = await withTenantTx(database, tenant, (tx) =>
+    loadSessionByLocator(tx, parsed.locator),
+  );
+
+  if (!session) {
+    throw new AuthException(ERROR_CODES.AUTH_SESSION_NOT_FOUND, "Invalid refresh token");
+  }
+
+  // Constant-time, and checked before any lifecycle branch: a caller must not be able to learn that
+  // a session exists, or that it was revoked, without holding the secret.
+  if (!verifySecret(parsed.secret, session.token_hash)) {
+    throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
+  }
+
+  // --- 3. Reuse detection ---------------------------------------------------
+  //
+  // Checked before expiry. A replayed token that has also aged out is still a theft signal, and
+  // rejecting it as merely "expired" would let an attacker who sat on a stolen token past its
+  // lifetime avoid tripping the alarm entirely.
+  if (session.rotated_at !== null || session.revoked_at !== null) {
+    await handleReuse(database, tenant, session, params.log);
+    throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
+  }
+
+  if (session.expires_at.getTime() <= Date.now()) {
+    throw new AuthException(ERROR_CODES.AUTH_TOKEN_EXPIRED, "Refresh token has expired");
+  }
+
+  // --- 4. Rotate ------------------------------------------------------------
+  return withTenantTx(database, tenant, async (tx) => {
+    const issued = await issueTokenPair(tx, config, {
+      userId: session.user_id,
+      schoolId: session.school_id,
+      channel: session.channel,
+      familyId: session.family_id,
+      parentTokenId: session.id,
+      device: {
+        // Device identity is carried forward from the session, not taken from the request. A
+        // rotation must not be able to move a session onto a different device.
+        deviceId: session.device_id,
+        deviceName: session.device_name,
+        // User agent and IP are refreshed: they are observational, and a session legitimately moves
+        // between networks and browser versions over a 30-day sliding window.
+        userAgent: params.device?.userAgent ?? session.user_agent,
+        ipAddress: params.device?.ipAddress ?? session.ip_address,
+      },
+    });
+
+    // The guard clause is the concurrency control for the whole endpoint. Two requests presenting
+    // the same token race here; the loser matches zero rows because rotated_at is no longer null,
+    // rolls this transaction back (discarding the child it just inserted), and is reported as reuse.
+    // Without it, both would succeed and the family would silently fork into two live branches.
+    const consumed = await tx`
+      UPDATE app.refresh_tokens
+         SET rotated_at = CURRENT_TIMESTAMP, replaced_by_token_id = ${issued.sessionId}
+       WHERE id = ${session.id}
+         AND rotated_at IS NULL
+         AND revoked_at IS NULL
+      RETURNING id
+    `;
+
+    if (consumed.length === 0) {
+      throw new ConcurrentRotationError();
+    }
+
+    return issued;
+  }).catch(async (err: unknown) => {
+    if (!(err instanceof ConcurrentRotationError)) throw err;
+
+    // Re-read outside the rolled-back transaction, then treat it exactly as any other replay. The
+    // loser of a genuine double-submit and a real attacker are indistinguishable at this point, and
+    // resolving that ambiguity in favour of the family is the entire premise of rotation.
+    const current = await withTenantTx(database, tenant, (tx) =>
+      loadSessionByLocator(tx, parsed.locator),
+    );
+    if (current) {
+      await handleReuse(database, tenant, current, params.log);
+    }
+    throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
+  });
+}
+
+/** Internal signal that the guarded UPDATE lost its race. Never leaves this module. */
+class ConcurrentRotationError extends Error {
+  constructor() {
+    super("refresh token was rotated concurrently");
+    this.name = "ConcurrentRotationError";
+  }
+}
+
+/**
+ * Burn down a compromised token family.
+ *
+ * Three things happen together, in one transaction, and the audit row is part of that atomicity
+ * rather than a best-effort afterthought: emitAuditLog throws on failure, which rolls the revocation
+ * back. A revocation nobody can prove happened is worse than one that visibly failed.
+ *
+ * The device is revoked alongside the family because ST-071 requires active sessions for the device
+ * to be cleared, and app.user_devices is what "the device" means in this schema — leaving its push
+ * token live would keep delivering notifications to a handset an attacker holds.
+ */
+async function handleReuse(
+  database: Database,
+  tenant: { schoolId: string; userId: string; requestId?: string },
+  session: SessionRow,
+  log?: Logger,
+): Promise<void> {
+  const revokedCount = await withTenantTx(database, tenant, async (tx) => {
+    const revoked = await tx`
+      UPDATE app.refresh_tokens
+         SET revoked_at = CURRENT_TIMESTAMP
+       WHERE family_id = ${session.family_id}
+         AND revoked_at IS NULL
+      RETURNING id
+    `;
+
+    if (session.device_id !== null) {
+      await tx`
+        UPDATE app.user_devices
+           SET revoked_at = CURRENT_TIMESTAMP
+         WHERE id = ${session.device_id}
+           AND revoked_at IS NULL
+      `;
+    }
+
+    await emitAuditLog(tx, {
+      action: "logout",
+      targetTable: "refresh_tokens",
+      // The family, not the individual token: the family is what was revoked, and it is the id that
+      // makes every row in the chain findable from this one audit entry.
+      targetId: session.family_id,
+      newValues: {
+        reason: "refresh_token_reuse_detected",
+        family_id: session.family_id,
+        session_id: session.id,
+        device_id: session.device_id,
+        revoked_token_count: revoked.length,
+      },
+      userAgent: session.user_agent,
+      clientIp: session.ip_address,
+    });
+
+    return revoked.length;
+  });
+
+  // Logged at error, not warn: this is the one event in the session subsystem that means a
+  // credential is in the wrong hands. No token material, in any form — not the presented token, not
+  // the locator, not the digest. The family id is the correlation key, and it is not a credential.
+  log?.error(
+    {
+      event: "refresh_token_reuse_detected",
+      family_id: session.family_id,
+      session_id: session.id,
+      device_id: session.device_id,
+      revoked_token_count: revokedCount,
+    },
+    "refresh token reuse detected — token family revoked",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Session enumeration and termination
+// ---------------------------------------------------------------------------
+
+export interface ActiveSession {
+  id: string;
+  deviceId: string | null;
+  deviceName: string | null;
+  channel: AuthChannel;
+  userAgent: string | null;
+  ipAddress: string | null;
+  issuedAt: Date;
+  expiresAt: Date;
+}
+
+/**
+ * The caller's live sessions — one row per family, not per token.
+ *
+ * A 30-day-old session has rotated hundreds of times and left every consumed token behind as a row.
+ * Listing tokens would show a user hundreds of entries for one browser. DISTINCT ON collapses each
+ * family to its live tip, which is what a human means by "a session".
+ */
+export async function listActiveSessions(
+  tx: TransactionSql,
+  userId: string,
+): Promise<ActiveSession[]> {
+  const rows = await tx<
+    {
+      id: string;
+      device_id: string | null;
+      device_name: string | null;
+      channel: AuthChannel;
+      user_agent: string | null;
+      ip_address: string | null;
+      issued_at: Date;
+      expires_at: Date;
+    }[]
+  >`
+    SELECT DISTINCT ON (family_id)
+      id, device_id, device_name, channel, user_agent, ip_address, issued_at, expires_at
+    FROM app.refresh_tokens
+    WHERE user_id = ${userId}
+      AND revoked_at IS NULL
+      AND rotated_at IS NULL
+      AND expires_at > CURRENT_TIMESTAMP
+    ORDER BY family_id, issued_at DESC
+  `;
+
+  // token_hash and locator are absent from the projection by design, not by oversight: this response
+  // is handed to a client, and either one would turn a session list into a set of credentials.
+  return rows.map((row) => ({
+    id: row.id,
+    deviceId: row.device_id,
+    deviceName: row.device_name,
+    channel: row.channel,
+    userAgent: row.user_agent,
+    ipAddress: row.ip_address,
+    issuedAt: row.issued_at,
+    expiresAt: row.expires_at,
+  }));
+}
+
+/**
+ * Revoke one session by the id of its live token, taking the whole family with it.
+ *
+ * Revoking the single row would leave the rest of the chain intact and the session usable, since the
+ * client holds the tip. The family is the unit of revocation everywhere in this module.
+ *
+ * Returns the number of tokens revoked; zero means the session was not found, already dead, or
+ * belongs to another user — the restrictive RLS policy makes the last case indistinguishable from
+ * the first, which is the right answer to give a caller probing for other people's session ids.
+ */
+export async function revokeSession(tx: TransactionSql, sessionId: string): Promise<number> {
+  const revoked = await tx`
+    UPDATE app.refresh_tokens
+       SET revoked_at = CURRENT_TIMESTAMP
+     WHERE family_id = (SELECT family_id FROM app.refresh_tokens WHERE id = ${sessionId})
+       AND revoked_at IS NULL
+    RETURNING id
+  `;
+  return revoked.length;
+}
+
+/** Revoke every session bound to one device. Used when a device is lost or handed on. */
+export async function revokeDeviceSessions(tx: TransactionSql, deviceId: string): Promise<number> {
+  const revoked = await tx`
+    UPDATE app.refresh_tokens
+       SET revoked_at = CURRENT_TIMESTAMP
+     WHERE device_id = ${deviceId}
+       AND revoked_at IS NULL
+    RETURNING id
+  `;
+  return revoked.length;
+}
+
+/**
+ * End the session a refresh token belongs to.
+ *
+ * Logout is unauthenticated — the token is the credential — so an unparseable or unknown token is
+ * not an error. Reporting "that token does not exist" to a caller asking to destroy it would be a
+ * probing oracle, and there is nothing for the client to do differently either way.
+ */
+export async function revokeSessionByToken(
+  database: Database,
+  presentedToken: string,
+  requestId?: string,
+): Promise<void> {
+  const parsed = parseOpaqueToken(presentedToken);
+  if (!parsed) return;
+
+  const owner = await resolveLocator(database, parsed.locator);
+  if (!owner) return;
+
+  const tenant = { schoolId: owner.school_id, userId: owner.user_id, requestId };
+
+  const session = await withTenantTx(database, tenant, (tx) =>
+    loadSessionByLocator(tx, parsed.locator),
+  );
+  if (!session) return;
+
+  // Still verified, even though the outcome is a revocation the session's owner would want. Skipping
+  // it would let anyone who learns a locator — from a log, a proxy, a crash dump — end that session
+  // at will, turning a leaked non-credential into a denial-of-service primitive.
+  if (!verifySecret(parsed.secret, session.token_hash)) return;
+
+  await withTenantTx(database, tenant, async (tx) => {
+    const revoked = await tx`
+        UPDATE app.refresh_tokens
+           SET revoked_at = CURRENT_TIMESTAMP
+         WHERE family_id = ${session.family_id}
+           AND revoked_at IS NULL
+        RETURNING id
+      `;
+
+    await emitAuditLog(tx, {
+      action: "logout",
+      targetTable: "refresh_tokens",
+      targetId: session.family_id,
+      newValues: {
+        reason: "user_logout",
+        family_id: session.family_id,
+        revoked_token_count: revoked.length,
+      },
+      userAgent: session.user_agent,
+      clientIp: session.ip_address,
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Shared internals
+// ---------------------------------------------------------------------------
+
+interface SessionRow {
+  id: string;
+  school_id: string;
+  user_id: string;
+  token_hash: Buffer;
+  family_id: string;
+  device_id: string | null;
+  channel: AuthChannel;
+  device_name: string | null;
+  user_agent: string | null;
+  ip_address: string | null;
+  expires_at: Date;
+  rotated_at: Date | null;
+  revoked_at: Date | null;
+}
+
+function loadSessionByLocator(
+  tx: TransactionSql,
+  locator: string,
+): Promise<SessionRow | undefined> {
+  return tx<SessionRow[]>`
+    SELECT id, school_id, user_id, token_hash, family_id, device_id, channel,
+           device_name, user_agent, ip_address, expires_at, rotated_at, revoked_at
+      FROM app.refresh_tokens
+     WHERE locator = ${locator}
+  `.then((rows) => rows[0]);
+}
+
+/**
+ * Resolve a locator to the tenant and user that own it.
+ *
+ * This is the one query in the subsystem that runs without a tenant context, because it is the query
+ * that establishes one. It reaches `app.refresh_token_locators` through a SECURITY DEFINER function
+ * rather than directly: `studafy_app` holds no SELECT grant on that table, so the only thing
+ * reachable is a single-locator answer. See the migration header for why the directory exists at all
+ * and why the same approach cannot work against `app.refresh_tokens`.
+ */
+async function resolveLocator(
+  database: Database,
+  locator: string,
+): Promise<{ school_id: string; user_id: string } | undefined> {
+  const rows = await database<{ school_id: string; user_id: string }[]>`
+    SELECT school_id, user_id FROM app.resolve_refresh_token_locator(${locator})
+  `;
+  return rows[0];
+}

@@ -17,7 +17,12 @@ import {
   securityHeadersMiddleware,
   jwtAuthMiddleware,
 } from "./middleware";
-import { createJtiDenylist, jwksRoutes } from "./modules/auth";
+import {
+  configureRefreshCookie,
+  createJtiDenylist,
+  jwksRoutes,
+  sessionRoutes,
+} from "./modules/auth";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -57,6 +62,10 @@ export interface AppOptions {
   jwtIssuer?: string;
   /** Required `aud` claim on access tokens. Threaded from env.JWT_AUDIENCE. */
   jwtAudience?: string;
+  /** Access-token lifetime in seconds. Threaded from env.JWT_ACCESS_TTL_SECONDS. */
+  jwtAccessTtlSeconds?: number;
+  /** Refresh-token lifetime in seconds, reapplied on every rotation. From env.JWT_REFRESH_TTL_SECONDS. */
+  jwtRefreshTtlSeconds?: number;
   /**
    * Where CORS and CSRF rejections are persisted (app.security_events).
    *
@@ -93,6 +102,8 @@ export function createApp({
   keyStore,
   jwtIssuer = "studafy",
   jwtAudience = "studafy-api",
+  jwtAccessTtlSeconds = 900,
+  jwtRefreshTtlSeconds = 30 * 24 * 60 * 60,
   securityEventSink,
   docsEnabled = false,
 }: AppOptions): OpenAPIHono<AppEnv> {
@@ -187,6 +198,28 @@ export function createApp({
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.
   if (keyStore) {
     app.route("/", jwksRoutes(keyStore));
+  }
+
+  // Session lifecycle (ST-071). Needs both a key store to mint access tokens and a database to hold
+  // the refresh-token families, so it mounts only when both exist.
+  //
+  // /api/auth/refresh and /api/auth/logout are exempt from the authentication boundary above via
+  // DEFAULT_PUBLIC_PATHS in middleware/jwtAuth.ts — they authenticate with a refresh token, and
+  // requiring an access token would make them unreachable exactly when a client needs them. The
+  // session enumeration and termination routes in the same sub-app are *not* exempt and run behind
+  // the normal boundary.
+  if (keyStore && database) {
+    configureRefreshCookie(jwtRefreshTtlSeconds);
+    app.route(
+      "/",
+      sessionRoutes(database, {
+        keyStore,
+        issuer: jwtIssuer,
+        audience: jwtAudience,
+        accessTtlSeconds: jwtAccessTtlSeconds,
+        refreshTtlSeconds: jwtRefreshTtlSeconds,
+      }),
+    );
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:
