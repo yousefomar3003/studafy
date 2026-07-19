@@ -44,6 +44,44 @@
 
 SET ROLE studafy_admin;
 
+-- ---------------------------------------------------------------------------
+-- Tenant context for the DDL below
+-- ---------------------------------------------------------------------------
+--
+-- app.refresh_tokens carries FORCE ROW LEVEL SECURITY, and its tenant_isolation policy (000006) is
+-- `USING (school_id = current_setting('app.school_id')::uuid)` with no missing_ok -- so evaluating it
+-- with the GUC unset raises 42704, "unrecognized configuration parameter", rather than matching no
+-- rows. FORCE means that applies to studafy_admin too; this schema has no BYPASSRLS role by design.
+--
+-- Every migration before this one got away with never setting the GUC, because none of them altered
+-- a FORCE-RLS table in a way that scans it. 000026 adds a *nullable* column (no scan) and 000020 adds
+-- a UNIQUE constraint (an index build, which reads the heap directly and never evaluates a policy).
+-- This migration is the first to add NOT NULL columns and foreign keys to such a table, and those
+-- carry verification scans that do go through the policy. Without the line below the whole migration
+-- aborts on the first of them.
+--
+-- The nil uuid is a deliberate choice rather than a placeholder tenant: it matches no school, so a
+-- policy-filtered scan sees zero rows. On this table that is also the true state -- app.refresh_tokens
+-- has never had a writer, as the column additions further down depend on and explain. The assertion
+-- immediately below turns that from an assumption into a checked precondition, so the GUC cannot
+-- quietly narrow a validation scan that should have seen rows. If the table is somehow non-empty,
+-- this migration refuses to run instead of validating a constraint against an RLS-filtered subset.
+DO $tenant_context$
+DECLARE
+  existing bigint;
+BEGIN
+  SELECT count(*) INTO existing FROM app.refresh_tokens;
+  IF existing > 0 THEN
+    RAISE EXCEPTION
+      'app.refresh_tokens holds % row(s); 000029 assumes it is empty because it adds NOT NULL '
+      'columns with no backfill and validates foreign keys under a tenant-scoped GUC', existing
+      USING ERRCODE = '23502';
+  END IF;
+END
+$tenant_context$;
+
+SELECT set_config('app.school_id', '00000000-0000-0000-0000-000000000000', true);
+
 -- The client surface a session was established from. Mirrors AUTH_CHANNELS in
 -- apps/api/src/modules/auth/channels.ts label-for-label, the same way app.notification_type mirrors
 -- its TypeScript constant (000017); the paired conformance test asserts both lists against pg_enum
