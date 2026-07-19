@@ -47,7 +47,7 @@ const EXEMPT_ROUTES = ["/healthz", "/readyz"];
  * gate silently stopped covering the webhook. Adding a mutating route means adding it here, and the
  * failure names what to do.
  */
-const EXPECTED_MUTATING_ROUTES = ["POST /erpnext/webhooks"];
+const EXPECTED_MUTATING_ROUTES = ["POST /api/invitations", "POST /erpnext/webhooks"];
 
 function collectSourceFiles(dir: string): string[] {
   const entries = readdirSync(dir);

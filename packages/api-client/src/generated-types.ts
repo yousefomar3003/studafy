@@ -27,6 +27,26 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/invitations": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Create a user invitation
+         * @description Issues a new invitation for a given email and role. Returns a one-time-use token that must be delivered to the invitee (e.g. via email). The raw token is never persisted server-side; only its SHA-256 hash is stored. An `invitation.sent` event is emitted into the outbox for downstream email dispatch.
+         */
+        readonly post: operations["createInvitation"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/erpnext/webhooks": {
         readonly parameters: {
             readonly query?: never;
@@ -95,6 +115,33 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        readonly CreateInvitation: {
+            /**
+             * Format: email
+             * @description Email address to send the invitation to.
+             * @example newuser@example.com
+             */
+            readonly email: string;
+            /**
+             * @description Number of days until the invitation expires. Defaults to 7. Must be between 1 and 365.
+             * @example 7
+             */
+            readonly expiry_days?: number;
+            /**
+             * @description Role to assign when the invitation is accepted.
+             * @example STUDENT
+             * @enum {string}
+             */
+            readonly role: "ORG_ADMIN" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST";
+        };
+        readonly CreateInvitationResponse: {
+            readonly invitation: components["schemas"]["Invitation"];
+            /**
+             * @description One-time-use invitation token (hex-encoded, 256-bit). This is the only time the raw token is returned. Store it securely and pass it to the invitee — it cannot be retrieved later.
+             * @example a1b2c3d4e5f6...
+             */
+            readonly token: string;
+        };
         readonly ErpNextWebhook: {
             /** @description ERPNext document action, e.g. 'on_submit'. */
             readonly action: string;
@@ -114,6 +161,30 @@ export interface components {
         readonly HealthOk: {
             /** @enum {string} */
             readonly status: "ok";
+        };
+        readonly Invitation: {
+            /**
+             * Format: date-time
+             * @description Issuance timestamp (ISO 8601).
+             */
+            readonly created_at: string;
+            /**
+             * Format: email
+             * @description Invited email address.
+             */
+            readonly email: string;
+            /**
+             * Format: date-time
+             * @description Expiry timestamp (ISO 8601).
+             */
+            readonly expires_at: string;
+            /**
+             * Format: uuid
+             * @description Unique invitation identifier.
+             */
+            readonly id: string;
+            /** @description Role to be assigned on acceptance. */
+            readonly role: string;
         };
         readonly JsonWebKeySet: {
             readonly keys: readonly {
@@ -239,6 +310,98 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["JsonWebKeySet"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly createInvitation: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateInvitation"];
+            };
+        };
+        readonly responses: {
+            /** @description Invitation created. The raw token is included in this response only. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CreateInvitationResponse"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
