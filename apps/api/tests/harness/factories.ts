@@ -530,3 +530,115 @@ export async function createFullTenant(sql: Sql): Promise<TenantFixture> {
     cls,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Push device + refresh-token session (ST-071)
+// ---------------------------------------------------------------------------
+
+export interface UserDeviceRecord {
+  id: string;
+  fcmToken: string;
+  platform: "ios" | "android" | "web";
+}
+
+export async function createUserDevice(
+  sql: Sql,
+  schoolId: string,
+  userId: string,
+  overrides?: { platform?: "ios" | "android" | "web"; fcmToken?: string },
+): Promise<UserDeviceRecord> {
+  const fcmToken = overrides?.fcmToken ?? `fcm-${crypto.randomUUID()}`;
+  const platform = overrides?.platform ?? "web";
+
+  return asAdmin(sql, async (tx) => {
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    const [device] = await tx<UserDeviceRecord[]>`
+      INSERT INTO app.user_devices (school_id, user_id, fcm_token, platform)
+      VALUES (${schoolId}, ${userId}, ${fcmToken}, ${platform}::app.device_platform)
+      RETURNING id, fcm_token AS "fcmToken", platform
+    `;
+    return device!;
+  });
+}
+
+export interface RefreshSessionRecord {
+  /** The full `<locator>.<secret>` string a client would present. */
+  token: string;
+  sessionId: string;
+  familyId: string;
+  locator: string;
+}
+
+export interface RefreshSessionOverrides {
+  channel?: "web" | "mobile" | "api";
+  deviceId?: string | null;
+  familyId?: string;
+  parentTokenId?: string | null;
+  /** Defaults to 30 days out. Pass a past Date to build an already-expired token. */
+  expiresAt?: Date;
+  /** Set to pre-age a token into the consumed state, so presenting it is a reuse. */
+  rotatedAt?: Date | null;
+  revokedAt?: Date | null;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+}
+
+/**
+ * Insert a refresh-token session directly, returning the presentable token.
+ *
+ * Deliberately not a call to `issueTokenPair`: the tests that need this one need states the service
+ * will never produce on purpose — already expired, already rotated, already revoked — and the point
+ * of those tests is what `rotateRefreshToken` does when it meets such a row. Building them through
+ * the happy path would mean rotating a token several times to age it, which tests the thing under
+ * test in order to set up the thing under test.
+ *
+ * Writes as studafy_admin because it must set `rotated_at` and `revoked_at` to arbitrary values and
+ * bypass the per-user RLS fence that the production path satisfies with a real GUC.
+ */
+export async function createRefreshSession(
+  sql: Sql,
+  schoolId: string,
+  userId: string,
+  overrides?: RefreshSessionOverrides,
+): Promise<RefreshSessionRecord> {
+  const { mintOpaqueToken } = await import("../../src/modules/auth/tokens/opaque-token");
+  const minted = mintOpaqueToken();
+
+  const familyId = overrides?.familyId ?? crypto.randomUUID();
+  const expiresAt = overrides?.expiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const channel = overrides?.channel ?? "web";
+
+  return asAdmin(sql, async (tx) => {
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+
+    await tx`
+      INSERT INTO app.refresh_token_locators (locator, school_id, user_id)
+      VALUES (${minted.locator}, ${schoolId}, ${userId})
+    `;
+
+    const [row] = await tx<{ id: string; family_id: string }[]>`
+      INSERT INTO app.refresh_tokens (
+        school_id, user_id, token_hash, locator, family_id, parent_token_id,
+        device_id, channel, user_agent, ip_address, expires_at, rotated_at, revoked_at
+      ) VALUES (
+        ${schoolId}, ${userId}, ${minted.secretHash}, ${minted.locator}, ${familyId},
+        ${overrides?.parentTokenId ?? null},
+        ${overrides?.deviceId ?? null},
+        ${channel}::app.auth_channel,
+        ${overrides?.userAgent ?? null},
+        ${overrides?.ipAddress ?? null},
+        ${expiresAt},
+        ${overrides?.rotatedAt ?? null},
+        ${overrides?.revokedAt ?? null}
+      )
+      RETURNING id, family_id
+    `;
+
+    return {
+      token: minted.token,
+      sessionId: row!.id,
+      familyId: row!.family_id,
+      locator: minted.locator,
+    };
+  });
+}
