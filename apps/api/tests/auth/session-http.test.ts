@@ -68,7 +68,7 @@ beforeAll(async () => {
     isReady: () => true,
     tracker: createInflightTracker(),
     logger,
-    database: sql as never,
+    database: sql,
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
