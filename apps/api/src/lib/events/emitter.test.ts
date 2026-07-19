@@ -144,6 +144,13 @@ describe("emit", () => {
         [DOMAIN_EVENTS.USER_CREATED]: { userId: uid },
         [DOMAIN_EVENTS.USER_SUSPENDED]: { userId: uid },
         [DOMAIN_EVENTS.USER_INVITED]: { userId: uid },
+        [DOMAIN_EVENTS.INVITATION_SENT]: {
+          invitationId: uid,
+          email: "test@example.com",
+          role: "STUDENT",
+          expiresAt: new Date().toISOString(),
+          invitedByUserId: uid,
+        },
         [DOMAIN_EVENTS.ORGANIZATION_CREATED]: { organizationId: uid },
         [DOMAIN_EVENTS.ORGANIZATION_UPDATED]: { organizationId: uid },
         [DOMAIN_EVENTS.COURSE_CREATED]: { courseId: uid },

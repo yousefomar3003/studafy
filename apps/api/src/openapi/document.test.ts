@@ -89,7 +89,13 @@ describe("structure", () => {
   // to the document, silently. This is the guard against that regression.
   test("contains every mounted route", () => {
     expect(Object.keys(document.paths ?? {}).sort()).toEqual(
-      ["/.well-known/jwks.json", "/erpnext/webhooks", "/healthz", "/readyz"].sort(),
+      [
+        "/.well-known/jwks.json",
+        "/api/invitations",
+        "/erpnext/webhooks",
+        "/healthz",
+        "/readyz",
+      ].sort(),
     );
   });
 
@@ -187,12 +193,18 @@ describe("security", () => {
     });
   });
 
-  // No route in this app authenticates anything. A root-level requirement would document an
-  // enforcement that does not exist, and every operation says so explicitly rather than by omission.
+  // No unauthenticated route omits its security declaration. A root-level requirement would document
+  // an enforcement that does not exist, and every operation says so explicitly rather than by
+  // omission. Authenticated routes (those declaring bearerAuth) are exempt from this check.
   test("requires no authentication anywhere, because none is implemented", () => {
     expect(document.security).toBeUndefined();
 
     for (const { path: p, method, operation } of operations) {
+      const hasBearerAuth = (operation.security ?? []).some(
+        (s) => typeof s === "object" && s !== null && "bearerAuth" in s,
+      );
+      if (hasBearerAuth) continue;
+
       expect(
         operation.security,
         `${method.toUpperCase()} ${p} does not state its security`,
