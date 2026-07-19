@@ -161,6 +161,64 @@ The `request_id` matches the response's `X-Request-Id` and the log lines for tha
 A violation is logged as a structured `warn` — `reason` (`missing_token` | `token_mismatch`), path,
 method, client IP, user agent, `request_id` — and never contains the token values.
 
+## Security event persistence
+
+Boundary rejections are also persisted to `app.security_events`, so a probe leaves a queryable trace
+rather than only a log line.
+
+| Rejection                                    | `event_type`           |
+| -------------------------------------------- | ---------------------- |
+| Mutation with no CSRF token                  | `csrf_missing_token`   |
+| Mutation whose header and cookie disagree    | `csrf_token_mismatch`  |
+| Request or preflight from an unlisted origin | `cors_origin_rejected` |
+
+Rows carry the path, method, origin (CORS only), client IP, user agent, `request_id`, and timestamp.
+**Token values are never stored** — a CSRF token at rest in a queryable table is a working forgery
+for anyone who can read it. The refused _origin_ is stored, because it is attacker-supplied and is
+the single most useful field for attributing a probe.
+
+### Why not `app.audit_logs`
+
+ST-067 asked for these events in the partitioned audit log. They cannot go there, for structural
+reasons rather than preference:
+
+- `audit_logs.school_id` is `NOT NULL` with an FK to `app.schools`. A request rejected at the
+  boundary is rejected **before** authentication, so it has no tenant — and no placeholder satisfies
+  that FK without attributing an attacker's probe to a real school.
+- `audit_logs.target_id` is `NOT NULL`. A refused request mutated nothing.
+- `audit_logs.actor_id` is a composite FK `(actor_id, school_id) → app.users`, only checkable once a
+  tenant is known.
+
+Relaxing `school_id` to make it fit would admit un-tenanted rows into a FORCE-RLS, append-only,
+tenant-partitioned table — dissolving the isolation guarantee
+[NFR-05](./NFR-05_cross_tenant_isolation.md) exists to prove. So these events get their own relation
+and `audit_logs` keeps its contract.
+
+`app.security_events` is a **global** table (registered in `approved_globals` in
+`db/policies/rls-coverage.ts`) and carries no `school_id` at all. That is the honest classification:
+the traffic it records never established a tenant. A nullable `school_id` would fail the coverage
+checker's tenant rules and its global rules simultaneously.
+
+### How the write stays off the request path
+
+`createSecurityEventSink` (`src/lib/security/securityEventSink.ts`) buffers in memory and drains on a
+timer or at a batch ceiling. Two properties carry the design:
+
+- **`record()` never awaits and never throws.** A slow or failing database cannot slow down, or fail,
+  a rejection. A flush failure is logged and the batch is discarded — deliberately not requeued, so a
+  persistently failing database cannot refill the queue from its own retries.
+- **The buffer is bounded** (`maxQueueSize`, default 1000). Past the ceiling, events are dropped and
+  counted, and the count is reported on the next flush. A flood costs a fixed amount of memory
+  instead of becoming an OOM vector, and is never silent.
+
+`src/index.ts` owns the sink and drains it during graceful shutdown. `createApp` defaults to a no-op
+sink, so tests never issue background INSERTs.
+
+**Retention is not yet automated.** These rows have a bounded useful life and the table is
+intentionally not partitioned and carries no append-only trigger — `DELETE` by `studafy_admin` is the
+intended sweep. A scheduled job in the ST-053 maintenance family should own it; until then the table
+grows, bounded in rate by the sink's queue ceiling.
+
 ## Performance
 
 The acceptance target is **< 0.5 ms** for the whole chain. Measured overhead is **~0.03 ms**, a ~16x
@@ -179,7 +237,8 @@ absolute budget had to be widened twice.
 What keeps it cheap:
 
 - **Zero database I/O.** Token validation is a hash comparison. No reads, no index lookups, on the
-  accept path or the reject path.
+  accept path or the reject path. Persisting a rejection is an in-memory buffer append; the INSERT
+  happens later, on a timer, off the request.
 - **Precomputed headers.** CSP and HSTS strings are built once at registration, not per request.
 - **Early termination.** A disallowed origin or a failed token check short-circuits before routing,
   so no connection pool or transaction lock is ever claimed.
@@ -188,7 +247,7 @@ What keeps it cheap:
 
 ```bash
 cd apps/api
-bun run test:security     # tests/security — CORS, CSRF, headers, cross-tenant
+bun run test:security     # tests/security — CORS, CSRF, headers, event sink, cross-tenant
 bun test                  # full suite
 SECURITY_CHAIN_BENCHMARK=1 bun test tests/benchmark/security-chain-benchmark.test.ts
 ```
@@ -213,14 +272,6 @@ curl -i -X POST -H "Authorization: Bearer test" localhost:3000/api/anything
   the presence of a session cookie: cookie-gating would enforce nothing today, and would fail open
   tomorrow for any cookie name other than the one guessed in advance. Revisit when sessions land, but
   note the current rule stays correct — it is strictly broader.
-
-- **CSRF violations are logged, not written to `audit_logs`.** Two reasons, and both should be
-  re-checked when auth ships. `emitAuditLog` resolves identity from the tenant GUCs that
-  `withTenantTx` sets, and a rejected unauthenticated request has no `user_id` or `school_id` to
-  attribute the event to. And a database round-trip on the reject path contradicts ST-067's own
-  "zero database reads" and sub-0.5 ms requirements — it would also hand an unauthenticated attacker
-  a cheap way to generate write load. If these events are wanted in `audit_logs`, the right shape is
-  an async batched sink, not an inline write.
 
 - **ST-067's "Tenant Isolation Checks" are not implemented, and should not be.** The ticket asks the
   middleware to assert that identity metadata such as `school_id` embedded in the CSRF payload

@@ -1,6 +1,7 @@
 import { createApp } from "./app";
 import { checkDatabase, closeDatabase, createDatabase } from "./database";
 import { loadEnv } from "./env";
+import { createSecurityEventSink } from "./lib/security/securityEventSink";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
 import { KeyStore } from "./modules/auth";
@@ -25,6 +26,10 @@ const tracker = createInflightTracker();
 const database = createDatabase(env);
 const redis = env.REDIS_URL ? createRedisClient({ url: env.REDIS_URL, logger }) : null;
 
+// Persists CORS/CSRF rejections off the request path. Returns a no-op sink when no database is
+// configured, so nothing downstream has to branch on that.
+const securityEventSink = createSecurityEventSink({ database, logger });
+
 const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
   logger.info({ kid }, "jwt key rotated");
 });
@@ -37,6 +42,7 @@ const app = createApp({
   redis,
   database,
   keyStore,
+  securityEventSink,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",
@@ -70,6 +76,8 @@ const shutdown = (signal: string) => {
     timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
   }).then(async () => {
     keyStore.destroy();
+    // Drains buffered security events. Must run before closeDatabase, which it writes through.
+    await securityEventSink.close();
     await closeRedis(redis);
     await closeDatabase(database);
     logger.info({ signal }, "shutdown complete");

@@ -14,8 +14,10 @@
  * be sent, but the same-origin policy stops it from *reading* the cookie to forge the header.
  *
  * Entirely stateless — zero database reads on the accept path and the reject path alike, per the
- * ST-067 performance requirement. Rejections are logged, not persisted; see the "Known gaps"
- * section of docs/security/web_defense_matrix.md for why audit_logs integration waits on auth.
+ * ST-067 performance requirement. Rejections are logged and, when a sink is supplied, handed to an
+ * async batched writer that persists them to app.security_events off the request path. The sink's
+ * record() never awaits and never throws, so that remains true. See
+ * docs/security/web_defense_matrix.md for why these events cannot live in app.audit_logs.
  *
  * @example
  * ```typescript
@@ -31,6 +33,7 @@ import { generateCsrfToken, validateCsrfToken } from "../lib/security/csrf";
 
 import { extractClientIp } from "./rateLimiter";
 
+import type { SecurityEventSink, SecurityEventType } from "../lib/security/securityEventSink";
 import type { MiddlewareHandler } from "hono";
 
 const STATE_MUTATING_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
@@ -50,7 +53,15 @@ export interface CsrfOptions {
   headerName?: string;
   cookieMaxAge?: number;
   exemptPaths?: string[];
+  /** Where rejections are persisted. Omitted in tests and when no database is configured. */
+  eventSink?: SecurityEventSink;
 }
+
+/** Maps a validation failure onto the app.security_event_type enum. */
+const CSRF_EVENT_TYPE: Record<CsrfFailureReason, SecurityEventType> = {
+  missing_token: "csrf_missing_token",
+  token_mismatch: "csrf_token_mismatch",
+};
 
 /**
  * CSRF middleware factory.
@@ -86,10 +97,10 @@ export function csrfMiddleware(options?: CsrfOptions): MiddlewareHandler {
       const headerToken = c.req.header(headerName);
 
       if (!cookieToken || !headerToken) {
-        reject(c, "missing_token", path, method);
+        reject(c, "missing_token", path, method, options?.eventSink);
       }
       if (!validateCsrfToken(cookieToken, headerToken)) {
-        reject(c, "token_mismatch", path, method);
+        reject(c, "token_mismatch", path, method, options?.eventSink);
       }
     }
 
@@ -122,17 +133,33 @@ function reject(
   reason: CsrfFailureReason,
   path: string,
   method: string,
+  eventSink?: SecurityEventSink,
 ): never {
+  const clientIp = extractClientIp(c);
+  const userAgent = c.req.header("User-Agent");
+
   c.get("log")?.warn(
     {
       path,
       method,
       reason,
-      client_ip: extractClientIp(c),
-      user_agent: c.req.header("User-Agent"),
+      client_ip: clientIp,
+      user_agent: userAgent,
     },
     "csrf validation failed",
   );
+
+  // Fire-and-forget by contract: record() buffers in memory and returns. Note that neither the
+  // cookie nor the header token is passed — the sink persists the fact of a rejection, never the
+  // token values, which would hand a database reader a working forgery.
+  eventSink?.record({
+    eventType: CSRF_EVENT_TYPE[reason],
+    path,
+    method,
+    clientIp,
+    userAgent,
+    requestId: c.get("requestId"),
+  });
 
   throw new HTTPException(403, { message: "CSRF token missing or invalid" });
 }
