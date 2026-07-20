@@ -68,6 +68,13 @@ describe("Invitation service", () => {
       const service = createInvitationService({ now: () => fixedTime });
       expect(service).toBeDefined();
     });
+
+    test("service exposes create, revoke, and regenerate", () => {
+      const service = createInvitationService();
+      expect(typeof service.create).toBe("function");
+      expect(typeof service.revoke).toBe("function");
+      expect(typeof service.regenerate).toBe("function");
+    });
   });
 });
 

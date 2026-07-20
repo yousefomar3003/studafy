@@ -22,6 +22,11 @@ export const eventPayloadSchemas = {
     expiresAt: z.string().datetime(),
     invitedByUserId: uid.nullable(),
   }),
+  [DOMAIN_EVENTS.INVITATION_REVOKED]: z.object({
+    invitationId: uid,
+    email: z.string().email(),
+    role: z.string(),
+  }),
 
   // ── Organization ──────────────────────────────────────────────────────
   [DOMAIN_EVENTS.ORGANIZATION_CREATED]: z.object({ organizationId: uid }),

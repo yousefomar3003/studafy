@@ -61,3 +61,51 @@ export const createInvitationResponseSchema = z
     }),
   })
   .openapi("CreateInvitationResponse");
+
+// ---------------------------------------------------------------------------
+// Path params
+// ---------------------------------------------------------------------------
+
+export const invitationIdPathParams = z
+  .object({
+    id: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "id", in: "path" },
+        description: "Invitation identifier.",
+        example: "8f14e45f-ceea-4a67-9a2d-1c3e7b0d5a91",
+      }),
+  })
+  .openapi("InvitationIdPathParams");
+
+// ---------------------------------------------------------------------------
+// Revoke
+// ---------------------------------------------------------------------------
+
+export const revokeInvitationResponseSchema = z
+  .object({
+    id: z.string().uuid().openapi({ description: "Revoked invitation identifier." }),
+    email: z.string().email().openapi({ description: "Invited email address." }),
+    role: z.string().openapi({ description: "Role that was assigned." }),
+    revoked_at: z.string().datetime().openapi({ description: "Revocation timestamp (ISO 8601)." }),
+  })
+  .openapi("RevokeInvitationResponse");
+
+// ---------------------------------------------------------------------------
+// Regenerate
+// ---------------------------------------------------------------------------
+
+export const regenerateInvitationResponseSchema = z
+  .object({
+    invitation: invitationResponseSchema,
+    token: z.string().openapi({
+      description:
+        "One-time-use invitation token for the new invitation. " +
+        "This is the only time the raw token is returned.",
+    }),
+    revoked_invitation_id: z.string().uuid().openapi({
+      description: "ID of the old invitation that was revoked.",
+    }),
+  })
+  .openapi("RegenerateInvitationResponse");

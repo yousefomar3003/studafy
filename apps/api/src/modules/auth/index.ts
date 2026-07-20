@@ -23,6 +23,8 @@ export {
   type InvitationServiceOptions,
   type CreateInvitationParams,
   type CreateInvitationResult,
+  type RevokeInvitationResult,
+  type RegenerateInvitationResult,
 } from "./invitation/service";
 export { invitationRoutes } from "./invitation/route";
 export {

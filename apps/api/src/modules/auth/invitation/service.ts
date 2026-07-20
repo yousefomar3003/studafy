@@ -34,6 +34,26 @@ export interface CreateInvitationResult {
   expiresAt: Date;
 }
 
+export interface RevokeInvitationResult {
+  invitationId: string;
+  email: string;
+  role: Role;
+  revokedAt: Date;
+}
+
+export interface RegenerateInvitationResult {
+  /** The new invitation's ID. */
+  invitationId: string;
+  /** The raw, one-time-use token for the new invitation. */
+  token: string;
+  email: string;
+  role: Role;
+  expiresAt: Date;
+  /** The old invitation's ID that was revoked. */
+  revokedInvitationId: string;
+  revokedAt: Date;
+}
+
 // ---------------------------------------------------------------------------
 // Token helpers
 // ---------------------------------------------------------------------------
@@ -168,6 +188,175 @@ export function createInvitationService(options: InvitationServiceOptions = {}) 
         email: params.email,
         role: params.role,
         expiresAt,
+      };
+    },
+
+    /**
+     * Revoke an active invitation by setting revoked_at. The invitation must exist, belong to
+     * the current tenant, and not already be revoked or consumed.
+     *
+     * Revocation is immediate: any subsequent use of the raw token will fail because the token
+     * acceptor checks for revoked_at IS NULL.
+     *
+     * @throws HTTPException(404) if the invitation does not exist, is already revoked, or is consumed.
+     */
+    async revoke(
+      tx: TransactionSql,
+      invitationId: string,
+      logger: Logger,
+    ): Promise<RevokeInvitationResult> {
+      const rows = await tx`
+        UPDATE app.invitations
+        SET revoked_at = CURRENT_TIMESTAMP
+        WHERE id = ${invitationId}::uuid
+          AND school_id = current_setting('app.school_id')::uuid
+          AND revoked_at IS NULL
+          AND consumed_at IS NULL
+        RETURNING id, email, role, revoked_at
+      `;
+
+      if (rows.length === 0) {
+        throw new HTTPException(404, { message: "Invitation not found" });
+      }
+
+      const row = rows[0]!;
+
+      await emitAuditLog(tx, {
+        action: "update",
+        targetTable: "invitations",
+        targetId: row.id,
+        oldValues: { revoked_at: null },
+        newValues: { revoked_at: row.revoked_at },
+      });
+
+      await emit(tx, DOMAIN_EVENTS.INVITATION_REVOKED, {
+        invitationId: row.id,
+        email: row.email,
+        role: row.role,
+      });
+
+      logger.info({ invitation_id: row.id, email: row.email }, "invitation revoked");
+
+      return {
+        invitationId: row.id,
+        email: row.email,
+        role: row.role,
+        revokedAt: new Date(row.revoked_at),
+      };
+    },
+
+    /**
+     * Regenerate an invitation: atomically revoke the current one and issue a fresh token.
+     *
+     * This is a single transaction consisting of:
+     * 1. SET revoked_at on the old invitation (invalidating the old token).
+     * 2. INSERT a new invitation with the same email/role/invitedBy but a new token hash.
+     *
+     * The partial unique index uq_invitations_active allows the insert once the old row is revoked,
+     * and the transaction ensures both writes succeed or neither does.
+     *
+     * @throws HTTPException(404) if the invitation does not exist, is already revoked, or is consumed.
+     */
+    async regenerate(
+      tx: TransactionSql,
+      invitationId: string,
+      logger: Logger,
+    ): Promise<RegenerateInvitationResult> {
+      // Step 1: Revoke the old invitation.
+      const revoked = await tx`
+        UPDATE app.invitations
+        SET revoked_at = CURRENT_TIMESTAMP
+        WHERE id = ${invitationId}::uuid
+          AND school_id = current_setting('app.school_id')::uuid
+          AND revoked_at IS NULL
+          AND consumed_at IS NULL
+        RETURNING id, email, normalized_email, role, invited_by_user_id, revoked_at
+      `;
+
+      if (revoked.length === 0) {
+        throw new HTTPException(404, { message: "Invitation not found" });
+      }
+
+      const old = revoked[0]!;
+
+      // Step 2: Issue a new token and insert a fresh invitation.
+      const token = generateToken();
+      const tokenHash = hashToken(token);
+      const now = options.now?.() ?? Date.now();
+      const expiresAt = new Date(now + defaultExpiryDays * 24 * 60 * 60 * 1000);
+
+      const created = await tx`
+        INSERT INTO app.invitations (
+          school_id,
+          email,
+          normalized_email,
+          role,
+          token_hash,
+          invited_by_user_id,
+          expires_at
+        ) VALUES (
+          current_setting('app.school_id')::uuid,
+          ${old.email},
+          ${old.normalized_email},
+          ${old.role}::app.user_role,
+          ${tokenHash}::bytea,
+          ${old.invited_by_user_id}::uuid,
+          ${expiresAt.toISOString()}::timestamptz
+        )
+        RETURNING id, email, role, expires_at
+      `;
+
+      const newRow = created[0]!;
+
+      // Audit: record the revocation of the old invitation.
+      await emitAuditLog(tx, {
+        action: "update",
+        targetTable: "invitations",
+        targetId: old.id,
+        oldValues: { revoked_at: null },
+        newValues: { revoked_at: old.revoked_at },
+      });
+
+      // Audit: record the issuance of the new invitation.
+      await emitAuditLog(tx, {
+        action: "insert",
+        targetTable: "invitations",
+        targetId: newRow.id,
+        newValues: {
+          email: old.email,
+          role: old.role,
+          expires_at: expiresAt.toISOString(),
+        },
+      });
+
+      // Domain events.
+      await emit(tx, DOMAIN_EVENTS.INVITATION_REVOKED, {
+        invitationId: old.id,
+        email: old.email,
+        role: old.role,
+      });
+
+      await emit(tx, DOMAIN_EVENTS.INVITATION_SENT, {
+        invitationId: newRow.id,
+        email: old.email,
+        role: old.role,
+        expiresAt: expiresAt.toISOString(),
+        invitedByUserId: old.invited_by_user_id,
+      });
+
+      logger.info(
+        { old_invitation_id: old.id, new_invitation_id: newRow.id, email: old.email },
+        "invitation regenerated",
+      );
+
+      return {
+        invitationId: newRow.id,
+        token,
+        email: old.email,
+        role: old.role,
+        expiresAt,
+        revokedInvitationId: old.id,
+        revokedAt: new Date(old.revoked_at),
       };
     },
   };
