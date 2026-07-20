@@ -257,7 +257,7 @@ The benchmark is
 [`apps/api/tests/benchmark/refresh-rotation-benchmark.test.ts`](../../apps/api/tests/benchmark/refresh-rotation-benchmark.test.ts),
 gated in CI on `REFRESH_ROTATION_BENCHMARK=1`. It measures 1,000 rotations at 16-way concurrency and
 asserts the **median**, reporting p95 without gating on it. Its disposable client uses the same
-ten-connection capacity as the production API pool, so the contention it records represents the
+sixteen-connection capacity as the production API pool, so the contention it records represents the
 deployed configuration instead of the four-connection default used by ordinary integration tests.
 
 An **absolute** budget, unlike the delta-based middleware benchmarks next door. Rotation has no

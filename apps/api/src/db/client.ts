@@ -5,7 +5,7 @@ import type { Env } from "../env";
 export type Database = ReturnType<typeof postgres>;
 
 /** Production pool capacity. Benchmarks use the same value so contention is representative. */
-export const DATABASE_MAX_CONNECTIONS = 10;
+export const DATABASE_MAX_CONNECTIONS = 16;
 
 export function createDatabase(env: Env): Database | null {
   if (!env.DATABASE_HOST) {
