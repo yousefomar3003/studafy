@@ -645,6 +645,8 @@ integrationTest(
         "idx_refresh_tokens_school_replaced_by",
         "idx_refresh_tokens_school_user",
         "idx_refresh_tokens_school_user_active",
+        // Added by 000030 for ST-072: batch revocation with INCLUDE for access_jti/access_expires_at.
+        "idx_refresh_tokens_school_user_device_active",
       ]);
 
       // Seed representative refresh-token families so the planner can distinguish the selective

@@ -24,7 +24,7 @@ import type { Context } from "hono";
  * says nothing about what they may do — adequate while every route operated on the caller's own
  * rows, and not adequate here.
  *
- * They are also the first consumers of the studafy_admin-owned maintenance path 000029 left open.
+ * They are also the first consumers of the SECURITY DEFINER maintenance path 000029 left open.
  * The RESTRICTIVE refresh_tokens_owner policy makes another user's sessions unreachable from
  * studafy_app, so the revocation runs through app.admin_revoke_user_sessions — see
  * services/revocation-service.ts and migration 000030's header for why that is sound rather than a

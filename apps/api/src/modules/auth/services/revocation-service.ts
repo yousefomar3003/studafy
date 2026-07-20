@@ -313,8 +313,9 @@ export interface AdminRevokeParams {
  * Separate from `revokeAndDenylist` because the query cannot be: `refresh_tokens_owner` is a
  * RESTRICTIVE policy comparing `user_id` to `app.current_user_id()`, so a statement issued as
  * studafy_app can only ever reach the caller's own rows. Migration 000030 provides
- * `app.admin_revoke_user_sessions`, a studafy_admin-owned SECURITY DEFINER function that the
- * per-user policy does not bind while tenant isolation still does — see that file's header.
+ * `app.admin_revoke_user_sessions`, a SECURITY DEFINER function (owned by the migration's
+ * maintenance role) that the per-user policy does not bind while tenant isolation still does — see
+ * that file's header.
  *
  * The transaction is opened with the *administrator's* identity, which is what makes the audit row
  * name the right actor: `emitAuditLog` reads `actor_id` from the `app.user_id` GUC. Opening it as
