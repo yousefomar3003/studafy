@@ -38,12 +38,24 @@ const MEASURED_ITERATIONS = 5;
 const TARGET_MS = 2_000;
 
 /** Routes the document must contain, so a script that wrote nothing cannot pass by doing nothing. */
+// Mirrors the list in src/openapi/document.test.ts. Two copies is one too many, and the duplication
+// is why this file failed in CI while the whole local suite was green: it is gated on
+// OPENAPI_BENCHMARK, so a new route updates the assertion nobody runs locally and misses this one.
+// ST-071 and ST-073 both tripped over it independently, which is about as clear a signal as this
+// kind of thing gives. Kept as its own list anyway rather than imported, because this benchmark
+// deliberately asserts against a document produced by a *separate process spawn* — importing the
+// expectation from the in-process suite would couple the two and weaken what this one proves.
 const EXPECTED_PATHS = [
   "/.well-known/jwks.json",
   "/healthz",
   "/readyz",
   "/erpnext/webhooks",
   "/api/invitations",
+  "/api/auth/refresh",
+  "/api/auth/logout",
+  "/api/auth/sessions",
+  "/api/auth/sessions/{sessionId}",
+  "/api/auth/devices/{deviceId}/sessions",
 ];
 
 const SCRIPT = path.join(import.meta.dir, "..", "..", "scripts", "generate-openapi.ts");

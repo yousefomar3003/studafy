@@ -145,6 +145,22 @@ when set; a token cannot be its own parent or replacement. Expiry is evaluated d
 authentication, not by a constraint. Reuse detection (presenting an already-rotated token) is
 an application flow that revokes the `family_id`.
 
+That flow now exists (ST-071) and is described in
+[SAD 13](../architecture/SAD_13_session_model.md), which is the reference for the session
+lifecycle as a whole. Three things it adds that change the picture above:
+
+- **The wire token is `<school_uuid>.<user_uuid>.<secret>`**, and only the secret is hashed into
+  `token_hash`. The two ids are there because a refresh request has no `school_id` or `user_id` yet
+  and no tenant transaction can open without both. They disclose nothing — the access token issued
+  to the same client already carries them as claims — and they only scope the lookup, which still
+  has to match a stored digest. `000029` carries the full rationale, including why a
+  `SECURITY DEFINER` function and a global locator directory both fail.
+- **`refresh_tokens` gained a RESTRICTIVE `refresh_tokens_owner` policy**, so rows are fenced to
+  their owning user and not merely to their tenant. Callers must set `app.user_id` as well as
+  `app.school_id`; `app.current_user_id()` raises on an unset GUC rather than matching nothing.
+- **`channel` records the surface a session was established from**, and decides whether a rotated
+  token is delivered as an `HttpOnly` cookie or in the response body.
+
 ### Device metadata policy
 
 Device context uses explicit optional columns — `device_name`, `user_agent`, `ip_address`

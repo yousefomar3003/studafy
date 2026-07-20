@@ -11,6 +11,11 @@ export interface TestDatabase {
   cleanup: () => Promise<void>;
 }
 
+export interface TestDatabaseOptions {
+  /** Connection capacity for the disposable database client. Defaults to the test-safe value 4. */
+  maxConnections?: number;
+}
+
 const REPOSITORY_MIGRATIONS = resolve(import.meta.dir, "../../../../db/migrations");
 
 const integrationEnabled = Boolean(process.env.TEST_DATABASE_URL);
@@ -23,7 +28,7 @@ function buildDatabaseUrl(adminUrl: string, databaseName: string): string {
   return url.toString();
 }
 
-export async function createTestDatabase(): Promise<TestDatabase> {
+export async function createTestDatabase(options: TestDatabaseOptions = {}): Promise<TestDatabase> {
   const adminUrl = process.env.TEST_DATABASE_URL;
   if (!adminUrl) {
     throw new Error(
@@ -37,7 +42,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   await admin.end();
 
   const url = buildDatabaseUrl(adminUrl, name);
-  const sql = postgres(url, { max: 4, ssl: false, prepare: false });
+  const sql = postgres(url, { max: options.maxConnections ?? 4, ssl: false, prepare: false });
 
   return {
     name,

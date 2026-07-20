@@ -44,7 +44,34 @@ const STATE_MUTATING_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
  * /api/webhooks is exempt because ERPNext authenticates by HMAC signature over the request body,
  * not by a session token (see src/app.ts) — it has no cookie to forge and no way to read one.
  */
-const EXEMPT_PATHS = ["/healthz", "/readyz", "/api/webhooks", "/docs", "/openapi.json"];
+const EXEMPT_PATHS = [
+  "/healthz",
+  "/readyz",
+  "/api/webhooks",
+  "/docs",
+  "/openapi.json",
+  // The two session-lifecycle endpoints (ST-071). They authenticate with a refresh token rather
+  // than an access token, and the Bearer exemption below cannot cover them: a client calls these
+  // precisely when its access token is gone, so there is frequently no Authorization header to
+  // exempt on. Without this entry a mobile client refreshing after its token expired — carrying no
+  // cookie at all, and therefore nothing a CSRF attack could forge with — would be rejected by a
+  // check that exists to protect browsers.
+  //
+  // What protects the browser case instead is the refresh cookie's own SameSite=Strict attribute
+  // (see modules/auth/delivery.ts). Strict means the cookie is not attached to *any* cross-site
+  // request, including top-level navigation, so an attacker's page cannot reach these endpoints
+  // with the victim's credential in the first place — the ambient-authority premise CSRF depends on
+  // never holds. The response is also unreadable cross-origin, and a web session's rotated token
+  // goes back as a cookie rather than in the body, so a forged call would leak nothing even if one
+  // landed.
+  //
+  // The narrower fix is to gate the check below on the presence of the session cookie rather than
+  // on the absence of a Bearer header, which is what the comment there anticipates now that a
+  // session subsystem exists. That changes CSRF behaviour for every route and belongs in its own
+  // ticket; see docs/architecture/SAD_13_session_model.md.
+  "/api/auth/refresh",
+  "/api/auth/logout",
+];
 
 type CsrfFailureReason = "missing_token" | "token_mismatch";
 

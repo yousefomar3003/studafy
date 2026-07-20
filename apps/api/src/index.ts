@@ -44,6 +44,8 @@ const app = createApp({
   keyStore,
   jwtIssuer: env.JWT_ISSUER,
   jwtAudience: env.JWT_AUDIENCE,
+  jwtAccessTtlSeconds: env.JWT_ACCESS_TTL_SECONDS,
+  jwtRefreshTtlSeconds: env.JWT_REFRESH_TTL_SECONDS,
   securityEventSink,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.

@@ -45,14 +45,22 @@ async function asRole<T>(
 }
 
 // Runs a single statement as `role` (optionally under a tenant GUC) and asserts it is rejected.
+//
+// `actor` sets app.user_id alongside app.school_id. Required for any statement touching
+// app.refresh_tokens since 000029: its RESTRICTIVE refresh_tokens_owner policy calls
+// app.current_user_id(), which raises 42704 on an unset GUC. Without it a statement would be
+// "denied" because the GUC was missing rather than because of the constraint under test, and this
+// helper cannot tell those apart — it catches WHEN OTHERS.
 async function expectRoleDenied(
   database: Database,
   role: Role,
   statement: string,
   context?: string,
+  actor?: string,
 ): Promise<void> {
   await asRole(database, role, async (tx) => {
     if (context !== undefined) await tx`SELECT set_config('app.school_id', ${context}, true)`;
+    if (actor !== undefined) await tx`SELECT set_config('app.user_id', ${actor}, true)`;
     await tx.unsafe(`
       DO $expected_database_error$
       DECLARE
@@ -165,16 +173,35 @@ integrationTest(
         WHERE n.nspname = 'app' AND c.relname = ANY(${IDENTITY_TABLES as unknown as string[]})
         ORDER BY c.relname
       `;
-      expect(policies.map((policy) => policy.table_name)).toEqual([...IDENTITY_TABLES].sort());
-      for (const policy of policies) {
+      const tenantPolicies = policies.filter((policy) => policy.permissive);
+      expect(tenantPolicies.map((policy) => policy.table_name)).toEqual(
+        [...IDENTITY_TABLES].sort(),
+      );
+      for (const policy of tenantPolicies) {
         expect(policy.name).toBe("tenant_isolation");
-        expect(policy.permissive).toBe(true);
         expect(policy.command).toBe("*");
         expect(policy.roles).toEqual([0]);
         expect(policy.using_expression).toContain("current_setting('app.school_id'::text)");
         expect(policy.check_expression).toContain("current_setting('app.school_id'::text)");
         expect(policy.using_expression).toContain("school_id");
         expect(policy.check_expression).toContain("school_id");
+      }
+
+      // Restrictive policies AND with the permissive one, so they can only ever narrow access —
+      // which is why they are filtered out above rather than folded into the same assertion. Exactly
+      // one exists here: refresh_tokens_owner (000029), fencing token rows to their owning user on
+      // top of the tenant fence. It names studafy_app rather than PUBLIC, so a studafy_admin-owned
+      // maintenance path keeps its reach; that is the same shape 000017 uses for user_devices.
+      const restrictivePolicies = policies.filter((policy) => !policy.permissive);
+      expect(restrictivePolicies.map((policy) => `${policy.table_name}.${policy.name}`)).toEqual([
+        "refresh_tokens.refresh_tokens_owner",
+      ]);
+      for (const policy of restrictivePolicies) {
+        expect(policy.command).toBe("*");
+        // Not PUBLIC (oid 0) — a restrictive policy applies only to the roles it names.
+        expect(policy.roles).not.toEqual([0]);
+        expect(policy.using_expression).toContain("current_user_id()");
+        expect(policy.check_expression).toContain("current_user_id()");
       }
 
       // studafy_app owns none of the identity tables.
@@ -415,31 +442,39 @@ integrationTest(
       const familyId = crypto.randomUUID();
       const firstTokenId = await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
+        await tx`SELECT set_config('app.user_id', ${userA}, true)`;
         const [row] = await tx<{ id: string }[]>`
           INSERT INTO app.refresh_tokens
-            (school_id, user_id, token_hash, family_id, expires_at, device_name)
+            (school_id, user_id, token_hash, channel, family_id, expires_at, device_name)
           VALUES
-            (${schoolA}, ${userA}, digest('refresh-token-1', 'sha256'), ${familyId},
-             CURRENT_TIMESTAMP + interval '30 days', 'Pixel 8')
+            (${schoolA}, ${userA}, digest('refresh-token-1', 'sha256'), 'mobile',
+             ${familyId}, CURRENT_TIMESTAMP + interval '30 days', 'Pixel 8')
           RETURNING id
         `;
         return row!.id;
       });
+      // Duplicate token_hash. Every other column is valid, so uq_refresh_tokens_token_hash is the
+      // only thing left that can reject this.
       await expectRoleDenied(
         database,
         "studafy_app",
-        `INSERT INTO app.refresh_tokens (school_id, user_id, token_hash, family_id, expires_at)
-         VALUES ('${schoolA}', '${userA}', digest('refresh-token-1', 'sha256'), '${familyId}',
-                 CURRENT_TIMESTAMP + interval '30 days')`,
+        `INSERT INTO app.refresh_tokens
+           (school_id, user_id, token_hash, channel, family_id, expires_at)
+         VALUES ('${schoolA}', '${userA}', digest('refresh-token-1', 'sha256'),
+                 'mobile', '${familyId}', CURRENT_TIMESTAMP + interval '30 days')`,
         schoolA,
+        userA,
       );
+      // expires_at before issued_at.
       await expectRoleDenied(
         database,
         "studafy_app",
-        `INSERT INTO app.refresh_tokens (school_id, user_id, token_hash, family_id, expires_at)
-         VALUES ('${schoolA}', '${userA}', digest('refresh-token-2', 'sha256'), '${familyId}',
-                 CURRENT_TIMESTAMP - interval '1 day')`,
+        `INSERT INTO app.refresh_tokens
+           (school_id, user_id, token_hash, channel, family_id, expires_at)
+         VALUES ('${schoolA}', '${userA}', digest('refresh-token-2', 'sha256'),
+                 'mobile', '${familyId}', CURRENT_TIMESTAMP - interval '1 day')`,
         schoolA,
+        userA,
       );
       // replaced_by_token_id cannot equal the row's own id.
       await expectRoleDenied(
@@ -448,17 +483,19 @@ integrationTest(
         `UPDATE app.refresh_tokens SET replaced_by_token_id = id
          WHERE id = '${firstTokenId}'`,
         schoolA,
+        userA,
       );
 
       // A rotated child token in the same family links back to its parent.
       await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
+        await tx`SELECT set_config('app.user_id', ${userA}, true)`;
         await tx`
           INSERT INTO app.refresh_tokens
-            (school_id, user_id, token_hash, family_id, parent_token_id, expires_at)
+            (school_id, user_id, token_hash, channel, family_id, parent_token_id, expires_at)
           VALUES
-            (${schoolA}, ${userA}, digest('refresh-token-2', 'sha256'), ${familyId},
-             ${firstTokenId}, CURRENT_TIMESTAMP + interval '30 days')
+            (${schoolA}, ${userA}, digest('refresh-token-2', 'sha256'), 'mobile',
+             ${familyId}, ${firstTokenId}, CURRENT_TIMESTAMP + interval '30 days')
         `;
         const family = await tx<{ count: string }[]>`
           SELECT count(*)::text AS count FROM app.refresh_tokens
@@ -600,10 +637,14 @@ integrationTest(
       expect(supportingIndexes.map((index) => index.indexname)).toEqual([
         "idx_invitations_school_invited_by",
         "idx_oauth_identities_school_user",
+        // Added by 000029 for ST-071: per-device session enumeration and termination, and the
+        // partial index backing the live-session list.
+        "idx_refresh_tokens_school_device",
         "idx_refresh_tokens_school_family",
         "idx_refresh_tokens_school_parent",
         "idx_refresh_tokens_school_replaced_by",
         "idx_refresh_tokens_school_user",
+        "idx_refresh_tokens_school_user_active",
       ]);
 
       // Seed representative refresh-token families so the planner can distinguish the selective
@@ -611,27 +652,37 @@ integrationTest(
       const familyId = crypto.randomUUID();
       await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
+        await tx`SELECT set_config('app.user_id', ${userA}, true)`;
         await tx`
-          INSERT INTO app.refresh_tokens (school_id, user_id, token_hash, family_id, expires_at)
-          VALUES (${schoolA}, ${userA}, digest('rt-plan', 'sha256'), ${familyId},
-                  CURRENT_TIMESTAMP + interval '30 days')
+          INSERT INTO app.refresh_tokens
+            (school_id, user_id, token_hash, channel, family_id, expires_at)
+          VALUES (${schoolA}, ${userA}, digest('rt-plan', 'sha256'), 'web',
+                  ${familyId}, CURRENT_TIMESTAMP + interval '30 days')
         `;
         await tx`
           INSERT INTO app.oauth_identities (school_id, user_id, provider, subject)
           VALUES (${schoolA}, ${userA}, 'google', 'plan-sub')
         `;
+      });
+
+      // Filler rows, so the planner can tell the selective family index from the user index instead
+      // of picking arbitrarily on a one-row fixture.
+      await asRole(database, "studafy_admin", async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         await tx`
           INSERT INTO app.refresh_tokens
-            (school_id, user_id, token_hash, family_id, expires_at)
+            (school_id, user_id, token_hash, channel, family_id, expires_at)
           SELECT
             ${schoolA},
             ${userA},
             digest('rt-plan-filler-' || number, 'sha256'),
+            'web',
             gen_random_uuid(),
             CURRENT_TIMESTAMP + interval '30 days'
           FROM generate_series(1, 250) AS series(number)
         `;
       });
+
       await asRole(database, "studafy_admin", (tx) =>
         tx.unsafe("ANALYZE app.refresh_tokens").then(() => undefined),
       );
@@ -639,6 +690,7 @@ integrationTest(
       // Intended index usage: token-hash lookup, OAuth callback lookup, and family revocation.
       const plans = await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
+        await tx`SELECT set_config('app.user_id', ${userA}, true)`;
         await tx.unsafe("SET LOCAL enable_seqscan = off");
         const tokenPlan = await tx.unsafe(`
           EXPLAIN (FORMAT JSON)
@@ -663,6 +715,92 @@ integrationTest(
         database,
         "studafy_app",
         "CREATE INDEX forbidden_runtime_index ON app.users (display_name)",
+        schoolA,
+      );
+    } finally {
+      await database.cleanup();
+    }
+  },
+  30_000,
+);
+
+/**
+ * ST-071 session objects: the channel enum and the per-user fence.
+ *
+ * Kept separate from the schema test above because these assert a security boundary rather than a
+ * shape. The fence is the point: app.refresh_tokens shipped with tenant isolation only, so any
+ * authenticated session in a school could read and revoke every other user's sessions in that
+ * school. 000029 adds a RESTRICTIVE policy on top, and restrictive policies AND with the permissive
+ * one, so a row is reachable only when both the school and the user match.
+ *
+ * The fence is also why the wire token carries the user id: app.current_user_id() raises on an unset
+ * GUC rather than matching nothing, so the owner has to be known before the row can be read. The
+ * last assertion here pins that failure mode, because a fence that failed *open* on a missing GUC
+ * would be worse than no fence at all.
+ */
+integrationTest(
+  "installs the ST-071 session objects with a per-user fence that fails closed",
+  async () => {
+    const database = await migratedDatabase();
+    try {
+      const { schoolA } = await createSchools(database);
+      const userA = await createUser(database, schoolA, "owner@example.com");
+      const userB = await createUser(database, schoolA, "other@example.com");
+
+      // app.auth_channel mirrors AUTH_CHANNELS in apps/api/src/modules/auth/channels.ts. Label order
+      // is asserted, not just membership, so the two cannot drift.
+      const [channelEnum] = await database.sql<{ values: string[] }[]>`
+        SELECT array_agg(e.enumlabel ORDER BY e.enumsortorder)::text[] AS values
+        FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        JOIN pg_enum e ON e.enumtypid = t.oid
+        WHERE n.nspname = 'app' AND t.typname = 'auth_channel'
+      `;
+      expect(channelEnum?.values).toEqual(["web", "mobile", "api"]);
+
+      // FORCE survived the migration. 000029 clears it to run its DDL and restores it at the end;
+      // if that restore were ever dropped, studafy_admin would be exempt from tenant_isolation on
+      // this table permanently and nothing in the application would misbehave to reveal it.
+      const [flags] = await database.sql<{ rls: boolean; forced: boolean }[]>`
+        SELECT relrowsecurity AS rls, relforcerowsecurity AS forced
+        FROM pg_class WHERE oid = 'app.refresh_tokens'::regclass
+      `;
+      expect(flags).toEqual({ rls: true, forced: true });
+
+      await asRole(database, "studafy_app", async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
+        await tx`SELECT set_config('app.user_id', ${userA}, true)`;
+        await tx`
+          INSERT INTO app.refresh_tokens
+            (school_id, user_id, token_hash, channel, family_id, expires_at)
+          VALUES (${schoolA}, ${userA}, digest('owned-token', 'sha256'), 'web',
+                  ${crypto.randomUUID()}, CURRENT_TIMESTAMP + interval '30 days')
+        `;
+      });
+
+      // userB is in the same school, so tenant_isolation alone would have let this through.
+      const seenByOther = await asRole(database, "studafy_app", async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
+        await tx`SELECT set_config('app.user_id', ${userB}, true)`;
+        return tx<{ count: string }[]>`SELECT count(*)::text AS count FROM app.refresh_tokens`;
+      });
+      expect(seenByOther[0]?.count).toBe("0");
+
+      // And the owner still sees their own.
+      const seenByOwner = await asRole(database, "studafy_app", async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
+        await tx`SELECT set_config('app.user_id', ${userA}, true)`;
+        return tx<{ count: string }[]>`SELECT count(*)::text AS count FROM app.refresh_tokens`;
+      });
+      expect(seenByOwner[0]?.count).toBe("1");
+
+      // Fails closed, not open, when app.user_id is missing: app.current_user_id() raises 42704 on an
+      // unset GUC. Every withTenantTx call touching this table must pass a userId, and this is what
+      // makes forgetting loud instead of silently returning somebody else's rows.
+      await expectRoleDenied(
+        database,
+        "studafy_app",
+        "SELECT count(*) FROM app.refresh_tokens",
         schoolA,
       );
     } finally {

@@ -81,6 +81,15 @@ export const envSchema = z
     JWT_ISSUER: z.string().min(1).default("studafy"),
     JWT_AUDIENCE: z.string().min(1).default("studafy-api"),
     JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+    // Refresh-token lifetime, reapplied in full on every rotation — the window slides forward as
+    // long as a session stays in use, and 30 days of inactivity ends it. There is deliberately no
+    // absolute cap on a family's total age; see the follow-up noted in
+    // docs/architecture/SAD_13_session_model.md.
+    JWT_REFRESH_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30 * 24 * 60 * 60),
     JWT_KEY_ROTATION_INTERVAL_MS: z.coerce
       .number()
       .int()

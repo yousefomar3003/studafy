@@ -25,4 +25,33 @@ export {
   type CreateInvitationResult,
 } from "./invitation/service";
 export { invitationRoutes } from "./invitation/route";
+export {
+  mintOpaqueToken,
+  parseOpaqueToken,
+  hashSecret,
+  verifySecret,
+  type MintedToken,
+  type ParsedToken,
+} from "./tokens/opaque-token";
+export {
+  issueTokenPair,
+  rotateRefreshToken,
+  listActiveSessions,
+  revokeSession,
+  revokeDeviceSessions,
+  revokeSessionByToken,
+  type SessionTokenConfig,
+  type IssuedTokenPair,
+  type DeviceContext,
+  type ActiveSession,
+} from "./services/session-service";
+export {
+  deliverTokenPair,
+  readPresentedToken,
+  clearRefreshCookie,
+  configureRefreshCookie,
+  usesCookieDelivery,
+  type TokenResponseBody,
+} from "./delivery";
+export { sessionRoutes } from "./routes/session-routes";
 export type { AccessTokenClaims, JwtPayload, SignAccessTokenParams } from "./jwt/types";

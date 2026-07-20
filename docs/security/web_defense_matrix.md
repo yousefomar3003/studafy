@@ -138,6 +138,41 @@ webview cannot break it. Other schemes (`Basic`, …) are **not** exempt.
 path is exempt because ERPNext authenticates by HMAC signature over the request body, not by a
 session token — it has no cookie to forge and no way to read one.
 
+**`POST /api/auth/refresh` and `POST /api/auth/logout` are exempt** (ST-071). The double-submit check
+cannot cover them usefully: a client calls these precisely when its access token is gone, so the
+Bearer exemption above frequently does not apply, and a mobile client refreshing with the token in
+the request body carries no cookie at all — nothing a CSRF attack could forge with — yet would be
+rejected by a defence meant for browsers.
+
+The browser case is protected by the refresh cookie's own `SameSite=Strict` attribute instead. Strict
+keeps the cookie off _every_ cross-site request, including top-level navigation, so an attacker's
+page cannot reach these endpoints carrying the victim's credential — the ambient-authority premise
+CSRF depends on never holds. A forged call would also leak nothing: the response is unreadable
+cross-origin, and a web session's rotated token goes back as a cookie rather than in the body.
+
+The narrower fix is to gate the check on the presence of the session cookie rather than on the
+absence of a Bearer header — which is what the note in `csrf.ts` anticipates now that a session
+subsystem exists. That changes behaviour for every route and belongs in its own ticket.
+
+## Refresh-token cookie
+
+Set by `POST /api/auth/refresh` for `web`-channel sessions only (ST-071 — see
+[SAD 13](../architecture/SAD_13_session_model.md)).
+
+| Attribute  | Value                     | Why                                                                                                             |
+| ---------- | ------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Name       | `session`                 | `SESSION_COOKIE_NAME` in `src/config/security.ts`                                                               |
+| `HttpOnly` | yes                       | Keeps the token unreadable by any script on the page                                                            |
+| `Secure`   | outside dev/test          | No TLS to attach it to locally; `NODE_ENV=test` is its own arm, so a deployed tier cannot lose it via `APP_ENV` |
+| `SameSite` | `Strict`                  | Nobody follows a link _into_ a token refresh, so there is no top-level-navigation case to preserve              |
+| `Path`     | `/api/auth`               | Scoped to the only two endpoints that consume it, so it rides on no other request                               |
+| `Max-Age`  | `JWT_REFRESH_TTL_SECONDS` | The browser drops it when the server would stop honouring it                                                    |
+
+`mobile` and `api` sessions get the token in the response body instead and set no cookie. Which
+branch runs is read from the stored session channel, never from a request header — a header would let
+a caller ask for a web session's token in the body, which is precisely the read `HttpOnly` exists to
+prevent.
+
 ### Rejections
 
 `403` with `application/problem+json` and the tracing `request_id`:

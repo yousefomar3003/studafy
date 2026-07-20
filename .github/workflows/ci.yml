@@ -56,6 +56,23 @@ jobs:
       - name: Run API integration tests
         run: bun run test:integration
         working-directory: apps/api
+      # Its own step rather than folded into test:integration, which globs only tests/harness. The
+      # session suites need a database (test:integration's does too, but tests/auth also holds the
+      # ST-070 probe-app tests, which do not and run in the main unit suite).
+      - name: Run session lifecycle tests (ST-071)
+        run: bun run test:auth
+        working-directory: apps/api
+      # Asserts the ST-071 acceptance target. An absolute wall clock rather than a delta, unlike the
+      # middleware benchmarks in the api-quality job: rotation has no baseline arm to subtract, and
+      # its cost is dominated by database round trips rather than framework overhead. Two arms — a
+      # serial one on a pinned connection that gates per-rotation cost against the 5 ms target, and a
+      # 16-way one that gates throughput rather than latency, because at concurrency == pool size the
+      # per-call median is a queue-depth artefact. See the file header.
+      - name: Refresh rotation benchmark (<5ms per rotation, 16-way throughput floor)
+        env:
+          REFRESH_ROTATION_BENCHMARK: "1"
+        run: bun test tests/benchmark/refresh-rotation-benchmark.test.ts --timeout 180000
+        working-directory: apps/api
       - name: Stop disposable PostgreSQL + Redis
         if: always()
         run: docker compose -f db/compose.yml down
