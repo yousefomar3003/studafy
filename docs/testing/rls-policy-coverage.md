@@ -33,7 +33,9 @@ Every tenant relation must have:
 - the exact permissive `FOR ALL TO PUBLIC` `tenant_isolation` policy using and checking
   `school_id = current_setting('app.school_id')::uuid`;
 - no other permissive policy, because permissive policies combine with `OR` (additional restrictive
-  policies are allowed); and
+  policies are allowed), except the exact `app.invitations` verification policy introduced by
+  migration `000031`: `SELECT`-only, `studafy_admin`-only, and constrained to the SHA-256 digest in
+  the transaction-local `app.invitation_token_hash` GUC; and
 - a valid, ready B-tree whose leftmost key is `school_id`.
 - an enabled canonical `BEFORE UPDATE OF school_id` trigger that rejects tenant-ownership changes,
   including changes attempted by a superuser or `BYPASSRLS` role.

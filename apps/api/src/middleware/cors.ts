@@ -15,6 +15,7 @@
 
 import { getSecurityConfig } from "../config/security";
 import { validateOrigin } from "../lib/security/origins";
+import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
 
 import { extractClientIp } from "./rateLimiter";
 
@@ -86,7 +87,7 @@ export function corsMiddleware(options?: CorsOptions): MiddlewareHandler {
   return async (c, next) => {
     const origin = c.req.header("Origin");
     const method = c.req.method;
-    const path = c.req.path;
+    const path = sanitizeSensitivePath(c.req.path);
 
     // Handle preflight requests
     if (method === "OPTIONS") {

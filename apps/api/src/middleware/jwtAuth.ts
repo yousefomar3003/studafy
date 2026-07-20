@@ -67,6 +67,19 @@ export interface JwtAuthOptions {
  */
 const DEFAULT_PUBLIC_PATHS = ["/api/webhooks", "/api/auth/refresh", "/api/auth/logout"];
 
+function isInvitationVerificationPath(path: string): boolean {
+  const segments = path.split("/");
+  return (
+    segments.length === 6 &&
+    segments[0] === "" &&
+    segments[1] === "api" &&
+    segments[2] === "auth" &&
+    segments[3] === "invitations" &&
+    segments[4] !== "" &&
+    segments[5] === "verify"
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Failure taxonomy
 // ---------------------------------------------------------------------------
@@ -138,7 +151,10 @@ export class AuthException extends HTTPException {
  * an entry incapable of opening a sibling route that merely shares its opening characters.
  */
 function isPublicPath(path: string, publicPaths: readonly string[]): boolean {
-  return publicPaths.some((entry) => path === entry || path.startsWith(`${entry}/`));
+  return (
+    isInvitationVerificationPath(path) ||
+    publicPaths.some((entry) => path === entry || path.startsWith(`${entry}/`))
+  );
 }
 
 export function jwtAuthMiddleware({

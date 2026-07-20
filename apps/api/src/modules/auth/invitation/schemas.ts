@@ -79,6 +79,30 @@ export const invitationIdPathParams = z
   })
   .openapi("InvitationIdPathParams");
 
+export const invitationVerificationPathParams = z
+  .object({
+    // Format validation is deliberately performed inside the verification service. A Zod path
+    // error retains the rejected value and the global error handler serializes that error to logs;
+    // for a bearer credential that would turn validation into a secret-disclosure path.
+    token: z.string().openapi({
+      param: { name: "token", in: "path" },
+      description: "One-time invitation bearer token (64 lowercase hexadecimal characters).",
+      example: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    }),
+  })
+  .openapi("InvitationVerificationPathParams");
+
+export const invitationVerificationResponseSchema = z
+  .object({
+    state: z.literal("valid"),
+    emailHint: z.string().openapi({
+      description: "Obfuscated normalized invitation email address.",
+      example: "j***e@example.com",
+    }),
+    schoolName: z.string().openapi({ description: "Inviting school's display name." }),
+  })
+  .openapi("InvitationVerificationResponse");
+
 // ---------------------------------------------------------------------------
 // Revoke
 // ---------------------------------------------------------------------------

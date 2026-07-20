@@ -3,6 +3,9 @@ import { problemDetailsSchema } from "@studafy/shared-schemas";
 import { HTTPException } from "hono/http-exception";
 import { z, ZodError } from "zod";
 
+import { CodedHttpException } from "../coded-http-exception";
+import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
+
 import { AuthException } from "./jwtAuth";
 import { getLocalizedMessage } from "./locale";
 
@@ -69,6 +72,10 @@ function mapError(error: unknown): MappedError {
   // expired token and send a client that only needs to refresh into a re-login loop.
   if (error instanceof AuthException) {
     return { status: 401, code: error.code, detail: error.message };
+  }
+
+  if (error instanceof CodedHttpException) {
+    return { status: error.status, code: error.code, detail: error.message };
   }
 
   if (error instanceof HTTPException) {
@@ -163,7 +170,7 @@ export function errorHandlerMiddleware(rootLogger: Logger): ErrorHandler<AppEnv>
 export const notFoundHandler: NotFoundHandler<AppEnv> = (c) => {
   const requestId = c.get("requestId") ?? crypto.randomUUID();
   const locale = c.get("locale") ?? "en";
-  const path = c.req.path;
+  const path = sanitizeSensitivePath(c.req.path);
 
   const localizedMessage = getLocalizedMessage(
     ERROR_CODES.RESOURCE_NOT_FOUND,

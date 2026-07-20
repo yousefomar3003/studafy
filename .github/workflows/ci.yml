@@ -62,6 +62,11 @@ jobs:
       - name: Run session lifecycle tests (ST-071)
         run: bun run test:auth
         working-directory: apps/api
+      - name: Invitation verification timing benchmark (valid vs miss)
+        env:
+          INVITATION_VERIFICATION_BENCHMARK: "1"
+        run: bun test tests/benchmark/invitation-verification-benchmark.test.ts --timeout 180000
+        working-directory: apps/api
       # Asserts the ST-071 acceptance target. An absolute wall clock rather than a delta, unlike the
       # middleware benchmarks in the api-quality job: rotation has no baseline arm to subtract, and
       # its cost is dominated by database round trips rather than framework overhead. Two arms — a
