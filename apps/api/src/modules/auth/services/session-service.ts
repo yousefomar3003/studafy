@@ -254,10 +254,10 @@ export async function rotateRefreshToken(
       const childId = randomUUID();
       const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
 
-      // Sign while the parent remains locked, before any state transition. A signing failure can
-      // therefore roll the transaction back without consuming the refresh token. Once signing has
-      // succeeded, the guarded write and COMMIT are pipelined on the reserved connection.
-      const accessToken = await signAccessToken(
+      // Signing and persistence are independent once the locked row has supplied the claims. Run
+      // them together, but do not commit until both succeed: a signing failure therefore rolls the
+      // inserted child and parent transition back as one unit.
+      const accessTokenPromise = signAccessToken(
         config.keyStore,
         {
           sub: session.user_id,
@@ -304,10 +304,21 @@ export async function rotateRefreshToken(
       RETURNING child.id AS session_id, child.family_id
       `.execute();
 
-      const persisted = await transaction.commitWith(persistencePromise);
-      committed = true;
+      const [signingResult, persistenceResult] = await Promise.allSettled([
+        accessTokenPromise,
+        persistencePromise,
+      ]);
+      // Drain both operations before throwing so rollback is never queued behind an in-flight
+      // statement on the reserved connection.
+      if (signingResult.status === "rejected") throw signingResult.reason;
+      if (persistenceResult.status === "rejected") throw persistenceResult.reason;
+
+      const accessToken = signingResult.value;
+      const persisted = persistenceResult.value;
       const row = persisted[0];
       if (!row) throw new Error("locked refresh token was not consumed");
+      await transaction.commit();
+      committed = true;
 
       return {
         kind: "issued",

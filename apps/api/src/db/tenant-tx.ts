@@ -11,7 +11,6 @@ export interface OpenTenantTransaction<T> {
   tx: TransactionSql;
   initial: T;
   commit: () => Promise<void>;
-  commitWith: <TResult>(statement: Promise<TResult>) => Promise<TResult>;
   rollback: () => Promise<void>;
 }
 
@@ -68,23 +67,10 @@ export async function openTenantTx<T>(
       }
     };
 
-    const commitWith = async <TResult>(statement: Promise<TResult>): Promise<TResult> => {
-      if (closed) throw new Error("tenant transaction is already closed");
-      const committed = reserved.unsafe("COMMIT").execute();
-      const [workResult, commitResult] = await Promise.allSettled([statement, committed]);
-      closed = true;
-      reserved.release();
-
-      if (workResult.status === "rejected") throw workResult.reason;
-      if (commitResult.status === "rejected") throw commitResult.reason;
-      return workResult.value;
-    };
-
     return {
       tx,
       initial: initialResult.value as T,
       commit: () => close("COMMIT"),
-      commitWith,
       rollback: () => close("ROLLBACK"),
     };
   } catch (error) {

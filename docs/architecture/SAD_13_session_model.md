@@ -265,10 +265,10 @@ baseline arm to subtract, and its cost is dominated by database round trips rath
 overhead, so it follows the precedent of the absolute budgets in `packages/db/tests` (see
 [`docs/database/attendance.md`](../database/attendance.md)).
 
-Covered: token parse, one SHA-256 digest, the single lock-protected tenant transaction that reads the
-session and roles, signs the access token before mutation, and atomically inserts the child/consumes
-the parent through a write-and-commit pipeline. Excluded: client network RTT, a property of
-deployment topology.
+Covered: token parse, one SHA-256 digest, and the single lock-protected tenant transaction that reads
+the session and roles, then signs the access token concurrently with the guarded CTE that inserts the
+child and consumes the parent. Commit follows only after both operations succeed, so either failure
+rolls the state transition back. Excluded: client network RTT, a property of deployment topology.
 
 Reproduce:
 
