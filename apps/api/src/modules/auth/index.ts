@@ -28,6 +28,16 @@ export {
 } from "./invitation/service";
 export { invitationRoutes } from "./invitation/route";
 export {
+  evaluateInvitationState,
+  hashInvitationToken,
+  maskInvitationEmail,
+  resolveInvitationToken,
+  verifyInvitationToken,
+  type InvitationTokenResolution,
+  type InvitationVerificationResult,
+  type InvitationVerificationState,
+} from "./invitation/verification";
+export {
   mintOpaqueToken,
   parseOpaqueToken,
   hashSecret,

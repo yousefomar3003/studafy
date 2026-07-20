@@ -96,6 +96,7 @@ describe("structure", () => {
         "/api/auth/devices",
         "/api/auth/devices/{deviceId}",
         "/api/auth/devices/{deviceId}/sessions",
+        "/api/auth/invitations/{token}/verify",
         "/api/auth/logout",
         "/api/auth/refresh",
         "/api/auth/sessions",

@@ -111,6 +111,12 @@ describe("extractClientIp", () => {
   });
 });
 
+describe("invitation verification rate-limit classification", () => {
+  test("uses the strict IP-scoped auth class", () => {
+    expect(resolveRouteClass(`/api/auth/invitations/${"a".repeat(64)}/verify`)).toBe("auth");
+  });
+});
+
 describe("resolveRouteClass", () => {
   test("returns exact match from ROUTE_CLASS_MAP", () => {
     // All entries are commented out in ROUTE_CLASS_MAP, so this tests the

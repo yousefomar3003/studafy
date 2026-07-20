@@ -287,6 +287,15 @@ describe("public paths", () => {
     expect(res.status).toBe(200);
     expect(probe.handlerCalls()).toBe(1);
   });
+
+  it("exempts only the invitation verification shape", async () => {
+    const token = "a".repeat(64);
+    const verification = await probe.app.request(`/api/auth/invitations/${token}/verify`);
+    const sibling = await probe.app.request(`/api/auth/invitations/${token}/manage`);
+
+    expect(verification.status).toBe(200);
+    expect(sibling.status).toBe(401);
+  });
 });
 
 describe("degraded key store", () => {

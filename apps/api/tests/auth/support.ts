@@ -151,6 +151,14 @@ export async function createProbeApp(
     calls += 1;
     return c.json({ handled: true });
   });
+  app.get("/api/auth/invitations/:token/verify", (c) => {
+    calls += 1;
+    return c.json({ handled: true });
+  });
+  app.get("/api/auth/invitations/:token/manage", (c) => {
+    calls += 1;
+    return c.json({ handled: true });
+  });
   app.onError(errorHandlerMiddleware(logger));
 
   return {

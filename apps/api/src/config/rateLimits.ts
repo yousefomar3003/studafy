@@ -57,6 +57,7 @@ export const RATE_LIMIT_BUDGETS: Record<RouteClass, RateLimitBudget> = {
  */
 export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   // Auth (pre-authentication, IP-scoped, strict limits)
+  "/api/auth/invitations/*": "auth",
   // "/api/auth/login": "auth",
   // "/api/auth/register": "auth",
   // "/api/auth/forgot-password": "auth",
