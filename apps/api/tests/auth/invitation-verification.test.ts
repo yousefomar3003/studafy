@@ -296,7 +296,13 @@ describe("GET invitation verification", () => {
 
       expect(emitted).toContain("[REDACTED]");
       expect(recordedEvents).toContain("[REDACTED]");
-      expect(unmatchedBody).toContain("[REDACTED]");
+
+      // The unmatched arm answers 401, not a redacted 404: only the exact six-segment shape is public,
+      // so jwtAuth short-circuits a descendant path before the not-found handler ever renders one. That
+      // is the stricter outcome — the body carries no path at all, so it cannot leak the token (asserted
+      // above) and does not even confirm the route shape. Asserting the status here pins the exemption
+      // as narrow; if it ever widened to a prefix match this would fall through to 404 and fail.
+      expect(unmatched.status).toBe(401);
       expect(securityEvents.slice(eventsBefore)).toHaveLength(4);
     },
   );
