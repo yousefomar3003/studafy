@@ -185,7 +185,7 @@ export function createApp({
   // so rate-limited requests are still logged for observability, but before routes so they
   // short-circuit before any handler runs.
   if (redis) {
-    app.use("*", rateLimiterMiddleware({ redis }));
+    app.use("*", rateLimiterMiddleware({ redis, eventSink }));
   }
 
   // Idempotency key middleware: captures and replays POST responses for financial and import
@@ -235,6 +235,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         jtiDenylist,
+        eventSink,
       ),
     );
   }

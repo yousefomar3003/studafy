@@ -23,7 +23,11 @@ import type { Logger } from "../../logger";
 
 /** Mirrors the app.security_event_type PostgreSQL enum. */
 export type SecurityEventType =
-  "csrf_missing_token" | "csrf_token_mismatch" | "cors_origin_rejected";
+  | "csrf_missing_token"
+  | "csrf_token_mismatch"
+  | "cors_origin_rejected"
+  | "auth_rate_limit_block"
+  | "auth_token_reuse_detected";
 
 /** One boundary rejection, as the middleware observed it. */
 export interface SecurityEvent {

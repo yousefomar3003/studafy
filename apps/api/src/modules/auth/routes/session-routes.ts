@@ -17,6 +17,7 @@ import {
 } from "../services/session-service";
 
 import type { Database } from "../../../db/client";
+import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { JtiDenylist } from "../denylist";
 import type { RevocationReason, RevocationScope } from "../services/revocation-service";
@@ -290,6 +291,7 @@ export function sessionRoutes(
   database: Database,
   config: SessionTokenConfig,
   denylist: JtiDenylist | null,
+  eventSink?: SecurityEventSink | null,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
@@ -341,6 +343,7 @@ export function sessionRoutes(
       requestId: c.get("requestId"),
       device: deviceContextFrom(c),
       log: c.get("log"),
+      eventSink,
     });
 
     return c.json(deliverTokenPair(c, issued), 200);

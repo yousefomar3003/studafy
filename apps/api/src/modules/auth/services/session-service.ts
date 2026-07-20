@@ -25,10 +25,12 @@ import { ERROR_CODES } from "@studafy/constants";
 import { openTenantTx, withTenantTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { AuthException } from "../../../middleware/jwtAuth";
+import { emitTokenReuseDetected } from "../auth-anomaly-events";
 import { signAccessToken } from "../jwt/sign";
 import { hashSecret, mintOpaqueToken, parseOpaqueToken } from "../tokens/opaque-token";
 
 import type { Database } from "../../../db/client";
+import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
 import type { Logger } from "../../../logger";
 import type { AuthChannel } from "../channels";
 import type { KeyStore } from "../jwt/key-store";
@@ -195,6 +197,8 @@ export interface RotateParams {
   requestId?: string;
   device?: DeviceContext;
   log?: Logger;
+  /** Where auth anomaly events are persisted. Omitted in tests. */
+  eventSink?: SecurityEventSink | null;
 }
 
 /**
@@ -368,7 +372,14 @@ export async function rotateRefreshToken(
     throw new AuthException(ERROR_CODES.AUTH_TOKEN_EXPIRED, "Refresh token has expired");
   }
 
-  logReuseEvent(outcome.event, params.log);
+  emitTokenReuseDetected(params.log, params.eventSink, {
+    familyId: outcome.event.familyId,
+    sessionId: outcome.event.sessionId,
+    deviceId: outcome.event.deviceId,
+    revokedTokenCount: outcome.event.revokedTokenCount,
+    clientIp: params.device?.ipAddress,
+    userAgent: params.device?.userAgent,
+  });
   throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
 }
 
@@ -424,22 +435,6 @@ async function revokeReusedSession(tx: TransactionSql, session: SessionRow): Pro
     deviceId: session.device_id,
     revokedTokenCount: revoked.length,
   };
-}
-
-function logReuseEvent(event: ReuseEvent, log?: Logger): void {
-  // Logged at error, not warn: this is the one event in the session subsystem that means a
-  // credential is in the wrong hands. No token material, in any form — not the presented token, not
-  // not the digest. The family id is the correlation key, and it is not a credential.
-  log?.error(
-    {
-      event: "refresh_token_reuse_detected",
-      family_id: event.familyId,
-      session_id: event.sessionId,
-      device_id: event.deviceId,
-      revoked_token_count: event.revokedTokenCount,
-    },
-    "refresh token reuse detected — token family revoked",
-  );
 }
 
 // ---------------------------------------------------------------------------

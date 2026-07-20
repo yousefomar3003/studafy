@@ -76,6 +76,12 @@ export {
   type TokenResponseBody,
 } from "./delivery";
 export { sessionRoutes } from "./routes/session-routes";
+export {
+  emitRateLimitBlock,
+  emitTokenReuseDetected,
+  type RateLimitBlockEvent,
+  type TokenReuseEvent,
+} from "./auth-anomaly-events";
 export { adminDeviceRoutes } from "./routes/admin-device-routes";
 export { type DenylistEntry } from "./denylist";
 export type { AccessTokenClaims, JwtPayload, SignAccessTokenParams } from "./jwt/types";
