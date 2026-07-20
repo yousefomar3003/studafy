@@ -12,7 +12,7 @@ import { AUTH_CHANNELS, KeyStore, signAccessToken } from "../../src/modules/auth
 
 import type { LogFields, Logger } from "../../src/logger";
 import type { AppEnv } from "../../src/middleware";
-import type { JtiDenylist } from "../../src/modules/auth";
+import type { DenylistEntry, JtiDenylist } from "../../src/modules/auth";
 import type { Role } from "@studafy/constants";
 
 /**
@@ -90,6 +90,20 @@ export function createFakeDenylist(): FakeDenylist {
       revoked.add(jti);
       return Promise.resolve();
     },
+    revokeMany(entries: readonly DenylistEntry[]) {
+      // Mirrors the real implementation's contract: already-expired entries are skipped rather than
+      // written, and the count returned is what actually landed. Tests asserting on denylisted counts
+      // depend on that, so the fake cannot simply add everything.
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      let written = 0;
+      for (const entry of entries) {
+        if (entry.expUnixSeconds - nowSeconds <= 0) continue;
+        revoked.add(entry.jti);
+        written += 1;
+      }
+      if (failure) return Promise.reject(failure);
+      return Promise.resolve(written);
+    },
   };
 }
 
@@ -134,6 +148,14 @@ export async function createProbeApp(
     return c.json({ handled: true, auth: c.get("auth") });
   });
   app.post("/api/webhooks/erpnext", (c) => {
+    calls += 1;
+    return c.json({ handled: true });
+  });
+  app.get("/api/auth/invitations/:token/verify", (c) => {
+    calls += 1;
+    return c.json({ handled: true });
+  });
+  app.get("/api/auth/invitations/:token/manage", (c) => {
     calls += 1;
     return c.json({ handled: true });
   });

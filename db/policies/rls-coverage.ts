@@ -309,6 +309,27 @@ violations AS (
   JOIN pg_catalog.pg_policy AS policy_catalog ON policy_catalog.polrelid = tenant.oid
   WHERE policy_catalog.polpermissive
     AND policy_catalog.polname <> 'tenant_isolation'
+    AND NOT (
+      tenant.schema_name = 'app'
+      AND tenant.table_name = 'invitations'
+      AND policy_catalog.polname = 'invitation_token_verification'
+      AND policy_catalog.polcmd = 'r'
+      AND policy_catalog.polroles = ARRAY[(
+        SELECT role_catalog.oid
+        FROM pg_catalog.pg_roles AS role_catalog
+        WHERE role_catalog.rolname = 'studafy_admin'
+      )]
+      AND policy_catalog.polwithcheck IS NULL
+      AND pg_catalog.translate(
+        pg_catalog.replace(
+          pg_catalog.pg_get_expr(policy_catalog.polqual, policy_catalog.polrelid),
+          '::text',
+          ''
+        ),
+        E' \n\t\r()',
+        ''
+      ) = 'token_hash=decodeNULLIFcurrent_setting''app.invitation_token_hash'',true,'''',''hex'''
+    )
 
   UNION ALL
 

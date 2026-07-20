@@ -78,6 +78,7 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   // Invitations — authenticated, IP-scoped
   "/api/invitations": "auth",
   "/api/invitations/*": "auth",
+  "/api/auth/invitations/*": "auth",
 };
 
 /**

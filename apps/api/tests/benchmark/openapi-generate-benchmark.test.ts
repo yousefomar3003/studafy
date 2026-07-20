@@ -55,9 +55,14 @@ const EXPECTED_PATHS = [
   "/api/invitations/{id}/revoke",
   "/api/auth/refresh",
   "/api/auth/logout",
+  "/api/auth/invitations/{token}/verify",
   "/api/auth/sessions",
   "/api/auth/sessions/{sessionId}",
+  "/api/auth/devices",
+  "/api/auth/devices/{deviceId}",
   "/api/auth/devices/{deviceId}/sessions",
+  "/api/admin/users/{userId}/devices",
+  "/api/admin/users/{userId}/devices/{deviceId}",
 ];
 
 const SCRIPT = path.join(import.meta.dir, "..", "..", "scripts", "generate-openapi.ts");

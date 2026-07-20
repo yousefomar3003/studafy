@@ -27,6 +27,86 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/admin/users/{userId}/devices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Force a global logout for a user
+         * @description Revokes every live token family the named user holds, on every device, and denylists the access tokens they minted. Use for a compromised account. Answers 200 with `revoked: 0` when the user has no live sessions, does not exist, or belongs to another tenant.
+         */
+        readonly delete: operations["adminRevokeAllDevices"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/admin/users/{userId}/devices/{deviceId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Revoke one of a user's devices
+         * @description Terminates every session on the named device and deregisters it, leaving the user's other devices signed in. Use when one device is lost rather than when an account is compromised.
+         */
+        readonly delete: operations["adminRevokeDevice"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/auth/devices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List registered devices
+         * @description Every device registered to the authenticated user that has not been revoked, with the number of live sessions on each. Distinct from `/api/auth/sessions`, which lists logins rather than the hardware they happened on — one device may carry several sessions.
+         */
+        readonly get: operations["listDevices"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/auth/devices/{deviceId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Revoke a device entirely
+         * @description Terminates every session on the device and deregisters it, so it stops receiving push notifications as well as losing its logins. Answers 200 with `revoked: 0` when the device does not exist or belongs to someone else — the two are indistinguishable by design.
+         */
+        readonly delete: operations["revokeDevice"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/auth/devices/{deviceId}/sessions": {
         readonly parameters: {
             readonly query?: never;
@@ -39,9 +119,29 @@ export interface paths {
         readonly post?: never;
         /**
          * Terminate every session on a device
-         * @description Revokes all live sessions bound to the named device. Use when a device is lost.
+         * @description Revokes all live sessions bound to the named device, leaving the device registered. Use `DELETE /api/auth/devices/{deviceId}` instead to also deregister the device itself.
          */
         readonly delete: operations["revokeDeviceSessions"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/auth/invitations/{token}/verify": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Verify an invitation token
+         * @description Resolves an invitation bearer token without provisioning an account. Valid responses expose only an obfuscated email hint and school name; unusable invitations use standardized problem details.
+         */
+        readonly get: operations["verifyInvitation"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
         readonly patch?: never;
@@ -255,6 +355,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        readonly AdminRevocationResult: {
+            /** @description Access tokens denylisted. */
+            readonly denylisted: number;
+            /** @description Refresh tokens revoked. */
+            readonly revoked: number;
+        };
         readonly CreateInvitation: {
             /**
              * Format: email
@@ -281,6 +387,20 @@ export interface components {
              * @example a1b2c3d4e5f6...
              */
             readonly token: string;
+        };
+        readonly Device: {
+            /** @description Live sessions currently bound to this device. */
+            readonly active_session_count: number;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: date-time */
+            readonly last_seen: string;
+            readonly platform: string;
+        };
+        readonly DeviceList: {
+            readonly devices: readonly components["schemas"]["Device"][];
         };
         readonly ErpNextWebhook: {
             /** @description ERPNext document action, e.g. 'on_submit'. */
@@ -326,6 +446,17 @@ export interface components {
             /** @description Role to be assigned on acceptance. */
             readonly role: string;
         };
+        readonly InvitationVerificationResponse: {
+            /**
+             * @description Obfuscated normalized invitation email address.
+             * @example j***e@example.com
+             */
+            readonly emailHint: string;
+            /** @description Inviting school's display name. */
+            readonly schoolName: string;
+            /** @enum {string} */
+            readonly state: "valid";
+        };
         readonly JsonWebKeySet: {
             readonly keys: readonly {
                 /** @enum {string} */
@@ -344,7 +475,7 @@ export interface components {
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "RATE_LIMIT_EXCEEDED" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "RATE_LIMIT_EXCEEDED" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -377,6 +508,8 @@ export interface components {
             readonly token: string;
         };
         readonly RevocationResult: {
+            /** @description Access tokens written to the denylist. Never exceeds `revoked`; sessions predating the access-token tracking added in ST-072 have no identifier to deny. */
+            readonly denylisted: number;
             /** @description Tokens revoked. */
             readonly revoked: number;
         };
@@ -539,6 +672,288 @@ export interface operations {
             };
         };
     };
+    readonly adminRevokeAllDevices: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly userId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description How much was torn down. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminRevocationResult"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly adminRevokeDevice: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly deviceId: string;
+                readonly userId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description How much was torn down. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminRevocationResult"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listDevices: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The caller's registered devices. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DeviceList"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly revokeDevice: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly deviceId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description How many tokens were revoked. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RevocationResult"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     readonly revokeDeviceSessions: {
         readonly parameters: {
             readonly query?: never;
@@ -574,6 +989,75 @@ export interface operations {
             };
             /** @description Authentication is missing or invalid. */
             readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly verifyInvitation: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description One-time invitation bearer token (64 lowercase hexadecimal characters). */
+                readonly token: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The invitation is active and can proceed to onboarding. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["InvitationVerificationResponse"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
                 headers: {
                     /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
                     readonly "X-Request-Id": string;

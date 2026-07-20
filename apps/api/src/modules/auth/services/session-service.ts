@@ -109,10 +109,19 @@ export async function issueTokenPair(
   // postgres.js template composition gets subtle, and this is not the place to be clever.
   const familyId = params.familyId ?? randomUUID();
 
+  // The access token's identity is decided here rather than inside signAccessToken, because the
+  // session row has to carry it: ST-072 revokes a family by projecting these two columns out of the
+  // UPDATE and denylisting what it finds. A jti the signer kept to itself would be unrecoverable the
+  // moment the response left the process, which is exactly the state ST-070's denylist sat in — a
+  // revoke() with nothing able to call it.
+  const accessJti = randomUUID();
+  const accessExpiresAt = new Date(Date.now() + config.accessTtlSeconds * 1000);
+
   const [row] = await tx<{ id: string; family_id: string }[]>`
     INSERT INTO app.refresh_tokens (
       school_id, user_id, token_hash, family_id, parent_token_id,
-      device_id, channel, device_name, user_agent, ip_address, expires_at
+      device_id, channel, device_name, user_agent, ip_address, expires_at,
+      access_jti, access_expires_at
     ) VALUES (
       current_setting('app.school_id')::uuid,
       ${params.userId},
@@ -124,7 +133,9 @@ export async function issueTokenPair(
       ${device.deviceName ?? null},
       ${device.userAgent ?? null},
       ${device.ipAddress ?? null},
-      ${expiresAt}
+      ${expiresAt},
+      ${accessJti},
+      ${accessExpiresAt}
     )
     RETURNING id, family_id
   `;
@@ -142,6 +153,7 @@ export async function issueTokenPair(
       issuer: config.issuer,
       audience: config.audience,
       ttlSeconds: config.accessTtlSeconds,
+      jti: accessJti,
     },
   );
 
@@ -257,6 +269,11 @@ export async function rotateRefreshToken(
       const minted = mintOpaqueToken(session.school_id, session.user_id);
       const childId = randomUUID();
       const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
+      // Generated up front, like childId above and for the same reason: signing and persistence run
+      // concurrently below, so every value both statements need has to exist before either starts.
+      // Taking the jti back from the signer would serialize them.
+      const accessJti = randomUUID();
+      const accessExpiresAt = new Date(Date.now() + config.accessTtlSeconds * 1000);
 
       // Signing and persistence are independent once the locked row has supplied the claims. Run
       // them together, but do not commit until both succeed: a signing failure therefore rolls the
@@ -274,6 +291,7 @@ export async function rotateRefreshToken(
           issuer: config.issuer,
           audience: config.audience,
           ttlSeconds: config.accessTtlSeconds,
+          jti: accessJti,
         },
       );
 
@@ -281,7 +299,8 @@ export async function rotateRefreshToken(
       WITH child AS (
         INSERT INTO app.refresh_tokens (
           id, school_id, user_id, token_hash, family_id, parent_token_id,
-          device_id, channel, device_name, user_agent, ip_address, expires_at
+          device_id, channel, device_name, user_agent, ip_address, expires_at,
+          access_jti, access_expires_at
         ) VALUES (
           ${childId},
           current_setting('app.school_id')::uuid,
@@ -294,7 +313,9 @@ export async function rotateRefreshToken(
           ${session.device_name},
           ${params.device?.userAgent ?? session.user_agent},
           ${params.device?.ipAddress ?? session.ip_address},
-          ${expiresAt}
+          ${expiresAt},
+          ${accessJti},
+          ${accessExpiresAt}
         )
         RETURNING id, family_id
       )
@@ -478,87 +499,139 @@ export async function listActiveSessions(
   }));
 }
 
+/** A registered device and how many live sessions are currently bound to it. */
+export interface UserDevice {
+  id: string;
+  platform: string;
+  lastSeen: Date;
+  createdAt: Date;
+  activeSessionCount: number;
+}
+
 /**
- * Revoke one session by the id of its live token, taking the whole family with it.
+ * The caller's registered, unrevoked devices.
  *
- * Revoking the single row would leave the rest of the chain intact and the session usable, since the
- * client holds the tip. The family is the unit of revocation everywhere in this module.
+ * Distinct from listActiveSessions, which enumerates token families. A device is the physical thing
+ * a person recognises and wants to revoke — "my old phone" — whereas a family is a login on it, and
+ * one device can carry several. The session count is what makes the list actionable rather than
+ * merely informational.
  *
- * Returns the number of tokens revoked; zero means the session was not found, already dead, or
- * belongs to another user — the restrictive RLS policy makes the last case indistinguishable from
- * the first, which is the right answer to give a caller probing for other people's session ids.
+ * fcm_token is absent from the projection for the same reason token_hash is absent from the session
+ * list: it is a credential for the push channel, and this response is handed to a client.
  */
-export async function revokeSession(tx: TransactionSql, sessionId: string): Promise<number> {
+export async function listUserDevices(tx: TransactionSql, userId: string): Promise<UserDevice[]> {
+  const rows = await tx<
+    {
+      id: string;
+      platform: string;
+      last_seen: Date;
+      created_at: Date;
+      active_session_count: string;
+    }[]
+  >`
+    SELECT d.id, d.platform::text AS platform, d.last_seen, d.created_at,
+           count(rt.family_id) AS active_session_count
+      FROM app.user_devices AS d
+      LEFT JOIN app.refresh_tokens AS rt
+             ON rt.device_id = d.id
+            AND rt.revoked_at IS NULL
+            AND rt.rotated_at IS NULL
+            AND rt.expires_at > CURRENT_TIMESTAMP
+     WHERE d.user_id = ${userId}
+       AND d.revoked_at IS NULL
+     GROUP BY d.id, d.platform, d.last_seen, d.created_at
+     ORDER BY d.last_seen DESC
+  `;
+
+  return rows.map((row) => ({
+    id: row.id,
+    platform: row.platform,
+    lastSeen: row.last_seen,
+    createdAt: row.created_at,
+    // count() comes back as a bigint, which postgres.js surfaces as a string to avoid a silent
+    // precision loss past 2^53. Harmless for a session count, but the cast has to be explicit or the
+    // JSON response would carry a quoted number.
+    activeSessionCount: Number(row.active_session_count),
+  }));
+}
+
+/**
+ * Soft-revoke a device registration.
+ *
+ * Sets revoked_at rather than deleting, matching how app.user_devices is treated everywhere else in
+ * this schema (000017 makes soft revocation the rule and app.claim_device_token the precedent): the
+ * row is evidence for a later investigation, and a delete would also break the composite foreign key
+ * every refresh_tokens row bound to this device holds.
+ *
+ * Scoped to the caller's own user_id in addition to the RLS fence, so a device id belonging to
+ * another user in the same tenant matches nothing rather than being deregistered.
+ */
+export async function deregisterDevice(
+  tx: TransactionSql,
+  userId: string,
+  deviceId: string,
+): Promise<number> {
   const revoked = await tx`
-    UPDATE app.refresh_tokens
-       SET revoked_at = CURRENT_TIMESTAMP
-     WHERE family_id = (SELECT family_id FROM app.refresh_tokens WHERE id = ${sessionId})
+    UPDATE app.user_devices
+       SET revoked_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+     WHERE id = ${deviceId}
+       AND user_id = ${userId}
        AND revoked_at IS NULL
     RETURNING id
   `;
   return revoked.length;
 }
 
-/** Revoke every session bound to one device. Used when a device is lost or handed on. */
-export async function revokeDeviceSessions(tx: TransactionSql, deviceId: string): Promise<number> {
-  const revoked = await tx`
-    UPDATE app.refresh_tokens
-       SET revoked_at = CURRENT_TIMESTAMP
-     WHERE device_id = ${deviceId}
-       AND revoked_at IS NULL
-    RETURNING id
-  `;
-  return revoked.length;
+/** Where a presented refresh token points: its tenant, its family, and the metadata to audit with. */
+export interface ResolvedFamily {
+  schoolId: string;
+  userId: string;
+  familyId: string;
+  userAgent: string | null;
+  ipAddress: string | null;
 }
 
 /**
- * End the session a refresh token belongs to.
+ * Resolve a presented refresh token to the family it belongs to, without revoking anything.
  *
- * Logout is unauthenticated — the token is the credential — so an unparseable or unknown token is
- * not an error. Reporting "that token does not exist" to a caller asking to destroy it would be a
- * probing oracle, and there is nothing for the client to do differently either way.
+ * Logout needs the tenant, the user, and the family before it can open a revoking transaction, and
+ * it has none of them: it is an unauthenticated route, so there is no access token and no auth
+ * context. The token itself is the only source, which is why the wire format carries the two ids —
+ * see 000029's header.
+ *
+ * Returns undefined for an unparseable or unknown token rather than throwing. Logout is
+ * unauthenticated and answers 200 either way; reporting "that token does not exist" to a caller
+ * asking to destroy it would be a probing oracle, and there is nothing a client could do
+ * differently.
+ *
+ * Matching on the digest is what makes this safe to expose unauthenticated: the ids in the token
+ * only scope the search, and a caller who knows someone's school and user ids but not their secret
+ * finds nothing. Otherwise a pair of identifiers the access token already publishes as claims would
+ * become a denial-of-service primitive.
  */
-export async function revokeSessionByToken(
+export async function resolveFamilyByToken(
   database: Database,
   presentedToken: string,
   requestId?: string,
-): Promise<void> {
+): Promise<ResolvedFamily | undefined> {
   const parsed = parseOpaqueToken(presentedToken);
-  if (!parsed) return;
+  if (!parsed) return undefined;
 
   const tenant = { schoolId: parsed.schoolId, userId: parsed.userId, requestId };
 
-  // Matching on the digest is what makes this safe to expose unauthenticated: the ids in the token
-  // only scope the search, and a caller who knows someone's school and user ids but not their secret
-  // finds nothing to revoke. Otherwise a pair of identifiers the access token already publishes
-  // would become a denial-of-service primitive.
   const session = await withTenantTx(database, tenant, (tx) =>
     loadSessionByHash(tx, hashSecret(parsed.secret)),
   );
-  if (!session) return;
+  if (!session) return undefined;
 
-  await withTenantTx(database, tenant, async (tx) => {
-    const revoked = await tx`
-        UPDATE app.refresh_tokens
-           SET revoked_at = CURRENT_TIMESTAMP
-         WHERE family_id = ${session.family_id}
-           AND revoked_at IS NULL
-        RETURNING id
-      `;
-
-    await emitAuditLog(tx, {
-      action: "logout",
-      targetTable: "refresh_tokens",
-      targetId: session.family_id,
-      newValues: {
-        reason: "user_logout",
-        family_id: session.family_id,
-        revoked_token_count: revoked.length,
-      },
-      userAgent: session.user_agent,
-      clientIp: session.ip_address,
-    });
-  });
+  return {
+    schoolId: session.school_id,
+    userId: session.user_id,
+    familyId: session.family_id,
+    userAgent: session.user_agent,
+    ipAddress: session.ip_address,
+  };
 }
 
 // ---------------------------------------------------------------------------

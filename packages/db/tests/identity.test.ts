@@ -173,18 +173,46 @@ integrationTest(
         WHERE n.nspname = 'app' AND c.relname = ANY(${IDENTITY_TABLES as unknown as string[]})
         ORDER BY c.relname
       `;
-      const tenantPolicies = policies.filter((policy) => policy.permissive);
+      const tenantPolicies = policies.filter(
+        (policy) => policy.permissive && policy.name === "tenant_isolation",
+      );
       expect(tenantPolicies.map((policy) => policy.table_name)).toEqual(
         [...IDENTITY_TABLES].sort(),
       );
       for (const policy of tenantPolicies) {
-        expect(policy.name).toBe("tenant_isolation");
         expect(policy.command).toBe("*");
         expect(policy.roles).toEqual([0]);
         expect(policy.using_expression).toContain("current_setting('app.school_id'::text)");
         expect(policy.check_expression).toContain("current_setting('app.school_id'::text)");
         expect(policy.using_expression).toContain("school_id");
         expect(policy.check_expression).toContain("school_id");
+      }
+
+      // A second permissive policy widens access rather than narrowing it, so every one that is not
+      // tenant_isolation is pinned by shape here instead of being waved through by the filter above.
+      // Exactly one exists: invitation_token_verification (000031), the read seam that lets the
+      // SECURITY DEFINER lookup behind GET /api/auth/invitations/{token}/verify see a single row while
+      // app.invitations stays FORCE ROW LEVEL SECURITY. What keeps that seam closed is the role and the
+      // predicate: it is granted to studafy_admin only — never PUBLIC, and never studafy_app, which is
+      // the role ordinary request handlers run as — and its USING clause pins token_hash to the one
+      // digest the function puts in a transaction-local GUC. db/policies/rls-coverage.ts carves out the
+      // same policy for the CLI audit; the two must agree.
+      const seamPolicies = policies.filter(
+        (policy) => policy.permissive && policy.name !== "tenant_isolation",
+      );
+      expect(seamPolicies.map((policy) => `${policy.table_name}.${policy.name}`)).toEqual([
+        "invitations.invitation_token_verification",
+      ]);
+      const [adminRole] = await database.sql<{ oid: number }[]>`
+        SELECT oid::integer AS oid FROM pg_roles WHERE rolname = 'studafy_admin'
+      `;
+      for (const policy of seamPolicies) {
+        // 'r' is SELECT — the seam can read one row, never write.
+        expect(policy.command).toBe("r");
+        expect(policy.roles).toEqual([adminRole!.oid]);
+        expect(policy.check_expression).toBeNull();
+        expect(policy.using_expression).toContain("app.invitation_token_hash");
+        expect(policy.using_expression).toContain("token_hash");
       }
 
       // Restrictive policies AND with the permissive one, so they can only ever narrow access —
@@ -645,6 +673,8 @@ integrationTest(
         "idx_refresh_tokens_school_replaced_by",
         "idx_refresh_tokens_school_user",
         "idx_refresh_tokens_school_user_active",
+        // Added by 000030 for ST-072: batch revocation with INCLUDE for access_jti/access_expires_at.
+        "idx_refresh_tokens_school_user_device_active",
       ]);
 
       // Seed representative refresh-token families so the planner can distinguish the selective

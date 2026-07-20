@@ -1,3 +1,5 @@
+import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
+
 import type { AuthContext } from "./authContext";
 import type { Logger } from "../logger";
 import type { MiddlewareHandler } from "hono";
@@ -46,7 +48,7 @@ export function requestIdMiddleware({
     const log = logger.child({
       request_id: requestId,
       method: c.req.method,
-      path: c.req.path,
+      path: sanitizeSensitivePath(c.req.path),
       school_id: auth?.schoolId ?? null,
       user_id: auth?.userId ?? null,
     });

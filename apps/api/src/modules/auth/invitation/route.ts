@@ -11,10 +11,13 @@ import {
   createInvitationBodySchema,
   createInvitationResponseSchema,
   invitationIdPathParams,
+  invitationVerificationPathParams,
+  invitationVerificationResponseSchema,
   revokeInvitationResponseSchema,
   regenerateInvitationResponseSchema,
 } from "./schemas";
 import { createInvitationService } from "./service";
+import { throwInvitationVerificationFailure, verifyInvitationToken } from "./verification";
 
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
@@ -105,6 +108,28 @@ const regenerateInvitationRoute = createRoute({
   ),
 });
 
+const verifyInvitationRoute = createRoute({
+  method: "get",
+  path: "/api/auth/invitations/{token}/verify",
+  tags: ["Invitations"],
+  operationId: "verifyInvitation",
+  summary: "Verify an invitation token",
+  description:
+    "Resolves an invitation bearer token without provisioning an account. Valid responses expose " +
+    "only an obfuscated email hint and school name; unusable invitations use standardized problem details.",
+  security: [],
+  request: { params: invitationVerificationPathParams },
+  responses: standardResponses(
+    {
+      200: {
+        description: "The invitation is active and can proceed to onboarding.",
+        schema: invitationVerificationResponseSchema,
+      },
+    },
+    [400, 409, 429, 500],
+  ),
+});
+
 // ---------------------------------------------------------------------------
 // Route group factory
 // ---------------------------------------------------------------------------
@@ -121,6 +146,20 @@ export function invitationRoutes(db: Database, _logger: Logger): OpenAPIHono<App
   routes.use("/api/invitations", auditAction("insert", "invitations"));
   routes.use("/api/invitations/{id}/revoke", auditAction("update", "invitations"));
   routes.use("/api/invitations/{id}/regenerate", auditAction("update", "invitations"));
+
+  routes.openapi(verifyInvitationRoute, async (c) => {
+    const { token } = c.req.valid("param");
+    const result = await verifyInvitationToken(db, token);
+
+    if (result.state !== "VALID") {
+      throwInvitationVerificationFailure(result);
+    }
+
+    return c.json(
+      { state: "valid" as const, emailHint: result.emailHint, schoolName: result.schoolName },
+      200,
+    );
+  });
 
   routes.openapi(createInvitationRoute, async (c) => {
     const auth = requireAuth(c);

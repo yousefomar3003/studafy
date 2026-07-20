@@ -3,6 +3,8 @@ import { problemDetailsSchema } from "@studafy/shared-schemas";
 import { HTTPException } from "hono/http-exception";
 import { z, ZodError } from "zod";
 
+import { sanitizeSensitivePath } from "./lib/security/sensitive-path";
+
 import type { Logger } from "./logger";
 import type { AppEnv } from "./request-context";
 import type { ErrorCode } from "@studafy/constants";
@@ -151,7 +153,7 @@ export const problemNotFound: NotFoundHandler<AppEnv> = (c) => {
   // client twice below. requestContext already keeps a query string out of the log line because it
   // can carry a token or a PII filter; reflecting one into a response body is strictly worse. It
   // stays percent-encoded, and JSON.stringify escapes it, so it reaches the body inert.
-  const path = c.req.path;
+  const path = sanitizeSensitivePath(c.req.path);
 
   return c.body(
     JSON.stringify(

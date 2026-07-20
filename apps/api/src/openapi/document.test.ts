@@ -91,7 +91,12 @@ describe("structure", () => {
     expect(Object.keys(document.paths ?? {}).sort()).toEqual(
       [
         "/.well-known/jwks.json",
+        "/api/admin/users/{userId}/devices",
+        "/api/admin/users/{userId}/devices/{deviceId}",
+        "/api/auth/devices",
+        "/api/auth/devices/{deviceId}",
         "/api/auth/devices/{deviceId}/sessions",
+        "/api/auth/invitations/{token}/verify",
         "/api/auth/logout",
         "/api/auth/refresh",
         "/api/auth/sessions",
@@ -247,8 +252,15 @@ describe("security", () => {
 
     expect(authenticated).toEqual(
       [
+        // Device revocation (ST-072). The two /api/admin routes are authenticated *and* gated on
+        // PERMISSIONS.USER_SUSPEND by middleware/authz.ts — a distinction this document cannot
+        // express, since bearerAuth covers only the first half. See routes/admin-device-routes.ts.
+        "DELETE /api/admin/users/{userId}/devices",
+        "DELETE /api/admin/users/{userId}/devices/{deviceId}",
+        "DELETE /api/auth/devices/{deviceId}",
         "DELETE /api/auth/devices/{deviceId}/sessions",
         "DELETE /api/auth/sessions/{sessionId}",
+        "GET /api/auth/devices",
         "GET /api/auth/sessions",
         "POST /api/invitations",
         "POST /api/invitations/{id}/regenerate",

@@ -7,17 +7,20 @@ import { requireAuth } from "../../../middleware/authContext";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { clearRefreshCookie, deliverTokenPair, readPresentedToken } from "../delivery";
+import { REVOCATION_REASONS, revokeAndDenylist } from "../services/revocation-service";
 import {
+  deregisterDevice,
   listActiveSessions,
-  revokeDeviceSessions,
-  revokeSession,
-  revokeSessionByToken,
+  listUserDevices,
+  resolveFamilyByToken,
   rotateRefreshToken,
 } from "../services/session-service";
 
 import type { Database } from "../../../db/client";
 import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { JtiDenylist } from "../denylist";
+import type { RevocationReason, RevocationScope } from "../services/revocation-service";
 import type { SessionTokenConfig } from "../services/session-service";
 import type { Context } from "hono";
 
@@ -85,8 +88,33 @@ const sessionListSchema = z.object({ sessions: z.array(sessionSchema) }).openapi
 const logoutResponseSchema = z.object({ ended: z.literal(true) }).openapi("LogoutResult");
 
 const revocationSchema = z
-  .object({ revoked: z.number().int().openapi({ description: "Tokens revoked." }) })
+  .object({
+    revoked: z.number().int().openapi({ description: "Tokens revoked." }),
+    denylisted: z
+      .number()
+      .int()
+      .openapi({
+        description:
+          "Access tokens written to the denylist. Never exceeds `revoked`; sessions predating the " +
+          "access-token tracking added in ST-072 have no identifier to deny.",
+      }),
+  })
   .openapi("RevocationResult");
+
+const deviceSchema = z
+  .object({
+    id: z.uuid(),
+    platform: z.string(),
+    last_seen: z.iso.datetime(),
+    created_at: z.iso.datetime(),
+    active_session_count: z
+      .number()
+      .int()
+      .openapi({ description: "Live sessions currently bound to this device." }),
+  })
+  .openapi("Device");
+
+const deviceListSchema = z.object({ devices: z.array(deviceSchema) }).openapi("DeviceList");
 
 // ---------------------------------------------------------------------------
 // Route definitions
@@ -201,7 +229,46 @@ const revokeDeviceRoute = createRoute({
   tags: ["Auth"],
   operationId: "revokeDeviceSessions",
   summary: "Terminate every session on a device",
-  description: "Revokes all live sessions bound to the named device. Use when a device is lost.",
+  description:
+    "Revokes all live sessions bound to the named device, leaving the device registered. Use " +
+    "`DELETE /api/auth/devices/{deviceId}` instead to also deregister the device itself.",
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ deviceId: z.uuid() }) },
+  responses: standardResponses(
+    { 200: { description: "How many tokens were revoked.", schema: revocationSchema } },
+    [400, 401, 429, 500],
+  ),
+});
+
+const listDevicesRoute = createRoute({
+  method: "get",
+  path: "/api/auth/devices",
+  tags: ["Auth"],
+  operationId: "listDevices",
+  summary: "List registered devices",
+  description:
+    "Every device registered to the authenticated user that has not been revoked, with the number " +
+    "of live sessions on each. Distinct from `/api/auth/sessions`, which lists logins rather than " +
+    "the hardware they happened on — one device may carry several sessions.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "The caller's registered devices.", schema: deviceListSchema } },
+    [401, 429, 500],
+  ),
+});
+
+const revokeDeviceEntirelyAudit = auditAction("logout", "refresh_tokens");
+
+const revokeDeviceEntirelyRoute = createRoute({
+  method: "delete",
+  path: "/api/auth/devices/{deviceId}",
+  tags: ["Auth"],
+  operationId: "revokeDevice",
+  summary: "Revoke a device entirely",
+  description:
+    "Terminates every session on the device and deregisters it, so it stops receiving push " +
+    "notifications as well as losing its logins. Answers 200 with `revoked: 0` when the device " +
+    "does not exist or belongs to someone else — the two are indistinguishable by design.",
   security: [{ bearerAuth: [] }],
   request: { params: z.object({ deviceId: z.uuid() }) },
   responses: standardResponses(
@@ -214,12 +281,41 @@ const revokeDeviceRoute = createRoute({
 // Handlers
 // ---------------------------------------------------------------------------
 
+/**
+ * @param denylist Redis-backed access-token denylist, or null when Redis is unconfigured. Threaded
+ *   in rather than constructed here so it is the *same* instance jwtAuth.ts checks against — two
+ *   clients over one Redis would work, but sharing makes the write-side and read-side of the
+ *   revocation boundary provably the same keyspace.
+ */
 export function sessionRoutes(
   database: Database,
   config: SessionTokenConfig,
+  denylist: JtiDenylist | null,
   eventSink?: SecurityEventSink | null,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  /** Shared teardown for the three authenticated revocation routes. */
+  const revokeForCaller = async (
+    c: Context<AppEnv>,
+    scope: RevocationScope,
+    reason: RevocationReason,
+  ): Promise<{ revoked: number; denylisted: number }> => {
+    const auth = requireAuth(c);
+    const result = await revokeAndDenylist({
+      database,
+      denylist,
+      tenant: tenantFrom(c),
+      targetUserId: auth.userId,
+      scope,
+      reason,
+      log: c.get("log"),
+      userAgent: c.req.header("User-Agent") ?? null,
+      clientIp: clientIpFrom(c),
+    });
+
+    return { revoked: result.revokedTokens, denylisted: result.denylistedJtis };
+  };
 
   // Mount the audit declarations defined alongside each route above. The revocation paths write
   // their own app.audit_logs rows from inside the service transaction — revocation and its audit
@@ -229,6 +325,7 @@ export function sessionRoutes(
   routes.use("/api/auth/logout", logoutAudit);
   routes.use("/api/auth/sessions/:sessionId", revokeSessionAudit);
   routes.use("/api/auth/devices/:deviceId/sessions", revokeDeviceAudit);
+  routes.use("/api/auth/devices/:deviceId", revokeDeviceEntirelyAudit);
 
   routes.openapi(refreshRoute, async (c) => {
     const presented = readPresentedToken(c, c.req.valid("json"));
@@ -254,9 +351,32 @@ export function sessionRoutes(
 
   routes.openapi(logoutRoute, async (c) => {
     const presented = readPresentedToken(c, c.req.valid("json"));
+    const requestId = c.get("requestId");
 
     if (presented !== undefined) {
-      await revokeSessionByToken(database, presented, c.get("requestId"));
+      // Resolved first, then revoked. This route is unauthenticated — it is listed in
+      // DEFAULT_PUBLIC_PATHS precisely because it is reached when the access token is already gone —
+      // so there is no auth context to take a tenant from, and the presented token is the only thing
+      // that can supply one.
+      const family = await resolveFamilyByToken(database, presented, requestId);
+
+      if (family !== undefined) {
+        // The jtis come from the revoked rows rather than from an Authorization header. That is not
+        // just convenient: a client logging out after its access token expired sends no bearer at
+        // all, and one logging out from a different tab may send a token from a different session.
+        // The family's own rows are the authoritative record of what this session minted.
+        await revokeAndDenylist({
+          database,
+          denylist,
+          tenant: { schoolId: family.schoolId, userId: family.userId, requestId },
+          targetUserId: family.userId,
+          scope: { kind: "family", familyId: family.familyId },
+          reason: REVOCATION_REASONS.LOGOUT_SINGLE,
+          log: c.get("log"),
+          userAgent: family.userAgent,
+          clientIp: family.ipAddress,
+        });
+      }
     }
 
     // Cleared unconditionally, including when no token was presented. A stale cookie the server
@@ -289,24 +409,64 @@ export function sessionRoutes(
     );
   });
 
+  routes.openapi(listDevicesRoute, async (c) => {
+    const auth = requireAuth(c);
+
+    const devices = await withTenantTx(database, tenantFrom(c), (tx) =>
+      listUserDevices(tx, auth.userId),
+    );
+
+    return c.json(
+      {
+        devices: devices.map((device) => ({
+          id: device.id,
+          platform: device.platform,
+          last_seen: device.lastSeen.toISOString(),
+          created_at: device.createdAt.toISOString(),
+          active_session_count: device.activeSessionCount,
+        })),
+      },
+      200,
+    );
+  });
+
   routes.openapi(revokeSessionRoute, async (c) => {
     const { sessionId } = c.req.valid("param");
 
-    const revoked = await withTenantTx(database, tenantFrom(c), (tx) =>
-      revokeSession(tx, sessionId),
+    return c.json(
+      await revokeForCaller(c, { kind: "session", sessionId }, REVOCATION_REASONS.REVOKE_SESSION),
+      200,
     );
-
-    return c.json({ revoked }, 200);
   });
 
   routes.openapi(revokeDeviceRoute, async (c) => {
     const { deviceId } = c.req.valid("param");
 
-    const revoked = await withTenantTx(database, tenantFrom(c), (tx) =>
-      revokeDeviceSessions(tx, deviceId),
+    return c.json(
+      await revokeForCaller(c, { kind: "device", deviceId }, REVOCATION_REASONS.REVOKE_DEVICE),
+      200,
+    );
+  });
+
+  routes.openapi(revokeDeviceEntirelyRoute, async (c) => {
+    const { deviceId } = c.req.valid("param");
+    const auth = requireAuth(c);
+
+    const result = await revokeForCaller(
+      c,
+      { kind: "device", deviceId },
+      REVOCATION_REASONS.REVOKE_DEVICE,
     );
 
-    return c.json({ revoked }, 200);
+    // Deregistration is separate from session teardown and runs after it. The order matters on
+    // failure: sessions revoked but the device still registered is a device that receives push and
+    // cannot log in, whereas the reverse is a device that is silent but still authenticated. The
+    // first is recoverable by retrying; the second is the security hole.
+    await withTenantTx(database, tenantFrom(c), (tx) =>
+      deregisterDevice(tx, auth.userId, deviceId),
+    );
+
+    return c.json(result, 200);
   });
 
   return routes;

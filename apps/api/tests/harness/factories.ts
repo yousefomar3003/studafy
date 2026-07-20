@@ -566,6 +566,8 @@ export interface RefreshSessionRecord {
   token: string;
   sessionId: string;
   familyId: string;
+  /** The access-token id recorded on the row (ST-072). Null when the seed suppressed it. */
+  accessJti: string | null;
 }
 
 export interface RefreshSessionOverrides {
@@ -590,6 +592,16 @@ export interface RefreshSessionOverrides {
   revokedAt?: Date | null;
   userAgent?: string | null;
   ipAddress?: string | null;
+  /**
+   * The access-token id this session last minted (ST-072). Defaults to a fresh uuid.
+   *
+   * Pass null to seed a row from before migration 000030 — one whose access token was issued when
+   * nothing recorded the jti. Revocation must still revoke such a session in Postgres while having
+   * nothing to denylist, and that asymmetry is worth a test.
+   */
+  accessJti?: string | null;
+  /** Defaults to 15 minutes out, matching the JWT_ACCESS_TTL_SECONDS default. Past dates are skipped by the denylist. */
+  accessExpiresAt?: Date;
 }
 
 /**
@@ -617,6 +629,14 @@ export async function createRefreshSession(
   const issuedAt = overrides?.issuedAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
   const expiresAt = overrides?.expiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const channel = overrides?.channel ?? "web";
+  // `undefined` means "give me one"; an explicit null means "seed a pre-000030 row". The two are
+  // distinguished with a property check rather than ??, which would collapse them.
+  const accessJti: string | null =
+    overrides !== undefined && "accessJti" in overrides
+      ? (overrides.accessJti ?? null)
+      : crypto.randomUUID();
+  const accessExpiresAt =
+    accessJti === null ? null : (overrides?.accessExpiresAt ?? new Date(Date.now() + 900 * 1000));
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
@@ -625,7 +645,8 @@ export async function createRefreshSession(
       INSERT INTO app.refresh_tokens (
         school_id, user_id, token_hash, family_id, parent_token_id,
         device_id, channel, user_agent, ip_address,
-        issued_at, expires_at, rotated_at, revoked_at
+        issued_at, expires_at, rotated_at, revoked_at,
+        access_jti, access_expires_at
       ) VALUES (
         ${schoolId}, ${userId}, ${minted.secretHash}, ${familyId},
         ${overrides?.parentTokenId ?? null},
@@ -636,11 +657,13 @@ export async function createRefreshSession(
         ${issuedAt},
         ${expiresAt},
         ${overrides?.rotatedAt ?? null},
-        ${overrides?.revokedAt ?? null}
+        ${overrides?.revokedAt ?? null},
+        ${accessJti},
+        ${accessExpiresAt}
       )
       RETURNING id, family_id
     `;
 
-    return { token: minted.token, sessionId: row!.id, familyId: row!.family_id };
+    return { token: minted.token, sessionId: row!.id, familyId: row!.family_id, accessJti };
   });
 }

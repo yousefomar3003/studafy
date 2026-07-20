@@ -28,22 +28,62 @@ interface StubRedis {
   writes: { key: string; value: string; mode: string; ttl: number }[];
   /** Keys that EXISTS should report as present. */
   present: Set<string>;
+  /** How many times a pipeline was opened. One batch must mean one round trip. */
+  pipelines: number;
+  /** Make the next pipeline exec report a per-command failure at this index. */
+  failPipelineAt: (index: number) => void;
 }
 
 function createStubRedis(): StubRedis {
   const writes: StubRedis["writes"] = [];
   const present = new Set<string>();
+  const stub: Partial<StubRedis> = { pipelines: 0 };
+  let failIndex: number | null = null;
+
+  const record = (key: string, value: string, mode: string, ttl: number): void => {
+    writes.push({ key, value, mode, ttl });
+    present.add(key);
+  };
 
   const client = {
     exists: (key: string) => Promise.resolve(present.has(key) ? 1 : 0),
     set: (key: string, value: string, mode: string, ttl: number) => {
-      writes.push({ key, value, mode, ttl });
-      present.add(key);
+      record(key, value, mode, ttl);
       return Promise.resolve("OK");
+    },
+    // ioredis's pipeline is a chainable command buffer flushed by exec(), which resolves to one
+    // [error, result] tuple per queued command rather than rejecting on failure. Modelling that
+    // shape is the point of this stub — revokeMany's error handling reads those tuples.
+    pipeline: () => {
+      stub.pipelines = (stub.pipelines ?? 0) + 1;
+      const queued: { key: string; value: string; mode: string; ttl: number }[] = [];
+      const chain = {
+        set(key: string, value: string, mode: string, ttl: number) {
+          queued.push({ key, value, mode, ttl });
+          return chain;
+        },
+        exec() {
+          return Promise.resolve(
+            queued.map((command, index) => {
+              if (failIndex === index) return [new Error("READONLY"), null];
+              record(command.key, command.value, command.mode, command.ttl);
+              return [null, "OK"];
+            }),
+          );
+        },
+      };
+      return chain;
     },
   } as unknown as RedisClient;
 
-  return { client, writes, present };
+  return Object.assign(stub, {
+    client,
+    writes,
+    present,
+    failPipelineAt: (index: number) => {
+      failIndex = index;
+    },
+  }) as StubRedis;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,6 +139,97 @@ describe("createJtiDenylist", () => {
 
     expect(await denylist.isRevoked(JTI)).toBe(true);
     expect(await denylist.isRevoked("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Batch revocation (ST-072)
+// ---------------------------------------------------------------------------
+
+describe("revokeMany", () => {
+  const NOW_MS = 1_700_000_000_000;
+  const NOW_S = Math.floor(NOW_MS / 1000);
+  const jti = (n: number): string => `aaaaaaaa-aaaa-4aaa-8aaa-00000000000${n}`;
+
+  it("writes the whole batch in a single round trip", async () => {
+    const redis = createStubRedis();
+    const denylist = createJtiDenylist(redis.client, { now: () => NOW_MS });
+
+    const written = await denylist.revokeMany([
+      { jti: jti(1), expUnixSeconds: NOW_S + 300 },
+      { jti: jti(2), expUnixSeconds: NOW_S + 600 },
+      { jti: jti(3), expUnixSeconds: NOW_S + 900 },
+    ]);
+
+    // One pipeline, not three SETs. This is the property that keeps a global logout on a
+    // many-session account inside the propagation budget: the cost is one network trip regardless
+    // of N, since each command is already O(1) server-side.
+    expect(written).toBe(3);
+    expect(redis.pipelines).toBe(1);
+    expect(redis.writes).toHaveLength(3);
+    expect(redis.writes.map((w) => w.key)).toEqual([
+      jtiDenylistKey(jti(1)),
+      jtiDenylistKey(jti(2)),
+      jtiDenylistKey(jti(3)),
+    ]);
+  });
+
+  it("gives each entry its own remaining lifetime", async () => {
+    const redis = createStubRedis();
+    const denylist = createJtiDenylist(redis.client, { now: () => NOW_MS });
+
+    await denylist.revokeMany([
+      { jti: jti(1), expUnixSeconds: NOW_S + 120 },
+      { jti: jti(2), expUnixSeconds: NOW_S + 840 },
+    ]);
+
+    // Tokens in one family were minted at different times, so a shared TTL would be wrong for all
+    // but one of them.
+    expect(redis.writes.map((w) => w.ttl)).toEqual([120, 840]);
+  });
+
+  it("skips expired entries without dropping the live ones", async () => {
+    const redis = createStubRedis();
+    const denylist = createJtiDenylist(redis.client, { now: () => NOW_MS });
+
+    const written = await denylist.revokeMany([
+      { jti: jti(1), expUnixSeconds: NOW_S - 5 },
+      { jti: jti(2), expUnixSeconds: NOW_S + 300 },
+      { jti: jti(3), expUnixSeconds: NOW_S },
+    ]);
+
+    // A batch assembled from a revocation query legitimately contains tokens that aged out between
+    // the UPDATE and this call. Exactly-now counts as expired: Redis rejects a zero EX.
+    expect(written).toBe(1);
+    expect(redis.writes).toHaveLength(1);
+    expect(redis.writes[0].key).toBe(jtiDenylistKey(jti(2)));
+  });
+
+  it("makes no round trip at all when nothing survives the filter", async () => {
+    const redis = createStubRedis();
+    const denylist = createJtiDenylist(redis.client, { now: () => NOW_MS });
+
+    const written = await denylist.revokeMany([{ jti: jti(1), expUnixSeconds: NOW_S - 60 }]);
+
+    expect(written).toBe(0);
+    expect(redis.pipelines).toBe(0);
+  });
+
+  it("surfaces a per-command failure rather than reporting success", async () => {
+    const redis = createStubRedis();
+    const denylist = createJtiDenylist(redis.client, { now: () => NOW_MS });
+    redis.failPipelineAt(1);
+
+    // ioredis reports per-command errors inside the results array instead of rejecting, so a
+    // pipeline that "succeeded" can still have failed. Swallowing that would tell a caller their
+    // stolen token was denylisted when it was not — the one outcome this boundary must never
+    // produce silently.
+    await expect(
+      denylist.revokeMany([
+        { jti: jti(1), expUnixSeconds: NOW_S + 300 },
+        { jti: jti(2), expUnixSeconds: NOW_S + 300 },
+      ]),
+    ).rejects.toThrow("READONLY");
   });
 });
 

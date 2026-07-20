@@ -1,3 +1,5 @@
+import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
+
 import type { Logger } from "../logger";
 import type { MiddlewareHandler } from "hono";
 
@@ -28,7 +30,7 @@ export function loggerMiddleware({
   excludePaths = ["/healthz", "/readyz"],
 }: LoggerMiddlewareOptions): MiddlewareHandler {
   return async (c, next) => {
-    const path = c.req.path;
+    const path = sanitizeSensitivePath(c.req.path);
 
     // Skip logging for excluded paths (health checks, etc.)
     if (excludePaths.includes(path)) {

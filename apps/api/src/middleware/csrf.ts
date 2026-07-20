@@ -30,6 +30,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { getSecurityConfig } from "../config/security";
 import { generateCsrfToken, validateCsrfToken } from "../lib/security/csrf";
+import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
 
 import { extractClientIp } from "./rateLimiter";
 
@@ -162,12 +163,13 @@ function reject(
   method: string,
   eventSink?: SecurityEventSink,
 ): never {
+  const safePath = sanitizeSensitivePath(path);
   const clientIp = extractClientIp(c);
   const userAgent = c.req.header("User-Agent");
 
   c.get("log")?.warn(
     {
-      path,
+      path: safePath,
       method,
       reason,
       client_ip: clientIp,
@@ -181,7 +183,7 @@ function reject(
   // token values, which would hand a database reader a working forgery.
   eventSink?.record({
     eventType: CSRF_EVENT_TYPE[reason],
-    path,
+    path: safePath,
     method,
     clientIp,
     userAgent,

@@ -9,6 +9,13 @@ export const ERROR_CODES = {
   AUTH_TOKEN_INVALID: "AUTH_TOKEN_INVALID",
   AUTH_SESSION_NOT_FOUND: "AUTH_SESSION_NOT_FOUND",
 
+  // Invitation verification — public invitation lifecycle resolution.
+  INVITATION_INVALID: "INVITATION_INVALID",
+  EXPIRED: "EXPIRED",
+  REVOKED: "REVOKED",
+  CONSUMED: "CONSUMED",
+  SCHOOL_SUSPENDED: "SCHOOL_SUSPENDED",
+
   // Authorization — caller is known, but not permitted.
   AUTHZ_FORBIDDEN: "AUTHZ_FORBIDDEN",
   AUTHZ_ROLE_NOT_FOUND: "AUTHZ_ROLE_NOT_FOUND",
