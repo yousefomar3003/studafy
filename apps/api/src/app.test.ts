@@ -40,11 +40,11 @@ describe("rate limiter coverage", () => {
 
   test("ROUTE_CLASS_MAP values are valid route classes with budgets", () => {
     for (const [, cls] of Object.entries(ROUTE_CLASS_MAP)) {
-      expect(["auth", "ai", "default"]).toContain(cls);
+      expect(["auth", "auth-strict", "ai", "default"]).toContain(cls);
     }
   });
 
   test("DEFAULT_ROUTE_CLASS has a defined budget", () => {
-    expect(["auth", "ai", "default"]).toContain(DEFAULT_ROUTE_CLASS);
+    expect(["auth", "auth-strict", "ai", "default"]).toContain(DEFAULT_ROUTE_CLASS);
   });
 });

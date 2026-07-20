@@ -33,9 +33,21 @@ export interface RateLimitBudget {
   windowSeconds: number;
 }
 
-export type RouteClass = "auth" | "ai" | "default";
+export type RouteClass = "auth" | "auth-strict" | "ai" | "default";
 
+/**
+ * Per-class token-bucket budgets.
+ *
+ * - `auth-strict`: Unauthenticated endpoints with brute-force or enumeration risk.
+ *   5 tokens burst, ~5 req/min sustained. Applies to `/api/auth/refresh` (token rotation)
+ *   and `/api/auth/logout` (session termination).
+ * - `auth`: Authenticated admin-mutating endpoints (invitations). 10 tokens burst,
+ *   ~10 req/min sustained.
+ * - `ai`: Metered tenant+user scoped (existing).
+ * - `default`: Generous catch-all for public/read endpoints (existing).
+ */
 export const RATE_LIMIT_BUDGETS: Record<RouteClass, RateLimitBudget> = {
+  "auth-strict": { maxTokens: 5, refillRate: 0.08, windowSeconds: 60 },
   auth: { maxTokens: 10, refillRate: 0.17, windowSeconds: 60 },
   ai: { maxTokens: 30, refillRate: 0.5, windowSeconds: 60 },
   default: { maxTokens: 100, refillRate: 1.67, windowSeconds: 60 },
@@ -56,12 +68,16 @@ export const RATE_LIMIT_BUDGETS: Record<RouteClass, RateLimitBudget> = {
  * Unregistered routes fall through to {@link DEFAULT_ROUTE_CLASS}.
  */
 export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
-  // Auth (pre-authentication, IP-scoped, strict limits)
-  // "/api/auth/login": "auth",
-  // "/api/auth/register": "auth",
-  // "/api/auth/forgot-password": "auth",
-  // AI (metered, tenant+user scoped)
-  // "/api/ai/*": "ai",
+  // Auth — unauthenticated, IP-scoped, brute-force targets (strictest budget)
+  "/api/auth/refresh": "auth-strict",
+  "/api/auth/logout": "auth-strict",
+  // Auth — authenticated, IP-scoped, sensitive mutations
+  "/api/auth/sessions": "auth",
+  "/api/auth/sessions/*": "auth",
+  "/api/auth/devices/*": "auth",
+  // Invitations — authenticated, IP-scoped
+  "/api/invitations": "auth",
+  "/api/invitations/*": "auth",
 };
 
 /**
@@ -120,8 +136,8 @@ export function buildRateLimitKey(routeClass: RouteClass, identity: string): str
   const budget = RATE_LIMIT_BUDGETS[routeClass];
   const window = Math.floor(Date.now() / 1000 / budget.windowSeconds);
 
-  if (routeClass === "auth") {
-    return `rl:auth:${identity}:${window}`;
+  if (routeClass === "auth" || routeClass === "auth-strict") {
+    return `rl:${routeClass}:${identity}:${window}`;
   }
 
   return `rl:sch:${identity}:${routeClass}:${window}`;

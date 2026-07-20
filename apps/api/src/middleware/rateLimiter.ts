@@ -1,8 +1,10 @@
 import { HTTPException } from "hono/http-exception";
 
 import { RATE_LIMIT_BUDGETS, buildRateLimitKey, resolveRouteClass } from "../config/rateLimits";
+import { emitRateLimitBlock } from "../modules/auth/auth-anomaly-events";
 
 import type { RouteClass } from "../config/rateLimits";
+import type { SecurityEventSink } from "../lib/security/securityEventSink";
 import type { RedisClient } from "../redis";
 import type { AppEnv } from "./requestId";
 import type { MiddlewareHandler } from "hono";
@@ -47,6 +49,8 @@ export interface RateLimiterOptions {
   budget?: { maxTokens: number; refillRate: number; windowSeconds: number };
   /** Override the clock for deterministic testing. Defaults to `Date.now()`. */
   now?: () => number;
+  /** Where auth rate-limit blocks are persisted. Omitted in tests. */
+  eventSink?: SecurityEventSink | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +93,7 @@ function buildIdentity(
   auth: { schoolId: string; userId: string } | undefined,
   clientIp: string,
 ): string {
-  if (routeClass === "auth") return clientIp;
+  if (routeClass === "auth" || routeClass === "auth-strict") return clientIp;
   if (auth) return `${auth.schoolId}:${auth.userId}`;
   return clientIp;
 }
@@ -167,6 +171,7 @@ export function rateLimiterMiddleware({
   routeClass: routeClassOverride,
   budget: budgetOverride,
   now: nowFn = () => Date.now(),
+  eventSink,
 }: RateLimiterOptions): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     if (!redis) {
@@ -245,6 +250,19 @@ export function rateLimiterMiddleware({
 
     if (!allowed) {
       c.header("Retry-After", String(retryAfter));
+
+      // Emit anomaly telemetry for auth endpoints so monitoring can count and alert.
+      // Non-auth routes are not recorded here: a 429 on /api/ai is operational, not adversarial.
+      if (routeClass === "auth" || routeClass === "auth-strict") {
+        emitRateLimitBlock(c.get("log"), eventSink, {
+          routeClass,
+          path: c.req.path,
+          clientIp: identity,
+          requestId: c.get("requestId"),
+          userAgent: c.req.header("User-Agent"),
+        });
+      }
+
       throw new HTTPException(429);
     }
 

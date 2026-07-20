@@ -16,6 +16,7 @@ import {
 } from "../services/session-service";
 
 import type { Database } from "../../../db/client";
+import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { SessionTokenConfig } from "../services/session-service";
 import type { Context } from "hono";
@@ -213,7 +214,11 @@ const revokeDeviceRoute = createRoute({
 // Handlers
 // ---------------------------------------------------------------------------
 
-export function sessionRoutes(database: Database, config: SessionTokenConfig): OpenAPIHono<AppEnv> {
+export function sessionRoutes(
+  database: Database,
+  config: SessionTokenConfig,
+  eventSink?: SecurityEventSink | null,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // Mount the audit declarations defined alongside each route above. The revocation paths write
@@ -241,6 +246,7 @@ export function sessionRoutes(database: Database, config: SessionTokenConfig): O
       requestId: c.get("requestId"),
       device: deviceContextFrom(c),
       log: c.get("log"),
+      eventSink,
     });
 
     return c.json(deliverTokenPair(c, issued), 200);

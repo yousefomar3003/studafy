@@ -56,4 +56,10 @@ export {
   type TokenResponseBody,
 } from "./delivery";
 export { sessionRoutes } from "./routes/session-routes";
+export {
+  emitRateLimitBlock,
+  emitTokenReuseDetected,
+  type RateLimitBlockEvent,
+  type TokenReuseEvent,
+} from "./auth-anomaly-events";
 export type { AccessTokenClaims, JwtPayload, SignAccessTokenParams } from "./jwt/types";
