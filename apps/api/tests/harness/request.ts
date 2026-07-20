@@ -29,6 +29,14 @@ export interface TestAuthContext {
   channel?: AuthChannel;
   /** Seconds until the minted token expires. Negative values produce an already-expired token. */
   ttlSeconds?: number;
+  /**
+   * The `jti` to stamp on the token. Defaults to a fresh uuid.
+   *
+   * Set it to pair a token with a seeded `app.refresh_tokens` row carrying the same `access_jti`,
+   * which is the invariant issueTokenPair maintains in production. The revocation suite needs that
+   * pairing to assert a *specific* token stops working after its session is torn down.
+   */
+  jti?: string;
 }
 
 export interface TestAppOptions {
@@ -99,6 +107,7 @@ export function mintTestToken(keyStore: KeyStore, auth: TestAuthContext): Promis
       issuer: TEST_JWT_ISSUER,
       audience: TEST_JWT_AUDIENCE,
       ttlSeconds: auth.ttlSeconds ?? 900,
+      ...(auth.jti !== undefined ? { jti: auth.jti } : {}),
     },
   );
 }

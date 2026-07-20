@@ -57,5 +57,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "User invitation management. Authenticated. Invitations are bound to an email and role, " +
         "carry a one-time-use token, and emit an event for email dispatch.",
     },
+    {
+      name: "Admin",
+      description:
+        "Administrative operations acting on a user other than the caller. Authenticated and " +
+        "additionally gated on a permission from the role matrix, so a valid token is necessary " +
+        "but not sufficient. Every operation is tenant-scoped: a target in another school is " +
+        "indistinguishable from one that does not exist.",
+    },
   ],
 };

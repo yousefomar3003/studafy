@@ -60,6 +60,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
   "DELETE /api/auth/devices/{deviceId}/sessions",
+  // Device revocation (ST-072). Same contract as the ST-071 routes above: the audit row is written
+  // from inside the revoking transaction in services/revocation-service.ts, so a teardown and its
+  // record commit or roll back together. The two admin paths act on a user other than the caller and
+  // are additionally gated on PERMISSIONS.USER_SUSPEND by middleware/authz.ts.
+  "DELETE /api/auth/devices/{deviceId}",
+  "DELETE /api/admin/users/{userId}/devices",
+  "DELETE /api/admin/users/{userId}/devices/{deviceId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {

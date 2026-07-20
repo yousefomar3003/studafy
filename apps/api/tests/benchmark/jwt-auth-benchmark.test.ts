@@ -60,6 +60,7 @@ function percentile(sorted: readonly number[], fraction: number): number {
 const denylist: JtiDenylist = {
   isRevoked: () => Promise.resolve(false),
   revoke: () => Promise.resolve(),
+  revokeMany: () => Promise.resolve(0),
 };
 
 /**
