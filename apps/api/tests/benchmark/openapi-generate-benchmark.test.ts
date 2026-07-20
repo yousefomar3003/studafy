@@ -51,6 +51,8 @@ const EXPECTED_PATHS = [
   "/readyz",
   "/erpnext/webhooks",
   "/api/invitations",
+  "/api/invitations/{id}/regenerate",
+  "/api/invitations/{id}/revoke",
   "/api/auth/refresh",
   "/api/auth/logout",
   "/api/auth/sessions",

@@ -97,6 +97,8 @@ describe("structure", () => {
         "/api/auth/sessions",
         "/api/auth/sessions/{sessionId}",
         "/api/invitations",
+        "/api/invitations/{id}/regenerate",
+        "/api/invitations/{id}/revoke",
         "/erpnext/webhooks",
         "/healthz",
         "/readyz",
@@ -245,10 +247,12 @@ describe("security", () => {
 
     expect(authenticated).toEqual(
       [
-        "POST /api/invitations",
-        "GET /api/auth/sessions",
-        "DELETE /api/auth/sessions/{sessionId}",
         "DELETE /api/auth/devices/{deviceId}/sessions",
+        "DELETE /api/auth/sessions/{sessionId}",
+        "GET /api/auth/sessions",
+        "POST /api/invitations",
+        "POST /api/invitations/{id}/regenerate",
+        "POST /api/invitations/{id}/revoke",
       ].sort(),
     );
   });

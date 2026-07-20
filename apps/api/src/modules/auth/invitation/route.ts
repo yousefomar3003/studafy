@@ -7,7 +7,13 @@ import { requireAuth } from "../../../middleware/authContext";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 
-import { createInvitationBodySchema, createInvitationResponseSchema } from "./schemas";
+import {
+  createInvitationBodySchema,
+  createInvitationResponseSchema,
+  invitationIdPathParams,
+  revokeInvitationResponseSchema,
+  regenerateInvitationResponseSchema,
+} from "./schemas";
 import { createInvitationService } from "./service";
 
 import type { Database } from "../../../db";
@@ -47,6 +53,58 @@ const createInvitationRoute = createRoute({
   ),
 });
 
+const revokeInvitationRoute = createRoute({
+  method: "post",
+  path: "/api/invitations/{id}/revoke",
+  tags: ["Invitations"],
+  operationId: "revokeInvitation",
+  summary: "Revoke a pending invitation",
+  description:
+    "Immediately invalidates a pending invitation by setting revoked_at. " +
+    "The old token stops working on the next acceptance attempt. " +
+    "An `invitation.revoked` event is emitted into the outbox.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: invitationIdPathParams,
+  },
+  responses: standardResponses(
+    {
+      200: {
+        description: "Invitation revoked.",
+        schema: revokeInvitationResponseSchema,
+      },
+    },
+    [401, 403, 404, 429, 500],
+  ),
+});
+
+const regenerateInvitationRoute = createRoute({
+  method: "post",
+  path: "/api/invitations/{id}/regenerate",
+  tags: ["Invitations"],
+  operationId: "regenerateInvitation",
+  summary: "Regenerate a pending invitation",
+  description:
+    "Atomically revokes the current invitation and issues a new one with a fresh token. " +
+    "The old token stops working immediately. The new raw token is included in the response " +
+    "and must be delivered to the invitee. " +
+    "Both `invitation.revoked` and `invitation.sent` events are emitted.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: invitationIdPathParams,
+  },
+  responses: standardResponses(
+    {
+      201: {
+        description:
+          "Old invitation revoked, new invitation created. The raw token is included in this response only.",
+        schema: regenerateInvitationResponseSchema,
+      },
+    },
+    [401, 403, 404, 429, 500],
+  ),
+});
+
 // ---------------------------------------------------------------------------
 // Route group factory
 // ---------------------------------------------------------------------------
@@ -61,6 +119,8 @@ export function invitationRoutes(db: Database, _logger: Logger): OpenAPIHono<App
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use("/api/invitations", auditAction("insert", "invitations"));
+  routes.use("/api/invitations/{id}/revoke", auditAction("update", "invitations"));
+  routes.use("/api/invitations/{id}/regenerate", auditAction("update", "invitations"));
 
   routes.openapi(createInvitationRoute, async (c) => {
     const auth = requireAuth(c);
@@ -106,6 +166,75 @@ export function invitationRoutes(db: Database, _logger: Logger): OpenAPIHono<App
           created_at: new Date().toISOString(),
         },
         token: result.token,
+      },
+      201,
+    );
+  });
+
+  routes.openapi(revokeInvitationRoute, async (c) => {
+    const auth = requireAuth(c);
+    const log = c.get("log");
+
+    if (!auth.roles.includes("SUPER_ADMIN") && !auth.roles.includes("ORG_ADMIN")) {
+      throw new HTTPException(403, {
+        message: "You do not have permission to revoke invitations",
+      });
+    }
+
+    const { id } = c.req.valid("param");
+
+    const result = await withTenantTx(
+      db,
+      { schoolId: auth.schoolId, userId: auth.userId },
+      async (tx) => {
+        const service = createInvitationService();
+        return service.revoke(tx, id, log);
+      },
+    );
+
+    return c.json(
+      {
+        id: result.invitationId,
+        email: result.email,
+        role: result.role,
+        revoked_at: result.revokedAt.toISOString(),
+      },
+      200,
+    );
+  });
+
+  routes.openapi(regenerateInvitationRoute, async (c) => {
+    const auth = requireAuth(c);
+    const log = c.get("log");
+
+    if (!auth.roles.includes("SUPER_ADMIN") && !auth.roles.includes("ORG_ADMIN")) {
+      throw new HTTPException(403, {
+        message: "You do not have permission to regenerate invitations",
+      });
+    }
+
+    const { id } = c.req.valid("param");
+
+    const result = await withTenantTx(
+      db,
+      { schoolId: auth.schoolId, userId: auth.userId },
+      async (tx) => {
+        const service = createInvitationService({ defaultExpiryDays: 7 });
+        return service.regenerate(tx, id, log);
+      },
+    );
+
+    return c.json(
+      {
+        invitation: {
+          id: result.invitationId,
+          email: result.email,
+          role: result.role,
+          expires_at: result.expiresAt.toISOString(),
+          created_at: new Date().toISOString(),
+        },
+        token: result.token,
+        revoked_invitation_id: result.revokedInvitationId,
       },
       201,
     );

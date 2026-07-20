@@ -151,6 +151,11 @@ describe("emit", () => {
           expiresAt: new Date().toISOString(),
           invitedByUserId: uid,
         },
+        [DOMAIN_EVENTS.INVITATION_REVOKED]: {
+          invitationId: uid,
+          email: "test@example.com",
+          role: "STUDENT",
+        },
         [DOMAIN_EVENTS.ORGANIZATION_CREATED]: { organizationId: uid },
         [DOMAIN_EVENTS.ORGANIZATION_UPDATED]: { organizationId: uid },
         [DOMAIN_EVENTS.COURSE_CREATED]: { courseId: uid },
