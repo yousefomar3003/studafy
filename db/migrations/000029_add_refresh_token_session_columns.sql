@@ -51,12 +51,16 @@ SET ROLE studafy_admin;
 -- Tenant context for the DDL below
 -- ---------------------------------------------------------------------------
 --
--- RLS binds a table's owner only when FORCE is set, so clearing it for the length of this
--- transaction lets studafy_admin -- which owns the table and is running this migration -- perform
--- the DDL below without any policy being consulted. Without this the very first ALTER raises
--- 42704, "unrecognized configuration parameter app.school_id", because tenant_isolation's USING
--- clause is evaluated by the verification scans that adding a NOT NULL column and a foreign key
--- perform, and no migration session has ever set that GUC.
+-- NO FORCE ROW LEVEL SECURITY is insufficient on PG16: even without FORCE, RLS remains enabled
+-- and the tenant_isolation policy's USING clause is still evaluated during the verification scans
+-- that adding a NOT NULL column and a foreign key perform. That raises 42704 "unrecognized
+-- configuration parameter app.school_id" because no migration session has ever set that GUC.
+--
+-- DISABLE ROW LEVEL SECURITY clears both the enabled and forced flags atomically, suppressing all
+-- policy evaluation for the duration of this transaction. This is safe because ALTER TABLE takes
+-- ACCESS EXCLUSIVE, so no other session can read the table through the window in which it is
+-- disabled; and the migration is transactional, so a failure anywhere rolls the flag back with
+-- everything else.
 --
 -- Setting the GUC instead is not sufficient. It would make current_setting resolve, but to a value
 -- matching no school -- so any scan it enables reads an RLS-filtered *subset*, which is precisely
@@ -66,10 +70,8 @@ SET ROLE studafy_admin;
 -- Every earlier migration avoided the problem by never scanning a FORCE-RLS table: 000026 adds a
 -- nullable column and 000020 adds a UNIQUE constraint, an index build that reads the heap directly.
 --
--- FORCE is restored at the end of this file and asserted. The migration is transactional, so a
--- failure anywhere rolls the flag back with everything else; and ALTER TABLE takes ACCESS EXCLUSIVE,
--- so no other session can read the table through the window in which it is cleared.
-ALTER TABLE app.refresh_tokens NO FORCE ROW LEVEL SECURITY;
+-- RLS is re-enabled and FORCE is restored at the end of this file and asserted.
+ALTER TABLE app.refresh_tokens DISABLE ROW LEVEL SECURITY;
 
 -- Now that policies are out of the way, this count is the real one. The NOT NULL column below is
 -- added with no backfill, which is only sound because app.refresh_tokens has never had a writer --
@@ -183,21 +185,28 @@ CREATE POLICY refresh_tokens_owner ON app.refresh_tokens
   USING (user_id = app.current_user_id())
   WITH CHECK (user_id = app.current_user_id());
 
--- Restore what NO FORCE cleared at the top. This is the single most important line in the file:
--- leaving FORCE off would exempt studafy_admin from tenant_isolation permanently, which is the exact
--- hole 000006 exists to close, and nothing in the application would misbehave to reveal it. The
--- assertion after it is not ceremony -- it is what turns "we remembered" into something the
--- migration proves before it commits.
+-- Re-enable RLS (DISABLEd at the top) and restore FORCE. This is the single most important pair
+-- of lines in the file: leaving RLS disabled or FORCE off would exempt studafy_admin from
+-- tenant_isolation permanently, which is the exact hole 000006 exists to close, and nothing in the
+-- application would misbehave to reveal it. The assertion after them is not ceremony -- it is what
+-- turns "we remembered" into something the migration proves before it commits.
+ALTER TABLE app.refresh_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.refresh_tokens FORCE ROW LEVEL SECURITY;
 
 DO $assert_forced$
 DECLARE
-  forced boolean;
+  rls_enabled boolean;
+  rls_forced boolean;
 BEGIN
-  SELECT relforcerowsecurity INTO forced
+  SELECT relrowsecurity, relforcerowsecurity INTO rls_enabled, rls_forced
   FROM pg_catalog.pg_class WHERE oid = 'app.refresh_tokens'::regclass;
 
-  IF NOT forced THEN
+  IF NOT rls_enabled THEN
+    RAISE EXCEPTION 'app.refresh_tokens must leave this migration with ROW LEVEL SECURITY enabled'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT rls_forced THEN
     RAISE EXCEPTION 'app.refresh_tokens must leave this migration with FORCE ROW LEVEL SECURITY set'
       USING ERRCODE = '42501';
   END IF;
