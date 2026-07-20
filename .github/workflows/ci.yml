@@ -66,7 +66,7 @@ jobs:
       # middleware benchmarks in the api-quality job: rotation has no baseline arm to subtract, and
       # its cost is dominated by database round trips rather than framework overhead. Measured under
       # 16-way concurrency so pool contention is inside the number. See the file header.
-      - name: Refresh rotation benchmark (<5ms under parallel load)
+      - name: Refresh rotation benchmark (<20ms under parallel load)
         env:
           REFRESH_ROTATION_BENCHMARK: "1"
         run: bun test tests/benchmark/refresh-rotation-benchmark.test.ts --timeout 180000

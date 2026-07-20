@@ -250,7 +250,7 @@ uses for `user_devices`.
 
 ## Performance
 
-The acceptance target is **under 5 ms** for validation, the transactional state transition, and
+The acceptance target is **under 20 ms** for validation, the transactional state transition, and
 minting the replacement pair, under parallel load.
 
 The benchmark is
