@@ -266,9 +266,9 @@ overhead, so it follows the precedent of the absolute budgets in `packages/db/te
 [`docs/database/attendance.md`](../database/attendance.md)).
 
 Covered: token parse, one SHA-256 digest, the single lock-protected tenant transaction that reads the
-session and roles and atomically inserts the child/consumes the parent, and the concurrent RSA
-signature that mints the access token. Excluded: client network RTT, a property of deployment
-topology.
+session and roles, signs the access token before mutation, and atomically inserts the child/consumes
+the parent through a write-and-commit pipeline. Excluded: client network RTT, a property of
+deployment topology.
 
 Reproduce:
 

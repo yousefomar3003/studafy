@@ -22,7 +22,7 @@ import { randomUUID } from "node:crypto";
 
 import { ERROR_CODES } from "@studafy/constants";
 
-import { withTenantTx } from "../../../db/tenant-tx";
+import { openTenantTx, withTenantTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { AuthException } from "../../../middleware/jwtAuth";
 import { signAccessToken } from "../jwt/sign";
@@ -221,52 +221,59 @@ export async function rotateRefreshToken(
 
   // The row lock is the concurrency boundary. A second request for the same token waits here, then
   // reads the version consumed by the winner and enters the reuse branch in this same transaction.
-  const outcome = await withTenantTx(database, tenant, async (tx): Promise<RotationOutcome> => {
-    const session = await loadSessionForRotation(tx, hashSecret(parsed.secret));
+  const transaction = await openTenantTx(database, tenant, (tx) =>
+    loadSessionForRotation(tx, hashSecret(parsed.secret)),
+  );
+  let outcome: RotationOutcome;
+  let committed = false;
 
-    // Finding a row is the secret verification: the digest matched inside both tenant and user RLS
-    // fences. Wrong locators and wrong secrets are indistinguishable from an absent session.
-    if (!session) return { kind: "not_found" };
+  try {
+    const tx = transaction.tx;
+    const session = transaction.initial;
+    outcome = await (async (): Promise<RotationOutcome> => {
+      // Finding a row is the secret verification: the digest matched inside both tenant and user RLS
+      // fences. Wrong locators and wrong secrets are indistinguishable from an absent session.
+      if (!session) return { kind: "not_found" };
 
-    // Reuse is checked before expiry. The revocation and audit record must commit, so the public
-    // exception is raised only after this transaction returns successfully.
-    if (session.rotated_at !== null || session.revoked_at !== null) {
-      return { kind: "reuse", event: await revokeReusedSession(tx, session) };
-    }
+      // Reuse is checked before expiry. The revocation and audit record must commit, so the public
+      // exception is raised only after this transaction returns successfully.
+      if (session.rotated_at !== null || session.revoked_at !== null) {
+        return { kind: "reuse", event: await revokeReusedSession(tx, session) };
+      }
 
-    if (session.expires_at.getTime() <= Date.now()) return { kind: "expired" };
+      if (session.expires_at.getTime() <= Date.now()) return { kind: "expired" };
 
-    if (session.roles.length === 0) {
-      throw new AuthException(
-        ERROR_CODES.AUTH_SESSION_NOT_FOUND,
-        "User has no roles in this tenant",
+      if (session.roles.length === 0) {
+        throw new AuthException(
+          ERROR_CODES.AUTH_SESSION_NOT_FOUND,
+          "User has no roles in this tenant",
+        );
+      }
+
+      const minted = mintOpaqueToken(session.school_id, session.user_id);
+      const childId = randomUUID();
+      const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
+
+      // Sign while the parent remains locked, before any state transition. A signing failure can
+      // therefore roll the transaction back without consuming the refresh token. Once signing has
+      // succeeded, the guarded write and COMMIT are pipelined on the reserved connection.
+      const accessToken = await signAccessToken(
+        config.keyStore,
+        {
+          sub: session.user_id,
+          school_id: session.school_id,
+          roles: session.roles,
+          entitlements_ver: 1,
+          channel: session.channel,
+        },
+        {
+          issuer: config.issuer,
+          audience: config.audience,
+          ttlSeconds: config.accessTtlSeconds,
+        },
       );
-    }
 
-    const minted = mintOpaqueToken(session.school_id, session.user_id);
-    const childId = randomUUID();
-    const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
-
-    // Signing and persistence are independent after the locked row and authoritative roles have
-    // been loaded. Running them together removes RSA time from the sequential database path, while
-    // awaiting both inside the callback keeps signing failure atomic with the state transition.
-    const accessTokenPromise = signAccessToken(
-      config.keyStore,
-      {
-        sub: session.user_id,
-        school_id: session.school_id,
-        roles: session.roles,
-        entitlements_ver: 1,
-        channel: session.channel,
-      },
-      {
-        issuer: config.issuer,
-        audience: config.audience,
-        ttlSeconds: config.accessTtlSeconds,
-      },
-    );
-
-    const persistencePromise = tx<{ session_id: string; family_id: string }[]>`
+      const persistencePromise = tx<{ session_id: string; family_id: string }[]>`
       WITH child AS (
         INSERT INTO app.refresh_tokens (
           id, school_id, user_id, token_hash, family_id, parent_token_id,
@@ -295,30 +302,31 @@ export async function rotateRefreshToken(
          AND parent.rotated_at IS NULL
          AND parent.revoked_at IS NULL
       RETURNING child.id AS session_id, child.family_id
-    `;
+      `.execute();
 
-    // Wait for both operations even when one fails. Rejecting the transaction callback while its
-    // SQL statement is still in flight would race postgres.js's rollback against that statement.
-    const [signed, persisted] = await Promise.allSettled([accessTokenPromise, persistencePromise]);
-    if (signed.status === "rejected") throw signed.reason;
-    if (persisted.status === "rejected") throw persisted.reason;
+      const persisted = await transaction.commitWith(persistencePromise);
+      committed = true;
+      const row = persisted[0];
+      if (!row) throw new Error("locked refresh token was not consumed");
 
-    const row = persisted.value[0];
-    if (!row) throw new Error("locked refresh token was not consumed");
-
-    return {
-      kind: "issued",
-      pair: {
-        accessToken: signed.value,
-        refreshToken: minted.token,
-        sessionId: row.session_id,
-        familyId: row.family_id,
-        channel: session.channel,
-        refreshExpiresAt: expiresAt,
-        accessExpiresInSeconds: config.accessTtlSeconds,
-      },
-    };
-  });
+      return {
+        kind: "issued",
+        pair: {
+          accessToken,
+          refreshToken: minted.token,
+          sessionId: row.session_id,
+          familyId: row.family_id,
+          channel: session.channel,
+          refreshExpiresAt: expiresAt,
+          accessExpiresInSeconds: config.accessTtlSeconds,
+        },
+      };
+    })();
+    if (!committed) await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 
   if (outcome.kind === "issued") return outcome.pair;
   if (outcome.kind === "not_found") {
