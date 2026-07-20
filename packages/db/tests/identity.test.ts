@@ -690,6 +690,7 @@ integrationTest(
       // Intended index usage: token-hash lookup, OAuth callback lookup, and family revocation.
       const plans = await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
+        await tx`SELECT set_config('app.user_id', ${userA}, true)`;
         await tx.unsafe("SET LOCAL enable_seqscan = off");
         const tokenPlan = await tx.unsafe(`
           EXPLAIN (FORMAT JSON)

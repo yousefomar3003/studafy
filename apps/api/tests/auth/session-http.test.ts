@@ -99,7 +99,6 @@ function webHeaders(
   extra: Record<string, string> = {},
 ): Record<string, string> {
   return {
-    "content-type": "application/json",
     cookie: `session=${refreshToken}`,
     ...extra,
   };

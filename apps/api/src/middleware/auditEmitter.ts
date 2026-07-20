@@ -13,7 +13,7 @@
  */
 
 import type { MiddlewareHandler } from "hono";
-import type { TransactionSql } from "postgres";
+import type { JSONValue, TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -100,8 +100,12 @@ export function redactPayload(data: Record<string, unknown>): Record<string, unk
  * the mutation and its audit record are atomic.
  */
 export async function emitAuditLog(tx: TransactionSql, entry: AuditEntry): Promise<void> {
-  const oldJson = entry.oldValues != null ? JSON.stringify(entry.oldValues) : null;
-  const newJson = entry.newValues != null ? JSON.stringify(entry.newValues) : null;
+  // postgres.js serializes parameters whose inferred PostgreSQL type is jsonb. Passing an already
+  // stringified value would therefore encode it a second time and store a JSON string, which the
+  // audit table's object-only constraints correctly reject. SQL NULL must stay distinct from the
+  // JSON value null for the same reason.
+  const oldJson = entry.oldValues != null ? tx.json(entry.oldValues as JSONValue) : null;
+  const newJson = entry.newValues != null ? tx.json(entry.newValues as JSONValue) : null;
 
   await tx`
     INSERT INTO app.audit_logs (

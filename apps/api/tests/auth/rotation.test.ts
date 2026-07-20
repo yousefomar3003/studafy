@@ -372,18 +372,18 @@ describe("rejections", () => {
     }
   });
 
-  integrationTest("rejects a correct locator carrying the wrong secret", async () => {
+  integrationTest("rejects a well-formed token carrying an unknown secret", async () => {
     const { rotateRefreshToken } = await import("../../src/modules/auth");
     const { config, destroy } = await sessionConfig();
 
     try {
       const user = tenant.users.INSTRUCTOR;
       const seed = await createRefreshSession(sql, tenant.schoolId, user.id);
-      const other = await createRefreshSession(sql, tenant.schoolId, user.id);
+      const secret = seed.token.split(".")[2]!;
+      const unknownSecret = `${secret[0] === "A" ? "B" : "A"}${secret.slice(1)}`;
 
-      // Correct tenant and user, secret from a different session. The ids scope the search; only the
-      // secret proves anything, so this must find nothing.
-      const forged = `${tenant.schoolId}.${user.id}.${other.token.split(".")[2]}`;
+      // Keep the locator and base64url shape valid while changing the digest that proves possession.
+      const forged = `${tenant.schoolId}.${user.id}.${unknownSecret}`;
 
       await expect(
         rotateRefreshToken(sql, config, { presentedToken: forged }),

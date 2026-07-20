@@ -56,11 +56,10 @@ SET ROLE studafy_admin;
 -- that adding a NOT NULL column and a foreign key perform. That raises 42704 "unrecognized
 -- configuration parameter app.school_id" because no migration session has ever set that GUC.
 --
--- DISABLE ROW LEVEL SECURITY clears both the enabled and forced flags atomically, suppressing all
--- policy evaluation for the duration of this transaction. This is safe because ALTER TABLE takes
--- ACCESS EXCLUSIVE, so no other session can read the table through the window in which it is
--- disabled; and the migration is transactional, so a failure anywhere rolls the flag back with
--- everything else.
+-- DISABLE ROW LEVEL SECURITY suppresses policy evaluation on app.refresh_tokens for the duration of
+-- this transaction. This is safe because ALTER TABLE takes ACCESS EXCLUSIVE, so no other session can
+-- read the table through the window in which it is disabled; and the migration is transactional, so
+-- a failure anywhere rolls the flag back with everything else.
 --
 -- Setting the GUC instead is not sufficient. It would make current_setting resolve, but to a value
 -- matching no school -- so any scan it enables reads an RLS-filtered *subset*, which is precisely
@@ -91,6 +90,17 @@ BEGIN
   END IF;
 END
 $assert_empty$;
+
+-- The device foreign key below is validated with a query that joins app.refresh_tokens to
+-- app.user_devices. Disabling RLS on the referencing table does not disable it on user_devices,
+-- whose tenant_isolation and user_devices_owner policies require both GUCs to exist. Sentinel UUIDs
+-- make those policy expressions resolvable without granting the migration a real tenant or user.
+--
+-- This cannot hide an invalid refresh-token row from the validation scan: the unfiltered assertion
+-- above already proved app.refresh_tokens is empty while its own RLS was disabled. Keep these values
+-- transaction-local so the migration connection cannot leak an artificial context to later work.
+SELECT set_config('app.school_id', '00000000-0000-0000-0000-000000000000', true);
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-000000000000', true);
 
 -- The client surface a session was established from. Mirrors AUTH_CHANNELS in
 -- apps/api/src/modules/auth/channels.ts label-for-label, the same way app.notification_type mirrors
