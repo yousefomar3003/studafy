@@ -387,7 +387,7 @@ describe("rejections", () => {
 
       await expect(
         rotateRefreshToken(sql, config, { presentedToken: forged }),
-      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+      ).rejects.toMatchObject({ code: "AUTH_SESSION_NOT_FOUND" });
 
       // And the real token still works: a failed guess must not consume the session.
       const rotated = await rotateRefreshToken(sql, config, { presentedToken: seed.token });
