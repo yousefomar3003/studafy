@@ -219,96 +219,117 @@ export async function rotateRefreshToken(
     requestId: params.requestId,
   };
 
-  // --- 2. Load the session row ----------------------------------------------
-  //
-  // Fully fenced: this runs under studafy_app with tenant_isolation and refresh_tokens_owner both in
-  // force. Nothing in this subsystem runs elevated.
-  const session = await withTenantTx(database, tenant, (tx) =>
-    loadSessionByHash(tx, hashSecret(parsed.secret)),
-  );
+  // The row lock is the concurrency boundary. A second request for the same token waits here, then
+  // reads the version consumed by the winner and enters the reuse branch in this same transaction.
+  const outcome = await withTenantTx(database, tenant, async (tx): Promise<RotationOutcome> => {
+    const session = await loadSessionForRotation(tx, hashSecret(parsed.secret));
 
-  // Finding a row *is* the verification: the lookup matched on the digest of the presented secret,
-  // under a unique index, inside the caller's own tenant and user scope. There is no separate
-  // comparison step because there is nothing left to compare — and note this ordering means a caller
-  // cannot learn that a session exists, or that it was revoked, without holding the secret.
-  if (!session) {
+    // Finding a row is the secret verification: the digest matched inside both tenant and user RLS
+    // fences. Wrong locators and wrong secrets are indistinguishable from an absent session.
+    if (!session) return { kind: "not_found" };
+
+    // Reuse is checked before expiry. The revocation and audit record must commit, so the public
+    // exception is raised only after this transaction returns successfully.
+    if (session.rotated_at !== null || session.revoked_at !== null) {
+      return { kind: "reuse", event: await revokeReusedSession(tx, session) };
+    }
+
+    if (session.expires_at.getTime() <= Date.now()) return { kind: "expired" };
+
+    if (session.roles.length === 0) {
+      throw new AuthException(
+        ERROR_CODES.AUTH_SESSION_NOT_FOUND,
+        "User has no roles in this tenant",
+      );
+    }
+
+    const minted = mintOpaqueToken(session.school_id, session.user_id);
+    const childId = randomUUID();
+    const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
+
+    // Signing and persistence are independent after the locked row and authoritative roles have
+    // been loaded. Running them together removes RSA time from the sequential database path, while
+    // awaiting both inside the callback keeps signing failure atomic with the state transition.
+    const accessTokenPromise = signAccessToken(
+      config.keyStore,
+      {
+        sub: session.user_id,
+        school_id: session.school_id,
+        roles: session.roles,
+        entitlements_ver: 1,
+        channel: session.channel,
+      },
+      {
+        issuer: config.issuer,
+        audience: config.audience,
+        ttlSeconds: config.accessTtlSeconds,
+      },
+    );
+
+    const persistencePromise = tx<{ session_id: string; family_id: string }[]>`
+      WITH child AS (
+        INSERT INTO app.refresh_tokens (
+          id, school_id, user_id, token_hash, family_id, parent_token_id,
+          device_id, channel, device_name, user_agent, ip_address, expires_at
+        ) VALUES (
+          ${childId},
+          current_setting('app.school_id')::uuid,
+          ${session.user_id},
+          ${minted.secretHash},
+          ${session.family_id},
+          ${session.id},
+          ${session.device_id},
+          ${session.channel},
+          ${session.device_name},
+          ${params.device?.userAgent ?? session.user_agent},
+          ${params.device?.ipAddress ?? session.ip_address},
+          ${expiresAt}
+        )
+        RETURNING id, family_id
+      )
+      UPDATE app.refresh_tokens AS parent
+         SET rotated_at = CURRENT_TIMESTAMP,
+             replaced_by_token_id = child.id
+        FROM child
+       WHERE parent.id = ${session.id}
+         AND parent.rotated_at IS NULL
+         AND parent.revoked_at IS NULL
+      RETURNING child.id AS session_id, child.family_id
+    `;
+
+    // Wait for both operations even when one fails. Rejecting the transaction callback while its
+    // SQL statement is still in flight would race postgres.js's rollback against that statement.
+    const [signed, persisted] = await Promise.allSettled([accessTokenPromise, persistencePromise]);
+    if (signed.status === "rejected") throw signed.reason;
+    if (persisted.status === "rejected") throw persisted.reason;
+
+    const row = persisted.value[0];
+    if (!row) throw new Error("locked refresh token was not consumed");
+
+    return {
+      kind: "issued",
+      pair: {
+        accessToken: signed.value,
+        refreshToken: minted.token,
+        sessionId: row.session_id,
+        familyId: row.family_id,
+        channel: session.channel,
+        refreshExpiresAt: expiresAt,
+        accessExpiresInSeconds: config.accessTtlSeconds,
+      },
+    };
+  });
+
+  if (outcome.kind === "issued") return outcome.pair;
+  if (outcome.kind === "not_found") {
     throw new AuthException(ERROR_CODES.AUTH_SESSION_NOT_FOUND, "Invalid refresh token");
   }
-
-  // --- 3. Reuse detection ---------------------------------------------------
-  //
-  // Checked before expiry. A replayed token that has also aged out is still a theft signal, and
-  // rejecting it as merely "expired" would let an attacker who sat on a stolen token past its
-  // lifetime avoid tripping the alarm entirely.
-  if (session.rotated_at !== null || session.revoked_at !== null) {
-    await handleReuse(database, tenant, session, params.log);
-    throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
-  }
-
-  if (session.expires_at.getTime() <= Date.now()) {
+  if (outcome.kind === "expired") {
     throw new AuthException(ERROR_CODES.AUTH_TOKEN_EXPIRED, "Refresh token has expired");
   }
 
-  // --- 4. Rotate ------------------------------------------------------------
-  return withTenantTx(database, tenant, async (tx) => {
-    const issued = await issueTokenPair(tx, config, {
-      userId: session.user_id,
-      schoolId: session.school_id,
-      channel: session.channel,
-      familyId: session.family_id,
-      parentTokenId: session.id,
-      device: {
-        // Device identity is carried forward from the session, not taken from the request. A
-        // rotation must not be able to move a session onto a different device.
-        deviceId: session.device_id,
-        deviceName: session.device_name,
-        // User agent and IP are refreshed: they are observational, and a session legitimately moves
-        // between networks and browser versions over a 30-day sliding window.
-        userAgent: params.device?.userAgent ?? session.user_agent,
-        ipAddress: params.device?.ipAddress ?? session.ip_address,
-      },
-    });
-
-    // The guard clause is the concurrency control for the whole endpoint. Two requests presenting
-    // the same token race here; the loser matches zero rows because rotated_at is no longer null,
-    // rolls this transaction back (discarding the child it just inserted), and is reported as reuse.
-    // Without it, both would succeed and the family would silently fork into two live branches.
-    const consumed = await tx`
-      UPDATE app.refresh_tokens
-         SET rotated_at = CURRENT_TIMESTAMP, replaced_by_token_id = ${issued.sessionId}
-       WHERE id = ${session.id}
-         AND rotated_at IS NULL
-         AND revoked_at IS NULL
-      RETURNING id
-    `;
-
-    if (consumed.length === 0) {
-      throw new ConcurrentRotationError();
-    }
-
-    return issued;
-  }).catch(async (err: unknown) => {
-    if (!(err instanceof ConcurrentRotationError)) throw err;
-
-    // Re-read outside the rolled-back transaction, then treat it exactly as any other replay. The
-    // loser of a genuine double-submit and a real attacker are indistinguishable at this point, and
-    // resolving that ambiguity in favour of the family is the entire premise of rotation.
-    const current = await withTenantTx(database, tenant, (tx) =>
-      loadSessionByHash(tx, hashSecret(parsed.secret)),
-    );
-    if (current) {
-      await handleReuse(database, tenant, current, params.log);
-    }
-    throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
-  });
-}
-
-/** Internal signal that the guarded UPDATE lost its race. Never leaves this module. */
-class ConcurrentRotationError extends Error {
-  constructor() {
-    super("refresh token was rotated concurrently");
-    this.name = "ConcurrentRotationError";
-  }
+  logReuseEvent(outcome.event, params.log);
+  throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
 }
 
 /**
@@ -322,60 +343,60 @@ class ConcurrentRotationError extends Error {
  * to be cleared, and app.user_devices is what "the device" means in this schema — leaving its push
  * token live would keep delivering notifications to a handset an attacker holds.
  */
-async function handleReuse(
-  database: Database,
-  tenant: { schoolId: string; userId: string; requestId?: string },
-  session: SessionRow,
-  log?: Logger,
-): Promise<void> {
-  const revokedCount = await withTenantTx(database, tenant, async (tx) => {
-    const revoked = await tx`
-      UPDATE app.refresh_tokens
+async function revokeReusedSession(tx: TransactionSql, session: SessionRow): Promise<ReuseEvent> {
+  const revoked = await tx`
+    UPDATE app.refresh_tokens
+       SET revoked_at = CURRENT_TIMESTAMP
+     WHERE family_id = ${session.family_id}
+       AND revoked_at IS NULL
+    RETURNING id
+  `;
+
+  if (session.device_id !== null) {
+    await tx`
+      UPDATE app.user_devices
          SET revoked_at = CURRENT_TIMESTAMP
-       WHERE family_id = ${session.family_id}
+       WHERE id = ${session.device_id}
          AND revoked_at IS NULL
-      RETURNING id
     `;
+  }
 
-    if (session.device_id !== null) {
-      await tx`
-        UPDATE app.user_devices
-           SET revoked_at = CURRENT_TIMESTAMP
-         WHERE id = ${session.device_id}
-           AND revoked_at IS NULL
-      `;
-    }
-
-    await emitAuditLog(tx, {
-      action: "logout",
-      targetTable: "refresh_tokens",
-      // The family, not the individual token: the family is what was revoked, and it is the id that
-      // makes every row in the chain findable from this one audit entry.
-      targetId: session.family_id,
-      newValues: {
-        reason: "refresh_token_reuse_detected",
-        family_id: session.family_id,
-        session_id: session.id,
-        device_id: session.device_id,
-        revoked_token_count: revoked.length,
-      },
-      userAgent: session.user_agent,
-      clientIp: session.ip_address,
-    });
-
-    return revoked.length;
+  await emitAuditLog(tx, {
+    action: "logout",
+    targetTable: "refresh_tokens",
+    // The family, not the individual token: the family is what was revoked, and it is the id that
+    // makes every row in the chain findable from this one audit entry.
+    targetId: session.family_id,
+    newValues: {
+      reason: "refresh_token_reuse_detected",
+      family_id: session.family_id,
+      session_id: session.id,
+      device_id: session.device_id,
+      revoked_token_count: revoked.length,
+    },
+    userAgent: session.user_agent,
+    clientIp: session.ip_address,
   });
 
+  return {
+    familyId: session.family_id,
+    sessionId: session.id,
+    deviceId: session.device_id,
+    revokedTokenCount: revoked.length,
+  };
+}
+
+function logReuseEvent(event: ReuseEvent, log?: Logger): void {
   // Logged at error, not warn: this is the one event in the session subsystem that means a
   // credential is in the wrong hands. No token material, in any form — not the presented token, not
   // not the digest. The family id is the correlation key, and it is not a credential.
   log?.error(
     {
       event: "refresh_token_reuse_detected",
-      family_id: session.family_id,
-      session_id: session.id,
-      device_id: session.device_id,
-      revoked_token_count: revokedCount,
+      family_id: event.familyId,
+      session_id: event.sessionId,
+      device_id: event.deviceId,
+      revoked_token_count: event.revokedTokenCount,
     },
     "refresh token reuse detected — token family revoked",
   );
@@ -544,6 +565,44 @@ interface SessionRow {
   expires_at: Date;
   rotated_at: Date | null;
   revoked_at: Date | null;
+}
+
+interface RotationSessionRow extends SessionRow {
+  roles: Role[];
+}
+
+interface ReuseEvent {
+  familyId: string;
+  sessionId: string;
+  deviceId: string | null;
+  revokedTokenCount: number;
+}
+
+type RotationOutcome =
+  | { kind: "issued"; pair: IssuedTokenPair }
+  | { kind: "not_found" }
+  | { kind: "expired" }
+  | { kind: "reuse"; event: ReuseEvent };
+
+/** Lock the presented row and fetch its authoritative roles in the same indexed round trip. */
+function loadSessionForRotation(
+  tx: TransactionSql,
+  tokenHash: Buffer,
+): Promise<RotationSessionRow | undefined> {
+  return tx<RotationSessionRow[]>`
+    SELECT rt.id, rt.school_id, rt.user_id, rt.token_hash, rt.family_id, rt.device_id,
+           rt.channel, rt.device_name, rt.user_agent, rt.ip_address, rt.expires_at,
+           rt.rotated_at, rt.revoked_at,
+           ARRAY(
+             SELECT ur.role::text
+               FROM app.user_roles AS ur
+              WHERE ur.user_id = rt.user_id
+              ORDER BY ur.role
+           )::text[] AS roles
+      FROM app.refresh_tokens AS rt
+     WHERE rt.token_hash = ${tokenHash}
+       FOR UPDATE OF rt
+  `.then((rows) => rows[0]);
 }
 
 /**

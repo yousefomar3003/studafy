@@ -32,6 +32,7 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { expect, test } from "bun:test";
 
+import { DATABASE_MAX_CONNECTIONS } from "../../src/db/client";
 import { AUTH_CHANNELS, KeyStore } from "../../src/modules/auth";
 import {
   createFullTenant,
@@ -72,7 +73,7 @@ function report(label: string, samples: number[]): { median: number; p95: number
 benchmarkTest(
   `refresh rotation completes in under ${TARGET_MS}ms under parallel load`,
   async () => {
-    const database = await createTestDatabase();
+    const database = await createTestDatabase({ maxConnections: DATABASE_MAX_CONNECTIONS });
     const keyStore = new KeyStore(3_600_000);
 
     try {
@@ -148,7 +149,7 @@ benchmarkTest(
       expect(rotations).toBe(expected);
       expect(samples).toHaveLength(expected);
 
-      const { median, p95 } = report(`rotation @${CONCURRENCY} concurrent`, samples);
+      const { median } = report(`rotation @${CONCURRENCY} concurrent`, samples);
       console.log(`rotation median: ${median.toFixed(4)}ms (target < ${TARGET_MS}ms)`);
 
       // The median is the gated figure. p95 is reported but not asserted: at this concurrency the

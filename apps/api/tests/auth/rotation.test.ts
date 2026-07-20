@@ -191,6 +191,35 @@ describe("normal rotation", () => {
       }
     },
   );
+
+  integrationTest("rolls the state transition back when access-token signing fails", async () => {
+    const { rotateRefreshToken } = await import("../../src/modules/auth");
+    const { config, destroy } = await sessionConfig();
+
+    try {
+      const user = tenant.users.INSTRUCTOR;
+      const seed = await createRefreshSession(sql, tenant.schoolId, user.id);
+      const failingConfig = {
+        ...config,
+        keyStore: {
+          signingKey(): never {
+            throw new Error("synthetic signing failure");
+          },
+        } as unknown as typeof config.keyStore,
+      };
+
+      await expect(
+        rotateRefreshToken(sql, failingConfig, { presentedToken: seed.token }),
+      ).rejects.toThrow("synthetic signing failure");
+
+      const parent = await readToken(seed.sessionId);
+      expect(parent.rotated_at).toBeNull();
+      expect(parent.replaced_by_token_id).toBeNull();
+      expect(await familyRows(seed.familyId)).toHaveLength(1);
+    } finally {
+      destroy();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -444,10 +473,16 @@ describe("concurrent rotation", () => {
       // the family would fork into two live branches that each look legitimate.
       expect(fulfilled).toHaveLength(1);
       expect(rejected).toHaveLength(1);
+      expect(rejected[0]).toMatchObject({
+        status: "rejected",
+        reason: { code: "AUTH_TOKEN_INVALID" },
+      });
 
-      // The loser rolled its child back rather than leaving an orphan.
+      // The winner creates exactly one child. The waiter then observes the consumed parent under
+      // the row lock and treats the double-submit exactly like any other reuse breach.
       const rows = await familyRows(seed.familyId);
       expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row.revoked_at !== null)).toBe(true);
     } finally {
       destroy();
     }

@@ -147,10 +147,10 @@ Two ordering details carry weight:
 
 ### Concurrency
 
-Two requests presenting the same token race. The consuming `UPDATE` carries
-`AND rotated_at IS NULL`, so the loser matches zero rows, rolls its transaction back — discarding the
-child it had already inserted — and is reported as reuse. Without that guard both would succeed and
-the family would fork into two live branches that each look legitimate.
+Two requests presenting the same token serialize on `SELECT … FOR UPDATE`. The winner inserts one
+child and consumes the parent through one guarded data-modifying CTE. The waiter then reads the
+committed consumed state and burns the family as reuse. Without the row lock and guarded update both
+requests could succeed and fork the family into two live branches.
 
 A genuine double-submit and a real attacker are indistinguishable here. Resolving that ambiguity in
 favour of the family is the premise of rotation, so an over-eager client that fires two refreshes at
@@ -256,17 +256,19 @@ minting the replacement pair, under parallel load.
 The benchmark is
 [`apps/api/tests/benchmark/refresh-rotation-benchmark.test.ts`](../../apps/api/tests/benchmark/refresh-rotation-benchmark.test.ts),
 gated in CI on `REFRESH_ROTATION_BENCHMARK=1`. It measures 1,000 rotations at 16-way concurrency and
-asserts the **median**, reporting p95 without gating on it — at that concurrency the tail is
-dominated by connection-pool queueing, which is a function of pool size and runner core count rather
-than of the rotation path.
+asserts the **median**, reporting p95 without gating on it. Its disposable client uses the same
+ten-connection capacity as the production API pool, so the contention it records represents the
+deployed configuration instead of the four-connection default used by ordinary integration tests.
 
 An **absolute** budget, unlike the delta-based middleware benchmarks next door. Rotation has no
 baseline arm to subtract, and its cost is dominated by database round trips rather than framework
 overhead, so it follows the precedent of the absolute budgets in `packages/db/tests` (see
 [`docs/database/attendance.md`](../database/attendance.md)).
 
-Covered: token parse, one SHA-256 digest, the tenant transaction that reads the session and inserts
-the child and consumes the parent, and the RSA signature that mints the access token. Excluded: client network RTT, a property of deployment topology.
+Covered: token parse, one SHA-256 digest, the single lock-protected tenant transaction that reads the
+session and roles and atomically inserts the child/consumes the parent, and the concurrent RSA
+signature that mints the access token. Excluded: client network RTT, a property of deployment
+topology.
 
 Reproduce:
 
