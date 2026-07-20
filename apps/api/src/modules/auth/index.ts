@@ -39,14 +39,24 @@ export {
   issueTokenPair,
   rotateRefreshToken,
   listActiveSessions,
-  revokeSession,
-  revokeDeviceSessions,
-  revokeSessionByToken,
+  listUserDevices,
+  deregisterDevice,
+  resolveFamilyByToken,
   type SessionTokenConfig,
   type IssuedTokenPair,
   type DeviceContext,
   type ActiveSession,
+  type UserDevice,
+  type ResolvedFamily,
 } from "./services/session-service";
+export {
+  revokeAndDenylist,
+  adminRevokeUserSessions,
+  REVOCATION_REASONS,
+  type RevocationReason,
+  type RevocationScope,
+  type RevocationResult,
+} from "./services/revocation-service";
 export {
   deliverTokenPair,
   readPresentedToken,
@@ -56,4 +66,6 @@ export {
   type TokenResponseBody,
 } from "./delivery";
 export { sessionRoutes } from "./routes/session-routes";
+export { adminDeviceRoutes } from "./routes/admin-device-routes";
+export { type DenylistEntry } from "./denylist";
 export type { AccessTokenClaims, JwtPayload, SignAccessTokenParams } from "./jwt/types";

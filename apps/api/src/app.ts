@@ -18,6 +18,7 @@ import {
   jwtAuthMiddleware,
 } from "./middleware";
 import {
+  adminDeviceRoutes,
   configureRefreshCookie,
   createJtiDenylist,
   jwksRoutes,
@@ -162,12 +163,18 @@ export function createApp({
   // schoolId:userId and falls back to the client IP when no auth context exists, so mounting it
   // after the limiter would silently collapse every user behind a shared NAT into one bucket.
   // It also runs after csrfMiddleware, which already exempts Bearer-authenticated requests.
+  // Built once and shared between the middleware that reads it and the revocation services that
+  // write it (ST-072). Two clients over the same Redis would behave identically, but a single
+  // instance makes it structurally impossible for the read side and the write side of the revocation
+  // boundary to drift onto different connections or key prefixes.
+  const jtiDenylist = redis ? createJtiDenylist(redis) : null;
+
   if (keyStore) {
     app.use(
       "/api/*",
       jwtAuthMiddleware({
         keyStore,
-        denylist: redis ? createJtiDenylist(redis) : null,
+        denylist: jtiDenylist,
         issuer: jwtIssuer,
         audience: jwtAudience,
       }),
@@ -218,14 +225,27 @@ export function createApp({
     configureRefreshCookie(jwtRefreshTtlSeconds);
     app.route(
       "/",
-      sessionRoutes(database, {
-        keyStore,
-        issuer: jwtIssuer,
-        audience: jwtAudience,
-        accessTtlSeconds: jwtAccessTtlSeconds,
-        refreshTtlSeconds: jwtRefreshTtlSeconds,
-      }),
+      sessionRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        jtiDenylist,
+      ),
     );
+  }
+
+  // Administrative device revocation (ST-072). Needs only a database — it revokes and denylists but
+  // never mints, so no key store is involved. Mounted under /api/admin, inside the authentication
+  // boundary above, and additionally gated per-route on PERMISSIONS.USER_SUSPEND by
+  // middleware/authz.ts. It is the first surface in this app that acts on a user other than the
+  // caller; see the header of routes/admin-device-routes.ts.
+  if (database) {
+    app.route("/", adminDeviceRoutes(database, jtiDenylist));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:

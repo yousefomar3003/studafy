@@ -12,6 +12,19 @@ export interface SignOptions {
   audience: string;
   /** Token lifetime in seconds. */
   ttlSeconds: number;
+  /**
+   * The `jti` to stamp on the token. Generated per call when omitted.
+   *
+   * Supplied by the session service (ST-072), which has to persist the value on the
+   * `app.refresh_tokens` row in the same statement that creates the session — revocation later reads
+   * it back to denylist the token. Letting the caller pass a jti it already holds is what makes that
+   * possible without this function returning one, which would change the shape of every call site
+   * for the benefit of two.
+   *
+   * Callers that supply one own its uniqueness. It must be a v4 UUID: verify.ts validates the claim
+   * with `pgUuidSchema`, and the denylist keys on it.
+   */
+  jti?: string;
 }
 
 /**
@@ -19,7 +32,7 @@ export interface SignOptions {
  * school_id, roles, entitlements_ver, channel, jti) plus the standard registered claims
  * (iss, aud, iat, exp, nbf).
  *
- * The `jti` is a v4 UUID generated per call — callers do not supply it.
+ * The `jti` is a v4 UUID generated per call unless the caller supplies one.
  */
 export async function signAccessToken(
   keyStore: KeyStore,
@@ -42,7 +55,7 @@ export async function signAccessToken(
     .setIssuedAt(now)
     .setExpirationTime(`${options.ttlSeconds}s`)
     .setNotBefore(now)
-    .setJti(randomUUID())
+    .setJti(options.jti ?? randomUUID())
     .sign(key.privateKey);
 
   return token;
