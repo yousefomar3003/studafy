@@ -21,6 +21,9 @@ export const ERROR_CODES = {
   OAUTH_EMAIL_NOT_VERIFIED: "OAUTH_EMAIL_NOT_VERIFIED",
   OAUTH_PROVIDER_ERROR: "OAUTH_PROVIDER_ERROR",
 
+  // Returning-user login — no matching OAuth identity found for the incoming (provider, sub) pair.
+  NO_ACCOUNT: "NO_ACCOUNT",
+
   // Account activation — the OAuth identity diverged from the invitation's bound email, so
   // automatic provisioning is withheld pending an administrator's decision.
   REQUIRES_ADMIN_APPROVAL: "REQUIRES_ADMIN_APPROVAL",

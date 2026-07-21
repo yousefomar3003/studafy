@@ -25,6 +25,7 @@ import {
   googleOAuthRoutes,
   jwksRoutes,
   microsoftOAuthRoutes,
+  returningUserLoginRoutes,
   sessionRoutes,
 } from "./modules/auth";
 import { invitationRoutes } from "./modules/auth/invitation/route";
@@ -310,6 +311,26 @@ export function createApp({
         },
         logger,
         microsoftIdentityVerifier ? { verifyMicrosoftIdentity: microsoftIdentityVerifier } : {},
+      ),
+    );
+  }
+
+  // Returning-user OAuth login (ST-079). Authenticates an active user via a verified Microsoft
+  // OIDC id_token, matches against oauth_identities, enforces tenant suspension policy, and
+  // issues session tokens. Public like the OAuth callbacks — the id_token is the credential.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      returningUserLoginRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        logger,
       ),
     );
   }

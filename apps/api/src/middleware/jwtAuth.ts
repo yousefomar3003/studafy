@@ -70,6 +70,7 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/auth/refresh",
   "/api/auth/logout",
   "/api/auth/oauth",
+  "/api/auth/login",
 ];
 
 function isInvitationSubPath(path: string, action: "verify" | "activate"): boolean {

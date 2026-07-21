@@ -95,6 +95,12 @@ export {
   type TokenReuseEvent,
 } from "./auth-anomaly-events";
 export { adminDeviceRoutes } from "./routes/admin-device-routes";
+export { returningUserLoginRoutes } from "./routes/returning-user-login-routes";
+export {
+  loginReturningUser,
+  type ReturningUserLoginParams,
+  type ReturningUserLoginResult,
+} from "./services/returning-user-login-service";
 export { googleOAuthRoutes } from "./oauth/google-route";
 export { microsoftOAuthRoutes } from "./oauth/microsoft-route";
 export { type DenylistEntry } from "./denylist";
