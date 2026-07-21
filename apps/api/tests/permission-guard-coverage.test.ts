@@ -40,6 +40,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/invitations/{id}/revoke",
   "POST /api/invitations/{id}/regenerate",
   "POST /api/auth/invitations/{token}/activate",
+  "POST /api/auth/login/oauth",
   "POST /erpnext/webhooks",
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
@@ -75,6 +76,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // token in the path plus a verified Microsoft OIDC identity, not by a bearer permission; there is
   // no other user's data to protect.
   "POST /api/auth/invitations/{token}/activate",
+  // Returning-user OAuth login (ST-079) — public self-service login. Authorized by a verified
+  // Microsoft OIDC id_token, not by a bearer permission; authenticates the caller, not another user.
+  "POST /api/auth/login/oauth",
   // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",

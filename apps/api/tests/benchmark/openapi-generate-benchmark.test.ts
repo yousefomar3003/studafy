@@ -57,6 +57,7 @@ const EXPECTED_PATHS = [
   "/api/auth/logout",
   "/api/auth/invitations/{token}/activate",
   "/api/auth/invitations/{token}/verify",
+  "/api/auth/login/oauth",
   "/api/auth/sessions",
   "/api/auth/sessions/{sessionId}",
   "/api/auth/devices",

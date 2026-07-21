@@ -188,20 +188,24 @@ integrationTest(
         expect(policy.check_expression).toContain("school_id");
       }
 
-      // A second permissive policy widens access rather than narrowing it, so every one that is not
+      // A permissive policy widens access rather than narrowing it, so every one that is not
       // tenant_isolation is pinned by shape here instead of being waved through by the filter above.
-      // Exactly one exists: invitation_token_verification (000031), the read seam that lets the
-      // SECURITY DEFINER lookup behind GET /api/auth/invitations/{token}/verify see a single row while
-      // app.invitations stays FORCE ROW LEVEL SECURITY. What keeps that seam closed is the role and the
-      // predicate: it is granted to studafy_admin only — never PUBLIC, and never studafy_app, which is
-      // the role ordinary request handlers run as — and its USING clause pins token_hash to the one
-      // digest the function puts in a transaction-local GUC. db/policies/rls-coverage.ts carves out the
-      // same policy for the CLI audit; the two must agree.
+      // Two exist, both SECURITY DEFINER read seams that let a global lookup see a single row while the
+      // table stays FORCE ROW LEVEL SECURITY:
+      //   - invitation_token_verification (000031), behind GET /api/auth/invitations/{token}/verify.
+      //   - oauth_identity_login_lookup (000034), behind POST /api/auth/login/oauth — the returning-user
+      //     login resolves the globally unique (provider, subject) pair before any tenant is known.
+      // What keeps each seam closed is the role and the predicate: both are granted to studafy_admin
+      // only — never PUBLIC, and never studafy_app, which is the role ordinary request handlers run as —
+      // and each USING clause pins the lookup to the exact value(s) the function places in a
+      // transaction-local GUC. db/policies/rls-coverage.ts carves out the same policies for the CLI
+      // audit; the two must agree.
       const seamPolicies = policies.filter(
         (policy) => policy.permissive && policy.name !== "tenant_isolation",
       );
       expect(seamPolicies.map((policy) => `${policy.table_name}.${policy.name}`)).toEqual([
         "invitations.invitation_token_verification",
+        "oauth_identities.oauth_identity_login_lookup",
       ]);
       const [adminRole] = await database.sql<{ oid: number }[]>`
         SELECT oid::integer AS oid FROM pg_roles WHERE rolname = 'studafy_admin'
@@ -211,9 +215,19 @@ integrationTest(
         expect(policy.command).toBe("r");
         expect(policy.roles).toEqual([adminRole!.oid]);
         expect(policy.check_expression).toBeNull();
-        expect(policy.using_expression).toContain("app.invitation_token_hash");
-        expect(policy.using_expression).toContain("token_hash");
       }
+      // Each seam pins its lookup to the GUC-carried value(s) its SECURITY DEFINER function sets, so the
+      // permissive grant can never reach beyond that one candidate row.
+      const invitationSeam = seamPolicies.find(
+        (policy) => policy.name === "invitation_token_verification",
+      );
+      expect(invitationSeam?.using_expression).toContain("app.invitation_token_hash");
+      expect(invitationSeam?.using_expression).toContain("token_hash");
+      const oauthSeam = seamPolicies.find(
+        (policy) => policy.name === "oauth_identity_login_lookup",
+      );
+      expect(oauthSeam?.using_expression).toContain("app.oauth_login_provider");
+      expect(oauthSeam?.using_expression).toContain("app.oauth_login_subject");
 
       // Restrictive policies AND with the permissive one, so they can only ever narrow access —
       // which is why they are filtered out above rather than folded into the same assertion. Exactly

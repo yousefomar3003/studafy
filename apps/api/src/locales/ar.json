@@ -23,5 +23,6 @@
   "CONFLICT_STATE_MISMATCH": "الطلب يتعارض مع الحالة الحالية",
   "CONFLICT_IDEMPOTENCY_KEY_MISMATCH": "محتوى الطلب يختلف عن الطلب الأصلي المحدد بمعرف التكرار",
   "RATE_LIMIT_EXCEEDED": "تم تجاوز حد الطلبات",
-  "INTERNAL_ERROR": "حدث خطأ غير متوقع"
+  "INTERNAL_ERROR": "حدث خطأ غير متوقع",
+  "NO_ACCOUNT": "لم يتم العثور على حساب"
 }
