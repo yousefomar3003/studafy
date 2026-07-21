@@ -203,6 +203,7 @@
               "OAUTH_STATE_INVALID",
               "OAUTH_EMAIL_NOT_VERIFIED",
               "OAUTH_PROVIDER_ERROR",
+              "REQUIRES_ADMIN_APPROVAL",
               "AUTHZ_FORBIDDEN",
               "AUTHZ_ROLE_NOT_FOUND",
               "AUTHZ_PERMISSION_NOT_FOUND",
@@ -610,6 +611,56 @@
           }
         },
         "required": ["revoked", "denylisted"]
+      },
+      "ActivateAccountResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["active"],
+            "description": "The account was provisioned and activated."
+          },
+          "access_token": {
+            "type": "string",
+            "description": "Signed JWT access token."
+          },
+          "token_type": {
+            "type": "string",
+            "enum": ["Bearer"]
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Access-token lifetime in seconds."
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifier of the new session."
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Opaque refresh token. Present only for non-web channels; web sessions receive it as an HttpOnly cookie instead."
+          }
+        },
+        "required": ["status", "access_token", "token_type", "expires_in", "session_id"]
+      },
+      "ActivateAccountRequest": {
+        "type": "object",
+        "properties": {
+          "id_token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Microsoft OIDC ID token obtained by the client's authorization request. It is verified server-side against Microsoft's JWKS before activation proceeds.",
+            "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIs..."
+          },
+          "nonce": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The nonce the client generated for its OIDC authorization request. The ID token is rejected unless it was minted with this nonce.",
+            "example": "n-0S6_WzA2Mj"
+          }
+        },
+        "required": ["id_token", "nonce"]
       },
       "AdminRevocationResult": {
         "type": "object",
@@ -2359,6 +2410,194 @@
           },
           "401": {
             "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded. Back off and retry.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/invitations/{token}/activate": {
+      "post": {
+        "tags": ["Invitations"],
+        "operationId": "activateAccount",
+        "summary": "Activate an account from an invitation",
+        "description": "Completes onboarding for an invited user. Verifies the Microsoft OIDC identity, asserts it matches the invitation's bound email, then atomically consumes the invitation, provisions and activates the user, links the OAuth identity, and issues the first session token pair. If the OIDC email diverges from the invitation, activation is withheld pending administrator approval.",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "One-time invitation bearer token (64 lowercase hexadecimal characters).",
+              "example": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+            },
+            "required": true,
+            "description": "One-time invitation bearer token (64 lowercase hexadecimal characters).",
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account activated. Returns the first session token pair.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivateAccountResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was malformed or failed schema validation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the resource.",
             "headers": {
               "X-Request-Id": {
                 "schema": {

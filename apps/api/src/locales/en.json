@@ -11,6 +11,7 @@
   "OAUTH_STATE_INVALID": "Invalid or expired OAuth state",
   "OAUTH_EMAIL_NOT_VERIFIED": "OAuth email is not verified",
   "OAUTH_PROVIDER_ERROR": "OAuth provider error",
+  "REQUIRES_ADMIN_APPROVAL": "This account requires administrator approval before it can be activated",
   "AUTHZ_FORBIDDEN": "Access denied",
   "AUTHZ_ROLE_NOT_FOUND": "Required role not found",
   "AUTHZ_PERMISSION_NOT_FOUND": "Required permission not found",

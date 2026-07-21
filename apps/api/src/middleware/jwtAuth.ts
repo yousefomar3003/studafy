@@ -72,7 +72,7 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/auth/oauth",
 ];
 
-function isInvitationVerificationPath(path: string): boolean {
+function isInvitationSubPath(path: string, action: "verify" | "activate"): boolean {
   const segments = path.split("/");
   return (
     segments.length === 6 &&
@@ -81,8 +81,20 @@ function isInvitationVerificationPath(path: string): boolean {
     segments[2] === "auth" &&
     segments[3] === "invitations" &&
     segments[4] !== "" &&
-    segments[5] === "verify"
+    segments[5] === action
   );
+}
+
+function isInvitationVerificationPath(path: string): boolean {
+  return isInvitationSubPath(path, "verify");
+}
+
+// Account activation (ST-078) authenticates with the invitation token in the path plus a verified
+// Microsoft OIDC identity in the body, not a bearer session — so, like verification, it is exempt
+// from the JWT boundary. The exemption is scoped to exactly `.../invitations/{token}/activate`; the
+// rest of /api/auth stays protected.
+function isInvitationActivationPath(path: string): boolean {
+  return isInvitationSubPath(path, "activate");
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +170,7 @@ export class AuthException extends HTTPException {
 function isPublicPath(path: string, publicPaths: readonly string[]): boolean {
   return (
     isInvitationVerificationPath(path) ||
+    isInvitationActivationPath(path) ||
     publicPaths.some((entry) => path === entry || path.startsWith(`${entry}/`))
   );
 }

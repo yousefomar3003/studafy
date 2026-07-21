@@ -21,6 +21,10 @@ export const ERROR_CODES = {
   OAUTH_EMAIL_NOT_VERIFIED: "OAUTH_EMAIL_NOT_VERIFIED",
   OAUTH_PROVIDER_ERROR: "OAUTH_PROVIDER_ERROR",
 
+  // Account activation — the OAuth identity diverged from the invitation's bound email, so
+  // automatic provisioning is withheld pending an administrator's decision.
+  REQUIRES_ADMIN_APPROVAL: "REQUIRES_ADMIN_APPROVAL",
+
   // Authorization — caller is known, but not permitted.
   AUTHZ_FORBIDDEN: "AUTHZ_FORBIDDEN",
   AUTHZ_ROLE_NOT_FOUND: "AUTHZ_ROLE_NOT_FOUND",

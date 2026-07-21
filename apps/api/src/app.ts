@@ -18,6 +18,7 @@ import {
   jwtAuthMiddleware,
 } from "./middleware";
 import {
+  activationRoutes,
   adminDeviceRoutes,
   configureRefreshCookie,
   createJtiDenylist,
@@ -86,6 +87,15 @@ export interface AppOptions {
    * tooling, and the default should be the one that exposes nothing.
    */
   docsEnabled?: boolean;
+  /**
+   * Seam for account activation's Microsoft OIDC verification (ST-078). Defaults to the real ST-077
+   * ID-token validation; injected in tests so activation can run without a live Microsoft JWKS, the
+   * same way `logger` and `securityEventSink` are injected.
+   */
+  microsoftIdentityVerifier?: (
+    idToken: string,
+    nonce: string,
+  ) => Promise<{ subject: string; email: string }>;
 }
 
 /**
@@ -110,6 +120,7 @@ export function createApp({
   jwtRefreshTtlSeconds = 30 * 24 * 60 * 60,
   securityEventSink,
   docsEnabled = false,
+  microsoftIdentityVerifier,
 }: AppOptions): OpenAPIHono<AppEnv> {
   const eventSink = securityEventSink ?? createNoopSecurityEventSink();
   // The defaultHook makes request-validation failures throw into errorHandlerMiddleware instead of
@@ -277,6 +288,28 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+      ),
+    );
+  }
+
+  // Account activation (ST-078). Consumes an invitation, provisions the user, links the Microsoft
+  // identity, and issues the first session token pair in one transaction. Public like the OAuth
+  // callbacks (the invitation token is the credential), and needs a database plus a key store to mint
+  // that first token pair.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      activationRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        logger,
+        microsoftIdentityVerifier ? { verifyMicrosoftIdentity: microsoftIdentityVerifier } : {},
       ),
     );
   }

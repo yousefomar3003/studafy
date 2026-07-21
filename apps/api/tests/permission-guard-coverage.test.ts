@@ -39,6 +39,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",
   "POST /api/invitations/{id}/regenerate",
+  "POST /api/auth/invitations/{token}/activate",
   "POST /erpnext/webhooks",
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
@@ -70,6 +71,10 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "DELETE /api/auth/devices/{deviceId}",
   // Webhook — HMAC-authenticated, not bearer.
   "POST /erpnext/webhooks",
+  // Account activation (ST-078) — public self-service onboarding. Authorized by the invitation
+  // token in the path plus a verified Microsoft OIDC identity, not by a bearer permission; there is
+  // no other user's data to protect.
+  "POST /api/auth/invitations/{token}/activate",
   // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",
