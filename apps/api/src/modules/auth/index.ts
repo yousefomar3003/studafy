@@ -77,6 +77,18 @@ export {
 } from "./delivery";
 export { sessionRoutes } from "./routes/session-routes";
 export {
+  activationRoutes,
+  type ActivationRouteDeps,
+  type VerifiedMicrosoftIdentity,
+} from "./routes/activation-routes";
+export {
+  activateAccount,
+  ACTIVATION_PROVIDER,
+  type ActivateAccountParams,
+  type ActivateAccountResult,
+  type ActivationIdentity,
+} from "./services/activation-service";
+export {
   emitRateLimitBlock,
   emitTokenReuseDetected,
   type RateLimitBlockEvent,

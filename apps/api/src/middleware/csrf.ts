@@ -40,6 +40,29 @@ import type { MiddlewareHandler } from "hono";
 const STATE_MUTATING_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
 
 /**
+ * Account activation (ST-078): POST /api/auth/invitations/{token}/activate.
+ *
+ * Exempt for the same reason as the webhook and session endpoints — it carries no ambient authority
+ * a cross-site page could forge. It authenticates with the invitation token in the path plus a
+ * verified Microsoft OIDC identity in the body, never with a cookie the browser attaches on its own.
+ * It is also frequently an invitee's first API call (arriving from an email link with no prior safe
+ * request), so there is no bootstrapped double-submit cookie to require. The token segment varies, so
+ * this is matched structurally rather than as a static prefix in EXEMPT_PATHS.
+ */
+function isInvitationActivationPath(path: string): boolean {
+  const segments = path.split("/");
+  return (
+    segments.length === 6 &&
+    segments[0] === "" &&
+    segments[1] === "api" &&
+    segments[2] === "auth" &&
+    segments[3] === "invitations" &&
+    segments[4] !== "" &&
+    segments[5] === "activate"
+  );
+}
+
+/**
  * Paths that never carry a browser-forged mutation worth protecting.
  *
  * /api/webhooks is exempt because ERPNext authenticates by HMAC signature over the request body,
@@ -108,7 +131,7 @@ export function csrfMiddleware(options?: CsrfOptions): MiddlewareHandler {
     const path = c.req.path;
     const method = c.req.method;
 
-    if (exemptPaths.some((exempt) => path.startsWith(exempt))) {
+    if (isInvitationActivationPath(path) || exemptPaths.some((exempt) => path.startsWith(exempt))) {
       await next();
       return;
     }
