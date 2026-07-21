@@ -65,7 +65,12 @@ export interface JwtAuthOptions {
  * enumeration and termination) must stay behind the boundary, and a `/api/auth` prefix would open
  * all of it. isPublicPath below matches accordingly.
  */
-const DEFAULT_PUBLIC_PATHS = ["/api/webhooks", "/api/auth/refresh", "/api/auth/logout"];
+const DEFAULT_PUBLIC_PATHS = [
+  "/api/webhooks",
+  "/api/auth/refresh",
+  "/api/auth/logout",
+  "/api/auth/oauth",
+];
 
 function isInvitationVerificationPath(path: string): boolean {
   const segments = path.split("/");
