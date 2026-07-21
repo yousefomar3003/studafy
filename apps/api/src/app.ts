@@ -21,6 +21,7 @@ import {
   adminDeviceRoutes,
   configureRefreshCookie,
   createJtiDenylist,
+  googleOAuthRoutes,
   jwksRoutes,
   sessionRoutes,
 } from "./modules/auth";
@@ -236,6 +237,25 @@ export function createApp({
         },
         jtiDenylist,
         eventSink,
+      ),
+    );
+  }
+
+  // Google OAuth (OIDC). Requires a database to look up oauth_identities and issue tokens, plus
+  // a key store to sign the resulting access tokens.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      googleOAuthRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        logger,
       ),
     );
   }

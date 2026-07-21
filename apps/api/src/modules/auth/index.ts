@@ -83,5 +83,6 @@ export {
   type TokenReuseEvent,
 } from "./auth-anomaly-events";
 export { adminDeviceRoutes } from "./routes/admin-device-routes";
+export { googleOAuthRoutes } from "./oauth/google-route";
 export { type DenylistEntry } from "./denylist";
 export type { AccessTokenClaims, JwtPayload, SignAccessTokenParams } from "./jwt/types";

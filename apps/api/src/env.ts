@@ -95,6 +95,12 @@ export const envSchema = z
       .int()
       .positive()
       .default(7 * 24 * 60 * 60 * 1000),
+    // Google OAuth (OIDC). All optional — the feature activates only when all three are set.
+    GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
+    GOOGLE_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // Where to redirect after a successful OAuth callback. Not setting it disables the redirect.
+    FRONTEND_URL: z.string().url().optional(),
   })
   .superRefine((env, context) => {
     // Checked before the NODE_ENV gate below: this constraint keys off the deployment tier, and a
@@ -118,6 +124,28 @@ export const envSchema = z
           });
         }
       }
+    }
+
+    // Google OAuth: all three must be present or all absent.
+    const googleVars = [
+      env.GOOGLE_OAUTH_CLIENT_ID,
+      env.GOOGLE_OAUTH_CLIENT_SECRET,
+      env.GOOGLE_OAUTH_REDIRECT_URI,
+    ];
+    const googleSetCount = googleVars.filter((v) => v !== undefined).length;
+    if (googleSetCount > 0 && googleSetCount < 3) {
+      const missing = [
+        !env.GOOGLE_OAUTH_CLIENT_ID && "GOOGLE_OAUTH_CLIENT_ID",
+        !env.GOOGLE_OAUTH_CLIENT_SECRET && "GOOGLE_OAUTH_CLIENT_SECRET",
+        !env.GOOGLE_OAUTH_REDIRECT_URI && "GOOGLE_OAUTH_REDIRECT_URI",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      context.addIssue({
+        code: "custom",
+        path: ["GOOGLE_OAUTH_CLIENT_ID"],
+        message: `All Google OAuth variables must be set together. Missing: ${missing}`,
+      });
     }
 
     if (env.NODE_ENV !== "production") return;
