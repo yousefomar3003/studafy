@@ -81,8 +81,9 @@ export function requirePermission(permission: Permission): MiddlewareHandler<App
       // legitimately lacks it can do nothing differently with the name anyway.
       c.get("log").warn(
         {
-          event: "authorization_denied",
+          event: "permission_denied",
           required_permission: permission,
+          route: c.req.path,
           actor_roles: auth.roles,
         },
         "caller lacks the permission required for this route",
