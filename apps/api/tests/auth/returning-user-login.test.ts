@@ -232,16 +232,17 @@ describe("returning-user OAuth login", () => {
       expect(problem.detail).toBe("No account found — ask your school admin for an invitation.");
       expect(problem.request_id).toBe(response.headers.get("x-request-id"));
 
-      // No orphaned records should exist.
-      const orphanCount = (await sql.begin(async (tx) => {
-        await tx.unsafe("SET LOCAL ROLE studafy_admin");
-        const [row] = await tx<{ count: string }[]>`
-          SELECT count(*)::text AS count FROM app.oauth_identities
-          WHERE provider = 'microsoft' AND subject = ${unknownSubject}
+      // No orphaned records should exist. app.oauth_identities is FORCE ROW LEVEL SECURITY and no
+      // role holds BYPASSRLS, so the existence check goes through the same global resolver the login
+      // path uses (migration 000034) rather than a raw cross-tenant SELECT.
+      const orphanFound = (await sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_app");
+        const [row] = await tx<{ found: boolean }[]>`
+          SELECT found FROM app.resolve_oauth_identity_for_login('microsoft', ${unknownSubject})
         `;
-        return Number(row!.count);
-      })) as number;
-      expect(orphanCount).toBe(0);
+        return row!.found;
+      })) as boolean;
+      expect(orphanFound).toBe(false);
     },
   );
 
@@ -422,27 +423,77 @@ describe("returning-user OAuth login", () => {
   integrationTest(
     "all login outcomes are written to audit_logs with correct tenant and user contexts",
     async () => {
-      // This test relies on the audit rows created by the tests above.
-      // We verify that the audit_logs table contains entries for each outcome type.
-      const outcomes = (await sql.begin(async (tx) => {
+      // app.audit_logs is FORCE ROW LEVEL SECURITY and no role holds BYPASSRLS, so audit rows can
+      // only be read one tenant at a time. Rather than aggregate across schools (which RLS forbids),
+      // drive both outcome types in schools this test owns and assert each within its own tenant
+      // context — which also proves the rows carry the correct school_id.
+
+      // A LOGIN_SUCCESS in an active school.
+      const okSchool = await createSchool(sql, { name: "Audit Active Academy" });
+      await sql.begin(async (tx) => {
         await tx.unsafe("SET LOCAL ROLE studafy_admin");
-        const rows = await tx<{ outcome: string; count: string }[]>`
-          SELECT
-            new_values->>'outcome' AS outcome,
-            count(*)::text AS count
-          FROM app.audit_logs
-          WHERE action = 'login'
-          GROUP BY new_values->>'outcome'
+        await tx`UPDATE app.schools SET status = 'active'::app.school_status WHERE id = ${okSchool.id}`;
+      });
+      const okSubject = `sub-${crypto.randomUUID()}`;
+      const okUser = await createUser(sql, okSchool.id);
+      await assignRole(sql, okSchool.id, okUser.id, ROLES.STUDENT);
+      await seedOAuthIdentity(okSchool.id, okUser.id, "microsoft", okSubject);
+
+      app = createApp({
+        isReady: () => true,
+        tracker: createInflightTracker(),
+        logger: createLogger({ destination: () => undefined }),
+        database: sql,
+        keyStore,
+        jwtIssuer: TEST_JWT_ISSUER,
+        jwtAudience: TEST_JWT_AUDIENCE,
+        microsoftIdentityVerifier: (_idToken: string, _nonce: string) =>
+          Promise.resolve({ subject: okSubject, email: okUser.email }),
+      });
+      expect((await loginViaHttp("stub-id-token", "stub-nonce")).status).toBe(200);
+
+      // A LOGIN_FAILED_SCHOOL_SUSPENDED for a standard role in a suspended school.
+      const susSchool = await createSchool(sql, { name: "Audit Suspended Academy" });
+      await sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`UPDATE app.schools SET status = 'suspended'::app.school_status WHERE id = ${susSchool.id}`;
+      });
+      const susSubject = `sub-${crypto.randomUUID()}`;
+      const susUser = await createUser(sql, susSchool.id);
+      await assignRole(sql, susSchool.id, susUser.id, ROLES.STUDENT);
+      await seedOAuthIdentity(susSchool.id, susUser.id, "microsoft", susSubject);
+
+      app = createApp({
+        isReady: () => true,
+        tracker: createInflightTracker(),
+        logger: createLogger({ destination: () => undefined }),
+        database: sql,
+        keyStore,
+        jwtIssuer: TEST_JWT_ISSUER,
+        jwtAudience: TEST_JWT_AUDIENCE,
+        microsoftIdentityVerifier: (_idToken: string, _nonce: string) =>
+          Promise.resolve({ subject: susSubject, email: susUser.email }),
+      });
+      expect((await loginViaHttp("stub-id-token", "stub-nonce")).status).toBe(403);
+
+      // Each outcome is present in — and only in — its own tenant.
+      const okOutcome = await countRows(okSchool.id, async (tx) => {
+        const [row] = await tx<{ count: string }[]>`
+          SELECT count(*)::text AS count FROM app.audit_logs
+          WHERE action = 'login' AND new_values->>'outcome' = 'LOGIN_SUCCESS'
         `;
-        return rows.map((r) => ({ outcome: r.outcome, count: Number(r.count) }));
-      })) as { outcome: string; count: number }[];
+        return Number(row!.count);
+      });
+      expect(okOutcome).toBeGreaterThanOrEqual(1);
 
-      const outcomeMap = new Map(outcomes.map((o) => [o.outcome, o.count]));
-
-      // At minimum, the tests above should have produced LOGIN_SUCCESS and
-      // LOGIN_FAILED_SCHOOL_SUSPENDED entries. LOGIN_SUCCESS is the most common.
-      expect(outcomeMap.get("LOGIN_SUCCESS")).toBeGreaterThanOrEqual(1);
-      expect(outcomeMap.get("LOGIN_FAILED_SCHOOL_SUSPENDED")).toBeGreaterThanOrEqual(1);
+      const susOutcome = await countRows(susSchool.id, async (tx) => {
+        const [row] = await tx<{ count: string }[]>`
+          SELECT count(*)::text AS count FROM app.audit_logs
+          WHERE action = 'login' AND new_values->>'outcome' = 'LOGIN_FAILED_SCHOOL_SUSPENDED'
+        `;
+        return Number(row!.count);
+      });
+      expect(susOutcome).toBeGreaterThanOrEqual(1);
     },
   );
 });
