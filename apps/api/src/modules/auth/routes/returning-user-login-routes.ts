@@ -22,6 +22,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { deliverTokenPair } from "../delivery";
@@ -128,19 +129,19 @@ interface LoginRouteDeps {
   verifyMicrosoftIdentity?: (
     idToken: string,
     nonce: string,
-  ) => Promise<{ sub: string; email: string }>;
+  ) => Promise<{ subject: string; email: string }>;
 }
 
 async function defaultVerifyIdentity(
   idToken: string,
   nonce: string,
-): Promise<{ sub: string; email: string }> {
+): Promise<{ subject: string; email: string }> {
   const oauthConfig = getMicrosoftOAuthConfig();
   if (!oauthConfig) {
     throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
   }
   const claims = await validateMicrosoftIdToken(idToken, oauthConfig.clientId, nonce);
-  return { sub: claims.sub, email: claims.email };
+  return { subject: claims.sub, email: claims.email };
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +163,8 @@ export function returningUserLoginRoutes(
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
   const verifyIdentity = deps.verifyMicrosoftIdentity ?? defaultVerifyIdentity;
 
+  routes.use("/api/auth/login/oauth", auditAction("login", "refresh_tokens"));
+
   routes.openapi(loginRoute, async (c) => {
     const { id_token, nonce, channel } = c.req.valid("json");
     const log = c.get("log");
@@ -174,7 +177,7 @@ export function returningUserLoginRoutes(
     const claims = await verifyIdentity(id_token, nonce);
 
     const result = await loginReturningUser(db, config, {
-      subject: claims.sub,
+      subject: claims.subject,
       channel,
       device: { userAgent, ipAddress: clientIp },
       requestId,

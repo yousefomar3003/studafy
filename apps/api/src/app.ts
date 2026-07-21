@@ -331,6 +331,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+        microsoftIdentityVerifier ? { verifyMicrosoftIdentity: microsoftIdentityVerifier } : {},
       ),
     );
   }

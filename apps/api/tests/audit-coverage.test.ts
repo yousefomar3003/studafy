@@ -55,6 +55,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // the audit rows are written from inside that transaction — see
   // src/modules/auth/services/activation-service.ts.
   "POST /api/auth/invitations/{token}/activate",
+  // Returning-user OAuth login (ST-079). Public self-service login via Microsoft OIDC id_token.
+  // Audit rows are written from the route's service transaction.
+  "POST /api/auth/login/oauth",
   "POST /erpnext/webhooks",
   // Session lifecycle (ST-071). All four mutate app.refresh_tokens. The revocation paths write
   // their audit rows from inside the service transaction rather than from the route, so that a

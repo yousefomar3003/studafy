@@ -23,5 +23,6 @@
   "CONFLICT_STATE_MISMATCH": "Request conflicts with current state",
   "CONFLICT_IDEMPOTENCY_KEY_MISMATCH": "Request body differs from the original idempotent request",
   "RATE_LIMIT_EXCEEDED": "Too many requests",
-  "INTERNAL_ERROR": "An unexpected error occurred"
+  "INTERNAL_ERROR": "An unexpected error occurred",
+  "NO_ACCOUNT": "No account found"
 }
