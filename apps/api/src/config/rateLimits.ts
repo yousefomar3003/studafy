@@ -79,8 +79,6 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/invitations": "auth",
   "/api/invitations/*": "auth",
   "/api/auth/invitations/*": "auth",
-  // Auth (pre-authentication, IP-scoped, strict limits)
-  "/api/auth/invitations/*": "auth",
   // "/api/auth/login": "auth",
   // "/api/auth/register": "auth",
   // "/api/auth/forgot-password": "auth",

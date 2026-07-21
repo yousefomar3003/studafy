@@ -448,7 +448,7 @@ describe("logging", () => {
       body: JSON.stringify({ refresh_token: seed.token }),
     });
 
-    const breach = lines.find((line) => line.event === "refresh_token_reuse_detected");
+    const breach = lines.find((line) => line.event === "auth_token_reuse_detected");
     expect(breach).toBeDefined();
     // 50 is pino's `error`. A theft signal that lands at warn gets lost among ordinary 401s.
     expect(breach!.level).toBe(50);
