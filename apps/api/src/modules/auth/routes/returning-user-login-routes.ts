@@ -95,7 +95,7 @@ const loginResponseSchema = z
 const loginRoute = createRoute({
   method: "post",
   path: "/api/auth/login/oauth",
-  tags: ["Authentication"],
+  tags: ["Auth"],
   operationId: "returningUserLogin",
   summary: "Log in as a returning user via OAuth",
   description:
@@ -172,9 +172,21 @@ export function returningUserLoginRoutes(
     const clientIp = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? null;
     const userAgent = c.req.header("user-agent") ?? null;
 
-    // Delegate identity verification to the injected or default verifier.
-    // This may throw CodedHttpException(401) if the id_token is invalid.
-    const claims = await verifyIdentity(id_token, nonce);
+    // Delegate identity verification to the injected or default verifier. Any typed HTTP failure it
+    // raises (the default verifier's CodedHttpException / HTTPException) is already a client-safe
+    // problem+json and propagates unchanged; anything else is an id_token that failed validation, so
+    // it collapses to a single 401 AUTH_TOKEN_INVALID rather than leaking as a 500.
+    let claims: { subject: string; email: string };
+    try {
+      claims = await verifyIdentity(id_token, nonce);
+    } catch (error) {
+      if (error instanceof HTTPException) throw error;
+      throw new CodedHttpException(
+        401,
+        ERROR_CODES.AUTH_TOKEN_INVALID,
+        "Invalid Microsoft identity token",
+      );
+    }
 
     const result = await loginReturningUser(db, config, {
       subject: claims.subject,

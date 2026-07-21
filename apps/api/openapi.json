@@ -2720,7 +2720,7 @@
     },
     "/api/auth/login/oauth": {
       "post": {
-        "tags": ["Authentication"],
+        "tags": ["Auth"],
         "operationId": "returningUserLogin",
         "summary": "Log in as a returning user via OAuth",
         "description": "Authenticates a returning active user by validating a Microsoft OIDC ID token, matching the (provider, sub) against the platform's oauth_identities, enforcing tenant suspension policy, and issuing a session token pair. Returns machine-readable outcome states for unknown identities (NO_ACCOUNT) and suspended tenants (SCHOOL_SUSPENDED).",

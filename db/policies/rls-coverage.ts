@@ -330,6 +330,31 @@ violations AS (
         ''
       ) = 'token_hash=decodeNULLIFcurrent_setting''app.invitation_token_hash'',true,'''',''hex'''
     )
+    -- The returning-user OAuth login seam (ST-079, migration 000034) reads the globally unique
+    -- (provider, subject) pair before any tenant is known, via a SECURITY DEFINER resolver scoped to
+    -- the pair placed in transaction-local GUCs. Same shape as the invitation carve-out above: a
+    -- SELECT-only policy for studafy_admin with no WITH CHECK, so it cannot widen any mutation path.
+    AND NOT (
+      tenant.schema_name = 'app'
+      AND tenant.table_name = 'oauth_identities'
+      AND policy_catalog.polname = 'oauth_identity_login_lookup'
+      AND policy_catalog.polcmd = 'r'
+      AND policy_catalog.polroles = ARRAY[(
+        SELECT role_catalog.oid
+        FROM pg_catalog.pg_roles AS role_catalog
+        WHERE role_catalog.rolname = 'studafy_admin'
+      )]
+      AND policy_catalog.polwithcheck IS NULL
+      AND pg_catalog.translate(
+        pg_catalog.replace(
+          pg_catalog.pg_get_expr(policy_catalog.polqual, policy_catalog.polrelid),
+          '::text',
+          ''
+        ),
+        E' \n\t\r()',
+        ''
+      ) = 'provider=NULLIFcurrent_setting''app.oauth_login_provider'',true,''''ANDsubject=NULLIFcurrent_setting''app.oauth_login_subject'',true,'''''
+    )
 
   UNION ALL
 

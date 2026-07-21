@@ -75,32 +75,40 @@ interface ResolvedIdentity {
 
 /**
  * Match an incoming (provider, subject) pair against the globally unique index on
- * app.oauth_identities. Runs outside tenant context because the lookup is global — the
- * (provider, subject) pair is unique across all schools by design (migration 000007).
+ * app.oauth_identities. The pair is unique across all schools by design (migration 000007), so this
+ * is a legitimate global lookup — but the table is FORCE ROW LEVEL SECURITY and no runtime role
+ * holds BYPASSRLS, so it cannot be read before app.school_id is known. Migration 000034 provides the
+ * SECURITY DEFINER resolver that bridges that chicken-and-egg: it scopes a permissive SELECT policy
+ * to the (provider, subject) pair placed in transaction-local GUCs, exactly as the invitation seams
+ * (000031/000033) do for their bearer tokens. Runs in its own short transaction against the resolver;
+ * the caller opens a real tenant transaction with the resolved school_id afterwards.
  *
- * Returns null when no identity matches. Does NOT throw — callers branch on null rather
- * than catching, which keeps the NO_ACCOUNT path cheap and explicit.
+ * Returns undefined when no identity matches. Does NOT throw for a miss — callers branch on undefined
+ * rather than catching, which keeps the NO_ACCOUNT path cheap and explicit.
  */
 async function findOAuthIdentity(
   db: Database,
   provider: string,
   subject: string,
 ): Promise<ResolvedIdentity | undefined> {
-  let result: ResolvedIdentity | undefined;
+  let row: { found: boolean; userId: string; schoolId: string; identityId: string } | undefined;
   await db.begin(async (tx) => {
     await tx.unsafe("SET LOCAL ROLE studafy_app");
-    const rows = await tx<{ user_id: string; school_id: string; id: string }[]>`
-      SELECT id, user_id, school_id
-        FROM app.oauth_identities
-       WHERE provider = ${provider}
-         AND subject = ${subject}
-       LIMIT 1
+    const rows = await tx<
+      { found: boolean; userId: string; schoolId: string; identityId: string }[]
+    >`
+      SELECT
+        found,
+        user_id AS "userId",
+        school_id AS "schoolId",
+        identity_id AS "identityId"
+      FROM app.resolve_oauth_identity_for_login(${provider}, ${subject})
     `;
-    result = rows[0]
-      ? { userId: rows[0].user_id, schoolId: rows[0].school_id, identityId: rows[0].id }
-      : undefined;
+    row = rows[0];
   });
-  return result;
+
+  if (!row || !row.found) return undefined;
+  return { userId: row.userId, schoolId: row.schoolId, identityId: row.identityId };
 }
 
 // ---------------------------------------------------------------------------
