@@ -23,6 +23,7 @@ import {
   createJtiDenylist,
   googleOAuthRoutes,
   jwksRoutes,
+  microsoftOAuthRoutes,
   sessionRoutes,
 } from "./modules/auth";
 import { invitationRoutes } from "./modules/auth/invitation/route";
@@ -247,6 +248,26 @@ export function createApp({
     app.route(
       "/",
       googleOAuthRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        logger,
+      ),
+    );
+  }
+
+  // Microsoft OAuth (OIDC). Same requirements as Google — database for identity lookup, key store
+  // for access-token signing. Uses the Microsoft identity platform common endpoint, which accepts
+  // tokens from any Entra ID tenant.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      microsoftOAuthRoutes(
         database,
         {
           keyStore,

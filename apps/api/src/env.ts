@@ -99,6 +99,10 @@ export const envSchema = z
     GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
     GOOGLE_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // Microsoft OAuth (OIDC). All optional — the feature activates only when all three are set.
+    MICROSOFT_OAUTH_CLIENT_ID: z.string().min(1).optional(),
+    MICROSOFT_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
+    MICROSOFT_OAUTH_REDIRECT_URI: z.string().url().optional(),
     // Where to redirect after a successful OAuth callback. Not setting it disables the redirect.
     FRONTEND_URL: z.string().url().optional(),
   })
@@ -145,6 +149,28 @@ export const envSchema = z
         code: "custom",
         path: ["GOOGLE_OAUTH_CLIENT_ID"],
         message: `All Google OAuth variables must be set together. Missing: ${missing}`,
+      });
+    }
+
+    // Microsoft OAuth: all three must be present or all absent.
+    const microsoftVars = [
+      env.MICROSOFT_OAUTH_CLIENT_ID,
+      env.MICROSOFT_OAUTH_CLIENT_SECRET,
+      env.MICROSOFT_OAUTH_REDIRECT_URI,
+    ];
+    const microsoftSetCount = microsoftVars.filter((v) => v !== undefined).length;
+    if (microsoftSetCount > 0 && microsoftSetCount < 3) {
+      const missing = [
+        !env.MICROSOFT_OAUTH_CLIENT_ID && "MICROSOFT_OAUTH_CLIENT_ID",
+        !env.MICROSOFT_OAUTH_CLIENT_SECRET && "MICROSOFT_OAUTH_CLIENT_SECRET",
+        !env.MICROSOFT_OAUTH_REDIRECT_URI && "MICROSOFT_OAUTH_REDIRECT_URI",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      context.addIssue({
+        code: "custom",
+        path: ["MICROSOFT_OAUTH_CLIENT_ID"],
+        message: `All Microsoft OAuth variables must be set together. Missing: ${missing}`,
       });
     }
 
