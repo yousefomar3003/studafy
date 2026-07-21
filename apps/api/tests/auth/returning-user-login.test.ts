@@ -1,7 +1,6 @@
 import { ROLES } from "@studafy/constants";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"; // eslint-disable-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 
-
 import { createApp } from "../../src/app";
 import { resetSecurityConfig } from "../../src/config/security";
 import { createInflightTracker } from "../../src/lifecycle";

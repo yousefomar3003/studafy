@@ -95,6 +95,11 @@ const EXEMPT_PATHS = [
   // ticket; see docs/architecture/SAD_13_session_model.md.
   "/api/auth/refresh",
   "/api/auth/logout",
+  // Returning-user OAuth login (ST-079). Authenticates with a Microsoft OIDC id_token in the
+  // request body — the id_token is the credential. There is no ambient authority (cookie or
+  // Bearer header) a cross-site page could forge; the token arrives as a one-shot credential,
+  // identical in security posture to the activation endpoint above.
+  "/api/auth/login",
 ];
 
 type CsrfFailureReason = "missing_token" | "token_mismatch";
