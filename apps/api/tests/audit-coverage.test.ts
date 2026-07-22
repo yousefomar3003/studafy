@@ -74,6 +74,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/auth/devices/{deviceId}",
   "DELETE /api/admin/users/{userId}/devices",
   "DELETE /api/admin/users/{userId}/devices/{deviceId}",
+  // Provider linking (R-03). Link start creates an oauth_identities row; unlink and admin unlink
+  // delete one. Audit rows are written from inside the service transactions.
+  "POST /api/auth/providers/link/start",
+  "DELETE /api/auth/providers/{provider}",
+  "DELETE /api/admin/users/{userId}/providers/{provider}",
 ];
 
 function collectSourceFiles(dir: string): string[] {

@@ -26,6 +26,8 @@ import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { deliverTokenPair } from "../delivery";
+import { getGoogleOAuthConfig } from "../oauth/config";
+import { validateGoogleIdToken } from "../oauth/google-id-token";
 import { getMicrosoftOAuthConfig } from "../oauth/microsoft-config";
 import { validateMicrosoftIdToken } from "../oauth/microsoft-id-token";
 import { loginReturningUser } from "../services/returning-user-login-service";
@@ -46,8 +48,8 @@ const loginBodySchema = z
       .min(1)
       .openapi({
         description:
-          "A verified Microsoft OIDC ID token. The client obtains this from a Microsoft " +
-          "authorization request; the server validates it against Microsoft's JWKS.",
+          "A verified Microsoft or Google OIDC ID token. The client obtains this from an " +
+          "authorization request; the server validates it against the provider's JWKS.",
         example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIs...",
       }),
     nonce: z
@@ -58,6 +60,15 @@ const loginBodySchema = z
           "The nonce the client generated for its OIDC authorization request. The ID token " +
           "is rejected unless it was minted with this nonce.",
         example: "n-0S6_WzA2Mj",
+      }),
+    provider: z
+      .enum(["microsoft", "google"])
+      .default("microsoft")
+      .openapi({
+        description:
+          "The OAuth provider that issued the id_token. Determines which JWKS is used for " +
+          "validation and which identity store is queried.",
+        example: "microsoft",
       }),
     channel: z
       .enum(["web", "mobile", "api"])
@@ -130,9 +141,13 @@ interface LoginRouteDeps {
     idToken: string,
     nonce: string,
   ) => Promise<{ subject: string; email: string }>;
+  verifyGoogleIdentity?: (
+    idToken: string,
+    nonce: string,
+  ) => Promise<{ subject: string; email: string }>;
 }
 
-async function defaultVerifyIdentity(
+async function defaultVerifyMicrosoftIdentity(
   idToken: string,
   nonce: string,
 ): Promise<{ subject: string; email: string }> {
@@ -141,6 +156,18 @@ async function defaultVerifyIdentity(
     throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
   }
   const claims = await validateMicrosoftIdToken(idToken, oauthConfig.clientId, nonce);
+  return { subject: claims.sub, email: claims.email };
+}
+
+async function defaultVerifyGoogleIdentity(
+  idToken: string,
+  nonce: string,
+): Promise<{ subject: string; email: string }> {
+  const oauthConfig = getGoogleOAuthConfig();
+  if (!oauthConfig) {
+    throw new HTTPException(404, { message: "Google OAuth is not configured" });
+  }
+  const claims = await validateGoogleIdToken(idToken, oauthConfig.clientId, nonce);
   return { subject: claims.sub, email: claims.email };
 }
 
@@ -161,35 +188,40 @@ export function returningUserLoginRoutes(
   deps: LoginRouteDeps = {},
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
-  const verifyIdentity = deps.verifyMicrosoftIdentity ?? defaultVerifyIdentity;
+  const verifyMicrosoft = deps.verifyMicrosoftIdentity ?? defaultVerifyMicrosoftIdentity;
+  const verifyGoogle = deps.verifyGoogleIdentity ?? defaultVerifyGoogleIdentity;
 
   routes.use("/api/auth/login/oauth", auditAction("login", "refresh_tokens"));
 
   routes.openapi(loginRoute, async (c) => {
-    const { id_token, nonce, channel } = c.req.valid("json");
+    const { id_token, nonce, provider, channel } = c.req.valid("json");
     const log = c.get("log");
     const requestId = c.get("requestId");
     const clientIp = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? null;
     const userAgent = c.req.header("user-agent") ?? null;
 
-    // Delegate identity verification to the injected or default verifier. Any typed HTTP failure it
+    // Delegate identity verification to the provider-specific verifier. Any typed HTTP failure it
     // raises (the default verifier's CodedHttpException / HTTPException) is already a client-safe
     // problem+json and propagates unchanged; anything else is an id_token that failed validation, so
     // it collapses to a single 401 AUTH_TOKEN_INVALID rather than leaking as a 500.
     let claims: { subject: string; email: string };
     try {
-      claims = await verifyIdentity(id_token, nonce);
+      claims =
+        provider === "google"
+          ? await verifyGoogle(id_token, nonce)
+          : await verifyMicrosoft(id_token, nonce);
     } catch (error) {
       if (error instanceof HTTPException) throw error;
       throw new CodedHttpException(
         401,
         ERROR_CODES.AUTH_TOKEN_INVALID,
-        "Invalid Microsoft identity token",
+        `Invalid ${provider} identity token`,
       );
     }
 
     const result = await loginReturningUser(db, config, {
       subject: claims.subject,
+      provider,
       channel,
       device: { userAgent, ipAddress: clientIp },
       requestId,

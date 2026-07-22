@@ -16,6 +16,10 @@ export interface StateEntry {
   codeVerifier: string;
   nonce: string;
   createdAt: number;
+  /** When present, this state initiates a provider-link flow bound to this user. */
+  purpose?: "link";
+  userId?: string;
+  schoolId?: string;
 }
 
 export interface StateStore {
