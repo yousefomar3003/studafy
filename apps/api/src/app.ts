@@ -25,6 +25,7 @@ import {
   googleOAuthRoutes,
   jwksRoutes,
   microsoftOAuthRoutes,
+  providerLinkRoutes,
   returningUserLoginRoutes,
   sessionRoutes,
 } from "./modules/auth";
@@ -332,6 +333,26 @@ export function createApp({
         },
         logger,
         microsoftIdentityVerifier ? { verifyMicrosoftIdentity: microsoftIdentityVerifier } : {},
+      ),
+    );
+  }
+
+  // OAuth provider linking (R-03). Lets authenticated users link a second provider for lockout
+  // resilience, and admins unlink providers. Needs database for identity CRUD and the state store
+  // for the linking OAuth flow.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      providerLinkRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        logger,
       ),
     );
   }

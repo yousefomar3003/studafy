@@ -105,3 +105,13 @@ export { googleOAuthRoutes } from "./oauth/google-route";
 export { microsoftOAuthRoutes } from "./oauth/microsoft-route";
 export { type DenylistEntry } from "./denylist";
 export type { AccessTokenClaims, JwtPayload, SignAccessTokenParams } from "./jwt/types";
+export {
+  listLinkedProviders,
+  completeProviderLink,
+  unlinkProvider,
+  type LinkedProvider,
+  type ListLinkedProvidersResult,
+  type LinkProviderParams,
+  type UnlinkProviderParams,
+} from "./services/provider-link-service";
+export { providerLinkRoutes } from "./routes/provider-link-routes";
