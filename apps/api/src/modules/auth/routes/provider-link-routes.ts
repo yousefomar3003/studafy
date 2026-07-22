@@ -23,8 +23,10 @@ import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
+import { requireChannel } from "../../../middleware/channelGuard";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { AUTH_CHANNELS } from "../channels";
 import { getGoogleOAuthConfig, GOOGLE_AUTH_ENDPOINT, GOOGLE_SCOPES } from "../oauth/config";
 import { validateGoogleIdToken } from "../oauth/google-id-token";
 import {
@@ -295,6 +297,9 @@ export function providerLinkRoutes(
   });
 
   // --- Admin unlink ---------------------------------------------------------
+  // Channel guard: administrative mutations are restricted to web sessions.
+  const adminChannelGuard = requireChannel(AUTH_CHANNELS.WEB);
+  routes.use("/api/admin/users/:userId/providers/:provider", adminChannelGuard);
   const adminGuard = requirePermission(PERMISSIONS.USER_SUSPEND);
   routes.use("/api/admin/users/:userId/providers/:provider", adminGuard);
   routes.use("/api/admin/users/:userId/providers/:provider", adminUnlinkAudit);

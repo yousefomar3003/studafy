@@ -35,6 +35,9 @@ export const ERROR_CODES = {
   AUTHZ_ROLE_NOT_FOUND: "AUTHZ_ROLE_NOT_FOUND",
   AUTHZ_PERMISSION_NOT_FOUND: "AUTHZ_PERMISSION_NOT_FOUND",
 
+  // Channel policy — the caller's session channel is not authorized for this operation.
+  CHANNEL_NOT_AUTHORIZED: "CHANNEL_NOT_AUTHORIZED",
+
   // Validation — caller input was malformed.
   VALIDATION_FAILED: "VALIDATION_FAILED",
   VALIDATION_REQUIRED_FIELD_MISSING: "VALIDATION_REQUIRED_FIELD_MISSING",
