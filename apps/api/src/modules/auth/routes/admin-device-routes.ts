@@ -4,8 +4,10 @@ import { PERMISSIONS } from "@studafy/constants";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
+import { requireChannel } from "../../../middleware/channelGuard";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { AUTH_CHANNELS } from "../../auth/channels";
 import { adminRevokeUserSessions, REVOCATION_REASONS } from "../services/revocation-service";
 
 import type { Database } from "../../../db/client";
@@ -101,6 +103,13 @@ export function adminDeviceRoutes(
   denylist: JtiDenylist | null,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  // Channel guard: administrative mutations are restricted to web sessions. Mobile and API
+  // tokens are rejected regardless of role — the threat model is the token surface, not the role.
+  // Runs before the permission guard for early rejection.
+  const channelGuard = requireChannel(AUTH_CHANNELS.WEB);
+  routes.use("/api/admin/users/:userId/devices", channelGuard);
+  routes.use("/api/admin/users/:userId/devices/:deviceId", channelGuard);
 
   // USER_SUSPEND rather than a new permission constant. Terminating every credential a user holds is
   // operationally indistinguishable from suspending them — both end the account's ability to act —

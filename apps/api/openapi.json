@@ -210,6 +210,7 @@
               "AUTHZ_FORBIDDEN",
               "AUTHZ_ROLE_NOT_FOUND",
               "AUTHZ_PERMISSION_NOT_FOUND",
+              "CHANNEL_NOT_AUTHORIZED",
               "VALIDATION_FAILED",
               "VALIDATION_REQUIRED_FIELD_MISSING",
               "RESOURCE_NOT_FOUND",

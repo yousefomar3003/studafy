@@ -15,6 +15,7 @@
   "AUTHZ_FORBIDDEN": "Access denied",
   "AUTHZ_ROLE_NOT_FOUND": "Required role not found",
   "AUTHZ_PERMISSION_NOT_FOUND": "Required permission not found",
+  "CHANNEL_NOT_AUTHORIZED": "This operation is not available from this client",
   "VALIDATION_FAILED": "Validation failed",
   "VALIDATION_REQUIRED_FIELD_MISSING": "Required field is missing",
   "RESOURCE_NOT_FOUND": "Resource not found",

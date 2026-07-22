@@ -15,6 +15,7 @@
   "AUTHZ_FORBIDDEN": "تم رفض الوصول",
   "AUTHZ_ROLE_NOT_FOUND": "لم يتم العثور على الدور المطلوب",
   "AUTHZ_PERMISSION_NOT_FOUND": "لم يتم العثور على الصلاحية المطلوبة",
+  "CHANNEL_NOT_AUTHORIZED": "هذه العملية غير متاحة من هذا العميل",
   "VALIDATION_FAILED": "فشل التحقق من الصحة",
   "VALIDATION_REQUIRED_FIELD_MISSING": "الحقل المطلوب مفقود",
   "RESOURCE_NOT_FOUND": "لم يتم العثور على المورد",
