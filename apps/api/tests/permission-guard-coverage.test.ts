@@ -41,14 +41,17 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/invitations/{id}/regenerate",
   "POST /api/auth/invitations/{token}/activate",
   "POST /api/auth/login/oauth",
+  "POST /api/auth/providers/link/start",
   "POST /erpnext/webhooks",
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
   "DELETE /api/auth/devices/{deviceId}/sessions",
   "DELETE /api/auth/devices/{deviceId}",
+  "DELETE /api/auth/providers/{provider}",
   "DELETE /api/admin/users/{userId}/devices",
   "DELETE /api/admin/users/{userId}/devices/{deviceId}",
+  "DELETE /api/admin/users/{userId}/providers/{provider}",
 ];
 
 /**
@@ -79,6 +82,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Returning-user OAuth login (ST-079) — public self-service login. Authorized by a verified
   // Microsoft OIDC id_token, not by a bearer permission; authenticates the caller, not another user.
   "POST /api/auth/login/oauth",
+  // Provider linking (ST-080) — self-service link/unlink on the caller's own data.
+  "POST /api/auth/providers/link/start",
+  "DELETE /api/auth/providers/{provider}",
   // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",

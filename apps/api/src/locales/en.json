@@ -24,5 +24,7 @@
   "CONFLICT_IDEMPOTENCY_KEY_MISMATCH": "Request body differs from the original idempotent request",
   "RATE_LIMIT_EXCEEDED": "Too many requests",
   "INTERNAL_ERROR": "An unexpected error occurred",
-  "NO_ACCOUNT": "No account found"
+  "NO_ACCOUNT": "No account found",
+  "OAUTH_LAST_PROVIDER": "Cannot unlink your last authentication provider",
+  "OAUTH_IDENTITY_EXISTS": "This provider account is already linked to another user"
 }

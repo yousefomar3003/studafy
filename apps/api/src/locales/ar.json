@@ -24,5 +24,7 @@
   "CONFLICT_IDEMPOTENCY_KEY_MISMATCH": "محتوى الطلب يختلف عن الطلب الأصلي المحدد بمعرف التكرار",
   "RATE_LIMIT_EXCEEDED": "تم تجاوز حد الطلبات",
   "INTERNAL_ERROR": "حدث خطأ غير متوقع",
-  "NO_ACCOUNT": "لم يتم العثور على حساب"
+  "NO_ACCOUNT": "لم يتم العثور على حساب",
+  "OAUTH_LAST_PROVIDER": "لا يمكن إلغاء ربط آخر مزود مصادقة",
+  "OAUTH_IDENTITY_EXISTS": "حساب هذا المزود مربوط بالفعل بمستخدم آخر"
 }
