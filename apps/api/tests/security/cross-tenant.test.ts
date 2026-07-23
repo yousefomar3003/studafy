@@ -133,6 +133,14 @@ async function seedTenant(
       VALUES (${school}, ${email}, ${email}, 'active') RETURNING id
     `;
     await transaction`SELECT set_config('app.user_id', ${user!.id}, true)`;
+    // ST-085: the academic tables now carry role_scope_visibility restrictive policies. This probe's
+    // principal is a plain user; granting it an admin role in its own school keeps it able to read the
+    // rows it seeds, so the forced-index-plan sweep still exercises real access paths rather than
+    // empty results. It does not weaken the cross-tenant assertions -- admin scope is school-local.
+    await transaction`
+      INSERT INTO app.user_roles (school_id, user_id, role)
+      VALUES (${school}, ${user!.id}, 'ORG_ADMIN')
+    `;
     const studentEmail = `st051-student-${suffix}@example.test`;
     const [studentUser] = await transaction<{ id: string }[]>`
       INSERT INTO app.users (school_id, email, normalized_email, status)

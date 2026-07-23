@@ -88,7 +88,12 @@ async function createSchool(database: Database, slug: string): Promise<string> {
 }
 
 async function createFixture(database: Database, school: string, suffix: string): Promise<Fixture> {
-  return asRole(database, "studafy_app", async (tx) => {
+  // ST-085: several tables this fixture seeds (students, subjects, courses, classes, gradebooks,
+  // grade_submissions, grades, ...) now carry a restrictive role_scope_visibility SELECT policy,
+  // which PostgreSQL also applies to INSERT ... RETURNING. Seed as studafy_admin (still bound by
+  // tenant_isolation, exempt from the TO studafy_app scope policy) so the fixture writes are not
+  // filtered by a per-user read scope it has no authenticated user for.
+  return asRole(database, "studafy_admin", async (tx) => {
     await tx`SELECT set_config('app.school_id', ${school}, true)`;
     const lower = suffix.toLowerCase();
     const [staff] = await tx<{ id: string }[]>`
@@ -263,11 +268,18 @@ integrationTest(
           AND c.relname = ANY(${TABLES as unknown as string[]})
         ORDER BY c.relname
       `;
-      expect(policies).toHaveLength(3);
-      for (const policy of policies) {
-        expect(policy.name).toBe("tenant_isolation");
+      // Every grades workflow table carries the permissive tenant_isolation policy. ST-085 layers
+      // the restrictive role_scope_visibility SELECT policy onto each of them as well.
+      const tenantPolicies = policies.filter((policy) => policy.name === "tenant_isolation");
+      const scopePolicies = policies.filter((policy) => policy.name === "role_scope_visibility");
+      expect(tenantPolicies).toHaveLength(3);
+      for (const policy of tenantPolicies) {
         expect(policy.using).toContain("current_setting('app.school_id'::text)");
         expect(policy.check).toContain("current_setting('app.school_id'::text)");
+      }
+      expect(scopePolicies.map((policy) => policy.tableName).sort()).toEqual([...TABLES].sort());
+      for (const policy of scopePolicies) {
+        expect(policy.check).toBeNull();
       }
     } finally {
       await database.cleanup();
@@ -305,7 +317,9 @@ integrationTest(
         schoolA,
       );
 
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: updates and reads back scoped app.gradebooks rows, so run as studafy_admin (exempt
+      // from role_scope_visibility, still bound by tenant_isolation).
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         const [row] = await tx<{ id: string; status: string }[]>`
           UPDATE app.gradebooks SET status = 'active' WHERE id = ${a.gradebook}
@@ -341,7 +355,8 @@ integrationTest(
         schoolA,
       );
 
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: updates and reads back scoped app.grade_submissions rows, so run as studafy_admin.
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
 
         await tx`
@@ -375,9 +390,13 @@ integrationTest(
         database,
         `UPDATE app.grade_submissions SET status = 'draft' WHERE id = '${a.submission}'`,
         schoolA,
+        // ST-085: run as studafy_admin so the published submission is visible; the state-machine
+        // trigger still rejects the published -> draft transition.
+        "studafy_admin",
       );
 
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: updates and reads back scoped app.grade_submissions rows, so run as studafy_admin.
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
 
         await tx`
@@ -413,12 +432,16 @@ integrationTest(
         `UPDATE app.grade_submissions
          SET submitted_at = '2026-01-01' WHERE id = '${a.submission}'`,
         schoolA,
+        // ST-085: run as studafy_admin so the existing submission is visible; the update is still
+        // rejected by the submission's guard trigger / column-immutability rule.
+        "studafy_admin",
       );
       await expectDenied(
         database,
         `UPDATE app.grade_submissions
          SET status = 'invented' WHERE id = '${a.submission}'`,
         schoolA,
+        "studafy_admin",
       );
     } finally {
       await database.cleanup();
@@ -480,7 +503,8 @@ integrationTest(
         schoolA,
       );
 
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: inserts scoped app.grades with RETURNING and reads them back, so run as studafy_admin.
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         const [grade] = await tx<{ id: string }[]>`
           INSERT INTO app.grades
@@ -548,13 +572,17 @@ integrationTest(
         ["gradebooks", a.gradebook],
         ["grade_submissions", a.submission],
       ]) {
+        // ST-085: run as studafy_admin so the existing scoped row is visible; tenant_isolation's
+        // WITH CHECK still blocks moving it to another school.
         await expectDenied(
           database,
           `UPDATE app.${table} SET school_id='${schoolB}' WHERE id='${id}'`,
           schoolA,
+          "studafy_admin",
         );
       }
-      const [gradeId] = await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: inserts a scoped app.grades row with RETURNING, so run as studafy_admin.
+      const [gradeId] = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         return tx<{ id: string }[]>`
           INSERT INTO app.grades
@@ -566,6 +594,7 @@ integrationTest(
         database,
         `UPDATE app.grades SET school_id='${schoolB}' WHERE id='${gradeId!.id}'`,
         schoolA,
+        "studafy_admin",
       );
 
       await expectDenied(
@@ -597,7 +626,9 @@ integrationTest(
       const school = await createSchool(database, "grades-visibility");
       const fixture = await createFixture(database, school, "VIS");
 
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: inserts scoped app.grades and updates/reads back scoped app.grade_submissions rows,
+      // so run as studafy_admin (exempt from role_scope_visibility, still bound by tenant_isolation).
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
 
         await tx`
@@ -703,7 +734,8 @@ integrationTest(
       `;
       expect(duplicates).toHaveLength(0);
 
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: updates the scoped submission and seeds scoped app.grades, so run as studafy_admin.
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         await tx`
           UPDATE app.grade_submissions
@@ -719,7 +751,10 @@ integrationTest(
       });
       await database.sql.unsafe("VACUUM ANALYZE app.grades");
 
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: this test verifies the index design for each query shape. Run the EXPLAIN sweep as
+      // studafy_admin so the plans are not perturbed by role_scope_visibility's can_read_* filter
+      // (a per-user SELECT policy on studafy_app); the index-selection assertions stay meaningful.
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         await tx.unsafe("SET LOCAL enable_seqscan = off");
         await tx.unsafe("SET LOCAL enable_bitmapscan = off");
