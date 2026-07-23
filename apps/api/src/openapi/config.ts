@@ -77,5 +77,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Academic year and term lifecycle management. Authenticated and tenant-scoped. " +
         "Includes CRUD operations and the rollover action for year transitions.",
     },
+    {
+      name: "Users",
+      description:
+        "User management and administration. Authenticated and tenant-scoped. " +
+        "Includes CRUD operations, role assignment, and deactivation with session revocation.",
+    },
   ],
 };

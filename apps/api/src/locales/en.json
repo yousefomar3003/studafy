@@ -35,5 +35,7 @@
   "VERIFICATION_TOKEN_CONSUMED": "Verification token has already been used",
   "CAPTCHA_INVALID": "Captcha verification failed",
   "ACADEMIC_YEAR_ACTIVE_EXISTS": "An active academic year already exists for this school",
-  "ACADEMIC_YEAR_DATE_OVERLAP": "The date range overlaps with an existing academic year"
+  "ACADEMIC_YEAR_DATE_OVERLAP": "The date range overlaps with an existing academic year",
+  "USER_EMAIL_DUPLICATE": "A user with this email already exists in this school",
+  "INVALID_ROLE_ASSIGNMENT": "The specified role is not valid for this school"
 }

@@ -93,6 +93,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/years/{yearId}/terms",
   "PATCH /api/academics/terms/{termId}",
   "DELETE /api/academics/terms/{termId}",
+  // User management & administration (ST-093). Authenticated, tenant-scoped CRUD and deactivation.
+  "POST /api/users",
+  "PATCH /api/users/{userId}",
+  "PATCH /api/users/{userId}/role",
+  "PATCH /api/users/{userId}/deactivate",
 ];
 
 function collectSourceFiles(dir: string): string[] {
