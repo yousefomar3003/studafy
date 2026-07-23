@@ -27,5 +27,8 @@
   "INTERNAL_ERROR": "An unexpected error occurred",
   "NO_ACCOUNT": "No account found",
   "OAUTH_LAST_PROVIDER": "Cannot unlink your last authentication provider",
-  "OAUTH_IDENTITY_EXISTS": "This provider account is already linked to another user"
+  "OAUTH_IDENTITY_EXISTS": "This provider account is already linked to another user",
+  "SCHOOL_EMAIL_DUPLICATE": "A school with this email already exists",
+  "SCHOOL_SLUG_DUPLICATE": "A school with this slug already exists",
+  "CAPTCHA_INVALID": "Captcha verification failed"
 }

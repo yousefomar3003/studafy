@@ -30,6 +30,7 @@ import {
   sessionRoutes,
 } from "./modules/auth";
 import { invitationRoutes } from "./modules/auth/invitation/route";
+import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -216,6 +217,13 @@ export function createApp({
   // (no auth middleware) because ERPNext authenticates via HMAC signature, not a session token.
   if (database) {
     app.route("/", erpNextWebhookRoutes(database, logger));
+  }
+
+  // School self-registration — public, no authentication. Protected by Turnstile captcha and
+  // rate limiting (auth-strict class). Needs a database to create the school, admin user,
+  // and activation invitation in a single transaction.
+  if (database) {
+    app.route("/", registerSchoolRoutes(database, logger));
   }
 
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.

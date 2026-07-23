@@ -407,6 +407,26 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/schools/register": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Register a new school
+         * @description Public self-registration endpoint. Validates the request, verifies the captcha token, and atomically creates the school (status=registered), its first ORG_ADMIN user, and an activation invitation. Duplicate school email or slug are rejected with clear error codes. The raw invitation token is returned exactly once in this response.
+         */
+        readonly post: operations["registerSchool"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/erpnext/webhooks": {
         readonly parameters: {
             readonly query?: never;
@@ -658,7 +678,7 @@ export interface components {
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "RATE_LIMIT_EXCEEDED" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "RATE_LIMIT_EXCEEDED" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -689,6 +709,98 @@ export interface components {
             readonly revoked_invitation_id: string;
             /** @description One-time-use invitation token for the new invitation. This is the only time the raw token is returned. */
             readonly token: string;
+        };
+        readonly RegisterSchool: {
+            /**
+             * Format: email
+             * @description Email address of the first administrator. An invitation will be sent to this address.
+             * @example principal@springfield-academy.edu
+             */
+            readonly admin_email: string;
+            /**
+             * @description Display name for the first administrator.
+             * @example Dr. Jane Smith
+             */
+            readonly admin_name?: string;
+            /** @description Cloudflare Turnstile captcha token from the client widget. */
+            readonly captcha_token: string;
+            /**
+             * Format: uuid
+             * @description UUID of the country from app.countries.
+             * @example d07d5b8e-1c2a-4f3e-9b6a-8c1d2e3f4a5b
+             */
+            readonly country_id: string;
+            /**
+             * Format: uuid
+             * @description UUID of the default currency from app.currencies.
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
+             */
+            readonly default_currency_id: string;
+            /**
+             * Format: email
+             * @description School contact email address. Must be unique across the platform.
+             * @example admin@springfield-academy.edu
+             */
+            readonly email: string;
+            /**
+             * @description Display name of the school.
+             * @example Springfield Academy
+             */
+            readonly school_name: string;
+            /**
+             * @description URL-safe school identifier. 3-63 characters, lowercase alphanumeric with hyphens.
+             * @example springfield-academy
+             */
+            readonly slug: string;
+        };
+        readonly RegisterSchoolResponse: {
+            readonly admin: {
+                /**
+                 * Format: email
+                 * @description Administrator email address.
+                 */
+                readonly email: string;
+                /**
+                 * Format: uuid
+                 * @description Administrator user identifier.
+                 */
+                readonly id: string;
+                /**
+                 * @description Role assigned to the administrator.
+                 * @enum {string}
+                 */
+                readonly role: "ORG_ADMIN";
+            };
+            readonly invitation: {
+                /**
+                 * Format: date-time
+                 * @description Invitation expiry (ISO 8601).
+                 */
+                readonly expires_at: string;
+                /** @description One-time-use activation token. This is the only time the raw token is returned. It must be delivered to the administrator (e.g. via email) to activate their account. */
+                readonly token: string;
+            };
+            readonly school: {
+                /**
+                 * Format: date-time
+                 * @description Registration timestamp (ISO 8601).
+                 */
+                readonly created_at: string;
+                /**
+                 * Format: uuid
+                 * @description School identifier.
+                 */
+                readonly id: string;
+                /** @description School display name. */
+                readonly name: string;
+                /** @description School slug. */
+                readonly slug: string;
+                /**
+                 * @description School status.
+                 * @enum {string}
+                 */
+                readonly status: "registered";
+            };
         };
         readonly ReturningUserLoginRequest: {
             /**
@@ -2297,6 +2409,76 @@ export interface operations {
             };
             /** @description No such resource, or it is not visible to this tenant. */
             readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly registerSchool: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RegisterSchool"];
+            };
+        };
+        readonly responses: {
+            /** @description School registered. The invitation token is included in this response only. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RegisterSchoolResponse"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
                 headers: {
                     /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
                     readonly "X-Request-Id": string;
