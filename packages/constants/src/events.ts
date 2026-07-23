@@ -12,6 +12,8 @@ export const DOMAIN_EVENTS = {
   INVITATION_REVOKED: "invitation.revoked",
 
   SCHOOL_REGISTERED: "school.registered",
+  SCHOOL_VERIFICATION_EMAIL_SENT: "school.verificationEmailSent",
+  SCHOOL_EMAIL_VERIFIED: "school.emailVerified",
 
   ORGANIZATION_CREATED: "organization.created",
   ORGANIZATION_UPDATED: "organization.updated",

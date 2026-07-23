@@ -37,9 +37,11 @@ export async function createSchool(
         (SELECT id FROM app.currencies WHERE code = 'USD') AS currency
     `;
 
+    const email = `${slug}@admin.local`;
+    const normalizedEmail = email.toLowerCase().trim();
     const [school] = await tx<{ id: string; slug: string }[]>`
-      INSERT INTO app.schools (slug, name, country_id, default_currency_id)
-      VALUES (${slug}, ${name}, ${reference!.country}, ${reference!.currency})
+      INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
+      VALUES (${slug}, ${name}, ${email}, ${normalizedEmail}, ${reference!.country}, ${reference!.currency})
       RETURNING id, slug
     `;
 

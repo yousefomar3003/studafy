@@ -5,10 +5,12 @@
 SET LOCAL ROLE studafy_admin;
 
 -- Demo school
-INSERT INTO app.schools (slug, name, status, country_id, default_currency_id)
+INSERT INTO app.schools (slug, name, email, normalized_email, status, country_id, default_currency_id)
 SELECT
   'demo-academy',
   'Demo Academy',
+  'demo-academy@admin.local',
+  'demo-academy@admin.local',
   'active',
   c.id,
   cur.id

@@ -127,8 +127,9 @@ benchmarkTest(
         const { school, material } = await database.sql.begin(async (tx) => {
           await tx.unsafe("SET LOCAL ROLE studafy_admin");
           const [created] = await tx<{ id: string }[]>`
-            INSERT INTO app.schools (slug, name, country_id, default_currency_id)
+            INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
             VALUES (${`bench-${t}`}, ${`Bench ${t}`},
+                    ${`${`bench-${t}`}@admin.local`}, ${`${`bench-${t}`}@admin.local`},
                     (SELECT id FROM app.countries WHERE alpha2_code = 'US'),
                     (SELECT id FROM app.currencies WHERE code = 'USD'))
             RETURNING id
