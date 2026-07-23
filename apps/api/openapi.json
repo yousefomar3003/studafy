@@ -47,6 +47,10 @@
     {
       "name": "Schools",
       "description": "School management endpoints. Public self-registration creates a new school with its first administrator; authenticated endpoints manage existing schools."
+    },
+    {
+      "name": "Academics",
+      "description": "Academic year and term lifecycle management. Authenticated and tenant-scoped. Includes CRUD operations and the rollover action for year transitions."
     }
   ],
   "components": {
@@ -228,6 +232,8 @@
               "CONFLICT_DUPLICATE_ENTRY",
               "CONFLICT_STATE_MISMATCH",
               "CONFLICT_IDEMPOTENCY_KEY_MISMATCH",
+              "ACADEMIC_YEAR_ACTIVE_EXISTS",
+              "ACADEMIC_YEAR_DATE_OVERLAP",
               "RATE_LIMIT_EXCEEDED",
               "INTERNAL_ERROR"
             ]
@@ -1016,6 +1022,355 @@
           }
         },
         "required": ["revoked", "denylisted"]
+      },
+      "AcademicYearList": {
+        "type": "object",
+        "properties": {
+          "academic_years": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcademicYear"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total matching records."
+          }
+        },
+        "required": ["academic_years", "total"]
+      },
+      "AcademicYear": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Primary key."
+          },
+          "school_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning school tenant."
+          },
+          "code": {
+            "type": "string",
+            "description": "Short unique code within the school.",
+            "example": "2025-2026"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name.",
+            "example": "Academic Year 2025-2026"
+          },
+          "starts_on": {
+            "type": "string",
+            "format": "date",
+            "description": "First day of the academic year."
+          },
+          "ends_on": {
+            "type": "string",
+            "format": "date",
+            "description": "Last day of the academic year."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["planned", "active", "closed", "archived"],
+            "description": "Lifecycle state of an academic year."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "school_id",
+          "code",
+          "name",
+          "starts_on",
+          "ends_on",
+          "status",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "CreateAcademicYearBody": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Short unique code.",
+            "example": "2025-2026"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Human-readable name.",
+            "example": "Academic Year 2025-2026"
+          },
+          "starts_on": {
+            "type": "string",
+            "format": "date",
+            "description": "First day (YYYY-MM-DD)."
+          },
+          "ends_on": {
+            "type": "string",
+            "format": "date",
+            "description": "Last day (YYYY-MM-DD). Must be after starts_on."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["planned", "active", "closed", "archived"],
+            "default": "planned",
+            "description": "Lifecycle state of an academic year."
+          }
+        },
+        "required": ["code", "name", "starts_on", "ends_on"]
+      },
+      "UpdateAcademicYearBody": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Short unique code."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Human-readable name."
+          },
+          "starts_on": {
+            "type": "string",
+            "format": "date",
+            "description": "First day (YYYY-MM-DD)."
+          },
+          "ends_on": {
+            "type": "string",
+            "format": "date",
+            "description": "Last day (YYYY-MM-DD)."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["planned", "active", "closed", "archived"],
+            "description": "Lifecycle state of an academic year."
+          }
+        }
+      },
+      "RolloverResult": {
+        "type": "object",
+        "properties": {
+          "prior_year_id": {
+            "type": ["string", "null"],
+            "format": "uuid",
+            "description": "ID of the previously active year, or null if none existed."
+          },
+          "prior_year_status": {
+            "type": ["string", "null"],
+            "enum": ["planned", "active", "closed", "archived", null],
+            "description": "Status the prior year was set to, or null."
+          },
+          "new_year_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the newly activated year."
+          },
+          "new_year_status": {
+            "type": "string",
+            "enum": ["active"],
+            "description": "The target year is now active."
+          },
+          "enrollments_archived": {
+            "type": "integer",
+            "description": "Number of enrollments transitioned to completed."
+          }
+        },
+        "required": [
+          "prior_year_id",
+          "prior_year_status",
+          "new_year_id",
+          "new_year_status",
+          "enrollments_archived"
+        ]
+      },
+      "TermList": {
+        "type": "object",
+        "properties": {
+          "terms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Term"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total matching records."
+          }
+        },
+        "required": ["terms", "total"]
+      },
+      "Term": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Primary key."
+          },
+          "school_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning school tenant."
+          },
+          "academic_year_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Parent academic year."
+          },
+          "code": {
+            "type": "string",
+            "description": "Short unique code within the academic year.",
+            "example": "T1"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name.",
+            "example": "Term 1"
+          },
+          "sequence_number": {
+            "type": "integer",
+            "description": "Ordinal position within the year.",
+            "example": 1
+          },
+          "starts_on": {
+            "type": "string",
+            "format": "date",
+            "description": "First day of the term."
+          },
+          "ends_on": {
+            "type": "string",
+            "format": "date",
+            "description": "Last day of the term."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["planned", "active", "closed", "archived"],
+            "description": "Lifecycle state of an academic year."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "school_id",
+          "academic_year_id",
+          "code",
+          "name",
+          "sequence_number",
+          "starts_on",
+          "ends_on",
+          "status",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "CreateTermBody": {
+        "type": "object",
+        "properties": {
+          "academic_year_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Parent academic year."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Short unique code.",
+            "example": "T1"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Human-readable name.",
+            "example": "Term 1"
+          },
+          "sequence_number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Ordinal position (1-based)."
+          },
+          "starts_on": {
+            "type": "string",
+            "format": "date",
+            "description": "First day (YYYY-MM-DD)."
+          },
+          "ends_on": {
+            "type": "string",
+            "format": "date",
+            "description": "Last day (YYYY-MM-DD)."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["planned", "active", "closed", "archived"],
+            "default": "planned",
+            "description": "Lifecycle state of an academic year."
+          }
+        },
+        "required": ["academic_year_id", "code", "name", "sequence_number", "starts_on", "ends_on"]
+      },
+      "UpdateTermBody": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Short unique code."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Human-readable name."
+          },
+          "sequence_number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Ordinal position."
+          },
+          "starts_on": {
+            "type": "string",
+            "format": "date",
+            "description": "First day (YYYY-MM-DD)."
+          },
+          "ends_on": {
+            "type": "string",
+            "format": "date",
+            "description": "Last day (YYYY-MM-DD)."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["planned", "active", "closed", "archived"],
+            "description": "Lifecycle state of an academic year."
+          }
+        }
       }
     },
     "parameters": {}
@@ -4471,6 +4826,1798 @@
           },
           "429": {
             "description": "Rate limit exceeded. Back off and retry.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/academics/years": {
+      "get": {
+        "tags": ["Academics"],
+        "operationId": "listAcademicYears",
+        "summary": "List academic years",
+        "description": "Paginated list of academic years for the authenticated school, ordered by start date descending.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["planned", "active", "closed", "archived"],
+              "description": "Lifecycle state of an academic year."
+            },
+            "required": false,
+            "description": "Lifecycle state of an academic year.",
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of academic years.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcademicYearList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Academics"],
+        "operationId": "createAcademicYear",
+        "summary": "Create an academic year",
+        "description": "Creates a new academic year for the school. Fails if the date range overlaps an active year or if setting status to active when one already exists.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAcademicYearBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created academic year.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcademicYear"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was malformed or failed schema validation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the resource.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/academics/years/{yearId}": {
+      "get": {
+        "tags": ["Academics"],
+        "operationId": "getAcademicYear",
+        "summary": "Get an academic year",
+        "description": "Returns a single academic year by ID.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Academic year UUID."
+            },
+            "required": true,
+            "description": "Academic year UUID.",
+            "name": "yearId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The academic year.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcademicYear"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource, or it is not visible to this tenant.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Academics"],
+        "operationId": "updateAcademicYear",
+        "summary": "Update an academic year",
+        "description": "Partially updates an academic year. Validates date overlap and active-year constraints when relevant fields change.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Academic year UUID."
+            },
+            "required": true,
+            "description": "Academic year UUID.",
+            "name": "yearId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAcademicYearBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated academic year.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcademicYear"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was malformed or failed schema validation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource, or it is not visible to this tenant.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the resource.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Academics"],
+        "operationId": "deleteAcademicYear",
+        "summary": "Delete an academic year",
+        "description": "Deletes an academic year. Only years in 'planned' status with no dependent terms or classes can be deleted.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Academic year UUID."
+            },
+            "required": true,
+            "description": "Academic year UUID.",
+            "name": "yearId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Academic year deleted.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource, or it is not visible to this tenant.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the resource.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/academics/years/{yearId}/rollover": {
+      "post": {
+        "tags": ["Academics"],
+        "operationId": "rolloverAcademicYear",
+        "summary": "Roll over to a new academic year",
+        "description": "Transitions the target year to active and closes the prior active year. Archives all active enrollments in classes belonging to the prior year. Executes atomically.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Academic year UUID."
+            },
+            "required": true,
+            "description": "Academic year UUID.",
+            "name": "yearId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rollover completed.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolloverResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was malformed or failed schema validation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource, or it is not visible to this tenant.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the resource.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/academics/years/{yearId}/terms": {
+      "get": {
+        "tags": ["Academics"],
+        "operationId": "listTerms",
+        "summary": "List terms for an academic year",
+        "description": "Paginated list of terms belonging to the specified academic year.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Academic year UUID."
+            },
+            "required": true,
+            "description": "Academic year UUID.",
+            "name": "yearId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["planned", "active", "closed", "archived"],
+              "description": "Lifecycle state of an academic year."
+            },
+            "required": false,
+            "description": "Lifecycle state of an academic year.",
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of terms.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource, or it is not visible to this tenant.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Academics"],
+        "operationId": "createTerm",
+        "summary": "Create a term",
+        "description": "Creates a new term within the specified academic year.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Academic year UUID."
+            },
+            "required": true,
+            "description": "Academic year UUID.",
+            "name": "yearId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTermBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created term.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Term"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was malformed or failed schema validation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource, or it is not visible to this tenant.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the resource.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/academics/terms/{termId}": {
+      "get": {
+        "tags": ["Academics"],
+        "operationId": "getTerm",
+        "summary": "Get a term",
+        "description": "Returns a single term by ID.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Term UUID."
+            },
+            "required": true,
+            "description": "Term UUID.",
+            "name": "termId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The term.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Term"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource, or it is not visible to this tenant.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Academics"],
+        "operationId": "updateTerm",
+        "summary": "Update a term",
+        "description": "Partially updates a term.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Term UUID."
+            },
+            "required": true,
+            "description": "Term UUID.",
+            "name": "termId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTermBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated term.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Term"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was malformed or failed schema validation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource, or it is not visible to this tenant.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the resource.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The body carries no detail; correlate via request_id.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Academics"],
+        "operationId": "deleteTerm",
+        "summary": "Delete a term",
+        "description": "Deletes a term. Only terms in 'planned' status with no dependent classes can be deleted.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Term UUID."
+            },
+            "required": true,
+            "description": "Term UUID.",
+            "name": "termId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Term deleted.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing or invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not permitted to perform this operation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource, or it is not visible to this tenant.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the resource.",
             "headers": {
               "X-Request-Id": {
                 "schema": {
