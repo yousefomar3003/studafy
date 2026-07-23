@@ -35,5 +35,7 @@
   "VERIFICATION_TOKEN_CONSUMED": "تم استخدام رمز التحقق مسبقاً",
   "CAPTCHA_INVALID": "فشل التحقق من التحقق من الهوية",
   "ACADEMIC_YEAR_ACTIVE_EXISTS": "يوجد بالفعل سنة أكاديمية نشطة لهذه المدرسة",
-  "ACADEMIC_YEAR_DATE_OVERLAP": "نطاق التاريخ يتداخل مع سنة أكاديمية موجودة"
+  "ACADEMIC_YEAR_DATE_OVERLAP": "نطاق التاريخ يتداخل مع سنة أكاديمية موجودة",
+  "USER_EMAIL_DUPLICATE": "يوجد بالفعل مستخدم بهذا البريد الإلكتروني في هذه المدرسة",
+  "INVALID_ROLE_ASSIGNMENT": "الدور المحدد غير صالح لهذه المدرسة"
 }
