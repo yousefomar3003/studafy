@@ -1,6 +1,6 @@
 -- Canonical reference copy of the ST-085 intra-tenant row-scope policies.
 --
--- The authoritative DDL lives in db/migrations/000036_add_role_scope_rls_policies.sql; this file is the
+-- The authoritative DDL lives in db/migrations/000037_add_role_scope_rls_policies.sql; this file is the
 -- readable copy kept alongside the other policy references (tenant_isolation.sql,
 -- evaluation_visibility.sql, notification_user_isolation.sql). Migrations are immutable, so any change
 -- to these policies ships as a new forward migration and is reflected here.
@@ -32,12 +32,12 @@
 -- SCOPE: SELECT only. Writes remain governed by tenant_isolation's WITH CHECK plus the application
 -- permission matrix.
 --
--- Prerequisites (all satisfied by migration 000036):
+-- Prerequisites (all satisfied by migration 000037):
 --   1. app.apply_tenant_isolation('app', <table>) already installed on each table.
 --   2. The SECURITY DEFINER helpers below exist, owned by studafy_admin, EXECUTE granted to studafy_app.
 --   3. The application sets app.school_id and app.user_id per transaction (withTenantTx).
 
--- Helper predicates (bodies in migration 000036):
+-- Helper predicates (bodies in migration 000037):
 --   app.scope_user_id()                     -> uuid    NULLIF(current_setting('app.user_id', true),'')::uuid
 --   app.current_user_is_school_admin()      -> boolean ORG_ADMIN/SUPER_ADMIN in the current school
 --   app.current_user_teacher_id()           -> uuid    the caller's teacher id, or NULL
