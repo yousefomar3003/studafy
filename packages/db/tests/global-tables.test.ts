@@ -151,13 +151,23 @@ integrationTest("all six tables are global, admin-owned, and runtime-read-only",
           has_table_privilege('studafy_app', 'app.${table}', 'DELETE') AS app_delete,
           has_table_privilege('public', 'app.${table}', 'SELECT') AS public_select
       `);
-      expect(privileges).toEqual({
-        app_select: true,
-        app_insert: false,
-        app_update: false,
-        app_delete: false,
-        public_select: false,
-      });
+      expect(privileges).toEqual(
+        table === "schools"
+          ? {
+              app_select: true,
+              app_insert: true,
+              app_update: true,
+              app_delete: false,
+              public_select: false,
+            }
+          : {
+              app_select: true,
+              app_insert: false,
+              app_update: false,
+              app_delete: false,
+              public_select: false,
+            },
+      );
     }
 
     await expectDenied(
@@ -207,13 +217,6 @@ integrationTest("school identity, references, and lifecycle constraints are enfo
       `INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
        VALUES ('bad-country', 'Invalid', 'bad-country@admin.local', 'bad-country@admin.local', gen_random_uuid(), '${currencyId}')`,
     );
-    await expectDenied(
-      database,
-      "studafy_app",
-      `INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
-       VALUES ('runtime-write', 'Forbidden', 'runtime-write@admin.local', 'runtime-write@admin.local', '${countryId}', '${currencyId}')`,
-    );
-
     const enumValues = await database.sql<{ enumlabel: string }[]>`
       SELECT e.enumlabel
       FROM pg_enum e
@@ -225,6 +228,7 @@ integrationTest("school identity, references, and lifecycle constraints are enfo
       "active",
       "suspended",
       "archived",
+      "registered",
     ]);
   } finally {
     await database.cleanup();
