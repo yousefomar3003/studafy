@@ -33,6 +33,7 @@ import {
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { emailVerificationRoutes } from "./modules/tenancy/verification/route";
+import { userRoutes } from "./modules/users";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -380,6 +381,13 @@ export function createApp({
   // caller; see the header of routes/admin-device-routes.ts.
   if (database) {
     app.route("/", adminDeviceRoutes(database, jtiDenylist));
+  }
+
+  // User management & administration (ST-093). CRUD endpoints for managing school users,
+  // role assignments, and deactivation with session/invitation revocation. Gated on USER_*
+  // and ROLE_* permissions, with web-only channel guard on all mutations.
+  if (database) {
+    app.route("/", userRoutes(database, jtiDenylist));
   }
 
   // Academic year & term management (ST-091). Full CRUD plus a rollover action that transitions
