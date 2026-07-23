@@ -5,7 +5,7 @@ Studafy isolates every school-owned row by tenant with the permissive `tenant_is
 That answers _"which school?"_. ST-085 adds the second boundary the academic tables need — _"which
 rows within the school may **this** user see?"_ — as a set of **RESTRICTIVE** `SELECT` policies named
 `role_scope_visibility`, installed by
-[`db/migrations/000035_add_role_scope_rls_policies.sql`](../../db/migrations/000035_add_role_scope_rls_policies.sql)
+[`db/migrations/000036_add_role_scope_rls_policies.sql`](../../db/migrations/000036_add_role_scope_rls_policies.sql)
 (canonical copy in [`db/policies/role_scope_visibility.sql`](../../db/policies/role_scope_visibility.sql)).
 
 A restrictive policy ANDs with the permissive tenant policy, so a row is readable only when **both**
@@ -107,7 +107,7 @@ submissions are deliberately **not** gated: a student always sees the work they 
 
 RLS does not cascade from a partitioned parent to its partitions, and `studafy_app` can name a
 partition directly, so `role_scope_visibility` is installed on the parents **and** on every existing
-leaf, and `app.create_attendance_partitions` (amended in 000035) installs it on every future monthly
+leaf, and `app.create_attendance_partitions` (amended in 000036) installs it on every future monthly
 leaf — the same discipline `tenant_isolation` follows in
 [000012](../../db/migrations/000012_create_attendance_tables_with_partitioning.sql).
 
