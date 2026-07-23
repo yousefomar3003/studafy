@@ -36,6 +36,8 @@ export interface RegisterSchoolResult {
   adminEmail: string;
   invitationToken: string;
   invitationExpiresAt: Date;
+  verificationToken: string;
+  verificationExpiresAt: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +57,7 @@ function hashToken(token: string): Buffer {
 // ---------------------------------------------------------------------------
 
 const INVITATION_EXPIRY_DAYS = 7;
+const VERIFICATION_EXPIRY_HOURS = 24;
 
 // ---------------------------------------------------------------------------
 // Service
@@ -92,6 +95,7 @@ export async function registerSchool(
   const normalizedAdminEmail = params.adminEmail.toLowerCase().trim();
   const now = options.now?.() ?? Date.now();
   const expiresAt = new Date(now + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+  const verificationExpiresAt = new Date(now + VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
   // ── 3. Pre-check uniqueness (advisory — DB constraints are the true guard) ──
   await checkDuplicates(database, params.slug, normalizedEmail);
@@ -131,7 +135,36 @@ export async function registerSchool(
         set_config('app.school_id', ${schoolId}, true)
     `;
 
-    // ── 4a. Create admin user ──────────────────────────────────────────────
+    // ── 4a. Store email verification token ─────────────────────────────────
+    const verificationToken = generateToken();
+    const verificationTokenHash = hashToken(verificationToken);
+
+    await tx`
+      UPDATE app.schools
+      SET email_verification_token_hash = ${verificationTokenHash}::bytea,
+          email_verification_expires_at = ${verificationExpiresAt.toISOString()}::timestamptz
+      WHERE id = ${schoolId}::uuid
+    `;
+
+    // ── 4b. Audit: email verification token created ────────────────────────
+    await emitAuditLog(tx, {
+      action: "insert",
+      targetTable: "schools",
+      targetId: schoolId,
+      newValues: {
+        email_verification_token_hash: "[REDACTED]",
+        email_verification_expires_at: verificationExpiresAt.toISOString(),
+      },
+    });
+
+    // ── 4c. Domain event: verification email ───────────────────────────────
+    await emit(tx, DOMAIN_EVENTS.SCHOOL_VERIFICATION_EMAIL_SENT, {
+      schoolId,
+      email: params.email,
+      expiresAt: verificationExpiresAt.toISOString(),
+    });
+
+    // ── 4d. Create admin user ──────────────────────────────────────────────
     const users = await tx<{ id: string }[]>`
       INSERT INTO app.users (
         school_id, email, normalized_email, display_name, status
@@ -151,7 +184,7 @@ export async function registerSchool(
 
     const adminUserId = users[0].id;
 
-    // ── 4b. Assign ORG_ADMIN role ──────────────────────────────────────────
+    // ── 4e. Assign ORG_ADMIN role ──────────────────────────────────────────
     await tx`
       INSERT INTO app.user_roles (school_id, user_id, role)
       VALUES (
@@ -161,7 +194,7 @@ export async function registerSchool(
       )
     `;
 
-    // ── 4c. Create activation invitation ────────────────────────────────────
+    // ── 4f. Create activation invitation ────────────────────────────────────
     const token = generateToken();
     const tokenHash = hashToken(token);
 
@@ -187,7 +220,7 @@ export async function registerSchool(
 
     const invitationId = invitations[0].id;
 
-    // ── 4d. Audit: school creation ─────────────────────────────────────────
+    // ── 4g. Audit: school creation ─────────────────────────────────────────
     await emitAuditLog(tx, {
       action: "insert",
       targetTable: "schools",
@@ -202,7 +235,7 @@ export async function registerSchool(
       },
     });
 
-    // ── 4e. Audit: user creation ───────────────────────────────────────────
+    // ── 4h. Audit: user creation ───────────────────────────────────────────
     await emitAuditLog(tx, {
       action: "insert",
       targetTable: "users",
@@ -214,7 +247,7 @@ export async function registerSchool(
       },
     });
 
-    // ── 4f. Audit: invitation creation ─────────────────────────────────────
+    // ── 4i. Audit: invitation creation ─────────────────────────────────────
     await emitAuditLog(tx, {
       action: "insert",
       targetTable: "invitations",
@@ -226,7 +259,7 @@ export async function registerSchool(
       },
     });
 
-    // ── 4g. Domain events ──────────────────────────────────────────────────
+    // ── 4j. Domain events ──────────────────────────────────────────────────
     await emit(tx, DOMAIN_EVENTS.SCHOOL_REGISTERED, {
       schoolId,
       adminUserId,
@@ -255,6 +288,8 @@ export async function registerSchool(
       adminEmail: params.adminEmail,
       invitationToken: token,
       invitationExpiresAt: expiresAt,
+      verificationToken,
+      verificationExpiresAt,
     };
   });
 }

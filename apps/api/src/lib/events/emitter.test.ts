@@ -162,6 +162,16 @@ describe("emit", () => {
           email: "test@example.com",
           slug: "test-school",
         },
+        [DOMAIN_EVENTS.SCHOOL_VERIFICATION_EMAIL_SENT]: {
+          schoolId: uid,
+          email: "test@example.com",
+          expiresAt: new Date().toISOString(),
+        },
+        [DOMAIN_EVENTS.SCHOOL_EMAIL_VERIFIED]: {
+          schoolId: uid,
+          email: "test@example.com",
+          slug: "test-school",
+        },
         [DOMAIN_EVENTS.ORGANIZATION_CREATED]: { organizationId: uid },
         [DOMAIN_EVENTS.ORGANIZATION_UPDATED]: { organizationId: uid },
         [DOMAIN_EVENTS.COURSE_CREATED]: { courseId: uid },
