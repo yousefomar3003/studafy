@@ -85,6 +85,14 @@ const EXPECTED_MUTATING_ROUTES = [
   // School email verification (ST-088). Public self-service endpoint; audit rows are written
   // from inside the service transaction.
   "POST /api/schools/resend-verification",
+  // Academic year & term management (ST-091). Authenticated, tenant-scoped CRUD and rollover.
+  "POST /api/academics/years",
+  "PATCH /api/academics/years/{yearId}",
+  "DELETE /api/academics/years/{yearId}",
+  "POST /api/academics/years/{yearId}/rollover",
+  "POST /api/academics/years/{yearId}/terms",
+  "PATCH /api/academics/terms/{termId}",
+  "DELETE /api/academics/terms/{termId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {

@@ -71,5 +71,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "School management endpoints. Public self-registration creates a new school with its " +
         "first administrator; authenticated endpoints manage existing schools.",
     },
+    {
+      name: "Academics",
+      description:
+        "Academic year and term lifecycle management. Authenticated and tenant-scoped. " +
+        "Includes CRUD operations and the rollover action for year transitions.",
+    },
   ],
 };

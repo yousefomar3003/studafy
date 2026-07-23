@@ -17,6 +17,7 @@ import {
   securityHeadersMiddleware,
   jwtAuthMiddleware,
 } from "./middleware";
+import { academicYearRoutes, termRoutes } from "./modules/academics";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -379,6 +380,13 @@ export function createApp({
   // caller; see the header of routes/admin-device-routes.ts.
   if (database) {
     app.route("/", adminDeviceRoutes(database, jtiDenylist));
+  }
+
+  // Academic year & term management (ST-091). Full CRUD plus a rollover action that transitions
+  // academic years and archives enrollments atomically. Authenticated and tenant-scoped.
+  if (database) {
+    app.route("/", academicYearRoutes(database));
+    app.route("/", termRoutes(database));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:
