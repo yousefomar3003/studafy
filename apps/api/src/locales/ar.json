@@ -31,6 +31,7 @@
   "SCHOOL_EMAIL_DUPLICATE": "مدرسة بهذا البريد الإلكتروني موجودة بالفعل",
   "SCHOOL_SLUG_DUPLICATE": "مدرسة بهذا المعرف موجودة بالفعل",
   "VERIFICATION_TOKEN_INVALID": "رمز التحقق غير صالح",
+  "VERIFICATION_TOKEN_INVALID": "رمز التحقق غير صالح أو منتهي الصلاحية",
   "VERIFICATION_TOKEN_EXPIRED": "انتهت صلاحية رمز التحقق",
   "VERIFICATION_TOKEN_CONSUMED": "تم استخدام رمز التحقق مسبقاً",
   "CAPTCHA_INVALID": "فشل التحقق من التحقق من الهوية"

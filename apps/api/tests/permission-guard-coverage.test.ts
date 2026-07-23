@@ -57,6 +57,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/schools/resend-verification",
   // School settings (ST-090). Gated on ORGANIZATION_MANAGE_SETTINGS.
   "PATCH /api/schools/current/settings",
+  // School email verification (ST-088). Public self-service endpoint; no caller identity or
+  // bearer permission; authorized by a one-time token.
+  "POST /api/schools/resend-verification",
 ];
 
 /**
@@ -94,6 +97,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // bearer permission; authorized by Turnstile captcha only.
   "POST /api/schools/register",
   // School email verification (ST-088) — self-service resend for the caller's own school.
+  // School email verification (ST-088) — public self-service endpoint; authorized by a one-time
+  // verification token, not by a bearer permission; no other user's data to protect.
   "POST /api/schools/resend-verification",
   // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
   "POST /api/invitations",

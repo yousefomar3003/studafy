@@ -86,6 +86,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/schools/resend-verification",
   // School settings (ST-090). PATCH updates school_settings with full before/after audit.
   "PATCH /api/schools/current/settings",
+  // School email verification (ST-088). Public self-service endpoint; audit rows are written
+  // from inside the service transaction.
+  "POST /api/schools/resend-verification",
 ];
 
 function collectSourceFiles(dir: string): string[] {
