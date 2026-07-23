@@ -30,5 +30,8 @@
   "OAUTH_IDENTITY_EXISTS": "This provider account is already linked to another user",
   "SCHOOL_EMAIL_DUPLICATE": "A school with this email already exists",
   "SCHOOL_SLUG_DUPLICATE": "A school with this slug already exists",
+  "VERIFICATION_TOKEN_INVALID": "Verification token is invalid",
+  "VERIFICATION_TOKEN_EXPIRED": "Verification token has expired",
+  "VERIFICATION_TOKEN_CONSUMED": "Verification token has already been used",
   "CAPTCHA_INVALID": "Captcha verification failed"
 }

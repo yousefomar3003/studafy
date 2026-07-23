@@ -53,6 +53,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/admin/users/{userId}/devices",
   "DELETE /api/admin/users/{userId}/devices/{deviceId}",
   "DELETE /api/admin/users/{userId}/providers/{provider}",
+  // School email verification (ST-088). Self-service; authorized by the caller's school identity.
+  "POST /api/schools/resend-verification",
   // School settings (ST-090). Gated on ORGANIZATION_MANAGE_SETTINGS.
   "PATCH /api/schools/current/settings",
 ];
@@ -91,6 +93,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // School self-registration (ST-081) — public unauthenticated endpoint; no caller identity or
   // bearer permission; authorized by Turnstile captcha only.
   "POST /api/schools/register",
+  // School email verification (ST-088) — self-service resend for the caller's own school.
+  "POST /api/schools/resend-verification",
   // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",

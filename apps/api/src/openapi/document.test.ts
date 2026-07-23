@@ -112,6 +112,8 @@ describe("structure", () => {
         "/api/invitations/{id}/revoke",
         "/api/schools/current/settings",
         "/api/schools/register",
+        "/api/schools/resend-verification",
+        "/api/schools/verify-email/{token}",
         "/erpnext/webhooks",
         "/healthz",
         "/readyz",
