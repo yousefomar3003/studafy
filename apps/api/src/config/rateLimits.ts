@@ -79,6 +79,8 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/invitations": "auth",
   "/api/invitations/*": "auth",
   "/api/auth/invitations/*": "auth",
+  // School registration — public, IP-scoped, brute-force target
+  "/api/schools/register": "auth-strict",
   "/api/auth/oauth/google/start": "auth-strict",
   "/api/auth/oauth/google/callback": "auth-strict",
   // "/api/auth/login": "auth",

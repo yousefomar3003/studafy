@@ -65,5 +65,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "but not sufficient. Every operation is tenant-scoped: a target in another school is " +
         "indistinguishable from one that does not exist.",
     },
+    {
+      name: "Schools",
+      description:
+        "School management endpoints. Public self-registration creates a new school with its " +
+        "first administrator; authenticated endpoints manage existing schools.",
+    },
   ],
 };

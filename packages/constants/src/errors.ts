@@ -46,6 +46,13 @@ export const ERROR_CODES = {
   RESOURCE_NOT_FOUND: "RESOURCE_NOT_FOUND",
   RESOURCE_ALREADY_DELETED: "RESOURCE_ALREADY_DELETED",
 
+  // School registration — duplicate school email or slug on registration.
+  SCHOOL_EMAIL_DUPLICATE: "SCHOOL_EMAIL_DUPLICATE",
+  SCHOOL_SLUG_DUPLICATE: "SCHOOL_SLUG_DUPLICATE",
+
+  // Captcha — the presented token failed server-side verification.
+  CAPTCHA_INVALID: "CAPTCHA_INVALID",
+
   // Conflict — the request contradicts current server state.
   CONFLICT_DUPLICATE_ENTRY: "CONFLICT_DUPLICATE_ENTRY",
   CONFLICT_STATE_MISMATCH: "CONFLICT_STATE_MISMATCH",

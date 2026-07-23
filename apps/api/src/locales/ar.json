@@ -27,5 +27,8 @@
   "INTERNAL_ERROR": "حدث خطأ غير متوقع",
   "NO_ACCOUNT": "لم يتم العثور على حساب",
   "OAUTH_LAST_PROVIDER": "لا يمكن إلغاء ربط آخر مزود مصادقة",
-  "OAUTH_IDENTITY_EXISTS": "حساب هذا المزود مربوط بالفعل بمستخدم آخر"
+  "OAUTH_IDENTITY_EXISTS": "حساب هذا المزود مربوط بالفعل بمستخدم آخر",
+  "SCHOOL_EMAIL_DUPLICATE": "مدرسة بهذا البريد الإلكتروني موجودة بالفعل",
+  "SCHOOL_SLUG_DUPLICATE": "مدرسة بهذا المعرف موجودة بالفعل",
+  "CAPTCHA_INVALID": "فشل التحقق من التحقق من الهوية"
 }

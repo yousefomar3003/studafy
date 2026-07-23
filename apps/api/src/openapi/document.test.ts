@@ -110,6 +110,7 @@ describe("structure", () => {
         "/api/invitations",
         "/api/invitations/{id}/regenerate",
         "/api/invitations/{id}/revoke",
+        "/api/schools/register",
         "/erpnext/webhooks",
         "/healthz",
         "/readyz",

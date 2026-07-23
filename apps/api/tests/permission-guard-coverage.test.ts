@@ -42,6 +42,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/invitations/{token}/activate",
   "POST /api/auth/login/oauth",
   "POST /api/auth/providers/link/start",
+  "POST /api/schools/register",
   "POST /erpnext/webhooks",
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
@@ -85,6 +86,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Provider linking (ST-080) — self-service link/unlink on the caller's own data.
   "POST /api/auth/providers/link/start",
   "DELETE /api/auth/providers/{provider}",
+  // School self-registration (ST-081) — public unauthenticated endpoint; no caller identity or
+  // bearer permission; authorized by Turnstile captcha only.
+  "POST /api/schools/register",
   // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",

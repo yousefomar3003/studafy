@@ -71,6 +71,7 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/auth/logout",
   "/api/auth/oauth",
   "/api/auth/login",
+  "/api/schools/register",
 ];
 
 function isInvitationSubPath(path: string, action: "verify" | "activate"): boolean {

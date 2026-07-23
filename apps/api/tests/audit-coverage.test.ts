@@ -51,6 +51,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",
   "POST /api/invitations/{id}/regenerate",
+  // School self-registration (ST-081). Public unauthenticated endpoint; audit rows are written
+  // from inside the service transaction.
+  "POST /api/schools/register",
   // Account activation (ST-078). Consumes the invitation and activates the user in one transaction;
   // the audit rows are written from inside that transaction — see
   // src/modules/auth/services/activation-service.ts.
