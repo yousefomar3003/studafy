@@ -60,37 +60,38 @@ export async function getSchoolSettings(
   database: Database,
   schoolId: string,
 ): Promise<SchoolSettingsRow> {
-  const rows = await database<SchoolSettingsRow[]>`
-    SELECT
-      school_id::text,
-      locale, timezone, grading_scheme,
-      invitation_expiry_days,
-      attendance_alert_threshold, absence_alert_threshold,
-      created_at, updated_at
-    FROM app.school_settings
-    WHERE school_id = ${schoolId}::uuid
-  `;
+  return withTenantTx(database, { schoolId }, async (tx) => {
+    const rows = await tx<SchoolSettingsRow[]>`
+      SELECT
+        school_id::text,
+        locale, timezone, grading_scheme,
+        invitation_expiry_days,
+        attendance_alert_threshold, absence_alert_threshold,
+        created_at, updated_at
+      FROM app.school_settings
+      WHERE school_id = ${schoolId}::uuid
+    `;
 
-  if (rows.length > 0) return rowToSettings(rows[0]);
+    if (rows.length > 0) return rowToSettings(rows[0]);
 
-  // Lazy init: create the default settings row for this school.
-  // Runs as studafy_app. The school already exists (caller is authenticated).
-  const created = await database<SchoolSettingsRow[]>`
-    INSERT INTO app.school_settings (school_id)
-    VALUES (${schoolId}::uuid)
-    RETURNING
-      school_id::text,
-      locale, timezone, grading_scheme,
-      invitation_expiry_days,
-      attendance_alert_threshold, absence_alert_threshold,
-      created_at, updated_at
-  `;
+    // Lazy init: create the default settings row for this school.
+    const created = await tx<SchoolSettingsRow[]>`
+      INSERT INTO app.school_settings (school_id)
+      VALUES (${schoolId}::uuid)
+      RETURNING
+        school_id::text,
+        locale, timezone, grading_scheme,
+        invitation_expiry_days,
+        attendance_alert_threshold, absence_alert_threshold,
+        created_at, updated_at
+    `;
 
-  if (created.length === 0) {
-    throw new HTTPException(500, { message: "Failed to initialize school settings." });
-  }
+    if (created.length === 0) {
+      throw new HTTPException(500, { message: "Failed to initialize school settings." });
+    }
 
-  return rowToSettings(created[0]);
+    return rowToSettings(created[0]);
+  });
 }
 
 // ---------------------------------------------------------------------------
