@@ -79,5 +79,15 @@ export const registerSchoolResponseSchema = z
       }),
       expires_at: z.string().datetime().openapi({ description: "Invitation expiry (ISO 8601)." }),
     }),
+    verification: z.object({
+      token: z.string().openapi({
+        description:
+          "One-time-use email verification token. This is the only time the raw token is returned. " +
+          "It is emailed to the school contact address. The school moves to active (trial) only after verification.",
+      }),
+      expires_at: z.string().datetime().openapi({
+        description: "Verification token expiry — 24 hours from registration (ISO 8601).",
+      }),
+    }),
   })
   .openapi("RegisterSchoolResponse");

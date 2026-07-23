@@ -101,6 +101,10 @@ export function registerSchoolRoutes(db: Database, logger: Logger): OpenAPIHono<
           token: result.invitationToken,
           expires_at: result.invitationExpiresAt.toISOString(),
         },
+        verification: {
+          token: result.verificationToken,
+          expires_at: result.verificationExpiresAt.toISOString(),
+        },
       },
       201,
     );
