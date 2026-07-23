@@ -16,7 +16,7 @@ const DUMMY_TOKEN_DIGEST = Buffer.from(
 export type InvitationVerificationState =
   "VALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED";
 
-type SchoolStatus = "pending" | "active" | "suspended" | "archived";
+type SchoolStatus = "registered" | "pending" | "active" | "suspended" | "archived";
 
 interface LookupRow {
   found: boolean;

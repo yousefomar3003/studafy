@@ -15,6 +15,7 @@
   "AUTHZ_FORBIDDEN": "تم رفض الوصول",
   "AUTHZ_ROLE_NOT_FOUND": "لم يتم العثور على الدور المطلوب",
   "AUTHZ_PERMISSION_NOT_FOUND": "لم يتم العثور على الصلاحية المطلوبة",
+  "CHANNEL_NOT_AUTHORIZED": "هذه العملية غير متاحة من هذا العميل",
   "VALIDATION_FAILED": "فشل التحقق من الصحة",
   "VALIDATION_REQUIRED_FIELD_MISSING": "الحقل المطلوب مفقود",
   "RESOURCE_NOT_FOUND": "لم يتم العثور على المورد",
@@ -24,5 +25,10 @@
   "CONFLICT_IDEMPOTENCY_KEY_MISMATCH": "محتوى الطلب يختلف عن الطلب الأصلي المحدد بمعرف التكرار",
   "RATE_LIMIT_EXCEEDED": "تم تجاوز حد الطلبات",
   "INTERNAL_ERROR": "حدث خطأ غير متوقع",
-  "NO_ACCOUNT": "لم يتم العثور على حساب"
+  "NO_ACCOUNT": "لم يتم العثور على حساب",
+  "OAUTH_LAST_PROVIDER": "لا يمكن إلغاء ربط آخر مزود مصادقة",
+  "OAUTH_IDENTITY_EXISTS": "حساب هذا المزود مربوط بالفعل بمستخدم آخر",
+  "SCHOOL_EMAIL_DUPLICATE": "مدرسة بهذا البريد الإلكتروني موجودة بالفعل",
+  "SCHOOL_SLUG_DUPLICATE": "مدرسة بهذا المعرف موجودة بالفعل",
+  "CAPTCHA_INVALID": "فشل التحقق من التحقق من الهوية"
 }

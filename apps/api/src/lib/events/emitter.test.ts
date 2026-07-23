@@ -156,6 +156,12 @@ describe("emit", () => {
           email: "test@example.com",
           role: "STUDENT",
         },
+        [DOMAIN_EVENTS.SCHOOL_REGISTERED]: {
+          schoolId: uid,
+          adminUserId: uid,
+          email: "test@example.com",
+          slug: "test-school",
+        },
         [DOMAIN_EVENTS.ORGANIZATION_CREATED]: { organizationId: uid },
         [DOMAIN_EVENTS.ORGANIZATION_UPDATED]: { organizationId: uid },
         [DOMAIN_EVENTS.COURSE_CREATED]: { courseId: uid },

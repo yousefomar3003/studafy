@@ -67,6 +67,26 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/admin/users/{userId}/providers/{provider}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Admin: unlink a user's OAuth provider
+         * @description Removes an OAuth provider from a user's account on an administrator's behalf. Refuses if this is the user's last linked provider. Requires USER_SUSPEND permission.
+         */
+        readonly delete: operations["adminUnlinkProvider"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/auth/devices": {
         readonly parameters: {
             readonly query?: never;
@@ -207,6 +227,66 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/auth/providers": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List linked OAuth providers
+         * @description Returns the OAuth providers linked to the authenticated user's account. Each entry includes the provider name and the time it was linked.
+         */
+        readonly get: operations["listLinkedProviders"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/auth/providers/{provider}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Unlink an OAuth provider
+         * @description Removes an OAuth provider from the authenticated user's account. Refuses if this is the last linked provider, which would leave the account without any login method.
+         */
+        readonly delete: operations["unlinkProvider"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/auth/providers/link/start": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Start linking an OAuth provider
+         * @description Initiates an OAuth authorization flow to link a second provider to the authenticated user's account. Returns a redirect URL the client should navigate to. On successful callback, the provider's identity is linked to this account for lockout resilience.
+         */
+        readonly post: operations["startProviderLink"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/auth/refresh": {
         readonly parameters: {
             readonly query?: never;
@@ -321,6 +401,26 @@ export interface paths {
          * @description Immediately invalidates a pending invitation by setting revoked_at. The old token stops working on the next acceptance attempt. An `invitation.revoked` event is emitted into the outbox.
          */
         readonly post: operations["revokeInvitation"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/schools/register": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Register a new school
+         * @description Public self-registration endpoint. Validates the request, verifies the captcha token, and atomically creates the school (status=registered), its first ORG_ADMIN user, and an activation invitation. Duplicate school email or slug are rejected with clear error codes. The raw invitation token is returned exactly once in this response.
+         */
+        readonly post: operations["registerSchool"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -541,13 +641,44 @@ export interface components {
                 readonly use: "sig";
             }[];
         };
+        readonly LinkedProvider: {
+            /**
+             * Format: date-time
+             * @description When the provider was linked.
+             */
+            readonly linked_at: string;
+            /**
+             * @description Provider identifier.
+             * @example microsoft
+             */
+            readonly provider: string;
+        };
+        readonly LinkProviderStartRequest: {
+            /**
+             * @description The OAuth provider to link.
+             * @example google
+             * @enum {string}
+             */
+            readonly provider: "microsoft" | "google";
+        };
+        readonly LinkProviderStartResponse: {
+            /**
+             * Format: uri
+             * @description Redirect the user's browser to this URL to complete linking.
+             */
+            readonly redirect_url: string;
+        };
+        readonly ListLinkedProvidersResponse: {
+            /** @description All OAuth providers linked to this account. */
+            readonly providers: readonly components["schemas"]["LinkedProvider"][];
+        };
         readonly LogoutResult: {
             /** @enum {boolean} */
             readonly ended: true;
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "RATE_LIMIT_EXCEEDED" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "RATE_LIMIT_EXCEEDED" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -579,6 +710,98 @@ export interface components {
             /** @description One-time-use invitation token for the new invitation. This is the only time the raw token is returned. */
             readonly token: string;
         };
+        readonly RegisterSchool: {
+            /**
+             * Format: email
+             * @description Email address of the first administrator. An invitation will be sent to this address.
+             * @example principal@springfield-academy.edu
+             */
+            readonly admin_email: string;
+            /**
+             * @description Display name for the first administrator.
+             * @example Dr. Jane Smith
+             */
+            readonly admin_name?: string;
+            /** @description Cloudflare Turnstile captcha token from the client widget. */
+            readonly captcha_token: string;
+            /**
+             * Format: uuid
+             * @description UUID of the country from app.countries.
+             * @example d07d5b8e-1c2a-4f3e-9b6a-8c1d2e3f4a5b
+             */
+            readonly country_id: string;
+            /**
+             * Format: uuid
+             * @description UUID of the default currency from app.currencies.
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
+             */
+            readonly default_currency_id: string;
+            /**
+             * Format: email
+             * @description School contact email address. Must be unique across the platform.
+             * @example admin@springfield-academy.edu
+             */
+            readonly email: string;
+            /**
+             * @description Display name of the school.
+             * @example Springfield Academy
+             */
+            readonly school_name: string;
+            /**
+             * @description URL-safe school identifier. 3-63 characters, lowercase alphanumeric with hyphens.
+             * @example springfield-academy
+             */
+            readonly slug: string;
+        };
+        readonly RegisterSchoolResponse: {
+            readonly admin: {
+                /**
+                 * Format: email
+                 * @description Administrator email address.
+                 */
+                readonly email: string;
+                /**
+                 * Format: uuid
+                 * @description Administrator user identifier.
+                 */
+                readonly id: string;
+                /**
+                 * @description Role assigned to the administrator.
+                 * @enum {string}
+                 */
+                readonly role: "ORG_ADMIN";
+            };
+            readonly invitation: {
+                /**
+                 * Format: date-time
+                 * @description Invitation expiry (ISO 8601).
+                 */
+                readonly expires_at: string;
+                /** @description One-time-use activation token. This is the only time the raw token is returned. It must be delivered to the administrator (e.g. via email) to activate their account. */
+                readonly token: string;
+            };
+            readonly school: {
+                /**
+                 * Format: date-time
+                 * @description Registration timestamp (ISO 8601).
+                 */
+                readonly created_at: string;
+                /**
+                 * Format: uuid
+                 * @description School identifier.
+                 */
+                readonly id: string;
+                /** @description School display name. */
+                readonly name: string;
+                /** @description School slug. */
+                readonly slug: string;
+                /**
+                 * @description School status.
+                 * @enum {string}
+                 */
+                readonly status: "registered";
+            };
+        };
         readonly ReturningUserLoginRequest: {
             /**
              * @description Session channel. Determines refresh-token delivery: 'web' uses an HttpOnly cookie; 'mobile' and 'api' return the token in the response body.
@@ -588,7 +811,7 @@ export interface components {
              */
             readonly channel: "web" | "mobile" | "api";
             /**
-             * @description A verified Microsoft OIDC ID token. The client obtains this from a Microsoft authorization request; the server validates it against Microsoft's JWKS.
+             * @description A verified Microsoft or Google OIDC ID token. The client obtains this from an authorization request; the server validates it against the provider's JWKS.
              * @example eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIs...
              */
             readonly id_token: string;
@@ -597,6 +820,13 @@ export interface components {
              * @example n-0S6_WzA2Mj
              */
             readonly nonce: string;
+            /**
+             * @description The OAuth provider that issued the id_token. Determines which JWKS is used for validation and which identity store is queried.
+             * @default microsoft
+             * @example microsoft
+             * @enum {string}
+             */
+            readonly provider: "microsoft" | "google";
         };
         readonly ReturningUserLoginResponse: {
             /** @description Signed JWT access token. */
@@ -697,6 +927,10 @@ export interface components {
             readonly session_id: string;
             /** @enum {string} */
             readonly token_type: "Bearer";
+        };
+        readonly UnlinkProviderResponse: {
+            /** @description The provider that was unlinked. */
+            readonly provider: string;
         };
         readonly User: {
             /** Format: date-time */
@@ -904,6 +1138,110 @@ export interface operations {
             };
             /** @description Authenticated, but not permitted to perform this operation. */
             readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly adminUnlinkProvider: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description The OAuth provider to unlink. */
+                readonly provider: "microsoft" | "google";
+                /** @description The target user's id. */
+                readonly userId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The provider was unlinked. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["UnlinkProviderResponse"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
                 headers: {
                     /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
                     readonly "X-Request-Id": string;
@@ -1432,6 +1770,233 @@ export interface operations {
             };
         };
     };
+    readonly listLinkedProviders: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The caller's linked providers. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ListLinkedProvidersResponse"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly unlinkProvider: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description The OAuth provider to link or unlink. */
+                readonly provider: "microsoft" | "google";
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The provider was unlinked. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["UnlinkProviderResponse"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly startProviderLink: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["LinkProviderStartRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description OAuth redirect URL for the client to navigate to. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["LinkProviderStartResponse"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     readonly refreshSession: {
         readonly parameters: {
             readonly query?: never;
@@ -1844,6 +2409,76 @@ export interface operations {
             };
             /** @description No such resource, or it is not visible to this tenant. */
             readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly registerSchool: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RegisterSchool"];
+            };
+        };
+        readonly responses: {
+            /** @description School registered. The invitation token is included in this response only. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RegisterSchoolResponse"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
                 headers: {
                     /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
                     readonly "X-Request-Id": string;

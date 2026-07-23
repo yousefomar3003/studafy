@@ -226,6 +226,22 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+      - name: Regenerate the permission matrix and fail on drift
+        run: |
+          bun run --cwd packages/constants docs:generate
+          if ! git diff --quiet -- packages/constants/docs/permission-matrix.md; then
+            {
+              echo '## Permission matrix drift'
+              echo
+              echo 'packages/constants/docs/permission-matrix.md does not match packages/constants/src/permissions.ts.'
+              echo 'Run `bun run --cwd packages/constants docs:generate` and commit the result.'
+              echo
+              echo '```diff'
+              git --no-pager diff -- packages/constants/docs/permission-matrix.md
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
       # oasdiff needs the base revision of the document to compare against. actions/checkout fetches
       # depth 1, so the base branch is not in the object store; fetch the single commit rather than
       # paying for full history. The file is written inside the workspace, not $RUNNER_TEMP, because

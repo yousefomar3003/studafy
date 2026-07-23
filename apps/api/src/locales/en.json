@@ -15,6 +15,7 @@
   "AUTHZ_FORBIDDEN": "Access denied",
   "AUTHZ_ROLE_NOT_FOUND": "Required role not found",
   "AUTHZ_PERMISSION_NOT_FOUND": "Required permission not found",
+  "CHANNEL_NOT_AUTHORIZED": "This operation is not available from this client",
   "VALIDATION_FAILED": "Validation failed",
   "VALIDATION_REQUIRED_FIELD_MISSING": "Required field is missing",
   "RESOURCE_NOT_FOUND": "Resource not found",
@@ -24,5 +25,10 @@
   "CONFLICT_IDEMPOTENCY_KEY_MISMATCH": "Request body differs from the original idempotent request",
   "RATE_LIMIT_EXCEEDED": "Too many requests",
   "INTERNAL_ERROR": "An unexpected error occurred",
-  "NO_ACCOUNT": "No account found"
+  "NO_ACCOUNT": "No account found",
+  "OAUTH_LAST_PROVIDER": "Cannot unlink your last authentication provider",
+  "OAUTH_IDENTITY_EXISTS": "This provider account is already linked to another user",
+  "SCHOOL_EMAIL_DUPLICATE": "A school with this email already exists",
+  "SCHOOL_SLUG_DUPLICATE": "A school with this slug already exists",
+  "CAPTCHA_INVALID": "Captcha verification failed"
 }

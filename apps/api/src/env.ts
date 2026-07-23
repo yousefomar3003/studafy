@@ -105,6 +105,9 @@ export const envSchema = z
     MICROSOFT_OAUTH_REDIRECT_URI: z.string().url().optional(),
     // Where to redirect after a successful OAuth callback. Not setting it disables the redirect.
     FRONTEND_URL: z.string().url().optional(),
+    // Cloudflare Turnstile secret key for captcha verification on public endpoints.
+    // When absent, captcha checks are skipped (development only).
+    TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
   })
   .superRefine((env, context) => {
     // Checked before the NODE_ENV gate below: this constraint keys off the deployment tier, and a

@@ -25,10 +25,12 @@ import {
   googleOAuthRoutes,
   jwksRoutes,
   microsoftOAuthRoutes,
+  providerLinkRoutes,
   returningUserLoginRoutes,
   sessionRoutes,
 } from "./modules/auth";
 import { invitationRoutes } from "./modules/auth/invitation/route";
+import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -217,6 +219,13 @@ export function createApp({
     app.route("/", erpNextWebhookRoutes(database, logger));
   }
 
+  // School self-registration — public, no authentication. Protected by Turnstile captcha and
+  // rate limiting (auth-strict class). Needs a database to create the school, admin user,
+  // and activation invitation in a single transaction.
+  if (database) {
+    app.route("/", registerSchoolRoutes(database, logger));
+  }
+
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.
   if (keyStore) {
     app.route("/", jwksRoutes(keyStore));
@@ -332,6 +341,26 @@ export function createApp({
         },
         logger,
         microsoftIdentityVerifier ? { verifyMicrosoftIdentity: microsoftIdentityVerifier } : {},
+      ),
+    );
+  }
+
+  // OAuth provider linking (R-03). Lets authenticated users link a second provider for lockout
+  // resilience, and admins unlink providers. Needs database for identity CRUD and the state store
+  // for the linking OAuth flow.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      providerLinkRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        logger,
       ),
     );
   }

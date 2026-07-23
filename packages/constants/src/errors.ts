@@ -20,6 +20,8 @@ export const ERROR_CODES = {
   OAUTH_STATE_INVALID: "OAUTH_STATE_INVALID",
   OAUTH_EMAIL_NOT_VERIFIED: "OAUTH_EMAIL_NOT_VERIFIED",
   OAUTH_PROVIDER_ERROR: "OAUTH_PROVIDER_ERROR",
+  OAUTH_LAST_PROVIDER: "OAUTH_LAST_PROVIDER",
+  OAUTH_IDENTITY_EXISTS: "OAUTH_IDENTITY_EXISTS",
 
   // Returning-user login — no matching OAuth identity found for the incoming (provider, sub) pair.
   NO_ACCOUNT: "NO_ACCOUNT",
@@ -33,6 +35,9 @@ export const ERROR_CODES = {
   AUTHZ_ROLE_NOT_FOUND: "AUTHZ_ROLE_NOT_FOUND",
   AUTHZ_PERMISSION_NOT_FOUND: "AUTHZ_PERMISSION_NOT_FOUND",
 
+  // Channel policy — the caller's session channel is not authorized for this operation.
+  CHANNEL_NOT_AUTHORIZED: "CHANNEL_NOT_AUTHORIZED",
+
   // Validation — caller input was malformed.
   VALIDATION_FAILED: "VALIDATION_FAILED",
   VALIDATION_REQUIRED_FIELD_MISSING: "VALIDATION_REQUIRED_FIELD_MISSING",
@@ -40,6 +45,13 @@ export const ERROR_CODES = {
   // Resource — the requested entity does not exist or was already removed.
   RESOURCE_NOT_FOUND: "RESOURCE_NOT_FOUND",
   RESOURCE_ALREADY_DELETED: "RESOURCE_ALREADY_DELETED",
+
+  // School registration — duplicate school email or slug on registration.
+  SCHOOL_EMAIL_DUPLICATE: "SCHOOL_EMAIL_DUPLICATE",
+  SCHOOL_SLUG_DUPLICATE: "SCHOOL_SLUG_DUPLICATE",
+
+  // Captcha — the presented token failed server-side verification.
+  CAPTCHA_INVALID: "CAPTCHA_INVALID",
 
   // Conflict — the request contradicts current server state.
   CONFLICT_DUPLICATE_ENTRY: "CONFLICT_DUPLICATE_ENTRY",

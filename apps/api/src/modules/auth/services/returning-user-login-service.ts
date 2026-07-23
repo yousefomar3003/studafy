@@ -35,8 +35,10 @@ import type { Role } from "@studafy/constants";
 // ---------------------------------------------------------------------------
 
 export interface ReturningUserLoginParams {
-  /** The validated Microsoft OIDC subject claim (`sub`) from the id_token. */
+  /** The validated Microsoft or Google OIDC subject claim (`sub`) from the id_token. */
   subject: string;
+  /** The OAuth provider that issued the id_token. Defaults to "microsoft" for backward compat. */
+  provider?: string;
   /** Channel determines refresh-token delivery (cookie vs body). */
   channel: AuthChannel;
   /** Optional device metadata captured from the request. */
@@ -178,14 +180,15 @@ export async function loginReturningUser(
   params: ReturningUserLoginParams,
 ): Promise<ReturningUserLoginResult> {
   const { subject, channel, device, requestId, logger, clientIp, userAgent } = params;
+  const provider = params.provider ?? "microsoft";
 
   // Identity resolution is done against the pre-validated subject claim.
-  const identity = await findOAuthIdentity(db, "microsoft", subject);
+  const identity = await findOAuthIdentity(db, provider, subject);
 
   if (!identity) {
     logger?.warn(
       {
-        provider: "microsoft",
+        provider,
         sub_hash: hashSubject(subject),
         client_ip: clientIp,
         user_agent: userAgent,
@@ -259,7 +262,7 @@ export async function loginReturningUser(
         targetId: issued.sessionId,
         newValues: {
           outcome: "LOGIN_SUCCESS",
-          provider: "microsoft",
+          provider,
           identity_id: identity.identityId,
         },
         clientIp,

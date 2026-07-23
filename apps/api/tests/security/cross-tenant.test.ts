@@ -105,10 +105,10 @@ async function createSchools(sql: TestDatabase["sql"]): Promise<[string, string]
     crypto.randomUUID(),
     (transaction) =>
       transaction<{ id: string; slug: string }[]>`
-      INSERT INTO app.schools (slug, name, country_id, default_currency_id)
+      INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
       VALUES
-        ('st051-school-a', 'ST-051 School A', ${references!.country}, ${references!.currency}),
-        ('st051-school-b', 'ST-051 School B', ${references!.country}, ${references!.currency})
+        ('st051-school-a', 'ST-051 School A', 'st051-school-a@admin.local', 'st051-school-a@admin.local', ${references!.country}, ${references!.currency}),
+        ('st051-school-b', 'ST-051 School B', 'st051-school-b@admin.local', 'st051-school-b@admin.local', ${references!.country}, ${references!.currency})
       RETURNING id, slug
     `,
   );
