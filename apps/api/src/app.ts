@@ -31,6 +31,7 @@ import {
 } from "./modules/auth";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
+import { schoolSettingsRoutes } from "./modules/tenancy/settings/route";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -372,6 +373,12 @@ export function createApp({
   // caller; see the header of routes/admin-device-routes.ts.
   if (database) {
     app.route("/", adminDeviceRoutes(database, jtiDenylist));
+  }
+
+  // School settings (GET/PATCH /api/schools/current/settings). Authenticated, admin-only,
+  // web-channel only. Needs database for settings CRUD and audit logging.
+  if (database) {
+    app.route("/", schoolSettingsRoutes(database));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:

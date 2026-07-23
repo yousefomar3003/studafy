@@ -82,6 +82,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/providers/link/start",
   "DELETE /api/auth/providers/{provider}",
   "DELETE /api/admin/users/{userId}/providers/{provider}",
+  // School settings (ST-090). PATCH updates school_settings with full before/after audit.
+  "PATCH /api/schools/current/settings",
 ];
 
 function collectSourceFiles(dir: string): string[] {

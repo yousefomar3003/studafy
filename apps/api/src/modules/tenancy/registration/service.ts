@@ -131,7 +131,13 @@ export async function registerSchool(
         set_config('app.school_id', ${schoolId}, true)
     `;
 
-    // ── 4a. Create admin user ──────────────────────────────────────────────
+    // ── 4a. Create default school settings ────────────────────────────────
+    await tx`
+      INSERT INTO app.school_settings (school_id)
+      VALUES (${schoolId}::uuid)
+    `;
+
+    // ── 4b. Create admin user ──────────────────────────────────────────────
     const users = await tx<{ id: string }[]>`
       INSERT INTO app.users (
         school_id, email, normalized_email, display_name, status
@@ -202,7 +208,22 @@ export async function registerSchool(
       },
     });
 
-    // ── 4e. Audit: user creation ───────────────────────────────────────────
+    // ── 4e. Audit: default settings creation ───────────────────────────────
+    await emitAuditLog(tx, {
+      action: "insert",
+      targetTable: "school_settings",
+      targetId: schoolId,
+      newValues: {
+        locale: "en",
+        timezone: "Africa/Casablanca",
+        grading_scheme: "letter",
+        invitation_expiry_days: 7,
+        attendance_alert_threshold: 75,
+        absence_alert_threshold: 50,
+      },
+    });
+
+    // ── 4f. Audit: user creation ───────────────────────────────────────────
     await emitAuditLog(tx, {
       action: "insert",
       targetTable: "users",
@@ -214,7 +235,7 @@ export async function registerSchool(
       },
     });
 
-    // ── 4f. Audit: invitation creation ─────────────────────────────────────
+    // ── 4g. Audit: invitation creation ─────────────────────────────────────
     await emitAuditLog(tx, {
       action: "insert",
       targetTable: "invitations",

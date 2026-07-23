@@ -53,6 +53,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/admin/users/{userId}/devices",
   "DELETE /api/admin/users/{userId}/devices/{deviceId}",
   "DELETE /api/admin/users/{userId}/providers/{provider}",
+  // School settings (ST-090). Gated on ORGANIZATION_MANAGE_SETTINGS.
+  "PATCH /api/schools/current/settings",
 ];
 
 /**
