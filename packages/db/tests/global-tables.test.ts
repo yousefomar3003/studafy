@@ -403,6 +403,7 @@ integrationTest("foreign keys and indexes are deliberate and non-redundant", asy
       "idx_plan_prices_currency_id",
       "idx_schools_country_id",
       "idx_schools_default_currency_id",
+      "idx_schools_verification_token",
     ]);
 
     const duplicateIndexes = await database.sql<{ count: string }[]>`
