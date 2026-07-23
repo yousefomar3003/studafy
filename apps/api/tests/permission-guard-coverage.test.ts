@@ -65,6 +65,12 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/years/{yearId}/terms",
   "PATCH /api/academics/terms/{termId}",
   "DELETE /api/academics/terms/{termId}",
+  // User management & administration (ST-093). Authenticated, tenant-scoped CRUD with per-route
+  // requirePermission() guards for USER_READ, USER_CREATE, USER_UPDATE, ROLE_ASSIGN, and USER_SUSPEND.
+  "POST /api/users",
+  "PATCH /api/users/{userId}",
+  "PATCH /api/users/{userId}/role",
+  "PATCH /api/users/{userId}/deactivate",
 ];
 
 /**
