@@ -54,10 +54,10 @@ benchmarkTest(
         log: () => undefined,
       });
 
-      const asApp = async <T>(run: (tx: TransactionSql) => Promise<T>): Promise<T> => {
+      const asAdmin = async <T>(run: (tx: TransactionSql) => Promise<T>): Promise<T> => {
         let result: T | undefined;
         await database.sql.begin(async (tx) => {
-          await tx.unsafe("SET LOCAL ROLE studafy_app");
+          await tx.unsafe("SET LOCAL ROLE studafy_admin");
           result = await run(tx);
         });
         return result as T;
@@ -68,8 +68,7 @@ benchmarkTest(
           (SELECT id FROM app.countries WHERE alpha2_code = 'US') AS country,
           (SELECT id FROM app.currencies WHERE code = 'USD') AS currency
       `;
-      const school = await database.sql.begin(async (tx) => {
-        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      const school = await asAdmin(async (tx) => {
         const [row] = await tx<{ id: string }[]>`
           INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
           VALUES ('bench', 'bench', 'bench@admin.local', 'bench@admin.local', ${refs!.country}, ${refs!.currency}) RETURNING id
@@ -77,7 +76,10 @@ benchmarkTest(
         return row!.id;
       });
 
-      const fixture = await asApp(async (tx) => {
+      // ST-085's restrictive SELECT policies also apply to INSERT ... RETURNING. Seed benchmark
+      // fixtures with the migration/test role so the timed application path remains the only path
+      // measured below.
+      const fixture = await asAdmin(async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         const [teacherUser] = await tx<{ id: string }[]>`
           INSERT INTO app.users (school_id, email, normalized_email, status)
@@ -153,7 +155,7 @@ benchmarkTest(
       // could never be matched back to its session by the composite foreign key. See the header of
       // 000012 and docs/database/attendance.md.
       const total = WARMUP_ITERATIONS + MEASURED_ITERATIONS;
-      const sessions = await asApp(async (tx) => {
+      const sessions = await asAdmin(async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         return tx<{ id: string; created_at: Date }[]>`
           INSERT INTO app.attendance_sessions
