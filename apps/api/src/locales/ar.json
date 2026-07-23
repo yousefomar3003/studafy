@@ -33,5 +33,7 @@
   "VERIFICATION_TOKEN_INVALID": "رمز التحقق غير صالح أو منتهي الصلاحية",
   "VERIFICATION_TOKEN_EXPIRED": "انتهت صلاحية رمز التحقق",
   "VERIFICATION_TOKEN_CONSUMED": "تم استخدام رمز التحقق مسبقاً",
-  "CAPTCHA_INVALID": "فشل التحقق من التحقق من الهوية"
+  "CAPTCHA_INVALID": "فشل التحقق من التحقق من الهوية",
+  "ACADEMIC_YEAR_ACTIVE_EXISTS": "يوجد بالفعل سنة أكاديمية نشطة لهذه المدرسة",
+  "ACADEMIC_YEAR_DATE_OVERLAP": "نطاق التاريخ يتداخل مع سنة أكاديمية موجودة"
 }

@@ -56,6 +56,15 @@ const EXPECTED_MUTATING_ROUTES = [
   // School email verification (ST-088). Public self-service endpoint; no caller identity or
   // bearer permission; authorized by a one-time token.
   "POST /api/schools/resend-verification",
+  // Academic year & term management (ST-091). Tenant-scoped CRUD protected by requireAuth; the
+  // school context is sufficient — there is no cross-user row-level permission to check.
+  "POST /api/academics/years",
+  "PATCH /api/academics/years/{yearId}",
+  "DELETE /api/academics/years/{yearId}",
+  "POST /api/academics/years/{yearId}/rollover",
+  "POST /api/academics/years/{yearId}/terms",
+  "PATCH /api/academics/terms/{termId}",
+  "DELETE /api/academics/terms/{termId}",
 ];
 
 /**
@@ -99,6 +108,15 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",
   "POST /api/invitations/{id}/regenerate",
+  // Academic year & term management (ST-091) — tenant-scoped school-level access protected by
+  // requireAuth; no cross-user row-level permission to check.
+  "POST /api/academics/years",
+  "PATCH /api/academics/years/{yearId}",
+  "DELETE /api/academics/years/{yearId}",
+  "POST /api/academics/years/{yearId}/rollover",
+  "POST /api/academics/years/{yearId}/terms",
+  "PATCH /api/academics/terms/{termId}",
+  "DELETE /api/academics/terms/{termId}",
 ]);
 
 // ---------------------------------------------------------------------------
