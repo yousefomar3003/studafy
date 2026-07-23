@@ -82,6 +82,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/providers/link/start",
   "DELETE /api/auth/providers/{provider}",
   "DELETE /api/admin/users/{userId}/providers/{provider}",
+  // School email verification (ST-088). Public self-service endpoint; audit rows are written
+  // from inside the service transaction.
+  "POST /api/schools/resend-verification",
 ];
 
 function collectSourceFiles(dir: string): string[] {
