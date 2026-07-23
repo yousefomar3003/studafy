@@ -96,7 +96,10 @@ async function createTimetableFixture(
   school: string,
   suffix: string,
 ): Promise<TimetableFixture> {
-  return asRole(database, "studafy_app", async (tx) => {
+  // ST-085: this fixture seeds scoped tables (subjects, courses, classes) whose
+  // role_scope_visibility SELECT policy PostgreSQL also applies to INSERT ... RETURNING. Seed as
+  // studafy_admin (still bound by tenant_isolation, exempt from the TO studafy_app scope policy).
+  return asRole(database, "studafy_admin", async (tx) => {
     await tx`SELECT set_config('app.school_id', ${school}, true)`;
     const userEmail = `staff-${suffix.toLowerCase()}@example.test`;
     const [user] = await tx<{ id: string }[]>`
@@ -223,8 +226,12 @@ integrationTest(
         WHERE c.relnamespace = 'app'::regnamespace
           AND c.relname = ANY(${TIMETABLE_TABLES as unknown as string[]})
       `;
-      expect(policies).toHaveLength(2);
-      expect(policies.every((policy) => policy.name === "tenant_isolation")).toBe(true);
+      // Both timetable tables carry the permissive tenant_isolation policy. ST-085 additionally
+      // layers the restrictive role_scope_visibility SELECT policy onto the scoped timetable_slots.
+      const tenantPolicies = policies.filter((policy) => policy.name === "tenant_isolation");
+      const scopePolicies = policies.filter((policy) => policy.name === "role_scope_visibility");
+      expect(tenantPolicies).toHaveLength(2);
+      expect(scopePolicies.map((policy) => policy.tableName)).toEqual(["timetable_slots"]);
 
       const excludeConstraints = await database.sql<{ name: string; definition: string }[]>`
         SELECT conname AS name, pg_get_constraintdef(oid) AS definition
@@ -266,7 +273,11 @@ integrationTest(
       const school = await createSchool(database, "timetable-overlap");
       const fixture = await createTimetableFixture(database, school, "OVL");
 
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: writing or reading timetable_slots runs the slot-integrity trigger, which reads the
+      // scoped app.classes row, and the count below reads the scoped slots directly. A userless
+      // studafy_app cannot see the class (role_scope_visibility), so these slot operations run as
+      // studafy_admin; the EXCLUDE overlap constraint they exercise is unaffected by role scope.
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${fixture.school}, true)`;
         await tx`
           INSERT INTO app.timetable_slots
@@ -284,6 +295,7 @@ integrationTest(
          VALUES ('${fixture.school}','${fixture.version}','${fixture.secondClassId}',
            '${fixture.teacher}','${fixture.secondRoom}',1,1)`,
         fixture.school,
+        "studafy_admin",
       );
 
       // Same room, same weekday/period, different teacher and class: still rejected.
@@ -294,10 +306,11 @@ integrationTest(
          VALUES ('${fixture.school}','${fixture.version}','${fixture.secondClassId}',
            '${fixture.secondTeacher}','${fixture.room}',1,1)`,
         fixture.school,
+        "studafy_admin",
       );
 
       // Different period: no conflict, both teacher and room are free.
-      await asRole(database, "studafy_app", async (tx) => {
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${fixture.school}, true)`;
         await tx`
           INSERT INTO app.timetable_slots
@@ -326,7 +339,9 @@ integrationTest(
       const school = await createSchool(database, "timetable-multi-version");
       const fixture = await createTimetableFixture(database, school, "MV");
 
-      const secondVersion = await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: inserts timetable_slots (whose integrity trigger reads the scoped app.classes row),
+      // so run as studafy_admin.
+      const secondVersion = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${fixture.school}, true)`;
         await tx`
           INSERT INTO app.timetable_slots
@@ -383,7 +398,10 @@ integrationTest(
         fixture.school,
       );
 
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: inserting a timetable_slot runs the slot-integrity trigger, which reads the scoped
+      // app.classes row, and the block reads timetable_versions after submitting, so run as
+      // studafy_admin (the state-machine transitions it exercises are unaffected by role scope).
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${fixture.school}, true)`;
         await tx`
           INSERT INTO app.timetable_slots
@@ -412,6 +430,8 @@ integrationTest(
       });
 
       // Slots are frozen once the version is out of draft.
+      // ST-085: run as studafy_admin so the class/slot are visible and the freeze rule (not the
+      // slot-integrity trigger's class lookup) is what rejects these writes.
       await expectDenied(
         database,
         `INSERT INTO app.timetable_slots
@@ -419,15 +439,18 @@ integrationTest(
          VALUES ('${fixture.school}','${fixture.version}','${fixture.secondClassId}',
            '${fixture.teacher}','${fixture.room}',2,1)`,
         fixture.school,
+        "studafy_admin",
       );
       await expectDenied(
         database,
         `DELETE FROM app.timetable_slots WHERE timetable_version_id = '${fixture.version}'`,
         fixture.school,
+        "studafy_admin",
       );
 
       // Reject the submission back to draft: audit columns clear, slots become editable again.
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: reinserts a timetable_slot (integrity trigger reads the scoped class), so run as admin.
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${fixture.school}, true)`;
         await tx`UPDATE app.timetable_versions SET status = 'draft' WHERE id = ${fixture.version}`;
         const [row] = await tx<{ submittedAt: Date | null }[]>`

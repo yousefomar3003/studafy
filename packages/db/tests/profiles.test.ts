@@ -182,9 +182,12 @@ integrationTest(
       WHERE n.nspname = 'app' AND c.relname = ANY(${PROFILE_TABLES as unknown as string[]})
       ORDER BY c.relname
     `;
-      expect(policies).toHaveLength(3);
-      for (const policy of policies) {
-        expect(policy.name).toBe("tenant_isolation");
+      // Every profile table carries the permissive tenant_isolation policy. ST-085 additionally
+      // layers the restrictive role_scope_visibility SELECT policy onto app.students.
+      const tenantPolicies = policies.filter((policy) => policy.name === "tenant_isolation");
+      const scopePolicies = policies.filter((policy) => policy.name === "role_scope_visibility");
+      expect(tenantPolicies).toHaveLength(3);
+      for (const policy of tenantPolicies) {
         expect(policy.permissive).toBe(true);
         expect(policy.command).toBe("*");
         expect(policy.roles).toEqual([0]);
@@ -194,6 +197,11 @@ integrationTest(
         expect(policy.check).toContain(
           "school_id = (current_setting('app.school_id'::text))::uuid",
         );
+      }
+      expect(scopePolicies.map((policy) => policy.table_name)).toEqual(["students"]);
+      for (const policy of scopePolicies) {
+        expect(policy.permissive).toBe(false);
+        expect(policy.command).toBe("r");
       }
 
       const keys = await database.sql<{ name: string }[]>`
@@ -247,7 +255,10 @@ integrationTest(
           createUser(database, b, "parent-b"),
         ]);
 
-      const studentA = await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: app.students carries a restrictive role_scope_visibility SELECT policy, which
+      // PostgreSQL also applies to INSERT ... RETURNING. Seed as studafy_admin (still bound by
+      // tenant_isolation, exempt from the TO studafy_app scope policy).
+      const studentA = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${a}, true)`;
         const [row] = await tx<{ id: string; normalized: string }[]>`
         INSERT INTO app.students
@@ -367,7 +378,8 @@ integrationTest(
       const parentUser = await createUser(database, a, "rls-parent");
       const foreignUser = await createUser(database, b, "rls-foreign");
       let student = "";
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: seed the scoped app.students row as studafy_admin (see the studentA fixture above).
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${a}, true)`;
         const [row] = await tx<{ id: string }[]>`INSERT INTO app.students
         (school_id,user_id,admission_number,first_name,last_name)
@@ -401,10 +413,15 @@ integrationTest(
        VALUES ('${a}','${foreignUser}','X','Cross','Tenant')`,
         b,
       );
+      // ST-085: role_scope_visibility (SELECT policy) also gates the rows an UPDATE/DELETE can see.
+      // A userless studafy_app would match zero rows here and never reach tenant_isolation's WITH
+      // CHECK, so run this cross-school denial as studafy_admin, which sees the row (tenant_isolation
+      // only) and is still blocked from moving it to another school.
       await expectDenied(
         database,
         `UPDATE app.students SET school_id='${b}' WHERE id='${student}'`,
         a,
+        "studafy_admin",
       );
       await expectDenied(database, `UPDATE app.teachers SET school_id='${b}'`, a);
       await expectDenied(database, `UPDATE app.parent_child_links SET school_id='${b}'`, a);
@@ -421,7 +438,9 @@ integrationTest(
       });
       expect(hiddenWrites).toEqual([0, 0]);
 
-      const ownWrites = await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: these own-tenant writes must see the scoped app.students row to affect it, so run as
+      // studafy_admin (exempt from role_scope_visibility, still bound by tenant_isolation).
+      const ownWrites = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${a}, true)`;
         const studentUpdate =
           await tx`UPDATE app.students SET preferred_name='Own' WHERE id=${student}`;
@@ -498,7 +517,8 @@ integrationTest(
       const studentUser = await createUser(database, a, "plan-student");
       const teacherUser = await createUser(database, a, "plan-teacher");
       const parentUser = await createUser(database, a, "plan-parent");
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: seed the scoped app.students row as studafy_admin (see the studentA fixture above).
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${a}, true)`;
         const [student] = await tx<{ id: string }[]>`INSERT INTO app.students
         (school_id,user_id,admission_number,first_name,last_name)

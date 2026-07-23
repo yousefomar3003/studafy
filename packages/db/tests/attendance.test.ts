@@ -110,7 +110,10 @@ async function createSchool(database: Database, slug: string): Promise<string> {
 // Builds a school with one class and 40 enrolled students -- the roster size the ST-040 batch-insert
 // target is stated against.
 async function createFixture(database: Database, school: string, suffix: string): Promise<Fixture> {
-  return asRole(database, "studafy_app", async (tx) => {
+  // ST-085: this fixture seeds scoped tables (subjects, courses, classes, students, enrollments)
+  // whose role_scope_visibility SELECT policy PostgreSQL also applies to INSERT ... RETURNING. Seed
+  // as studafy_admin (still bound by tenant_isolation, exempt from the TO studafy_app scope policy).
+  return asRole(database, "studafy_admin", async (tx) => {
     await tx`SELECT set_config('app.school_id', ${school}, true)`;
     const lower = suffix.toLowerCase();
     const [staff] = await tx<{ id: string }[]>`
@@ -191,7 +194,9 @@ async function createSession(
   fixture: Fixture,
   options: { createdAt?: string; sessionDate?: string; period?: number | null } = {},
 ): Promise<{ id: string; createdAt: Date; partition: string }> {
-  return asRole(database, "studafy_app", async (tx) => {
+  // ST-085: attendance_sessions carries a role_scope_visibility SELECT policy that also gates
+  // INSERT ... RETURNING, so seed as studafy_admin (still bound by tenant_isolation).
+  return asRole(database, "studafy_admin", async (tx) => {
     await tx`SELECT set_config('app.school_id', ${fixture.school}, true)`;
     // A row whose created_at is written explicitly must write updated_at with it: the house
     // ck_<table>_timestamps constraint requires updated_at >= created_at, and a future-dated or
@@ -220,7 +225,9 @@ async function createRecord(
   studentId: string,
   createdAt = JULY,
 ): Promise<{ id: string; partition: string }> {
-  return asRole(database, "studafy_app", async (tx) => {
+  // ST-085: attendance_records carries a role_scope_visibility SELECT policy that also gates
+  // INSERT ... RETURNING, so seed as studafy_admin (still bound by tenant_isolation).
+  return asRole(database, "studafy_admin", async (tx) => {
     await tx`SELECT set_config('app.school_id', ${fixture.school}, true)`;
     const [row] = await tx<{ id: string; partition: string }[]>`
       INSERT INTO app.attendance_records
@@ -465,7 +472,8 @@ integrationTest(
 
       // A record's own created_at routes it, independently of the session it belongs to: a July
       // session corrected in August puts the correction row in the August partition.
-      const record = await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: INSERT ... RETURNING on the scoped attendance_records table, so run as studafy_admin.
+      const record = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         const [row] = await tx<{ partition: string }[]>`
           INSERT INTO app.attendance_records
@@ -844,25 +852,29 @@ integrationTest(
       await createRecord(database, fixtureB, sessionB, fixtureB.students[0]!);
 
       // School A sees only its own row, through the parent...
-      const throughParent = await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: these positive tenant-visibility reads assert the school boundary (through the parent
+      // and a directly-named partition). Run as studafy_admin, which tenant_isolation still scopes to
+      // school A but role_scope_visibility (TO studafy_app) does not filter; a userless studafy_app
+      // would now see zero scoped rows. Intra-school row scope is covered by the row-scope suite.
+      const throughParent = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         return tx<{ id: string }[]>`SELECT id FROM app.attendance_sessions`;
       });
       expect(throughParent.map((row) => row.id)).toEqual([sessionA.id]);
 
       // ...and when it names the July partition directly, which is the bypass the ticket asks about.
-      const throughPartition = await asRole(database, "studafy_app", async (tx) => {
+      const throughPartition = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         return tx<{ id: string }[]>`SELECT id FROM app.attendance_sessions_y2026m07`;
       });
       expect(throughPartition.map((row) => row.id)).toEqual([sessionA.id]);
 
-      const recordsThroughParent = await asRole(database, "studafy_app", async (tx) => {
+      const recordsThroughParent = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         return tx<{ id: string }[]>`SELECT id FROM app.attendance_records`;
       });
       expect(recordsThroughParent.map((row) => row.id)).toEqual([recordA.id]);
-      const recordsThroughPartition = await asRole(database, "studafy_app", async (tx) => {
+      const recordsThroughPartition = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${schoolA}, true)`;
         return tx<{ id: string }[]>`SELECT id FROM app.attendance_records_y2026m07`;
       });
@@ -920,11 +932,15 @@ integrationTest(
         database,
         `UPDATE app.attendance_sessions SET school_id = '${schoolB}' WHERE id = '${sessionA.id}'`,
         schoolA,
+        // ST-085: run as studafy_admin so the existing scoped row is visible; tenant_isolation's
+        // WITH CHECK still blocks moving it to another school.
+        "studafy_admin",
       );
       await expectDenied(
         database,
         `UPDATE app.attendance_records SET school_id = '${schoolB}' WHERE id = '${recordA.id}'`,
         schoolA,
+        "studafy_admin",
       );
 
       // Fail-closed context: no GUC and a non-uuid GUC both raise rather than returning everything.
@@ -1123,7 +1139,9 @@ integrationTest(
         school,
       );
 
-      const movedSession = await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: updates/deletes existing scoped attendance_sessions rows (and reads one back via
+      // RETURNING), so run as studafy_admin (exempt from role_scope_visibility, still tenant-scoped).
+      const movedSession = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         const [row] = await tx<{ partition: string }[]>`
           UPDATE app.attendance_sessions
@@ -1134,7 +1152,7 @@ integrationTest(
         return row!.partition;
       });
       expect(movedSession).toBe("app.attendance_sessions_y2026m08");
-      await asRole(database, "studafy_app", async (tx) => {
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         await tx`DELETE FROM app.attendance_sessions WHERE id = ${periodSession.id}`;
       });
@@ -1172,10 +1190,14 @@ integrationTest(
         database,
         `DELETE FROM app.attendance_sessions WHERE id = '${session.id}'`,
         school,
+        // ST-085: run as studafy_admin so the session is visible; the delete is still blocked by the
+        // record's tenant-safe session foreign key.
+        "studafy_admin",
       );
 
       // Deleting the record releases the key again.
-      await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: deletes/reinserts scoped attendance_records rows, so run as studafy_admin.
+      await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         await tx`
           DELETE FROM app.attendance_records
@@ -1190,7 +1212,8 @@ integrationTest(
         `;
       });
 
-      const movedRecord = await asRole(database, "studafy_app", async (tx) => {
+      // ST-085: updates an existing scoped attendance_records row and reads it back, so run as admin.
+      const movedRecord = await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${school}, true)`;
         const [row] = await tx<{ partition: string; created_at: Date }[]>`
           UPDATE app.attendance_records
