@@ -10,7 +10,6 @@ import type { Database } from "../../db/client";
 import type { TenantContext } from "../../db/tenant-tx";
 import type { TransactionSql } from "postgres";
 
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
