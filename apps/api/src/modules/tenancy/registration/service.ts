@@ -63,9 +63,10 @@ const INVITATION_EXPIRY_DAYS = 7;
 /**
  * Register a new school, create its first ORG_ADMIN user, and issue an activation invitation.
  *
- * All writes run inside a single database transaction. The school INSERT runs as studafy_admin
- * (the DDL-owning role that owns global tables), then the transaction switches to studafy_app
- * for tenant-scoped inserts (users, roles, invitations, audit, outbox).
+ * All writes run inside a single database transaction. The school INSERT is delegated to the
+ * SECURITY DEFINER function app.register_school() (the API never holds admin credentials),
+ * then the transaction switches to studafy_app for tenant-scoped inserts (users, roles,
+ * invitations, audit, outbox).
  *
  * @throws HTTPException 409 with SCHOOL_SLUG_DUPLICATE or SCHOOL_EMAIL_DUPLICATE
  * @throws HTTPException 400 with CAPTCHA_INVALID when the captcha token is invalid
@@ -98,33 +99,25 @@ export async function registerSchool(
 
   // ── 4. Transaction ─────────────────────────────────────────────────────
   return database.begin(async (tx) => {
-    // Phase A: Insert the school as studafy_admin (global table, no RLS).
-    // set_config(..., true) is transaction-local, so it won't leak across pooled connections.
-    await tx`SELECT set_config('role', 'studafy_admin', true)`;
-
-    const schools = await tx<{ id: string }[]>`
-      INSERT INTO app.schools (
-        slug, name, email, normalized_email,
-        status, country_id, default_currency_id
-      ) VALUES (
+    // Phase A: Create the school via SECURITY DEFINER function (global table, no RLS).
+    const schools = await tx<{ register_school: string }[]>`
+      SELECT app.register_school(
         ${params.slug},
         ${params.schoolName},
         ${params.email},
         ${normalizedEmail},
-        'registered'::app.school_status,
         ${params.countryId}::uuid,
         ${params.defaultCurrencyId}::uuid
       )
-      RETURNING id
     `;
 
     if (schools.length === 0) {
       throw new HTTPException(500, { message: "Failed to create school." });
     }
 
-    const schoolId = schools[0].id;
+    const schoolId = schools[0].register_school;
 
-    // Phase B: Switch to studafy_app and set tenant context for remaining inserts.
+    // Phase B: Switch to the runtime role and set tenant context for remaining inserts.
     await tx`
       SELECT
         set_config('role', 'studafy_app', true),
