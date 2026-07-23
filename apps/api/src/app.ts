@@ -31,6 +31,7 @@ import {
 } from "./modules/auth";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
+import { emailVerificationRoutes } from "./modules/tenancy/verification/route";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -224,6 +225,12 @@ export function createApp({
   // and activation invitation in a single transaction.
   if (database) {
     app.route("/", registerSchoolRoutes(database, logger));
+  }
+
+  // School email verification — public, no authentication. Rate-limited (auth-strict class).
+  // Verify consumes a one-time token and activates the school; resend regenerates the token.
+  if (database) {
+    app.route("/", emailVerificationRoutes(database, logger));
   }
 
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.
