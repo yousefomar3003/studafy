@@ -69,10 +69,10 @@ async function createSchools(
   `;
   return asRole(database, "studafy_admin", async (tx) => {
     const rows = await tx<{ id: string; slug: string }[]>`
-      INSERT INTO app.schools (slug, name, country_id, default_currency_id)
+      INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
       VALUES
-        ('profiles-a', 'Profiles A', ${refs!.country}, ${refs!.currency}),
-        ('profiles-b', 'Profiles B', ${refs!.country}, ${refs!.currency})
+        ('profiles-a', 'Profiles A', 'profiles-a@admin.local', 'profiles-a@admin.local', ${refs!.country}, ${refs!.currency}),
+        ('profiles-b', 'Profiles B', 'profiles-b@admin.local', 'profiles-b@admin.local', ${refs!.country}, ${refs!.currency})
       RETURNING id, slug
     `;
     return {

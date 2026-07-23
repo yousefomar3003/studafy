@@ -176,8 +176,8 @@ integrationTest("school identity, references, and lifecycle constraints are enfo
     const { countryId, currencyId } = await referenceIds(database);
     await asRole(database, "studafy_admin", async (tx) => {
       const [school] = await tx.unsafe<{ status: string }[]>(`
-        INSERT INTO app.schools (slug, name, country_id, default_currency_id)
-        VALUES ('north-star-school', 'North Star School', '${countryId}', '${currencyId}')
+        INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
+        VALUES ('north-star-school', 'North Star School', 'north-star-school@admin.local', 'north-star-school@admin.local', '${countryId}', '${currencyId}')
         RETURNING status::text
       `);
       expect(school?.status).toBe("pending");
@@ -186,32 +186,32 @@ integrationTest("school identity, references, and lifecycle constraints are enfo
     await expectDenied(
       database,
       "studafy_admin",
-      `INSERT INTO app.schools (slug, name, country_id, default_currency_id)
-       VALUES ('north-star-school', 'Duplicate', '${countryId}', '${currencyId}')`,
+      `INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
+       VALUES ('north-star-school', 'Duplicate', 'north-star-school@admin.local', 'north-star-school@admin.local', '${countryId}', '${currencyId}')`,
     );
     await expectDenied(
       database,
       "studafy_admin",
-      `INSERT INTO app.schools (slug, name, country_id, default_currency_id)
-       VALUES ('Invalid Slug', 'Invalid', '${countryId}', '${currencyId}')`,
+      `INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
+       VALUES ('Invalid Slug', 'Invalid', 'invalid-slug@admin.local', 'invalid-slug@admin.local', '${countryId}', '${currencyId}')`,
     );
     await expectDenied(
       database,
       "studafy_admin",
-      `INSERT INTO app.schools (slug, name, status, country_id, default_currency_id)
-       VALUES ('bad-status', 'Invalid', 'deleted', '${countryId}', '${currencyId}')`,
+      `INSERT INTO app.schools (slug, name, status, email, normalized_email, country_id, default_currency_id)
+       VALUES ('bad-status', 'Invalid', 'deleted', 'bad-status@admin.local', 'bad-status@admin.local', '${countryId}', '${currencyId}')`,
     );
     await expectDenied(
       database,
       "studafy_admin",
-      `INSERT INTO app.schools (slug, name, country_id, default_currency_id)
-       VALUES ('bad-country', 'Invalid', gen_random_uuid(), '${currencyId}')`,
+      `INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
+       VALUES ('bad-country', 'Invalid', 'bad-country@admin.local', 'bad-country@admin.local', gen_random_uuid(), '${currencyId}')`,
     );
     await expectDenied(
       database,
       "studafy_app",
-      `INSERT INTO app.schools (slug, name, country_id, default_currency_id)
-       VALUES ('runtime-write', 'Forbidden', '${countryId}', '${currencyId}')`,
+      `INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
+       VALUES ('runtime-write', 'Forbidden', 'runtime-write@admin.local', 'runtime-write@admin.local', '${countryId}', '${currencyId}')`,
     );
 
     const enumValues = await database.sql<{ enumlabel: string }[]>`

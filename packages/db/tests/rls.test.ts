@@ -101,10 +101,10 @@ async function createSchools(database: Database): Promise<{ schoolA: string; sch
 
   return asRole(database, "studafy_admin", async (tx) => {
     const schools = await tx<{ id: string; slug: string }[]>`
-      INSERT INTO app.schools (slug, name, country_id, default_currency_id)
+      INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
       VALUES
-        ('rls-school-a', 'RLS School A', ${references.country_id}, ${references.currency_id}),
-        ('rls-school-b', 'RLS School B', ${references.country_id}, ${references.currency_id})
+        ('rls-school-a', 'RLS School A', 'rls-school-a@admin.local', 'rls-school-a@admin.local', ${references.country_id}, ${references.currency_id}),
+        ('rls-school-b', 'RLS School B', 'rls-school-b@admin.local', 'rls-school-b@admin.local', ${references.country_id}, ${references.currency_id})
       RETURNING id, slug
     `;
     return {

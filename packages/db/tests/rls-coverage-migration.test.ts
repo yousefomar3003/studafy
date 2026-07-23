@@ -56,10 +56,10 @@ integrationTest(
         // eslint-disable-next-line studafy/no-session-set -- reserved superuser connection, not pooled
         await reserved.unsafe("SET session_replication_role = replica");
         await reserved`
-          INSERT INTO app.schools (id, slug, name, country_id, default_currency_id)
+          INSERT INTO app.schools (id, slug, name, email, normalized_email, country_id, default_currency_id)
           VALUES
-            (${schoolA}, 'st050-school-a', 'ST050 School A', gen_random_uuid(), gen_random_uuid()),
-            (${schoolB}, 'st050-school-b', 'ST050 School B', gen_random_uuid(), gen_random_uuid())
+            (${schoolA}, 'st050-school-a', 'ST050 School A', 'st050-school-a@admin.local', 'st050-school-a@admin.local', gen_random_uuid(), gen_random_uuid()),
+            (${schoolB}, 'st050-school-b', 'ST050 School B', 'st050-school-b@admin.local', 'st050-school-b@admin.local', gen_random_uuid(), gen_random_uuid())
         `;
         await reserved`
           INSERT INTO app.ai_conversations (id, school_id, student_id, model)

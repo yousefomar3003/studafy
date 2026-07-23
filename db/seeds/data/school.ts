@@ -58,6 +58,8 @@ export async function seedSchool(sql: Sql): Promise<SchoolCtx> {
       id: schoolId,
       slug: DEMO_SCHOOL_SLUG,
       name: DEMO_SCHOOL_NAME,
+      email: `${DEMO_SCHOOL_SLUG}@admin.local`,
+      normalized_email: `${DEMO_SCHOOL_SLUG}@admin.local`,
       status: "active",
       country_id: country.id,
       default_currency_id: currency.id,

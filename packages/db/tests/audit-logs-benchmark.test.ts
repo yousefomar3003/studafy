@@ -59,8 +59,8 @@ benchmarkTest(
       await database.sql.begin(async (tx) => {
         await tx.unsafe("SET LOCAL ROLE studafy_admin");
         const [created] = await tx<{ id: string }[]>`
-          INSERT INTO app.schools (slug, name, country_id, default_currency_id)
-          VALUES ('audit-benchmark', 'Audit Benchmark', ${refs!.country}, ${refs!.currency})
+          INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
+          VALUES ('audit-benchmark', 'Audit Benchmark', 'audit-benchmark@admin.local', 'audit-benchmark@admin.local', ${refs!.country}, ${refs!.currency})
           RETURNING id
         `;
         school = created!.id;
