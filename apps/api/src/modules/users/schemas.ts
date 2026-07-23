@@ -46,14 +46,10 @@ export type UserWithRoles = z.infer<typeof userWithRolesSchema>;
 
 export const createUserBodySchema = z
   .object({
-    email: z
-      .string()
-      .email()
-      .max(320)
-      .openapi({
-        description: "Contact address. Unique per school after normalization.",
-        example: "newuser@example.edu",
-      }),
+    email: z.string().email().max(320).openapi({
+      description: "Contact address. Unique per school after normalization.",
+      example: "newuser@example.edu",
+    }),
     display_name: z
       .string()
       .min(1)
