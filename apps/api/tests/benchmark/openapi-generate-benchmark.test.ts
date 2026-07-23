@@ -77,6 +77,10 @@ const EXPECTED_PATHS = [
   "/api/academics/years/{yearId}/rollover",
   "/api/academics/years/{yearId}/terms",
   "/api/academics/terms/{termId}",
+  "/api/users",
+  "/api/users/{userId}",
+  "/api/users/{userId}/role",
+  "/api/users/{userId}/deactivate",
 ];
 
 const SCRIPT = path.join(import.meta.dir, "..", "..", "scripts", "generate-openapi.ts");
