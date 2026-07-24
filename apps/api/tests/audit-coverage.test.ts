@@ -106,6 +106,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // Audit rows are written from inside the service transactions.
   "POST /api/students",
   "PATCH /api/students/{studentId}",
+  // Teacher profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards.
+  // Audit rows are written from inside the service transactions.
+  "POST /api/teachers",
+  "PATCH /api/teachers/{teacherId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {
