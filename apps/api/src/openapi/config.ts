@@ -83,5 +83,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "User management and administration. Authenticated and tenant-scoped. " +
         "Includes CRUD operations, role assignment, and deactivation with session revocation.",
     },
+    {
+      name: "Students",
+      description:
+        "Student profile and guardians management. Authenticated and tenant-scoped. " +
+        "Includes CRUD operations for student records with role-based field projection: " +
+        "finance-visible roles receive full profiles including admission data.",
+    },
   ],
 };

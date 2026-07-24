@@ -75,6 +75,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/users/{userId}",
   "PATCH /api/users/{userId}/role",
   "PATCH /api/users/{userId}/deactivate",
+  // Student profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards
+  // for STUDENT_READ, STUDENT_CREATE, and STUDENT_UPDATE.
+  "POST /api/students",
+  "PATCH /api/students/{studentId}",
 ];
 
 /**

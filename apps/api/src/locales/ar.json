@@ -39,6 +39,7 @@
   "ACADEMIC_YEAR_DATE_OVERLAP": "نطاق التاريخ يتداخل مع سنة أكاديمية موجودة",
   "USER_EMAIL_DUPLICATE": "يوجد بالفعل مستخدم بهذا البريد الإلكتروني في هذه المدرسة",
   "INVALID_ROLE_ASSIGNMENT": "الدور المحدد غير صالح لهذه المدرسة",
+  "STUDENT_ADMISSION_DUPLICATE": "رقم القيد هذا مستخدم بالفعل",
   "PROVISIONING_FAILED": "فشل إعداد المستأجر",
   "PROVISIONING_IN_PROGRESS": "إعداد المستأجر قيد التنفيذ بالفعل",
   "ERPNEXT_SITE_CREATION_FAILED": "فشل إنشاء موقع ERPNext",

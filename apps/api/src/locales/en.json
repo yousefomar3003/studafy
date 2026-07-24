@@ -39,6 +39,7 @@
   "ACADEMIC_YEAR_DATE_OVERLAP": "The date range overlaps with an existing academic year",
   "USER_EMAIL_DUPLICATE": "A user with this email already exists in this school",
   "INVALID_ROLE_ASSIGNMENT": "The specified role is not valid for this school",
+  "STUDENT_ADMISSION_DUPLICATE": "This admission number is already in use",
   "PROVISIONING_FAILED": "Tenant provisioning failed",
   "PROVISIONING_IN_PROGRESS": "Tenant provisioning is already in progress",
   "ERPNEXT_SITE_CREATION_FAILED": "Failed to create ERPNext site",

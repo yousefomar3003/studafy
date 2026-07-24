@@ -655,6 +655,74 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/students": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List students
+         * @description Paginated, cursor-based list of students for the authenticated school. Supports search over name and admission number, filtering by status, and date-range filtering.
+         */
+        readonly get: operations["listStudents"];
+        readonly put?: never;
+        /**
+         * Create a student
+         * @description Creates a new student with a linked user account and the STUDENT role. Fails with 409 if the admission number already exists in this school.
+         */
+        readonly post: operations["createStudent"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/students/{studentId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get a student profile
+         * @description Returns a single student profile. Roles with billing permissions receive the full profile including admission data; others receive demographics only.
+         */
+        readonly get: operations["getStudent"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Update a student
+         * @description Partially updates a student profile. Fails with 409 if the new admission number conflicts. Emits an audit log with the diff.
+         */
+        readonly patch: operations["updateStudent"];
+        readonly trace?: never;
+    };
+    readonly "/api/students/{studentId}/guardians": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List student guardians
+         * @description Returns the guardian links for a student.
+         */
+        readonly get: operations["listStudentGuardians"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/users": {
         readonly parameters: {
             readonly query?: never;
@@ -950,6 +1018,61 @@ export interface components {
              */
             readonly token: string;
         };
+        readonly CreateStudentBody: {
+            /**
+             * Format: date
+             * @description Date of admission (YYYY-MM-DD).
+             */
+            readonly admission_date?: string;
+            /**
+             * @description Unique admission number within the school.
+             * @example ADM-2024-001
+             */
+            readonly admission_number: string;
+            /**
+             * Format: date
+             * @description Date of birth (YYYY-MM-DD).
+             */
+            readonly date_of_birth?: string;
+            /**
+             * Format: email
+             * @description Contact address. Unique per school after normalization.
+             * @example student@example.edu
+             */
+            readonly email: string;
+            /** @description Legal first name. */
+            readonly first_name: string;
+            /** @description Guardian links to create. */
+            readonly guardians?: readonly {
+                /**
+                 * Format: uuid
+                 * @description Guardian's user ID.
+                 */
+                readonly parent_user_id: string;
+                /**
+                 * @description Guardian relationship to the student.
+                 * @enum {string}
+                 */
+                readonly relationship: "mother" | "father" | "guardian" | "step_parent" | "grandparent" | "sibling" | "other";
+            }[];
+            /** @description Legal last name. */
+            readonly last_name: string;
+            /** @description Middle name. */
+            readonly middle_name?: string;
+            /**
+             * Format: uuid
+             * @description Nationality country FK.
+             */
+            readonly nationality_country_id?: string;
+            /** @description Preferred or informal name. */
+            readonly preferred_name?: string;
+            /**
+             * @description Lifecycle state of the student within the school.
+             * @default applicant
+             * @enum {string}
+             */
+            readonly status: "applicant" | "enrolled" | "suspended" | "graduated" | "withdrawn" | "archived";
+        };
         readonly CreateTermBody: {
             /**
              * Format: uuid
@@ -1029,6 +1152,20 @@ export interface components {
         readonly ErpNextWebhookAccepted: {
             /** @enum {boolean} */
             readonly ok: true;
+        };
+        readonly Guardian: {
+            /** Format: date-time */
+            readonly created_at: string;
+            /**
+             * Format: uuid
+             * @description Guardian's user ID.
+             */
+            readonly parent_user_id: string;
+            /**
+             * @description Guardian relationship to the student.
+             * @enum {string}
+             */
+            readonly relationship: "mother" | "father" | "guardian" | "step_parent" | "grandparent" | "sibling" | "other";
         };
         readonly HealthOk: {
             /** @enum {string} */
@@ -1118,7 +1255,7 @@ export interface components {
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -1460,6 +1597,65 @@ export interface components {
         readonly SessionList: {
             readonly sessions: readonly components["schemas"]["Session"][];
         };
+        readonly StudentList: {
+            /** @description Opaque cursor for the next page. Null when no more results. */
+            readonly next_cursor: string | null;
+            readonly students: readonly components["schemas"]["StudentProfile"][];
+        };
+        readonly StudentProfile: {
+            /**
+             * Format: date
+             * @description Date of admission (YYYY-MM-DD).
+             */
+            readonly admission_date: string | null;
+            /**
+             * @description Unique admission number within the school.
+             * @example ADM-2024-001
+             */
+            readonly admission_number: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /**
+             * Format: date
+             * @description Date of birth (YYYY-MM-DD).
+             */
+            readonly date_of_birth: string | null;
+            /** @description Legal first name. */
+            readonly first_name: string;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /** @description Legal last name. */
+            readonly last_name: string;
+            /** @description Middle name, if any. */
+            readonly middle_name: string | null;
+            /**
+             * Format: uuid
+             * @description Nationality country FK.
+             */
+            readonly nationality_country_id: string | null;
+            /** @description Preferred or informal name. */
+            readonly preferred_name: string | null;
+            /**
+             * Format: uuid
+             * @description Owning school tenant.
+             */
+            readonly school_id: string;
+            /**
+             * @description Lifecycle state of the student within the school.
+             * @enum {string}
+             */
+            readonly status: "applicant" | "enrolled" | "suspended" | "graduated" | "withdrawn" | "archived";
+            /** Format: date-time */
+            readonly updated_at: string;
+            /**
+             * Format: uuid
+             * @description Linked user account.
+             */
+            readonly user_id: string;
+        };
         readonly Term: {
             /**
              * Format: uuid
@@ -1601,6 +1797,38 @@ export interface components {
              * @example Africa/Casablanca
              */
             readonly timezone?: string;
+        };
+        readonly UpdateStudentBody: {
+            /**
+             * Format: date
+             * @description Date of admission (YYYY-MM-DD).
+             */
+            readonly admission_date?: string;
+            /** @description Unique admission number within the school. */
+            readonly admission_number?: string;
+            /**
+             * Format: date
+             * @description Date of birth (YYYY-MM-DD).
+             */
+            readonly date_of_birth?: string;
+            /** @description Legal first name. */
+            readonly first_name?: string;
+            /** @description Legal last name. */
+            readonly last_name?: string;
+            /** @description Middle name. */
+            readonly middle_name?: string;
+            /**
+             * Format: uuid
+             * @description Nationality country FK.
+             */
+            readonly nationality_country_id?: string;
+            /** @description Preferred or informal name. */
+            readonly preferred_name?: string;
+            /**
+             * @description Lifecycle state of the student within the school.
+             * @enum {string}
+             */
+            readonly status?: "applicant" | "enrolled" | "suspended" | "graduated" | "withdrawn" | "archived";
         };
         readonly UpdateTermBody: {
             /** @description Short unique code. */
@@ -4581,6 +4809,430 @@ export interface operations {
             };
             /** @description Rate limit exceeded. Back off and retry. */
             readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listStudents: {
+        readonly parameters: {
+            readonly query?: {
+                /** @description Filter by created_at >= this ISO datetime. */
+                readonly created_from?: string;
+                /** @description Filter by created_at <= this ISO datetime. */
+                readonly created_to?: string;
+                readonly cursor?: string;
+                readonly limit?: number;
+                /** @description Search over first_name, last_name, and admission_number. */
+                readonly search?: string;
+                /** @description Lifecycle state of the student within the school. */
+                readonly status?: "applicant" | "enrolled" | "suspended" | "graduated" | "withdrawn" | "archived";
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Paginated list of students. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["StudentList"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly createStudent: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateStudentBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The created student profile. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["StudentProfile"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly getStudent: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Student UUID. */
+                readonly studentId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The student profile. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["StudentProfile"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly updateStudent: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Student UUID. */
+                readonly studentId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["UpdateStudentBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The updated student profile. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["StudentProfile"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listStudentGuardians: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Student UUID. */
+                readonly studentId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description List of guardian links. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["Guardian"][];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
                 headers: {
                     /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
                     readonly "X-Request-Id": string;
