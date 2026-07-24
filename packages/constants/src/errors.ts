@@ -70,6 +70,9 @@ export const ERROR_CODES = {
   // Student — duplicate admission number within a school.
   STUDENT_ADMISSION_DUPLICATE: "STUDENT_ADMISSION_DUPLICATE",
 
+  // Teacher — duplicate employee number within a school.
+  TEACHER_EMPLOYEE_NUMBER_DUPLICATE: "TEACHER_EMPLOYEE_NUMBER_DUPLICATE",
+
   // Academic — year/term lifecycle violations.
   ACADEMIC_YEAR_ACTIVE_EXISTS: "ACADEMIC_YEAR_ACTIVE_EXISTS",
   ACADEMIC_YEAR_DATE_OVERLAP: "ACADEMIC_YEAR_DATE_OVERLAP",

@@ -90,5 +90,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Includes CRUD operations for student records with role-based field projection: " +
         "finance-visible roles receive full profiles including admission data.",
     },
+    {
+      name: "Teachers",
+      description:
+        "Teacher profile management. Authenticated and tenant-scoped. " +
+        "Includes CRUD operations for teacher records and a self-view endpoint.",
+    },
   ],
 };

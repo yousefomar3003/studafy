@@ -411,3 +411,149 @@ export const studentListQuerySchema = z
       .openapi({ description: "Filter by created_at <= this ISO datetime." }),
   })
   .openapi("StudentListQuery");
+
+// ---------------------------------------------------------------------------
+// Teacher
+// ---------------------------------------------------------------------------
+
+const teacherEmploymentStatusValues = [
+  "pending",
+  "active",
+  "on_leave",
+  "suspended",
+  "terminated",
+  "archived",
+] as const;
+
+export const teacherEmploymentStatusSchema = z
+  .enum(teacherEmploymentStatusValues)
+  .openapi({ description: "Employment lifecycle state of the teacher." });
+
+export type TeacherEmploymentStatus = z.infer<typeof teacherEmploymentStatusSchema>;
+
+// ---------------------------------------------------------------------------
+// Teacher profile
+// ---------------------------------------------------------------------------
+
+export const teacherProfileSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    user_id: uuidSchema.openapi({ description: "Linked user account." }),
+    employee_number: z.string().openapi({
+      description: "Unique employee number within the school.",
+      example: "EMP-2024-001",
+    }),
+    employment_status: teacherEmploymentStatusSchema,
+    hire_date: dateSchema.nullable().openapi({ description: "Date of hire (YYYY-MM-DD)." }),
+    termination_date: dateSchema
+      .nullable()
+      .openapi({ description: "Date of termination (YYYY-MM-DD)." }),
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("TeacherProfile");
+
+export type TeacherProfile = z.infer<typeof teacherProfileSchema>;
+
+// ---------------------------------------------------------------------------
+// Create teacher
+// ---------------------------------------------------------------------------
+
+export const createTeacherBodySchema = z
+  .object({
+    email: z.string().email().max(320).openapi({
+      description: "Contact address. Unique per school after normalization.",
+      example: "teacher@example.edu",
+    }),
+    employee_number: z.string().min(1).max(100).openapi({
+      description: "Unique employee number within the school.",
+      example: "EMP-2024-001",
+    }),
+    employment_status: teacherEmploymentStatusSchema.default("pending"),
+    hire_date: z.string().date().optional().openapi({ description: "Date of hire (YYYY-MM-DD)." }),
+  })
+  .openapi("CreateTeacherBody");
+
+export type CreateTeacherBody = z.infer<typeof createTeacherBodySchema>;
+
+// ---------------------------------------------------------------------------
+// Update teacher
+// ---------------------------------------------------------------------------
+
+export const updateTeacherBodySchema = z
+  .object({
+    employee_number: z
+      .string()
+      .min(1)
+      .max(100)
+      .optional()
+      .openapi({ description: "Unique employee number within the school." }),
+    employment_status: teacherEmploymentStatusSchema.optional(),
+    hire_date: z.string().date().optional().openapi({ description: "Date of hire (YYYY-MM-DD)." }),
+    termination_date: z
+      .string()
+      .date()
+      .optional()
+      .openapi({ description: "Date of termination (YYYY-MM-DD)." }),
+  })
+  .openapi("UpdateTeacherBody");
+
+export type UpdateTeacherBody = z.infer<typeof updateTeacherBodySchema>;
+
+// ---------------------------------------------------------------------------
+// Teacher list
+// ---------------------------------------------------------------------------
+
+export const teacherListSchema = z
+  .object({
+    teachers: z.array(teacherProfileSchema),
+    next_cursor: z.string().nullable().openapi({
+      description: "Opaque cursor for the next page. Null when no more results.",
+    }),
+  })
+  .openapi("TeacherList");
+
+// ---------------------------------------------------------------------------
+// Teacher path params
+// ---------------------------------------------------------------------------
+
+export const teacherIdParamSchema = z
+  .object({
+    teacherId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "teacherId", in: "path" },
+        description: "Teacher UUID.",
+      }),
+  })
+  .openapi("TeacherIdParam");
+
+// ---------------------------------------------------------------------------
+// Teacher list query
+// ---------------------------------------------------------------------------
+
+export const teacherListQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().min(1).optional(),
+    status: teacherEmploymentStatusSchema.optional(),
+    search: z
+      .string()
+      .min(1)
+      .max(200)
+      .optional()
+      .openapi({ description: "Search over employee_number." }),
+    created_from: z
+      .string()
+      .datetime()
+      .optional()
+      .openapi({ description: "Filter by created_at >= this ISO datetime." }),
+    created_to: z
+      .string()
+      .datetime()
+      .optional()
+      .openapi({ description: "Filter by created_at <= this ISO datetime." }),
+  })
+  .openapi("TeacherListQuery");

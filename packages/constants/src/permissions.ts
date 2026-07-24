@@ -117,6 +117,10 @@ export const PERMISSIONS = {
   STUDENT_CREATE: "student:create",
   STUDENT_READ: "student:read",
   STUDENT_UPDATE: "student:update",
+
+  TEACHER_CREATE: "teacher:create",
+  TEACHER_READ: "teacher:read",
+  TEACHER_UPDATE: "teacher:update",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -184,6 +188,7 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.NOTIFICATION_READ,
   PERMISSIONS.NOTIFICATION_SEND,
   PERMISSIONS.STUDENT_READ,
+  PERMISSIONS.TEACHER_READ,
 ];
 
 const TEACHING_ASSISTANT_PERMISSIONS: readonly Permission[] = [

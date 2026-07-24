@@ -37,7 +37,7 @@ import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { schoolSettingsRoutes } from "./modules/tenancy/settings/route";
 import { emailVerificationRoutes } from "./modules/tenancy/verification/route";
-import { userRoutes, studentRoutes } from "./modules/users";
+import { userRoutes, studentRoutes, teacherRoutes } from "./modules/users";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -417,6 +417,12 @@ export function createApp({
   // field projection and role-based view scoping. Gated on STUDENT_* permissions.
   if (database) {
     app.route("/", studentRoutes(database));
+  }
+
+  // Teacher profiles (CRUD). Employment data with role-based view scoping. Admin full CRUD,
+  // teacher self-view of own profile read-only. Gated on TEACHER_* permissions.
+  if (database) {
+    app.route("/", teacherRoutes(database));
   }
 
   // Academic year & term management (ST-091). Full CRUD plus a rollover action that transitions
