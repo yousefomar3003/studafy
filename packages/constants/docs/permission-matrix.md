@@ -96,3 +96,6 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `certificate:issue`              | ✅          | ✅        | ✅         |                    |         |       |               |
 | `certificate:read`               | ✅          | ✅        | ✅         |                    | ✅      |       |               |
 | `certificate:revoke`             | ✅          | ✅        |            |                    |         |       |               |
+| `student:create`                 | ✅          | ✅        |            |                    |         |       |               |
+| `student:read`                   | ✅          | ✅        | ✅         | ✅                 | ✅      |       | ✅            |
+| `student:update`                 | ✅          | ✅        |            |                    |         |       |               |
