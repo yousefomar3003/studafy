@@ -974,7 +974,7 @@ export interface components {
              * @description Role to assign to the new user.
              * @enum {string}
              */
-            readonly role: "SUPER_ADMIN" | "ORG_ADMIN" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST" | "SUPPORT_AGENT";
+            readonly role: "SUPER_ADMIN" | "ORG_ADMIN" | "FINANCE" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST" | "SUPPORT_AGENT";
         };
         readonly Device: {
             /** @description Live sessions currently bound to this device. */
@@ -1094,7 +1094,7 @@ export interface components {
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -1546,7 +1546,7 @@ export interface components {
              * @description New role to assign. Replaces the existing role.
              * @enum {string}
              */
-            readonly role: "SUPER_ADMIN" | "ORG_ADMIN" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST" | "SUPPORT_AGENT";
+            readonly role: "SUPER_ADMIN" | "ORG_ADMIN" | "FINANCE" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST" | "SUPPORT_AGENT";
         };
         readonly User: {
             /** Format: date-time */
@@ -1630,7 +1630,7 @@ export interface components {
              */
             readonly last_login_at: string | null;
             /** @description Roles assigned to this user in the school. */
-            readonly roles: readonly ("SUPER_ADMIN" | "ORG_ADMIN" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST" | "SUPPORT_AGENT")[];
+            readonly roles: readonly ("SUPER_ADMIN" | "ORG_ADMIN" | "FINANCE" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST" | "SUPPORT_AGENT")[];
             /**
              * Format: uuid
              * @description Owning school tenant.
@@ -4373,7 +4373,7 @@ export interface operations {
                 readonly cursor?: string;
                 readonly limit?: number;
                 /** @description Predefined platform role. */
-                readonly role?: "SUPER_ADMIN" | "ORG_ADMIN" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST" | "SUPPORT_AGENT";
+                readonly role?: "SUPER_ADMIN" | "ORG_ADMIN" | "FINANCE" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST" | "SUPPORT_AGENT";
                 /** @description Trigram search over display_name and email. */
                 readonly search?: string;
                 /** @description Lifecycle state of the user within its school. */
