@@ -70,6 +70,9 @@ const EXPECTED_PATHS = [
   "/api/admin/users/{userId}/devices/{deviceId}",
   "/api/admin/users/{userId}/providers/{provider}",
   "/api/schools/register",
+  "/api/schools/resend-verification",
+  "/api/schools/verify-email/{token}",
+  "/api/schools/current/settings",
 ];
 
 const SCRIPT = path.join(import.meta.dir, "..", "..", "scripts", "generate-openapi.ts");
