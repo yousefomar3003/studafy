@@ -201,8 +201,12 @@ describe("getCache / setCache", () => {
 
     try {
       const key = cacheKey(`${TEST_PREFIX}:bad-ttl`, "ttl", "bad");
-      await expect(setCache(client, key, "x", 0)).rejects.toThrow("ttlSeconds must be positive");
-      await expect(setCache(client, key, "x", -5)).rejects.toThrow("ttlSeconds must be positive");
+      await expect(setCache(client, key, "x", 0)).rejects.toThrow(
+        "ttlSeconds must be a positive integer",
+      );
+      await expect(setCache(client, key, "x", -5)).rejects.toThrow(
+        "ttlSeconds must be a positive integer",
+      );
     } finally {
       await client.quit();
     }
