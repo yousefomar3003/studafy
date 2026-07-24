@@ -53,9 +53,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/admin/users/{userId}/devices",
   "DELETE /api/admin/users/{userId}/devices/{deviceId}",
   "DELETE /api/admin/users/{userId}/providers/{provider}",
-  // School email verification (ST-088). Public self-service endpoint; no caller identity or
-  // bearer permission; authorized by a one-time token.
+  // School email verification (ST-088). Self-service; authorized by the caller's school identity.
   "POST /api/schools/resend-verification",
+  // School settings (ST-090). Gated on ORGANIZATION_MANAGE_SETTINGS.
+  "PATCH /api/schools/current/settings",
   // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
   // school context is sufficient — no cross-user row-level permission.
   "POST /api/schools/{schoolId}/provision",
@@ -110,6 +111,7 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // School self-registration (ST-081) — public unauthenticated endpoint; no caller identity or
   // bearer permission; authorized by Turnstile captcha only.
   "POST /api/schools/register",
+  // School email verification (ST-088) — self-service resend for the caller's own school.
   // School email verification (ST-088) — public self-service endpoint; authorized by a one-time
   // verification token, not by a bearer permission; no other user's data to protect.
   "POST /api/schools/resend-verification",

@@ -571,6 +571,30 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/schools/current/settings": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get current school settings
+         * @description Returns the authenticated school's configuration: locale, timezone, grading scheme, invitation expiry, and attendance alert thresholds. Creates a default settings row on first access.
+         */
+        readonly get: operations["getSchoolSettings"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Update school settings
+         * @description Partially update the school's configuration. Only provided fields are changed; omitted fields retain their current values. Every mutation is audited with full before/after snapshots.
+         */
+        readonly patch: operations["updateSchoolSettings"];
+        readonly trace?: never;
+    };
     readonly "/api/schools/register": {
         readonly parameters: {
             readonly query?: never;
@@ -1383,6 +1407,41 @@ export interface components {
             /** Format: date-time */
             readonly updated_at: string;
         };
+        readonly SchoolSettings: {
+            /** @description Absence alert threshold (%). */
+            readonly absence_alert_threshold: number;
+            /** @description Attendance alert threshold (%). */
+            readonly attendance_alert_threshold: number;
+            /**
+             * Format: date-time
+             * @description Row creation timestamp (ISO 8601).
+             */
+            readonly created_at: string;
+            /**
+             * @description Grading scheme.
+             * @example letter
+             * @enum {string}
+             */
+            readonly grading_scheme: "letter" | "percentage" | "gpa" | "numeric" | "pass_fail";
+            /** @description Invitation expiry (days). */
+            readonly invitation_expiry_days: number;
+            /**
+             * @description School locale.
+             * @example en
+             * @enum {string}
+             */
+            readonly locale: "en" | "fr" | "ar" | "es" | "pt" | "de";
+            /**
+             * @description IANA timezone.
+             * @example Africa/Casablanca
+             */
+            readonly timezone: string;
+            /**
+             * Format: date-time
+             * @description Last modification timestamp (ISO 8601).
+             */
+            readonly updated_at: string;
+        };
         readonly Session: {
             /** @enum {string} */
             readonly channel: "web" | "mobile" | "api";
@@ -1508,6 +1567,40 @@ export interface components {
              * @enum {string}
              */
             readonly status?: "planned" | "active" | "closed" | "archived";
+        };
+        readonly UpdateSchoolSettings: {
+            /**
+             * @description Absence percentage at which an alert fires.
+             * @example 75
+             */
+            readonly absence_alert_threshold?: number;
+            /**
+             * @description Attendance percentage at which an alert fires.
+             * @example 75
+             */
+            readonly attendance_alert_threshold?: number;
+            /**
+             * @description Grading scheme.
+             * @example letter
+             * @enum {string}
+             */
+            readonly grading_scheme?: "letter" | "percentage" | "gpa" | "numeric" | "pass_fail";
+            /**
+             * @description Invitation validity in days.
+             * @example 7
+             */
+            readonly invitation_expiry_days?: number;
+            /**
+             * @description Default locale for the school.
+             * @example en
+             * @enum {string}
+             */
+            readonly locale?: "en" | "fr" | "ar" | "es" | "pt" | "de";
+            /**
+             * @description IANA timezone.
+             * @example Africa/Casablanca
+             */
+            readonly timezone?: string;
         };
         readonly UpdateTermBody: {
             /** @description Short unique code. */
@@ -4143,6 +4236,153 @@ export interface operations {
             };
             /** @description No such resource, or it is not visible to this tenant. */
             readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly getSchoolSettings: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Current school settings. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SchoolSettings"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly updateSchoolSettings: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["UpdateSchoolSettings"];
+            };
+        };
+        readonly responses: {
+            /** @description Updated school settings. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SchoolSettings"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Rate limit exceeded. Back off and retry. */
+            readonly 429: {
                 headers: {
                     /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
                     readonly "X-Request-Id": string;

@@ -82,9 +82,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/providers/link/start",
   "DELETE /api/auth/providers/{provider}",
   "DELETE /api/admin/users/{userId}/providers/{provider}",
-  // School email verification (ST-088). Public self-service endpoint; audit rows are written
-  // from inside the service transaction.
+  // School email verification (ST-088). Resends the verification email for a pending school.
   "POST /api/schools/resend-verification",
+  // School settings (ST-090). PATCH updates school_settings with full before/after audit.
+  "PATCH /api/schools/current/settings",
   // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
   // audit rows are written by the auditAction middleware on the route.
   "POST /api/schools/{schoolId}/provision",

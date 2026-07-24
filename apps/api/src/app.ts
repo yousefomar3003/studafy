@@ -34,6 +34,7 @@ import {
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
+import { schoolSettingsRoutes } from "./modules/tenancy/settings/route";
 import { emailVerificationRoutes } from "./modules/tenancy/verification/route";
 import { userRoutes } from "./modules/users";
 import { registerOpenApiComponents } from "./openapi/components";
@@ -391,6 +392,12 @@ export function createApp({
   // caller; see the header of routes/admin-device-routes.ts.
   if (database) {
     app.route("/", adminDeviceRoutes(database, jtiDenylist));
+  }
+
+  // School settings (GET/PATCH /api/schools/current/settings). Authenticated, admin-only,
+  // web-channel only. Needs database for settings CRUD and audit logging.
+  if (database) {
+    app.route("/", schoolSettingsRoutes(database));
   }
 
   // User management & administration (ST-093). CRUD endpoints for managing school users,
