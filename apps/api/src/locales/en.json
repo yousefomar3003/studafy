@@ -46,5 +46,8 @@
   "ERPNEXT_COMPANY_CREATION_FAILED": "Failed to create ERPNext company",
   "LIMIT_EXCEEDED_STUDENT_CAP": "Student limit reached. Upgrade your plan to add more students",
   "TENANT_SUSPENDED": "Tenant is suspended. Contact your administrator for access",
-  "TENANT_CLOSED": "This tenant has been permanently closed"
+  "TENANT_CLOSED": "This tenant has been permanently closed",
+  "PARENT_LINK_EXISTS": "A parent-child link already exists for this student and parent",
+  "PARENT_NOT_LINKED": "No parent-child link found for this student and parent",
+  "PARENT_INVALID_ROLE": "The specified user does not have the PARENT role"
 }

@@ -83,6 +83,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // for TEACHER_READ, TEACHER_CREATE, and TEACHER_UPDATE.
   "POST /api/teachers",
   "PATCH /api/teachers/{teacherId}",
+  // Student guardian (parent-child) linking. Authenticated, tenant-scoped CRUD with per-route
+  // requirePermission() guards for STUDENT_READ and STUDENT_UPDATE.
+  "POST /api/students/{studentId}/guardians",
+  "DELETE /api/students/{studentId}/guardians/{userId}",
 ];
 
 /**
