@@ -36,7 +36,7 @@ import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { schoolSettingsRoutes } from "./modules/tenancy/settings/route";
 import { emailVerificationRoutes } from "./modules/tenancy/verification/route";
-import { userRoutes } from "./modules/users";
+import { userRoutes, studentRoutes } from "./modules/users";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -405,6 +405,12 @@ export function createApp({
   // and ROLE_* permissions, with web-only channel guard on all mutations.
   if (database) {
     app.route("/", userRoutes(database, jtiDenylist));
+  }
+
+  // Student profiles (CRUD). Demographics, guardians, and admission data with finance-visible
+  // field projection and role-based view scoping. Gated on STUDENT_* permissions.
+  if (database) {
+    app.route("/", studentRoutes(database));
   }
 
   // Academic year & term management (ST-091). Full CRUD plus a rollover action that transitions

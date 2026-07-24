@@ -102,6 +102,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/users/{userId}",
   "PATCH /api/users/{userId}/role",
   "PATCH /api/users/{userId}/deactivate",
+  // Student profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards.
+  // Audit rows are written from inside the service transactions.
+  "POST /api/students",
+  "PATCH /api/students/{studentId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {
