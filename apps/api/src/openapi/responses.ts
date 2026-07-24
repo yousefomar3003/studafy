@@ -25,7 +25,7 @@ type ResponseConfig = Exclude<RouteConfig["responses"][string], { $ref: string }
  * STATUS_ERROR_CODES maps, plus the 500 that mapError falls back to for unknown errors. Declaring a
  * problem response outside this set would document a response no code path can produce.
  */
-export const PROBLEM_STATUSES = [400, 401, 403, 404, 409, 429, 500] as const;
+export const PROBLEM_STATUSES = [400, 401, 402, 403, 404, 409, 410, 429, 500] as const;
 export type ProblemStatus = (typeof PROBLEM_STATUSES)[number];
 
 /**
@@ -71,9 +71,11 @@ interface ProblemEntry {
 const PROBLEM_DESCRIPTIONS: Record<ProblemStatus, string> = {
   400: "The request was malformed or failed schema validation.",
   401: "Authentication is missing or invalid.",
+  402: "Subscription limit reached. Upgrade your plan to continue.",
   403: "Authenticated, but not permitted to perform this operation.",
   404: "No such resource, or it is not visible to this tenant.",
   409: "The request conflicts with the current state of the resource.",
+  410: "This tenant has been permanently closed.",
   429: "Rate limit exceeded. Back off and retry.",
   500: "Unexpected server error. The body carries no detail; correlate via request_id.",
 };

@@ -2,7 +2,7 @@ import { HTTPException } from "hono/http-exception";
 
 import type { AppEnv } from "./requestId";
 import type { AuthChannel } from "../modules/auth/channels";
-import type { Role } from "@studafy/constants";
+import type { Role, SubscriptionStatus } from "@studafy/constants";
 import type { Context } from "hono";
 
 /**
@@ -33,6 +33,8 @@ export interface AuthContext {
   jti: string;
   /** Entitlement version counter, for cache invalidation without revocation. */
   entitlementsVer: number;
+  /** The tenant's current subscription lifecycle state. Drives tenantLifecycleGuard middleware. */
+  subscriptionStatus: SubscriptionStatus;
 }
 
 /**

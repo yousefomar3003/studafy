@@ -257,6 +257,7 @@ export function jwtAuthMiddleware({
       channel: payload.channel,
       jti: payload.jti,
       entitlementsVer: payload.entitlements_ver,
+      subscriptionStatus: payload.subscription_status,
     };
     c.set("auth", auth);
 

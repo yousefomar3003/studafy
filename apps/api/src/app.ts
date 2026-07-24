@@ -17,6 +17,7 @@ import {
   csrfMiddleware,
   securityHeadersMiddleware,
   jwtAuthMiddleware,
+  tenantLifecycleGuard,
 } from "./middleware";
 import { academicYearRoutes, termRoutes } from "./modules/academics";
 import {
@@ -201,6 +202,11 @@ export function createApp({
       }),
     );
   }
+
+  // Tenant lifecycle guard: enforces subscription state machine (ST-092). Runs after JWT auth
+  // so the auth context (including subscriptionStatus claim) is available. Runs before the rate
+  // limiter so lifecycle blocks short-circuit before any quota consumption.
+  app.use("/api/*", tenantLifecycleGuard());
 
   // Rate limiter middleware: token-bucket rate limiting via Redis. Registered after the logger
   // so rate-limited requests are still logged for observability, but before routes so they

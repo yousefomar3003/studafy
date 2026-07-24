@@ -1,5 +1,5 @@
 import type { AuthChannel } from "../channels";
-import type { Role } from "@studafy/constants";
+import type { Role, SubscriptionStatus } from "@studafy/constants";
 
 /**
  * Custom claims embedded in every access token. These are the application-specific fields
@@ -21,6 +21,8 @@ export interface AccessTokenClaims {
   jti: string;
   /** The client surface this token was minted for. See ../channels.ts. */
   channel: AuthChannel;
+  /** The tenant's current subscription lifecycle state. Drives the lifecycle middleware. */
+  subscription_status: SubscriptionStatus;
 }
 
 /**
@@ -42,4 +44,5 @@ export interface SignAccessTokenParams {
   roles: Role[];
   entitlements_ver: number;
   channel: AuthChannel;
+  subscription_status: SubscriptionStatus;
 }

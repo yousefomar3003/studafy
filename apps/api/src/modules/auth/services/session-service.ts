@@ -34,7 +34,7 @@ import type { SecurityEventSink } from "../../../lib/security/securityEventSink"
 import type { Logger } from "../../../logger";
 import type { AuthChannel } from "../channels";
 import type { KeyStore } from "../jwt/key-store";
-import type { Role } from "@studafy/constants";
+import type { Role, SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,10 @@ export async function issueTokenPair(
   config: SessionTokenConfig,
   params: IssueTokenPairParams,
 ): Promise<IssuedTokenPair> {
-  const roles = await readUserRoles(tx, params.userId);
+  const [roles, subscriptionStatus] = await Promise.all([
+    readUserRoles(tx, params.userId),
+    readSubscriptionStatus(tx),
+  ]);
 
   const minted = mintOpaqueToken(params.schoolId, params.userId);
   const device = params.device ?? {};
@@ -148,6 +151,7 @@ export async function issueTokenPair(
       roles,
       entitlements_ver: 1,
       channel: params.channel,
+      subscription_status: subscriptionStatus,
     },
     {
       issuer: config.issuer,
@@ -186,6 +190,22 @@ async function readUserRoles(tx: TransactionSql, userId: string): Promise<Role[]
   }
 
   return rows.map((row) => row.role);
+}
+
+/**
+ * Read the tenant's current subscription lifecycle status.
+ *
+ * Defaults to "trialing" if no subscription row exists — a defensive fallback for tenants
+ * that have not yet been fully provisioned. The provisioning pipeline creates the subscription
+ * row, but there is a window between school creation and provisioning completion where the row
+ * may not exist yet.
+ */
+async function readSubscriptionStatus(tx: TransactionSql): Promise<SubscriptionStatus> {
+  const [row] = await tx<{ status: SubscriptionStatus }[]>`
+    SELECT status FROM app.subscriptions
+    WHERE school_id = current_setting('app.school_id')::uuid
+  `;
+  return row?.status ?? "trialing";
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +306,7 @@ export async function rotateRefreshToken(
           roles: session.roles,
           entitlements_ver: 1,
           channel: session.channel,
+          subscription_status: await readSubscriptionStatus(tx),
         },
         {
           issuer: config.issuer,

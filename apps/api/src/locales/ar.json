@@ -41,5 +41,8 @@
   "PROVISIONING_FAILED": "فشل إعداد المستأجر",
   "PROVISIONING_IN_PROGRESS": "إعداد المستأجر قيد التنفيذ بالفعل",
   "ERPNEXT_SITE_CREATION_FAILED": "فشل إنشاء موقع ERPNext",
-  "ERPNEXT_COMPANY_CREATION_FAILED": "فشل إنشاء شركة ERPNext"
+  "ERPNEXT_COMPANY_CREATION_FAILED": "فشل إنشاء شركة ERPNext",
+  "LIMIT_EXCEEDED_STUDENT_CAP": "تم الوصول إلى الحد الأقصى للطلاب. قم بترقية خطتك لإضافة المزيد",
+  "TENANT_SUSPENDED": "المستأجر معلق. اتصل بالمسؤول للحصول على الوصول",
+  "TENANT_CLOSED": "تم إغلاق هذا المستأجر نهائياً"
 }
