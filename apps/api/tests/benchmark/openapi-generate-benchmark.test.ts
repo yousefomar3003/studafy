@@ -72,6 +72,8 @@ const EXPECTED_PATHS = [
   "/api/schools/register",
   "/api/schools/resend-verification",
   "/api/schools/verify-email/{token}",
+  "/api/schools/{schoolId}/provision",
+  "/api/schools/{schoolId}/provisioning-status",
   "/api/academics/years",
   "/api/academics/years/{yearId}",
   "/api/academics/years/{yearId}/rollover",

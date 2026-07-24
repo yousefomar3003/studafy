@@ -10,6 +10,7 @@ export const QUEUE_NAMES = {
   IMPORTS: "imports",
   BILLING: "billing",
   OUTBOX_RELAY: "outbox-relay",
+  PROVISIONING: "provisioning",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

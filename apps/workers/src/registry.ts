@@ -60,4 +60,9 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     concurrency: 5,
     processor: placeholderProcessor(QUEUE_NAMES.OUTBOX_RELAY),
   },
+  {
+    name: QUEUE_NAMES.PROVISIONING,
+    concurrency: 2,
+    processor: placeholderProcessor(QUEUE_NAMES.PROVISIONING),
+  },
 ];

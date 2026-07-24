@@ -85,6 +85,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // School email verification (ST-088). Public self-service endpoint; audit rows are written
   // from inside the service transaction.
   "POST /api/schools/resend-verification",
+  // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
+  // audit rows are written by the auditAction middleware on the route.
+  "POST /api/schools/{schoolId}/provision",
   // Academic year & term management (ST-091). Authenticated, tenant-scoped CRUD and rollover.
   "POST /api/academics/years",
   "PATCH /api/academics/years/{yearId}",

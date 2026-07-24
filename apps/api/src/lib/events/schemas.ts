@@ -31,6 +31,13 @@ export const eventPayloadSchemas = {
     email: z.string().email(),
     slug: z.string(),
   }),
+  [DOMAIN_EVENTS.SCHOOL_CREATED]: z.object({
+    schoolId: uid,
+    slug: z.string(),
+    name: z.string(),
+    countryId: uid,
+    defaultCurrencyId: uid,
+  }),
 
   // ── Invitation ────────────────────────────────────────────────────────
   [DOMAIN_EVENTS.INVITATION_SENT]: z.object({

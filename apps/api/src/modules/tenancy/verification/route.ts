@@ -3,6 +3,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { provisionTenant } from "../provisioning/service";
 
 import {
   resendVerificationBodySchema,
@@ -13,6 +14,7 @@ import {
 import { resendVerificationEmail, verifySchoolEmail } from "./service";
 
 import type { Database } from "../../../db";
+import type { ErpNextClient } from "../../../erpnext/client";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
 
@@ -29,7 +31,8 @@ const verifyEmailRoute = createRoute({
   description:
     "Verifies the school contact email using a one-time token. On success the token is consumed, " +
     "email_verified_at is set, and the school status moves from 'registered' to 'active' (trial). " +
-    "The school must be active before the admin invitation can be activated.",
+    "The school must be active before the admin invitation can be activated. " +
+    "Triggers async tenant provisioning (trial subscription, ERPNext bootstrap).",
   security: [],
   request: { params: verifyEmailPathParams },
   responses: standardResponses(
@@ -80,7 +83,11 @@ const resendVerificationRoute = createRoute({
  *
  * Public (no authentication). Requires: database, logger.
  */
-export function emailVerificationRoutes(db: Database, _logger: Logger): OpenAPIHono<AppEnv> {
+export function emailVerificationRoutes(
+  db: Database,
+  _logger: Logger,
+  erpNextClient: ErpNextClient | null,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use("/api/schools/verify-email/{token}", auditAction("update", "schools"));
@@ -91,6 +98,33 @@ export function emailVerificationRoutes(db: Database, _logger: Logger): OpenAPIH
     const log = c.get("log");
 
     const result = await verifySchoolEmail(db, token, log);
+
+    // Trigger async provisioning after successful verification.
+    // Fire-and-forget: provisioning errors are logged but don't fail the
+    // verification response. The provisioning status can be polled via
+    // the provisioning status endpoint.
+    provisionTenant(
+      db,
+      {
+        schoolId: result.schoolId,
+        slug: result.slug,
+        schoolName: result.schoolName,
+        countryId: result.countryId,
+        country: "", // Will be resolved from country_id in the service
+        defaultCurrencyId: result.defaultCurrencyId,
+        currency: "", // Will be resolved from currency_id in the service
+        adminUserId: result.adminUserId,
+        adminEmail: result.adminEmail,
+        tenantContext: { schoolId: result.schoolId, userId: result.adminUserId },
+      },
+      log,
+      erpNextClient,
+    ).catch((error) => {
+      log.error(
+        { school_id: result.schoolId, error: error instanceof Error ? error.message : "unknown" },
+        "provisioning failed after email verification",
+      );
+    });
 
     return c.json(
       {

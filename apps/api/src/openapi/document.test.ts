@@ -118,6 +118,8 @@ describe("structure", () => {
         "/api/schools/register",
         "/api/schools/resend-verification",
         "/api/schools/verify-email/{token}",
+        "/api/schools/{schoolId}/provision",
+        "/api/schools/{schoolId}/provisioning-status",
         "/api/users",
         "/api/users/{userId}",
         "/api/users/{userId}/deactivate",
@@ -291,6 +293,7 @@ describe("security", () => {
         "GET /api/auth/sessions",
         "GET /api/users",
         "GET /api/users/{userId}",
+        "GET /api/schools/{schoolId}/provisioning-status",
         "PATCH /api/academics/years/{yearId}",
         "PATCH /api/academics/terms/{termId}",
         "PATCH /api/users/{userId}",
@@ -304,6 +307,7 @@ describe("security", () => {
         "POST /api/invitations/{id}/regenerate",
         "POST /api/invitations/{id}/revoke",
         "POST /api/users",
+        "POST /api/schools/{schoolId}/provision",
       ].sort(),
     );
   });
