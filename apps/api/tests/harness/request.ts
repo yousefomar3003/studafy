@@ -102,6 +102,7 @@ export function mintTestToken(keyStore: KeyStore, auth: TestAuthContext): Promis
       roles: auth.roles ?? [ROLES.ORG_ADMIN],
       entitlements_ver: 1,
       channel: auth.channel ?? AUTH_CHANNELS.API,
+      subscription_status: "active",
     },
     {
       issuer: TEST_JWT_ISSUER,

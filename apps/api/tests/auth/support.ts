@@ -184,6 +184,7 @@ export interface TokenOverrides {
   roles?: Role[];
   entitlements_ver?: number;
   channel?: string;
+  subscription_status?: string;
   issuer?: string;
   audience?: string;
   ttlSeconds?: number;
@@ -199,6 +200,7 @@ export function mintToken(keyStore: KeyStore, overrides: TokenOverrides = {}): P
       roles: overrides.roles ?? (["INSTRUCTOR"] as Role[]),
       entitlements_ver: overrides.entitlements_ver ?? 1,
       channel: (overrides.channel ?? AUTH_CHANNELS.WEB) as never,
+      subscription_status: (overrides.subscription_status ?? "active") as never,
     },
     {
       issuer: overrides.issuer ?? ISSUER,

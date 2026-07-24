@@ -43,9 +43,11 @@ export type ApiProblem = z.infer<typeof apiProblemSchema>;
 const STATUS_TITLES = new Map<number, string>([
   [400, "Bad Request"],
   [401, "Unauthorized"],
+  [402, "Payment Required"],
   [403, "Forbidden"],
   [404, "Not Found"],
   [409, "Conflict"],
+  [410, "Gone"],
   [429, "Too Many Requests"],
   [500, "Internal Server Error"],
   [503, "Service Unavailable"],
@@ -54,9 +56,11 @@ const STATUS_TITLES = new Map<number, string>([
 const STATUS_ERROR_CODES = new Map<number, ErrorCode>([
   [400, ERROR_CODES.VALIDATION_FAILED],
   [401, ERROR_CODES.AUTH_TOKEN_INVALID],
+  [402, ERROR_CODES.LIMIT_EXCEEDED_STUDENT_CAP],
   [403, ERROR_CODES.AUTHZ_FORBIDDEN],
   [404, ERROR_CODES.RESOURCE_NOT_FOUND],
   [409, ERROR_CODES.CONFLICT_STATE_MISMATCH],
+  [410, ERROR_CODES.TENANT_CLOSED],
   [429, ERROR_CODES.RATE_LIMIT_EXCEEDED],
 ]);
 

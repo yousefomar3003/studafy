@@ -138,6 +138,7 @@ benchmarkTest(
         roles: ["INSTRUCTOR", "ORG_ADMIN"] as Role[],
         entitlements_ver: 1,
         channel: AUTH_CHANNELS.WEB,
+        subscription_status: "active",
       },
       { issuer: ISSUER, audience: AUDIENCE, ttlSeconds: 86_400 },
     );

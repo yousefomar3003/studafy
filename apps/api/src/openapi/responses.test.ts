@@ -81,6 +81,6 @@ describe("PROBLEM_STATUSES", () => {
   // mapError falls back to. If a status is added there, it belongs here; if one is documented that
   // the handler cannot produce, the document is lying.
   test("is exactly the set errorHandlerMiddleware can emit", () => {
-    expect([...PROBLEM_STATUSES]).toEqual([400, 401, 403, 404, 409, 429, 500]);
+    expect([...PROBLEM_STATUSES]).toEqual([400, 401, 402, 403, 404, 409, 410, 429, 500]);
   });
 });

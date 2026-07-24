@@ -221,6 +221,7 @@ benchmarkTest(
             roles: ["INSTRUCTOR"],
             entitlements_ver: 1,
             channel: AUTH_CHANNELS.MOBILE,
+            subscription_status: "active",
           },
           { issuer: config.issuer, audience: config.audience, ttlSeconds: config.accessTtlSeconds },
         );

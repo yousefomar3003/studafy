@@ -42,5 +42,8 @@
   "PROVISIONING_FAILED": "Tenant provisioning failed",
   "PROVISIONING_IN_PROGRESS": "Tenant provisioning is already in progress",
   "ERPNEXT_SITE_CREATION_FAILED": "Failed to create ERPNext site",
-  "ERPNEXT_COMPANY_CREATION_FAILED": "Failed to create ERPNext company"
+  "ERPNEXT_COMPANY_CREATION_FAILED": "Failed to create ERPNext company",
+  "LIMIT_EXCEEDED_STUDENT_CAP": "Student limit reached. Upgrade your plan to add more students",
+  "TENANT_SUSPENDED": "Tenant is suspended. Contact your administrator for access",
+  "TENANT_CLOSED": "This tenant has been permanently closed"
 }
