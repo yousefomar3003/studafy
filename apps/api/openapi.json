@@ -245,6 +245,9 @@
               "STUDENT_ADMISSION_DUPLICATE",
               "ACADEMIC_YEAR_ACTIVE_EXISTS",
               "ACADEMIC_YEAR_DATE_OVERLAP",
+              "LIMIT_EXCEEDED_STUDENT_CAP",
+              "TENANT_SUSPENDED",
+              "TENANT_CLOSED",
               "RATE_LIMIT_EXCEEDED",
               "PROVISIONING_FAILED",
               "PROVISIONING_IN_PROGRESS",
@@ -1193,6 +1196,7 @@
               "enum": [
                 "SUPER_ADMIN",
                 "ORG_ADMIN",
+                "FINANCE",
                 "INSTRUCTOR",
                 "TEACHING_ASSISTANT",
                 "STUDENT",
@@ -1256,6 +1260,7 @@
             "enum": [
               "SUPER_ADMIN",
               "ORG_ADMIN",
+              "FINANCE",
               "INSTRUCTOR",
               "TEACHING_ASSISTANT",
               "STUDENT",
@@ -1291,6 +1296,7 @@
             "enum": [
               "SUPER_ADMIN",
               "ORG_ADMIN",
+              "FINANCE",
               "INSTRUCTOR",
               "TEACHING_ASSISTANT",
               "STUDENT",
@@ -5817,6 +5823,7 @@
               "enum": [
                 "SUPER_ADMIN",
                 "ORG_ADMIN",
+                "FINANCE",
                 "INSTRUCTOR",
                 "TEACHING_ASSISTANT",
                 "STUDENT",

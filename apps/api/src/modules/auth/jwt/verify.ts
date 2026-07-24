@@ -1,4 +1,4 @@
-import { ROLES } from "@studafy/constants";
+import { ROLES, SUBSCRIPTION_STATUSES } from "@studafy/constants";
 import { decodeProtectedHeader, errors as joseErrors, jwtVerify } from "jose";
 import { z } from "zod";
 
@@ -80,6 +80,7 @@ const accessTokenClaimsSchema = z.object({
   entitlements_ver: z.number().int(),
   jti: pgUuidSchema,
   channel: z.enum(AUTH_CHANNELS),
+  subscription_status: z.enum(SUBSCRIPTION_STATUSES),
 });
 
 /** Translate a `jose` verification failure into our own reason taxonomy. */

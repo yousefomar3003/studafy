@@ -47,6 +47,7 @@ export async function signAccessToken(
     roles: params.roles,
     entitlements_ver: params.entitlements_ver,
     channel: params.channel,
+    subscription_status: params.subscription_status,
   })
     .setProtectedHeader({ alg: "RS256", kid: key.kid })
     .setSubject(params.sub)

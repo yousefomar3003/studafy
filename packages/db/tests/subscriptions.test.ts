@@ -119,7 +119,15 @@ integrationTest(
         WHERE n.nspname = 'app' AND t.typname = 'subscription_status'
         GROUP BY t.typname
       `;
-      expect(enum_!.values).toEqual(["trialing", "active", "past_due", "canceled", "expired"]);
+      expect(enum_!.values).toEqual([
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "expired",
+        "grace_period",
+        "closed",
+      ]);
 
       const tenantTables = await database.sql<
         { name: string; owner: string; rls: boolean; forced: boolean; app_crud: boolean }[]

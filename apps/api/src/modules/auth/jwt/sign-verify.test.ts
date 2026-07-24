@@ -21,6 +21,7 @@ const signParams = {
   roles: ["INSTRUCTOR", "STUDENT"] as Role[],
   entitlements_ver: 3,
   channel: AUTH_CHANNELS.WEB,
+  subscription_status: "active" as const,
 };
 
 let store: KeyStore;

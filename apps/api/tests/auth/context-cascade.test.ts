@@ -75,6 +75,7 @@ describe("protected routes in the real stack", () => {
         channel: "web",
         jti: expect.any(String),
         entitlementsVer: 1,
+        subscriptionStatus: "active",
       },
     });
   });
