@@ -56,6 +56,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // School email verification (ST-088). Public self-service endpoint; no caller identity or
   // bearer permission; authorized by a one-time token.
   "POST /api/schools/resend-verification",
+  // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
+  // school context is sufficient — no cross-user row-level permission.
+  "POST /api/schools/{schoolId}/provision",
   // Academic year & term management (ST-091). Tenant-scoped CRUD protected by requireAuth; the
   // school context is sufficient — there is no cross-user row-level permission to check.
   "POST /api/academics/years",
@@ -110,6 +113,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // School email verification (ST-088) — public self-service endpoint; authorized by a one-time
   // verification token, not by a bearer permission; no other user's data to protect.
   "POST /api/schools/resend-verification",
+  // Tenant provisioning (ST-089) — school admin self-service on their own school's provisioning.
+  "POST /api/schools/{schoolId}/provision",
   // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",

@@ -77,6 +77,11 @@ export const envSchema = z
     DATABASE_CA_CERT: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1).optional(),
     ERPNEXT_WEBHOOK_SECRET: z.string().min(1).optional(),
+    // ERPNext integration (ST-089). All optional — activates only when both are set.
+    ERPNEXT_API_URL: z.string().url().optional(),
+    ERPNEXT_API_KEY: z.string().min(1).optional(),
+    // ERPNext site domain for auto-provisioned sites (e.g., "erpnext.studafy.com").
+    ERPNEXT_SITE_DOMAIN: z.string().min(1).optional(),
     // JWT access-token signing
     JWT_ISSUER: z.string().min(1).default("studafy"),
     JWT_AUDIENCE: z.string().min(1).default("studafy-api"),
@@ -174,6 +179,22 @@ export const envSchema = z
         code: "custom",
         path: ["MICROSOFT_OAUTH_CLIENT_ID"],
         message: `All Microsoft OAuth variables must be set together. Missing: ${missing}`,
+      });
+    }
+
+    // ERPNext API: both URL and key must be present or both absent.
+    if (env.ERPNEXT_API_URL !== undefined && env.ERPNEXT_API_KEY === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["ERPNEXT_API_KEY"],
+        message: "ERPNEXT_API_KEY is required when ERPNEXT_API_URL is set",
+      });
+    }
+    if (env.ERPNEXT_API_KEY !== undefined && env.ERPNEXT_API_URL === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["ERPNEXT_API_URL"],
+        message: "ERPNEXT_API_URL is required when ERPNEXT_API_KEY is set",
       });
     }
 

@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 
+import { ErpNextClient } from "./erpnext/client";
 import { erpNextWebhookRoutes } from "./erpnext/webhook";
 import { healthRoutes } from "./health";
 import { createNoopSecurityEventSink } from "./lib/security/securityEventSink";
@@ -31,6 +32,7 @@ import {
   sessionRoutes,
 } from "./modules/auth";
 import { invitationRoutes } from "./modules/auth/invitation/route";
+import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { emailVerificationRoutes } from "./modules/tenancy/verification/route";
 import { userRoutes } from "./modules/users";
@@ -231,8 +233,16 @@ export function createApp({
 
   // School email verification — public, no authentication. Rate-limited (auth-strict class).
   // Verify consumes a one-time token and activates the school; resend regenerates the token.
+  // Triggers async tenant provisioning (trial subscription, ERPNext bootstrap) on success.
   if (database) {
-    app.route("/", emailVerificationRoutes(database, logger));
+    const erpNextClient =
+      process.env.ERPNEXT_API_URL && process.env.ERPNEXT_API_KEY
+        ? new ErpNextClient({
+            baseUrl: process.env.ERPNEXT_API_URL,
+            apiKey: process.env.ERPNEXT_API_KEY,
+          })
+        : null;
+    app.route("/", emailVerificationRoutes(database, logger, erpNextClient));
   }
 
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.
@@ -395,6 +405,12 @@ export function createApp({
   if (database) {
     app.route("/", academicYearRoutes(database));
     app.route("/", termRoutes(database));
+  }
+
+  // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.
+  // Provides read access to provisioning status and manual provisioning trigger.
+  if (database) {
+    app.route("/", provisioningRoutes(database, logger));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:

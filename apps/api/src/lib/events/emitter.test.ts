@@ -172,6 +172,13 @@ describe("emit", () => {
           email: "test@example.com",
           slug: "test-school",
         },
+        [DOMAIN_EVENTS.SCHOOL_CREATED]: {
+          schoolId: uid,
+          slug: "test-school",
+          name: "Test School",
+          countryId: uid,
+          defaultCurrencyId: uid,
+        },
         [DOMAIN_EVENTS.ORGANIZATION_CREATED]: { organizationId: uid },
         [DOMAIN_EVENTS.ORGANIZATION_UPDATED]: { organizationId: uid },
         [DOMAIN_EVENTS.COURSE_CREATED]: { courseId: uid },
