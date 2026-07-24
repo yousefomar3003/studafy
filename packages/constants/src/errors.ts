@@ -73,6 +73,11 @@ export const ERROR_CODES = {
   // Teacher — duplicate employee number within a school.
   TEACHER_EMPLOYEE_NUMBER_DUPLICATE: "TEACHER_EMPLOYEE_NUMBER_DUPLICATE",
 
+  // Parent-child linking — link/unlink constraints.
+  PARENT_LINK_EXISTS: "PARENT_LINK_EXISTS",
+  PARENT_NOT_LINKED: "PARENT_NOT_LINKED",
+  PARENT_INVALID_ROLE: "PARENT_INVALID_ROLE",
+
   // Academic — year/term lifecycle violations.
   ACADEMIC_YEAR_ACTIVE_EXISTS: "ACADEMIC_YEAR_ACTIVE_EXISTS",
   ACADEMIC_YEAR_DATE_OVERLAP: "ACADEMIC_YEAR_DATE_OVERLAP",
