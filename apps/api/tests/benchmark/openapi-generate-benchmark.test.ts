@@ -73,6 +73,17 @@ const EXPECTED_PATHS = [
   "/api/schools/resend-verification",
   "/api/schools/verify-email/{token}",
   "/api/schools/current/settings",
+  "/api/schools/{schoolId}/provision",
+  "/api/schools/{schoolId}/provisioning-status",
+  "/api/academics/years",
+  "/api/academics/years/{yearId}",
+  "/api/academics/years/{yearId}/rollover",
+  "/api/academics/years/{yearId}/terms",
+  "/api/academics/terms/{termId}",
+  "/api/users",
+  "/api/users/{userId}",
+  "/api/users/{userId}/role",
+  "/api/users/{userId}/deactivate",
 ];
 
 const SCRIPT = path.join(import.meta.dir, "..", "..", "scripts", "generate-openapi.ts");

@@ -36,6 +36,11 @@ export interface VerifySchoolEmailResult {
   schoolId: string;
   slug: string;
   schoolName: string;
+  email: string;
+  countryId: string;
+  defaultCurrencyId: string;
+  adminUserId: string;
+  adminEmail: string;
 }
 
 export interface ResendVerificationResult {
@@ -51,7 +56,8 @@ export interface ResendVerificationResult {
  *
  * Looks up the school by token hash (global table, no RLS), checks expiry,
  * consumes the token, sets email_verified_at, and moves the school from
- * 'registered' to 'active' (trial begins).
+ * 'registered' to 'active' (trial begins). Also returns the school's
+ * admin user information needed for provisioning.
  *
  * @throws CodedHttpException 400 with VERIFICATION_TOKEN_INVALID for malformed or unknown tokens
  * @throws CodedHttpException 409 with VERIFICATION_TOKEN_EXPIRED for expired tokens
@@ -82,12 +88,14 @@ export async function verifySchoolEmail(
       slug: string;
       name: string;
       email: string;
+      country_id: string;
+      default_currency_id: string;
       email_verified_at: Date | null;
       email_verification_expires_at: Date | null;
     }[]
   >`
     SELECT
-      id, slug, name, email,
+      id, slug, name, email, country_id, default_currency_id,
       email_verified_at,
       email_verification_expires_at
     FROM app.schools
@@ -107,7 +115,24 @@ export async function verifySchoolEmail(
 
   // Already verified — idempotent success.
   if (school.email_verified_at !== null) {
-    return { schoolId: school.id, slug: school.slug, schoolName: school.name };
+    // Look up admin user for provisioning info.
+    const admin = await database<{ id: string; email: string }[]>`
+      SELECT id, email
+      FROM app.users
+      WHERE school_id = ${school.id}::uuid
+      ORDER BY created_at ASC
+      LIMIT 1
+    `;
+    return {
+      schoolId: school.id,
+      slug: school.slug,
+      schoolName: school.name,
+      email: school.email,
+      countryId: school.country_id,
+      defaultCurrencyId: school.default_currency_id,
+      adminUserId: admin.length > 0 ? admin[0].id : "",
+      adminEmail: admin.length > 0 ? admin[0].email : "",
+    };
   }
 
   // Check expiry.
@@ -121,6 +146,18 @@ export async function verifySchoolEmail(
       "Verification token has expired.",
     );
   }
+
+  // Look up admin user before the transaction (for provisioning info).
+  const adminRows = await database<{ id: string; email: string }[]>`
+    SELECT id, email
+    FROM app.users
+    WHERE school_id = ${school.id}::uuid
+    ORDER BY created_at ASC
+    LIMIT 1
+  `;
+
+  const adminUserId = adminRows.length > 0 ? adminRows[0].id : "";
+  const adminEmail = adminRows.length > 0 ? adminRows[0].email : "";
 
   // Consume the token and activate the school in one transaction.
   await database.begin(async (tx) => {
@@ -176,7 +213,16 @@ export async function verifySchoolEmail(
     );
   });
 
-  return { schoolId: school.id, slug: school.slug, schoolName: school.name };
+  return {
+    schoolId: school.id,
+    slug: school.slug,
+    schoolName: school.name,
+    email: school.email,
+    countryId: school.country_id,
+    defaultCurrencyId: school.default_currency_id,
+    adminUserId,
+    adminEmail,
+  };
 }
 
 /**

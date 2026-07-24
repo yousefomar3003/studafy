@@ -81,7 +81,11 @@ async function createSchool(database: Database, slug: string): Promise<string> {
 }
 
 async function createStudent(database: Database, school: string, suffix: string): Promise<string> {
-  return asRole(database, "studafy_app", async (tx) => {
+  // ST-085: app.students now carries a restrictive role_scope_visibility SELECT policy, which
+  // PostgreSQL also applies to INSERT ... RETURNING. Seed as studafy_admin (still bound by
+  // tenant_isolation, exempt from the TO studafy_app scope policy) so the fixture write is not
+  // filtered by a per-user read scope it has no authenticated user for.
+  return asRole(database, "studafy_admin", async (tx) => {
     await tx`SELECT set_config('app.school_id', ${school}, true)`;
     const email = `student-ai-${suffix}@example.test`;
     const [user] = await tx<{ id: string }[]>`

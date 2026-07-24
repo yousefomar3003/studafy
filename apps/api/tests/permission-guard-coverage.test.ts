@@ -57,9 +57,24 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/schools/resend-verification",
   // School settings (ST-090). Gated on ORGANIZATION_MANAGE_SETTINGS.
   "PATCH /api/schools/current/settings",
-  // School email verification (ST-088). Public self-service endpoint; no caller identity or
-  // bearer permission; authorized by a one-time token.
-  "POST /api/schools/resend-verification",
+  // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
+  // school context is sufficient — no cross-user row-level permission.
+  "POST /api/schools/{schoolId}/provision",
+  // Academic year & term management (ST-091). Tenant-scoped CRUD protected by requireAuth; the
+  // school context is sufficient — there is no cross-user row-level permission to check.
+  "POST /api/academics/years",
+  "PATCH /api/academics/years/{yearId}",
+  "DELETE /api/academics/years/{yearId}",
+  "POST /api/academics/years/{yearId}/rollover",
+  "POST /api/academics/years/{yearId}/terms",
+  "PATCH /api/academics/terms/{termId}",
+  "DELETE /api/academics/terms/{termId}",
+  // User management & administration (ST-093). Authenticated, tenant-scoped CRUD with per-route
+  // requirePermission() guards for USER_READ, USER_CREATE, USER_UPDATE, ROLE_ASSIGN, and USER_SUSPEND.
+  "POST /api/users",
+  "PATCH /api/users/{userId}",
+  "PATCH /api/users/{userId}/role",
+  "PATCH /api/users/{userId}/deactivate",
 ];
 
 /**
@@ -100,10 +115,21 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // School email verification (ST-088) — public self-service endpoint; authorized by a one-time
   // verification token, not by a bearer permission; no other user's data to protect.
   "POST /api/schools/resend-verification",
+  // Tenant provisioning (ST-089) — school admin self-service on their own school's provisioning.
+  "POST /api/schools/{schoolId}/provision",
   // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",
   "POST /api/invitations/{id}/regenerate",
+  // Academic year & term management (ST-091) — tenant-scoped school-level access protected by
+  // requireAuth; no cross-user row-level permission to check.
+  "POST /api/academics/years",
+  "PATCH /api/academics/years/{yearId}",
+  "DELETE /api/academics/years/{yearId}",
+  "POST /api/academics/years/{yearId}/rollover",
+  "POST /api/academics/years/{yearId}/terms",
+  "PATCH /api/academics/terms/{termId}",
+  "DELETE /api/academics/terms/{termId}",
 ]);
 
 // ---------------------------------------------------------------------------

@@ -133,7 +133,9 @@ export async function createStudent(
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
-    await tx.unsafe("SET LOCAL ROLE studafy_app");
+    // ST-085: this table carries a restrictive role_scope_visibility SELECT policy, which PostgreSQL
+    // also applies to INSERT ... RETURNING. Seed as studafy_admin (still bound by tenant_isolation) so
+    // the fixture write is not filtered by a per-user read scope it has no authenticated user for.
 
     const [student] = await tx<{ id: string; admission_number: string }[]>`
       INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status)
@@ -266,7 +268,8 @@ export async function createSubject(
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
-    await tx.unsafe("SET LOCAL ROLE studafy_app");
+    // ST-085: role_scope_visibility (a restrictive SELECT policy) also gates INSERT ... RETURNING, so
+    // seed this scoped table as studafy_admin. See createStudent for the full rationale.
 
     const [subject] = await tx<{ id: string; code: string }[]>`
       INSERT INTO app.subjects (school_id, code, name, status)
@@ -293,7 +296,8 @@ export async function createCourse(
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
-    await tx.unsafe("SET LOCAL ROLE studafy_app");
+    // ST-085: role_scope_visibility (a restrictive SELECT policy) also gates INSERT ... RETURNING, so
+    // seed this scoped table as studafy_admin. See createStudent for the full rationale.
 
     const [course] = await tx<{ id: string; code: string }[]>`
       INSERT INTO app.courses (school_id, subject_id, code, name, status)
@@ -352,7 +356,8 @@ export async function createClass(
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
-    await tx.unsafe("SET LOCAL ROLE studafy_app");
+    // ST-085: role_scope_visibility (a restrictive SELECT policy) also gates INSERT ... RETURNING, so
+    // seed this scoped table as studafy_admin. See createStudent for the full rationale.
 
     const [cls] = await tx<{ id: string; code: string }[]>`
       INSERT INTO app.classes
@@ -417,7 +422,8 @@ export async function createMaterial(
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
-    await tx.unsafe("SET LOCAL ROLE studafy_app");
+    // ST-085: role_scope_visibility (a restrictive SELECT policy) also gates INSERT ... RETURNING, so
+    // seed this scoped table as studafy_admin. See createStudent for the full rationale.
 
     const [material] = await tx<{ id: string; title: string }[]>`
       INSERT INTO app.materials

@@ -86,9 +86,22 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/schools/resend-verification",
   // School settings (ST-090). PATCH updates school_settings with full before/after audit.
   "PATCH /api/schools/current/settings",
-  // School email verification (ST-088). Public self-service endpoint; audit rows are written
-  // from inside the service transaction.
-  "POST /api/schools/resend-verification",
+  // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
+  // audit rows are written by the auditAction middleware on the route.
+  "POST /api/schools/{schoolId}/provision",
+  // Academic year & term management (ST-091). Authenticated, tenant-scoped CRUD and rollover.
+  "POST /api/academics/years",
+  "PATCH /api/academics/years/{yearId}",
+  "DELETE /api/academics/years/{yearId}",
+  "POST /api/academics/years/{yearId}/rollover",
+  "POST /api/academics/years/{yearId}/terms",
+  "PATCH /api/academics/terms/{termId}",
+  "DELETE /api/academics/terms/{termId}",
+  // User management & administration (ST-093). Authenticated, tenant-scoped CRUD and deactivation.
+  "POST /api/users",
+  "PATCH /api/users/{userId}",
+  "PATCH /api/users/{userId}/role",
+  "PATCH /api/users/{userId}/deactivate",
 ];
 
 function collectSourceFiles(dir: string): string[] {

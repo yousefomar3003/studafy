@@ -105,7 +105,10 @@ async function createTenantFixture(
   school: string,
   suffix: string,
 ): Promise<TenantFixture> {
-  return asRole(database, "studafy_app", async (tx) => {
+  // ST-085: this fixture seeds scoped tables (students, subjects, courses, classes, enrollments)
+  // whose role_scope_visibility SELECT policy PostgreSQL also applies to INSERT ... RETURNING. Seed
+  // as studafy_admin (still bound by tenant_isolation, exempt from the TO studafy_app scope policy).
+  return asRole(database, "studafy_admin", async (tx) => {
     await tx`SELECT set_config('app.school_id', ${school}, true)`;
     const studentEmail = `student-${suffix.toLowerCase()}@example.test`;
     const teacherEmail = `teacher-${suffix.toLowerCase()}@example.test`;
@@ -239,12 +242,26 @@ integrationTest(
         WHERE c.relnamespace='app'::regnamespace
           AND c.relname = ANY(${ACADEMIC_TABLES as unknown as string[]}) ORDER BY c.relname
       `;
-      expect(policies).toHaveLength(7);
-      for (const policy of policies) {
-        expect(policy.name).toBe("tenant_isolation");
+      // Every academic table carries the permissive tenant_isolation policy. ST-085 additionally
+      // layers a restrictive role_scope_visibility SELECT policy onto the scoped academic tables
+      // (subjects, courses, classes, enrollments); academic_years, terms, and rooms are unscoped.
+      const tenantPolicies = policies.filter((policy) => policy.name === "tenant_isolation");
+      const scopePolicies = policies.filter((policy) => policy.name === "role_scope_visibility");
+      expect(tenantPolicies).toHaveLength(7);
+      for (const policy of tenantPolicies) {
         expect(policy.command).toBe("*");
         expect(policy.using).toContain("current_setting('app.school_id'::text)");
         expect(policy.check).toContain("current_setting('app.school_id'::text)");
+      }
+      expect(scopePolicies.map((policy) => policy.tableName).sort()).toEqual([
+        "classes",
+        "courses",
+        "enrollments",
+        "subjects",
+      ]);
+      for (const policy of scopePolicies) {
+        expect(policy.command).toBe("r");
+        expect(policy.check).toBeNull();
       }
 
       const constraints = await database.sql<{ name: string }[]>`
@@ -319,14 +336,28 @@ integrationTest(
         `UPDATE app.academic_years SET starts_on='2026-09-01' WHERE id='${a.year}'`,
         `INSERT INTO app.rooms (school_id,code,name,room_type,building,virtual_url)
        VALUES ('${a.school}','BAD-V','Bad virtual','virtual','Main','http://example.test')`,
-        `UPDATE app.enrollments SET status='withdrawn' WHERE class_id='${a.classId}'`,
-        `UPDATE app.enrollments SET status='withdrawn', withdrawn_at='2020-01-01'
-       WHERE class_id='${a.classId}'`,
         `INSERT INTO app.classes
        (school_id,course_id,academic_year_id,term_id,lead_teacher_id,room_id,code)
        VALUES ('${a.school}','${a.course}','${a.year}','${a.term}','${a.teacher}','${a.room}','CLASS-A')`,
       ])
         await expectDenied(database, statement, a.school);
+
+      // ST-085: these enrollment lifecycle denials target existing scoped app.enrollments rows, which
+      // a userless studafy_app can no longer see (role_scope_visibility). Run as studafy_admin so the
+      // row is visible and the status / withdrawn_at CHECK still rejects the update.
+      await expectDenied(
+        database,
+        `UPDATE app.enrollments SET status='withdrawn' WHERE class_id='${a.classId}'`,
+        a.school,
+        "studafy_admin",
+      );
+      await expectDenied(
+        database,
+        `UPDATE app.enrollments SET status='withdrawn', withdrawn_at='2020-01-01'
+       WHERE class_id='${a.classId}'`,
+        a.school,
+        "studafy_admin",
+      );
 
       await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${a.school}, true)`;
@@ -377,7 +408,11 @@ integrationTest(
       for (const table of ACADEMIC_TABLES) {
         await expectDenied(database, `SELECT * FROM app.${table}`);
         await expectDenied(database, `SELECT * FROM app.${table}`, "not-a-uuid");
-        const counts = await asRole(database, "studafy_app", async (tx) => {
+        // ST-085: this positive count asserts tenant isolation (each table holds exactly the one row
+        // for school A). Run as studafy_admin, which tenant_isolation still scopes to school A but
+        // role_scope_visibility (TO studafy_app) does not filter; a userless studafy_app would now
+        // see zero rows on the scoped academic tables. Intra-school scope is covered by row-scope.
+        const counts = await asRole(database, "studafy_admin", async (tx) => {
           await tx`SELECT set_config('app.school_id', ${a.school}, true)`;
           return tx.unsafe(`SELECT count(*)::integer AS count FROM app.${table}`);
         });
@@ -404,11 +439,14 @@ integrationTest(
         ["classes", "id", a.classId],
         ["enrollments", "class_id", a.classId],
       ];
+      // ST-085: run as studafy_admin so the existing scoped rows (subjects, courses, classes,
+      // enrollments) are visible; tenant_isolation's WITH CHECK still blocks the cross-school move.
       for (const [table, key, id] of tenantMutationTargets)
         await expectDenied(
           database,
           `UPDATE app.${table} SET school_id='${schools.b}' WHERE ${key}='${id}'`,
           a.school,
+          "studafy_admin",
         );
 
       await expectDenied(database, "SELECT * FROM app.academic_years", undefined, "studafy_admin");

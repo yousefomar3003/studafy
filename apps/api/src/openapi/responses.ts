@@ -33,7 +33,7 @@ export type ProblemStatus = (typeof PROBLEM_STATUSES)[number];
  * the successful ones — including responses built by app.onError, which unwind back through that
  * line. Declared `required` because it is unconditional.
  */
-const requestIdHeaders = z.object({
+export const requestIdHeaders = z.object({
   "X-Request-Id": z.uuid().openapi({
     description:
       "Server-generated correlation id, present on every response. Never read from the request. " +
