@@ -396,3 +396,109 @@ export async function updateStudent(
 
   return { ...updated, status: updated.status as StudentStatus };
 }
+
+// ---------------------------------------------------------------------------
+// Parent-child linking
+// ---------------------------------------------------------------------------
+
+export async function linkParentToStudent(
+  tx: TransactionSql,
+  schoolId: string,
+  studentId: string,
+  parentUserId: string,
+  relationship: ParentRelationship,
+): Promise<GuardianRow> {
+  const [student] = await tx<{ id: string }[]>`
+    SELECT id FROM app.students
+    WHERE id = ${studentId}::uuid AND school_id = ${schoolId}
+  `;
+  if (!student) {
+    throw new HTTPException(404, { message: "Student not found" });
+  }
+
+  const [parent] = await tx<{ id: string }[]>`
+    SELECT u.id FROM app.users u
+    JOIN app.user_roles ur ON ur.user_id = u.id AND ur.school_id = u.school_id
+    WHERE u.id = ${parentUserId}::uuid
+      AND u.school_id = ${schoolId}
+      AND ur.role = 'PARENT'::app.user_role
+  `;
+  if (!parent) {
+    const exists = await tx<{ id: string }[]>`
+      SELECT id FROM app.users
+      WHERE id = ${parentUserId}::uuid AND school_id = ${schoolId}
+    `;
+    if (exists.length === 0) {
+      throw new HTTPException(404, { message: "Parent user not found" });
+    }
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.PARENT_INVALID_ROLE,
+      "User does not have the PARENT role.",
+    );
+  }
+
+  const existing = await tx<{ parent_user_id: string }[]>`
+    SELECT parent_user_id FROM app.parent_child_links
+    WHERE school_id = ${schoolId}
+      AND parent_user_id = ${parentUserId}::uuid
+      AND student_id = ${studentId}::uuid
+  `;
+  if (existing.length > 0) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.PARENT_LINK_EXISTS,
+      "This parent is already linked to this student.",
+    );
+  }
+
+  const [row] = await tx<GuardianRow[]>`
+    INSERT INTO app.parent_child_links (school_id, parent_user_id, student_id, relationship)
+    VALUES (${schoolId}, ${parentUserId}::uuid, ${studentId}::uuid, ${relationship}::app.parent_relationship)
+    RETURNING parent_user_id, relationship, created_at
+  `;
+
+  await emitAuditLog(tx, {
+    action: "insert",
+    targetTable: "parent_child_links",
+    targetId: studentId,
+    newValues: { parent_user_id: parentUserId, relationship },
+  });
+
+  return row!;
+}
+
+export async function unlinkParentFromStudent(
+  tx: TransactionSql,
+  schoolId: string,
+  studentId: string,
+  parentUserId: string,
+): Promise<void> {
+  const [existing] = await tx<{ parent_user_id: string; relationship: string }[]>`
+    SELECT parent_user_id, relationship FROM app.parent_child_links
+    WHERE school_id = ${schoolId}
+      AND parent_user_id = ${parentUserId}::uuid
+      AND student_id = ${studentId}::uuid
+  `;
+  if (!existing) {
+    throw new CodedHttpException(
+      404,
+      ERROR_CODES.PARENT_NOT_LINKED,
+      "No link exists between this parent and student.",
+    );
+  }
+
+  await tx`
+    DELETE FROM app.parent_child_links
+    WHERE school_id = ${schoolId}
+      AND parent_user_id = ${parentUserId}::uuid
+      AND student_id = ${studentId}::uuid
+  `;
+
+  await emitAuditLog(tx, {
+    action: "delete",
+    targetTable: "parent_child_links",
+    targetId: studentId,
+    oldValues: { parent_user_id: parentUserId, relationship: existing.relationship },
+  });
+}

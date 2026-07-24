@@ -8,11 +8,13 @@ import { requireAuth } from "../../../middleware/authContext";
 import { hasPermission, requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { openApiValidationHook } from "../../../openapi/hook";
-import { standardResponses } from "../../../openapi/responses";
+import { standardResponses, requestIdHeaders } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
 import {
   createStudentBodySchema,
+  guardianParamSchema,
   guardianSchema,
+  linkGuardianBodySchema,
   studentIdParamSchema,
   studentListQuerySchema,
   studentListSchema,
@@ -23,7 +25,9 @@ import {
   createStudent as createStudentService,
   getStudent,
   getStudentGuardians,
+  linkParentToStudent,
   listStudents,
+  unlinkParentFromStudent,
   updateStudent as updateStudentService,
 } from "../student-service";
 
@@ -214,6 +218,50 @@ const listGuardiansRoute = createRoute({
   ),
 });
 
+const linkGuardianRoute = createRoute({
+  method: "post",
+  path: "/api/students/{studentId}/guardians",
+  tags: ["Students"],
+  operationId: "linkGuardian",
+  summary: "Link a guardian to a student",
+  description:
+    "Creates a parent-child link between an existing parent user and a student. " +
+    "The parent user must have the PARENT role. Fails with 409 if the link already exists.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: studentIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: linkGuardianBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    {
+      201: {
+        description: "The created guardian link.",
+        schema: guardianSchema,
+      },
+    },
+    [400, 401, 403, 404, 409, 429, 500],
+  ),
+});
+
+const unlinkGuardianRoute = createRoute({
+  method: "delete",
+  path: "/api/students/{studentId}/guardians/{userId}",
+  tags: ["Students"],
+  operationId: "unlinkGuardian",
+  summary: "Unlink a guardian from a student",
+  description:
+    "Removes a parent-child link. The unlink takes effect within the same request cycle.",
+  security: [{ bearerAuth: [] }],
+  request: { params: guardianParamSchema },
+  responses: {
+    204: { description: "Guardian unlinked.", headers: requestIdHeaders },
+    ...standardResponses({}, [401, 403, 404, 429, 500]),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Route factory
 // ---------------------------------------------------------------------------
@@ -232,10 +280,20 @@ export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
   routes.use("/api/students/{studentId}", requirePermission(PERMISSIONS.STUDENT_READ));
   routes.use("/api/students/{studentId}", requirePermission(PERMISSIONS.STUDENT_UPDATE));
   routes.use("/api/students/{studentId}/guardians", requirePermission(PERMISSIONS.STUDENT_READ));
+  routes.use("/api/students/{studentId}/guardians", requirePermission(PERMISSIONS.STUDENT_UPDATE));
+  routes.use(
+    "/api/students/{studentId}/guardians/{userId}",
+    requirePermission(PERMISSIONS.STUDENT_UPDATE),
+  );
 
   // --- Audit declarations ---
   routes.use("/api/students", auditAction("insert", "students"));
   routes.use("/api/students/{studentId}", auditAction("update", "students"));
+  routes.use("/api/students/{studentId}/guardians", auditAction("insert", "parent_child_links"));
+  routes.use(
+    "/api/students/{studentId}/guardians/{userId}",
+    auditAction("delete", "parent_child_links"),
+  );
 
   // --- Handlers ---
 
@@ -310,6 +368,29 @@ export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
     );
 
     return c.json(guardians, 200);
+  });
+
+  routes.openapi(linkGuardianRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { studentId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const guardian = await withTenantTx(database, tenantFrom(c), (tx) =>
+      linkParentToStudent(tx, auth.schoolId, studentId, body.parent_user_id, body.relationship),
+    );
+
+    return c.json(guardian, 201);
+  });
+
+  routes.openapi(unlinkGuardianRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { studentId, userId } = c.req.valid("param");
+
+    await withTenantTx(database, tenantFrom(c), (tx) =>
+      unlinkParentFromStudent(tx, auth.schoolId, studentId, userId),
+    );
+
+    return c.body(null, 204);
   });
 
   return routes;

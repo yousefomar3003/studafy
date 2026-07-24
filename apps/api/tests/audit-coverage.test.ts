@@ -106,6 +106,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // Audit rows are written from inside the service transactions.
   "POST /api/students",
   "PATCH /api/students/{studentId}",
+  // Student guardians. Link/unlink parent-child relationships with audit trails.
+  "POST /api/students/{studentId}/guardians",
+  "DELETE /api/students/{studentId}/guardians/{userId}",
   // Teacher profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards.
   // Audit rows are written from inside the service transactions.
   "POST /api/teachers",

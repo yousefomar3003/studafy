@@ -266,6 +266,44 @@ export const guardianSchema = z
   .openapi("Guardian");
 
 // ---------------------------------------------------------------------------
+// Link guardian
+// ---------------------------------------------------------------------------
+
+export const linkGuardianBodySchema = z
+  .object({
+    parent_user_id: uuidSchema.openapi({
+      description: "User ID of the parent to link. Must have the PARENT role.",
+    }),
+    relationship: parentRelationshipSchema,
+  })
+  .openapi("LinkGuardianBody");
+
+export type LinkGuardianBody = z.infer<typeof linkGuardianBodySchema>;
+
+// ---------------------------------------------------------------------------
+// Unlink guardian path params
+// ---------------------------------------------------------------------------
+
+export const guardianParamSchema = z
+  .object({
+    studentId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "studentId", in: "path" },
+        description: "Student UUID.",
+      }),
+    userId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "userId", in: "path" },
+        description: "Parent user UUID.",
+      }),
+  })
+  .openapi("GuardianParam");
+
+// ---------------------------------------------------------------------------
 // Create student
 // ---------------------------------------------------------------------------
 

@@ -121,6 +121,9 @@ export const PERMISSIONS = {
   TEACHER_CREATE: "teacher:create",
   TEACHER_READ: "teacher:read",
   TEACHER_UPDATE: "teacher:update",
+
+  PARENT_LINK: "parent:link",
+  PARENT_UNLINK: "parent:unlink",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -232,6 +235,8 @@ const STUDENT_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.STUDENT_READ,
 ];
 
+const PARENT_PERMISSIONS: readonly Permission[] = [PERMISSIONS.STUDENT_READ];
+
 const GUEST_PERMISSIONS: readonly Permission[] = [PERMISSIONS.COURSE_READ, PERMISSIONS.LESSON_READ];
 
 const FINANCE_PERMISSIONS: readonly Permission[] = [
@@ -273,6 +278,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   [ROLES.INSTRUCTOR]: INSTRUCTOR_PERMISSIONS,
   [ROLES.TEACHING_ASSISTANT]: TEACHING_ASSISTANT_PERMISSIONS,
   [ROLES.STUDENT]: STUDENT_PERMISSIONS,
+  [ROLES.PARENT]: PARENT_PERMISSIONS,
   [ROLES.GUEST]: GUEST_PERMISSIONS,
   [ROLES.SUPPORT_AGENT]: SUPPORT_AGENT_PERMISSIONS,
 };

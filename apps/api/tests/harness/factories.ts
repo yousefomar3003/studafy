@@ -478,6 +478,7 @@ export async function createFullTenant(sql: Sql): Promise<TenantFixture> {
     "INSTRUCTOR",
     "TEACHING_ASSISTANT",
     "STUDENT",
+    "PARENT",
     "GUEST",
     "SUPPORT_AGENT",
   ];
