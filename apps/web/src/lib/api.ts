@@ -5,7 +5,7 @@ import { createApiClient } from "@studafy/api-client";
  * Import `api` and call `api.GET("/healthz")`, `api.POST(...)`, etc. — every path, parameter, and
  * response is type-checked against the spec, and a non-2xx response throws a typed `ApiError`.
  *
- * The base URL comes from `VITE_API_BASE_URL` (see `.env.example`), defaulting to the local API.
+ * The base URL comes from `VITE_API_BASE_URL` (see `.env`), defaulting to the local API.
  *
  * `getToken`/`getSchoolId` are the auth and tenant seams. They return `null` today because nothing
  * issues a session yet; the interceptors inject an `Authorization: Bearer` header and the active
