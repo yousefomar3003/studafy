@@ -49,5 +49,7 @@
   "TENANT_CLOSED": "This tenant has been permanently closed",
   "PARENT_LINK_EXISTS": "A parent-child link already exists for this student and parent",
   "PARENT_NOT_LINKED": "No parent-child link found for this student and parent",
-  "PARENT_INVALID_ROLE": "The specified user does not have the PARENT role"
+  "PARENT_INVALID_ROLE": "The specified user does not have the PARENT role",
+  "SUBJECT_HAS_COURSES": "Cannot delete this subject because it has courses. Archive it instead.",
+  "COURSE_HAS_CLASSES": "Cannot delete this course because it has classes. Archive it instead."
 }
