@@ -19,7 +19,7 @@ import {
   jwtAuthMiddleware,
   tenantLifecycleGuard,
 } from "./middleware";
-import { academicYearRoutes, termRoutes } from "./modules/academics";
+import { academicYearRoutes, termRoutes, subjectRoutes, courseRoutes } from "./modules/academics";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -430,6 +430,13 @@ export function createApp({
   if (database) {
     app.route("/", academicYearRoutes(database));
     app.route("/", termRoutes(database));
+  }
+
+  // Subject & course catalog (CRUD). Subjects are top-level catalog entities; courses belong
+  // to a subject. Delete archives instead of hard-deleting when referenced by dependents.
+  if (database) {
+    app.route("/", subjectRoutes(database));
+    app.route("/", courseRoutes(database));
   }
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.

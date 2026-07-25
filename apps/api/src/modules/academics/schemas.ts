@@ -218,3 +218,194 @@ export const termQuerySchema = z
     status: academicYearStatusSchema.optional(),
   })
   .openapi("TermQuery");
+
+// ---------------------------------------------------------------------------
+// Catalog status (shared by subjects and courses)
+// ---------------------------------------------------------------------------
+
+export const catalogStatusSchema = z
+  .enum(["draft", "active", "inactive", "archived"])
+  .openapi({ description: "Lifecycle state of a catalog entity (subject or course)." });
+
+export type CatalogStatus = z.infer<typeof catalogStatusSchema>;
+
+// ---------------------------------------------------------------------------
+// Subjects
+// ---------------------------------------------------------------------------
+
+export const subjectSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    code: z
+      .string()
+      .openapi({ description: "Short unique code within the school.", example: "MATH" }),
+    name: z.string().openapi({ description: "Human-readable name.", example: "Mathematics" }),
+    description: z
+      .string()
+      .nullable()
+      .openapi({ description: "Optional description.", example: "Core mathematics curriculum" }),
+    status: catalogStatusSchema,
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("Subject");
+
+export type Subject = z.infer<typeof subjectSchema>;
+
+export const createSubjectBodySchema = z
+  .object({
+    code: z.string().min(1).max(50).openapi({ description: "Short unique code.", example: "MATH" }),
+    name: z
+      .string()
+      .min(1)
+      .max(200)
+      .openapi({ description: "Human-readable name.", example: "Mathematics" }),
+    description: z
+      .string()
+      .max(2000)
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional description." }),
+    status: catalogStatusSchema.default("draft"),
+  })
+  .openapi("CreateSubjectBody");
+
+export type CreateSubjectBody = z.infer<typeof createSubjectBodySchema>;
+
+export const updateSubjectBodySchema = z
+  .object({
+    code: z.string().min(1).max(50).optional().openapi({ description: "Short unique code." }),
+    name: z.string().min(1).max(200).optional().openapi({ description: "Human-readable name." }),
+    description: z
+      .string()
+      .max(2000)
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional description." }),
+    status: catalogStatusSchema.optional(),
+  })
+  .openapi("UpdateSubjectBody");
+
+export type UpdateSubjectBody = z.infer<typeof updateSubjectBodySchema>;
+
+export const subjectListSchema = z
+  .object({
+    subjects: z.array(subjectSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("SubjectList");
+
+export const subjectQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    status: catalogStatusSchema.optional(),
+  })
+  .openapi("SubjectQuery");
+
+// ---------------------------------------------------------------------------
+// Courses
+// ---------------------------------------------------------------------------
+
+export const courseSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    subject_id: uuidSchema.openapi({ description: "Parent subject." }),
+    code: z
+      .string()
+      .openapi({ description: "Short unique code within the school.", example: "CALC101" }),
+    name: z.string().openapi({ description: "Human-readable name.", example: "Calculus I" }),
+    description: z.string().nullable().openapi({ description: "Optional description." }),
+    status: catalogStatusSchema,
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("Course");
+
+export type Course = z.infer<typeof courseSchema>;
+
+export const createCourseBodySchema = z
+  .object({
+    subject_id: uuidSchema.openapi({ description: "Parent subject." }),
+    code: z
+      .string()
+      .min(1)
+      .max(50)
+      .openapi({ description: "Short unique code.", example: "CALC101" }),
+    name: z
+      .string()
+      .min(1)
+      .max(200)
+      .openapi({ description: "Human-readable name.", example: "Calculus I" }),
+    description: z
+      .string()
+      .max(2000)
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional description." }),
+    status: catalogStatusSchema.default("draft"),
+  })
+  .openapi("CreateCourseBody");
+
+export type CreateCourseBody = z.infer<typeof createCourseBodySchema>;
+
+export const updateCourseBodySchema = z
+  .object({
+    code: z.string().min(1).max(50).optional().openapi({ description: "Short unique code." }),
+    name: z.string().min(1).max(200).optional().openapi({ description: "Human-readable name." }),
+    description: z
+      .string()
+      .max(2000)
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional description." }),
+    status: catalogStatusSchema.optional(),
+  })
+  .openapi("UpdateCourseBody");
+
+export type UpdateCourseBody = z.infer<typeof updateCourseBodySchema>;
+
+export const courseListSchema = z
+  .object({
+    courses: z.array(courseSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("CourseList");
+
+export const courseQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    status: catalogStatusSchema.optional(),
+  })
+  .openapi("CourseQuery");
+
+// ---------------------------------------------------------------------------
+// Path params (subjects & courses)
+// ---------------------------------------------------------------------------
+
+export const subjectIdParamSchema = z
+  .object({
+    subjectId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "subjectId", in: "path" },
+        description: "Subject UUID.",
+      }),
+  })
+  .openapi("SubjectIdParam");
+
+export const courseIdParamSchema = z
+  .object({
+    courseId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "courseId", in: "path" },
+        description: "Course UUID.",
+      }),
+  })
+  .openapi("CourseIdParam");
