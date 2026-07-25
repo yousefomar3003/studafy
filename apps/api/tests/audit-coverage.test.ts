@@ -97,6 +97,14 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/years/{yearId}/terms",
   "PATCH /api/academics/terms/{termId}",
   "DELETE /api/academics/terms/{termId}",
+  // Subjects & courses (ST-099). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/subjects",
+  "PATCH /api/academics/subjects/{subjectId}",
+  "DELETE /api/academics/subjects/{subjectId}",
+  "POST /api/academics/subjects/{subjectId}/courses",
+  "PATCH /api/academics/courses/{courseId}",
+  "DELETE /api/academics/courses/{courseId}",
   // User management & administration (ST-093). Authenticated, tenant-scoped CRUD and deactivation.
   "POST /api/users",
   "PATCH /api/users/{userId}",

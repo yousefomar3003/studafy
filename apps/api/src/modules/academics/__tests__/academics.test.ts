@@ -26,7 +26,21 @@ import {
   updateAcademicYear,
   deleteAcademicYear,
 } from "../academic-year-service";
+import {
+  listCourses,
+  getCourse,
+  createCourse as createCourseService,
+  updateCourse,
+  deleteCourse,
+} from "../course-service";
 import { rolloverAcademicYear } from "../rollover-service";
+import {
+  listSubjects,
+  getSubject,
+  createSubject as createSubjectService,
+  updateSubject,
+  deleteSubject,
+} from "../subject-service";
 import {
   listTerms,
   getTerm,
@@ -429,5 +443,265 @@ describeDb("rollover service", () => {
     await expect(
       rolloverAcademicYear(db.sql, { schoolId: school.id }, "00000000-0000-0000-0000-000000000000"),
     ).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Subject service
+// ---------------------------------------------------------------------------
+
+describeDb("subject service", () => {
+  test("createSubject inserts a row and returns it", async () => {
+    const school = await createSchool(db.sql);
+    const subject = await withTx((tx) =>
+      createSubjectService(tx, school.id, {
+        code: "MATH",
+        name: "Mathematics",
+        description: "Core math curriculum",
+      }),
+    );
+
+    expect(subject).toBeDefined();
+    expect(subject.code).toBe("MATH");
+    expect(subject.name).toBe("Mathematics");
+    expect(subject.description).toBe("Core math curriculum");
+    expect(subject.status).toBe("draft");
+  });
+
+  test("getSubject returns undefined for non-existent ID", async () => {
+    const school = await createSchool(db.sql);
+    const result = await withTx((tx) =>
+      getSubject(tx, school.id, "00000000-0000-0000-0000-000000000000"),
+    );
+    expect(result).toBeUndefined();
+  });
+
+  test("listSubjects returns paginated results", async () => {
+    const school = await createSchool(db.sql);
+
+    await withTx((tx) => createSubjectService(tx, school.id, { code: "PHY", name: "Physics" }));
+    await withTx((tx) => createSubjectService(tx, school.id, { code: "CHEM", name: "Chemistry" }));
+    await withTx((tx) => createSubjectService(tx, school.id, { code: "BIO", name: "Biology" }));
+
+    const { rows, total } = await withTx((tx) =>
+      listSubjects(tx, school.id, { limit: 2, offset: 0 }),
+    );
+    expect(total).toBe(3);
+    expect(rows.length).toBe(2);
+  });
+
+  test("updateSubject modifies fields", async () => {
+    const school = await createSchool(db.sql);
+    const subject = await withTx((tx) =>
+      createSubjectService(tx, school.id, { code: "HIST", name: "History" }),
+    );
+
+    const updated = await withTx((tx) =>
+      updateSubject(tx, school.id, subject.id, { name: "World History" }),
+    );
+    expect(updated.name).toBe("World History");
+    expect(updated.code).toBe("HIST");
+  });
+
+  test("deleteSubject hard-deletes an unreferenced subject", async () => {
+    const school = await createSchool(db.sql);
+    const subject = await withTx((tx) =>
+      createSubjectService(tx, school.id, { code: "DEL", name: "To Delete" }),
+    );
+
+    const result = await withTx((tx) => deleteSubject(tx, school.id, subject.id));
+    expect(result.deleted).toBe(true);
+
+    const gone = await withTx((tx) => getSubject(tx, school.id, subject.id));
+    expect(gone).toBeUndefined();
+  });
+
+  test("deleteSubject archives a subject that has courses", async () => {
+    const school = await createSchool(db.sql);
+    const subject = await withTx((tx) =>
+      createSubjectService(tx, school.id, { code: "ARCH", name: "To Archive" }),
+    );
+
+    await withTx((tx) =>
+      createCourseService(tx, school.id, {
+        subject_id: subject.id,
+        code: "C1",
+        name: "Course 1",
+      }),
+    );
+
+    const result = await withTx((tx) => deleteSubject(tx, school.id, subject.id));
+    expect(result.deleted).toBe(false);
+
+    const archived = await withTx((tx) => getSubject(tx, school.id, subject.id));
+    expect(archived).toBeDefined();
+    expect(archived!.status).toBe("archived");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Course service
+// ---------------------------------------------------------------------------
+
+describeDb("course service", () => {
+  test("createCourse inserts a row and returns it", async () => {
+    const school = await createSchool(db.sql);
+    const subject = await withTx((tx) =>
+      createSubjectService(tx, school.id, { code: "MATH", name: "Mathematics" }),
+    );
+
+    const course = await withTx((tx) =>
+      createCourseService(tx, school.id, {
+        subject_id: subject.id,
+        code: "CALC101",
+        name: "Calculus I",
+        description: "Intro calculus",
+      }),
+    );
+
+    expect(course).toBeDefined();
+    expect(course.code).toBe("CALC101");
+    expect(course.name).toBe("Calculus I");
+    expect(course.description).toBe("Intro calculus");
+    expect(course.subject_id).toBe(subject.id);
+    expect(course.status).toBe("draft");
+  });
+
+  test("createCourse rejects non-existent subject", async () => {
+    const school = await createSchool(db.sql);
+
+    await expect(
+      withTx((tx) =>
+        createCourseService(tx, school.id, {
+          subject_id: "00000000-0000-0000-0000-000000000000",
+          code: "X",
+          name: "X",
+        }),
+      ),
+    ).rejects.toThrow();
+  });
+
+  test("getCourse returns undefined for non-existent ID", async () => {
+    const school = await createSchool(db.sql);
+    const result = await withTx((tx) =>
+      getCourse(tx, school.id, "00000000-0000-0000-0000-000000000000"),
+    );
+    expect(result).toBeUndefined();
+  });
+
+  test("listCourses returns courses for a specific subject", async () => {
+    const school = await createSchool(db.sql);
+    const subject = await withTx((tx) =>
+      createSubjectService(tx, school.id, { code: "SCI", name: "Science" }),
+    );
+
+    await withTx((tx) =>
+      createCourseService(tx, school.id, {
+        subject_id: subject.id,
+        code: "PHY101",
+        name: "Physics I",
+      }),
+    );
+    await withTx((tx) =>
+      createCourseService(tx, school.id, {
+        subject_id: subject.id,
+        code: "PHY102",
+        name: "Physics II",
+      }),
+    );
+
+    const { rows, total } = await withTx((tx) =>
+      listCourses(tx, school.id, subject.id, { limit: 10, offset: 0 }),
+    );
+    expect(total).toBe(2);
+    expect(rows.length).toBe(2);
+  });
+
+  test("updateCourse modifies fields", async () => {
+    const school = await createSchool(db.sql);
+    const subject = await withTx((tx) =>
+      createSubjectService(tx, school.id, { code: "ENG", name: "English" }),
+    );
+    const course = await withTx((tx) =>
+      createCourseService(tx, school.id, {
+        subject_id: subject.id,
+        code: "ENG101",
+        name: "English I",
+      }),
+    );
+
+    const updated = await withTx((tx) =>
+      updateCourse(tx, school.id, course.id, { name: "English Composition I" }),
+    );
+    expect(updated.name).toBe("English Composition I");
+  });
+
+  test("deleteCourse hard-deletes an unreferenced course", async () => {
+    const school = await createSchool(db.sql);
+    const subject = await withTx((tx) =>
+      createSubjectService(tx, school.id, { code: "DEL", name: "To Delete" }),
+    );
+    const course = await withTx((tx) =>
+      createCourseService(tx, school.id, {
+        subject_id: subject.id,
+        code: "DC1",
+        name: "Delete Me",
+      }),
+    );
+
+    const result = await withTx((tx) => deleteCourse(tx, school.id, course.id));
+    expect(result.deleted).toBe(true);
+
+    const gone = await withTx((tx) => getCourse(tx, school.id, course.id));
+    expect(gone).toBeUndefined();
+  });
+
+  test("deleteCourse archives a course that has classes", async () => {
+    const school = await createSchool(db.sql);
+    const subject = await withTx((tx) =>
+      createSubjectService(tx, school.id, { code: "ARCH", name: "To Archive" }),
+    );
+    const course = await withTx((tx) =>
+      createCourseService(tx, school.id, {
+        subject_id: subject.id,
+        code: "AC1",
+        name: "Archive Me",
+      }),
+    );
+
+    // Create a class referencing this course
+    const year = await withTx((tx) =>
+      createYearService(tx, school.id, {
+        code: "AY-TEST",
+        name: "Test Year",
+        starts_on: "2025-01-01",
+        ends_on: "2025-12-31",
+      }),
+    );
+    const term = await withTx((tx) =>
+      createTermService(tx, school.id, {
+        academic_year_id: year.id,
+        code: "T1",
+        name: "Term 1",
+        sequence_number: 1,
+        starts_on: "2025-01-01",
+        ends_on: "2025-06-30",
+      }),
+    );
+
+    // Directly insert a class row (factory requires teacher/room, so raw SQL is simpler here)
+    await db.sql`
+      INSERT INTO app.classes (school_id, course_id, academic_year_id, term_id,
+        lead_teacher_id, room_id, code, capacity, status)
+      VALUES (${school.id}, ${course.id}, ${year.id}, ${term.id},
+        gen_random_uuid(), gen_random_uuid(), 'CLS-TEST', 30, 'planned'::app.class_status)
+    `;
+
+    const result = await withTx((tx) => deleteCourse(tx, school.id, course.id));
+    expect(result.deleted).toBe(false);
+
+    const archived = await withTx((tx) => getCourse(tx, school.id, course.id));
+    expect(archived).toBeDefined();
+    expect(archived!.status).toBe("archived");
   });
 });

@@ -69,6 +69,14 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/years/{yearId}/terms",
   "PATCH /api/academics/terms/{termId}",
   "DELETE /api/academics/terms/{termId}",
+  // Subjects & courses (ST-099). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/subjects",
+  "PATCH /api/academics/subjects/{subjectId}",
+  "DELETE /api/academics/subjects/{subjectId}",
+  "POST /api/academics/subjects/{subjectId}/courses",
+  "PATCH /api/academics/courses/{courseId}",
+  "DELETE /api/academics/courses/{courseId}",
   // User management & administration (ST-093). Authenticated, tenant-scoped CRUD with per-route
   // requirePermission() guards for USER_READ, USER_CREATE, USER_UPDATE, ROLE_ASSIGN, and USER_SUSPEND.
   "POST /api/users",
@@ -142,6 +150,14 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/years/{yearId}/terms",
   "PATCH /api/academics/terms/{termId}",
   "DELETE /api/academics/terms/{termId}",
+  // Subjects & courses (ST-099) — tenant-scoped school-level catalog data protected by
+  // requireAuth; no cross-user row-level permission to check.
+  "POST /api/academics/subjects",
+  "PATCH /api/academics/subjects/{subjectId}",
+  "DELETE /api/academics/subjects/{subjectId}",
+  "POST /api/academics/subjects/{subjectId}/courses",
+  "PATCH /api/academics/courses/{courseId}",
+  "DELETE /api/academics/courses/{courseId}",
 ]);
 
 // ---------------------------------------------------------------------------
