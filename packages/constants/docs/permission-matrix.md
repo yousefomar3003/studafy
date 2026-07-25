@@ -99,6 +99,7 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `student:create`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `student:read`                   | ✅          | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       | ✅            |
 | `student:update`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `student:import`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `teacher:create`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `teacher:read`                   | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `teacher:update`                 | ✅          | ✅        |         |            |                    |         |        |       |               |

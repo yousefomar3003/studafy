@@ -21,6 +21,7 @@
     "@studafy/constants": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
     "hono": "4.12.28",
+    "bullmq": "5.79.3",
     "ioredis": "5.10.1",
     "jose": "6.2.3",
     "postgres": "3.4.9",

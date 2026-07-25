@@ -81,7 +81,10 @@ approved_flexible_columns(table_name, column_name) AS (
     ('invoice_cache', 'erpnext_payload'),
     ('notifications', 'metadata'),
     ('outbox_events', 'payload'),
-    ('payment_cache', 'erpnext_payload')
+    ('payment_cache', 'erpnext_payload'),
+    ('student_imports', 'rows_data'),
+    ('student_imports', 'errors'),
+    ('student_imports', 'summary')
 ),
 relations AS (
   SELECT

@@ -51,5 +51,10 @@
   "PARENT_NOT_LINKED": "No parent-child link found for this student and parent",
   "PARENT_INVALID_ROLE": "The specified user does not have the PARENT role",
   "SUBJECT_HAS_COURSES": "Cannot delete this subject because it has courses. Archive it instead.",
-  "COURSE_HAS_CLASSES": "Cannot delete this course because it has classes. Archive it instead."
+  "COURSE_HAS_CLASSES": "Cannot delete this course because it has classes. Archive it instead.",
+  "IMPORT_NOT_FOUND": "Import not found",
+  "IMPORT_INVALID_STATE": "Import is not in a valid state for this operation",
+  "IMPORT_VALIDATION_FAILED": "Import validation failed",
+  "IMPORT_ROWS_EXCEED_LIMIT": "CSV file exceeds the maximum row limit",
+  "IMPORT_IDEMPOTENCY_KEY_EXISTS": "An import with this idempotency key already exists"
 }

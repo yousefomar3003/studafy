@@ -33,6 +33,7 @@ import {
   sessionRoutes,
 } from "./modules/auth";
 import { invitationRoutes } from "./modules/auth/invitation/route";
+import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { schoolSettingsRoutes } from "./modules/tenancy/settings/route";
@@ -417,6 +418,12 @@ export function createApp({
   // field projection and role-based view scoping. Gated on STUDENT_* permissions.
   if (database) {
     app.route("/", studentRoutes(database));
+  }
+
+  // Student CSV import (upload → validate → confirm → async processing).
+  // Gated on STUDENT_IMPORT permission. Idempotency key middleware pre-wired on /api/imports/*.
+  if (database) {
+    app.route("/", importRoutes(database, redis ?? null));
   }
 
   // Teacher profiles (CRUD). Employment data with role-based view scoping. Admin full CRUD,

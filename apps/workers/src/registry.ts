@@ -1,5 +1,7 @@
 import { QUEUE_NAMES } from "@studafy/constants";
 
+import { processStudentImport } from "./queues/imports/worker";
+
 import type { QueueName } from "@studafy/constants";
 import type { Job } from "bullmq";
 
@@ -11,6 +13,10 @@ export interface QueueDefinition {
   concurrency: number;
   processor: Processor;
 }
+
+// The import processor needs the database URL. It is read from the environment
+// at registry construction time so it can be injected into the queue definition.
+const databaseUrl = process.env.DATABASE_URL ?? "postgres://localhost:5432/studafy";
 
 /**
  * Placeholder processor for a queue that has no domain logic yet. It exists so the worker
@@ -48,7 +54,13 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.IMPORTS,
     concurrency: 2,
-    processor: placeholderProcessor(QUEUE_NAMES.IMPORTS),
+    processor: async (job: Job) => {
+      const data = job.data as { importId?: string; schoolId?: string };
+      if (!data.importId || !data.schoolId) {
+        return { processed: false, reason: "missing job data" };
+      }
+      return processStudentImport(data as { importId: string; schoolId: string }, databaseUrl);
+    },
   },
   {
     name: QUEUE_NAMES.BILLING,
