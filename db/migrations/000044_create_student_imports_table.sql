@@ -39,6 +39,12 @@ CREATE UNIQUE INDEX uq_student_imports_idempotency_key
 CREATE INDEX idx_student_imports_school_status
   ON app.student_imports (school_id, status, created_at DESC);
 
-SELECT apply_tenant_isolation('app', 'student_imports');
+SELECT app.apply_tenant_isolation('app', 'student_imports');
+
+REVOKE ALL PRIVILEGES ON TABLE app.student_imports FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE ON TABLE app.student_imports TO studafy_app;
+
+REVOKE ALL ON TYPE app.import_status FROM PUBLIC;
+GRANT USAGE ON TYPE app.import_status TO studafy_app;
 
 RESET ROLE;
