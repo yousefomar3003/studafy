@@ -5,7 +5,7 @@ import { CodedHttpException } from "../../coded-http-exception";
 import { csvStudentRowSchema } from "./schemas";
 
 import type { ImportRowError, ImportStatus, ImportSummary } from "./schemas";
-import type { JSONValue, TransactionSql  } from "postgres";
+import type { JSONValue, TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
 // Types
