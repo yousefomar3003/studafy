@@ -96,5 +96,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Teacher profile management. Authenticated and tenant-scoped. " +
         "Includes CRUD operations for teacher records and a self-view endpoint.",
     },
+    {
+      name: "Imports",
+      description:
+        "Student CSV import management. Authenticated and tenant-scoped. " +
+        "Upload a CSV for validation, review errors, and confirm to enqueue async processing.",
+    },
   ],
 };

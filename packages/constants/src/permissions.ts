@@ -117,6 +117,7 @@ export const PERMISSIONS = {
   STUDENT_CREATE: "student:create",
   STUDENT_READ: "student:read",
   STUDENT_UPDATE: "student:update",
+  STUDENT_IMPORT: "student:import",
 
   TEACHER_CREATE: "teacher:create",
   TEACHER_READ: "teacher:read",

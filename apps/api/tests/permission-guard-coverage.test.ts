@@ -95,6 +95,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // requirePermission() guards for STUDENT_READ and STUDENT_UPDATE.
   "POST /api/students/{studentId}/guardians",
   "DELETE /api/students/{studentId}/guardians/{userId}",
+  // Student CSV imports. Upload and confirm are mutating; guarded by STUDENT_IMPORT permission.
+  "POST /api/imports/students/upload",
+  "POST /api/imports/students/{importId}/confirm",
 ];
 
 /**

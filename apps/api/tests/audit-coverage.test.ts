@@ -121,6 +121,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // Audit rows are written from inside the service transactions.
   "POST /api/teachers",
   "PATCH /api/teachers/{teacherId}",
+  // Student CSV imports. Upload and confirm are mutating; audit rows written from the route.
+  "POST /api/imports/students/upload",
+  "POST /api/imports/students/{importId}/confirm",
 ];
 
 function collectSourceFiles(dir: string): string[] {
