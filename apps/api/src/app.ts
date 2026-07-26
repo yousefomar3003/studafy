@@ -19,7 +19,14 @@ import {
   jwtAuthMiddleware,
   tenantLifecycleGuard,
 } from "./middleware";
-import { academicYearRoutes, termRoutes, subjectRoutes, courseRoutes } from "./modules/academics";
+import {
+  academicYearRoutes,
+  termRoutes,
+  subjectRoutes,
+  courseRoutes,
+  classRoutes,
+  enrollmentRoutes,
+} from "./modules/academics";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -444,6 +451,13 @@ export function createApp({
   if (database) {
     app.route("/", subjectRoutes(database));
     app.route("/", courseRoutes(database));
+  }
+
+  // Class delivery & enrollment management. Classes represent scheduled course offerings;
+  // enrollments bind students to classes with capacity enforcement and transfer history.
+  if (database) {
+    app.route("/", classRoutes(database));
+    app.route("/", enrollmentRoutes(database));
   }
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.

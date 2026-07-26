@@ -409,3 +409,188 @@ export const courseIdParamSchema = z
       }),
   })
   .openapi("CourseIdParam");
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+export const classStatusSchema = z
+  .enum(["planned", "active", "completed", "cancelled"])
+  .openapi({ description: "Lifecycle state of a class." });
+
+export type ClassStatus = z.infer<typeof classStatusSchema>;
+
+export const enrollmentStatusSchema = z
+  .enum(["active", "waitlisted", "withdrawn", "completed", "cancelled"])
+  .openapi({ description: "Lifecycle state of an enrollment." });
+
+export type EnrollmentStatus = z.infer<typeof enrollmentStatusSchema>;
+
+// ---------------------------------------------------------------------------
+// Classes
+// ---------------------------------------------------------------------------
+
+export const classSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    course_id: uuidSchema.openapi({ description: "Parent course." }),
+    academic_year_id: uuidSchema.openapi({ description: "Parent academic year." }),
+    term_id: uuidSchema.openapi({ description: "Parent term." }),
+    lead_teacher_id: uuidSchema.openapi({ description: "Lead teacher." }),
+    room_id: uuidSchema.openapi({ description: "Assigned room." }),
+    code: z
+      .string()
+      .openapi({ description: "Short unique code within the school.", example: "CLASS-MATH-101" }),
+    capacity: z
+      .number()
+      .int()
+      .nullable()
+      .openapi({ description: "Maximum enrollment count, or null for unlimited." }),
+    status: classStatusSchema,
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("Class");
+
+export type Class = z.infer<typeof classSchema>;
+
+export const createClassBodySchema = z
+  .object({
+    course_id: uuidSchema.openapi({ description: "Parent course." }),
+    academic_year_id: uuidSchema.openapi({ description: "Parent academic year." }),
+    term_id: uuidSchema.openapi({ description: "Parent term." }),
+    lead_teacher_id: uuidSchema.openapi({ description: "Lead teacher." }),
+    room_id: uuidSchema.openapi({ description: "Assigned room." }),
+    code: z
+      .string()
+      .min(1)
+      .max(50)
+      .openapi({ description: "Short unique code.", example: "CLASS-MATH-101" }),
+    capacity: z
+      .number()
+      .int()
+      .min(1)
+      .nullable()
+      .optional()
+      .openapi({ description: "Maximum enrollment count, or null for unlimited." }),
+    status: classStatusSchema.default("planned"),
+  })
+  .openapi("CreateClassBody");
+
+export type CreateClassBody = z.infer<typeof createClassBodySchema>;
+
+export const updateClassBodySchema = z
+  .object({
+    lead_teacher_id: uuidSchema.optional().openapi({ description: "Lead teacher." }),
+    room_id: uuidSchema.optional().openapi({ description: "Assigned room." }),
+    code: z.string().min(1).max(50).optional().openapi({ description: "Short unique code." }),
+    capacity: z
+      .number()
+      .int()
+      .min(1)
+      .nullable()
+      .optional()
+      .openapi({ description: "Maximum enrollment count, or null for unlimited." }),
+    status: classStatusSchema.optional(),
+  })
+  .openapi("UpdateClassBody");
+
+export type UpdateClassBody = z.infer<typeof updateClassBodySchema>;
+
+export const classListSchema = z
+  .object({
+    classes: z.array(classSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("ClassList");
+
+export const classQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    status: classStatusSchema.optional(),
+    course_id: uuidSchema.optional(),
+    term_id: uuidSchema.optional(),
+    lead_teacher_id: uuidSchema.optional(),
+  })
+  .openapi("ClassQuery");
+
+// ---------------------------------------------------------------------------
+// Path params (classes & enrollments)
+// ---------------------------------------------------------------------------
+
+export const classIdParamSchema = z
+  .object({
+    classId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "classId", in: "path" },
+        description: "Class UUID.",
+      }),
+  })
+  .openapi("ClassIdParam");
+
+// ---------------------------------------------------------------------------
+// Enrollments
+// ---------------------------------------------------------------------------
+
+export const enrollmentSchema = z
+  .object({
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    class_id: uuidSchema.openapi({ description: "Parent class." }),
+    student_id: uuidSchema.openapi({ description: "Enrolled student." }),
+    status: enrollmentStatusSchema,
+    enrolled_at: dateTimeSchema,
+    withdrawn_at: dateTimeSchema.nullable().openapi({ description: "When the student withdrew." }),
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("Enrollment");
+
+export type Enrollment = z.infer<typeof enrollmentSchema>;
+
+export const enrollmentListSchema = z
+  .object({
+    enrollments: z.array(enrollmentSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("EnrollmentList");
+
+export const enrollmentQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    status: enrollmentStatusSchema.optional(),
+  })
+  .openapi("EnrollmentQuery");
+
+export const createEnrollmentBodySchema = z
+  .object({
+    student_id: uuidSchema.openapi({ description: "Student to enroll." }),
+  })
+  .openapi("CreateEnrollmentBody");
+
+export type CreateEnrollmentBody = z.infer<typeof createEnrollmentBodySchema>;
+
+export const transferEnrollmentBodySchema = z
+  .object({
+    student_id: uuidSchema.openapi({ description: "Student to transfer." }),
+    to_class_id: uuidSchema.openapi({ description: "Destination class." }),
+  })
+  .openapi("TransferEnrollmentBody");
+
+export type TransferEnrollmentBody = z.infer<typeof transferEnrollmentBodySchema>;
+
+export const studentIdParamSchema = z
+  .object({
+    studentId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "studentId", in: "path" },
+        description: "Student UUID.",
+      }),
+  })
+  .openapi("StudentIdParam");
