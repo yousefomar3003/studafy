@@ -4,3 +4,4 @@ export { subjectRoutes } from "./routes/subject-routes";
 export { courseRoutes } from "./routes/course-routes";
 export { classRoutes } from "./routes/class-routes";
 export { enrollmentRoutes } from "./routes/enrollment-routes";
+export { timetableRoutes } from "./routes/timetable-routes";

@@ -26,6 +26,7 @@ import {
   courseRoutes,
   classRoutes,
   enrollmentRoutes,
+  timetableRoutes,
 } from "./modules/academics";
 import {
   activationRoutes,
@@ -460,6 +461,12 @@ export function createApp({
   if (database) {
     app.route("/", classRoutes(database));
     app.route("/", enrollmentRoutes(database));
+  }
+
+  // Timetable builder: draft version management, slot CRUD with teacher/room conflict
+  // detection, approval workflow, and copy-from-previous-term.
+  if (database) {
+    app.route("/", timetableRoutes(database));
   }
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.
