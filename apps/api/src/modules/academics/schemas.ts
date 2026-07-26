@@ -594,3 +594,232 @@ export const studentIdParamSchema = z
       }),
   })
   .openapi("StudentIdParam");
+
+// ---------------------------------------------------------------------------
+// Timetable
+// ---------------------------------------------------------------------------
+
+export const timetableVersionStatusSchema = z
+  .enum(["draft", "pending", "approved"])
+  .openapi({ description: "Lifecycle state of a timetable version." });
+
+export type TimetableVersionStatus = z.infer<typeof timetableVersionStatusSchema>;
+
+export const timetableVersionSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    academic_year_id: uuidSchema.openapi({ description: "Parent academic year." }),
+    term_id: uuidSchema.openapi({ description: "Parent term." }),
+    name: z
+      .string()
+      .openapi({ description: "Human-readable name.", example: "Term 1 Weekly Schedule" }),
+    status: timetableVersionStatusSchema,
+    submitted_at: dateTimeSchema.nullable().openapi({ description: "When submitted for review." }),
+    submitted_by_user_id: uuidSchema.nullable().openapi({ description: "Who submitted." }),
+    approved_at: dateTimeSchema.nullable().openapi({ description: "When approved." }),
+    approved_by_user_id: uuidSchema.nullable().openapi({ description: "Who approved." }),
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("TimetableVersion");
+
+export type TimetableVersion = z.infer<typeof timetableVersionSchema>;
+
+export const createTimetableVersionBodySchema = z
+  .object({
+    term_id: uuidSchema.openapi({ description: "Target term." }),
+    academic_year_id: uuidSchema.openapi({ description: "Parent academic year." }),
+    name: z
+      .string()
+      .min(1)
+      .max(200)
+      .openapi({ description: "Human-readable name.", example: "Term 1 Weekly Schedule" }),
+  })
+  .openapi("CreateTimetableVersionBody");
+
+export type CreateTimetableVersionBody = z.infer<typeof createTimetableVersionBodySchema>;
+
+export const updateTimetableVersionBodySchema = z
+  .object({
+    name: z.string().min(1).max(200).optional().openapi({ description: "Human-readable name." }),
+  })
+  .openapi("UpdateTimetableVersionBody");
+
+export type UpdateTimetableVersionBody = z.infer<typeof updateTimetableVersionBodySchema>;
+
+export const timetableVersionListSchema = z
+  .object({
+    timetable_versions: z.array(timetableVersionSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("TimetableVersionList");
+
+export const timetableVersionQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    term_id: uuidSchema.openapi({ description: "Filter by term." }),
+    status: timetableVersionStatusSchema.optional(),
+  })
+  .openapi("TimetableVersionQuery");
+
+// ---------------------------------------------------------------------------
+// Timetable Slots
+// ---------------------------------------------------------------------------
+
+export const timetableSlotSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    timetable_version_id: uuidSchema.openapi({ description: "Parent timetable version." }),
+    class_id: uuidSchema.openapi({ description: "Scheduled class." }),
+    teacher_id: uuidSchema.openapi({ description: "Assigned teacher." }),
+    room_id: uuidSchema.openapi({ description: "Assigned room." }),
+    weekday: z
+      .number()
+      .int()
+      .min(1)
+      .max(7)
+      .openapi({ description: "Day of week (1=Mon, 7=Sun).", example: 1 }),
+    period: z
+      .number()
+      .int()
+      .min(1)
+      .openapi({ description: "Period number (1-based).", example: 2 }),
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("TimetableSlot");
+
+export type TimetableSlot = z.infer<typeof timetableSlotSchema>;
+
+export const createTimetableSlotBodySchema = z
+  .object({
+    class_id: uuidSchema.openapi({ description: "Class to schedule." }),
+    teacher_id: uuidSchema.openapi({ description: "Teacher to assign." }),
+    room_id: uuidSchema.openapi({ description: "Room to assign." }),
+    weekday: z
+      .number()
+      .int()
+      .min(1)
+      .max(7)
+      .openapi({ description: "Day of week (1=Mon, 7=Sun).", example: 1 }),
+    period: z
+      .number()
+      .int()
+      .min(1)
+      .openapi({ description: "Period number (1-based).", example: 2 }),
+  })
+  .openapi("CreateTimetableSlotBody");
+
+export type CreateTimetableSlotBody = z.infer<typeof createTimetableSlotBodySchema>;
+
+export const updateTimetableSlotBodySchema = z
+  .object({
+    class_id: uuidSchema.optional().openapi({ description: "Class to schedule." }),
+    teacher_id: uuidSchema.optional().openapi({ description: "Teacher to assign." }),
+    room_id: uuidSchema.optional().openapi({ description: "Room to assign." }),
+    weekday: z
+      .number()
+      .int()
+      .min(1)
+      .max(7)
+      .optional()
+      .openapi({ description: "Day of week (1=Mon, 7=Sun)." }),
+    period: z.number().int().min(1).optional().openapi({ description: "Period number (1-based)." }),
+  })
+  .openapi("UpdateTimetableSlotBody");
+
+export type UpdateTimetableSlotBody = z.infer<typeof updateTimetableSlotBodySchema>;
+
+export const timetableSlotListSchema = z
+  .object({
+    timetable_slots: z.array(timetableSlotSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("TimetableSlotList");
+
+export const timetableSlotQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .openapi("TimetableSlotQuery");
+
+// ---------------------------------------------------------------------------
+// Timetable: Copy from previous term
+// ---------------------------------------------------------------------------
+
+export const copyTimetableBodySchema = z
+  .object({
+    source_version_id: uuidSchema.openapi({ description: "Version to copy slots from." }),
+    name: z.string().min(1).max(200).openapi({
+      description: "Name for the new draft version.",
+      example: "Term 2 Weekly Schedule",
+    }),
+    term_id: uuidSchema.openapi({ description: "Target term." }),
+    academic_year_id: uuidSchema.openapi({ description: "Target academic year." }),
+  })
+  .openapi("CopyTimetableBody");
+
+export type CopyTimetableBody = z.infer<typeof copyTimetableBodySchema>;
+
+export const copyTimetableResponseSchema = z
+  .object({
+    timetable_version: timetableVersionSchema,
+    slots_copied: z.number().int().openapi({ description: "Number of slots successfully copied." }),
+    slots_skipped: z
+      .number()
+      .int()
+      .openapi({ description: "Number of slots skipped (class not in target term)." }),
+  })
+  .openapi("CopyTimetableResponse");
+
+// ---------------------------------------------------------------------------
+// Timetable: Conflict payload (extension of ProblemDetails for 409)
+// ---------------------------------------------------------------------------
+
+export const timetableConflictDetailSchema = z
+  .object({
+    conflict_type: z
+      .enum(["teacher", "room"])
+      .openapi({ description: "What resource is double-booked." }),
+    existing_slot_id: uuidSchema.openapi({ description: "ID of the conflicting slot." }),
+    existing_class_code: z.string().openapi({ description: "Class code of the existing booking." }),
+    entity_id: uuidSchema.openapi({ description: "Teacher or room ID that conflicts." }),
+    entity_name: z
+      .string()
+      .openapi({ description: "Display name of the conflicting teacher or room." }),
+    weekday: z.number().int().min(1).max(7).openapi({ description: "Day of week." }),
+    period: z.number().int().min(1).openapi({ description: "Period number." }),
+  })
+  .openapi("TimetableConflictDetail");
+
+// ---------------------------------------------------------------------------
+// Path params (timetable)
+// ---------------------------------------------------------------------------
+
+export const versionIdParamSchema = z
+  .object({
+    versionId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "versionId", in: "path" },
+        description: "Timetable version UUID.",
+      }),
+  })
+  .openapi("VersionIdParam");
+
+export const slotIdParamSchema = z
+  .object({
+    slotId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "slotId", in: "path" },
+        description: "Timetable slot UUID.",
+      }),
+  })
+  .openapi("SlotIdParam");

@@ -109,6 +109,18 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",
+  // Timetable (ST-101). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/timetable-versions",
+  "PATCH /api/academics/timetable-versions/{versionId}",
+  "DELETE /api/academics/timetable-versions/{versionId}",
+  "POST /api/academics/timetable-versions/{versionId}/submit",
+  "POST /api/academics/timetable-versions/{versionId}/approve",
+  "POST /api/academics/timetable-versions/{versionId}/reject",
+  "POST /api/academics/timetable-versions/copy",
+  "POST /api/academics/timetable-versions/{versionId}/slots",
+  "PATCH /api/academics/slots/{slotId}",
+  "DELETE /api/academics/slots/{slotId}",
 ];
 
 /**
@@ -180,6 +192,18 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",
+  // Timetable (ST-101) — tenant-scoped school-level catalog data protected by
+  // requireAuth; no cross-user row-level permission to check.
+  "POST /api/academics/timetable-versions",
+  "PATCH /api/academics/timetable-versions/{versionId}",
+  "DELETE /api/academics/timetable-versions/{versionId}",
+  "POST /api/academics/timetable-versions/{versionId}/submit",
+  "POST /api/academics/timetable-versions/{versionId}/approve",
+  "POST /api/academics/timetable-versions/{versionId}/reject",
+  "POST /api/academics/timetable-versions/copy",
+  "POST /api/academics/timetable-versions/{versionId}/slots",
+  "PATCH /api/academics/slots/{slotId}",
+  "DELETE /api/academics/slots/{slotId}",
 ]);
 
 // ---------------------------------------------------------------------------

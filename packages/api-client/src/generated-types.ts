@@ -171,6 +171,34 @@ export interface paths {
         readonly patch: operations["updateCourse"];
         readonly trace?: never;
     };
+    readonly "/api/academics/slots/{slotId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get a timetable slot
+         * @description Returns a single timetable slot by ID.
+         */
+        readonly get: operations["getTimetableSlot"];
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Delete a timetable slot
+         * @description Deletes a timetable slot from a draft version.
+         */
+        readonly delete: operations["deleteTimetableSlot"];
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Update a timetable slot
+         * @description Partially updates a timetable slot. Returns 409 with conflict details (who/where/when) if the teacher or room is already booked at that time.
+         */
+        readonly patch: operations["updateTimetableSlot"];
+        readonly trace?: never;
+    };
     readonly "/api/academics/subjects": {
         readonly parameters: {
             readonly query?: never;
@@ -273,6 +301,162 @@ export interface paths {
          * @description Partially updates a term.
          */
         readonly patch: operations["updateTerm"];
+        readonly trace?: never;
+    };
+    readonly "/api/academics/timetable-versions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List timetable versions
+         * @description Paginated list of timetable versions for a given term.
+         */
+        readonly get: operations["listTimetableVersions"];
+        readonly put?: never;
+        /**
+         * Create a timetable version
+         * @description Creates a new draft timetable version for a term.
+         */
+        readonly post: operations["createTimetableVersion"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/timetable-versions/{versionId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get a timetable version
+         * @description Returns a single timetable version by ID.
+         */
+        readonly get: operations["getTimetableVersion"];
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Delete a timetable version
+         * @description Deletes a draft timetable version. Only draft versions with no slots can be deleted.
+         */
+        readonly delete: operations["deleteTimetableVersion"];
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Update a timetable version
+         * @description Updates the name of a draft timetable version.
+         */
+        readonly patch: operations["updateTimetableVersion"];
+        readonly trace?: never;
+    };
+    readonly "/api/academics/timetable-versions/{versionId}/approve": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Approve a timetable version
+         * @description Approves a pending timetable version, making it the live schedule for the term.
+         */
+        readonly post: operations["approveTimetableVersion"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/timetable-versions/{versionId}/reject": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Reject a timetable version back to draft
+         * @description Sends a pending version back to draft status for revisions.
+         */
+        readonly post: operations["rejectTimetableVersion"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/timetable-versions/{versionId}/slots": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List slots in a timetable version
+         * @description Paginated list of slots for a given timetable version, ordered by weekday and period.
+         */
+        readonly get: operations["listTimetableSlots"];
+        readonly put?: never;
+        /**
+         * Create a timetable slot
+         * @description Adds a slot to a draft timetable version. Returns 409 with conflict details (who/where/when) if the teacher or room is already booked at that time.
+         */
+        readonly post: operations["createTimetableSlot"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/timetable-versions/{versionId}/submit": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Submit a timetable version for review
+         * @description Transitions a draft version to pending status for admin review.
+         */
+        readonly post: operations["submitTimetableVersion"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/timetable-versions/copy": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Copy timetable from a previous term
+         * @description Creates a new draft version by copying slots from a source version. Slots whose class does not belong to the target term are skipped.
+         */
+        readonly post: operations["copyTimetableVersion"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
         readonly trace?: never;
     };
     readonly "/api/academics/years": {
@@ -1629,6 +1813,35 @@ export interface components {
              */
             readonly idempotency_key?: string;
         };
+        readonly CopyTimetableBody: {
+            /**
+             * Format: uuid
+             * @description Target academic year.
+             */
+            readonly academic_year_id: string;
+            /**
+             * @description Name for the new draft version.
+             * @example Term 2 Weekly Schedule
+             */
+            readonly name: string;
+            /**
+             * Format: uuid
+             * @description Version to copy slots from.
+             */
+            readonly source_version_id: string;
+            /**
+             * Format: uuid
+             * @description Target term.
+             */
+            readonly term_id: string;
+        };
+        readonly CopyTimetableResponse: {
+            /** @description Number of slots successfully copied. */
+            readonly slots_copied: number;
+            /** @description Number of slots skipped (class not in target term). */
+            readonly slots_skipped: number;
+            readonly timetable_version: components["schemas"]["TimetableVersion"];
+        };
         readonly Course: {
             /**
              * @description Short unique code within the school.
@@ -1933,6 +2146,50 @@ export interface components {
              */
             readonly status: "planned" | "active" | "closed" | "archived";
         };
+        readonly CreateTimetableSlotBody: {
+            /**
+             * Format: uuid
+             * @description Class to schedule.
+             */
+            readonly class_id: string;
+            /**
+             * @description Period number (1-based).
+             * @example 2
+             */
+            readonly period: number;
+            /**
+             * Format: uuid
+             * @description Room to assign.
+             */
+            readonly room_id: string;
+            /**
+             * Format: uuid
+             * @description Teacher to assign.
+             */
+            readonly teacher_id: string;
+            /**
+             * @description Day of week (1=Mon, 7=Sun).
+             * @example 1
+             */
+            readonly weekday: number;
+        };
+        readonly CreateTimetableVersionBody: {
+            /**
+             * Format: uuid
+             * @description Parent academic year.
+             */
+            readonly academic_year_id: string;
+            /**
+             * @description Human-readable name.
+             * @example Term 1 Weekly Schedule
+             */
+            readonly name: string;
+            /**
+             * Format: uuid
+             * @description Target term.
+             */
+            readonly term_id: string;
+        };
         readonly CreateUserBody: {
             /** @description Optional human-readable name. */
             readonly display_name?: string;
@@ -2207,7 +2464,7 @@ export interface components {
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "CLASS_HAS_ENROLLMENTS" | "CLASS_CAPACITY_EXCEEDED" | "ENROLLMENT_DUPLICATE" | "ENROLLMENT_NOT_ACTIVE" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "CLASS_HAS_ENROLLMENTS" | "CLASS_CAPACITY_EXCEEDED" | "ENROLLMENT_DUPLICATE" | "ENROLLMENT_NOT_ACTIVE" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "TIMETABLE_TEACHER_CONFLICT" | "TIMETABLE_ROOM_CONFLICT" | "TIMETABLE_VERSION_NOT_DRAFT" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -2751,6 +3008,118 @@ export interface components {
             /** @description Total matching records. */
             readonly total: number;
         };
+        readonly TimetableSlot: {
+            /**
+             * Format: uuid
+             * @description Scheduled class.
+             */
+            readonly class_id: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /**
+             * @description Period number (1-based).
+             * @example 2
+             */
+            readonly period: number;
+            /**
+             * Format: uuid
+             * @description Assigned room.
+             */
+            readonly room_id: string;
+            /**
+             * Format: uuid
+             * @description Owning school tenant.
+             */
+            readonly school_id: string;
+            /**
+             * Format: uuid
+             * @description Assigned teacher.
+             */
+            readonly teacher_id: string;
+            /**
+             * Format: uuid
+             * @description Parent timetable version.
+             */
+            readonly timetable_version_id: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+            /**
+             * @description Day of week (1=Mon, 7=Sun).
+             * @example 1
+             */
+            readonly weekday: number;
+        };
+        readonly TimetableSlotList: {
+            readonly timetable_slots: readonly components["schemas"]["TimetableSlot"][];
+            /** @description Total matching records. */
+            readonly total: number;
+        };
+        readonly TimetableVersion: {
+            /**
+             * Format: uuid
+             * @description Parent academic year.
+             */
+            readonly academic_year_id: string;
+            /**
+             * Format: date-time
+             * @description When approved.
+             */
+            readonly approved_at: string | null;
+            /**
+             * Format: uuid
+             * @description Who approved.
+             */
+            readonly approved_by_user_id: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /**
+             * @description Human-readable name.
+             * @example Term 1 Weekly Schedule
+             */
+            readonly name: string;
+            /**
+             * Format: uuid
+             * @description Owning school tenant.
+             */
+            readonly school_id: string;
+            /**
+             * @description Lifecycle state of a timetable version.
+             * @enum {string}
+             */
+            readonly status: "draft" | "pending" | "approved";
+            /**
+             * Format: date-time
+             * @description When submitted for review.
+             */
+            readonly submitted_at: string | null;
+            /**
+             * Format: uuid
+             * @description Who submitted.
+             */
+            readonly submitted_by_user_id: string | null;
+            /**
+             * Format: uuid
+             * @description Parent term.
+             */
+            readonly term_id: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly TimetableVersionList: {
+            readonly timetable_versions: readonly components["schemas"]["TimetableVersion"][];
+            /** @description Total matching records. */
+            readonly total: number;
+        };
         readonly TokenPair: {
             /** @description RS256 JWT. Send as `Authorization: Bearer`. */
             readonly access_token: string;
@@ -2969,6 +3338,31 @@ export interface components {
              * @enum {string}
              */
             readonly status?: "planned" | "active" | "closed" | "archived";
+        };
+        readonly UpdateTimetableSlotBody: {
+            /**
+             * Format: uuid
+             * @description Class to schedule.
+             */
+            readonly class_id?: string;
+            /** @description Period number (1-based). */
+            readonly period?: number;
+            /**
+             * Format: uuid
+             * @description Room to assign.
+             */
+            readonly room_id?: string;
+            /**
+             * Format: uuid
+             * @description Teacher to assign.
+             */
+            readonly teacher_id?: string;
+            /** @description Day of week (1=Mon, 7=Sun). */
+            readonly weekday?: number;
+        };
+        readonly UpdateTimetableVersionBody: {
+            /** @description Human-readable name. */
+            readonly name?: string;
         };
         readonly UpdateUserBody: {
             /** @description Human-readable name. */
@@ -4105,6 +4499,248 @@ export interface operations {
             };
         };
     };
+    readonly getTimetableSlot: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable slot UUID. */
+                readonly slotId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The timetable slot. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableSlot"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly deleteTimetableSlot: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable slot UUID. */
+                readonly slotId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Timetable slot deleted. */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly updateTimetableSlot: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable slot UUID. */
+                readonly slotId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["UpdateTimetableSlotBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The updated timetable slot. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableSlot"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     readonly listSubjects: {
         readonly parameters: {
             readonly query?: {
@@ -4818,6 +5454,901 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Term"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listTimetableVersions: {
+        readonly parameters: {
+            readonly query: {
+                readonly limit?: number;
+                readonly offset?: number | null;
+                /** @description Lifecycle state of a timetable version. */
+                readonly status?: "draft" | "pending" | "approved";
+                /** @description Filter by term. */
+                readonly term_id: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Paginated list of timetable versions. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableVersionList"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly createTimetableVersion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateTimetableVersionBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The created timetable version. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableVersion"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly getTimetableVersion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable version UUID. */
+                readonly versionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The timetable version. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableVersion"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly deleteTimetableVersion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable version UUID. */
+                readonly versionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Timetable version deleted. */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly updateTimetableVersion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable version UUID. */
+                readonly versionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["UpdateTimetableVersionBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The updated timetable version. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableVersion"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly approveTimetableVersion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable version UUID. */
+                readonly versionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The approved timetable version. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableVersion"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly rejectTimetableVersion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable version UUID. */
+                readonly versionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The rejected timetable version (now draft). */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableVersion"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listTimetableSlots: {
+        readonly parameters: {
+            readonly query?: {
+                readonly limit?: number;
+                readonly offset?: number | null;
+            };
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable version UUID. */
+                readonly versionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Paginated list of timetable slots. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableSlotList"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly createTimetableSlot: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable version UUID. */
+                readonly versionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateTimetableSlotBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The created timetable slot. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableSlot"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Scheduling conflict: a teacher or room is double-booked. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly submitTimetableVersion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Timetable version UUID. */
+                readonly versionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The submitted timetable version. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TimetableVersion"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly copyTimetableVersion: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CopyTimetableBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The new draft version with copy statistics. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CopyTimetableResponse"];
                 };
             };
             /** @description The request was malformed or failed schema validation. */

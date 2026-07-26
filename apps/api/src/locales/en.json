@@ -60,5 +60,8 @@
   "CLASS_HAS_ENROLLMENTS": "Cannot delete this class because it has enrollments. Cancel it instead.",
   "CLASS_CAPACITY_EXCEEDED": "This class has reached its maximum enrollment capacity.",
   "ENROLLMENT_DUPLICATE": "This student is already enrolled in this class.",
-  "ENROLLMENT_NOT_ACTIVE": "This enrollment is not active."
+  "ENROLLMENT_NOT_ACTIVE": "This enrollment is not active.",
+  "TIMETABLE_TEACHER_CONFLICT": "This teacher is already assigned to another class at this time",
+  "TIMETABLE_ROOM_CONFLICT": "This room is already booked for another class at this time",
+  "TIMETABLE_VERSION_NOT_DRAFT": "Only draft timetable versions can be modified"
 }
