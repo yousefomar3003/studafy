@@ -15,3 +15,14 @@ commit-msg:
   commands:
     commitlint:
       run: node_modules/.bin/commitlint --edit {1}
+
+# Mirrors the fast half of CI (.github/workflows/ci.yml's "quality" job: format, lint, check-types,
+# test, build, plus the OpenAPI/client/permission-matrix drift checks) so those failures surface
+# before the push instead of a few minutes later in a red CI run. Deliberately does not run the
+# database-migrations or containers jobs here -- those need Docker/Postgres and take minutes, which
+# would make every push slow. Run them on demand with `bun run ci:local:db` /
+# `bun run ci:local:containers` instead.
+pre-push:
+  commands:
+    ci-local:
+      run: bun run ci:local
