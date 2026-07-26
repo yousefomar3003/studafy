@@ -128,6 +128,14 @@ const EXPECTED_MUTATING_ROUTES = [
   // auditAction middleware in bulk-invite-routes.ts.
   "POST /api/invitations/bulk",
   "POST /api/invitations/bulk/{bulkInviteId}/retry",
+  // Classes & enrollments (ST-100). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/classes",
+  "PATCH /api/academics/classes/{classId}",
+  "DELETE /api/academics/classes/{classId}",
+  "POST /api/academics/classes/{classId}/enrollments",
+  "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
+  "POST /api/academics/classes/{classId}/enrollments/transfer",
 ];
 
 function collectSourceFiles(dir: string): string[] {
