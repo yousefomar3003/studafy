@@ -83,7 +83,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # "docker" driver uses the host daemon directly — no need to pull the moby/buildkit image
+      # from Docker Hub, which is what causes the "context deadline exceeded" timeout.
       - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -91,8 +95,6 @@ jobs:
           load: true
           push: false
           tags: studafy/${{ matrix.service }}:ci
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
       - uses: anchore/sbom-action@v0
         with:
           image: studafy/${{ matrix.service }}:ci
