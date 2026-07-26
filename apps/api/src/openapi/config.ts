@@ -102,5 +102,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Student CSV import management. Authenticated and tenant-scoped. " +
         "Upload a CSV for validation, review errors, and confirm to enqueue async processing.",
     },
+    {
+      name: "Timetable",
+      description:
+        "Timetable version and slot management. Authenticated and tenant-scoped. " +
+        "Includes version lifecycle (draft → pending → approved), slot CRUD with teacher/room " +
+        "conflict detection, and copy-from-previous-term.",
+    },
   ],
 };

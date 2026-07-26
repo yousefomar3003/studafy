@@ -60,5 +60,8 @@
   "CLASS_HAS_ENROLLMENTS": "لا يمكن حذف هذا الفصل لأنه يحتوي على تسجيلات. قم بإلغائه بدلاً من ذلك.",
   "CLASS_CAPACITY_EXCEEDED": "وصل هذا الفصل إلى الحد الأقصى لعدد التسجيلات.",
   "ENROLLMENT_DUPLICATE": "الطالب مسجّل بالفعل في هذا الفصل.",
-  "ENROLLMENT_NOT_ACTIVE": "التسجيل غير نشط."
+  "ENROLLMENT_NOT_ACTIVE": "التسجيل غير نشط.",
+  "TIMETABLE_TEACHER_CONFLICT": "هذا المدرّس معين بالفعل على فصل آخر في هذا الوقت",
+  "TIMETABLE_ROOM_CONFLICT": "هذه الغرفة محجوزة بالفعل لفصل آخر في هذا الوقت",
+  "TIMETABLE_VERSION_NOT_DRAFT": "يمكن تعديل جداول الدروس المسودة فقط"
 }

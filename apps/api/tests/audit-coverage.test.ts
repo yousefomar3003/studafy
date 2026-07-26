@@ -136,6 +136,17 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",
+  // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
+  "POST /api/academics/timetable-versions",
+  "PATCH /api/academics/timetable-versions/{versionId}",
+  "DELETE /api/academics/timetable-versions/{versionId}",
+  "POST /api/academics/timetable-versions/{versionId}/submit",
+  "POST /api/academics/timetable-versions/{versionId}/approve",
+  "POST /api/academics/timetable-versions/{versionId}/reject",
+  "POST /api/academics/timetable-versions/copy",
+  "POST /api/academics/timetable-versions/{versionId}/slots",
+  "PATCH /api/academics/slots/{slotId}",
+  "DELETE /api/academics/slots/{slotId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {
