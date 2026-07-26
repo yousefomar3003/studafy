@@ -1,6 +1,7 @@
 import { QUEUE_NAMES } from "@studafy/constants";
 
 import { processStudentImport } from "./queues/imports/worker";
+import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
 
 import type { QueueName } from "@studafy/constants";
 import type { Job } from "bullmq";
@@ -44,7 +45,13 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.NOTIFICATIONS,
     concurrency: 10,
-    processor: placeholderProcessor(QUEUE_NAMES.NOTIFICATIONS),
+    processor: async (job: Job) => {
+      const data = job.data as { bulkInviteId?: string; schoolId?: string };
+      if (data.bulkInviteId && data.schoolId) {
+        return processBulkInvite(data as { bulkInviteId: string; schoolId: string }, databaseUrl);
+      }
+      return { processed: true };
+    },
   },
   {
     name: QUEUE_NAMES.REPORTS,
