@@ -27,6 +27,7 @@ CREATE TABLE app.bulk_invites (
   updated_at      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   completed_at    timestamptz,
 
+  CONSTRAINT uq_bulk_invites_id_school UNIQUE (id, school_id),
   CONSTRAINT fk_bulk_invites_school FOREIGN KEY (school_id)
     REFERENCES app.schools (id),
   CONSTRAINT fk_bulk_invites_user FOREIGN KEY (created_by, school_id)
