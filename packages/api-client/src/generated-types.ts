@@ -27,6 +27,122 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/academics/classes": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List classes
+         * @description Paginated list of classes for the authenticated school, ordered by code ascending.
+         */
+        readonly get: operations["listClasses"];
+        readonly put?: never;
+        /**
+         * Create a class
+         * @description Creates a new class (a scheduled delivery of a course).
+         */
+        readonly post: operations["createClass"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/classes/{classId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get a class
+         * @description Returns a single class by ID.
+         */
+        readonly get: operations["getClass"];
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Delete a class
+         * @description Deletes a class. If the class has enrollments it is cancelled instead. Unreferenced classes are hard-deleted.
+         */
+        readonly delete: operations["deleteClass"];
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Update a class
+         * @description Partially updates a class.
+         */
+        readonly patch: operations["updateClass"];
+        readonly trace?: never;
+    };
+    readonly "/api/academics/classes/{classId}/enrollments": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List enrollments for a class
+         * @description Paginated list of enrollments belonging to the specified class.
+         */
+        readonly get: operations["listEnrollments"];
+        readonly put?: never;
+        /**
+         * Enroll a student in a class
+         * @description Enrolls a student in the specified class. Rejects if the class is at capacity.
+         */
+        readonly post: operations["enrollStudent"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/classes/{classId}/enrollments/{studentId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Withdraw a student from a class
+         * @description Withdraws a student from the specified class. Sets the enrollment status to withdrawn and records the withdrawal timestamp.
+         */
+        readonly delete: operations["withdrawStudent"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/classes/{classId}/enrollments/transfer": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Transfer a student between classes
+         * @description Transfers a student from the specified class to a destination class. Withdraws from the source class (preserving history) and enrolls in the destination class with a capacity check.
+         */
+        readonly post: operations["transferStudent"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/academics/courses/{courseId}": {
         readonly parameters: {
             readonly query?: never;
@@ -1259,6 +1375,64 @@ export interface components {
             /** @description Refresh tokens revoked. */
             readonly revoked: number;
         };
+        readonly Class: {
+            /**
+             * Format: uuid
+             * @description Parent academic year.
+             */
+            readonly academic_year_id: string;
+            /** @description Maximum enrollment count, or null for unlimited. */
+            readonly capacity: number | null;
+            /**
+             * @description Short unique code within the school.
+             * @example CLASS-MATH-101
+             */
+            readonly code: string;
+            /**
+             * Format: uuid
+             * @description Parent course.
+             */
+            readonly course_id: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /**
+             * Format: uuid
+             * @description Lead teacher.
+             */
+            readonly lead_teacher_id: string;
+            /**
+             * Format: uuid
+             * @description Assigned room.
+             */
+            readonly room_id: string;
+            /**
+             * Format: uuid
+             * @description Owning school tenant.
+             */
+            readonly school_id: string;
+            /**
+             * @description Lifecycle state of a class.
+             * @enum {string}
+             */
+            readonly status: "planned" | "active" | "completed" | "cancelled";
+            /**
+             * Format: uuid
+             * @description Parent term.
+             */
+            readonly term_id: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly ClassList: {
+            readonly classes: readonly components["schemas"]["Class"][];
+            /** @description Total matching records. */
+            readonly total: number;
+        };
         readonly ConfirmImportBody: {
             /**
              * @description Optional idempotency key. If provided and an import with this key already completed, the request is a no-op and returns the existing import.
@@ -1337,6 +1511,46 @@ export interface components {
              */
             readonly status: "planned" | "active" | "closed" | "archived";
         };
+        readonly CreateClassBody: {
+            /**
+             * Format: uuid
+             * @description Parent academic year.
+             */
+            readonly academic_year_id: string;
+            /** @description Maximum enrollment count, or null for unlimited. */
+            readonly capacity?: number | null;
+            /**
+             * @description Short unique code.
+             * @example CLASS-MATH-101
+             */
+            readonly code: string;
+            /**
+             * Format: uuid
+             * @description Parent course.
+             */
+            readonly course_id: string;
+            /**
+             * Format: uuid
+             * @description Lead teacher.
+             */
+            readonly lead_teacher_id: string;
+            /**
+             * Format: uuid
+             * @description Assigned room.
+             */
+            readonly room_id: string;
+            /**
+             * @description Lifecycle state of a class.
+             * @default planned
+             * @enum {string}
+             */
+            readonly status: "planned" | "active" | "completed" | "cancelled";
+            /**
+             * Format: uuid
+             * @description Parent term.
+             */
+            readonly term_id: string;
+        };
         readonly CreateCourseBody: {
             /**
              * @description Short unique code.
@@ -1361,6 +1575,13 @@ export interface components {
              * @description Parent subject.
              */
             readonly subject_id: string;
+        };
+        readonly CreateEnrollmentBody: {
+            /**
+             * Format: uuid
+             * @description Student to enroll.
+             */
+            readonly student_id: string;
         };
         readonly CreateInvitation: {
             /**
@@ -1551,6 +1772,44 @@ export interface components {
         };
         readonly DeviceList: {
             readonly devices: readonly components["schemas"]["Device"][];
+        };
+        readonly Enrollment: {
+            /**
+             * Format: uuid
+             * @description Parent class.
+             */
+            readonly class_id: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly enrolled_at: string;
+            /**
+             * Format: uuid
+             * @description Owning school tenant.
+             */
+            readonly school_id: string;
+            /**
+             * @description Lifecycle state of an enrollment.
+             * @enum {string}
+             */
+            readonly status: "active" | "waitlisted" | "withdrawn" | "completed" | "cancelled";
+            /**
+             * Format: uuid
+             * @description Enrolled student.
+             */
+            readonly student_id: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+            /**
+             * Format: date-time
+             * @description When the student withdrew.
+             */
+            readonly withdrawn_at: string | null;
+        };
+        readonly EnrollmentList: {
+            readonly enrollments: readonly components["schemas"]["Enrollment"][];
+            /** @description Total matching records. */
+            readonly total: number;
         };
         readonly ErpNextWebhook: {
             /** @description ERPNext document action, e.g. 'on_submit'. */
@@ -1759,7 +2018,7 @@ export interface components {
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "CLASS_HAS_ENROLLMENTS" | "CLASS_CAPACITY_EXCEEDED" | "ENROLLMENT_DUPLICATE" | "ENROLLMENT_NOT_ACTIVE" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -2318,6 +2577,18 @@ export interface components {
             /** @enum {string} */
             readonly token_type: "Bearer";
         };
+        readonly TransferEnrollmentBody: {
+            /**
+             * Format: uuid
+             * @description Student to transfer.
+             */
+            readonly student_id: string;
+            /**
+             * Format: uuid
+             * @description Destination class.
+             */
+            readonly to_class_id: string;
+        };
         readonly TriggerProvisioningResponse: {
             /**
              * Format: uuid
@@ -2354,6 +2625,27 @@ export interface components {
              * @enum {string}
              */
             readonly status?: "planned" | "active" | "closed" | "archived";
+        };
+        readonly UpdateClassBody: {
+            /** @description Maximum enrollment count, or null for unlimited. */
+            readonly capacity?: number | null;
+            /** @description Short unique code. */
+            readonly code?: string;
+            /**
+             * Format: uuid
+             * @description Lead teacher.
+             */
+            readonly lead_teacher_id?: string;
+            /**
+             * Format: uuid
+             * @description Assigned room.
+             */
+            readonly room_id?: string;
+            /**
+             * @description Lifecycle state of a class.
+             * @enum {string}
+             */
+            readonly status?: "planned" | "active" | "completed" | "cancelled";
         };
         readonly UpdateCourseBody: {
             /** @description Short unique code. */
@@ -2643,6 +2935,741 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["JsonWebKeySet"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listClasses: {
+        readonly parameters: {
+            readonly query?: {
+                readonly course_id?: string;
+                readonly lead_teacher_id?: string;
+                readonly limit?: number;
+                readonly offset?: number | null;
+                /** @description Lifecycle state of a class. */
+                readonly status?: "planned" | "active" | "completed" | "cancelled";
+                readonly term_id?: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Paginated list of classes. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ClassList"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly createClass: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateClassBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The created class. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Class"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly getClass: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Class UUID. */
+                readonly classId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The class. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Class"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly deleteClass: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Class UUID. */
+                readonly classId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Class deleted or cancelled. */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly updateClass: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Class UUID. */
+                readonly classId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["UpdateClassBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The updated class. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Class"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listEnrollments: {
+        readonly parameters: {
+            readonly query?: {
+                readonly limit?: number;
+                readonly offset?: number | null;
+                /** @description Lifecycle state of an enrollment. */
+                readonly status?: "active" | "waitlisted" | "withdrawn" | "completed" | "cancelled";
+            };
+            readonly header?: never;
+            readonly path: {
+                /** @description Class UUID. */
+                readonly classId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Paginated list of enrollments. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["EnrollmentList"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly enrollStudent: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Class UUID. */
+                readonly classId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateEnrollmentBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The created enrollment. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Enrollment"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly withdrawStudent: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Class UUID. */
+                readonly classId: string;
+                /** @description Student UUID. */
+                readonly studentId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The updated enrollment. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Enrollment"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly transferStudent: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Class UUID. */
+                readonly classId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["TransferEnrollmentBody"];
+            };
+        };
+        readonly responses: {
+            /** @description Transfer completed. Returns both source and destination enrollments. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly destination: components["schemas"]["Enrollment"];
+                        readonly source: components["schemas"]["Enrollment"];
+                    };
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Unexpected server error. The body carries no detail; correlate via request_id. */

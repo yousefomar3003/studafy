@@ -124,6 +124,14 @@ const EXPECTED_MUTATING_ROUTES = [
   // Student CSV imports. Upload and confirm are mutating; audit rows written from the route.
   "POST /api/imports/students/upload",
   "POST /api/imports/students/{importId}/confirm",
+  // Classes & enrollments (ST-100). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/classes",
+  "PATCH /api/academics/classes/{classId}",
+  "DELETE /api/academics/classes/{classId}",
+  "POST /api/academics/classes/{classId}/enrollments",
+  "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
+  "POST /api/academics/classes/{classId}/enrollments/transfer",
 ];
 
 function collectSourceFiles(dir: string): string[] {
