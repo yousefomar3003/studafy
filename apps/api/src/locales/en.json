@@ -56,5 +56,9 @@
   "IMPORT_INVALID_STATE": "Import is not in a valid state for this operation",
   "IMPORT_VALIDATION_FAILED": "Import validation failed",
   "IMPORT_ROWS_EXCEED_LIMIT": "CSV file exceeds the maximum row limit",
-  "IMPORT_IDEMPOTENCY_KEY_EXISTS": "An import with this idempotency key already exists"
+  "IMPORT_IDEMPOTENCY_KEY_EXISTS": "An import with this idempotency key already exists",
+  "CLASS_HAS_ENROLLMENTS": "Cannot delete this class because it has enrollments. Cancel it instead.",
+  "CLASS_CAPACITY_EXCEEDED": "This class has reached its maximum enrollment capacity.",
+  "ENROLLMENT_DUPLICATE": "This student is already enrolled in this class.",
+  "ENROLLMENT_NOT_ACTIVE": "This enrollment is not active."
 }

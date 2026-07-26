@@ -160,6 +160,10 @@ export function enrollmentRoutes(database: Database): OpenAPIHono<AppEnv> {
     "/api/academics/classes/{classId}/enrollments/{studentId}",
     auditAction("update", "enrollments"),
   );
+  routes.use(
+    "/api/academics/classes/{classId}/enrollments/transfer",
+    auditAction("update", "enrollments"),
+  );
 
   routes.openapi(listEnrollmentsRoute, async (c) => {
     const auth = requireAuth(c);

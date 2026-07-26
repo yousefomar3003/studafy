@@ -98,6 +98,14 @@ const EXPECTED_MUTATING_ROUTES = [
   // Student CSV imports. Upload and confirm are mutating; guarded by STUDENT_IMPORT permission.
   "POST /api/imports/students/upload",
   "POST /api/imports/students/{importId}/confirm",
+  // Classes & enrollments (ST-100). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/classes",
+  "PATCH /api/academics/classes/{classId}",
+  "DELETE /api/academics/classes/{classId}",
+  "POST /api/academics/classes/{classId}/enrollments",
+  "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
+  "POST /api/academics/classes/{classId}/enrollments/transfer",
 ];
 
 /**
@@ -161,6 +169,14 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/subjects/{subjectId}/courses",
   "PATCH /api/academics/courses/{courseId}",
   "DELETE /api/academics/courses/{courseId}",
+  // Classes & enrollments (ST-100) — tenant-scoped school-level catalog data protected by
+  // requireAuth; no cross-user row-level permission to check.
+  "POST /api/academics/classes",
+  "PATCH /api/academics/classes/{classId}",
+  "DELETE /api/academics/classes/{classId}",
+  "POST /api/academics/classes/{classId}/enrollments",
+  "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
+  "POST /api/academics/classes/{classId}/enrollments/transfer",
 ]);
 
 // ---------------------------------------------------------------------------

@@ -56,5 +56,9 @@
   "IMPORT_INVALID_STATE": "الاستيراد ليس في حالة صالحة لهذه العملية",
   "IMPORT_VALIDATION_FAILED": "فشل التحقق من صحة الاستيراد",
   "IMPORT_ROWS_EXCEED_LIMIT": "ملف CSV يتجاوز الحد الأقصى لعدد الصفوف",
-  "IMPORT_IDEMPOTENCY_KEY_EXISTS": "استيراد بهذا المعرّف موجود بالفعل"
+  "IMPORT_IDEMPOTENCY_KEY_EXISTS": "استيراد بهذا المعرّف موجود بالفعل",
+  "CLASS_HAS_ENROLLMENTS": "لا يمكن حذف هذا الفصل لأنه يحتوي على تسجيلات. قم بإلغائه بدلاً من ذلك.",
+  "CLASS_CAPACITY_EXCEEDED": "وصل هذا الفصل إلى الحد الأقصى لعدد التسجيلات.",
+  "ENROLLMENT_DUPLICATE": "الطالب مسجّل بالفعل في هذا الفصل.",
+  "ENROLLMENT_NOT_ACTIVE": "التسجيل غير نشط."
 }
