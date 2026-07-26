@@ -133,3 +133,143 @@ export const regenerateInvitationResponseSchema = z
     }),
   })
   .openapi("RegenerateInvitationResponse");
+
+// ---------------------------------------------------------------------------
+// Bulk invite
+// ---------------------------------------------------------------------------
+
+export const bulkInviteStatusValues = ["pending", "processing", "completed", "failed"] as const;
+
+export const bulkInviteStatusSchema = z
+  .enum(bulkInviteStatusValues)
+  .openapi({ description: "Lifecycle state of the bulk invitation batch." });
+
+export type BulkInviteStatus = z.infer<typeof bulkInviteStatusSchema>;
+
+export const bulkInviteRecipientStatusValues = ["pending", "sent", "failed"] as const;
+
+export const bulkInviteRecipientStatusSchema = z
+  .enum(bulkInviteRecipientStatusValues)
+  .openapi({ description: "Per-recipient dispatch state." });
+
+export type BulkInviteRecipientStatus = z.infer<typeof bulkInviteRecipientStatusSchema>;
+
+export const bulkInviteBodySchema = z
+  .object({
+    role: z
+      .enum([
+        ROLES.ORG_ADMIN,
+        ROLES.INSTRUCTOR,
+        ROLES.TEACHING_ASSISTANT,
+        ROLES.STUDENT,
+        ROLES.GUEST,
+      ])
+      .openapi({
+        description: "Role to assign when each invitation is accepted.",
+        example: "STUDENT",
+      }),
+    expiry_days: z.number().int().min(1).max(365).optional().openapi({
+      description: "Number of days until each invitation expires. Defaults to 7.",
+      example: 7,
+    }),
+    recipients: z
+      .array(
+        z.object({
+          email: z.string().email().max(320).openapi({
+            description: "Email address to invite.",
+            example: "student@example.com",
+          }),
+        }),
+      )
+      .min(1)
+      .max(5000)
+      .openapi({
+        description: "List of email addresses to invite. Maximum 5,000 recipients.",
+      }),
+  })
+  .openapi("BulkInviteBody");
+
+export const bulkInviteResponseSchema = z
+  .object({
+    id: z.string().uuid().openapi({ description: "Bulk invite batch identifier." }),
+    status: bulkInviteStatusSchema,
+    role: z.string().openapi({ description: "Role assigned on acceptance." }),
+    expiry_days: z.number().int().openapi({ description: "Days until invitations expire." }),
+    target_mode: z
+      .string()
+      .openapi({ description: "Targeting mode (explicit, role, import_batch)." }),
+    total_count: z.number().int().openapi({ description: "Total recipients in the batch." }),
+    sent_count: z
+      .number()
+      .int()
+      .openapi({ description: "Recipients with successfully created invitations." }),
+    failed_count: z
+      .number()
+      .int()
+      .openapi({ description: "Recipients where invitation creation failed." }),
+    created_at: z.string().datetime().openapi({ description: "Batch creation timestamp." }),
+    updated_at: z.string().datetime().openapi({ description: "Last state change." }),
+    completed_at: z
+      .string()
+      .datetime()
+      .nullable()
+      .openapi({ description: "When all recipients were processed." }),
+  })
+  .openapi("BulkInviteResponse");
+
+export const bulkInviteRecipientSchema = z
+  .object({
+    id: z.string().uuid().openapi({ description: "Recipient row identifier." }),
+    email: z.string().email().openapi({ description: "Invited email address." }),
+    status: bulkInviteRecipientStatusSchema,
+    invitation_id: z
+      .string()
+      .uuid()
+      .nullable()
+      .openapi({ description: "Created invitation ID (null until sent)." }),
+    error_message: z
+      .string()
+      .nullable()
+      .openapi({ description: "Failure reason (null on success)." }),
+    created_at: z.string().datetime().openapi({ description: "Row creation timestamp." }),
+    updated_at: z.string().datetime().openapi({ description: "Last state change." }),
+  })
+  .openapi("BulkInviteRecipient");
+
+export const bulkInviteListResponseSchema = z
+  .object({
+    bulk_invites: z.array(bulkInviteResponseSchema),
+    next_cursor: z.string().nullable().openapi({
+      description: "Opaque cursor for the next page. Null when no more results.",
+    }),
+  })
+  .openapi("BulkInviteList");
+
+export const bulkInviteRecipientsResponseSchema = z
+  .object({
+    recipients: z.array(bulkInviteRecipientSchema),
+    next_cursor: z.string().nullable().openapi({
+      description: "Opaque cursor for the next page. Null when no more results.",
+    }),
+  })
+  .openapi("BulkInviteRecipients");
+
+export const bulkInviteIdPathParams = z
+  .object({
+    bulkInviteId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "bulkInviteId", in: "path" },
+        description: "Bulk invite batch UUID.",
+      }),
+  })
+  .openapi("BulkInviteIdPathParams");
+
+export const bulkInviteRecipientsQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().min(1).optional(),
+    status: bulkInviteRecipientStatusSchema.optional(),
+  })
+  .openapi("BulkInviteRecipientsQuery");

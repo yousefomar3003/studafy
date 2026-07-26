@@ -39,6 +39,7 @@ import {
   returningUserLoginRoutes,
   sessionRoutes,
 } from "./modules/auth";
+import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
@@ -268,6 +269,7 @@ export function createApp({
   // Invitation routes — requires database for persistence and outbox event emission.
   if (database) {
     app.route("/", invitationRoutes(database, logger));
+    app.route("/", bulkInviteRoutes(database, redis ?? null));
   }
 
   // Session lifecycle (ST-071). Needs both a key store to mint access tokens and a database to hold

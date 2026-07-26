@@ -98,6 +98,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // Student CSV imports. Upload and confirm are mutating; guarded by STUDENT_IMPORT permission.
   "POST /api/imports/students/upload",
   "POST /api/imports/students/{importId}/confirm",
+  // Bulk invitations. Admin dispatches invitations in batches; guarded by USER_INVITE permission.
+  "POST /api/invitations/bulk",
+  "POST /api/invitations/bulk/{bulkInviteId}/retry",
   // Classes & enrollments (ST-100). Tenant-scoped CRUD protected by requireAuth; school-level
   // catalog data with no cross-user row-level permission.
   "POST /api/academics/classes",
