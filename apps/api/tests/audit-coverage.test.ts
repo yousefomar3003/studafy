@@ -124,6 +124,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // Student CSV imports. Upload and confirm are mutating; audit rows written from the route.
   "POST /api/imports/students/upload",
   "POST /api/imports/students/{importId}/confirm",
+  // Bulk invitations. Admin dispatches invitations in batches; audit rows written by
+  // auditAction middleware in bulk-invite-routes.ts.
+  "POST /api/invitations/bulk",
+  "POST /api/invitations/bulk/{bulkInviteId}/retry",
 ];
 
 function collectSourceFiles(dir: string): string[] {

@@ -48,8 +48,8 @@ CREATE TABLE app.bulk_invite_recipients (
   created_at      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT fk_bulk_invite_recipients_bulk FOREIGN KEY (bulk_invite_id)
-    REFERENCES app.bulk_invites (id) ON DELETE CASCADE,
+  CONSTRAINT fk_bulk_invite_recipients_bulk FOREIGN KEY (bulk_invite_id, school_id)
+    REFERENCES app.bulk_invites (id, school_id) ON DELETE CASCADE,
   CONSTRAINT fk_bulk_invite_recipients_school FOREIGN KEY (school_id)
     REFERENCES app.schools (id)
 );
