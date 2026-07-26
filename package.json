@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "verify": "bun run format:check && bun run lint && bun run typecheck && bun run test && bun run build",
     "prepare": "lefthook install",
     "build": "turbo run build",
     "typecheck": "turbo run check-types",

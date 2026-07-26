@@ -3,10 +3,7 @@ pre-commit:
   commands:
     lint-staged:
       run: node_modules/.bin/lint-staged
-    # Mobile is excluded for the same reason CI excludes it (.github/workflows/ci.yml): its
-    # check-types is `flutter analyze`, which needs the Flutter SDK. Without this the hook is
-    # stricter than CI and unrunnable for anyone who does not have Flutter installed — and it bites
-    # on any change to a root file (turbo.json, bun.lock), since that puts every package in scope.
+
     check-types:
       glob: "*.{ts,tsx,mts,cts}"
       run: node_modules/.bin/turbo run check-types --filter="[HEAD]" --filter=!@studafy/mobile
@@ -15,3 +12,13 @@ commit-msg:
   commands:
     commitlint:
       run: node_modules/.bin/commitlint --edit {1}
+
+pre-push:
+  commands:
+    verify:
+      run: |
+        bun run format:check
+        bun run lint
+        bun run typecheck
+        bun run test
+        bun run build
