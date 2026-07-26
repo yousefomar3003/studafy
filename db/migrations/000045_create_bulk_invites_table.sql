@@ -61,6 +61,9 @@ CREATE INDEX idx_bulk_invite_recipients_bulk_status
 CREATE UNIQUE INDEX uq_bulk_invite_recipients_email_per_bulk
   ON app.bulk_invite_recipients (bulk_invite_id, normalized_email);
 
+CREATE INDEX idx_bulk_invite_recipients_school
+  ON app.bulk_invite_recipients (school_id, bulk_invite_id);
+
 SELECT app.apply_tenant_isolation('app', 'bulk_invites');
 SELECT app.apply_tenant_isolation('app', 'bulk_invite_recipients');
 
