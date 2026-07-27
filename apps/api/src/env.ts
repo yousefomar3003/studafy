@@ -113,6 +113,19 @@ export const envSchema = z
     // Cloudflare Turnstile secret key for captcha verification on public endpoints.
     // When absent, captcha checks are skipped (development only).
     TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+    // S3-compatible object storage for the app-files bucket (ST-103). All optional and validated
+    // as a group below: the feature activates only when the whole set is present, so dev and test
+    // boot without object storage and attachment endpoints answer 503 instead of the app failing to
+    // start. S3_ENDPOINT is optional even within the group — absent means AWS S3 proper; set it for
+    // MinIO or any other S3-compatible provider.
+    S3_ENDPOINT: z.string().url().optional(),
+    S3_REGION: z.string().min(1).optional(),
+    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    S3_APP_FILES_BUCKET: z.string().min(1).optional(),
+    // Lifetime of a pre-signed URL. Bounded to the 15–60 minute window ST-103 specifies: short
+    // enough that a leaked URL expires before it is useful, long enough to survive a slow upload.
+    S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(900).max(3600).default(900),
   })
   .superRefine((env, context) => {
     // Checked before the NODE_ENV gate below: this constraint keys off the deployment tier, and a
@@ -195,6 +208,29 @@ export const envSchema = z
         code: "custom",
         path: ["ERPNEXT_API_URL"],
         message: "ERPNEXT_API_URL is required when ERPNEXT_API_KEY is set",
+      });
+    }
+
+    // Object storage: the four credential/bucket variables must be present or absent together.
+    // A half-configured client is worse than none — it would construct successfully and fail at
+    // the first presign, at which point the failure is a runtime 500 on a user's upload rather
+    // than a startup error naming the missing variable.
+    const storageVars = [
+      ["S3_REGION", env.S3_REGION],
+      ["S3_ACCESS_KEY_ID", env.S3_ACCESS_KEY_ID],
+      ["S3_SECRET_ACCESS_KEY", env.S3_SECRET_ACCESS_KEY],
+      ["S3_APP_FILES_BUCKET", env.S3_APP_FILES_BUCKET],
+    ] as const;
+    const storageSetCount = storageVars.filter(([, value]) => value !== undefined).length;
+    if (storageSetCount > 0 && storageSetCount < storageVars.length) {
+      const missing = storageVars
+        .filter(([, value]) => value === undefined)
+        .map(([key]) => key)
+        .join(", ");
+      context.addIssue({
+        code: "custom",
+        path: ["S3_APP_FILES_BUCKET"],
+        message: `All object storage variables must be set together. Missing: ${missing}`,
       });
     }
 

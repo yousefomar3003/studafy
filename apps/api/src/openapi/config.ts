@@ -109,5 +109,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Includes version lifecycle (draft → pending → approved), slot CRUD with teacher/room " +
         "conflict detection, and copy-from-previous-term.",
     },
+    {
+      name: "Assignments",
+      description:
+        "Class-scoped coursework. Authenticated and tenant-scoped, then scoped again within the " +
+        "tenant: teachers manage assignments only for classes they teach, and students read only " +
+        "published work for classes they are actively enrolled in. File attachments are served as " +
+        "short-lived pre-signed URLs — a raw storage key never appears in a payload.",
+    },
   ],
 };

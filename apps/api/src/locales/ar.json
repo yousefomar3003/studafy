@@ -63,5 +63,10 @@
   "ENROLLMENT_NOT_ACTIVE": "التسجيل غير نشط.",
   "TIMETABLE_TEACHER_CONFLICT": "هذا المدرّس معين بالفعل على فصل آخر في هذا الوقت",
   "TIMETABLE_ROOM_CONFLICT": "هذه الغرفة محجوزة بالفعل لفصل آخر في هذا الوقت",
-  "TIMETABLE_VERSION_NOT_DRAFT": "يمكن تعديل جداول الدروس المسودة فقط"
+  "TIMETABLE_VERSION_NOT_DRAFT": "يمكن تعديل جداول الدروس المسودة فقط",
+  "ASSIGNMENT_CLASS_FORBIDDEN": "أنت غير معيّن على هذا الفصل",
+  "ASSIGNMENT_INVALID_STATUS_TRANSITION": "لا يمكن إعادة الواجب إلى مسودة بعد نشره",
+  "STORAGE_KEY_FORBIDDEN": "هذا الملف لا يخص مدرستك",
+  "STORAGE_OBJECT_NOT_FOUND": "تعذّر العثور على الملف المرفوع. يرجى رفعه مرة أخرى.",
+  "STORAGE_NOT_CONFIGURED": "خدمة تخزين الملفات غير متاحة. يرجى المحاولة لاحقاً."
 }
