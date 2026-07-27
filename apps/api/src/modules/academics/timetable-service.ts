@@ -64,7 +64,7 @@ export interface UpdateVersionParams {
 }
 
 export interface RejectVersionParams {
-  reason: string;
+  reason?: string | null;
 }
 
 export interface CreateSlotParams {
@@ -578,9 +578,11 @@ export async function rejectTimetableVersion(
     );
   }
 
+  const reason = params.reason ?? null;
+
   const [row] = await tx<TimetableVersionRow[]>`
     UPDATE app.timetable_versions
-    SET status = 'draft', rejected_reason = ${params.reason}
+    SET status = 'draft', rejected_reason = ${reason}
     WHERE id = ${versionId} AND school_id = ${schoolId}
     RETURNING id, school_id, academic_year_id, term_id, name, status,
               submitted_at, submitted_by_user_id,
@@ -598,13 +600,13 @@ export async function rejectTimetableVersion(
     targetTable: "timetable_versions",
     targetId: versionId,
     oldValues: { status: existing.status },
-    newValues: { status: "draft", rejected_reason: params.reason },
+    newValues: { status: "draft", rejected_reason: reason },
   });
 
   await emit(tx, DOMAIN_EVENTS.TIMETABLE_REJECTED, {
     timetableVersionId: versionId,
     termId: row.term_id,
-    rejectedReason: params.reason,
+    rejectedReason: reason ?? "",
   });
 
   return row;

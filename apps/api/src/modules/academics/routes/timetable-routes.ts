@@ -233,7 +233,7 @@ const rejectVersionRoute = createRoute({
   request: {
     params: versionIdParamSchema,
     body: {
-      required: true,
+      required: false,
       content: { "application/json": { schema: rejectTimetableBodySchema } },
     },
   },
@@ -516,7 +516,7 @@ export function timetableRoutes(database: Database): OpenAPIHono<AppEnv> {
     const body = c.req.valid("json");
 
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      rejectTimetableVersion(tx, auth.schoolId, versionId, { reason: body.reason }),
+      rejectTimetableVersion(tx, auth.schoolId, versionId, { reason: body?.reason ?? null }),
     );
 
     return c.json(row, 200);

@@ -2623,7 +2623,7 @@ export interface components {
         };
         readonly RejectTimetableBody: {
             /** @description Rejection reason explaining why the version is sent back to draft. */
-            readonly reason: string;
+            readonly reason?: string;
         };
         readonly ResendVerification: {
             /**
@@ -6016,7 +6016,7 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody: {
+        readonly requestBody?: {
             readonly content: {
                 readonly "application/json": components["schemas"]["RejectTimetableBody"];
             };

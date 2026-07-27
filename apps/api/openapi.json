@@ -3164,8 +3164,7 @@
             "maxLength": 2000,
             "description": "Rejection reason explaining why the version is sent back to draft."
           }
-        },
-        "required": ["reason"]
+        }
       },
       "CopyTimetableResponse": {
         "type": "object",
@@ -18062,7 +18061,7 @@
           }
         ],
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {

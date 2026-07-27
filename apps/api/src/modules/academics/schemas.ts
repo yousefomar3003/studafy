@@ -786,7 +786,7 @@ export const copyTimetableResponseSchema = z
 
 export const rejectTimetableBodySchema = z
   .object({
-    reason: z.string().min(1).max(2000).openapi({
+    reason: z.string().min(1).max(2000).optional().openapi({
       description: "Rejection reason explaining why the version is sent back to draft.",
     }),
   })
