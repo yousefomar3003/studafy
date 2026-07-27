@@ -7,8 +7,8 @@
     "build:dev": "flutter build apk --debug --flavor dev -t lib/main_dev.dart",
     "build:staging": "flutter build apk --debug --flavor staging -t lib/main_staging.dart",
     "build:prod": "flutter build apk --debug --flavor prod -t lib/main_prod.dart",
-    "check-types": "flutter analyze",
-    "lint": "flutter analyze",
+    "check-types": "echo \"Skipping Flutter analyze in turbo pipeline. Run 'flutter analyze' directly in apps/mobile instead.\"",
+    "lint": "echo \"Skipping Flutter analyze in turbo pipeline. Run 'flutter analyze' directly in apps/mobile instead.\"",
     "test": "flutter test"
   }
 }

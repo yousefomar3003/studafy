@@ -3092,6 +3092,10 @@
             "format": "uuid",
             "description": "Who approved."
           },
+          "rejected_reason": {
+            "type": ["string", "null"],
+            "description": "Rejection reason, set when rejected back to draft."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -3112,6 +3116,7 @@
           "submitted_by_user_id",
           "approved_at",
           "approved_by_user_id",
+          "rejected_reason",
           "created_at",
           "updated_at"
         ]
@@ -3147,6 +3152,17 @@
             "minLength": 1,
             "maxLength": 200,
             "description": "Human-readable name."
+          }
+        }
+      },
+      "RejectTimetableBody": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "Rejection reason explaining why the version is sent back to draft."
           }
         }
       },
@@ -18025,7 +18041,7 @@
         "tags": ["Timetable"],
         "operationId": "rejectTimetableVersion",
         "summary": "Reject a timetable version back to draft",
-        "description": "Sends a pending version back to draft status for revisions.",
+        "description": "Sends a pending version back to draft status with a rejection reason.",
         "security": [
           {
             "bearerAuth": []
@@ -18044,6 +18060,16 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectTimetableBody"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The rejected timetable version (now draft).",
@@ -18063,6 +18089,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TimetableVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was malformed or failed schema validation.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs.",
+                  "example": "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12"
+                },
+                "required": true,
+                "description": "Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs."
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }

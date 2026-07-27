@@ -43,6 +43,9 @@ export const DOMAIN_EVENTS = {
   CERTIFICATE_ISSUED: "certificate.issued",
   CERTIFICATE_REVOKED: "certificate.revoked",
 
+  TIMETABLE_APPROVED: "timetable.approved",
+  TIMETABLE_REJECTED: "timetable.rejected",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

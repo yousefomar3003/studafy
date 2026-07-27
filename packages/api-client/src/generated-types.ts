@@ -386,7 +386,7 @@ export interface paths {
         readonly put?: never;
         /**
          * Reject a timetable version back to draft
-         * @description Sends a pending version back to draft status for revisions.
+         * @description Sends a pending version back to draft status with a rejection reason.
          */
         readonly post: operations["rejectTimetableVersion"];
         readonly delete?: never;
@@ -2621,6 +2621,10 @@ export interface components {
                 readonly token: string;
             };
         };
+        readonly RejectTimetableBody: {
+            /** @description Rejection reason explaining why the version is sent back to draft. */
+            readonly reason?: string;
+        };
         readonly ResendVerification: {
             /**
              * Format: email
@@ -3087,6 +3091,8 @@ export interface components {
              * @example Term 1 Weekly Schedule
              */
             readonly name: string;
+            /** @description Rejection reason, set when rejected back to draft. */
+            readonly rejected_reason: string | null;
             /**
              * Format: uuid
              * @description Owning school tenant.
@@ -6010,7 +6016,11 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody?: never;
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RejectTimetableBody"];
+            };
+        };
         readonly responses: {
             /** @description The rejected timetable version (now draft). */
             readonly 200: {
@@ -6021,6 +6031,17 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["TimetableVersion"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Authentication is missing or invalid. */
