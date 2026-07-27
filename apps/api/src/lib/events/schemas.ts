@@ -124,6 +124,19 @@ export const eventPayloadSchemas = {
     studentId: uid,
   }),
 
+  // ── Timetable ───────────────────────────────────────────────────────
+  [DOMAIN_EVENTS.TIMETABLE_APPROVED]: z.object({
+    timetableVersionId: uid,
+    termId: uid,
+    approvedByUserId: uid,
+    slotCount: z.number().int(),
+  }),
+  [DOMAIN_EVENTS.TIMETABLE_REJECTED]: z.object({
+    timetableVersionId: uid,
+    termId: uid,
+    rejectedReason: z.string(),
+  }),
+
   // ── ERPNext (freeform — external system payloads) ─────────────────────
   [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: z.record(z.string(), z.unknown()),
   [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: z.record(z.string(), z.unknown()),

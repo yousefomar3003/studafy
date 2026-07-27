@@ -222,6 +222,17 @@ describe("emit", () => {
         [DOMAIN_EVENTS.STUDY_GROUP_JOINED]: { groupId: uid },
         [DOMAIN_EVENTS.CERTIFICATE_ISSUED]: { certificateId: uid, studentId: uid },
         [DOMAIN_EVENTS.CERTIFICATE_REVOKED]: { certificateId: uid, studentId: uid },
+        [DOMAIN_EVENTS.TIMETABLE_APPROVED]: {
+          timetableVersionId: uid,
+          termId: uid,
+          approvedByUserId: uid,
+          slotCount: 5,
+        },
+        [DOMAIN_EVENTS.TIMETABLE_REJECTED]: {
+          timetableVersionId: uid,
+          termId: uid,
+          rejectedReason: "Missing Monday periods",
+        },
         [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: { name: "INV-001" },
         [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: { name: "FEE-001" },
         [DOMAIN_EVENTS.ERPNEXT_PAYMENT_RECEIVED]: { name: "PAY-001" },

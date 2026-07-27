@@ -1,7 +1,8 @@
-import { ERROR_CODES } from "@studafy/constants";
+import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../coded-http-exception";
+import { emit } from "../../lib/events/emitter";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import type { TimetableVersionStatus } from "./schemas";
@@ -22,6 +23,7 @@ export interface TimetableVersionRow {
   submitted_by_user_id: string | null;
   approved_at: Date | null;
   approved_by_user_id: string | null;
+  rejected_reason: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -59,6 +61,10 @@ export interface CreateVersionParams {
 
 export interface UpdateVersionParams {
   name?: string;
+}
+
+export interface RejectVersionParams {
+  reason: string;
 }
 
 export interface CreateSlotParams {
@@ -266,6 +272,7 @@ async function getVersion(
     SELECT id, school_id, academic_year_id, term_id, name, status,
            submitted_at, submitted_by_user_id,
            approved_at, approved_by_user_id,
+           rejected_reason,
            created_at, updated_at
     FROM app.timetable_versions
     WHERE id = ${versionId} AND school_id = ${schoolId}
@@ -291,6 +298,7 @@ export async function listTimetableVersions(
       SELECT v.id, v.school_id, v.academic_year_id, v.term_id, v.name, v.status,
              v.submitted_at, v.submitted_by_user_id,
              v.approved_at, v.approved_by_user_id,
+             v.rejected_reason,
              v.created_at, v.updated_at
       FROM app.timetable_versions v
       WHERE v.school_id = ${schoolId}
@@ -340,6 +348,7 @@ export async function createTimetableVersion(
     RETURNING id, school_id, academic_year_id, term_id, name, status,
               submitted_at, submitted_by_user_id,
               approved_at, approved_by_user_id,
+              rejected_reason,
               created_at, updated_at
   `;
 
@@ -379,6 +388,7 @@ export async function updateTimetableVersion(
     RETURNING id, school_id, academic_year_id, term_id, name, status,
               submitted_at, submitted_by_user_id,
               approved_at, approved_by_user_id,
+              rejected_reason,
               created_at, updated_at
   `;
 
@@ -474,6 +484,7 @@ export async function submitTimetableVersion(
     RETURNING id, school_id, academic_year_id, term_id, name, status,
               submitted_at, submitted_by_user_id,
               approved_at, approved_by_user_id,
+              rejected_reason,
               created_at, updated_at
   `;
 
@@ -517,6 +528,7 @@ export async function approveTimetableVersion(
     RETURNING id, school_id, academic_year_id, term_id, name, status,
               submitted_at, submitted_by_user_id,
               approved_at, approved_by_user_id,
+              rejected_reason,
               created_at, updated_at
   `;
 
@@ -532,6 +544,19 @@ export async function approveTimetableVersion(
     newValues: { status: "approved" },
   });
 
+  const [{ count }] = await tx<{ count: string }[]>`
+    SELECT count(*)::int AS count
+    FROM app.timetable_slots
+    WHERE timetable_version_id = ${versionId} AND school_id = ${schoolId}
+  `;
+
+  await emit(tx, DOMAIN_EVENTS.TIMETABLE_APPROVED, {
+    timetableVersionId: versionId,
+    termId: row.term_id,
+    approvedByUserId: userId,
+    slotCount: Number(count),
+  });
+
   return row;
 }
 
@@ -539,6 +564,7 @@ export async function rejectTimetableVersion(
   tx: TransactionSql,
   schoolId: string,
   versionId: string,
+  params: RejectVersionParams,
 ): Promise<TimetableVersionRow> {
   const existing = await getVersion(tx, schoolId, versionId);
   if (!existing) {
@@ -554,11 +580,12 @@ export async function rejectTimetableVersion(
 
   const [row] = await tx<TimetableVersionRow[]>`
     UPDATE app.timetable_versions
-    SET status = 'draft'
+    SET status = 'draft', rejected_reason = ${params.reason}
     WHERE id = ${versionId} AND school_id = ${schoolId}
     RETURNING id, school_id, academic_year_id, term_id, name, status,
               submitted_at, submitted_by_user_id,
               approved_at, approved_by_user_id,
+              rejected_reason,
               created_at, updated_at
   `;
 
@@ -571,7 +598,13 @@ export async function rejectTimetableVersion(
     targetTable: "timetable_versions",
     targetId: versionId,
     oldValues: { status: existing.status },
-    newValues: { status: "draft" },
+    newValues: { status: "draft", rejected_reason: params.reason },
+  });
+
+  await emit(tx, DOMAIN_EVENTS.TIMETABLE_REJECTED, {
+    timetableVersionId: versionId,
+    termId: row.term_id,
+    rejectedReason: params.reason,
   });
 
   return row;

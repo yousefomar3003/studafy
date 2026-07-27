@@ -12,6 +12,7 @@ import {
   copyTimetableResponseSchema,
   createTimetableSlotBodySchema,
   createTimetableVersionBodySchema,
+  rejectTimetableBodySchema,
   slotIdParamSchema,
   timetableSlotListSchema,
   timetableSlotQuerySchema,
@@ -227,9 +228,15 @@ const rejectVersionRoute = createRoute({
   tags: ["Timetable"],
   operationId: "rejectTimetableVersion",
   summary: "Reject a timetable version back to draft",
-  description: "Sends a pending version back to draft status for revisions.",
+  description: "Sends a pending version back to draft status with a rejection reason.",
   security: [{ bearerAuth: [] }],
-  request: { params: versionIdParamSchema },
+  request: {
+    params: versionIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: rejectTimetableBodySchema } },
+    },
+  },
   responses: standardResponses(
     {
       200: {
@@ -237,7 +244,7 @@ const rejectVersionRoute = createRoute({
         schema: timetableVersionSchema,
       },
     },
-    [401, 403, 404, 409, 500],
+    [400, 401, 403, 404, 409, 500],
   ),
 });
 
@@ -506,9 +513,10 @@ export function timetableRoutes(database: Database): OpenAPIHono<AppEnv> {
   routes.openapi(rejectVersionRoute, async (c) => {
     const auth = requireAuth(c);
     const { versionId } = c.req.valid("param");
+    const body = c.req.valid("json");
 
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      rejectTimetableVersion(tx, auth.schoolId, versionId),
+      rejectTimetableVersion(tx, auth.schoolId, versionId, { reason: body.reason }),
     );
 
     return c.json(row, 200);

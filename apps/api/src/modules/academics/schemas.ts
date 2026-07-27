@@ -619,6 +619,10 @@ export const timetableVersionSchema = z
     submitted_by_user_id: uuidSchema.nullable().openapi({ description: "Who submitted." }),
     approved_at: dateTimeSchema.nullable().openapi({ description: "When approved." }),
     approved_by_user_id: uuidSchema.nullable().openapi({ description: "Who approved." }),
+    rejected_reason: z
+      .string()
+      .nullable()
+      .openapi({ description: "Rejection reason, set when rejected back to draft." }),
     created_at: dateTimeSchema,
     updated_at: dateTimeSchema,
   })
@@ -775,6 +779,20 @@ export const copyTimetableResponseSchema = z
       .openapi({ description: "Number of slots skipped (class not in target term)." }),
   })
   .openapi("CopyTimetableResponse");
+
+// ---------------------------------------------------------------------------
+// Timetable: Reject body
+// ---------------------------------------------------------------------------
+
+export const rejectTimetableBodySchema = z
+  .object({
+    reason: z.string().min(1).max(2000).openapi({
+      description: "Rejection reason explaining why the version is sent back to draft.",
+    }),
+  })
+  .openapi("RejectTimetableBody");
+
+export type RejectTimetableBody = z.infer<typeof rejectTimetableBodySchema>;
 
 // ---------------------------------------------------------------------------
 // Timetable: Conflict payload (extension of ProblemDetails for 409)

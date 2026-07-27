@@ -3,7 +3,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "build/**"]
+      "outputs": ["dist/**", "build/**"],
+      "env": ["LOCALAPPDATA"]
     },
     "check-types": {
       "dependsOn": ["^build"],
@@ -15,7 +16,8 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": [],
+      "env": ["LOCALAPPDATA"]
     }
   }
 }
