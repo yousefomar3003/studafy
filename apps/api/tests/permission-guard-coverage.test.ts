@@ -121,6 +121,16 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/timetable-versions/{versionId}/slots",
   "PATCH /api/academics/slots/{slotId}",
   "DELETE /api/academics/slots/{slotId}",
+  // Assignments (ST-103). Guarded per method by requirePermission() on ASSIGNMENT_CREATE,
+  // ASSIGNMENT_UPDATE, and ASSIGNMENT_DELETE — see permissionByMethod() in the route file. These
+  // are genuinely row-level: a teacher may only act on classes they teach, so unlike the rest of
+  // academics they are NOT exempt below.
+  "POST /api/academics/assignments",
+  "PATCH /api/academics/assignments/{assignmentId}",
+  "DELETE /api/academics/assignments/{assignmentId}",
+  "POST /api/academics/assignments/{assignmentId}/attachments/upload-url",
+  "POST /api/academics/assignments/{assignmentId}/attachments",
+  "DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
 ];
 
 /**

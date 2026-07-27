@@ -20,6 +20,7 @@ describe("loadEnv", () => {
       JWT_ACCESS_TTL_SECONDS: 900,
       JWT_REFRESH_TTL_SECONDS: 2592000,
       JWT_KEY_ROTATION_INTERVAL_MS: 7 * 24 * 60 * 60 * 1000,
+      S3_PRESIGN_TTL_SECONDS: 900,
     });
   });
 
@@ -51,6 +52,7 @@ describe("loadEnv", () => {
       JWT_ACCESS_TTL_SECONDS: 900,
       JWT_REFRESH_TTL_SECONDS: 2592000,
       JWT_KEY_ROTATION_INTERVAL_MS: 7 * 24 * 60 * 60 * 1000,
+      S3_PRESIGN_TTL_SECONDS: 900,
     });
   });
 

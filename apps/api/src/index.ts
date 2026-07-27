@@ -2,6 +2,7 @@ import { createApp } from "./app";
 import { checkDatabase, closeDatabase, createDatabase } from "./database";
 import { loadEnv } from "./env";
 import { createSecurityEventSink } from "./lib/security/securityEventSink";
+import { createStorageService } from "./lib/storage";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
 import { KeyStore } from "./modules/auth";
@@ -30,6 +31,11 @@ const redis = env.REDIS_URL ? createRedisClient({ url: env.REDIS_URL, logger }) 
 // configured, so nothing downstream has to branch on that.
 const securityEventSink = createSecurityEventSink({ database, logger });
 
+// Object storage for assignment attachments. Null when the S3_* variables are absent, which is the
+// normal state in development — the attachment endpoints then answer 503 rather than the process
+// refusing to start over a feature the developer may not be touching.
+const storage = createStorageService(env);
+
 const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
   logger.info({ kid }, "jwt key rotated");
 });
@@ -47,6 +53,7 @@ const app = createApp({
   jwtAccessTtlSeconds: env.JWT_ACCESS_TTL_SECONDS,
   jwtRefreshTtlSeconds: env.JWT_REFRESH_TTL_SECONDS,
   securityEventSink,
+  storage,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",

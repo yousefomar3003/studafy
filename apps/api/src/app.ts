@@ -28,6 +28,7 @@ import {
   enrollmentRoutes,
   timetableRoutes,
 } from "./modules/academics";
+import { assignmentRoutes } from "./modules/academics/assignments";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -54,6 +55,7 @@ import { openApiValidationHook } from "./openapi/hook";
 
 import type { Database } from "./db";
 import type { SecurityEventSink } from "./lib/security/securityEventSink";
+import type { StorageService } from "./lib/storage";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
@@ -116,6 +118,15 @@ export interface AppOptions {
     idToken: string,
     nonce: string,
   ) => Promise<{ subject: string; email: string }>;
+  /**
+   * S3-compatible object storage for assignment attachments (ST-103).
+   *
+   * Nullable and defaulted to null, like `redis`: dev, test, and the OpenAPI generator all run
+   * without a bucket. Routes that need it still register — so the published contract does not
+   * depend on a deployment's environment — and answer 503 at request time. See
+   * modules/academics/assignments/routes/assignment-routes.ts.
+   */
+  storage?: StorageService | null;
 }
 
 /**
@@ -141,6 +152,7 @@ export function createApp({
   securityEventSink,
   docsEnabled = false,
   microsoftIdentityVerifier,
+  storage = null,
 }: AppOptions): OpenAPIHono<AppEnv> {
   const eventSink = securityEventSink ?? createNoopSecurityEventSink();
   // The defaultHook makes request-validation failures throw into errorHandlerMiddleware instead of
@@ -467,6 +479,14 @@ export function createApp({
   // detection, approval workflow, and copy-from-previous-term.
   if (database) {
     app.route("/", timetableRoutes(database));
+  }
+
+  // Assignments (ST-103). Teacher CRUD scoped to the classes they teach, a student view scoped to
+  // active enrolments, and file attachments served as short-lived pre-signed URLs. Gated on
+  // ASSIGNMENT_* permissions per method; `storage` may be null, in which case the attachment
+  // endpoints answer 503 and download URLs come back null.
+  if (database) {
+    app.route("/", assignmentRoutes(database, storage));
   }
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.
