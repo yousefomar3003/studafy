@@ -137,6 +137,22 @@ export const eventPayloadSchemas = {
     rejectedReason: z.string(),
   }),
 
+  // ── Exam ───────────────────────────────────────────────────────────
+  [DOMAIN_EVENTS.EXAM_SCHEDULED]: z.object({
+    examId: uid,
+    classId: uid,
+    scheduledByUserId: uid,
+  }),
+  [DOMAIN_EVENTS.EXAM_UPDATED]: z.object({
+    examId: uid,
+    classId: uid,
+    updatedByUserId: uid,
+  }),
+  [DOMAIN_EVENTS.EXAM_CANCELLED]: z.object({
+    examId: uid,
+    classId: uid,
+  }),
+
   // ── ERPNext (freeform — external system payloads) ─────────────────────
   [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: z.record(z.string(), z.unknown()),
   [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: z.record(z.string(), z.unknown()),

@@ -43,6 +43,10 @@ export const DOMAIN_EVENTS = {
   CERTIFICATE_ISSUED: "certificate.issued",
   CERTIFICATE_REVOKED: "certificate.revoked",
 
+  EXAM_SCHEDULED: "exam.scheduled",
+  EXAM_UPDATED: "exam.updated",
+  EXAM_CANCELLED: "exam.cancelled",
+
   TIMETABLE_APPROVED: "timetable.approved",
   TIMETABLE_REJECTED: "timetable.rejected",
 

@@ -68,5 +68,7 @@
   "ASSIGNMENT_INVALID_STATUS_TRANSITION": "لا يمكن إعادة الواجب إلى مسودة بعد نشره",
   "STORAGE_KEY_FORBIDDEN": "هذا الملف لا يخص مدرستك",
   "STORAGE_OBJECT_NOT_FOUND": "تعذّر العثور على الملف المرفوع. يرجى رفعه مرة أخرى.",
-  "STORAGE_NOT_CONFIGURED": "خدمة تخزين الملفات غير متاحة. يرجى المحاولة لاحقاً."
+  "STORAGE_NOT_CONFIGURED": "خدمة تخزين الملفات غير متاحة. يرجى المحاولة لاحقاً.",
+  "EXAM_NOT_FOUND": "لم يتم العثور على الامتحان",
+  "EXAM_INVALID_STATE": "الامتحان ليس في حالة صالحة لهذه العملية"
 }

@@ -233,6 +233,20 @@ describe("emit", () => {
           termId: uid,
           rejectedReason: "Missing Monday periods",
         },
+        [DOMAIN_EVENTS.EXAM_SCHEDULED]: {
+          examId: uid,
+          classId: uid,
+          scheduledByUserId: uid,
+        },
+        [DOMAIN_EVENTS.EXAM_UPDATED]: {
+          examId: uid,
+          classId: uid,
+          updatedByUserId: uid,
+        },
+        [DOMAIN_EVENTS.EXAM_CANCELLED]: {
+          examId: uid,
+          classId: uid,
+        },
         [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: { name: "INV-001" },
         [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: { name: "FEE-001" },
         [DOMAIN_EVENTS.ERPNEXT_PAYMENT_RECEIVED]: { name: "PAY-001" },
