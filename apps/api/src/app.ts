@@ -27,6 +27,7 @@ import {
   classRoutes,
   enrollmentRoutes,
   timetableRoutes,
+  examRoutes,
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import {
@@ -487,6 +488,12 @@ export function createApp({
   // endpoints answer 503 and download URLs come back null.
   if (database) {
     app.route("/", assignmentRoutes(database, storage));
+  }
+
+  // Exam scheduling: CRUD with timetable conflict warnings, gradebook weight linkage,
+  // and student/parent visibility via RLS.
+  if (database) {
+    app.route("/", examRoutes(database));
   }
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.

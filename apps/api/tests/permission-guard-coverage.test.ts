@@ -131,6 +131,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/assignments/{assignmentId}/attachments/upload-url",
   "POST /api/academics/assignments/{assignmentId}/attachments",
   "DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  // Exam scheduling (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission to check.
+  "POST /api/academics/exams",
+  "PATCH /api/academics/exams/{examId}",
+  "DELETE /api/academics/exams/{examId}",
 ];
 
 /**
@@ -214,6 +219,11 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/timetable-versions/{versionId}/slots",
   "PATCH /api/academics/slots/{slotId}",
   "DELETE /api/academics/slots/{slotId}",
+  // Exam scheduling (ST-102) — tenant-scoped school-level catalog data protected by
+  // requireAuth; no cross-user row-level permission to check.
+  "POST /api/academics/exams",
+  "PATCH /api/academics/exams/{examId}",
+  "DELETE /api/academics/exams/{examId}",
 ]);
 
 // ---------------------------------------------------------------------------

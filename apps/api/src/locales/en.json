@@ -68,5 +68,7 @@
   "ASSIGNMENT_INVALID_STATUS_TRANSITION": "An assignment cannot return to draft once it has been published",
   "STORAGE_KEY_FORBIDDEN": "This file does not belong to your school",
   "STORAGE_OBJECT_NOT_FOUND": "The uploaded file could not be found. Please upload it again.",
-  "STORAGE_NOT_CONFIGURED": "File storage is unavailable. Please try again later."
+  "STORAGE_NOT_CONFIGURED": "File storage is unavailable. Please try again later.",
+  "EXAM_NOT_FOUND": "Exam not found",
+  "EXAM_INVALID_STATE": "Exam is not in a valid state for this operation"
 }

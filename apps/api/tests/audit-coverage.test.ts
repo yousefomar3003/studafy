@@ -155,6 +155,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/assignments/{assignmentId}/attachments/upload-url",
   "POST /api/academics/assignments/{assignmentId}/attachments",
   "DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  // Exam scheduling (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission. Audit rows written by auditAction middleware.
+  "POST /api/academics/exams",
+  "PATCH /api/academics/exams/{examId}",
+  "DELETE /api/academics/exams/{examId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {

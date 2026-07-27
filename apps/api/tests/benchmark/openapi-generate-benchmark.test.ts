@@ -118,6 +118,8 @@ const EXPECTED_PATHS = [
   "/api/academics/timetable-versions/{versionId}/slots",
   "/api/academics/timetable-versions/{versionId}/submit",
   "/api/academics/timetable-versions/copy",
+  "/api/academics/exams",
+  "/api/academics/exams/{examId}",
   "/api/users",
   "/api/users/{userId}",
   "/api/users/{userId}/role",

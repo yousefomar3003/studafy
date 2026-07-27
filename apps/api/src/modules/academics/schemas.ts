@@ -841,3 +841,163 @@ export const slotIdParamSchema = z
       }),
   })
   .openapi("SlotIdParam");
+
+// ---------------------------------------------------------------------------
+// Exams
+// ---------------------------------------------------------------------------
+
+export const examStatusSchema = z
+  .enum(["draft", "scheduled", "open", "closed", "cancelled", "archived"])
+  .openapi({ description: "Lifecycle state of an exam." });
+
+export type ExamStatus = z.infer<typeof examStatusSchema>;
+
+export const examSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    class_id: uuidSchema.openapi({ description: "Parent class." }),
+    created_by_user_id: uuidSchema.openapi({ description: "User who created the exam." }),
+    last_edited_by_user_id: uuidSchema.openapi({ description: "User who last edited the exam." }),
+    title: z.string().openapi({ description: "Exam title.", example: "Midterm Mathematics" }),
+    description: z
+      .string()
+      .nullable()
+      .openapi({ description: "Optional description.", example: "Covers chapters 1-5" }),
+    status: examStatusSchema,
+    starts_at: dateTimeSchema.openapi({ description: "Exam start timestamp." }),
+    ends_at: dateTimeSchema.openapi({ description: "Exam end timestamp." }),
+    max_score: z.number().openapi({ description: "Maximum possible score.", example: 100 }),
+    room_id: uuidSchema
+      .nullable()
+      .openapi({ description: "Assigned room, or null if unassigned." }),
+    weight: z.number().openapi({ description: "Weight in gradebook calculation.", example: 1 }),
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("Exam");
+
+export type Exam = z.infer<typeof examSchema>;
+
+export const createExamBodySchema = z
+  .object({
+    class_id: uuidSchema.openapi({ description: "Parent class." }),
+    title: z
+      .string()
+      .min(1)
+      .max(200)
+      .openapi({ description: "Exam title.", example: "Midterm Mathematics" }),
+    description: z
+      .string()
+      .max(2000)
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional description." }),
+    starts_at: z.string().datetime().openapi({ description: "Exam start (ISO 8601)." }),
+    ends_at: z
+      .string()
+      .datetime()
+      .openapi({ description: "Exam end (ISO 8601). Must be after starts_at." }),
+    max_score: z
+      .number()
+      .positive()
+      .openapi({ description: "Maximum possible score.", example: 100 }),
+    room_id: uuidSchema
+      .nullable()
+      .optional()
+      .openapi({ description: "Assigned room, or null to leave unassigned." }),
+    weight: z
+      .number()
+      .positive()
+      .default(1)
+      .openapi({ description: "Weight in gradebook calculation.", example: 1 }),
+    status: examStatusSchema.default("draft"),
+  })
+  .openapi("CreateExamBody");
+
+export type CreateExamBody = z.infer<typeof createExamBodySchema>;
+
+export const updateExamBodySchema = z
+  .object({
+    title: z.string().min(1).max(200).optional().openapi({ description: "Exam title." }),
+    description: z
+      .string()
+      .max(2000)
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional description." }),
+    starts_at: z.string().datetime().optional().openapi({ description: "Exam start (ISO 8601)." }),
+    ends_at: z.string().datetime().optional().openapi({ description: "Exam end (ISO 8601)." }),
+    max_score: z.number().positive().optional().openapi({ description: "Maximum possible score." }),
+    room_id: uuidSchema
+      .nullable()
+      .optional()
+      .openapi({ description: "Assigned room, or null to clear." }),
+    weight: z.number().positive().optional().openapi({ description: "Gradebook weight." }),
+    status: examStatusSchema.optional(),
+  })
+  .openapi("UpdateExamBody");
+
+export type UpdateExamBody = z.infer<typeof updateExamBodySchema>;
+
+export const examListSchema = z
+  .object({
+    exams: z.array(examSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("ExamList");
+
+export const examQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    class_id: uuidSchema.openapi({ description: "Filter by class." }),
+    status: examStatusSchema.optional(),
+  })
+  .openapi("ExamQuery");
+
+// ---------------------------------------------------------------------------
+// Exam: conflict warnings (timetable overlap)
+// ---------------------------------------------------------------------------
+
+export const examConflictWarningSchema = z
+  .object({
+    conflict_type: z
+      .enum(["class_slot", "room"])
+      .openapi({ description: "What resource overlaps the exam schedule." }),
+    timetable_slot_id: uuidSchema.openapi({ description: "Conflicting timetable slot ID." }),
+    class_code: z
+      .string()
+      .openapi({ description: "Class code of the conflicting timetable slot." }),
+    entity_id: uuidSchema.openapi({ description: "Class or room ID involved." }),
+    entity_name: z.string().openapi({ description: "Display name of the conflicting entity." }),
+    weekday: z.number().int().min(1).max(7).openapi({ description: "Day of week (1=Mon, 7=Sun)." }),
+  })
+  .openapi("ExamConflictWarning");
+
+// ---------------------------------------------------------------------------
+// Exam: composite response (exam + warnings)
+// ---------------------------------------------------------------------------
+
+export const examWithWarningsSchema = z
+  .object({
+    exam: examSchema,
+    warnings: z.array(examConflictWarningSchema),
+  })
+  .openapi("ExamWithWarnings");
+
+// ---------------------------------------------------------------------------
+// Path params (exams)
+// ---------------------------------------------------------------------------
+
+export const examIdParamSchema = z
+  .object({
+    examId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "examId", in: "path" },
+        description: "Exam UUID.",
+      }),
+  })
+  .openapi("ExamIdParam");
