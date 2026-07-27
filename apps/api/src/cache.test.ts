@@ -26,7 +26,7 @@ const silentLogger = {
 async function createTestClient() {
   try {
     const client = createRedisClient({
-      url: "redis://localhost:6379/0",
+      url: "redis://localhost:6390/0",
       logger: silentLogger,
     });
     await client.connect();
@@ -46,7 +46,7 @@ const TEST_PREFIX = `test:sch:${Date.now()}`;
 describe("createRedisClient", () => {
   test("does not connect eagerly", () => {
     const client = createRedisClient({
-      url: "redis://localhost:6379/0",
+      url: "redis://localhost:6390/0",
       logger: silentLogger,
     });
     try {
@@ -59,7 +59,7 @@ describe("createRedisClient", () => {
 
   test("enables ready check for post-reconnect validation", () => {
     const client = createRedisClient({
-      url: "redis://localhost:6379/0",
+      url: "redis://localhost:6390/0",
       logger: silentLogger,
     });
     try {
@@ -71,7 +71,7 @@ describe("createRedisClient", () => {
 
   test("configures exponential backoff retry strategy", () => {
     const client = createRedisClient({
-      url: "redis://localhost:6379/0",
+      url: "redis://localhost:6390/0",
       logger: silentLogger,
     });
     try {

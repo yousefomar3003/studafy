@@ -31,7 +31,7 @@ const silentLogger = {
 async function createTestClient(): Promise<RedisClient | null> {
   try {
     const client = createRedisClient({
-      url: "redis://localhost:6379/0",
+      url: "redis://localhost:6390/0",
       logger: silentLogger,
     });
     await client.connect();
