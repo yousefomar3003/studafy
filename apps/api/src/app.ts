@@ -28,6 +28,7 @@ import {
   enrollmentRoutes,
   timetableRoutes,
   examRoutes,
+  materialRoutes,
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
@@ -518,6 +519,9 @@ export function createApp({
 
   // Attendance sessions (ST-107). Idempotent session management per class period with
   // batch record-keeping. Gated on ATTENDANCE_RECORD_CREATE permission.
+  if (database) {
+    app.route("/", attendanceSessionRoutes(database));
+  }
 
   // Discipline incidents and actions: teacher reporting, principal management (actions,
   // resolution, severity), and parent visibility of own child's resolved incidents per
@@ -529,7 +533,7 @@ export function createApp({
   // Learning materials: CRUD, pre-signed upload flow, AI visibility toggle.
   // Storage client is optional — upload endpoints return 503 when unconfigured.
   if (database) {
-    app.route("/", attendanceSessionRoutes(database));
+    app.route("/", materialRoutes(database));
   }
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.
