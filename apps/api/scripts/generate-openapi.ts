@@ -6,18 +6,14 @@ import { buildOpenApiDocument } from "../src/openapi/document";
 /**
  * Regenerates apps/api/openapi.json from the routes createApp actually mounts (ST-060).
  *
- * Run via `bun run openapi:generate`. Do not hand-edit the output: CI regenerates it and fails the
- * build if the working tree comes back dirty, so a manual edit is reverted and reported as drift.
+ * Run via `bun run openapi:generate`. The output is gitignored (see root .gitignore) to eliminate
+ * merge conflicts between branches. CI regenerates it at build time to ensure the toolchain works
+ * and feeds it to downstream steps (client codegen, oasdiff).
  *
- * The document is committed rather than built only in CI so that a contract change appears in the
- * pull-request diff and gets reviewed like any other code, and so oasdiff has a base revision to
- * classify breaking changes against.
- *
- * JSON only. Scalar, oasdiff, and `git diff` all read JSON natively, and a second serialization
- * would be a second artifact to keep from drifting.
+ * JSON only. Scalar, oasdiff, and `git diff` all read JSON natively.
  *
  * OPENAPI_OUT overrides the destination. The generation benchmark uses it to time this script
- * honestly without clobbering the committed artifact.
+ * honestly without clobbering the regular output.
  */
 async function main(): Promise<void> {
   const outPath = process.env.OPENAPI_OUT ?? path.join(import.meta.dirname, "..", "openapi.json");

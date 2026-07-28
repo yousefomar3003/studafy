@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -6,15 +6,13 @@ import path from "node:path";
 import { describe, expect, test } from "bun:test";
 
 /**
- * Proves the CI drift gate does its job: a manual edit to the generated types is flagged, the change
- * vector is logged, and the runner exits 1. The simulation points the drift script's comparison
- * target at a deliberately-corrupted copy via CLIENT_TYPES_COMPARE, so the committed file and the git
- * tree are never touched.
+ * Proves the generated-types validation does its job: it passes when the file exists and is non-empty,
+ * and exits 1 when the file is missing. The generated file is gitignored (see root .gitignore), so the
+ * validation script is a simple existence + size check rather than a content-level drift comparison.
  */
 
 const PACKAGE_ROOT = path.join(import.meta.dir, "..");
 const CHECK_DRIFT = path.join(PACKAGE_ROOT, "scripts", "check-drift.ts");
-const COMMITTED_TYPES = path.join(PACKAGE_ROOT, "src", "generated-types.ts");
 
 async function runCheckDrift(env: Record<string, string> = {}): Promise<{
   exitCode: number;
@@ -35,37 +33,24 @@ async function runCheckDrift(env: Record<string, string> = {}): Promise<{
   };
 }
 
-describe("client type drift detection", () => {
-  test("passes when the committed types match the spec", async () => {
+describe("client type validation", () => {
+  test("passes when the generated types file exists and is non-empty", async () => {
     const { exitCode, stdout, stderr } = await runCheckDrift();
-    // Surface the change vector if this ever fails, so CI shows what diverged (e.g. an OS-specific
-    // codegen difference) instead of only "expected 0, got 1".
     if (exitCode !== 0) {
       console.error(stderr);
     }
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("in sync");
+    expect(stdout).toContain("generated at");
   }, 30_000);
 
-  test("flags a hand-edited field type, logs the change vector, and exits 1", async () => {
-    const scratch = await mkdtemp(path.join(tmpdir(), "studafy-drift-sim-"));
-    const corrupted = path.join(scratch, "generated-types.ts");
+  test("fails when the generated types file is missing and exits 1", async () => {
+    const scratch = await mkdtemp(path.join(tmpdir(), "studafy-validate-sim-"));
+    const missing = path.join(scratch, "nonexistent.ts");
     try {
-      // Start from the real generated file and edit a single field type by hand — the exact kind of
-      // manual modification the drift guard exists to catch.
-      const original = await readFile(COMMITTED_TYPES, "utf8");
-      const edited = original.replace('readonly status: "ok"', "readonly status: number");
-      expect(edited).not.toBe(original); // guard: the field we corrupt must actually exist
-
-      await writeFile(corrupted, edited);
-
-      const { exitCode, stderr } = await runCheckDrift({ CLIENT_TYPES_COMPARE: corrupted });
+      const { exitCode, stderr } = await runCheckDrift({ CLIENT_TYPES_COMPARE: missing });
 
       expect(exitCode).toBe(1);
-      expect(stderr).toContain("type drift");
-      // The logged change vector is a real unified diff naming the corrupted field.
-      expect(stderr).toContain('readonly status: "ok"');
-      expect(stderr).toContain("readonly status: number");
+      expect(stderr).toContain("not found");
     } finally {
       await rm(scratch, { recursive: true, force: true });
     }

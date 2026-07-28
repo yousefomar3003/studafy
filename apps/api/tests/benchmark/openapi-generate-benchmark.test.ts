@@ -172,8 +172,7 @@ function report(label: string, samples: number[]): number {
 /**
  * Run the real script exactly as `bun run openapi:generate` does, writing to a scratch path.
  *
- * OPENAPI_OUT is why the committed artifact is never touched: a benchmark that rewrote the file it
- * measures would dirty the working tree on every run and trip the CI drift gate it exists beside.
+ * OPENAPI_OUT keeps the benchmark from overwriting the regular output path.
  */
 async function generate(outPath: string): Promise<number> {
   const startedAt = performance.now();

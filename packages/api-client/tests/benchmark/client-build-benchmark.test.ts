@@ -54,8 +54,7 @@ function report(label: string, samples: number[]): number {
 
 /**
  * Runs the full acceptance pipeline as one `bun run` spawn — codegen → TypeScript verification →
- * bundle export — writing only into `scratch`, so the committed artifact and the git tree are never
- * disturbed.
+ * bundle export — writing only into `scratch`, so the git tree is never disturbed.
  */
 async function runPipelineSpawn(scratch: string): Promise<number> {
   const startedAt = performance.now();

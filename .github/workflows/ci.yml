@@ -183,49 +183,17 @@ jobs:
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run format:check
       - run: bunx turbo run lint check-types test build --filter=!@studafy/mobile
-      # The OpenAPI document is committed so a contract change appears in the pull-request diff and
-      # gets reviewed like code. Regenerating here and failing on a dirty tree is what makes the
-      # committed file trustworthy: it cannot drift from the routes without this step going red.
-      # Runs after the turbo step because the generator imports @studafy/shared-schemas from its
-      # built dist/.
-      - name: Regenerate the OpenAPI document and fail on drift
-        run: |
-          bun run openapi:generate
-          if ! git diff --quiet -- apps/api/openapi.json; then
-            {
-              echo '## OpenAPI drift'
-              echo
-              echo 'apps/api/openapi.json does not match the routes it is generated from.'
-              echo 'Run `bun run openapi:generate` and commit the result.'
-              echo
-              echo '```diff'
-              git --no-pager diff -- apps/api/openapi.json
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-      # The generated TypeScript client (@studafy/api-client) is committed for the same reason the
-      # OpenAPI document is: a contract change lands in the pull-request diff and is reviewed like
-      # code. Regenerating here and failing on a dirty tree is what keeps the committed client honest
-      # -- it cannot drift from the spec, and no hand-edit to the generated types can survive. Runs
-      # after the OpenAPI drift step above, which refreshes apps/api/openapi.json on disk -- the file
-      # the client is generated from.
-      - name: Regenerate the API client and fail on drift
-        run: |
-          bun run client:generate
-          if ! git diff --quiet -- packages/api-client/src/generated-types.ts; then
-            {
-              echo '## API client drift'
-              echo
-              echo 'packages/api-client/src/generated-types.ts does not match apps/api/openapi.json.'
-              echo 'Run `bun run client:generate` and commit the result.'
-              echo
-              echo '```diff'
-              git --no-pager diff -- packages/api-client/src/generated-types.ts
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
+      # Regenerate the OpenAPI document from the live Hono routes. The generated file is gitignored
+      # (see .gitignore) so it never causes merge conflicts; CI regenerates it to ensure the
+      # generation toolchain works and that the artifact is available for downstream steps (client
+      # codegen, oasdiff).
+      - name: Regenerate the OpenAPI document
+        run: bun run openapi:generate
+      # Regenerate the TypeScript API client types from the OpenAPI document. Same rationale as the
+      # OpenAPI document above: gitignored to eliminate merge conflicts, regenerated in CI for
+      # validation and downstream use.
+      - name: Regenerate the API client
+        run: bun run client:generate
       - name: Regenerate the permission matrix and fail on drift
         run: |
           bun run --cwd packages/constants docs:generate

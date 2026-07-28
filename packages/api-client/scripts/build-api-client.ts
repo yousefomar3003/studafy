@@ -13,15 +13,12 @@ import {
 /**
  * Regenerates packages/api-client/src/generated-types.ts from apps/api/openapi.json (ST-060).
  *
- * Run via `bun run --cwd packages/api-client generate` (or root `bun run client:generate`). Do not
- * hand-edit the output: CI regenerates it and fails the build if the working tree comes back dirty,
- * so a manual edit is reverted and reported as drift.
+ * Run via `bun run --cwd packages/api-client generate` (or root `bun run client:generate`). The
+ * output is gitignored (see root .gitignore) to eliminate merge conflicts between branches. CI
+ * regenerates it at build time to keep it in sync with the spec.
  *
- * The types are committed rather than built only in CI so that a contract change appears in the
- * pull-request diff and gets reviewed like any other code.
- *
- * CLIENT_TYPES_OUT overrides the destination. The build benchmark and the drift-simulation test use
- * it to time/compare this script honestly without clobbering the committed artifact.
+ * CLIENT_TYPES_OUT overrides the destination. The build benchmark uses it to time this script
+ * honestly without clobbering the regular output.
  */
 export async function generateClientTypes(outPath: string): Promise<string> {
   // Parse the committed document and hand openapi-typescript the object directly, rather than a URL
@@ -57,7 +54,7 @@ async function main(): Promise<void> {
 }
 
 // Only write when run directly (`bun run scripts/build-api-client.ts`). Importing this module for its
-// `generateClientTypes` export — as check-drift.ts does — must not overwrite the committed artifact.
+// `generateClientTypes` export — as check-drift.ts does — must not overwrite the file.
 if (import.meta.main) {
   await main();
 }

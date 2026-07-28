@@ -1,24 +1,16 @@
 #!/usr/bin/env bash
-# Mirrors the drift checks in the CI "quality" job (.github/workflows/ci.yml) so a dirty
-# generated file is caught locally instead of in a red CI run. Regenerates each committed
-# artifact and fails if it no longer matches what's on disk.
+# Regenerates all codegen artifacts locally so a dirty generated file is caught before CI.
+# Generated files are gitignored (no merge conflicts), so this validates that generation
+# succeeds rather than comparing against a tracked file.
 set -uo pipefail
 
 fail=0
 
 echo "==> OpenAPI document"
-bun run openapi:generate
-if ! git diff --quiet -- apps/api/openapi.json; then
-  echo "apps/api/openapi.json does not match the routes it is generated from." >&2
-  echo "Run 'bun run openapi:generate' and commit the result." >&2
-  git --no-pager diff -- apps/api/openapi.json
-  fail=1
-fi
+bun run openapi:generate || fail=1
 
 echo "==> API client"
-if ! bun run client:check-drift; then
-  fail=1
-fi
+bun run client:generate || fail=1
 
 echo "==> Permission matrix"
 bun run --cwd packages/constants docs:generate
