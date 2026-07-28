@@ -24,6 +24,9 @@ CREATE TABLE app.grading_schemes (
   created_at         timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at         timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
+  CONSTRAINT uq_grading_schemes_id_school
+    UNIQUE (id, school_id),
+
   CONSTRAINT uq_grading_schemes_term_version
     UNIQUE (school_id, term_id, version),
 
@@ -64,13 +67,18 @@ GRANT SELECT, INSERT ON TABLE app.grading_schemes TO studafy_app;
 SELECT app.apply_tenant_isolation('app', 'grading_schemes');
 
 -- 2. Link gradebooks to a specific grading scheme version
+--    NOT VALID is used because gradebooks has FORCE ROW LEVEL SECURITY
+--    and studafy_admin has NOBYPASSRLS, so the validation scan would fail.
+--    Since gradebooks is empty (new deployment), the constraint is trivially satisfied.
 
 ALTER TABLE app.gradebooks
-  ADD COLUMN grading_scheme_id uuid,
+  ADD COLUMN grading_scheme_id uuid;
+
+ALTER TABLE app.gradebooks
   ADD CONSTRAINT fk_gradebooks_grading_scheme
     FOREIGN KEY (grading_scheme_id, school_id)
     REFERENCES app.grading_schemes (id, school_id)
-    ON UPDATE RESTRICT ON DELETE SET NULL;
+    ON UPDATE RESTRICT ON DELETE SET NULL NOT VALID;
 
 CREATE INDEX idx_gradebooks_school_grading_scheme_id
   ON app.gradebooks (school_id, grading_scheme_id)
