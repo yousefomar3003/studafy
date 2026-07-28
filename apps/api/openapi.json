@@ -73,12 +73,20 @@
       "description": "Timetable version and slot management. Authenticated and tenant-scoped. Includes version lifecycle (draft → pending → approved), slot CRUD with teacher/room conflict detection, and copy-from-previous-term."
     },
     {
+      "name": "Attendance",
+      "description": "Attendance session management. Authenticated and tenant-scoped. Open sessions for class periods, list history, retrieve details, and transition through the draft → open → submitted → locked lifecycle."
+    },
+    {
       "name": "Assignments",
       "description": "Class-scoped coursework. Authenticated and tenant-scoped, then scoped again within the tenant: teachers manage assignments only for classes they teach, and students read only published work for classes they are actively enrolled in. File attachments are served as short-lived pre-signed URLs — a raw storage key never appears in a payload."
     },
     {
       "name": "Submissions",
       "description": "Student hand-ins and teacher grading. Authenticated and tenant-scoped, then scoped again within the tenant: a student sees only their own submission, a linked parent only their child's, and a teacher every submission for a class they teach. Score, feedback and grader identity are withheld from students and parents until the grade is published — the submission stays visible, the marks do not."
+    },
+    {
+      "name": "Gradebook Configuration",
+      "description": "Gradebook configuration endpoints. Authenticated and tenant-scoped. Manages assessment categories with weighted scoring and versioned grading schemes."
     }
   ],
   "components": {
@@ -305,6 +313,13 @@
               "STORAGE_KEY_FORBIDDEN",
               "STORAGE_OBJECT_NOT_FOUND",
               "STORAGE_NOT_CONFIGURED",
+              "MATERIAL_NOT_FOUND",
+              "MATERIAL_STORAGE_CONFIRM_FAILED",
+              "MATERIAL_INGEST_IN_PROGRESS",
+              "ATTENDANCE_SESSION_NOT_FOUND",
+              "ATTENDANCE_SESSION_DUPLICATE",
+              "ATTENDANCE_NO_TIMETABLE_SLOT",
+              "ATTENDANCE_INVALID_STATUS_TRANSITION",
               "INVALID_GRADEBOOK_WEIGHT_TOTAL",
               "GRADEBOOK_NOT_FOUND",
               "GRADING_SCHEME_NOT_FOUND",
