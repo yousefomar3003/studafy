@@ -93,5 +93,11 @@
   "GRADEBOOK_NOT_FOUND": "Gradebook not found",
   "GRADING_SCHEME_NOT_FOUND": "Grading scheme not found",
   "GRADING_SCHEME_IMMUTABLE": "Cannot modify a versioned grading scheme",
-  "ASSESSMENT_CATEGORY_NOT_FOUND": "Assessment category not found"
+  "ASSESSMENT_CATEGORY_NOT_FOUND": "Assessment category not found",
+  "DISCIPLINE_INCIDENT_NOT_FOUND": "Discipline incident not found",
+  "DISCIPLINE_INCIDENT_INVALID_STATUS_TRANSITION": "This status transition is not allowed for a discipline incident",
+  "DISCIPLINE_INCIDENT_CANNOT_RESOLVE": "You are not permitted to resolve discipline incidents",
+  "DISCIPLINE_INCIDENT_PARENT_VISIBILITY_DISABLED": "Parent visibility of discipline incidents is disabled for this school",
+  "DISCIPLINE_ACTION_NOT_FOUND": "Discipline action not found",
+  "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION": "This status transition is not allowed for a discipline action"
 }

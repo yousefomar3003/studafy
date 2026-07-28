@@ -88,6 +88,9 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   // "/api/auth/login": "auth",
   // "/api/auth/register": "auth",
   // "/api/auth/forgot-password": "auth",
+  // Discipline — authenticated CRUD
+  "/api/discipline/incidents": "default",
+  "/api/discipline/incidents/*": "default",
   // AI (metered, tenant+user scoped)
   // "/api/ai/*": "ai",
 };

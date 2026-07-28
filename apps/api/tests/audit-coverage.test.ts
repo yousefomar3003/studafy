@@ -192,6 +192,13 @@ const EXPECTED_MUTATING_ROUTES = [
   // Attendance sessions (ST-107). Idempotent session management per class period.
   "POST /api/attendance/sessions",
   "PATCH /api/attendance/sessions/{sessionId}",
+  // Discipline incidents and actions (ST-XXX). Teacher reporting, principal management,
+  // parent visibility. Audit rows written by auditAction middleware.
+  "POST /api/discipline/incidents",
+  "PATCH /api/discipline/incidents/{incidentId}",
+  "POST /api/discipline/incidents/{incidentId}/resolve",
+  "POST /api/discipline/incidents/{incidentId}/actions",
+  "PATCH /api/discipline/incidents/{incidentId}/actions/{actionId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {

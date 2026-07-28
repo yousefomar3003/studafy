@@ -46,6 +46,7 @@ import {
 } from "./modules/auth";
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
+import { disciplineRoutes } from "./modules/discipline";
 import { gradebookConfigRoutes } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
@@ -517,6 +518,16 @@ export function createApp({
 
   // Attendance sessions (ST-107). Idempotent session management per class period with
   // batch record-keeping. Gated on ATTENDANCE_RECORD_CREATE permission.
+
+  // Discipline incidents and actions: teacher reporting, principal management (actions,
+  // resolution, severity), and parent visibility of own child's resolved incidents per
+  // school policy flag. All mutations are audited.
+  if (database) {
+    app.route("/", disciplineRoutes(database));
+  }
+
+  // Learning materials: CRUD, pre-signed upload flow, AI visibility toggle.
+  // Storage client is optional — upload endpoints return 503 when unconfigured.
   if (database) {
     app.route("/", attendanceSessionRoutes(database));
   }

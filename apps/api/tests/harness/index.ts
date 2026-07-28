@@ -38,6 +38,10 @@ export {
   type MaterialRecord,
   type TenantFixture,
   type TenantUser,
+  createDisciplineIncident,
+  createDisciplineAction,
+  type DisciplineIncidentRecord,
+  type DisciplineActionRecord,
 } from "./factories";
 
 export {

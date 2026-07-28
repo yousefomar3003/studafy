@@ -125,6 +125,14 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "short-lived pre-signed URLs — a raw storage key never appears in a payload.",
     },
     {
+      name: "Discipline",
+      description:
+        "Discipline incident reporting and management. Teachers can report incidents and " +
+        "view their own reports; administrators manage severity, status transitions, actions, " +
+        "and resolution. Parents can view their own child's resolved incidents only when the " +
+        "school policy enables it.",
+    },
+    {
       name: "Submissions",
       description:
         "Student hand-ins and teacher grading. Authenticated and tenant-scoped, then scoped again " +
