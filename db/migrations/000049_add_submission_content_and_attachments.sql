@@ -147,15 +147,25 @@ ALTER TABLE app.assignment_submissions
   );
 
 -- ---------------------------------------------------------------------------
--- Index
+-- Indexes: deliberately none on app.assignment_submissions
 -- ---------------------------------------------------------------------------
-
--- Serves the teacher's marking queue -- "everything on this assignment still waiting on me".
--- No index is added for the plain "every submission on assignment X" read: the existing
--- uq_assignment_submissions_school_assignment_student unique constraint is already a
--- (school_id, assignment_id, student_id) btree and serves that prefix exactly.
-CREATE INDEX idx_assignment_submissions_school_assignment_grade_status
-  ON app.assignment_submissions (school_id, assignment_id, grade_status, id);
+--
+-- grade_status gets no index of its own, and the reason is worth recording because adding one is
+-- the obvious move.
+--
+-- Every query in the submissions module leads with (school_id, assignment_id), which
+-- uq_assignment_submissions_school_assignment_student (000011) already serves as a btree prefix.
+-- That prefix narrows to a single assignment's class roster -- tens of rows -- so filtering
+-- grade_status on top of it is free. An index adding grade_status after those two columns would
+-- buy no measurable selectivity while costing write amplification on a table this hot.
+--
+-- It would also do active harm. An index on (school_id, assignment_id, grade_status, id) does not
+-- contain student_id, so for the exact three-column lookup
+-- (school_id = ? AND assignment_id = ? AND student_id = ?) it can only match the two-column prefix
+-- and then filter. On a small table its cost ties with the unique index that matches all three,
+-- and the planner picks between them arbitrarily -- displacing the correct index for the most
+-- common lookup in the module. packages/db/tests/assessment-content.test.ts pins that choice, and
+-- caught exactly this.
 
 -- ---------------------------------------------------------------------------
 -- Submission attachments
