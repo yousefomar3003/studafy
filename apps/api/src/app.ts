@@ -28,11 +28,9 @@ import {
   enrollmentRoutes,
   timetableRoutes,
   examRoutes,
-  materialRoutes,
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
-import { attendanceSessionRoutes } from "./modules/attendance";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -47,6 +45,7 @@ import {
 } from "./modules/auth";
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
+import { gradebookConfigRoutes } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -507,16 +506,11 @@ export function createApp({
     app.route("/", examRoutes(database));
   }
 
-  // Attendance sessions: open/list/get/update-status per class period, with idempotent
-  // duplicate protection and timetable-slot validation.
+  // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and
+  // versioned grading schemes per term. Gated on GRADE_READ/GRADE_UPDATE permissions
+  // and class-level teacher authorization.
   if (database) {
-    app.route("/", attendanceSessionRoutes(database));
-  }
-
-  // Learning materials: CRUD, pre-signed upload flow, AI visibility toggle.
-  // Storage client is optional — upload endpoints return 503 when unconfigured.
-  if (database) {
-    app.route("/", materialRoutes(database));
+    app.route("/", gradebookConfigRoutes(database));
   }
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.
