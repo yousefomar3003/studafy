@@ -1,13 +1,18 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
-    "build": {
+    "generate": {
       "dependsOn": ["^build"],
+      "outputs": ["src/generated-types.ts"],
+      "env": ["LOCALAPPDATA"]
+    },
+    "build": {
+      "dependsOn": ["^build", "generate"],
       "outputs": ["dist/**", "build/**"],
       "env": ["LOCALAPPDATA"]
     },
     "check-types": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate"],
       "outputs": []
     },
     "lint": {
@@ -15,7 +20,7 @@
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate"],
       "outputs": [],
       "env": ["LOCALAPPDATA"]
     }
