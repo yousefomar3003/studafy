@@ -124,5 +124,14 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "published work for classes they are actively enrolled in. File attachments are served as " +
         "short-lived pre-signed URLs — a raw storage key never appears in a payload.",
     },
+    {
+      name: "Submissions",
+      description:
+        "Student hand-ins and teacher grading. Authenticated and tenant-scoped, then scoped again " +
+        "within the tenant: a student sees only their own submission, a linked parent only their " +
+        "child's, and a teacher every submission for a class they teach. Score, feedback and " +
+        "grader identity are withheld from students and parents until the grade is published — " +
+        "the submission stays visible, the marks do not.",
+    },
   ],
 };

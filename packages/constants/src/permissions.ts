@@ -236,7 +236,19 @@ const STUDENT_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.STUDENT_READ,
 ];
 
-const PARENT_PERMISSIONS: readonly Permission[] = [PERMISSIONS.STUDENT_READ];
+// A parent reads their own child's coursework and nothing else. The narrowing is done by the
+// database, not by this list: app.is_related_to_student -- the same predicate the
+// role_scope_visibility policies on app.assignments and app.assignment_submissions already call --
+// resolves parent_child_links, so holding assignment:read here grants a parent exactly the
+// assignments their child can see, and submission:read exactly their child's hand-ins (ST-104).
+//
+// Note what a parent does NOT hold: submission:create, submission:update, submission:grade. They
+// can read a submission and they cannot touch one.
+const PARENT_PERMISSIONS: readonly Permission[] = [
+  PERMISSIONS.STUDENT_READ,
+  PERMISSIONS.ASSIGNMENT_READ,
+  PERMISSIONS.SUBMISSION_READ,
+];
 
 const GUEST_PERMISSIONS: readonly Permission[] = [PERMISSIONS.COURSE_READ, PERMISSIONS.LESSON_READ];
 

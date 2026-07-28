@@ -83,7 +83,7 @@ WHERE cl.school_id = current_setting('app.school_id')::uuid AND cl.code = 'CLASS
 ON CONFLICT DO NOTHING;
 
 -- Submissions for Problem Set 1 (Math) - some graded, some submitted
-INSERT INTO app.assignment_submissions (school_id, assignment_id, student_id, last_edited_by_user_id, graded_by_user_id, status, submitted_at, graded_at, score, feedback)
+INSERT INTO app.assignment_submissions (school_id, assignment_id, student_id, last_edited_by_user_id, graded_by_user_id, status, grade_status, submitted_at, graded_at, score, feedback)
 SELECT
   current_setting('app.school_id')::uuid,
   a.id,
@@ -91,6 +91,7 @@ SELECT
   s_user.id,
   t_user.id,
   'graded',
+  'published',
   '2026-01-17 14:30:00+00'::timestamptz,
   '2026-01-18 10:00:00+00'::timestamptz,
   92,
@@ -121,7 +122,7 @@ WHERE a.school_id = current_setting('app.school_id')::uuid AND a.title = 'Proble
   AND s_user.school_id = current_setting('app.school_id')::uuid AND s_user.normalized_email = 'student.bob@demo-academy.local'
 ON CONFLICT (school_id, assignment_id, student_id) DO NOTHING;
 
-INSERT INTO app.assignment_submissions (school_id, assignment_id, student_id, last_edited_by_user_id, graded_by_user_id, status, submitted_at, graded_at, score, feedback)
+INSERT INTO app.assignment_submissions (school_id, assignment_id, student_id, last_edited_by_user_id, graded_by_user_id, status, grade_status, submitted_at, graded_at, score, feedback)
 SELECT
   current_setting('app.school_id')::uuid,
   a.id,
@@ -129,6 +130,7 @@ SELECT
   s_user.id,
   t_user.id,
   'graded',
+  'published',
   '2026-01-16 11:00:00+00'::timestamptz,
   '2026-01-17 16:00:00+00'::timestamptz,
   78,
@@ -144,7 +146,7 @@ WHERE a.school_id = current_setting('app.school_id')::uuid AND a.title = 'Proble
 ON CONFLICT (school_id, assignment_id, student_id) DO NOTHING;
 
 -- Submission for Narrative Essay (English) - graded
-INSERT INTO app.assignment_submissions (school_id, assignment_id, student_id, last_edited_by_user_id, graded_by_user_id, status, submitted_at, graded_at, score, feedback)
+INSERT INTO app.assignment_submissions (school_id, assignment_id, student_id, last_edited_by_user_id, graded_by_user_id, status, grade_status, submitted_at, graded_at, score, feedback)
 SELECT
   current_setting('app.school_id')::uuid,
   a.id,
@@ -152,6 +154,7 @@ SELECT
   s_user.id,
   t_user.id,
   'graded',
+  'published',
   '2026-01-22 15:00:00+00'::timestamptz,
   '2026-01-23 09:00:00+00'::timestamptz,
   88,
