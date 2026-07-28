@@ -179,6 +179,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
   "POST /api/grades/config/gradebooks/{gradebookId}/scheme/link",
   "POST /api/grades/config/schemes",
+  // Attendance sessions. Tenant-scoped session management with auditAction middleware.
+  "POST /api/attendance/records/batch",
+  "POST /api/attendance/sessions",
+  "PATCH /api/attendance/sessions/{sessionId}",
   // Learning materials (ST-106). Storage-triggered upload flow with AI visibility.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",

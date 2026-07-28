@@ -95,3 +95,82 @@ export const sessionIdParamSchema = z
       }),
   })
   .openapi("SessionIdParam");
+
+// ---------------------------------------------------------------------------
+// Attendance Records
+// ---------------------------------------------------------------------------
+
+export const attendanceStatusSchema = z
+  .enum(["present", "absent", "late", "excused", "remote"])
+  .openapi({ description: "Attendance status for a single student record." });
+
+export type AttendanceStatus = z.infer<typeof attendanceStatusSchema>;
+
+export const attendanceRecordSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    attendance_session_id: uuidSchema.openapi({ description: "Parent attendance session." }),
+    student_id: uuidSchema.openapi({ description: "Student this record belongs to." }),
+    status: attendanceStatusSchema,
+    minutes_late: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .openapi({ description: "Minutes late; non-null only when status is 'late'." }),
+    reason: z.string().nullable().openapi({ description: "Optional free-text reason." }),
+    recorded_by_user_id: uuidSchema
+      .nullable()
+      .openapi({ description: "User who recorded this entry." }),
+    created_at: dateTimeSchema,
+  })
+  .openapi("AttendanceRecord");
+
+export type AttendanceRecord = z.infer<typeof attendanceRecordSchema>;
+
+export const batchRecordItemSchema = z
+  .object({
+    student_id: uuidSchema.openapi({ description: "Student to record attendance for." }),
+    status: attendanceStatusSchema,
+    minutes_late: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .openapi({ description: "Required when status is 'late'." }),
+    reason: z.string().max(500).optional().openapi({ description: "Optional reason text." }),
+  })
+  .openapi("BatchRecordItem");
+
+export type BatchRecordItem = z.infer<typeof batchRecordItemSchema>;
+
+export const batchRecordAttendanceBodySchema = z
+  .object({
+    attendance_session_id: uuidSchema.openapi({ description: "Target attendance session." }),
+    records: z
+      .array(batchRecordItemSchema)
+      .min(1)
+      .max(50)
+      .openapi({ description: "Student attendance states (1–50 entries)." }),
+  })
+  .openapi("BatchRecordAttendanceBody");
+
+export type BatchRecordAttendanceBody = z.infer<typeof batchRecordAttendanceBodySchema>;
+
+export const batchRecordAttendanceResponseSchema = z
+  .object({
+    attendance_session_id: uuidSchema,
+    records: z.array(attendanceRecordSchema),
+    created_count: z
+      .number()
+      .int()
+      .openapi({ description: "Number of records inserted in this call." }),
+    total_count: z
+      .number()
+      .int()
+      .openapi({ description: "Total records for this session after this call." }),
+  })
+  .openapi("BatchRecordAttendanceResponse");
+
+export type BatchRecordAttendanceResponse = z.infer<typeof batchRecordAttendanceResponseSchema>;

@@ -154,6 +154,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
   "POST /api/grades/config/gradebooks/{gradebookId}/scheme/link",
   "POST /api/grades/config/schemes",
+  // Attendance sessions. Tenant-scoped session management protected by requireAuth; school-level
+  // data with no cross-user row-level permission.
+  "POST /api/attendance/records/batch",
+  "POST /api/attendance/sessions",
+  "PATCH /api/attendance/sessions/{sessionId}",
   // Learning materials (ST-106). Storage-triggered upload flow with AI visibility.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",
@@ -251,6 +256,11 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
+  // Attendance sessions (ST-107) — idempotent session management; teacher self-service
+  // on the class period they teach, guarded by a route handler that verifies the caller
+  // is the class teacher rather than requirePermission().
+  "POST /api/attendance/sessions",
+  "PATCH /api/attendance/sessions/{sessionId}",
   // Learning materials (ST-106) — storage-triggered upload flow, authorized by
   // signed upload URL and row ownership, not by the permission guard.
   "POST /api/academics/materials/upload",

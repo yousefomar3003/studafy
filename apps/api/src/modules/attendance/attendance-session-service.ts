@@ -4,7 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
-import type { AttendanceSessionStatus } from "./schemas";
+import type { AttendanceSessionStatus, AttendanceStatus } from "./schemas";
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -329,4 +329,205 @@ export async function updateAttendanceSessionStatus(
   });
 
   return parseSessionRow(row);
+}
+
+// ---------------------------------------------------------------------------
+// Attendance Records (batch)
+// ---------------------------------------------------------------------------
+
+export interface BatchRecordItem {
+  student_id: string;
+  status: AttendanceStatus;
+  minutes_late?: number;
+  reason?: string;
+}
+
+export interface BatchRecordAttendanceParams {
+  attendance_session_id: string;
+  records: BatchRecordItem[];
+}
+
+export interface AttendanceRecordRow {
+  id: string;
+  school_id: string;
+  attendance_session_id: string;
+  student_id: string;
+  status: AttendanceStatus;
+  minutes_late: number | null;
+  reason: string | null;
+  recorded_by_user_id: string | null;
+  created_at: Date;
+}
+
+export interface BatchRecordAttendanceResult {
+  records: AttendanceRecordRow[];
+  created_count: number;
+}
+
+const RECORD_COLUMNS = `
+  id, school_id, attendance_session_id, student_id,
+  status::text AS status, minutes_late, reason,
+  recorded_by_user_id, created_at
+`;
+
+function parseRecordRow(row: Record<string, unknown>): AttendanceRecordRow {
+  return {
+    id: row.id as string,
+    school_id: row.school_id as string,
+    attendance_session_id: row.attendance_session_id as string,
+    student_id: row.student_id as string,
+    status: row.status as AttendanceStatus,
+    minutes_late: row.minutes_late as number | null,
+    reason: row.reason as string | null,
+    recorded_by_user_id: row.recorded_by_user_id as string | null,
+    created_at: row.created_at as Date,
+  };
+}
+
+/**
+ * Record attendance for multiple students in a single call.
+ *
+ * Idempotent: records that already exist for (session_id, student_id) are
+ * silently skipped.  The response always reflects the full set of records
+ * for the session regardless of how many were actually inserted.
+ *
+ * Teacher scope is enforced: the caller must be a school admin or the
+ * teacher of the class this session belongs to.
+ */
+export async function recordAttendanceBatch(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  params: BatchRecordAttendanceParams,
+): Promise<BatchRecordAttendanceResult> {
+  // 1. Fetch session and validate it exists, is open, and belongs to this school.
+  const [session] = await tx<Record<string, unknown>[]>`
+    SELECT id, class_id, status::text AS status, created_at
+    FROM app.attendance_sessions
+    WHERE id = ${params.attendance_session_id} AND school_id = ${schoolId}
+  `;
+  if (!session) {
+    throw new CodedHttpException(
+      404,
+      ERROR_CODES.ATTENDANCE_SESSION_NOT_FOUND,
+      "Attendance session not found",
+    );
+  }
+  if (session.status !== "open") {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.ATTENDANCE_SESSION_NOT_OPEN,
+      `Attendance session is '${session.status}'; only 'open' sessions accept records`,
+    );
+  }
+
+  // 2. Assert teacher scope: caller must be admin or assigned teacher.
+  const classId = session.class_id as string;
+  const [auth] = await tx<{ allowed: boolean }[]>`
+    SELECT (
+      app.current_user_is_school_admin()
+      OR app.teaches_class(${classId}::uuid)
+    ) AS allowed
+  `;
+  if (!auth?.allowed) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.ATTENDANCE_RECORD_FORBIDDEN,
+      "You are not assigned to this class",
+    );
+  }
+
+  // 3. Validate all student_ids exist and are enrolled in this class.
+  const studentIds = params.records.map((r) => r.student_id);
+  const enrolled = await tx<{ id: string }[]>`
+    SELECT id FROM app.students
+    WHERE id = ANY (${studentIds}::uuid[]) AND class_id = ${classId}::uuid
+  `;
+  const enrolledSet = new Set(enrolled.map((r) => r.id));
+  for (const sid of studentIds) {
+    if (!enrolledSet.has(sid)) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.ATTENDANCE_STUDENT_NOT_IN_CLASS,
+        `Student ${sid} is not enrolled in this class`,
+      );
+    }
+  }
+
+  // 4. Validate conditional fields (minutes_late required when status is 'late').
+  for (const r of params.records) {
+    if (r.status === "late" && (r.minutes_late == null || r.minutes_late < 1)) {
+      throw new HTTPException(400, {
+        message: `minutes_late is required and must be >= 1 when status is 'late' (student: ${r.student_id})`,
+      });
+    }
+  }
+
+  // 5. Check attendance_record_keys for already-recorded students.
+  const existing = await tx<{ student_id: string }[]>`
+    SELECT student_id
+    FROM app.attendance_record_keys
+    WHERE school_id = ${schoolId}
+      AND attendance_session_id = ${params.attendance_session_id}
+      AND student_id = ANY (${studentIds}::uuid[])
+  `;
+  const existingSet = new Set(existing.map((r) => r.student_id));
+  const newRecords = params.records.filter((r) => !existingSet.has(r.student_id));
+
+  // 6. Single multi-row INSERT for records that don't yet exist.
+  if (newRecords.length > 0) {
+    const insertable = newRecords.map((r) => ({
+      student_id: r.student_id,
+      status: r.status,
+      minutes_late: r.status === "late" ? (r.minutes_late ?? 0) : null,
+      reason: r.reason ?? null,
+    }));
+
+    const sessionCreatedAt = session.created_at as Date;
+    await tx`
+      INSERT INTO app.attendance_records
+        (school_id, attendance_session_id, session_created_at, student_id, status, minutes_late, reason, recorded_by_user_id)
+      SELECT
+        ${schoolId}::uuid,
+        ${params.attendance_session_id}::uuid,
+        ${sessionCreatedAt}::timestamptz,
+        x.student_id,
+        x.status::app.attendance_status,
+        x.minutes_late::smallint,
+        x.reason,
+        ${userId}::uuid
+      FROM jsonb_to_recordset(${tx.json(insertable)}::jsonb)
+        AS x(student_id uuid, status text, minutes_late smallint, reason text)
+    `;
+  }
+
+  // 7. Fetch the full set of records for the response (includes pre-existing records).
+  const allRows = await tx<Record<string, unknown>[]>`
+    SELECT ${tx.unsafe(RECORD_COLUMNS)}
+    FROM app.attendance_records
+    WHERE attendance_session_id = ${params.attendance_session_id}
+      AND school_id = ${schoolId}
+    ORDER BY student_id
+  `;
+
+  // 8. Emit single audit log for the batch.
+  await emitAuditLog(tx, {
+    action: "insert",
+    targetTable: "attendance_records",
+    targetId: params.attendance_session_id,
+    newValues: {
+      count: newRecords.length,
+      session_status: session.status,
+      class_id: classId,
+      records: newRecords.map((r) => ({
+        student_id: r.student_id,
+        status: r.status,
+      })),
+    },
+  });
+
+  return {
+    records: allRows.map(parseRecordRow),
+    created_count: newRecords.length,
+  };
 }

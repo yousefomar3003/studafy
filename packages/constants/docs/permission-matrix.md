@@ -108,5 +108,6 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `material:update`                | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `material:delete`                | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `material:manageAi`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
+| `attendance:record:create`       | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `parent:link`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `parent:unlink`                  | ✅          | ✅        |         |            |                    |         |        |       |               |
