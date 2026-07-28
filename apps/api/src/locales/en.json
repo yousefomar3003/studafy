@@ -88,5 +88,11 @@
   "MATERIAL_NOT_FOUND": "Material not found",
   "MATERIAL_STORAGE_CONFIRM_FAILED": "Storage confirmation failed",
   "MATERIAL_INGEST_IN_PROGRESS": "Material ingestion is already in progress",
+  "DISCIPLINE_INCIDENT_NOT_FOUND": "Discipline incident not found",
+  "DISCIPLINE_INCIDENT_INVALID_STATUS_TRANSITION": "This status transition is not allowed for a discipline incident",
+  "DISCIPLINE_INCIDENT_CANNOT_RESOLVE": "You are not permitted to resolve discipline incidents",
+  "DISCIPLINE_INCIDENT_PARENT_VISIBILITY_DISABLED": "Parent visibility of discipline incidents is disabled for this school",
+  "DISCIPLINE_ACTION_NOT_FOUND": "Discipline action not found",
+  "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION": "This status transition is not allowed for a discipline action",
   "ATTENDANCE_RECORD_FORBIDDEN": "You are not allowed to record attendance for this session"
 }

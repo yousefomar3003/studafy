@@ -88,5 +88,11 @@
   "MATERIAL_NOT_FOUND": "لم يتم العثور على المادة",
   "MATERIAL_STORAGE_CONFIRM_FAILED": "فشل تأكيد التخزين",
   "MATERIAL_INGEST_IN_PROGRESS": "امتصاص المادة قيد التنفيذ بالفعل",
+  "DISCIPLINE_INCIDENT_NOT_FOUND": "لم يتم العثور على حادثة تأديبية",
+  "DISCIPLINE_INCIDENT_INVALID_STATUS_TRANSITION": "هذا التحول في الحالة غير مسموح به لحادثة تأديبية",
+  "DISCIPLINE_INCIDENT_CANNOT_RESOLVE": "غير مسموح لك بحل الحوادث التأديبية",
+  "DISCIPLINE_INCIDENT_PARENT_VISIBILITY_DISABLED": "رؤية ولي الأمر للحوادث التأديبية معطلة لهذه المدرسة",
+  "DISCIPLINE_ACTION_NOT_FOUND": "لم يتم العثور على الإجراء التأديبي",
+  "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION": "هذا التحول في الحالة غير مسموح به لإجراء تأديبي",
   "ATTENDANCE_RECORD_FORBIDDEN": "لا يُسمح لك بتسجيل الحضور لهذه الجلسة"
 }

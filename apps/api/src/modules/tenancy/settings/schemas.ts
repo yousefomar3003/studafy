@@ -52,6 +52,10 @@ export const updateSchoolSettingsBodySchema = z
     absence_alert_threshold: attendanceThresholdSchema.optional().openapi({
       description: "Absence percentage at which an alert fires.",
     }),
+    parent_discipline_visibility: z.boolean().optional().openapi({
+      description: "When true, parents can view their own child's resolved discipline incidents.",
+      example: false,
+    }),
   })
   .strict()
   .openapi("UpdateSchoolSettings");
@@ -70,6 +74,10 @@ export const schoolSettingsResponseSchema = z
       description: "Attendance alert threshold (%).",
     }),
     absence_alert_threshold: z.number().openapi({ description: "Absence alert threshold (%)." }),
+    parent_discipline_visibility: z.boolean().openapi({
+      description: "When true, parents can view their own child's resolved discipline incidents.",
+      example: false,
+    }),
     created_at: z
       .string()
       .datetime()

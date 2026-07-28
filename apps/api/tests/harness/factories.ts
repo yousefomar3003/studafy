@@ -541,6 +541,98 @@ export async function createFullTenant(sql: Sql): Promise<TenantFixture> {
 }
 
 // ---------------------------------------------------------------------------
+// Discipline incident
+// ---------------------------------------------------------------------------
+
+export interface DisciplineIncidentRecord {
+  id: string;
+  studentId: string;
+  reporterUserId: string;
+}
+
+export async function createDisciplineIncident(
+  sql: Sql,
+  schoolId: string,
+  overrides: {
+    studentId: string;
+    reporterUserId: string;
+    classId?: string;
+    incidentType?: string;
+    severity?: string;
+    title?: string;
+    incidentAt?: string;
+  },
+): Promise<DisciplineIncidentRecord> {
+  return asAdmin(sql, async (tx) => {
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    await tx.unsafe("SET LOCAL ROLE studafy_app");
+
+    const [incident] = await tx<{ id: string }[]>`
+      INSERT INTO app.discipline_incidents
+        (school_id, student_id, class_id, reporter_user_id,
+         incident_type, severity, title, incident_at)
+      VALUES (
+        ${schoolId}::uuid,
+        ${overrides.studentId}::uuid,
+        ${overrides.classId ?? null}::uuid,
+        ${overrides.reporterUserId}::uuid,
+        ${overrides.incidentType ?? "behavioral"}::app.discipline_incident_type,
+        ${overrides.severity ?? "minor"}::app.discipline_severity,
+        ${overrides.title ?? "Test incident"},
+        ${overrides.incidentAt ?? new Date().toISOString()}::timestamptz
+      )
+      RETURNING id
+    `;
+
+    return {
+      id: incident!.id,
+      studentId: overrides.studentId,
+      reporterUserId: overrides.reporterUserId,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Discipline action
+// ---------------------------------------------------------------------------
+
+export interface DisciplineActionRecord {
+  id: string;
+  incidentId: string;
+}
+
+export async function createDisciplineAction(
+  sql: Sql,
+  schoolId: string,
+  overrides: {
+    incidentId: string;
+    actionByUserId: string;
+    actionType?: string;
+    description?: string;
+  },
+): Promise<DisciplineActionRecord> {
+  return asAdmin(sql, async (tx) => {
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    await tx.unsafe("SET LOCAL ROLE studafy_app");
+
+    const [action] = await tx<{ id: string }[]>`
+      INSERT INTO app.discipline_actions
+        (school_id, incident_id, action_type, action_by_user_id, description)
+      VALUES (
+        ${schoolId}::uuid,
+        ${overrides.incidentId}::uuid,
+        ${overrides.actionType ?? "verbal_warning"}::app.discipline_action_type,
+        ${overrides.actionByUserId}::uuid,
+        ${overrides.description ?? null}
+      )
+      RETURNING id
+    `;
+
+    return { id: action!.id, incidentId: overrides.incidentId };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Push device + refresh-token session (ST-071)
 // ---------------------------------------------------------------------------
 
