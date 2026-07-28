@@ -147,6 +147,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
+  // Attendance sessions. Tenant-scoped session management protected by requireAuth; school-level
+  // data with no cross-user row-level permission.
+  "POST /api/attendance/sessions",
+  "PATCH /api/attendance/sessions/{sessionId}",
   // Learning materials (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
   // catalog data with no cross-user row-level permission.
   "POST /api/academics/materials/upload",
@@ -242,6 +246,10 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
+  // Attendance sessions — tenant-scoped session management protected by requireAuth; school-level
+  // data with no cross-user row-level permission to check.
+  "POST /api/attendance/sessions",
+  "PATCH /api/attendance/sessions/{sessionId}",
   // Learning materials (ST-102) — tenant-scoped school-level catalog data protected by
   // requireAuth; no cross-user row-level permission to check.
   "POST /api/academics/materials/upload",

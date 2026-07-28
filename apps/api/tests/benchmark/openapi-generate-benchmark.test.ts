@@ -73,6 +73,8 @@ const EXPECTED_PATHS = [
   "/api/admin/users/{userId}/devices",
   "/api/admin/users/{userId}/devices/{deviceId}",
   "/api/admin/users/{userId}/providers/{provider}",
+  "/api/attendance/sessions",
+  "/api/attendance/sessions/{sessionId}",
   "/api/schools/register",
   "/api/schools/resend-verification",
   "/api/schools/verify-email/{token}",

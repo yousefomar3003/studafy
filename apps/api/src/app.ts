@@ -32,6 +32,7 @@ import {
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
+import { attendanceSessionRoutes } from "./modules/attendance";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -504,6 +505,12 @@ export function createApp({
   // and student/parent visibility via RLS.
   if (database) {
     app.route("/", examRoutes(database));
+  }
+
+  // Attendance sessions: open/list/get/update-status per class period, with idempotent
+  // duplicate protection and timetable-slot validation.
+  if (database) {
+    app.route("/", attendanceSessionRoutes(database));
   }
 
   // Learning materials: CRUD, pre-signed upload flow, AI visibility toggle.
