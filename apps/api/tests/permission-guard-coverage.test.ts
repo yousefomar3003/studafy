@@ -151,6 +151,13 @@ const EXPECTED_MUTATING_ROUTES = [
   // data with no cross-user row-level permission.
   "POST /api/attendance/sessions",
   "PATCH /api/attendance/sessions/{sessionId}",
+  // Discipline incidents & actions. Guarded per method by requirePermissionIn() on
+  // DISCIPLIN_INCIDENT_CREATE/READ/UPDATE/RESOLVE and DISCIPLINE_ACTION_CREATE/READ/UPDATE.
+  "POST /api/discipline/incidents",
+  "PATCH /api/discipline/incidents/{incidentId}",
+  "POST /api/discipline/incidents/{incidentId}/resolve",
+  "POST /api/discipline/incidents/{incidentId}/actions",
+  "PATCH /api/discipline/incidents/{incidentId}/actions/{actionId}",
   // Learning materials (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
   // catalog data with no cross-user row-level permission.
   "POST /api/academics/materials/upload",

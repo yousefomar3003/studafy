@@ -47,6 +47,7 @@ import {
 } from "./modules/auth";
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
+import { disciplineRoutes } from "./modules/discipline";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -511,6 +512,13 @@ export function createApp({
   // duplicate protection and timetable-slot validation.
   if (database) {
     app.route("/", attendanceSessionRoutes(database));
+  }
+
+  // Discipline incidents and actions: teacher reporting, principal management (actions,
+  // resolution, severity), and parent visibility of own child's resolved incidents per
+  // school policy flag. All mutations are audited.
+  if (database) {
+    app.route("/", disciplineRoutes(database));
   }
 
   // Learning materials: CRUD, pre-signed upload flow, AI visibility toggle.

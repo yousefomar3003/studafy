@@ -110,3 +110,10 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `material:manageAi`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `parent:link`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `parent:unlink`                  | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `disciplineIncident:create`      | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
+| `disciplineIncident:read`        | ✅          | ✅        |         | ✅         |                    |         | ✅     |       | ✅            |
+| `disciplineIncident:update`      | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `disciplineIncident:resolve`     | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `disciplineAction:create`        | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `disciplineAction:read`          | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `disciplineAction:update`        | ✅          | ✅        |         |            |                    |         |        |       |               |

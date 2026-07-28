@@ -182,6 +182,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "DELETE /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
+  // Discipline incidents and actions (ST-XXX). Teacher reporting, principal management,
+  // parent visibility. Audit rows written by auditAction middleware.
+  "POST /api/discipline/incidents",
+  "PATCH /api/discipline/incidents/{incidentId}",
+  "POST /api/discipline/incidents/{incidentId}/resolve",
+  "POST /api/discipline/incidents/{incidentId}/actions",
+  "PATCH /api/discipline/incidents/{incidentId}/actions/{actionId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {
