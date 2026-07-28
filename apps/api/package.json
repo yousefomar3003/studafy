@@ -13,6 +13,7 @@
     "test:auth": "bun test ./tests/auth --timeout 90000",
     "test:security": "bun test ./tests/security --timeout 90000",
     "test:cross-tenant": "bun test ./tests/security/cross-tenant.test.ts ./tests/security/probe-support.test.ts --timeout 90000",
+    "generate": "bun run openapi:generate",
     "openapi:generate": "bun run scripts/generate-openapi.ts && prettier --write openapi.json"
   },
   "dependencies": {

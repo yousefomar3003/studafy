@@ -6,6 +6,11 @@
       "outputs": ["src/generated-types.ts"],
       "env": ["LOCALAPPDATA"]
     },
+    "@studafy/api-client#generate": {
+      "dependsOn": ["@studafy/api#generate", "^build"],
+      "outputs": ["src/generated-types.ts"],
+      "env": ["LOCALAPPDATA"]
+    },
     "build": {
       "dependsOn": ["^build", "generate"],
       "outputs": ["dist/**", "build/**"],
