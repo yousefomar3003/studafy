@@ -70,5 +70,9 @@
   "STORAGE_OBJECT_NOT_FOUND": "تعذّر العثور على الملف المرفوع. يرجى رفعه مرة أخرى.",
   "STORAGE_NOT_CONFIGURED": "خدمة تخزين الملفات غير متاحة. يرجى المحاولة لاحقاً.",
   "EXAM_NOT_FOUND": "لم يتم العثور على الامتحان",
-  "EXAM_INVALID_STATE": "الامتحان ليس في حالة صالحة لهذه العملية"
+  "EXAM_INVALID_STATE": "الامتحان ليس في حالة صالحة لهذه العملية",
+  "ATTENDANCE_SESSION_NOT_FOUND": "لم يتم العثور على جلسة الحضور",
+  "ATTENDANCE_SESSION_DUPLICATE": "توجد بالفعل جلسة حضور لهذا الفصل والتاريخ والفترة",
+  "ATTENDANCE_NO_TIMETABLE_SLOT": "لم يتم العثور على خانة جدول درس معتمدة لهذا الفصل والتاريخ والفترة",
+  "ATTENDANCE_INVALID_STATUS_TRANSITION": "هذه الحالة الانتقالية غير مسموح بها لجلسة الحضور"
 }

@@ -70,5 +70,9 @@
   "STORAGE_OBJECT_NOT_FOUND": "The uploaded file could not be found. Please upload it again.",
   "STORAGE_NOT_CONFIGURED": "File storage is unavailable. Please try again later.",
   "EXAM_NOT_FOUND": "Exam not found",
-  "EXAM_INVALID_STATE": "Exam is not in a valid state for this operation"
+  "EXAM_INVALID_STATE": "Exam is not in a valid state for this operation",
+  "ATTENDANCE_SESSION_NOT_FOUND": "Attendance session not found",
+  "ATTENDANCE_SESSION_DUPLICATE": "An attendance session already exists for this class, date, and period",
+  "ATTENDANCE_NO_TIMETABLE_SLOT": "No approved timetable slot found for this class, date, and period",
+  "ATTENDANCE_INVALID_STATUS_TRANSITION": "This status transition is not allowed for an attendance session"
 }

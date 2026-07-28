@@ -110,6 +110,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "conflict detection, and copy-from-previous-term.",
     },
     {
+      name: "Attendance",
+      description:
+        "Attendance session management. Authenticated and tenant-scoped. " +
+        "Open sessions for class periods, list history, retrieve details, " +
+        "and transition through the draft → open → submitted → locked lifecycle.",
+    },
+    {
       name: "Assignments",
       description:
         "Class-scoped coursework. Authenticated and tenant-scoped, then scoped again within the " +

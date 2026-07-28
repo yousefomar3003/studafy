@@ -160,6 +160,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
+  // Attendance sessions. Tenant-scoped session management protected by requireAuth; school-level
+  // data with no cross-user row-level permission. Audit rows written by auditAction middleware.
+  "POST /api/attendance/sessions",
+  "PATCH /api/attendance/sessions/{sessionId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {
