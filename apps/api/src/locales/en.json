@@ -82,7 +82,11 @@
   "ATTENDANCE_SESSION_DUPLICATE": "An attendance session already exists for this class, date, and period",
   "ATTENDANCE_NO_TIMETABLE_SLOT": "No approved timetable slot found for this class, date, and period",
   "ATTENDANCE_INVALID_STATUS_TRANSITION": "This status transition is not allowed for an attendance session",
+  "ATTENDANCE_SESSION_NOT_OPEN": "This attendance session is not open for recording",
+  "ATTENDANCE_STUDENT_NOT_IN_CLASS": "This student is not in the class for this session",
+  "ATTENDANCE_BATCH_TOO_LARGE": "The batch request exceeds the maximum number of records allowed",
   "MATERIAL_NOT_FOUND": "Material not found",
   "MATERIAL_STORAGE_CONFIRM_FAILED": "Storage confirmation failed",
-  "MATERIAL_INGEST_IN_PROGRESS": "Material ingestion is already in progress"
+  "MATERIAL_INGEST_IN_PROGRESS": "Material ingestion is already in progress",
+  "ATTENDANCE_RECORD_FORBIDDEN": "You are not allowed to record attendance for this session"
 }

@@ -149,6 +149,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/academics/exams/{examId}",
   // Attendance sessions. Tenant-scoped session management protected by requireAuth; school-level
   // data with no cross-user row-level permission.
+  "POST /api/attendance/records/batch",
   "POST /api/attendance/sessions",
   "PATCH /api/attendance/sessions/{sessionId}",
   // Learning materials (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
