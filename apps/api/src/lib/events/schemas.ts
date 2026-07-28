@@ -110,6 +110,14 @@ export const eventPayloadSchemas = {
   [DOMAIN_EVENTS.DISCUSSION_POSTED]: z.object({ discussionId: uid }),
   [DOMAIN_EVENTS.DISCUSSION_MODERATED]: z.object({ discussionId: uid }),
 
+  // ── Materials ─────────────────────────────────────────────────────────
+  [DOMAIN_EVENTS.MATERIAL_UPLOADED]: z.object({
+    materialId: uid,
+    classId: uid,
+  }),
+  [DOMAIN_EVENTS.MATERIAL_AI_ENABLED]: z.object({ materialId: uid }),
+  [DOMAIN_EVENTS.MATERIAL_AI_DISABLED]: z.object({ materialId: uid }),
+
   // ── Study Group ───────────────────────────────────────────────────────
   [DOMAIN_EVENTS.STUDY_GROUP_CREATED]: z.object({ groupId: uid }),
   [DOMAIN_EVENTS.STUDY_GROUP_JOINED]: z.object({ groupId: uid }),

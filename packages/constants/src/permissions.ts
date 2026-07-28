@@ -123,6 +123,12 @@ export const PERMISSIONS = {
   TEACHER_READ: "teacher:read",
   TEACHER_UPDATE: "teacher:update",
 
+  MATERIAL_CREATE: "material:create",
+  MATERIAL_READ: "material:read",
+  MATERIAL_UPDATE: "material:update",
+  MATERIAL_DELETE: "material:delete",
+  MATERIAL_MANAGE_AI: "material:manageAi",
+
   PARENT_LINK: "parent:link",
   PARENT_UNLINK: "parent:unlink",
 } as const;
@@ -193,6 +199,11 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.NOTIFICATION_SEND,
   PERMISSIONS.STUDENT_READ,
   PERMISSIONS.TEACHER_READ,
+  PERMISSIONS.MATERIAL_CREATE,
+  PERMISSIONS.MATERIAL_READ,
+  PERMISSIONS.MATERIAL_UPDATE,
+  PERMISSIONS.MATERIAL_DELETE,
+  PERMISSIONS.MATERIAL_MANAGE_AI,
 ];
 
 const TEACHING_ASSISTANT_PERMISSIONS: readonly Permission[] = [
@@ -213,6 +224,7 @@ const TEACHING_ASSISTANT_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.QUIZ_GRADE,
   PERMISSIONS.NOTIFICATION_READ,
   PERMISSIONS.STUDENT_READ,
+  PERMISSIONS.MATERIAL_READ,
 ];
 
 const STUDENT_PERMISSIONS: readonly Permission[] = [
@@ -234,6 +246,7 @@ const STUDENT_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.CERTIFICATE_READ,
   PERMISSIONS.NOTIFICATION_READ,
   PERMISSIONS.STUDENT_READ,
+  PERMISSIONS.MATERIAL_READ,
 ];
 
 // A parent reads their own child's coursework and nothing else. The narrowing is done by the

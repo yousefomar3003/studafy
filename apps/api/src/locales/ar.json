@@ -77,5 +77,8 @@
   "STORAGE_OBJECT_NOT_FOUND": "تعذّر العثور على الملف المرفوع. يرجى رفعه مرة أخرى.",
   "STORAGE_NOT_CONFIGURED": "خدمة تخزين الملفات غير متاحة. يرجى المحاولة لاحقاً.",
   "EXAM_NOT_FOUND": "لم يتم العثور على الامتحان",
-  "EXAM_INVALID_STATE": "الامتحان ليس في حالة صالحة لهذه العملية"
+  "EXAM_INVALID_STATE": "الامتحان ليس في حالة صالحة لهذه العملية",
+  "MATERIAL_NOT_FOUND": "لم يتم العثور على المادة",
+  "MATERIAL_STORAGE_CONFIRM_FAILED": "فشل تأكيد التخزين",
+  "MATERIAL_INGEST_IN_PROGRESS": "امتصاص المادة قيد التنفيذ بالفعل"
 }

@@ -171,6 +171,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
+  // Learning materials (ST-102). Teacher upload/manage with metadata, pre-signed upload flow,
+  // and AI visibility toggle with chunk purge.
+  "POST /api/academics/materials/upload",
+  "POST /api/academics/materials/{materialId}/confirm",
+  "PATCH /api/academics/materials/{materialId}",
+  "DELETE /api/academics/materials/{materialId}",
+  "PATCH /api/academics/materials/{materialId}/ai-visible",
 ];
 
 function collectSourceFiles(dir: string): string[] {

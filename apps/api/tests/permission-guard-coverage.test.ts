@@ -147,6 +147,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
+  // Learning materials (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/materials/upload",
+  "POST /api/academics/materials/{materialId}/confirm",
+  "PATCH /api/academics/materials/{materialId}",
+  "DELETE /api/academics/materials/{materialId}",
+  "PATCH /api/academics/materials/{materialId}/ai-visible",
 ];
 
 /**
@@ -235,6 +242,13 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
+  // Learning materials (ST-102) — tenant-scoped school-level catalog data protected by
+  // requireAuth; no cross-user row-level permission to check.
+  "POST /api/academics/materials/upload",
+  "POST /api/academics/materials/{materialId}/confirm",
+  "PATCH /api/academics/materials/{materialId}",
+  "DELETE /api/academics/materials/{materialId}",
+  "PATCH /api/academics/materials/{materialId}/ai-visible",
 ]);
 
 // ---------------------------------------------------------------------------
