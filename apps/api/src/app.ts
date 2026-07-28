@@ -31,6 +31,7 @@ import {
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
+import { attendanceSessionRoutes } from "./modules/attendance";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -512,6 +513,12 @@ export function createApp({
   // and class-level teacher authorization.
   if (database) {
     app.route("/", gradebookConfigRoutes(database));
+  }
+
+  // Attendance sessions (ST-107). Idempotent session management per class period with
+  // batch record-keeping. Gated on ATTENDANCE_RECORD_CREATE permission.
+  if (database) {
+    app.route("/", attendanceSessionRoutes(database));
   }
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.

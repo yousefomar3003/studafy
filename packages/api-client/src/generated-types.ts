@@ -903,6 +903,74 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/attendance/records/batch": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Record attendance for multiple students
+         * @description Records attendance states for a full class roster in a single call. Idempotent: replaying the same request safely skips already-recorded students. Teacher scope is enforced — only the assigned teacher or school admin may record.
+         */
+        readonly post: operations["recordAttendanceBatch"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/attendance/sessions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List attendance sessions
+         * @description Paginated list of attendance sessions, ordered by date descending.
+         */
+        readonly get: operations["listAttendanceSessions"];
+        readonly put?: never;
+        /**
+         * Open an attendance session
+         * @description Opens an attendance session for a class on a given date and period. Idempotent: if a session already exists for the same class, date, and period, the existing session is returned.
+         */
+        readonly post: operations["openAttendanceSession"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/attendance/sessions/{sessionId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get an attendance session
+         * @description Returns a single attendance session by ID.
+         */
+        readonly get: operations["getAttendanceSession"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Update attendance session status
+         * @description Transitions an attendance session to a new status. Valid transitions: draft → open | cancelled, open → submitted | cancelled, submitted → locked.
+         */
+        readonly patch: operations["updateAttendanceSessionStatus"];
+        readonly trace?: never;
+    };
     readonly "/api/auth/devices": {
         readonly parameters: {
             readonly query?: never;
@@ -2231,6 +2299,121 @@ export interface components {
             /** @description Pass as `cursor` to fetch the next page. Null on the last page. */
             readonly next_cursor: string | null;
         };
+        readonly AttendanceRecord: {
+            /**
+             * Format: uuid
+             * @description Parent attendance session.
+             */
+            readonly attendance_session_id: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /** @description Minutes late; non-null only when status is 'late'. */
+            readonly minutes_late: number | null;
+            /** @description Optional free-text reason. */
+            readonly reason: string | null;
+            /**
+             * Format: uuid
+             * @description User who recorded this entry.
+             */
+            readonly recorded_by_user_id: string | null;
+            /**
+             * Format: uuid
+             * @description Owning school tenant.
+             */
+            readonly school_id: string;
+            /**
+             * @description Attendance status for a single student record.
+             * @enum {string}
+             */
+            readonly status: "present" | "absent" | "late" | "excused" | "remote";
+            /**
+             * Format: uuid
+             * @description Student this record belongs to.
+             */
+            readonly student_id: string;
+        };
+        readonly AttendanceSession: {
+            /**
+             * Format: uuid
+             * @description Parent class.
+             */
+            readonly class_id: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /** @description Timetable period (1-based), or null for daily attendance. */
+            readonly period: number | null;
+            /**
+             * Format: uuid
+             * @description Owning school tenant.
+             */
+            readonly school_id: string;
+            /**
+             * Format: date
+             * @description Educational business date.
+             */
+            readonly session_date: string;
+            /**
+             * @description Lifecycle state of an attendance session.
+             * @enum {string}
+             */
+            readonly status: "draft" | "open" | "submitted" | "locked" | "cancelled";
+            /**
+             * Format: uuid
+             * @description User who opened the session.
+             */
+            readonly taken_by_user_id: string | null;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly AttendanceSessionList: {
+            readonly attendance_sessions: readonly components["schemas"]["AttendanceSession"][];
+            /** @description Total matching records. */
+            readonly total: number;
+        };
+        readonly BatchRecordAttendanceBody: {
+            /**
+             * Format: uuid
+             * @description Target attendance session.
+             */
+            readonly attendance_session_id: string;
+            /** @description Student attendance states (1–50 entries). */
+            readonly records: readonly components["schemas"]["BatchRecordItem"][];
+        };
+        readonly BatchRecordAttendanceResponse: {
+            /** Format: uuid */
+            readonly attendance_session_id: string;
+            /** @description Number of records inserted in this call. */
+            readonly created_count: number;
+            readonly records: readonly components["schemas"]["AttendanceRecord"][];
+            /** @description Total records for this session after this call. */
+            readonly total_count: number;
+        };
+        readonly BatchRecordItem: {
+            /** @description Required when status is 'late'. */
+            readonly minutes_late?: number;
+            /** @description Optional reason text. */
+            readonly reason?: string;
+            /**
+             * @description Attendance status for a single student record.
+             * @enum {string}
+             */
+            readonly status: "present" | "absent" | "late" | "excused" | "remote";
+            /**
+             * Format: uuid
+             * @description Student to record attendance for.
+             */
+            readonly student_id: string;
+        };
         readonly BulkInviteBody: {
             /**
              * @description Number of days until each invitation expires. Defaults to 7.
@@ -2571,6 +2754,20 @@ export interface components {
              * @example Problem Set 3
              */
             readonly title: string;
+        };
+        readonly CreateAttendanceSessionBody: {
+            /**
+             * Format: uuid
+             * @description Class to take attendance for.
+             */
+            readonly class_id: string;
+            /** @description Timetable period (1-based). Omit for daily attendance. */
+            readonly period?: number;
+            /**
+             * Format: date
+             * @description Educational business date (YYYY-MM-DD).
+             */
+            readonly session_date: string;
         };
         readonly CreateClassBody: {
             /**
@@ -3420,7 +3617,7 @@ export interface components {
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "CLASS_HAS_ENROLLMENTS" | "CLASS_CAPACITY_EXCEEDED" | "ENROLLMENT_DUPLICATE" | "ENROLLMENT_NOT_ACTIVE" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "EXAM_NOT_FOUND" | "EXAM_INVALID_STATE" | "TIMETABLE_TEACHER_CONFLICT" | "TIMETABLE_ROOM_CONFLICT" | "TIMETABLE_VERSION_NOT_DRAFT" | "ASSIGNMENT_CLASS_FORBIDDEN" | "ASSIGNMENT_INVALID_STATUS_TRANSITION" | "SUBMISSION_NOT_FOUND" | "SUBMISSION_FORBIDDEN" | "SUBMISSION_NOT_ENROLLED" | "SUBMISSION_WINDOW_CLOSED" | "SUBMISSION_ALREADY_GRADED" | "SUBMISSION_INVALID_STATE" | "SUBMISSION_SCORE_EXCEEDS_MAX" | "STORAGE_KEY_FORBIDDEN" | "STORAGE_OBJECT_NOT_FOUND" | "STORAGE_NOT_CONFIGURED" | "MATERIAL_NOT_FOUND" | "MATERIAL_STORAGE_CONFIRM_FAILED" | "MATERIAL_INGEST_IN_PROGRESS" | "ATTENDANCE_SESSION_NOT_FOUND" | "ATTENDANCE_SESSION_DUPLICATE" | "ATTENDANCE_NO_TIMETABLE_SLOT" | "ATTENDANCE_INVALID_STATUS_TRANSITION" | "INVALID_GRADEBOOK_WEIGHT_TOTAL" | "GRADEBOOK_NOT_FOUND" | "GRADING_SCHEME_NOT_FOUND" | "GRADING_SCHEME_IMMUTABLE" | "ASSESSMENT_CATEGORY_NOT_FOUND" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "CLASS_HAS_ENROLLMENTS" | "CLASS_CAPACITY_EXCEEDED" | "ENROLLMENT_DUPLICATE" | "ENROLLMENT_NOT_ACTIVE" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "EXAM_NOT_FOUND" | "EXAM_INVALID_STATE" | "TIMETABLE_TEACHER_CONFLICT" | "TIMETABLE_ROOM_CONFLICT" | "TIMETABLE_VERSION_NOT_DRAFT" | "ASSIGNMENT_CLASS_FORBIDDEN" | "ASSIGNMENT_INVALID_STATUS_TRANSITION" | "ATTENDANCE_SESSION_NOT_FOUND" | "ATTENDANCE_SESSION_DUPLICATE" | "ATTENDANCE_NO_TIMETABLE_SLOT" | "ATTENDANCE_INVALID_STATUS_TRANSITION" | "ATTENDANCE_RECORD_FORBIDDEN" | "ATTENDANCE_SESSION_NOT_OPEN" | "ATTENDANCE_STUDENT_NOT_IN_CLASS" | "ATTENDANCE_BATCH_TOO_LARGE" | "SUBMISSION_NOT_FOUND" | "SUBMISSION_FORBIDDEN" | "SUBMISSION_NOT_ENROLLED" | "SUBMISSION_WINDOW_CLOSED" | "SUBMISSION_ALREADY_GRADED" | "SUBMISSION_INVALID_STATE" | "SUBMISSION_SCORE_EXCEEDS_MAX" | "STORAGE_KEY_FORBIDDEN" | "STORAGE_OBJECT_NOT_FOUND" | "STORAGE_NOT_CONFIGURED" | "MATERIAL_NOT_FOUND" | "MATERIAL_STORAGE_CONFIRM_FAILED" | "MATERIAL_INGEST_IN_PROGRESS" | "INVALID_GRADEBOOK_WEIGHT_TOTAL" | "GRADEBOOK_NOT_FOUND" | "GRADING_SCHEME_NOT_FOUND" | "GRADING_SCHEME_IMMUTABLE" | "ASSESSMENT_CATEGORY_NOT_FOUND" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -4307,6 +4504,13 @@ export interface components {
              * @example Problem Set 3
              */
             readonly title?: string;
+        };
+        readonly UpdateAttendanceSessionBody: {
+            /**
+             * @description New session status.
+             * @enum {string}
+             */
+            readonly status: "draft" | "open" | "submitted" | "locked" | "cancelled";
         };
         readonly UpdateClassBody: {
             /** @description Maximum enrollment count, or null for unlimited. */
@@ -10099,6 +10303,438 @@ export interface operations {
             };
             /** @description Rate limit exceeded. Back off and retry. */
             readonly 429: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly recordAttendanceBatch: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["BatchRecordAttendanceBody"];
+            };
+        };
+        readonly responses: {
+            /** @description All requested records already existed — no new records created. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["BatchRecordAttendanceResponse"];
+                };
+            };
+            /** @description One or more new attendance records were created. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["BatchRecordAttendanceResponse"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listAttendanceSessions: {
+        readonly parameters: {
+            readonly query?: {
+                /** @description Filter by class. */
+                readonly class_id?: string;
+                readonly limit?: number;
+                readonly offset?: number | null;
+                /** @description Filter by session date. */
+                readonly session_date?: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Paginated list of attendance sessions. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AttendanceSessionList"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly openAttendanceSession: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateAttendanceSessionBody"];
+            };
+        };
+        readonly responses: {
+            /** @description An existing session already covers this class, date, and period. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AttendanceSession"];
+                };
+            };
+            /** @description A new attendance session was created. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AttendanceSession"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly getAttendanceSession: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Attendance session UUID. */
+                readonly sessionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The attendance session. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AttendanceSession"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly updateAttendanceSessionStatus: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Attendance session UUID. */
+                readonly sessionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["UpdateAttendanceSessionBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The updated attendance session. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AttendanceSession"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
                 headers: {
                     /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
                     readonly "X-Request-Id": string;
