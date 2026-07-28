@@ -182,16 +182,7 @@ jobs:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run format:check
-      # Regenerate the OpenAPI document from the live Hono routes first, so the downstream turbo
-      # pipeline (which includes @studafy/api-client:generate) can consume it.
-      - name: Regenerate the OpenAPI document
-        run: bun run openapi:generate
       - run: bunx turbo run lint check-types test build --filter=!@studafy/mobile
-      # Regenerate the TypeScript API client types from the OpenAPI document. Same rationale as the
-      # OpenAPI document above: gitignored to eliminate merge conflicts, regenerated in CI for
-      # validation and downstream use.
-      - name: Regenerate the API client
-        run: bun run client:generate
       - name: Regenerate the permission matrix and fail on drift
         run: |
           bun run --cwd packages/constants docs:generate
