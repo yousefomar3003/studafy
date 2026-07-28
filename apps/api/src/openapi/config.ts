@@ -141,5 +141,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "grader identity are withheld from students and parents until the grade is published — " +
         "the submission stays visible, the marks do not.",
     },
+    {
+      name: "Gradebook Configuration",
+      description:
+        "Gradebook configuration endpoints. Authenticated and tenant-scoped. " +
+        "Manages assessment categories with weighted scoring and versioned grading schemes.",
+    },
   ],
 };

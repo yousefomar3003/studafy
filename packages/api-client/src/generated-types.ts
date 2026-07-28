@@ -1451,6 +1451,138 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/grades/config/gradebooks/{gradebookId}/categories": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List assessment categories
+         * @description Returns all assessment categories for a gradebook, ordered by sort_order. Includes the total weight sum of all active categories.
+         */
+        readonly get: operations["listAssessmentCategories"];
+        readonly put?: never;
+        /**
+         * Create an assessment category
+         * @description Creates a new weighted assessment category. After insertion, validates that all active category weights sum to exactly 100%. Returns 400 (INVALID_GRADEBOOK_WEIGHT_TOTAL) if not.
+         */
+        readonly post: operations["createAssessmentCategory"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Delete an assessment category
+         * @description Deletes an assessment category. After deletion, validates that remaining active category weights sum to exactly 100%. Returns 400 (INVALID_GRADEBOOK_WEIGHT_TOTAL) if not.
+         */
+        readonly delete: operations["deleteAssessmentCategory"];
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Update an assessment category
+         * @description Partially updates an assessment category. After updating, validates that all active category weights sum to exactly 100%. Returns 400 (INVALID_GRADEBOOK_WEIGHT_TOTAL) if not.
+         */
+        readonly patch: operations["updateAssessmentCategory"];
+        readonly trace?: never;
+    };
+    readonly "/api/grades/config/gradebooks/{gradebookId}/scheme": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get gradebook configuration
+         * @description Returns the full gradebook configuration: assessment categories (with total weight) and the linked grading scheme. If no scheme is linked yet, one is auto-inherited from the school's default grading settings.
+         */
+        readonly get: operations["getGradebookConfig"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/grades/config/gradebooks/{gradebookId}/scheme/link": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Link a grading scheme to a gradebook
+         * @description Associates a specific grading scheme version with a gradebook. The scheme must belong to the same academic term as the gradebook's class.
+         */
+        readonly post: operations["linkGradingScheme"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/grades/config/schemes": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List grading schemes
+         * @description Lists all versions of grading schemes for a given term, ordered by version descending. The highest version number is the current scheme.
+         */
+        readonly get: operations["listGradingSchemes"];
+        readonly put?: never;
+        /**
+         * Create a grading scheme
+         * @description Creates a new versioned grading scheme for an academic term. Each modification creates a new version; prior versions are immutable. Returns 400 if the grade boundaries are invalid.
+         */
+        readonly post: operations["createGradingScheme"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/grades/config/schemes/{schemeId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get a grading scheme
+         * @description Returns a specific grading scheme by ID. Answers 404 if not found.
+         */
+        readonly get: operations["getGradingScheme"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/imports/students": {
         readonly parameters: {
             readonly query?: never;
@@ -2219,6 +2351,55 @@ export interface components {
             /** @description Refresh tokens revoked. */
             readonly revoked: number;
         };
+        readonly AssessmentCategory: {
+            /**
+             * Format: date-time
+             * @description Row creation timestamp.
+             */
+            readonly created_at: string;
+            /**
+             * @description Optional human-readable description.
+             * @example Weekly problem sets
+             */
+            readonly description: string | null;
+            /**
+             * Format: uuid
+             * @description Owning gradebook.
+             */
+            readonly gradebook_id: string;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /** @description Whether this category contributes to the weight total. */
+            readonly is_active: boolean;
+            /**
+             * @description Category name (e.g. 'Homework', 'Midterm', 'Final Exam').
+             * @example Homework
+             */
+            readonly name: string;
+            /**
+             * @description Display ordering (ascending).
+             * @example 0
+             */
+            readonly sort_order: number;
+            /**
+             * Format: date-time
+             * @description Last modification timestamp.
+             */
+            readonly updated_at: string;
+            /**
+             * @description Percentage weight of this category (0-100). All active weights must sum to 100.
+             * @example 20
+             */
+            readonly weight: number;
+        };
+        readonly AssessmentCategoryList: {
+            readonly categories: readonly components["schemas"]["AssessmentCategory"][];
+            /** @description Sum of active category weights (should be 100 for a valid gradebook). */
+            readonly total_weight: number;
+        };
         readonly Assignment: {
             /** @description Whether submissions are accepted after due_at. */
             readonly allow_late_submission: boolean;
@@ -2764,6 +2945,24 @@ export interface components {
              */
             readonly effective_until?: string;
         };
+        readonly CreateAssessmentCategoryBody: {
+            /** @description Optional description. */
+            readonly description?: string | null;
+            /** @description Whether this category is active. Defaults to true. */
+            readonly is_active?: boolean;
+            /**
+             * @description Category name.
+             * @example Homework
+             */
+            readonly name: string;
+            /** @description Display ordering. Defaults to 0. */
+            readonly sort_order?: number;
+            /**
+             * @description Percentage weight (0-100).
+             * @example 20
+             */
+            readonly weight: number;
+        };
         readonly CreateAssignmentBody: {
             /** @default false */
             readonly allow_late_submission: boolean;
@@ -2932,6 +3131,26 @@ export interface components {
              * @example 1
              */
             readonly weight: number;
+        };
+        readonly CreateGradingSchemeBody: {
+            /** @description Grade boundaries (must have at least one entry). */
+            readonly grade_boundaries: readonly components["schemas"]["GradeBoundary"][];
+            /**
+             * @description Scheme name.
+             * @example Standard Letter Scale
+             */
+            readonly name: string;
+            /**
+             * @description Type of grading scale.
+             * @example letter
+             * @enum {string}
+             */
+            readonly scheme_type: "letter" | "percentage" | "gpa" | "numeric" | "pass_fail";
+            /**
+             * Format: uuid
+             * @description Academic term to create this scheme for.
+             */
+            readonly term_id: string;
         };
         readonly CreateIncidentBody: {
             /**
@@ -3532,6 +3751,39 @@ export interface components {
             readonly exam: components["schemas"]["Exam"];
             readonly warnings: readonly components["schemas"]["ExamConflictWarning"][];
         };
+        readonly GradebookConfig: {
+            readonly categories: readonly components["schemas"]["AssessmentCategory"][];
+            /**
+             * Format: uuid
+             * @description The gradebook this config belongs to.
+             */
+            readonly gradebook_id: string;
+            readonly grading_scheme: components["schemas"]["GradingScheme"];
+            /** @description Sum of active category weights. */
+            readonly total_weight: number;
+        };
+        readonly GradeBoundary: {
+            /**
+             * @description GPA equivalent (null for non-GPA schemes).
+             * @example 4
+             */
+            readonly gpa_points?: number | null;
+            /**
+             * @description Grade label (e.g. 'A', 'Pass', '90-100%').
+             * @example A
+             */
+            readonly label: string;
+            /**
+             * @description Maximum percentage for this grade (inclusive).
+             * @example 100
+             */
+            readonly max: number;
+            /**
+             * @description Minimum percentage for this grade (inclusive).
+             * @example 90
+             */
+            readonly min: number;
+        };
         readonly GradeSubmissionBody: {
             /** @description Comments for the student. Pass null to clear. */
             readonly feedback?: string | null;
@@ -3550,6 +3802,47 @@ export interface components {
              * @example 87.5
              */
             readonly score?: number;
+        };
+        /** @description The linked grading scheme, or null if none is assigned. */
+        readonly GradingScheme: {
+            /**
+             * Format: date-time
+             * @description Row creation timestamp.
+             */
+            readonly created_at: string;
+            /** @description Ordered grade boundaries from highest to lowest. */
+            readonly grade_boundaries: readonly components["schemas"]["GradeBoundary"][];
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /** @description True if this scheme was auto-generated from school defaults. */
+            readonly is_inherited: boolean;
+            /**
+             * @description Human-readable scheme name.
+             * @example Standard Letter Scale
+             */
+            readonly name: string;
+            /**
+             * @description Type of grading scale.
+             * @example letter
+             * @enum {string}
+             */
+            readonly scheme_type: "letter" | "percentage" | "gpa" | "numeric" | "pass_fail";
+            /**
+             * Format: uuid
+             * @description Academic term this scheme belongs to.
+             */
+            readonly term_id: string;
+            /**
+             * @description Immutable version number. Prior versions cannot be modified.
+             * @example 1
+             */
+            readonly version: number;
+        } | null;
+        readonly GradingSchemeList: {
+            readonly schemes: readonly components["schemas"]["GradingScheme"][];
         };
         readonly Guardian: {
             /** Format: date-time */
@@ -3732,6 +4025,10 @@ export interface components {
              */
             readonly redirect_url: string;
         };
+        readonly LinkSchemeBody: {
+            /** Format: uuid */
+            readonly scheme_id: string;
+        };
         readonly ListLinkedProvidersResponse: {
             /** @description All OAuth providers linked to this account. */
             readonly providers: readonly components["schemas"]["LinkedProvider"][];
@@ -3835,7 +4132,7 @@ export interface components {
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "CLASS_HAS_ENROLLMENTS" | "CLASS_CAPACITY_EXCEEDED" | "ENROLLMENT_DUPLICATE" | "ENROLLMENT_NOT_ACTIVE" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "EXAM_NOT_FOUND" | "EXAM_INVALID_STATE" | "TIMETABLE_TEACHER_CONFLICT" | "TIMETABLE_ROOM_CONFLICT" | "TIMETABLE_VERSION_NOT_DRAFT" | "ASSIGNMENT_CLASS_FORBIDDEN" | "ASSIGNMENT_INVALID_STATUS_TRANSITION" | "ATTENDANCE_SESSION_NOT_FOUND" | "ATTENDANCE_SESSION_DUPLICATE" | "ATTENDANCE_NO_TIMETABLE_SLOT" | "ATTENDANCE_INVALID_STATUS_TRANSITION" | "ATTENDANCE_RECORD_FORBIDDEN" | "ATTENDANCE_SESSION_NOT_OPEN" | "ATTENDANCE_STUDENT_NOT_IN_CLASS" | "ATTENDANCE_BATCH_TOO_LARGE" | "SUBMISSION_NOT_FOUND" | "SUBMISSION_FORBIDDEN" | "SUBMISSION_NOT_ENROLLED" | "SUBMISSION_WINDOW_CLOSED" | "SUBMISSION_ALREADY_GRADED" | "SUBMISSION_INVALID_STATE" | "SUBMISSION_SCORE_EXCEEDS_MAX" | "STORAGE_KEY_FORBIDDEN" | "STORAGE_OBJECT_NOT_FOUND" | "STORAGE_NOT_CONFIGURED" | "MATERIAL_NOT_FOUND" | "MATERIAL_STORAGE_CONFIRM_FAILED" | "MATERIAL_INGEST_IN_PROGRESS" | "DISCIPLINE_INCIDENT_NOT_FOUND" | "DISCIPLINE_INCIDENT_INVALID_STATUS_TRANSITION" | "DISCIPLINE_INCIDENT_CANNOT_RESOLVE" | "DISCIPLINE_INCIDENT_PARENT_VISIBILITY_DISABLED" | "DISCIPLINE_ACTION_NOT_FOUND" | "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "CLASS_HAS_ENROLLMENTS" | "CLASS_CAPACITY_EXCEEDED" | "ENROLLMENT_DUPLICATE" | "ENROLLMENT_NOT_ACTIVE" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "EXAM_NOT_FOUND" | "EXAM_INVALID_STATE" | "TIMETABLE_TEACHER_CONFLICT" | "TIMETABLE_ROOM_CONFLICT" | "TIMETABLE_VERSION_NOT_DRAFT" | "ASSIGNMENT_CLASS_FORBIDDEN" | "ASSIGNMENT_INVALID_STATUS_TRANSITION" | "ATTENDANCE_SESSION_NOT_FOUND" | "ATTENDANCE_SESSION_DUPLICATE" | "ATTENDANCE_NO_TIMETABLE_SLOT" | "ATTENDANCE_INVALID_STATUS_TRANSITION" | "ATTENDANCE_RECORD_FORBIDDEN" | "ATTENDANCE_SESSION_NOT_OPEN" | "ATTENDANCE_STUDENT_NOT_IN_CLASS" | "ATTENDANCE_BATCH_TOO_LARGE" | "SUBMISSION_NOT_FOUND" | "SUBMISSION_FORBIDDEN" | "SUBMISSION_NOT_ENROLLED" | "SUBMISSION_WINDOW_CLOSED" | "SUBMISSION_ALREADY_GRADED" | "SUBMISSION_INVALID_STATE" | "SUBMISSION_SCORE_EXCEEDS_MAX" | "STORAGE_KEY_FORBIDDEN" | "STORAGE_OBJECT_NOT_FOUND" | "STORAGE_NOT_CONFIGURED" | "MATERIAL_NOT_FOUND" | "MATERIAL_STORAGE_CONFIRM_FAILED" | "MATERIAL_INGEST_IN_PROGRESS" | "INVALID_GRADEBOOK_WEIGHT_TOTAL" | "GRADEBOOK_NOT_FOUND" | "GRADING_SCHEME_NOT_FOUND" | "GRADING_SCHEME_IMMUTABLE" | "ASSESSMENT_CATEGORY_NOT_FOUND" | "DISCIPLINE_INCIDENT_NOT_FOUND" | "DISCIPLINE_INCIDENT_INVALID_STATUS_TRANSITION" | "DISCIPLINE_INCIDENT_CANNOT_RESOLVE" | "DISCIPLINE_INCIDENT_PARENT_VISIBILITY_DISABLED" | "DISCIPLINE_ACTION_NOT_FOUND" | "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -4711,6 +5008,18 @@ export interface components {
              * @enum {string}
              */
             readonly status?: "pending" | "active" | "completed" | "revoked";
+        };
+        readonly UpdateAssessmentCategoryBody: {
+            /** @description Updated description. */
+            readonly description?: string | null;
+            /** @description Updated active status. */
+            readonly is_active?: boolean;
+            /** @description Updated category name. */
+            readonly name?: string;
+            /** @description Updated display ordering. */
+            readonly sort_order?: number;
+            /** @description Updated percentage weight (0-100). */
+            readonly weight?: number;
         };
         readonly UpdateAssignmentBody: {
             readonly allow_late_submission?: boolean;
@@ -13113,6 +13422,752 @@ export interface operations {
             };
             /** @description The request conflicts with the current state of the resource. */
             readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listAssessmentCategories: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Gradebook UUID. */
+                readonly gradebookId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description List of assessment categories. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AssessmentCategoryList"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly createAssessmentCategory: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Gradebook UUID. */
+                readonly gradebookId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateAssessmentCategoryBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The created category. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AssessmentCategory"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly deleteAssessmentCategory: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Assessment category UUID. */
+                readonly categoryId: string;
+                /** @description Gradebook UUID. */
+                readonly gradebookId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Category deleted. */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly updateAssessmentCategory: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Assessment category UUID. */
+                readonly categoryId: string;
+                /** @description Gradebook UUID. */
+                readonly gradebookId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["UpdateAssessmentCategoryBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The updated category. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AssessmentCategory"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly getGradebookConfig: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Gradebook UUID. */
+                readonly gradebookId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Full gradebook configuration. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["GradebookConfig"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly linkGradingScheme: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Gradebook UUID. */
+                readonly gradebookId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["LinkSchemeBody"];
+            };
+        };
+        readonly responses: {
+            /** @description Scheme linked successfully. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["GradingScheme"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listGradingSchemes: {
+        readonly parameters: {
+            readonly query: {
+                /** @description Filter grading schemes by academic term. */
+                readonly termId: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description List of grading schemes. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["GradingSchemeList"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly createGradingScheme: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateGradingSchemeBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The created grading scheme. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["GradingScheme"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly getGradingScheme: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                /** @description Grading scheme UUID. */
+                readonly schemeId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The grading scheme. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["GradingScheme"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
                 headers: {
                     /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
                     readonly "X-Request-Id": string;

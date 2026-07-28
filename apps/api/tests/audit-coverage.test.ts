@@ -171,18 +171,24 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
-  // Attendance sessions. Tenant-scoped session management protected by requireAuth; school-level
-  // data with no cross-user row-level permission. Audit rows written by auditAction middleware.
+  // Gradebook configuration (ST-112). Assessment category and grading scheme mutations
+  // each write an app.audit_logs row from inside the service transaction — see
+  // modules/grades/config/gradebook-config-service.ts.
+  "POST /api/grades/config/gradebooks/{gradebookId}/categories",
+  "PATCH /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+  "DELETE /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+  "POST /api/grades/config/gradebooks/{gradebookId}/scheme/link",
+  "POST /api/grades/config/schemes",
+  // Attendance sessions. Tenant-scoped session management with auditAction middleware.
   "POST /api/attendance/records/batch",
   "POST /api/attendance/sessions",
   "PATCH /api/attendance/sessions/{sessionId}",
-  // Learning materials (ST-102). Teacher upload/manage with metadata, pre-signed upload flow,
-  // and AI visibility toggle with chunk purge.
+  // Learning materials (ST-106). Storage-triggered upload flow with AI visibility.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",
   "PATCH /api/academics/materials/{materialId}",
-  "DELETE /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
+  "DELETE /api/academics/materials/{materialId}",
   // Discipline incidents and actions (ST-XXX). Teacher reporting, principal management,
   // parent visibility. Audit rows written by auditAction middleware.
   "POST /api/discipline/incidents",

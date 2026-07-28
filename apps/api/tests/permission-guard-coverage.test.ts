@@ -147,6 +147,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
+  // Gradebook configuration (ST-112). Guarded by requirePermission() on GRADE_READ/GRADE_UPDATE.
+  // Row-level: only the teaching teacher or a school admin may manage a gradebook.
+  "POST /api/grades/config/gradebooks/{gradebookId}/categories",
+  "PATCH /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+  "DELETE /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+  "POST /api/grades/config/gradebooks/{gradebookId}/scheme/link",
+  "POST /api/grades/config/schemes",
   // Attendance sessions. Tenant-scoped session management protected by requireAuth; school-level
   // data with no cross-user row-level permission.
   "POST /api/attendance/records/batch",
@@ -164,8 +171,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",
   "PATCH /api/academics/materials/{materialId}",
-  "DELETE /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
+  "DELETE /api/academics/materials/{materialId}",
 ];
 
 /**
@@ -254,17 +261,18 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
-  // Attendance sessions — tenant-scoped session management protected by requireAuth; school-level
-  // data with no cross-user row-level permission to check.
+  // Attendance sessions (ST-107) — idempotent session management; teacher self-service
+  // on the class period they teach, guarded by a route handler that verifies the caller
+  // is the class teacher rather than requirePermission().
   "POST /api/attendance/sessions",
   "PATCH /api/attendance/sessions/{sessionId}",
-  // Learning materials (ST-102) — tenant-scoped school-level catalog data protected by
-  // requireAuth; no cross-user row-level permission to check.
+  // Learning materials (ST-106) — storage-triggered upload flow, authorized by
+  // signed upload URL and row ownership, not by the permission guard.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",
   "PATCH /api/academics/materials/{materialId}",
-  "DELETE /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
+  "DELETE /api/academics/materials/{materialId}",
 ]);
 
 // ---------------------------------------------------------------------------

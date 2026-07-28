@@ -48,6 +48,7 @@ import {
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { disciplineRoutes } from "./modules/discipline";
+import { gradebookConfigRoutes } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -509,8 +510,15 @@ export function createApp({
     app.route("/", examRoutes(database));
   }
 
-  // Attendance sessions: open/list/get/update-status per class period, with idempotent
-  // duplicate protection and timetable-slot validation.
+  // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and
+  // versioned grading schemes per term. Gated on GRADE_READ/GRADE_UPDATE permissions
+  // and class-level teacher authorization.
+  if (database) {
+    app.route("/", gradebookConfigRoutes(database));
+  }
+
+  // Attendance sessions (ST-107). Idempotent session management per class period with
+  // batch record-keeping. Gated on ATTENDANCE_RECORD_CREATE permission.
   if (database) {
     app.route("/", attendanceSessionRoutes(database));
   }
