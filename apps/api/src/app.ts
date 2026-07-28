@@ -248,6 +248,7 @@ export function createApp({
   if (redis) {
     app.use("/api/finance/*", idempotencyMiddleware({ redis }));
     app.use("/api/imports/*", idempotencyMiddleware({ redis }));
+    app.use("/api/attendance/records/batch", idempotencyMiddleware({ redis }));
   }
 
   app.route("/", healthRoutes(isReady));

@@ -129,6 +129,8 @@ export const PERMISSIONS = {
   MATERIAL_DELETE: "material:delete",
   MATERIAL_MANAGE_AI: "material:manageAi",
 
+  ATTENDANCE_RECORD_CREATE: "attendance:record:create",
+
   PARENT_LINK: "parent:link",
   PARENT_UNLINK: "parent:unlink",
 
@@ -215,6 +217,7 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.MATERIAL_MANAGE_AI,
   PERMISSIONS.DISCIPLINE_INCIDENT_CREATE,
   PERMISSIONS.DISCIPLINE_INCIDENT_READ,
+  PERMISSIONS.ATTENDANCE_RECORD_CREATE,
 ];
 
 const TEACHING_ASSISTANT_PERMISSIONS: readonly Permission[] = [
