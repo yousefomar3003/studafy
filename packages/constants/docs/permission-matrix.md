@@ -44,13 +44,13 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `enrollment:approve`             | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `enrollment:cancel`              | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `assignment:create`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `assignment:read`                | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        |       |               |
+| `assignment:read`                | ✅          | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       |               |
 | `assignment:update`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `assignment:delete`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `assignment:publish`             | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `assignment:extendDeadline`      | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `submission:create`              | ✅          | ✅        |         |            |                    | ✅      |        |       |               |
-| `submission:read`                | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        |       |               |
+| `submission:read`                | ✅          | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       |               |
 | `submission:update`              | ✅          | ✅        |         |            |                    | ✅      |        |       |               |
 | `submission:delete`              | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `submission:grade`               | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |

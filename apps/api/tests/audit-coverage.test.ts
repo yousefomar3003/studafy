@@ -155,6 +155,17 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/assignments/{assignmentId}/attachments/upload-url",
   "POST /api/academics/assignments/{assignmentId}/attachments",
   "DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  // Submissions (ST-104). Same contract as the assignments routes above: every mutation writes its
+  // app.audit_logs row from inside its own service transaction, so a hand-in, a grade change or a
+  // superseded attempt and its record commit or roll back together — see
+  // modules/academics/submissions/submission-service.ts and submission-attachment-service.ts. The
+  // POST is declared "insert" although a resubmission updates in place; the service emits the
+  // action that actually occurred.
+  "POST /api/academics/assignments/{assignmentId}/submissions",
+  "PATCH /api/academics/submissions/{submissionId}/grade",
+  "POST /api/academics/submissions/{submissionId}/attachments/upload-url",
+  "POST /api/academics/submissions/{submissionId}/attachments",
+  "DELETE /api/academics/submissions/{submissionId}/attachments/{attachmentId}",
   // Exam scheduling (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
   // catalog data with no cross-user row-level permission. Audit rows written by auditAction middleware.
   "POST /api/academics/exams",

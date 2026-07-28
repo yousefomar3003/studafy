@@ -139,6 +139,30 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/academics/assignments/{assignmentId}/submissions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List submissions for an assignment
+         * @description Teachers of the assignment's class and school admins see every submission; a student sees only their own, and a linked parent only their child's. Marks that have not been published are withheld from students and parents -- the submission is returned, but `score`, `feedback`, `graded_at` and `graded_by_user_id` are null and `grade_status` reads `none`.
+         */
+        readonly get: operations["listSubmissions"];
+        readonly put?: never;
+        /**
+         * Hand in or resubmit work
+         * @description Records the calling student's work for an assignment. A student has at most one submission per assignment: submitting again replaces the previous attempt atomically, increments `attempt_number`, and clears any unpublished mark. Answers 201 on a first hand-in and 200 on a resubmission. Work handed in after `due_at` is flagged `is_late` when the assignment allows late submission, and rejected with 409 when it does not.
+         */
+        readonly post: operations["createSubmission"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/academics/classes": {
         readonly parameters: {
             readonly query?: never;
@@ -437,6 +461,106 @@ export interface paths {
         readonly options?: never;
         readonly head?: never;
         readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/submissions/{submissionId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get a submission
+         * @description Returns one submission with pre-signed download URLs for its attachments. Answers 404 when the submission is outside the caller's scope, so one student cannot probe for another's work. Unpublished marks are withheld as described on the list endpoint.
+         */
+        readonly get: operations["getSubmission"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/submissions/{submissionId}/attachments": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Confirm an uploaded submission attachment
+         * @description Verifies the staged object exists, moves it to permanent storage, and records it against the submission, stamped with the current `attempt_number`. The storage key must be one issued by the upload-url endpoint for this school; any other key is rejected with 403.
+         */
+        readonly post: operations["confirmSubmissionAttachment"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/submissions/{submissionId}/attachments/{attachmentId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Delete a submission attachment
+         * @description Detaches a file from a submission. Only the owning student may do this -- a teacher can read the files they are marking but cannot alter them. The stored object is left for a storage sweep to reclaim rather than deleted inline, because an object delete cannot be rolled back with the row.
+         */
+        readonly delete: operations["deleteSubmissionAttachment"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/submissions/{submissionId}/attachments/upload-url": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Get a pre-signed upload URL for a submission attachment
+         * @description Returns a short-lived pre-signed PUT URL and the staging storage key. Upload the file body directly to the URL, then POST the key back to the attachments endpoint to confirm. Only the student the submission belongs to may attach files. Answers 503 when the deployment has no object storage configured.
+         */
+        readonly post: operations["createSubmissionAttachmentUploadUrl"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/academics/submissions/{submissionId}/grade": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Grade a submission
+         * @description Records a mark on a submission for a class the caller teaches. With `publish: false` the score and feedback are saved as a draft visible only to staff; with `publish: true` they are released to the student and their linked parents and the submission moves to `graded`. `return_to_student: true` instead sends the work back for another attempt, clearing any draft mark and permitting resubmission even after the deadline.
+         */
+        readonly patch: operations["gradeSubmission"];
         readonly trace?: never;
     };
     readonly "/api/academics/terms/{termId}": {
@@ -2104,6 +2228,14 @@ export interface components {
              */
             readonly idempotency_key?: string;
         };
+        readonly ConfirmSubmissionAttachmentBody: {
+            /** @description Optional integrity checksum computed by the client. */
+            readonly checksum_sha256?: string;
+            /** @description MIME type of the uploaded object. */
+            readonly content_type: string;
+            /** @description The `storage_key` returned by the upload-url endpoint. */
+            readonly storage_key: string;
+        };
         readonly CopyTimetableBody: {
             /**
              * Format: uuid
@@ -2461,6 +2593,25 @@ export interface components {
              */
             readonly status: "draft" | "active" | "inactive" | "archived";
         };
+        readonly CreateSubmissionBody: {
+            /**
+             * @description Free-text answer. Omit for an attachments-only hand-in.
+             * @example My answer to question 1 is...
+             */
+            readonly content?: string;
+        };
+        readonly CreateSubmissionUploadUrlBody: {
+            /**
+             * @description MIME type the client will upload with.
+             * @example application/pdf
+             */
+            readonly content_type: string;
+            /**
+             * @description Original file name.
+             * @example essay-final.pdf
+             */
+            readonly file_name: string;
+        };
         readonly CreateTeacherBody: {
             /**
              * Format: email
@@ -2762,6 +2913,25 @@ export interface components {
             readonly exam: components["schemas"]["Exam"];
             readonly warnings: readonly components["schemas"]["ExamConflictWarning"][];
         };
+        readonly GradeSubmissionBody: {
+            /** @description Comments for the student. Pass null to clear. */
+            readonly feedback?: string | null;
+            /**
+             * @description False saves a draft mark visible only to staff. True releases it to the student and their linked parents, and moves the submission to `graded`.
+             * @default false
+             */
+            readonly publish: boolean;
+            /**
+             * @description Send the work back for another attempt. Mutually exclusive with `publish`; clears the draft mark and permits resubmission even after the deadline.
+             * @default false
+             */
+            readonly return_to_student: boolean;
+            /**
+             * @description Points awarded. Two decimal places. Must not exceed the assignment's max_score.
+             * @example 87.5
+             */
+            readonly score?: number;
+        };
         readonly Guardian: {
             /** Format: date-time */
             readonly created_at: string;
@@ -2953,7 +3123,7 @@ export interface components {
         };
         readonly ProblemDetails: {
             /** @enum {string} */
-            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "CLASS_HAS_ENROLLMENTS" | "CLASS_CAPACITY_EXCEEDED" | "ENROLLMENT_DUPLICATE" | "ENROLLMENT_NOT_ACTIVE" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "EXAM_NOT_FOUND" | "EXAM_INVALID_STATE" | "TIMETABLE_TEACHER_CONFLICT" | "TIMETABLE_ROOM_CONFLICT" | "TIMETABLE_VERSION_NOT_DRAFT" | "ASSIGNMENT_CLASS_FORBIDDEN" | "ASSIGNMENT_INVALID_STATUS_TRANSITION" | "STORAGE_KEY_FORBIDDEN" | "STORAGE_OBJECT_NOT_FOUND" | "STORAGE_NOT_CONFIGURED" | "INTERNAL_ERROR";
+            readonly code: "AUTH_INVALID_CREDENTIALS" | "AUTH_TOKEN_EXPIRED" | "AUTH_TOKEN_INVALID" | "AUTH_SESSION_NOT_FOUND" | "INVITATION_INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" | "SCHOOL_SUSPENDED" | "OAUTH_STATE_INVALID" | "OAUTH_EMAIL_NOT_VERIFIED" | "OAUTH_PROVIDER_ERROR" | "OAUTH_LAST_PROVIDER" | "OAUTH_IDENTITY_EXISTS" | "NO_ACCOUNT" | "REQUIRES_ADMIN_APPROVAL" | "AUTHZ_FORBIDDEN" | "AUTHZ_ROLE_NOT_FOUND" | "AUTHZ_PERMISSION_NOT_FOUND" | "CHANNEL_NOT_AUTHORIZED" | "VALIDATION_FAILED" | "VALIDATION_REQUIRED_FIELD_MISSING" | "RESOURCE_NOT_FOUND" | "RESOURCE_ALREADY_DELETED" | "SCHOOL_EMAIL_DUPLICATE" | "SCHOOL_SLUG_DUPLICATE" | "VERIFICATION_TOKEN_INVALID" | "VERIFICATION_TOKEN_EXPIRED" | "VERIFICATION_TOKEN_CONSUMED" | "CAPTCHA_INVALID" | "CONFLICT_DUPLICATE_ENTRY" | "CONFLICT_STATE_MISMATCH" | "CONFLICT_IDEMPOTENCY_KEY_MISMATCH" | "USER_EMAIL_DUPLICATE" | "INVALID_ROLE_ASSIGNMENT" | "STUDENT_ADMISSION_DUPLICATE" | "TEACHER_EMPLOYEE_NUMBER_DUPLICATE" | "PARENT_LINK_EXISTS" | "PARENT_NOT_LINKED" | "PARENT_INVALID_ROLE" | "ACADEMIC_YEAR_ACTIVE_EXISTS" | "ACADEMIC_YEAR_DATE_OVERLAP" | "SUBJECT_HAS_COURSES" | "COURSE_HAS_CLASSES" | "CLASS_HAS_ENROLLMENTS" | "CLASS_CAPACITY_EXCEEDED" | "ENROLLMENT_DUPLICATE" | "ENROLLMENT_NOT_ACTIVE" | "LIMIT_EXCEEDED_STUDENT_CAP" | "TENANT_SUSPENDED" | "TENANT_CLOSED" | "RATE_LIMIT_EXCEEDED" | "PROVISIONING_FAILED" | "PROVISIONING_IN_PROGRESS" | "ERPNEXT_SITE_CREATION_FAILED" | "ERPNEXT_COMPANY_CREATION_FAILED" | "IMPORT_NOT_FOUND" | "IMPORT_INVALID_STATE" | "IMPORT_VALIDATION_FAILED" | "IMPORT_ROWS_EXCEED_LIMIT" | "IMPORT_IDEMPOTENCY_KEY_EXISTS" | "EXAM_NOT_FOUND" | "EXAM_INVALID_STATE" | "TIMETABLE_TEACHER_CONFLICT" | "TIMETABLE_ROOM_CONFLICT" | "TIMETABLE_VERSION_NOT_DRAFT" | "ASSIGNMENT_CLASS_FORBIDDEN" | "ASSIGNMENT_INVALID_STATUS_TRANSITION" | "SUBMISSION_NOT_FOUND" | "SUBMISSION_FORBIDDEN" | "SUBMISSION_NOT_ENROLLED" | "SUBMISSION_WINDOW_CLOSED" | "SUBMISSION_ALREADY_GRADED" | "SUBMISSION_INVALID_STATE" | "SUBMISSION_SCORE_EXCEEDS_MAX" | "STORAGE_KEY_FORBIDDEN" | "STORAGE_OBJECT_NOT_FOUND" | "STORAGE_NOT_CONFIGURED" | "INTERNAL_ERROR";
             readonly detail?: string;
             readonly instance?: string;
             /** Format: uuid */
@@ -3398,6 +3568,132 @@ export interface components {
             readonly subjects: readonly components["schemas"]["Subject"][];
             /** @description Total matching records. */
             readonly total: number;
+        };
+        readonly Submission: {
+            /**
+             * Format: uuid
+             * @description Assignment this answers.
+             */
+            readonly assignment_id: string;
+            /** @description Files handed in, with pre-signed download URLs. */
+            readonly attachments: readonly components["schemas"]["SubmissionAttachment"][];
+            /** @description 1 on first hand-in, incremented on every resubmission. */
+            readonly attempt_number: number;
+            /** @description Free-text answer. Null when the hand-in is attachments only. */
+            readonly content: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** @description Teacher's comments. Null until the grade is released. */
+            readonly feedback: string | null;
+            /**
+             * @description Grade release state. `none` = unmarked, `draft` = marked but withheld, `published` = released to the student. Students and parents never see `draft`; an unreleased grade reports as `none`.
+             * @enum {string}
+             */
+            readonly grade_status: "none" | "draft" | "published";
+            /**
+             * Format: date-time
+             * @description When the mark was recorded.
+             */
+            readonly graded_at: string | null;
+            /**
+             * Format: uuid
+             * @description Teacher who marked it. Null until the grade is released.
+             */
+            readonly graded_by_user_id: string | null;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /** @description Whether the hand-in landed after the assignment's due_at. Computed in the database at submission time and unaffected by grading. */
+            readonly is_late: boolean;
+            /**
+             * Format: uuid
+             * @description Most recent editor.
+             */
+            readonly last_edited_by_user_id: string;
+            /**
+             * Format: uuid
+             * @description Owning school tenant.
+             */
+            readonly school_id: string;
+            /** @description Points awarded. Null until the grade is released to the caller. */
+            readonly score: number | null;
+            /**
+             * @description Lifecycle state of a submission. `late` is a legacy value never written by this API; a late hand-in is `submitted` with `is_late: true`.
+             * @enum {string}
+             */
+            readonly status: "draft" | "submitted" | "late" | "graded" | "returned" | "withdrawn";
+            /**
+             * Format: uuid
+             * @description Student who handed it in.
+             */
+            readonly student_id: string;
+            /**
+             * Format: date-time
+             * @description When the current attempt was handed in.
+             */
+            readonly submitted_at: string | null;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        readonly SubmissionAttachment: {
+            /** @description Which attempt this file was uploaded against. Resubmission updates the submission in place, so files from a superseded attempt keep their original number. */
+            readonly attempt_number: number;
+            /** @description Lowercase hex SHA-256 of the object, when the client supplied one. */
+            readonly checksum_sha256: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** @description Short-lived pre-signed GET URL. Null when object storage is not configured for this deployment. Treat it as opaque and do not cache it beyond `download_url_expires_at`. */
+            readonly download_url: string | null;
+            /**
+             * Format: date-time
+             * @description When `download_url` stops working.
+             */
+            readonly download_url_expires_at: string | null;
+            /**
+             * Format: uuid
+             * @description Primary key.
+             */
+            readonly id: string;
+            /**
+             * @description Content type.
+             * @example application/pdf
+             */
+            readonly mime_type: string;
+            /**
+             * @description File name as uploaded.
+             * @example essay-final.pdf
+             */
+            readonly original_file_name: string;
+            /** @description Object size in bytes. */
+            readonly size_bytes: number;
+            /**
+             * Format: uuid
+             * @description Owning submission.
+             */
+            readonly submission_id: string;
+            /**
+             * Format: uuid
+             * @description User who confirmed the upload.
+             */
+            readonly uploaded_by_user_id: string;
+        };
+        readonly SubmissionList: {
+            readonly submissions: readonly components["schemas"]["Submission"][];
+            /** @description Total matching records. */
+            readonly total: number;
+        };
+        readonly SubmissionUploadUrl: {
+            /**
+             * Format: date-time
+             * @description When `upload_url` stops working.
+             */
+            readonly expires_at: string;
+            /** @description Staging key to pass back to the confirm endpoint. Opaque -- do not construct or edit it. */
+            readonly storage_key: string;
+            /** @description Pre-signed PUT URL. Upload the file body directly to it, then confirm. */
+            readonly upload_url: string;
         };
         readonly TeacherList: {
             /** @description Opaque cursor for the next page. Null when no more results. */
@@ -4701,6 +4997,201 @@ export interface operations {
             };
             /** @description No such resource, or it is not visible to this tenant. */
             readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly listSubmissions: {
+        readonly parameters: {
+            readonly query?: {
+                /** @description Restrict to one grade release state -- the teacher's marking queue is `grade_status=none`. Ignored for non-staff callers, who cannot observe it. */
+                readonly grade_status?: "none" | "draft" | "published";
+                /** @description Maximum submissions to return. */
+                readonly limit?: number;
+                /** @description Records to skip. */
+                readonly offset?: number | null;
+                /** @description Restrict to one lifecycle state. */
+                readonly status?: "draft" | "submitted" | "late" | "graded" | "returned" | "withdrawn";
+                /** @description Restrict to one student. Staff only; ignored for other callers. */
+                readonly student_id?: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly assignmentId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Paginated list of submissions. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SubmissionList"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly createSubmission: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly assignmentId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateSubmissionBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The replaced submission. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Submission"];
+                };
+            };
+            /** @description The created submission. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Submission"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
                 headers: {
                     /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
                     readonly "X-Request-Id": string;
@@ -6798,6 +7289,401 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Course"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description The request conflicts with the current state of the resource. */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly getSubmission: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly submissionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description The submission. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Submission"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly confirmSubmissionAttachment: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly submissionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ConfirmSubmissionAttachmentBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The recorded attachment. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SubmissionAttachment"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly deleteSubmissionAttachment: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly attachmentId: string;
+                readonly submissionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Attachment deleted. */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly createSubmissionAttachmentUploadUrl: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly submissionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateSubmissionUploadUrlBody"];
+            };
+        };
+        readonly responses: {
+            /** @description Pre-signed upload URL and staging key. */
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SubmissionUploadUrl"];
+                };
+            };
+            /** @description The request was malformed or failed schema validation. */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authentication is missing or invalid. */
+            readonly 401: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Authenticated, but not permitted to perform this operation. */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description No such resource, or it is not visible to this tenant. */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unexpected server error. The body carries no detail; correlate via request_id. */
+            readonly 500: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    readonly gradeSubmission: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly submissionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["GradeSubmissionBody"];
+            };
+        };
+        readonly responses: {
+            /** @description The graded submission. */
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated correlation id, present on every response. Never read from the request. Matches the `request_id` member of a problem+json body and the request_id in server logs. */
+                    readonly "X-Request-Id": string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Submission"];
                 };
             };
             /** @description The request was malformed or failed schema validation. */

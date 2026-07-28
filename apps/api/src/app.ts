@@ -30,6 +30,7 @@ import {
   examRoutes,
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
+import { submissionRoutes } from "./modules/academics/submissions";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -488,6 +489,14 @@ export function createApp({
   // endpoints answer 503 and download URLs come back null.
   if (database) {
     app.route("/", assignmentRoutes(database, storage));
+  }
+
+  // Submissions (ST-104). Student hand-in with atomic resubmission and database-derived late
+  // flagging, teacher grading with a draft/publish split, and attachments the owning student
+  // controls. Gated on SUBMISSION_* permissions per method; `storage` is nullable on the same
+  // terms as the assignments module above.
+  if (database) {
+    app.route("/", submissionRoutes(database, storage));
   }
 
   // Exam scheduling: CRUD with timetable conflict warnings, gradebook weight linkage,

@@ -45,6 +45,10 @@ export async function seedAssessments(sql: Sql, ctx: FullCtx): Promise<void> {
         last_edited_by_user_id: student.userId,
         graded_by_user_id: teacher.userId,
         status: "graded",
+        // ck_assignment_submissions_lifecycle (000049) requires status='graded' to imply
+        // grade_status='published'. The two record one fact -- the mark is released -- and the
+        // constraint is what stops them disagreeing, so every writer must set both.
+        grade_status: "published",
         submitted_at: seedDate(-2, 12),
         graded_at: seedDate(-1, 12),
         score: 78 + index * 6,
@@ -57,6 +61,7 @@ export async function seedAssessments(sql: Sql, ctx: FullCtx): Promise<void> {
       "last_edited_by_user_id",
       "graded_by_user_id",
       "status",
+      "grade_status",
       "submitted_at",
       "graded_at",
       "score",

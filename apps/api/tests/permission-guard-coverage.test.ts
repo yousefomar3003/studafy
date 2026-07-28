@@ -131,6 +131,17 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/assignments/{assignmentId}/attachments/upload-url",
   "POST /api/academics/assignments/{assignmentId}/attachments",
   "DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  // Submissions (ST-104). Guarded per method by requirePermission() on SUBMISSION_CREATE,
+  // SUBMISSION_GRADE, and SUBMISSION_UPDATE — see permissionByMethod() in the route file. Row-level
+  // for the same reason the assignments routes are, and then some: a student may only act on their
+  // own submission and a teacher only on classes they teach, so these are NOT exempt below. The
+  // attachment routes gate on SUBMISSION_UPDATE specifically because INSTRUCTOR does not hold it —
+  // a teacher can read the work they are marking but cannot alter it.
+  "POST /api/academics/assignments/{assignmentId}/submissions",
+  "PATCH /api/academics/submissions/{submissionId}/grade",
+  "POST /api/academics/submissions/{submissionId}/attachments/upload-url",
+  "POST /api/academics/submissions/{submissionId}/attachments",
+  "DELETE /api/academics/submissions/{submissionId}/attachments/{attachmentId}",
   // Exam scheduling (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
   // catalog data with no cross-user row-level permission to check.
   "POST /api/academics/exams",
