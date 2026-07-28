@@ -173,9 +173,6 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
-  // Attendance sessions (ST-107). Idempotent session management per class period.
-  "POST /api/attendance/sessions",
-  "PATCH /api/attendance/sessions/{sessionId}",
 ];
 
 /**
@@ -276,11 +273,6 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
-  // Attendance sessions (ST-107) — idempotent session management; teacher self-service
-  // on the class period they teach, guarded by a route handler that verifies the caller
-  // is the class teacher rather than requirePermission().
-  "POST /api/attendance/sessions",
-  "PATCH /api/attendance/sessions/{sessionId}",
 ]);
 
 // ---------------------------------------------------------------------------

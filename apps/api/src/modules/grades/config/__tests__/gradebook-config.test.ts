@@ -373,6 +373,27 @@ describeDb("grading scheme CRUD", () => {
     expect(scheme.version).toBe(1);
     expect(scheme.term_id).toBe(t.term.id);
     expect(scheme.is_inherited).toBe(false);
+
+    const fetched = await asUser(t.school.id, t.teacherA.userId, (tx) =>
+      getScheme(tx, t.school.id, scheme.id),
+    );
+    expect(fetched.grade_boundaries).toEqual([
+      { label: "A", min: 90, max: 100, gpa_points: 4 },
+      { label: "F", min: 0, max: 59, gpa_points: 0 },
+    ]);
+
+    await expect(
+      asUser(
+        t.school.id,
+        t.teacherA.userId,
+        (tx) => tx`
+        UPDATE app.grading_scheme_boundaries
+        SET label = 'Changed'
+        WHERE school_id = ${t.school.id}::uuid
+          AND grading_scheme_id = ${scheme.id}::uuid
+      `,
+      ),
+    ).rejects.toThrow();
   });
 
   test("auto-increments version for subsequent schemes in the same term", async () => {

@@ -9,7 +9,7 @@ import type {
   GradingSchemeType,
   UpdateCategoryBody,
 } from "./schemas";
-import type { JSONValue, TransactionSql } from "postgres";
+import type { TransactionSql } from "postgres";
 
 /**
  * Gradebook configuration persistence and authorization (ST-112).
@@ -443,11 +443,38 @@ export async function listSchemes(
   termId: string,
 ): Promise<GradingSchemeRow[]> {
   return tx<GradingSchemeRow[]>`
-    SELECT id, school_id, term_id, academic_year_id, version, name, scheme_type,
-           grade_boundaries, is_inherited, created_by_user_id, created_at, updated_at
-    FROM app.grading_schemes
-    WHERE school_id = ${schoolId}::uuid AND term_id = ${termId}::uuid
-    ORDER BY version DESC
+    SELECT
+      scheme.id,
+      scheme.school_id,
+      scheme.term_id,
+      scheme.academic_year_id,
+      scheme.version,
+      scheme.name,
+      scheme.scheme_type,
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'label', boundary.label,
+              'min', boundary.min_percentage,
+              'max', boundary.max_percentage,
+              'gpa_points', boundary.gpa_points
+            )
+            ORDER BY boundary.position
+          )
+          FROM app.grading_scheme_boundaries AS boundary
+          WHERE boundary.school_id = scheme.school_id
+            AND boundary.grading_scheme_id = scheme.id
+        ),
+        '[]'::jsonb
+      ) AS grade_boundaries,
+      scheme.is_inherited,
+      scheme.created_by_user_id,
+      scheme.created_at,
+      scheme.updated_at
+    FROM app.grading_schemes AS scheme
+    WHERE scheme.school_id = ${schoolId}::uuid AND scheme.term_id = ${termId}::uuid
+    ORDER BY scheme.version DESC
   `;
 }
 
@@ -460,10 +487,37 @@ export async function getScheme(
   schemeId: string,
 ): Promise<GradingSchemeRow> {
   const [row] = await tx<GradingSchemeRow[]>`
-    SELECT id, school_id, term_id, academic_year_id, version, name, scheme_type,
-           grade_boundaries, is_inherited, created_by_user_id, created_at, updated_at
-    FROM app.grading_schemes
-    WHERE id = ${schemeId}::uuid AND school_id = ${schoolId}::uuid
+    SELECT
+      scheme.id,
+      scheme.school_id,
+      scheme.term_id,
+      scheme.academic_year_id,
+      scheme.version,
+      scheme.name,
+      scheme.scheme_type,
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'label', boundary.label,
+              'min', boundary.min_percentage,
+              'max', boundary.max_percentage,
+              'gpa_points', boundary.gpa_points
+            )
+            ORDER BY boundary.position
+          )
+          FROM app.grading_scheme_boundaries AS boundary
+          WHERE boundary.school_id = scheme.school_id
+            AND boundary.grading_scheme_id = scheme.id
+        ),
+        '[]'::jsonb
+      ) AS grade_boundaries,
+      scheme.is_inherited,
+      scheme.created_by_user_id,
+      scheme.created_at,
+      scheme.updated_at
+    FROM app.grading_schemes AS scheme
+    WHERE scheme.id = ${schemeId}::uuid AND scheme.school_id = ${schoolId}::uuid
   `;
 
   if (!row) {
@@ -512,12 +566,10 @@ export async function createScheme(
 
   const nextVersion = (maxVersion?.max_version ?? 0) + 1;
 
-  const boundariesJson = tx.json(params.grade_boundaries as unknown as JSONValue);
-
   const [row] = await tx<GradingSchemeRow[]>`
     INSERT INTO app.grading_schemes
       (school_id, term_id, academic_year_id, version, name, scheme_type,
-       grade_boundaries, is_inherited, created_by_user_id)
+       is_inherited, created_by_user_id)
     VALUES (
       ${schoolId}::uuid,
       ${params.term_id}::uuid,
@@ -525,13 +577,15 @@ export async function createScheme(
       ${nextVersion},
       ${params.name},
       ${params.scheme_type},
-      ${boundariesJson}::jsonb,
       false,
       ${userId}::uuid
     )
     RETURNING id, school_id, term_id, academic_year_id, version, name, scheme_type,
-              grade_boundaries, is_inherited, created_by_user_id, created_at, updated_at
+              '[]'::jsonb AS grade_boundaries, is_inherited, created_by_user_id,
+              created_at, updated_at
   `;
+
+  await insertSchemeBoundaries(tx, schoolId, row!.id, params.grade_boundaries);
 
   await emitAuditLog(tx, {
     action: "insert",
@@ -546,7 +600,7 @@ export async function createScheme(
     },
   });
 
-  return row!;
+  return { ...row!, grade_boundaries: params.grade_boundaries };
 }
 
 /**
@@ -576,12 +630,10 @@ export async function getOrCreateInheritedScheme(
     throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Term not found");
   }
 
-  const boundariesJson = tx.json(boundaries as unknown as JSONValue);
-
   const [row] = await tx<GradingSchemeRow[]>`
     INSERT INTO app.grading_schemes
       (school_id, term_id, academic_year_id, version, name, scheme_type,
-       grade_boundaries, is_inherited, created_by_user_id)
+       is_inherited, created_by_user_id)
     VALUES (
       ${schoolId}::uuid,
       ${termId}::uuid,
@@ -589,16 +641,18 @@ export async function getOrCreateInheritedScheme(
       1,
       ${`Inherited ${schemeType} scale`},
       ${scheme_type(schemeType)},
-      ${boundariesJson}::jsonb,
       true,
       ${userId}::uuid
     )
     ON CONFLICT (school_id, term_id, version) DO NOTHING
     RETURNING id, school_id, term_id, academic_year_id, version, name, scheme_type,
-              grade_boundaries, is_inherited, created_by_user_id, created_at, updated_at
+              '[]'::jsonb AS grade_boundaries, is_inherited, created_by_user_id,
+              created_at, updated_at
   `;
 
   if (row) {
+    await insertSchemeBoundaries(tx, schoolId, row.id, boundaries);
+
     await emitAuditLog(tx, {
       action: "insert",
       targetTable: "grading_schemes",
@@ -612,7 +666,7 @@ export async function getOrCreateInheritedScheme(
         is_inherited: true,
       },
     });
-    return row;
+    return { ...row, grade_boundaries: boundaries };
   }
 
   // Race condition: another request created it. Re-fetch.
@@ -721,6 +775,29 @@ function auditableFields(row: AssessmentCategoryRow): Record<string, unknown> {
     sort_order: row.sort_order,
     is_active: row.is_active,
   };
+}
+
+async function insertSchemeBoundaries(
+  tx: TransactionSql,
+  schoolId: string,
+  schemeId: string,
+  boundaries: GradeBoundary[],
+): Promise<void> {
+  for (const [position, boundary] of boundaries.entries()) {
+    await tx`
+      INSERT INTO app.grading_scheme_boundaries
+        (school_id, grading_scheme_id, position, label, min_percentage, max_percentage, gpa_points)
+      VALUES (
+        ${schoolId}::uuid,
+        ${schemeId}::uuid,
+        ${position},
+        ${boundary.label},
+        ${boundary.min},
+        ${boundary.max},
+        ${boundary.gpa_points ?? null}
+      )
+    `;
+  }
 }
 
 /**

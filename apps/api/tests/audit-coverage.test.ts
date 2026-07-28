@@ -189,9 +189,6 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
-  // Attendance sessions (ST-107). Idempotent session management per class period.
-  "POST /api/attendance/sessions",
-  "PATCH /api/attendance/sessions/{sessionId}",
   // Discipline incidents and actions (ST-XXX). Teacher reporting, principal management,
   // parent visibility. Audit rows written by auditAction middleware.
   "POST /api/discipline/incidents",
