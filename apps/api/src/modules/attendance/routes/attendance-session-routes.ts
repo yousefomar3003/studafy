@@ -1,21 +1,26 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import {
   getAttendanceSession,
   listAttendanceSessions,
   openAttendanceSession,
+  recordAttendanceBatch,
   updateAttendanceSessionStatus,
 } from "../attendance-session-service";
 import {
   attendanceSessionListSchema,
   attendanceSessionQuerySchema,
   attendanceSessionSchema,
+  batchRecordAttendanceBodySchema,
+  batchRecordAttendanceResponseSchema,
   createAttendanceSessionBodySchema,
   sessionIdParamSchema,
   updateAttendanceSessionBodySchema,
@@ -142,6 +147,38 @@ const updateSessionStatusRoute = createRoute({
   ),
 });
 
+const batchRecordAttendanceRoute = createRoute({
+  method: "post",
+  path: "/api/attendance/records/batch",
+  tags: ["Attendance"],
+  operationId: "recordAttendanceBatch",
+  summary: "Record attendance for multiple students",
+  description:
+    "Records attendance states for a full class roster in a single call. " +
+    "Idempotent: replaying the same request safely skips already-recorded students. " +
+    "Teacher scope is enforced — only the assigned teacher or school admin may record.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: batchRecordAttendanceBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    {
+      200: {
+        description: "All requested records already existed — no new records created.",
+        schema: batchRecordAttendanceResponseSchema,
+      },
+      201: {
+        description: "One or more new attendance records were created.",
+        schema: batchRecordAttendanceResponseSchema,
+      },
+    },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
 // ---------------------------------------------------------------------------
 // Route factory
 // ---------------------------------------------------------------------------
@@ -152,6 +189,40 @@ export function attendanceSessionRoutes(database: Database): OpenAPIHono<AppEnv>
   // Audit declarations
   routes.use("/api/attendance/sessions", auditAction("insert", "attendance_sessions"));
   routes.use("/api/attendance/sessions/{sessionId}", auditAction("update", "attendance_sessions"));
+
+  // Audit declarations
+  routes.use("/api/attendance/records/batch", auditAction("insert", "attendance_records"));
+
+  // Permission guard
+  routes.use(
+    "/api/attendance/records/batch",
+    requirePermission(PERMISSIONS.ATTENDANCE_RECORD_CREATE),
+  );
+
+  // --- Batch record attendance ---
+
+  routes.openapi(batchRecordAttendanceRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+
+    const result = await withTenantTx(database, tenantFrom(c), (tx) =>
+      recordAttendanceBatch(tx, auth.schoolId, auth.userId, {
+        attendance_session_id: body.attendance_session_id,
+        records: body.records,
+      }),
+    );
+
+    const status = result.created_count > 0 ? 201 : 200;
+    return c.json(
+      {
+        attendance_session_id: body.attendance_session_id,
+        records: result.records,
+        created_count: result.created_count,
+        total_count: result.records.length,
+      },
+      status,
+    );
+  });
 
   // --- Open session (idempotent) ---
 
