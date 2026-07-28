@@ -6,3 +6,4 @@ export { classRoutes } from "./routes/class-routes";
 export { enrollmentRoutes } from "./routes/enrollment-routes";
 export { timetableRoutes } from "./routes/timetable-routes";
 export { examRoutes } from "./routes/exam-routes";
+export { materialRoutes } from "./routes/material-routes";

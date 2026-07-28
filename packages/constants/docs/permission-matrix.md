@@ -103,5 +103,10 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `teacher:create`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `teacher:read`                   | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `teacher:update`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `material:create`                | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
+| `material:read`                  | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        |       |               |
+| `material:update`                | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
+| `material:delete`                | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
+| `material:manageAi`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `parent:link`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `parent:unlink`                  | ✅          | ✅        |         |            |                    |         |        |       |               |
