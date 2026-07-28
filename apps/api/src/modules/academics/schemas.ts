@@ -1001,3 +1001,169 @@ export const examIdParamSchema = z
       }),
   })
   .openapi("ExamIdParam");
+
+// ---------------------------------------------------------------------------
+// Materials
+// ---------------------------------------------------------------------------
+
+export const materialIngestStatusSchema = z
+  .enum(["uploaded", "processing", "ready", "failed"])
+  .openapi({ description: "Ingestion lifecycle state of a material." });
+
+export type MaterialIngestStatus = z.infer<typeof materialIngestStatusSchema>;
+
+export const materialSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    class_id: uuidSchema.openapi({ description: "Parent class." }),
+    uploaded_by_user_id: uuidSchema.openapi({ description: "User who uploaded." }),
+    last_edited_by_user_id: uuidSchema.openapi({ description: "User who last edited." }),
+    title: z
+      .string()
+      .openapi({ description: "Material title.", example: "Photosynthesis Study Guide" }),
+    description: z.string().nullable().openapi({ description: "Optional description." }),
+    storage_key: z.string().openapi({
+      description: "Permanent object storage key.",
+      example: "permanent/{schoolId}/materials/guide.pdf",
+    }),
+    original_file_name: z.string().openapi({
+      description: "Original file name as uploaded.",
+      example: "photosynthesis-guide.pdf",
+    }),
+    mime_type: z.string().openapi({ description: "MIME type.", example: "application/pdf" }),
+    size_bytes: z.number().int().openapi({ description: "File size in bytes.", example: 204800 }),
+    checksum_sha256: z
+      .string()
+      .nullable()
+      .openapi({ description: "SHA-256 hex digest, or null if not computed." }),
+    ai_visible: z
+      .boolean()
+      .openapi({ description: "Whether this material is exposed to AI ingestion." }),
+    ingest_status: materialIngestStatusSchema,
+    ingest_error: z
+      .string()
+      .nullable()
+      .openapi({ description: "Last ingestion error message, or null." }),
+    ingested_at: dateTimeSchema
+      .nullable()
+      .openapi({ description: "When ingestion last completed successfully." }),
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("Material");
+
+export type Material = z.infer<typeof materialSchema>;
+
+export const createMaterialBodySchema = z
+  .object({
+    class_id: uuidSchema.openapi({ description: "Parent class." }),
+    title: z
+      .string()
+      .min(1)
+      .max(200)
+      .openapi({ description: "Material title.", example: "Photosynthesis Study Guide" }),
+    description: z
+      .string()
+      .max(2000)
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional description." }),
+    original_file_name: z
+      .string()
+      .min(1)
+      .max(255)
+      .openapi({ description: "Original file name.", example: "photosynthesis-guide.pdf" }),
+    mime_type: z
+      .string()
+      .min(1)
+      .max(127)
+      .openapi({ description: "MIME type.", example: "application/pdf" }),
+    size_bytes: z.number().int().min(1).openapi({ description: "File size in bytes." }),
+    checksum_sha256: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional()
+      .openapi({ description: "SHA-256 hex digest." }),
+  })
+  .openapi("CreateMaterialBody");
+
+export type CreateMaterialBody = z.infer<typeof createMaterialBodySchema>;
+
+export const updateMaterialBodySchema = z
+  .object({
+    title: z.string().min(1).max(200).optional().openapi({ description: "Material title." }),
+    description: z
+      .string()
+      .max(2000)
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional description." }),
+  })
+  .openapi("UpdateMaterialBody");
+
+export type UpdateMaterialBody = z.infer<typeof updateMaterialBodySchema>;
+
+export const materialListSchema = z
+  .object({
+    materials: z.array(materialSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("MaterialList");
+
+export const materialQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    class_id: uuidSchema.optional(),
+    ingest_status: materialIngestStatusSchema.optional(),
+  })
+  .openapi("MaterialQuery");
+
+export const materialIdParamSchema = z
+  .object({
+    materialId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "materialId", in: "path" },
+        description: "Material UUID.",
+      }),
+  })
+  .openapi("MaterialIdParam");
+
+// ---------------------------------------------------------------------------
+// Materials — presigned upload flow
+// ---------------------------------------------------------------------------
+
+export const presignedUploadResponseSchema = z
+  .object({
+    upload_url: z.string().url().openapi({ description: "Pre-signed URL for PUT upload." }),
+    storage_key: z.string().openapi({ description: "Storage key the file will be written to." }),
+    expires_at: dateTimeSchema.openapi({ description: "When the upload URL expires." }),
+  })
+  .openapi("PresignedUpload");
+
+export const confirmUploadBodySchema = z
+  .object({
+    storage_key: z
+      .string()
+      .min(1)
+      .openapi({ description: "Storage key returned by the presign step." }),
+    checksum_sha256: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional()
+      .openapi({ description: "Client-computed SHA-256 hex digest." }),
+  })
+  .openapi("ConfirmUploadBody");
+
+export type ConfirmUploadBody = z.infer<typeof confirmUploadBodySchema>;
+
+export const toggleAiVisibleBodySchema = z
+  .object({
+    ai_visible: z.boolean().openapi({ description: "New AI visibility setting." }),
+  })
+  .openapi("ToggleAiVisibleBody");
+
+export type ToggleAiVisibleBody = z.infer<typeof toggleAiVisibleBodySchema>;

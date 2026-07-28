@@ -37,6 +37,10 @@ export const DOMAIN_EVENTS = {
   DISCUSSION_POSTED: "discussion.posted",
   DISCUSSION_MODERATED: "discussion.moderated",
 
+  MATERIAL_UPLOADED: "material.uploaded",
+  MATERIAL_AI_ENABLED: "material.aiEnabled",
+  MATERIAL_AI_DISABLED: "material.aiDisabled",
+
   STUDY_GROUP_CREATED: "studyGroup.created",
   STUDY_GROUP_JOINED: "studyGroup.joined",
 

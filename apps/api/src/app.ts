@@ -28,6 +28,7 @@ import {
   enrollmentRoutes,
   timetableRoutes,
   examRoutes,
+  materialRoutes,
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
@@ -510,6 +511,12 @@ export function createApp({
   // duplicate protection and timetable-slot validation.
   if (database) {
     app.route("/", attendanceSessionRoutes(database));
+  }
+
+  // Learning materials: CRUD, pre-signed upload flow, AI visibility toggle.
+  // Storage client is optional — upload endpoints return 503 when unconfigured.
+  if (database) {
+    app.route("/", materialRoutes(database));
   }
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.
