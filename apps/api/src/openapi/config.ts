@@ -156,5 +156,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Grade entry endpoints. Authenticated and tenant-scoped. " +
         "Manage the grade entry grid including bulk grade updates and submission status transitions.",
     },
+    {
+      name: "Grade Workflow",
+      description:
+        "Grade workflow endpoints. Authenticated and tenant-scoped. " +
+        "Submit, approve/reject, and unlock grade submissions.",
+    },
   ],
 };

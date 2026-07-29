@@ -1,9 +1,14 @@
-import { ERROR_CODES } from "@studafy/constants";
+import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
+import { emit } from "../../lib/events/emitter";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
-import { assertCanManageGradebook, getGradebookById } from "./config/gradebook-config-service";
+import {
+  assertCanManageGradebook,
+  getGradebookByClassId,
+  getGradebookById,
+} from "./config/gradebook-config-service";
 
 import type { UpdateGradeEntry } from "./config/schemas";
 import type { TransactionSql } from "postgres";
@@ -31,6 +36,7 @@ export interface GradeSubmissionRow {
   student_id: string;
   submitted_by_user_id: string | null;
   decided_by_user_id: string | null;
+  rejection_reason: string | null;
   status: string;
   submitted_at: Date | null;
   decided_at: Date | null;
@@ -45,6 +51,7 @@ export interface GradeSubmissionWithGrades {
   status: string;
   submitted_by_user_id: string | null;
   decided_by_user_id: string | null;
+  rejection_reason: string | null;
   submitted_at: Date | null;
   decided_at: Date | null;
   created_at: Date;
@@ -62,7 +69,7 @@ const BATCH_LIMIT = 100;
 // Authorization (re-exported for convenience)
 // ---------------------------------------------------------------------------
 
-export { assertCanManageGradebook, getGradebookById };
+export { assertCanManageGradebook, getGradebookByClassId, getGradebookById };
 
 // ---------------------------------------------------------------------------
 // Enrolled students
@@ -78,7 +85,7 @@ export async function getEnrolledStudentIds(
 ): Promise<string[]> {
   const rows = await tx<{ student_id: string }[]>`
     SELECT student_id
-    FROM app.class_enrollments
+    FROM app.enrollments
     WHERE school_id = ${schoolId}::uuid
       AND class_id = ${classId}::uuid
       AND status = 'active'
@@ -109,6 +116,7 @@ export async function ensureDraftSubmissions(
     return tx<GradeSubmissionRow[]>`
       SELECT id, school_id, gradebook_id, student_id,
              submitted_by_user_id, decided_by_user_id,
+             rejection_reason,
              status, submitted_at, decided_at,
              created_at, updated_at
       FROM app.grade_submissions
@@ -119,6 +127,7 @@ export async function ensureDraftSubmissions(
   const existing = await tx<GradeSubmissionRow[]>`
     SELECT id, school_id, gradebook_id, student_id,
            submitted_by_user_id, decided_by_user_id,
+           rejection_reason,
            status, submitted_at, decided_at,
            created_at, updated_at
     FROM app.grade_submissions
@@ -138,6 +147,7 @@ export async function ensureDraftSubmissions(
         ON CONFLICT (school_id, gradebook_id, student_id) DO NOTHING
         RETURNING id, school_id, gradebook_id, student_id,
                   submitted_by_user_id, decided_by_user_id,
+                  rejection_reason,
                   status, submitted_at, decided_at,
                   created_at, updated_at
       `;
@@ -177,6 +187,7 @@ export async function getSubmissionsWithGrades(
   const submissions = await tx<GradeSubmissionRow[]>`
     SELECT gs.id, gs.school_id, gs.gradebook_id, gs.student_id,
            gs.submitted_by_user_id, gs.decided_by_user_id,
+           gs.rejection_reason,
            gs.status, gs.submitted_at, gs.decided_at,
            gs.created_at, gs.updated_at
     FROM app.grade_submissions AS gs
@@ -219,6 +230,7 @@ export async function getSubmissionsWithGrades(
     status: s.status,
     submitted_by_user_id: s.submitted_by_user_id,
     decided_by_user_id: s.decided_by_user_id,
+    rejection_reason: s.rejection_reason,
     submitted_at: s.submitted_at,
     decided_at: s.decided_at,
     created_at: s.created_at,
@@ -365,18 +377,349 @@ export async function bulkUpdateGrades(
 }
 
 // ---------------------------------------------------------------------------
-// Submission status transitions
+// Authorization helpers
 // ---------------------------------------------------------------------------
 
 /**
- * Transition a grade submission's status. The actual state machine is
- * enforced by the `enforce_grade_submission_transition` DB trigger.
+ * Assert the current DB session user teaches the gradebook's class.
+ */
+export async function assertUserTeachesGradebook(
+  tx: TransactionSql,
+  gradebookId: string,
+): Promise<void> {
+  const [row] = await tx<{ allowed: boolean }[]>`
+    SELECT app.teaches_gradebook(${gradebookId}) AS allowed
+  `;
+  if (!row?.allowed) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.AUTHZ_FORBIDDEN,
+      "Only the assigned teacher can submit or unlock grades",
+    );
+  }
+}
+
+/**
+ * Assert the current DB session user is a school admin.
+ */
+export async function assertUserIsSchoolAdmin(tx: TransactionSql): Promise<void> {
+  const [row] = await tx<{ allowed: boolean }[]>`
+    SELECT app.current_user_is_school_admin() AS allowed
+  `;
+  if (!row?.allowed) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.AUTHZ_FORBIDDEN,
+      "Only school administrators can approve or reject grades",
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// State machine validation (app-level — complements DB trigger)
+// ---------------------------------------------------------------------------
+
+const VALID_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+  draft: new Set(["submitted"]),
+  submitted: new Set(["approved", "rejected"]),
+  approved: new Set(["published"]),
+  rejected: new Set(["draft"]),
+  published: new Set(),
+};
+
+function assertValidTransition(from: string, to: string): void {
+  const allowed = VALID_TRANSITIONS[from];
+  if (!allowed?.has(to)) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.GRADE_INVALID_STATUS_TRANSITION,
+      `Cannot transition submission from ${from} to ${to}`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Concurrency guard helper
+// ---------------------------------------------------------------------------
+
+async function fetchSubmissionOrThrow(
+  tx: TransactionSql,
+  schoolId: string,
+  submissionId: string,
+): Promise<GradeSubmissionRow> {
+  const [row] = await tx<GradeSubmissionRow[]>`
+    SELECT id, school_id, gradebook_id, student_id,
+           submitted_by_user_id, decided_by_user_id,
+           rejection_reason,
+           status, submitted_at, decided_at,
+           created_at, updated_at
+    FROM app.grade_submissions
+    WHERE id = ${submissionId}::uuid AND school_id = ${schoolId}::uuid
+  `;
+  if (!row) {
+    throw new CodedHttpException(
+      404,
+      ERROR_CODES.GRADE_SUBMISSION_NOT_FOUND,
+      "Grade submission not found",
+    );
+  }
+  return row;
+}
+
+function concurrencyConflict(submissionId: string): never {
+  throw new CodedHttpException(
+    409,
+    ERROR_CODES.GRADE_CONCURRENT_EDIT,
+    `Submission ${submissionId} was modified by another user. Reload and retry.`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Workflow: submit (draft → submitted)
+// ---------------------------------------------------------------------------
+
+/**
+ * Submit a draft grade submission for administrative review.
  *
- * This function sets `status` and `updated_at` only; the trigger
- * populates the audit columns (submitted_by_user_id, submitted_at,
- * decided_by_user_id, decided_at).
+ * Only the assigned teacher may submit. Emits a `grades.submitted` domain
+ * event atomically within the transaction.
+ */
+export async function submitSubmission(
+  tx: TransactionSql,
+  schoolId: string,
+  gradebookId: string,
+  submissionId: string,
+  updatedAt: string,
+  userId: string,
+): Promise<GradeSubmissionRow> {
+  await assertUserTeachesGradebook(tx, gradebookId);
+
+  const before = await fetchSubmissionOrThrow(tx, schoolId, submissionId);
+  assertValidTransition(before.status, "submitted");
+
+  const [updated] = await tx<GradeSubmissionRow[]>`
+    UPDATE app.grade_submissions SET
+      status = 'submitted'::app.grade_submission_status,
+      submitted_by_user_id = ${userId}::uuid,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${submissionId}::uuid
+      AND school_id = ${schoolId}::uuid
+      AND updated_at = ${updatedAt}::timestamptz
+    RETURNING id, school_id, gradebook_id, student_id,
+              submitted_by_user_id, decided_by_user_id,
+              rejection_reason,
+              status, submitted_at, decided_at,
+              created_at, updated_at
+  `;
+
+  if (!updated) {
+    await fetchSubmissionOrThrow(tx, schoolId, submissionId);
+    concurrencyConflict(submissionId);
+  }
+
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "grade_submissions",
+    targetId: submissionId,
+    oldValues: { status: before.status },
+    newValues: { status: "submitted" },
+  });
+
+  await emit(tx, DOMAIN_EVENTS.GRADES_SUBMITTED, {
+    submissionId,
+    gradebookId,
+    studentId: updated!.student_id,
+  });
+
+  return updated!;
+}
+
+// ---------------------------------------------------------------------------
+// Workflow: decide (submitted → approved+published | submitted → rejected)
+// ---------------------------------------------------------------------------
+
+/**
+ * Approve or reject a submitted grade.
  *
- * Uses the same `updated_at` concurrency guard as bulkUpdateGrades.
+ * - **Approve** chains `submitted → approved → published` atomically.
+ *   Emits a `grades.published` domain event.
+ * - **Reject** transitions to `rejected` with a required rejection reason.
+ *   The teacher may later unlock and resubmit.
+ *
+ * Only a school admin may decide.
+ */
+export async function decideSubmission(
+  tx: TransactionSql,
+  schoolId: string,
+  submissionId: string,
+  action: "approve" | "reject",
+  updatedAt: string,
+  userId: string,
+  rejectionReason?: string | null,
+): Promise<GradeSubmissionRow> {
+  await assertUserIsSchoolAdmin(tx);
+
+  const before = await fetchSubmissionOrThrow(tx, schoolId, submissionId);
+  assertValidTransition(before.status, action === "approve" ? "approved" : "rejected");
+
+  if (action === "reject") {
+    if (!rejectionReason) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.VALIDATION_FAILED,
+        "A rejection reason is required when rejecting a grade submission",
+      );
+    }
+
+    const [updated] = await tx<GradeSubmissionRow[]>`
+      UPDATE app.grade_submissions SET
+        status = 'rejected'::app.grade_submission_status,
+        decided_by_user_id = ${userId}::uuid,
+        rejection_reason = ${rejectionReason},
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${submissionId}::uuid
+        AND school_id = ${schoolId}::uuid
+        AND updated_at = ${updatedAt}::timestamptz
+      RETURNING id, school_id, gradebook_id, student_id,
+                submitted_by_user_id, decided_by_user_id,
+                rejection_reason,
+                status, submitted_at, decided_at,
+                created_at, updated_at
+    `;
+
+    if (!updated) {
+      await fetchSubmissionOrThrow(tx, schoolId, submissionId);
+      concurrencyConflict(submissionId);
+    }
+
+    await emitAuditLog(tx, {
+      action: "update",
+      targetTable: "grade_submissions",
+      targetId: submissionId,
+      oldValues: { status: before.status },
+      newValues: { status: "rejected", rejection_reason: rejectionReason },
+    });
+
+    return updated!;
+  }
+
+  // Approve: chain submitted → approved → published within the same transaction.
+  const [approved] = await tx<GradeSubmissionRow[]>`
+    UPDATE app.grade_submissions SET
+      status = 'approved'::app.grade_submission_status,
+      decided_by_user_id = ${userId}::uuid,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${submissionId}::uuid
+      AND school_id = ${schoolId}::uuid
+      AND updated_at = ${updatedAt}::timestamptz
+    RETURNING id, school_id, gradebook_id, student_id,
+              submitted_by_user_id, decided_by_user_id,
+              rejection_reason,
+              status, submitted_at, decided_at,
+              created_at, updated_at
+  `;
+
+  if (!approved) {
+    await fetchSubmissionOrThrow(tx, schoolId, submissionId);
+    concurrencyConflict(submissionId);
+  }
+
+  const [published] = await tx<GradeSubmissionRow[]>`
+    UPDATE app.grade_submissions SET
+      status = 'published'::app.grade_submission_status,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${approved!.id}::uuid
+      AND school_id = ${schoolId}::uuid
+      AND status = 'approved'::app.grade_submission_status
+    RETURNING id, school_id, gradebook_id, student_id,
+              submitted_by_user_id, decided_by_user_id,
+              rejection_reason,
+              status, submitted_at, decided_at,
+              created_at, updated_at
+  `;
+
+  if (!published) {
+    throw new CodedHttpException(
+      500,
+      ERROR_CODES.INTERNAL_ERROR,
+      "Failed to publish approved submission",
+    );
+  }
+
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "grade_submissions",
+    targetId: submissionId,
+    oldValues: { status: before.status },
+    newValues: { status: "published" },
+  });
+
+  await emit(tx, DOMAIN_EVENTS.GRADES_PUBLISHED, {
+    submissionId,
+    gradebookId: published.gradebook_id,
+    studentId: published.student_id,
+    approvedByUserId: userId,
+  });
+
+  return published;
+}
+
+// ---------------------------------------------------------------------------
+// Workflow: unlock (rejected → draft)
+// ---------------------------------------------------------------------------
+
+/**
+ * Unlock a rejected submission so the teacher can edit and resubmit.
+ *
+ * The DB trigger clears all audit columns and the rejection reason.
+ * Only the assigned teacher may unlock.
+ */
+export async function unlockSubmission(
+  tx: TransactionSql,
+  schoolId: string,
+  gradebookId: string,
+  submissionId: string,
+  updatedAt: string,
+): Promise<GradeSubmissionRow> {
+  await assertUserTeachesGradebook(tx, gradebookId);
+
+  const before = await fetchSubmissionOrThrow(tx, schoolId, submissionId);
+  assertValidTransition(before.status, "draft");
+
+  const [updated] = await tx<GradeSubmissionRow[]>`
+    UPDATE app.grade_submissions SET
+      status = 'draft'::app.grade_submission_status,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${submissionId}::uuid
+      AND school_id = ${schoolId}::uuid
+      AND updated_at = ${updatedAt}::timestamptz
+    RETURNING id, school_id, gradebook_id, student_id,
+              submitted_by_user_id, decided_by_user_id,
+              rejection_reason,
+              status, submitted_at, decided_at,
+              created_at, updated_at
+  `;
+
+  if (!updated) {
+    await fetchSubmissionOrThrow(tx, schoolId, submissionId);
+    concurrencyConflict(submissionId);
+  }
+
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "grade_submissions",
+    targetId: submissionId,
+    oldValues: { status: before.status },
+    newValues: { status: "draft" },
+  });
+
+  return updated!;
+}
+
+/**
+ * @deprecated Use submitSubmission, decideSubmission, or unlockSubmission instead.
+ *   This generic function is kept for backward compatibility during the migration
+ *   to the workflow-specific API and will be removed in a future release.
  */
 export async function updateSubmissionStatus(
   tx: TransactionSql,
@@ -386,7 +729,6 @@ export async function updateSubmissionStatus(
   updatedAt: string,
   userId: string,
 ): Promise<GradeSubmissionRow> {
-  // Determine which actor column to set based on target status per trigger.
   const actorColumn = status === "submitted" ? "submitted_by_user_id" : "decided_by_user_id";
 
   const [updated] = await tx<GradeSubmissionRow[]>`
@@ -399,33 +741,14 @@ export async function updateSubmissionStatus(
       AND updated_at = ${updatedAt}::timestamptz
     RETURNING id, school_id, gradebook_id, student_id,
               submitted_by_user_id, decided_by_user_id,
+              rejection_reason,
               status, submitted_at, decided_at,
               created_at, updated_at
   `;
 
   if (!updated) {
-    const [current] = await tx<GradeSubmissionRow[]>`
-      SELECT id, school_id, gradebook_id, student_id,
-             submitted_by_user_id, decided_by_user_id,
-             status, submitted_at, decided_at,
-             created_at, updated_at
-      FROM app.grade_submissions
-      WHERE id = ${submissionId}::uuid AND school_id = ${schoolId}::uuid
-    `;
-
-    if (current) {
-      throw new CodedHttpException(
-        409,
-        ERROR_CODES.GRADE_CONCURRENT_EDIT,
-        `Submission ${submissionId} was modified by another user. Reload and retry.`,
-      );
-    }
-
-    throw new CodedHttpException(
-      404,
-      ERROR_CODES.GRADE_SUBMISSION_NOT_FOUND,
-      "Grade submission not found",
-    );
+    await fetchSubmissionOrThrow(tx, schoolId, submissionId);
+    concurrencyConflict(submissionId);
   }
 
   await emitAuditLog(tx, {

@@ -19,7 +19,7 @@ async function runCheckDrift(env: Record<string, string> = {}): Promise<{
   stderr: string;
   stdout: string;
 }> {
-  const proc = Bun.spawn(["bun", "run", CHECK_DRIFT], {
+  const proc = Bun.spawn([Bun.argv[0], "run", CHECK_DRIFT], {
     cwd: PACKAGE_ROOT,
     env: { ...process.env, ...env },
     stdout: "pipe",

@@ -54,6 +54,10 @@ export const DOMAIN_EVENTS = {
   TIMETABLE_APPROVED: "timetable.approved",
   TIMETABLE_REJECTED: "timetable.rejected",
 
+  // Grade workflow — submission lifecycle and visibility transitions.
+  GRADES_SUBMITTED: "grades.submitted",
+  GRADES_PUBLISHED: "grades.published",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

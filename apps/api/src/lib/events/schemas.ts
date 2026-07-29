@@ -161,6 +161,19 @@ export const eventPayloadSchemas = {
     classId: uid,
   }),
 
+  // ── Grade workflow ────────────────────────────────────────────────
+  [DOMAIN_EVENTS.GRADES_SUBMITTED]: z.object({
+    submissionId: uid,
+    gradebookId: uid,
+    studentId: uid,
+  }),
+  [DOMAIN_EVENTS.GRADES_PUBLISHED]: z.object({
+    submissionId: uid,
+    gradebookId: uid,
+    studentId: uid,
+    approvedByUserId: uid,
+  }),
+
   // ── ERPNext (freeform — external system payloads) ─────────────────────
   [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: z.record(z.string(), z.unknown()),
   [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: z.record(z.string(), z.unknown()),

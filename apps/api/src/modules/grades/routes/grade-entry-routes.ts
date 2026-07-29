@@ -9,20 +9,24 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import {
   bulkUpdateGradesBodySchema,
+  decideBodySchema,
   gradeSchema,
   gradeSubmissionSchema,
   gradebookEntryListSchema,
   gradebookEntryQuerySchema,
   gradebookIdParamSchema,
   submissionIdParamSchema,
-  submissionStatusUpdateBodySchema,
+  submitBodySchema,
+  unlockBodySchema,
 } from "../config/schemas";
 import {
   assertCanManageGradebook,
   bulkUpdateGrades,
+  decideSubmission,
   getGradebookById,
   getSubmissionsWithGrades,
-  updateSubmissionStatus,
+  submitSubmission,
+  unlockSubmission,
 } from "../grade-entry-service";
 
 import type { Database } from "../../../db/client";
@@ -72,6 +76,7 @@ function toSubmissionResponse(row: GradeSubmissionWithGrades & { grades: GradeRo
   status: "draft" | "submitted" | "approved" | "rejected" | "published";
   submitted_by_user_id: string | null;
   decided_by_user_id: string | null;
+  rejection_reason: string | null;
   submitted_at: string | null;
   decided_at: string | null;
   created_at: string;
@@ -85,6 +90,7 @@ function toSubmissionResponse(row: GradeSubmissionWithGrades & { grades: GradeRo
     status: row.status as "draft" | "submitted" | "approved" | "rejected" | "published",
     submitted_by_user_id: row.submitted_by_user_id,
     decided_by_user_id: row.decided_by_user_id,
+    rejection_reason: row.rejection_reason,
     submitted_at: row.submitted_at?.toISOString() ?? null,
     decided_at: row.decided_at?.toISOString() ?? null,
     created_at: row.created_at.toISOString(),
@@ -148,23 +154,70 @@ const bulkUpdateGradesRoute = createRoute({
   ),
 });
 
-const updateSubmissionStatusRoute = createRoute({
+const submitSubmissionRoute = createRoute({
   method: "patch",
-  path: "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/status",
-  tags: ["Grade Entry"],
-  operationId: "updateSubmissionStatus",
-  summary: "Transition submission status",
+  path: "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+  tags: ["Grade Workflow"],
+  operationId: "submitGradeSubmission",
+  summary: "Submit draft grade for approval",
   description:
-    "Transition a grade submission along its state machine: " +
-    "draft → submitted → approved → published, or submitted → rejected → draft. " +
-    "The DB trigger sets audit timestamps and actor columns automatically. " +
-    "Uses an updated_at concurrency guard.",
+    "Submit a draft grade submission for administrative review. " +
+    "Only the assigned teacher may perform this action. " +
+    "Emits a grades.submitted domain event.",
   security: [{ bearerAuth: [] }],
   request: {
     params: gradebookIdParamSchema.merge(submissionIdParamSchema),
     body: {
       required: true,
-      content: { "application/json": { schema: submissionStatusUpdateBodySchema } },
+      content: { "application/json": { schema: submitBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "The updated submission.", schema: gradeSubmissionSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const decideSubmissionRoute = createRoute({
+  method: "patch",
+  path: "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+  tags: ["Grade Workflow"],
+  operationId: "decideGradeSubmission",
+  summary: "Approve or reject a submitted grade",
+  description:
+    "Administrative decision on a submitted grade. " +
+    "Approve auto-publishes the submission and emits a grades.published event. " +
+    "Reject requires a rejection reason and returns the submission to rejected status. " +
+    "Only school administrators may perform this action.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema.merge(submissionIdParamSchema),
+    body: {
+      required: true,
+      content: { "application/json": { schema: decideBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "The updated submission.", schema: gradeSubmissionSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const unlockSubmissionRoute = createRoute({
+  method: "patch",
+  path: "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+  tags: ["Grade Workflow"],
+  operationId: "unlockGradeSubmission",
+  summary: "Unlock a rejected submission for editing",
+  description:
+    "Return a rejected submission to draft so the teacher can edit and resubmit. " +
+    "Only the assigned teacher may perform this action.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema.merge(submissionIdParamSchema),
+    body: {
+      required: true,
+      content: { "application/json": { schema: unlockBodySchema } },
     },
   },
   responses: standardResponses(
@@ -189,12 +242,31 @@ export function gradeEntryRoutes(database: Database): OpenAPIHono<AppEnv> {
     requirePermission(PERMISSIONS.GRADE_UPDATE),
   );
   routes.use("/api/grades/gradebooks/{gradebookId}/grades", auditAction("update", "grades"));
+
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/status",
+    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
     requirePermission(PERMISSIONS.GRADE_UPDATE),
   );
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/status",
+    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+    auditAction("update", "grade_submissions"),
+  );
+
+  routes.use(
+    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+    requirePermission(PERMISSIONS.GRADE_OVERRIDE),
+  );
+  routes.use(
+    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+    auditAction("update", "grade_submissions"),
+  );
+
+  routes.use(
+    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use(
+    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
     auditAction("update", "grade_submissions"),
   );
 
@@ -230,9 +302,9 @@ export function gradeEntryRoutes(database: Database): OpenAPIHono<AppEnv> {
     return c.json(grades.map(toGradeResponse), 200);
   });
 
-  // --- Update submission status ---
+  // --- Submit draft for approval ---
 
-  routes.openapi(updateSubmissionStatusRoute, async (c) => {
+  routes.openapi(submitSubmissionRoute, async (c) => {
     const auth = requireAuth(c);
     const { gradebookId, submissionId } = c.req.valid("param");
     const body = c.req.valid("json");
@@ -240,15 +312,54 @@ export function gradeEntryRoutes(database: Database): OpenAPIHono<AppEnv> {
     const submission = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
       await assertCanManageGradebook(tx, gradebook.class_id);
-      const raw = await updateSubmissionStatus(
+      return submitSubmission(
         tx,
         auth.schoolId,
+        gradebookId,
         submissionId,
-        body.status,
         body.updated_at,
         auth.userId,
       );
-      return raw;
+    });
+
+    return c.json(toSubmissionResponse({ ...submission, grades: [] }), 200);
+  });
+
+  // --- Approve or reject ---
+
+  routes.openapi(decideSubmissionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId, submissionId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const submission = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return decideSubmission(
+        tx,
+        auth.schoolId,
+        submissionId,
+        body.action,
+        body.updated_at,
+        auth.userId,
+        body.rejection_reason,
+      );
+    });
+
+    return c.json(toSubmissionResponse({ ...submission, grades: [] }), 200);
+  });
+
+  // --- Unlock rejected submission ---
+
+  routes.openapi(unlockSubmissionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId, submissionId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const submission = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return unlockSubmission(tx, auth.schoolId, gradebookId, submissionId, body.updated_at);
     });
 
     return c.json(toSubmissionResponse({ ...submission, grades: [] }), 200);

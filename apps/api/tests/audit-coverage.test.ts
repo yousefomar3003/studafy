@@ -189,7 +189,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // Grade entry (ST-113). Bulk update grades and submission status transitions.
   // Audit rows are written by auditAction middleware in grade-entry-routes.ts.
   "PATCH /api/grades/gradebooks/{gradebookId}/grades",
-  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/status",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
   // Learning materials (ST-106). Storage-triggered upload flow with AI visibility.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",

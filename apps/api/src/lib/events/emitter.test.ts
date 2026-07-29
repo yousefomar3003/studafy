@@ -254,6 +254,13 @@ describe("emit", () => {
         [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: { name: "FEE-001" },
         [DOMAIN_EVENTS.ERPNEXT_PAYMENT_RECEIVED]: { name: "PAY-001" },
         [DOMAIN_EVENTS.ERPNEXT_CREDIT_NOTE_ISSUED]: { name: "CN-001" },
+        [DOMAIN_EVENTS.GRADES_SUBMITTED]: { submissionId: uid, gradebookId: uid, studentId: uid },
+        [DOMAIN_EVENTS.GRADES_PUBLISHED]: {
+          submissionId: uid,
+          gradebookId: uid,
+          studentId: uid,
+          approvedByUserId: uid,
+        },
       };
 
       await database!.sql.begin(async (tx) => {
