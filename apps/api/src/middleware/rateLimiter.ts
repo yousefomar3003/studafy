@@ -133,7 +133,8 @@ local elapsed = math.max(0, now - lastTs)
 tokens = math.min(max, tokens + elapsed * rate)
 
 if tokens < 1 then
-  return {math.floor(tokens), 0, math.ceil((1 - tokens) / rate)}
+  local retryAfter = rate > 0 and math.ceil((1 - tokens) / rate) or ttl
+  return {math.floor(tokens), 0, retryAfter}
 end
 
 tokens = tokens - 1
@@ -186,7 +187,10 @@ export function rateLimiterMiddleware({
     const identity = buildIdentity(routeClass, auth, clientIp);
     const key = buildRateLimitKey(routeClass, identity);
     const now = Math.floor(nowFn() / 1000);
-    const ttl = budget.windowSeconds + Math.ceil(budget.maxTokens / budget.refillRate);
+    const ttl =
+      budget.refillRate > 0
+        ? budget.windowSeconds + Math.ceil(budget.maxTokens / budget.refillRate)
+        : budget.windowSeconds;
 
     let remaining: number;
     let allowed: number;

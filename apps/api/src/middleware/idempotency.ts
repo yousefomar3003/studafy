@@ -203,6 +203,15 @@ export function idempotencyMiddleware({
         body: responseBody,
       };
 
+      // Don't cache server errors (5xx) — they may be transient, and a retry
+      // should re-invoke the handler rather than replay the same error.
+      // The in-flight promise is resolved so concurrent waiters get the same
+      // error response without hanging.
+      if (res.status >= 500) {
+        resolve(entry);
+        return;
+      }
+
       // Store in Redis and resolve the in-flight promise.
       await storeResponse(redis, key, entry, windowSeconds);
       resolve(entry);
