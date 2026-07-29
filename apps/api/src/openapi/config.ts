@@ -156,5 +156,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Grade entry endpoints. Authenticated and tenant-scoped. " +
         "Manage the grade entry grid including bulk grade updates and submission status transitions.",
     },
+    {
+      name: "Evaluations",
+      description:
+        "Teacher evaluation management. Authenticated and tenant-scoped. " +
+        "Principals create evaluation cycles with criteria templates, score teachers against them, " +
+        "and share completed evaluations to grant teacher read access.",
+    },
   ],
 };

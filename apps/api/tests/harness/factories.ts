@@ -717,6 +717,130 @@ export interface RefreshSessionOverrides {
  * Writes as studafy_admin because it must set rotated_at and revoked_at to arbitrary values and
  * bypass the per-user RLS fence that the production path satisfies with a real GUC.
  */
+// ---------------------------------------------------------------------------
+// Evaluation criteria template
+// ---------------------------------------------------------------------------
+
+export interface EvaluationCriteriaTemplateRecord {
+  id: string;
+  title: string;
+}
+
+export async function createEvaluationCriteriaTemplate(
+  sql: Sql,
+  schoolId: string,
+  overrides?: { title?: string; maxScore?: number; sortOrder?: number },
+): Promise<EvaluationCriteriaTemplateRecord> {
+  const title = overrides?.title ?? `Criteria ${crypto.randomUUID().slice(0, 6)}`;
+
+  return asAdmin(sql, async (tx) => {
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    await tx.unsafe("SET LOCAL ROLE studafy_app");
+
+    const [template] = await tx<{ id: string }[]>`
+      INSERT INTO app.evaluation_criteria_templates
+        (school_id, title, max_score, sort_order)
+      VALUES (
+        ${schoolId}::uuid,
+        ${title},
+        ${overrides?.maxScore ?? 10}::numeric(5,2),
+        ${overrides?.sortOrder ?? 0}::smallint
+      )
+      RETURNING id
+    `;
+
+    return { id: template!.id, title };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Teacher evaluation
+// ---------------------------------------------------------------------------
+
+export interface TeacherEvaluationRecord {
+  id: string;
+  teacherId: string;
+  evaluatorUserId: string;
+}
+
+export async function createTeacherEvaluation(
+  sql: Sql,
+  schoolId: string,
+  overrides: {
+    teacherId: string;
+    evaluatorUserId: string;
+    evaluationType?: string;
+    evaluatedAt?: string;
+  },
+): Promise<TeacherEvaluationRecord> {
+  return asAdmin(sql, async (tx) => {
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    await tx.unsafe("SET LOCAL ROLE studafy_app");
+
+    const [evaluation] = await tx<{ id: string }[]>`
+      INSERT INTO app.teacher_evaluations
+        (school_id, teacher_id, evaluator_user_id, evaluation_type, evaluated_at)
+      VALUES (
+        ${schoolId}::uuid,
+        ${overrides.teacherId}::uuid,
+        ${overrides.evaluatorUserId}::uuid,
+        ${overrides.evaluationType ?? "formal_observation"}::app.evaluation_type,
+        ${overrides.evaluatedAt ?? new Date().toISOString()}::timestamptz
+      )
+      RETURNING id
+    `;
+
+    return {
+      id: evaluation!.id,
+      teacherId: overrides.teacherId,
+      evaluatorUserId: overrides.evaluatorUserId,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Evaluation score
+// ---------------------------------------------------------------------------
+
+export interface EvaluationScoreRecord {
+  id: string;
+  evaluationId: string;
+  criteriaTemplateId: string;
+}
+
+export async function createEvaluationScore(
+  sql: Sql,
+  schoolId: string,
+  overrides: {
+    evaluationId: string;
+    criteriaTemplateId: string;
+    score?: number;
+  },
+): Promise<EvaluationScoreRecord> {
+  return asAdmin(sql, async (tx) => {
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    await tx.unsafe("SET LOCAL ROLE studafy_app");
+
+    const [scoreRecord] = await tx<{ id: string }[]>`
+      INSERT INTO app.evaluation_scores
+        (school_id, evaluation_id, criteria_template_id, score)
+      VALUES (
+        ${schoolId}::uuid,
+        ${overrides.evaluationId}::uuid,
+        ${overrides.criteriaTemplateId}::uuid,
+        ${overrides.score ?? 8}::numeric(5,2)
+      )
+      RETURNING id
+    `;
+
+    return {
+      id: scoreRecord!.id,
+      evaluationId: overrides.evaluationId,
+      criteriaTemplateId: overrides.criteriaTemplateId,
+    };
+  });
+}
+
 export async function createRefreshSession(
   sql: Sql,
   schoolId: string,

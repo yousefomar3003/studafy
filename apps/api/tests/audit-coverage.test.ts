@@ -203,6 +203,17 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/discipline/incidents/{incidentId}/resolve",
   "POST /api/discipline/incidents/{incidentId}/actions",
   "PATCH /api/discipline/incidents/{incidentId}/actions/{actionId}",
+  // Teacher evaluations: criteria templates, scoring, narrative, share-with-teacher.
+  // Principal-only mutations. Audit rows written by auditAction middleware.
+  "POST /api/evaluations/templates",
+  "PATCH /api/evaluations/templates/{templateId}",
+  "DELETE /api/evaluations/templates/{templateId}",
+  "POST /api/evaluations",
+  "PATCH /api/evaluations/{evaluationId}",
+  "POST /api/evaluations/{evaluationId}/submit",
+  "POST /api/evaluations/{evaluationId}/share",
+  "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {

@@ -108,5 +108,11 @@
   "DISCIPLINE_INCIDENT_CANNOT_RESOLVE": "You are not permitted to resolve discipline incidents",
   "DISCIPLINE_INCIDENT_PARENT_VISIBILITY_DISABLED": "Parent visibility of discipline incidents is disabled for this school",
   "DISCIPLINE_ACTION_NOT_FOUND": "Discipline action not found",
-  "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION": "This status transition is not allowed for a discipline action"
+  "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION": "This status transition is not allowed for a discipline action",
+  "EVALUATION_NOT_FOUND": "Teacher evaluation not found",
+  "EVALUATION_INVALID_STATUS_TRANSITION": "This status transition is not allowed for a teacher evaluation",
+  "EVALUATION_ALREADY_SHARED": "This evaluation has already been shared with the teacher",
+  "EVALUATION_NOT_SHARED": "This evaluation has not been shared with the teacher",
+  "EVALUATION_TEMPLATE_NOT_FOUND": "Evaluation criteria template not found",
+  "EVALUATION_SCORE_NOT_FOUND": "Evaluation score not found"
 }
