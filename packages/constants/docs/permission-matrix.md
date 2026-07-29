@@ -121,3 +121,16 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `disciplineAction:create`        | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `disciplineAction:read`          | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `disciplineAction:update`        | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluationTemplate:create`      | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluationTemplate:read`        | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluationTemplate:update`      | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluationTemplate:delete`      | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluation:create`              | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluation:read`                | ✅          | ✅        |         |            | ✅                 |         |        |       |               |
+| `evaluation:update`              | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluation:submit`              | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluation:share`               | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluationScore:create`         | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluationScore:read`           | ✅          | ✅        |         |            | ✅                 |         |        |       |               |
+| `evaluationScore:update`         | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `evaluationScore:delete`         | ✅          | ✅        |         |            |                    |         |        |       |               |
