@@ -132,6 +132,18 @@ export const eventPayloadSchemas = {
     studentId: uid,
   }),
 
+  // ── Attendance ────────────────────────────────────────────────────────
+  // One event per breach, not per notified parent: consumers care that the threshold was crossed,
+  // and the recipient list is a property of that fact rather than a separate occurrence.
+  [DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED]: z.object({
+    studentId: uid,
+    ruleType: z.enum(["consecutive_days", "period_count"]),
+    thresholdValue: z.number().int().positive(),
+    absentDays: z.number().int().positive(),
+    boundaryDate: z.string().date(),
+    parentUserIds: z.array(uid),
+  }),
+
   // ── Timetable ───────────────────────────────────────────────────────
   [DOMAIN_EVENTS.TIMETABLE_APPROVED]: z.object({
     timetableVersionId: uid,

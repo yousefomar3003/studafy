@@ -527,14 +527,14 @@ export function createApp({
   // Attendance sessions (ST-107). Idempotent session management per class period with
   // batch record-keeping. Gated on ATTENDANCE_RECORD_CREATE permission.
   if (database) {
-    app.route("/", attendanceSessionRoutes(database));
+    app.route("/", attendanceSessionRoutes(database, redis ?? null));
   }
 
   // Attendance corrections (ST-109). Amends submitted records into an immutable version chain and
   // exposes that chain. Gated on ATTENDANCE_RECORD_CORRECT / ATTENDANCE_RECORD_READ, with
   // ATTENDANCE_CORRECTION_OVERRIDE deciding whether a caller may correct past the school's window.
   if (database) {
-    app.route("/", attendanceCorrectionRoutes(database));
+    app.route("/", attendanceCorrectionRoutes(database, redis ?? null));
   }
 
   // Discipline incidents and actions: teacher reporting, principal management (actions,

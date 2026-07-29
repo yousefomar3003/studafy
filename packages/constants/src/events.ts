@@ -58,6 +58,11 @@ export const DOMAIN_EVENTS = {
   GRADES_SUBMITTED: "grades.submitted",
   GRADES_PUBLISHED: "grades.published",
 
+  // Attendance alerting (ST-110). Raised by the alert worker once a student's absences cross a
+  // school's configured threshold and the linked parents have been notified — so consumers see
+  // the breach, not each individual absence.
+  ATTENDANCE_ALERT_RAISED: "attendance.alertRaised",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

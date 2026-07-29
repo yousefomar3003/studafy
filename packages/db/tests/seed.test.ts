@@ -107,11 +107,22 @@ integrationTest(
       `;
       expect(citations).toBeGreaterThan(0);
 
-      // notification_preferences are trigger-seeded per active user (8 types x 3 channels).
+      // notification_preferences are trigger-seeded per active user: the full type x channel
+      // matrix. Both cardinalities are read from the enums rather than hardcoded, because what
+      // this test is for is "the trigger seeds every combination for every user" — not "there are
+      // exactly N types". Pinning the enum's membership is notifications.test.ts's job, and
+      // hardcoding it here only meant that adding one notification type broke two suites.
+      const [{ count: matrix }] = await database.sql<{ count: number }[]>`
+        SELECT (
+          (SELECT count(*) FROM pg_catalog.pg_enum WHERE enumtypid = 'app.notification_type'::regtype)
+          *
+          (SELECT count(*) FROM pg_catalog.pg_enum WHERE enumtypid = 'app.notification_channel'::regtype)
+        )::int AS count
+      `;
       const [{ count: prefs }] = await database.sql<{ count: number }[]>`
         SELECT count(*)::int AS count FROM app.notification_preferences
       `;
-      expect(prefs).toBe(users * 8 * 3);
+      expect(prefs).toBe(users * matrix);
 
       // Every tenant row belongs to exactly one school: the demo school.
       const [{ schools }] = await database.sql<{ schools: number }[]>`

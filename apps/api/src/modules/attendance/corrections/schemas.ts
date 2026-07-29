@@ -82,6 +82,10 @@ export const correctedAttendanceRecordSchema = z
     out_of_window: z.boolean().openapi({
       description: "True when this correction was an administrative override past the window.",
     }),
+    session_date: z
+      .string()
+      .date()
+      .openapi({ description: "Business date of the parent attendance session (YYYY-MM-DD)." }),
     created_at: dateTimeSchema,
     updated_at: dateTimeSchema,
   })
