@@ -187,28 +187,29 @@ export function idempotencyMiddleware({
 
     try {
       await next();
-
-      // Capture the response before it's consumed.
       const res = c.res.clone();
-      const responseBody = await res.text();
-      const responseHeaders: Record<string, string> = {};
-      res.headers.forEach((value, name) => {
-        responseHeaders[name] = value;
-      });
 
-      const entry: StoredResponse = {
-        bodyHash,
-        status: res.status,
-        headers: responseHeaders,
-        body: responseBody,
-      };
+      if (res.status < 400) {
+        const responseBody = await res.text();
+        const responseHeaders: Record<string, string> = {};
+        res.headers.forEach((value, name) => {
+          responseHeaders[name] = value;
+        });
 
-      // Store in Redis and resolve the in-flight promise.
-      await storeResponse(redis, key, entry, windowSeconds);
-      resolve(entry);
+        const entry: StoredResponse = {
+          bodyHash,
+          status: res.status,
+          headers: responseHeaders,
+          body: responseBody,
+        };
 
-      // Rebuild the response for the current request since c.res may have been consumed.
-      c.res = buildResponse(entry);
+        await storeResponse(redis, key, entry, windowSeconds);
+        resolve(entry);
+
+        c.res = buildResponse(entry);
+      } else {
+        resolve({ bodyHash, status: res.status, headers: {}, body: "" });
+      }
     } catch (err) {
       reject(err);
       throw err;
