@@ -167,5 +167,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Grade workflow endpoints. Authenticated and tenant-scoped. " +
         "Submit, approve/reject, and unlock grade submissions.",
     },
+    {
+      name: "Approval Queue",
+      description:
+        "Approval queue for administrators. Authenticated and permission-gated. " +
+        "Unified pending-approvals feed plus bulk approve/reject.",
+    },
   ],
 };

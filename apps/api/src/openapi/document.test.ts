@@ -197,6 +197,8 @@ describe("structure", () => {
         "/api/students/{studentId}/guardians/{userId}",
         "/api/teachers",
 
+        "/api/approvals/bulk-decision",
+        "/api/approvals/queue",
         "/api/teachers/me",
         "/api/teachers/{teacherId}",
         "/api/users",
@@ -503,6 +505,8 @@ describe("security", () => {
         "POST /api/students/{studentId}/guardians",
         "POST /api/teachers",
         "POST /api/users",
+        "POST /api/approvals/bulk-decision",
+        "GET /api/approvals/queue",
         "POST /api/schools/{schoolId}/provision",
       ].sort(),
     );
