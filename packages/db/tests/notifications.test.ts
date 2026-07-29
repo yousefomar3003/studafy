@@ -22,6 +22,10 @@ const NOTIFICATION_TYPES = [
   "STUDY_GROUP_INVITE",
   "CERTIFICATE_ISSUED",
   "SUPPORT_MESSAGE",
+  // ST-110. Appended by 000057 via ALTER TYPE ... ADD VALUE, so it sorts last in pg_enum order —
+  // which is what the enum assertion below compares against. DEFAULT_PREFERENCES is derived from
+  // this list, so the activation trigger's seeded matrix grows with it.
+  "ATTENDANCE_ALERT",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;
