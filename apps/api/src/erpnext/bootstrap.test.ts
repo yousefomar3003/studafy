@@ -24,7 +24,7 @@ describe("bootstrapErpNextSite", () => {
   test("returns correct site config on success", async () => {
     const client = createMockClient();
     const postCalls: unknown[][] = [];
-    let putCalled = false;
+    const putCalled = false;
 
     const originalPost = client.post.bind(client);
     const originalPut = client.put.bind(client);
