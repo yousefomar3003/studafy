@@ -174,8 +174,21 @@ export const OPENAPI_DOCUMENT_CONFIG = {
     {
       name: "Grade Workflow",
       description:
-        "Grade workflow endpoints. Authenticated and tenant-scoped. " +
-        "Submit, approve/reject, and unlock grade submissions.",
+        "Grade submission workflow endpoints. Authenticated and tenant-scoped. " +
+        "Submit, decide, and unlock grade submissions for review and approval.",
+    },
+    {
+      name: "Evaluations",
+      description:
+        "Teacher evaluation management. Authenticated and tenant-scoped. " +
+        "Principals create evaluation cycles with criteria templates, score teachers against them, " +
+        "and share completed evaluations to grant teacher read access.",
+    },
+    {
+      name: "Approval Queue",
+      description:
+        "Approval queue for administrators. Authenticated and permission-gated. " +
+        "Unified pending-approvals feed plus bulk approve/reject.",
     },
   ],
 };

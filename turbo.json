@@ -3,8 +3,12 @@
   "tasks": {
     "generate": {
       "dependsOn": ["^build"],
-      "outputs": ["src/generated-types.ts"],
+      "outputs": [],
       "env": ["LOCALAPPDATA"]
+    },
+    "@studafy/api#generate": {
+      "dependsOn": ["^build"],
+      "outputs": ["openapi.json"]
     },
     "@studafy/api-client#generate": {
       "dependsOn": ["@studafy/api#generate", "^build"],

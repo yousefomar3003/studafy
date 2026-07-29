@@ -51,9 +51,9 @@ import {
 } from "./modules/auth";
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
-import { disciplineRoutes } from "./modules/discipline";
+import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
 import { EnvCredentialResolver, feeStructureRoutes, TenantErpNextFactory } from "./modules/finance";
-import { gradebookConfigRoutes, gradeEntryRoutes } from "./modules/grades";
+import { approvalQueueRoutes, gradebookConfigRoutes, gradeEntryRoutes } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -553,6 +553,15 @@ export function createApp({
     app.route("/", gradeEntryRoutes(database));
   }
 
+  // Approval queue — unified pending-approvals feed for administrators. Queries grade
+  // submissions (status = submitted) and timetable versions (status = pending) into a single
+  // list with type-specific diff payloads. Bulk decision delegates to the existing grade and
+  // timetable decision functions with per-item partial-failure reporting. Gated on
+  // APPROVAL_REVIEW permission (ORG_ADMIN+).
+  if (database) {
+    app.route("/", approvalQueueRoutes(database));
+  }
+
   // Attendance sessions (ST-107). Idempotent session management per class period with
   // batch record-keeping. Gated on ATTENDANCE_RECORD_CREATE permission.
   if (database) {
@@ -575,6 +584,13 @@ export function createApp({
   // school policy flag. All mutations are audited.
   if (database) {
     app.route("/", disciplineRoutes(database));
+  }
+
+  // Teacher evaluations: principal evaluation cycles with criteria templates, scoring,
+  // narrative, and share-with-teacher toggle. Principal-only mutations, teacher read
+  // access to shared evaluations. All mutations are audited.
+  if (database) {
+    app.route("/", evaluationRoutes(database));
   }
 
   // Learning materials: CRUD, pre-signed upload flow, AI visibility toggle.

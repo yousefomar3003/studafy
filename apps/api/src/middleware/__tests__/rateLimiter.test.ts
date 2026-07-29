@@ -1,5 +1,5 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 
 import { buildRateLimitKey, resolveRouteClass } from "../../config/rateLimits";
@@ -40,6 +40,35 @@ async function createTestClient(): Promise<RedisClient | null> {
   }
 }
 
+async function clearRateLimitKeys(client: RedisClient): Promise<void> {
+  let cursor = "0";
+  do {
+    const [nextCursor, keys] = (await client.scan(cursor, "MATCH", "rl:*", "COUNT", "100")) as [
+      string,
+      string[],
+    ];
+    cursor = nextCursor;
+    if (keys.length > 0) {
+      await client.del(...keys);
+    }
+  } while (cursor !== "0");
+}
+
+// Shared Redis client for cleanup across tests.
+let cleanupClient: RedisClient | null = null;
+
+beforeEach(async () => {
+  if (!cleanupClient) {
+    cleanupClient = await createTestClient();
+  }
+  if (cleanupClient) {
+    await clearRateLimitKeys(cleanupClient);
+  }
+});
+
+afterAll(async () => {
+  await cleanupClient?.quit();
+});
 async function flushRateLimitKeys(client: RedisClient): Promise<void> {
   const keys = await client.keys("rl:*");
   if (keys.length > 0) {
@@ -182,6 +211,7 @@ describe("token consumption (requires Redis)", () => {
     try {
       const budget = { maxTokens: 3, refillRate: 0, windowSeconds: 60 };
       const app = new Hono<AppEnv>();
+      app.use("*", rateLimiterMiddleware({ redis: client, routeClass: "auth", budget }));
       app.use("*", requestIdMiddleware({ logger: silentLogger }));
       app.use("*", rateLimiterMiddleware({ redis: client, routeClass: "auth", budget }));
       app.onError(errorHandlerMiddleware(silentLogger));

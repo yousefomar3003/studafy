@@ -133,6 +133,12 @@ local elapsed = math.max(0, now - lastTs)
 tokens = math.min(max, tokens + elapsed * rate)
 
 if tokens < 1 then
+  local retryAfter
+  if rate > 0 then
+    retryAfter = math.ceil((1 - tokens) / rate)
+  else
+    retryAfter = ttl
+  end
   local retryAfter = rate > 0 and math.ceil((1 - tokens) / rate) or ttl
   return {math.floor(tokens), 0, retryAfter}
 end
@@ -188,9 +194,8 @@ export function rateLimiterMiddleware({
     const key = buildRateLimitKey(routeClass, identity);
     const now = Math.floor(nowFn() / 1000);
     const ttl =
-      budget.refillRate > 0
-        ? budget.windowSeconds + Math.ceil(budget.maxTokens / budget.refillRate)
-        : budget.windowSeconds;
+      budget.windowSeconds +
+      (budget.refillRate > 0 ? Math.ceil(budget.maxTokens / budget.refillRate) : 0);
 
     let remaining: number;
     let allowed: number;
@@ -211,7 +216,7 @@ export function rateLimiterMiddleware({
 
       remaining = result[0];
       allowed = result[1];
-      retryAfter = result[2];
+      retryAfter = Number.isFinite(result[2]) ? result[2] : budget.windowSeconds;
     } catch (err: unknown) {
       // NOSCRIPT = script evicted from cache; re-load and retry once.
       if (

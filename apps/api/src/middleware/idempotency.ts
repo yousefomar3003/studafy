@@ -187,9 +187,29 @@ export function idempotencyMiddleware({
 
     try {
       await next();
-
-      // Capture the response before it's consumed.
       const res = c.res.clone();
+
+      if (res.status < 400) {
+        const responseBody = await res.text();
+        const responseHeaders: Record<string, string> = {};
+        res.headers.forEach((value, name) => {
+          responseHeaders[name] = value;
+        });
+
+        const entry: StoredResponse = {
+          bodyHash,
+          status: res.status,
+          headers: responseHeaders,
+          body: responseBody,
+        };
+
+        await storeResponse(redis, key, entry, windowSeconds);
+        resolve(entry);
+
+        c.res = buildResponse(entry);
+      } else {
+        resolve({ bodyHash, status: res.status, headers: {}, body: "" });
+      }
       const responseBody = await res.text();
       const responseHeaders: Record<string, string> = {};
       res.headers.forEach((value, name) => {

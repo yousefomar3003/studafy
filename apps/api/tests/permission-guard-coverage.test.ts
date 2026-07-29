@@ -180,6 +180,21 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/discipline/incidents/{incidentId}/resolve",
   "POST /api/discipline/incidents/{incidentId}/actions",
   "PATCH /api/discipline/incidents/{incidentId}/actions/{actionId}",
+  // Evaluation criteria templates. Guarded per method by requirePermission() on
+  // EVALUATION_TEMPLATE_CREATE/UPDATE/DELETE.
+  "POST /api/evaluations/templates",
+  "PATCH /api/evaluations/templates/{templateId}",
+  "DELETE /api/evaluations/templates/{templateId}",
+  // Teacher evaluations. Guarded per method by requirePermission() on
+  // EVALUATION_CREATE/UPDATE/SUBMIT/SHARE.
+  "POST /api/evaluations",
+  "PATCH /api/evaluations/{evaluationId}",
+  "POST /api/evaluations/{evaluationId}/submit",
+  "POST /api/evaluations/{evaluationId}/share",
+  // Evaluation scores. Guarded per method by requirePermission() on
+  // EVALUATION_SCORE_CREATE/DELETE.
+  "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
   // Learning materials (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
   // catalog data with no cross-user row-level permission.
   "POST /api/academics/materials/upload",
@@ -187,6 +202,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  // Approval queue (ST-115). Atomic bulk approve/reject with per-item partial-failure.
+  // Gated on APPROVAL_REVIEW permission via requirePermission middleware.
+  "POST /api/approvals/bulk-decision",
 ];
 
 /**

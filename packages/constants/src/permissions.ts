@@ -89,6 +89,8 @@ export const PERMISSIONS = {
   REPORT_EXPORT: "report:export",
   REPORT_VIEW_FINANCIAL: "report:viewFinancial",
 
+  APPROVAL_REVIEW: "approval:review",
+
   AUDIT_LOG_READ: "auditLog:read",
   AUDIT_LOG_EXPORT: "auditLog:export",
 
@@ -150,6 +152,22 @@ export const PERMISSIONS = {
   DISCIPLINE_ACTION_CREATE: "disciplineAction:create",
   DISCIPLINE_ACTION_READ: "disciplineAction:read",
   DISCIPLINE_ACTION_UPDATE: "disciplineAction:update",
+
+  EVALUATION_TEMPLATE_CREATE: "evaluationTemplate:create",
+  EVALUATION_TEMPLATE_READ: "evaluationTemplate:read",
+  EVALUATION_TEMPLATE_UPDATE: "evaluationTemplate:update",
+  EVALUATION_TEMPLATE_DELETE: "evaluationTemplate:delete",
+
+  EVALUATION_CREATE: "evaluation:create",
+  EVALUATION_READ: "evaluation:read",
+  EVALUATION_UPDATE: "evaluation:update",
+  EVALUATION_SUBMIT: "evaluation:submit",
+  EVALUATION_SHARE: "evaluation:share",
+
+  EVALUATION_SCORE_CREATE: "evaluationScore:create",
+  EVALUATION_SCORE_READ: "evaluationScore:read",
+  EVALUATION_SCORE_UPDATE: "evaluationScore:update",
+  EVALUATION_SCORE_DELETE: "evaluationScore:delete",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -252,6 +270,9 @@ const TEACHING_ASSISTANT_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.STUDENT_READ,
   PERMISSIONS.MATERIAL_READ,
   PERMISSIONS.ATTENDANCE_RECORD_READ,
+
+  PERMISSIONS.EVALUATION_READ,
+  PERMISSIONS.EVALUATION_SCORE_READ,
 ];
 
 const STUDENT_PERMISSIONS: readonly Permission[] = [
