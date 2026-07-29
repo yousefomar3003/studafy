@@ -225,6 +225,14 @@ describe("emit", () => {
         [DOMAIN_EVENTS.STUDY_GROUP_JOINED]: { groupId: uid },
         [DOMAIN_EVENTS.CERTIFICATE_ISSUED]: { certificateId: uid, studentId: uid },
         [DOMAIN_EVENTS.CERTIFICATE_REVOKED]: { certificateId: uid, studentId: uid },
+        [DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED]: {
+          studentId: uid,
+          ruleType: "consecutive_days",
+          thresholdValue: 3,
+          absentDays: 3,
+          boundaryDate: "2026-07-29",
+          parentUserIds: [uid],
+        },
         [DOMAIN_EVENTS.TIMETABLE_APPROVED]: {
           timetableVersionId: uid,
           termId: uid,

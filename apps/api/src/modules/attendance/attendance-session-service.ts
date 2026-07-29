@@ -362,6 +362,11 @@ export interface AttendanceRecordRow {
 export interface BatchRecordAttendanceResult {
   records: AttendanceRecordRow[];
   created_count: number;
+  /**
+   * The session's business date. Returned so the route can enqueue the ST-110 alert job without a
+   * second round trip — the session is already loaded here to validate the batch.
+   */
+  session_date: string;
 }
 
 const RECORD_COLUMNS = `
@@ -402,7 +407,7 @@ export async function recordAttendanceBatch(
 ): Promise<BatchRecordAttendanceResult> {
   // 1. Fetch session and validate it exists, is open, and belongs to this school.
   const [session] = await tx<Record<string, unknown>[]>`
-    SELECT id, class_id, status::text AS status, created_at
+    SELECT id, class_id, status::text AS status, created_at, session_date::text AS session_date
     FROM app.attendance_sessions
     WHERE id = ${params.attendance_session_id} AND school_id = ${schoolId}
   `;
@@ -529,5 +534,6 @@ export async function recordAttendanceBatch(
   return {
     records: allRows.map(parseRecordRow),
     created_count: newRecords.length,
+    session_date: session.session_date as string,
   };
 }
