@@ -16,6 +16,7 @@ const FINANCE_TABLES = [
   "fee_schedule_cache",
   "erpnext_id_mappings",
   "finance_sync_outbox",
+  "fee_structure_cache",
 ] as const;
 
 type Database = Awaited<ReturnType<typeof testDatabase>>;
@@ -124,7 +125,10 @@ integrationTest(
         GROUP BY t.typname ORDER BY t.typname
       `;
       expect(enums.map(({ type, values }) => ({ type, values }))).toEqual([
-        { type: "finance_entity_type", values: ["invoice", "payment", "fee_schedule"] },
+        {
+          type: "finance_entity_type",
+          values: ["invoice", "payment", "fee_schedule", "fee_structure", "fee_category"],
+        },
         {
           type: "finance_sync_outbox_status",
           values: ["pending", "processing", "completed", "failed"],
@@ -137,13 +141,15 @@ integrationTest(
           owner: string;
           rls: boolean;
           forced: boolean;
-          app_crud: boolean;
+          app_dml: boolean;
+          app_delete: boolean;
           public_access: boolean;
         }[]
       >`
         SELECT c.relname AS name, pg_get_userbyid(c.relowner) AS owner,
           c.relrowsecurity AS rls, c.relforcerowsecurity AS forced,
-          has_table_privilege('studafy_app', c.oid, 'SELECT,INSERT,UPDATE,DELETE') AS app_crud,
+          has_table_privilege('studafy_app', c.oid, 'SELECT,INSERT,UPDATE') AS app_dml,
+          has_table_privilege('studafy_app', c.oid, 'DELETE') AS app_delete,
           has_table_privilege('public', c.oid, 'SELECT,INSERT,UPDATE,DELETE') AS public_access
         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'app' AND c.relname = ANY(${FINANCE_TABLES as unknown as string[]})
@@ -156,9 +162,12 @@ integrationTest(
             row.owner === "studafy_admin" &&
             row.rls &&
             row.forced &&
-            row.app_crud &&
+            row.app_dml &&
             !row.public_access,
         ),
+      ).toBe(true);
+      expect(
+        tables.filter((row) => row.name !== "fee_structure_cache").every((row) => row.app_delete),
       ).toBe(true);
 
       const policies = await database.sql<{ table_name: string; name: string }[]>`
@@ -167,7 +176,7 @@ integrationTest(
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'app' AND c.relname = ANY(${FINANCE_TABLES as unknown as string[]})
       `;
-      expect(policies).toHaveLength(5);
+      expect(policies).toHaveLength(6);
       expect(policies.every((policy) => policy.name === "tenant_isolation")).toBe(true);
 
       // No local ledger: no table in this migration's schema names an account, journal, or ledger.

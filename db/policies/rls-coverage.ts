@@ -77,6 +77,7 @@ approved_flexible_columns(table_name, column_name) AS (
     ('audit_logs', 'old_values'),
     ('billing_events', 'payload'),
     ('fee_schedule_cache', 'erpnext_payload'),
+    ('fee_structure_cache', 'erpnext_payload'),
     ('finance_sync_outbox', 'payload'),
     ('invoice_cache', 'erpnext_payload'),
     ('notifications', 'metadata'),

@@ -191,6 +191,7 @@ export const eventPayloadSchemas = {
   [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: z.record(z.string(), z.unknown()),
   [DOMAIN_EVENTS.ERPNEXT_PAYMENT_RECEIVED]: z.record(z.string(), z.unknown()),
   [DOMAIN_EVENTS.ERPNEXT_CREDIT_NOTE_ISSUED]: z.record(z.string(), z.unknown()),
+  [DOMAIN_EVENTS.ERPNEXT_FEE_STRUCTURE_SUBMITTED]: z.record(z.string(), z.unknown()),
 } as const;
 
 /**

@@ -201,6 +201,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/academics/materials/{materialId}",
   // Discipline incidents and actions (ST-XXX). Teacher reporting, principal management,
   // parent visibility. Audit rows written by auditAction middleware.
+  // Finance gateway (ST-119). Both writes call ERPNext synchronously; the audit row records the
+  // resulting fee_structure_cache projection with its before/after amounts.
+  "POST /api/finance/fee-structures",
+  "PATCH /api/finance/fee-structures/{feeStructureId}",
   "POST /api/discipline/incidents",
   "PATCH /api/discipline/incidents/{incidentId}",
   "POST /api/discipline/incidents/{incidentId}/resolve",

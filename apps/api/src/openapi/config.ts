@@ -52,6 +52,16 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "request body, not by a session token.",
     },
     {
+      name: "Finance",
+      description:
+        "Outbound gateway to each school's ERPNext site. Authenticated and tenant-scoped. " +
+        "ERPNext owns fee validation, currency rules, and amounts — these endpoints route, " +
+        "translate identifiers, and maintain a local read model, and forward ERPNext's own " +
+        "validation messages verbatim in the request's language. Amounts are exchanged as both a " +
+        "decimal string and integer minor units, at the currency's own precision: JOD has three " +
+        "decimal places, not two.",
+    },
+    {
       name: "Invitations",
       description:
         "User invitation management. Authenticated. Invitations are bound to an email and role, " +
