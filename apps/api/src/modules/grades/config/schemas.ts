@@ -254,3 +254,148 @@ export const termIdQuerySchema = z
     }),
   })
   .openapi("TermIdQuery");
+
+// ---------------------------------------------------------------------------
+// Grade entry — grade submissions and grade records (ST-113)
+// ---------------------------------------------------------------------------
+
+export const gradeSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    grade_submission_id: uuidSchema.openapi({ description: "Owning grade submission." }),
+    score: z.number().nullable().openapi({
+      description: "Numeric score. Null means ungraded.",
+      example: 85,
+    }),
+    max_score: z.number().openapi({
+      description: "Maximum possible score (must be > 0).",
+      example: 100,
+    }),
+    weight: z.number().openapi({
+      description: "Relative weight of this item within the submission (default 1).",
+      example: 1,
+    }),
+    label: z.string().openapi({
+      description: "Human-readable identifier (e.g. 'Midterm', 'Homework 3').",
+      example: "Midterm Exam",
+    }),
+    created_at: dateTimeSchema.openapi({ description: "Row creation timestamp." }),
+    updated_at: dateTimeSchema.openapi({ description: "Last modification timestamp." }),
+  })
+  .openapi("Grade");
+
+export type Grade = z.infer<typeof gradeSchema>;
+
+export const gradeSubmissionSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    gradebook_id: uuidSchema.openapi({ description: "Owning gradebook." }),
+    student_id: uuidSchema.openapi({ description: "The student this submission belongs to." }),
+    status: z
+      .enum(["draft", "submitted", "approved", "rejected", "published"])
+      .openapi({ description: "Lifecycle status." }),
+    submitted_by_user_id: uuidSchema.nullable().openapi({
+      description: "Who submitted it (set by trigger on draft→submitted).",
+    }),
+    decided_by_user_id: uuidSchema.nullable().openapi({
+      description: "Who approved/rejected it (set by trigger on approval transitions).",
+    }),
+    submitted_at: dateTimeSchema.nullable().openapi({
+      description: "When it was submitted (set by trigger).",
+    }),
+    decided_at: dateTimeSchema.nullable().openapi({
+      description: "When it was decided (set by trigger).",
+    }),
+    created_at: dateTimeSchema.openapi({ description: "Row creation timestamp." }),
+    updated_at: dateTimeSchema.openapi({ description: "Last modification timestamp." }),
+    grades: z.array(gradeSchema).openapi({ description: "Individual grade records." }),
+  })
+  .openapi("GradeSubmission");
+
+export type GradeSubmission = z.infer<typeof gradeSubmissionSchema>;
+
+// ---------------------------------------------------------------------------
+// Path & Query Params
+// ---------------------------------------------------------------------------
+
+export const submissionIdParamSchema = z
+  .object({
+    submissionId: uuidSchema.openapi({
+      param: { name: "submissionId", in: "path" },
+      description: "Grade submission UUID.",
+    }),
+  })
+  .openapi("SubmissionIdParam");
+
+export const gradebookEntryQuerySchema = z
+  .object({
+    status: z
+      .enum(["draft", "submitted", "approved", "rejected", "published"])
+      .optional()
+      .openapi({
+        param: { name: "status", in: "query" },
+        description: "Filter submissions by status.",
+      }),
+  })
+  .openapi("GradebookEntryQuery");
+
+// ---------------------------------------------------------------------------
+// Request Bodies
+// ---------------------------------------------------------------------------
+
+export const updateGradeEntrySchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Grade record UUID." }),
+    score: z.number().nullable().openapi({
+      description: "New score (null to ungrade). Must be 0 ≤ score ≤ max_score.",
+      example: 85,
+    }),
+    updated_at: z.string().openapi({
+      description:
+        "Concurrency token from the client's last read of this grade. " +
+        "If it does not match the current row, the update is rejected with 409.",
+      example: "2026-07-29T10:00:00.000Z",
+    }),
+  })
+  .openapi("UpdateGradeEntry");
+
+export type UpdateGradeEntry = z.infer<typeof updateGradeEntrySchema>;
+
+export const bulkUpdateGradesBodySchema = z
+  .object({
+    grades: z.array(updateGradeEntrySchema).min(1).max(100).openapi({
+      description: "Up to 100 grade cells to update atomically.",
+    }),
+  })
+  .openapi("BulkUpdateGradesBody");
+
+export type BulkUpdateGradesBody = z.infer<typeof bulkUpdateGradesBodySchema>;
+
+export const submissionStatusUpdateBodySchema = z
+  .object({
+    status: z
+      .enum(["draft", "submitted", "approved", "rejected", "published"])
+      .openapi({ description: "Target status. Valid transitions enforced by DB trigger." }),
+    updated_at: z.string().openapi({
+      description:
+        "Concurrency token from the client's last read of the submission. " +
+        "If it does not match the current row, the update is rejected with 409.",
+    }),
+  })
+  .openapi("SubmissionStatusUpdateBody");
+
+export type SubmissionStatusUpdateBody = z.infer<typeof submissionStatusUpdateBodySchema>;
+
+// ---------------------------------------------------------------------------
+// Response shapes
+// ---------------------------------------------------------------------------
+
+export const gradebookEntryListSchema = z
+  .object({
+    submissions: z.array(gradeSubmissionSchema).openapi({
+      description: "All submissions for this gradebook matching the optional status filter.",
+    }),
+  })
+  .openapi("GradebookEntryList");
+
+export type GradebookEntryList = z.infer<typeof gradebookEntryListSchema>;

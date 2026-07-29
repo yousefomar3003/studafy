@@ -48,7 +48,7 @@ import {
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { disciplineRoutes } from "./modules/discipline";
-import { gradebookConfigRoutes } from "./modules/grades";
+import { gradebookConfigRoutes, gradeEntryRoutes } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -515,6 +515,13 @@ export function createApp({
   // and class-level teacher authorization.
   if (database) {
     app.route("/", gradebookConfigRoutes(database));
+  }
+
+  // Grade entry (ST-113). Teacher draft grade entry with bulk cell updates, max_score
+  // validation, updated_at concurrency guard, and submission status transitions. Gated on
+  // GRADE_READ / GRADE_UPDATE permissions and class-level teacher authorization.
+  if (database) {
+    app.route("/", gradeEntryRoutes(database));
   }
 
   // Attendance sessions (ST-107). Idempotent session management per class period with
