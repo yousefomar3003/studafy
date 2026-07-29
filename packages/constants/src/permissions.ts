@@ -130,6 +130,12 @@ export const PERMISSIONS = {
   MATERIAL_MANAGE_AI: "material:manageAi",
 
   ATTENDANCE_RECORD_CREATE: "attendance:record:create",
+  ATTENDANCE_RECORD_READ: "attendance:record:read",
+  ATTENDANCE_RECORD_CORRECT: "attendance:record:correct",
+  // Amend a record whose correction window has closed. Deliberately withheld from INSTRUCTOR:
+  // holding it is what distinguishes a principal's administrative override from a teacher's
+  // routine same-week fix.
+  ATTENDANCE_CORRECTION_OVERRIDE: "attendance:correction:override",
 
   PARENT_LINK: "parent:link",
   PARENT_UNLINK: "parent:unlink",
@@ -218,6 +224,10 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.DISCIPLINE_INCIDENT_CREATE,
   PERMISSIONS.DISCIPLINE_INCIDENT_READ,
   PERMISSIONS.ATTENDANCE_RECORD_CREATE,
+  PERMISSIONS.ATTENDANCE_RECORD_READ,
+  // Correct, but not override: past the school's correction window an instructor is refused and
+  // the amendment becomes a principal's call (ST-109).
+  PERMISSIONS.ATTENDANCE_RECORD_CORRECT,
 ];
 
 const TEACHING_ASSISTANT_PERMISSIONS: readonly Permission[] = [
@@ -239,6 +249,7 @@ const TEACHING_ASSISTANT_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.NOTIFICATION_READ,
   PERMISSIONS.STUDENT_READ,
   PERMISSIONS.MATERIAL_READ,
+  PERMISSIONS.ATTENDANCE_RECORD_READ,
 ];
 
 const STUDENT_PERMISSIONS: readonly Permission[] = [

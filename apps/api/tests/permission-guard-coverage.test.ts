@@ -159,6 +159,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/attendance/records/batch",
   "POST /api/attendance/sessions",
   "PATCH /api/attendance/sessions/{sessionId}",
+  // Attendance corrections (ST-109). Guarded by requirePermission() on
+  // ATTENDANCE_RECORD_CORRECT; ATTENDANCE_CORRECTION_OVERRIDE is then checked in the handler to
+  // decide whether the caller may correct past the school's window.
+  "PATCH /api/attendance/records/{recordId}",
   // Discipline incidents & actions. Guarded per method by requirePermissionIn() on
   // DISCIPLIN_INCIDENT_CREATE/READ/UPDATE/RESOLVE and DISCIPLINE_ACTION_CREATE/READ/UPDATE.
   "POST /api/discipline/incidents",

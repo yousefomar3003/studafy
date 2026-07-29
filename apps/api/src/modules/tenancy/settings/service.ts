@@ -19,6 +19,7 @@ export interface SchoolSettingsRow {
   attendance_alert_threshold: number;
   absence_alert_threshold: number;
   parent_discipline_visibility: boolean;
+  attendance_correction_window_hours: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -31,6 +32,7 @@ export interface UpdateSchoolSettingsParams {
   attendance_alert_threshold?: number;
   absence_alert_threshold?: number;
   parent_discipline_visibility?: boolean;
+  attendance_correction_window_hours?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +49,7 @@ function rowToSettings(row: SchoolSettingsRow): SchoolSettingsRow {
     attendance_alert_threshold: row.attendance_alert_threshold,
     absence_alert_threshold: row.absence_alert_threshold,
     parent_discipline_visibility: row.parent_discipline_visibility,
+    attendance_correction_window_hours: row.attendance_correction_window_hours,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -71,6 +74,7 @@ export async function getSchoolSettings(
         invitation_expiry_days,
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
+        attendance_correction_window_hours,
         created_at, updated_at
       FROM app.school_settings
       WHERE school_id = ${schoolId}::uuid
@@ -88,6 +92,7 @@ export async function getSchoolSettings(
         invitation_expiry_days,
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
+        attendance_correction_window_hours,
         created_at, updated_at
     `;
 
@@ -128,6 +133,7 @@ export async function updateSchoolSettings(
         invitation_expiry_days,
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
+        attendance_correction_window_hours,
         created_at, updated_at
       FROM app.school_settings
       WHERE school_id = ${schoolId}::uuid
@@ -153,6 +159,7 @@ export async function updateSchoolSettings(
         attendance_alert_threshold    = COALESCE(${patch.attendance_alert_threshold ?? null}, attendance_alert_threshold),
         absence_alert_threshold       = COALESCE(${patch.absence_alert_threshold ?? null}, absence_alert_threshold),
         parent_discipline_visibility  = COALESCE(${patch.parent_discipline_visibility ?? null}, parent_discipline_visibility),
+        attendance_correction_window_hours = COALESCE(${patch.attendance_correction_window_hours ?? null}, attendance_correction_window_hours),
         updated_at                    = CURRENT_TIMESTAMP
       WHERE school_id = ${schoolId}::uuid
       RETURNING
@@ -161,6 +168,7 @@ export async function updateSchoolSettings(
         invitation_expiry_days,
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
+        attendance_correction_window_hours,
         created_at, updated_at
     `;
 
@@ -184,6 +192,7 @@ export async function updateSchoolSettings(
             attendance_alert_threshold: before.attendance_alert_threshold,
             absence_alert_threshold: before.absence_alert_threshold,
             parent_discipline_visibility: before.parent_discipline_visibility,
+            attendance_correction_window_hours: before.attendance_correction_window_hours,
           }
         : null,
       newValues: {
@@ -194,6 +203,7 @@ export async function updateSchoolSettings(
         attendance_alert_threshold: after.attendance_alert_threshold,
         absence_alert_threshold: after.absence_alert_threshold,
         parent_discipline_visibility: after.parent_discipline_visibility,
+        attendance_correction_window_hours: after.attendance_correction_window_hours,
       },
     });
 

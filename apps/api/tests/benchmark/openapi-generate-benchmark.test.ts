@@ -74,6 +74,8 @@ const EXPECTED_PATHS = [
   "/api/admin/users/{userId}/devices/{deviceId}",
   "/api/admin/users/{userId}/providers/{provider}",
   "/api/attendance/records/batch",
+  "/api/attendance/records/{recordId}",
+  "/api/attendance/records/{recordId}/history",
   "/api/attendance/sessions",
   "/api/attendance/sessions/{sessionId}",
   "/api/discipline/incidents",

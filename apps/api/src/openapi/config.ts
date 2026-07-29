@@ -114,7 +114,10 @@ export const OPENAPI_DOCUMENT_CONFIG = {
       description:
         "Attendance session management. Authenticated and tenant-scoped. " +
         "Open sessions for class periods, list history, retrieve details, " +
-        "and transition through the draft → open → submitted → locked lifecycle.",
+        "and transition through the draft → open → submitted → locked lifecycle. " +
+        "Once a session is submitted, individual records are amended through the correction " +
+        "endpoint, which preserves every prior state in an immutable version chain readable at " +
+        "/api/attendance/records/{recordId}/history.",
     },
     {
       name: "Assignments",

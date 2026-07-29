@@ -32,7 +32,7 @@ import {
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
-import { attendanceSessionRoutes } from "./modules/attendance";
+import { attendanceCorrectionRoutes, attendanceSessionRoutes } from "./modules/attendance";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -521,6 +521,13 @@ export function createApp({
   // batch record-keeping. Gated on ATTENDANCE_RECORD_CREATE permission.
   if (database) {
     app.route("/", attendanceSessionRoutes(database));
+  }
+
+  // Attendance corrections (ST-109). Amends submitted records into an immutable version chain and
+  // exposes that chain. Gated on ATTENDANCE_RECORD_CORRECT / ATTENDANCE_RECORD_READ, with
+  // ATTENDANCE_CORRECTION_OVERRIDE deciding whether a caller may correct past the school's window.
+  if (database) {
+    app.route("/", attendanceCorrectionRoutes(database));
   }
 
   // Discipline incidents and actions: teacher reporting, principal management (actions,
