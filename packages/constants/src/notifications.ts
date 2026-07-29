@@ -12,6 +12,9 @@ export const NOTIFICATION_TYPES = {
   STUDY_GROUP_INVITE: "STUDY_GROUP_INVITE",
   CERTIFICATE_ISSUED: "CERTIFICATE_ISSUED",
   SUPPORT_MESSAGE: "SUPPORT_MESSAGE",
+  // ST-110. Raised for a linked parent when a student's absences cross a school's configured
+  // threshold. Mirrored in app.notification_type by migration 000057.
+  ATTENDANCE_ALERT: "ATTENDANCE_ALERT",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

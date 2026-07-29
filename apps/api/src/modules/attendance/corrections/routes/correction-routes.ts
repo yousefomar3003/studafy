@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { PERMISSIONS } from "@studafy/constants";
+import { PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
+import { Queue } from "bullmq";
 
 import { withTenantTx } from "../../../../db/tenant-tx";
 import { auditAction } from "../../../../middleware/auditEmitter";
@@ -7,6 +8,7 @@ import { requireAuth } from "../../../../middleware/authContext";
 import { hasPermission, requirePermission } from "../../../../middleware/authz";
 import { openApiValidationHook } from "../../../../openapi/hook";
 import { standardResponses } from "../../../../openapi/responses";
+import { enqueueAttendanceAlerts } from "../../enqueue-alerts";
 import { correctAttendanceRecord, getAttendanceRecordHistory } from "../correction-service";
 import {
   attendanceRecordHistorySchema,
@@ -17,6 +19,7 @@ import {
 
 import type { Database } from "../../../../db/client";
 import type { AppEnv } from "../../../../middleware/requestId";
+import type { RedisClient } from "../../../../redis";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -95,8 +98,15 @@ const recordHistoryRoute = createRoute({
 // Route factory
 // ---------------------------------------------------------------------------
 
-export function attendanceCorrectionRoutes(database: Database): OpenAPIHono<AppEnv> {
+export function attendanceCorrectionRoutes(
+  database: Database,
+  redis: RedisClient | null = null,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  const notificationsQueue = redis
+    ? new Queue(QUEUE_NAMES.NOTIFICATIONS, { connection: redis as never })
+    : null;
 
   // Audit declarations
   routes.use("/api/attendance/records/{recordId}", auditAction("update", "attendance_records"));
@@ -129,6 +139,18 @@ export function attendanceCorrectionRoutes(database: Database): OpenAPIHono<AppE
         reason: body.reason,
       }),
     );
+
+    // ST-110: a correction INTO 'absent' can complete a threshold run that nothing else would
+    // ever notice — the batch path only sees the day it was submitted. Correcting away from
+    // 'absent' enqueues nothing: alerts already sent stay sent, and the log is immutable.
+    if (record.status === "absent") {
+      await enqueueAttendanceAlerts(notificationsQueue, c, {
+        schoolId: auth.schoolId,
+        attendanceSessionId: record.attendance_session_id,
+        sessionDate: record.session_date,
+        studentIds: [record.student_id],
+      });
+    }
 
     return c.json(
       {

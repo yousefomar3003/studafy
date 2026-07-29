@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { PERMISSIONS } from "@studafy/constants";
+import { PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
+import { Queue } from "bullmq";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
@@ -15,6 +16,7 @@ import {
   recordAttendanceBatch,
   updateAttendanceSessionStatus,
 } from "../attendance-session-service";
+import { enqueueAttendanceAlerts } from "../enqueue-alerts";
 import {
   attendanceSessionListSchema,
   attendanceSessionQuerySchema,
@@ -28,6 +30,7 @@ import {
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { RedisClient } from "../../../redis";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -183,8 +186,18 @@ const batchRecordAttendanceRoute = createRoute({
 // Route factory
 // ---------------------------------------------------------------------------
 
-export function attendanceSessionRoutes(database: Database): OpenAPIHono<AppEnv> {
+export function attendanceSessionRoutes(
+  database: Database,
+  redis: RedisClient | null = null,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  // Nullable for the same reason every other producer in this app is: REDIS_URL is optional, and
+  // dev, test and the OpenAPI generator all run without it. Without Redis the API still records
+  // attendance perfectly well; it simply raises no alerts.
+  const notificationsQueue = redis
+    ? new Queue(QUEUE_NAMES.NOTIFICATIONS, { connection: redis as never })
+    : null;
 
   // Audit declarations
   routes.use("/api/attendance/sessions", auditAction("insert", "attendance_sessions"));
@@ -211,6 +224,20 @@ export function attendanceSessionRoutes(database: Database): OpenAPIHono<AppEnv>
         records: body.records,
       }),
     );
+
+    // ST-110: hand the absent students to the alert engine.
+    //
+    // Enqueued after the transaction commits, not inside it — a job referencing rows that were
+    // rolled back is worse than a job that was never queued. The cost is a genuine gap: a crash
+    // between COMMIT and this line loses the evaluation for that submission. Accepted deliberately
+    // (see docs/architecture/alert-rules-engine.md) because the transactional alternative, the
+    // outbox, has no BullMQ fan-out and its relay is not configured in production.
+    await enqueueAttendanceAlerts(notificationsQueue, c, {
+      schoolId: auth.schoolId,
+      attendanceSessionId: body.attendance_session_id,
+      sessionDate: result.session_date,
+      studentIds: result.records.filter((r) => r.status === "absent").map((r) => r.student_id),
+    });
 
     const status = result.created_count > 0 ? 201 : 200;
     return c.json(
