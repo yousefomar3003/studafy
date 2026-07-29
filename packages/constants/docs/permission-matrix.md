@@ -76,6 +76,7 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `report:read`                    | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
 | `report:export`                  | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `report:viewFinancial`           | ✅          | ✅        | ✅      |            |                    |         |        |       |               |
+| `approval:review`                | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `auditLog:read`                  | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
 | `auditLog:export`                | ✅          | ✅        | ✅      |            |                    |         |        |       |               |
 | `apiKey:create`                  | ✅          |           |         |            |                    |         |        |       |               |
