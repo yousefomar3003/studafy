@@ -91,6 +91,11 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   // Discipline — authenticated CRUD
   "/api/discipline/incidents": "default",
   "/api/discipline/incidents/*": "default",
+  // Finance gateway — authenticated, and every write is a synchronous call into ERPNext. Classed
+  // explicitly rather than left to fall through, because the cost of a request here is paid by a
+  // second system: a burst that this app would shrug off can still exhaust ERPNext's workers.
+  "/api/finance/fee-structures": "default",
+  "/api/finance/fee-structures/*": "default",
   // AI (metered, tenant+user scoped)
   // "/api/ai/*": "ai",
 };

@@ -171,6 +171,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
   // Discipline incidents & actions. Guarded per method by requirePermissionIn() on
   // DISCIPLIN_INCIDENT_CREATE/READ/UPDATE/RESOLVE and DISCIPLINE_ACTION_CREATE/READ/UPDATE.
+  // Finance gateway (ST-119). Guarded by requirePermission(BILLING_UPDATE); FINANCE_PERMISSIONS
+  // already holds it, so the FINANCE role gains this surface without a matrix change.
+  "POST /api/finance/fee-structures",
+  "PATCH /api/finance/fee-structures/{feeStructureId}",
   "POST /api/discipline/incidents",
   "PATCH /api/discipline/incidents/{incidentId}",
   "POST /api/discipline/incidents/{incidentId}/resolve",

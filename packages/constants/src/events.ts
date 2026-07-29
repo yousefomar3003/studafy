@@ -69,6 +69,7 @@ export const DOMAIN_EVENTS = {
   ERPNEXT_FEE_DUE: "erpnext.feeDue",
   ERPNEXT_PAYMENT_RECEIVED: "erpnext.paymentReceived",
   ERPNEXT_CREDIT_NOTE_ISSUED: "erpnext.creditNoteIssued",
+  ERPNEXT_FEE_STRUCTURE_SUBMITTED: "erpnext.feeStructureSubmitted",
 } as const;
 
 /**
@@ -80,6 +81,9 @@ export const ERPNEXT_DOC_EVENT_MAP: Record<string, DomainEvent | undefined> = {
   "Fee Schedule-submitted": DOMAIN_EVENTS.ERPNEXT_FEE_DUE,
   "Payment Entry-submitted": DOMAIN_EVENTS.ERPNEXT_PAYMENT_RECEIVED,
   "Sales Invoice-return": DOMAIN_EVENTS.ERPNEXT_CREDIT_NOTE_ISSUED,
+  // Fee Structure, not Fee Schedule: a structure is the priced template, a schedule is one dated
+  // application of it. They are separate DocTypes and only the schedule was mapped before (ST-119).
+  "Fee Structure-submitted": DOMAIN_EVENTS.ERPNEXT_FEE_STRUCTURE_SUBMITTED,
 };
 
 export type DomainEvent = (typeof DOMAIN_EVENTS)[keyof typeof DOMAIN_EVENTS];

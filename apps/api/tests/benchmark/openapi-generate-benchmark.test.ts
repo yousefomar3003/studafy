@@ -82,6 +82,8 @@ const EXPECTED_PATHS = [
   "/api/attendance/reports/trends",
   "/api/attendance/sessions",
   "/api/attendance/sessions/{sessionId}",
+  "/api/finance/fee-structures",
+  "/api/finance/fee-structures/{feeStructureId}",
   "/api/discipline/incidents",
   "/api/discipline/incidents/{incidentId}",
   "/api/discipline/incidents/{incidentId}/actions",

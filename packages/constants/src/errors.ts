@@ -108,6 +108,16 @@ export const ERROR_CODES = {
   ERPNEXT_SITE_CREATION_FAILED: "ERPNEXT_SITE_CREATION_FAILED",
   ERPNEXT_COMPANY_CREATION_FAILED: "ERPNEXT_COMPANY_CREATION_FAILED",
 
+  // ERPNext gateway — upstream availability, distinguished from each other because a client can act
+  // on the difference: a timeout is worth retrying, an open circuit is not (ST-119).
+  ERPNEXT_NOT_CONFIGURED: "ERPNEXT_NOT_CONFIGURED",
+  ERPNEXT_UNAVAILABLE: "ERPNEXT_UNAVAILABLE",
+  ERPNEXT_TIMEOUT: "ERPNEXT_TIMEOUT",
+  ERPNEXT_CIRCUIT_OPEN: "ERPNEXT_CIRCUIT_OPEN",
+
+  // Finance gateway — fee structures (ST-119).
+  FEE_STRUCTURE_NOT_FOUND: "FEE_STRUCTURE_NOT_FOUND",
+
   // Import — CSV import lifecycle.
   IMPORT_NOT_FOUND: "IMPORT_NOT_FOUND",
   IMPORT_INVALID_STATE: "IMPORT_INVALID_STATE",

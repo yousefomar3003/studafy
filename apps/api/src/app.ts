@@ -52,6 +52,7 @@ import {
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { disciplineRoutes } from "./modules/discipline";
+import { EnvCredentialResolver, feeStructureRoutes, TenantErpNextFactory } from "./modules/finance";
 import { gradebookConfigRoutes, gradeEntryRoutes } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
@@ -286,6 +287,27 @@ export function createApp({
           })
         : null;
     app.route("/", emailVerificationRoutes(database, logger, erpNextClient));
+  }
+
+  // Finance gateway (ST-119). A pass-through to each school's ERPNext site: ERPNext owns fee
+  // validation, currency rules and totals, and this only routes, crosswalks ids, and maintains the
+  // read model. The Host header selects the tenant's Frappe site, so the client is built per
+  // school rather than shared. Idempotency on /api/finance/* is already wired above.
+  if (database) {
+    app.route(
+      "/",
+      feeStructureRoutes(
+        database,
+        new TenantErpNextFactory({
+          resolver: new EnvCredentialResolver({
+            baseUrl: process.env.ERPNEXT_API_URL,
+            apiKey: process.env.ERPNEXT_API_KEY,
+          }),
+          logger,
+          redis,
+        }),
+      ),
+    );
   }
 
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.
