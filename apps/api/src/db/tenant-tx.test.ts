@@ -77,6 +77,41 @@ describe("withTenantTx", () => {
     expect(result).toBe("studafy_app");
   });
 
+  integrationTest(
+    "routes analytical transactions to the read pool and makes them read-only",
+    async () => {
+      const primary = postgres(database!.url, {
+        max: 1,
+        ssl: false,
+        prepare: false,
+        connection: { application_name: "attendance-primary" },
+      });
+      const readReplica = postgres(database!.url, {
+        max: 1,
+        ssl: false,
+        prepare: false,
+        connection: { application_name: "attendance-read" },
+      });
+      try {
+        const result = await withTenantTx(
+          { primary, readReplica },
+          { schoolId: crypto.randomUUID() },
+          async (tx) => {
+            const [row] = await tx<{ application_name: string; read_only: string }[]>`
+            SELECT current_setting('application_name') AS application_name,
+                   current_setting('transaction_read_only') AS read_only
+          `;
+            return row!;
+          },
+          { useReadReplica: true },
+        );
+        expect(result).toEqual({ application_name: "attendance-read", read_only: "on" });
+      } finally {
+        await Promise.all([primary.end({ timeout: 1 }), readReplica.end({ timeout: 1 })]);
+      }
+    },
+  );
+
   integrationTest("rolls back on callback error", async () => {
     const schoolId = crypto.randomUUID();
     const pooled = postgres(database!.url, { max: 2, ssl: false, prepare: false });

@@ -13,6 +13,11 @@ variable "postgres_instance_id" {
   type        = string
 }
 
+variable "postgres_read_replica_instance_id" {
+  description = "PostgreSQL reporting read-replica DBInstanceIdentifier."
+  type        = string
+}
+
 variable "mariadb_instance_id" {
   description = "MariaDB DBInstanceIdentifier, or null where the ERPNext plane is disabled."
   type        = string

@@ -44,4 +44,17 @@ describe("ROLE_PERMISSIONS", () => {
       }
     }
   });
+
+  test("attendance reporting permissions are admin-only", () => {
+    for (const permission of [
+      PERMISSIONS.ATTENDANCE_REPORT_READ,
+      PERMISSIONS.ATTENDANCE_REPORT_EXPORT,
+    ]) {
+      const roles = Object.entries(ROLE_PERMISSIONS)
+        .filter(([, permissions]) => permissions.includes(permission))
+        .map(([role]) => role)
+        .sort();
+      expect(roles).toEqual([ROLES.ORG_ADMIN, ROLES.SUPER_ADMIN].sort());
+    }
+  });
 });

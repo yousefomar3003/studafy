@@ -8,6 +8,16 @@ output "address" {
   value       = aws_db_instance.this.address
 }
 
+output "read_replica_instance_id" {
+  description = "RDS read-replica identifier used for reporting health and lag alarms."
+  value       = aws_db_instance.read_replica.identifier
+}
+
+output "read_replica_address" {
+  description = "Read-replica endpoint (host only). Route reporting traffic through PgBouncer's read pools."
+  value       = aws_db_instance.read_replica.address
+}
+
 output "port" {
   description = "TCP port Postgres (SSL-enforced) listens on."
   value       = var.port

@@ -1,5 +1,5 @@
 import { createApp } from "./app";
-import { checkDatabase, closeDatabase, createDatabase } from "./database";
+import { checkDatabase, closeDatabasePools, createDatabase, createReadDatabase } from "./database";
 import { loadEnv } from "./env";
 import { createSecurityEventSink } from "./lib/security/securityEventSink";
 import { createStorageService } from "./lib/storage";
@@ -25,6 +25,7 @@ const logger = createLogger({
 const state = { ready: true };
 const tracker = createInflightTracker();
 const database = createDatabase(env);
+const readDatabase = createReadDatabase(env, database);
 const redis = env.REDIS_URL ? createRedisClient({ url: env.REDIS_URL, logger }) : null;
 
 // Persists CORS/CSRF rejections off the request path. Returns a no-op sink when no database is
@@ -42,11 +43,16 @@ const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
 await keyStore.init();
 
 const app = createApp({
-  isReady: async () => state.ready && (await checkDatabase(database)) && (await checkRedis(redis)),
+  isReady: async () =>
+    state.ready &&
+    (await checkDatabase(database)) &&
+    (await checkDatabase(readDatabase)) &&
+    (await checkRedis(redis)),
   tracker,
   logger,
   redis,
   database,
+  readDatabase,
   keyStore,
   jwtIssuer: env.JWT_ISSUER,
   jwtAudience: env.JWT_AUDIENCE,
@@ -90,7 +96,7 @@ const shutdown = (signal: string) => {
     // Drains buffered security events. Must run before closeDatabase, which it writes through.
     await securityEventSink.close();
     await closeRedis(redis);
-    await closeDatabase(database);
+    await closeDatabasePools(database, readDatabase);
     logger.info({ signal }, "shutdown complete");
     process.exit(0);
   });

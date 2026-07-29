@@ -45,6 +45,9 @@ cat > /etc/pgbouncer/pgbouncer.ini <<INI
 %{ for name, pool in service_pools ~}
 ${name} = host=$PG_HOST port=$PG_PORT dbname=$PG_DB user=$PG_USER pool_size=${pool.pool_size} reserve_pool_size=${pool.reserve_pool_size}
 %{ endfor ~}
+%{ for name, pool in read_pools ~}
+${name} = host=${read_replica_host} port=$PG_PORT dbname=$PG_DB user=$PG_USER pool_size=${pool.pool_size} reserve_pool_size=${pool.reserve_pool_size}
+%{ endfor ~}
 
 [pgbouncer]
 listen_addr = *

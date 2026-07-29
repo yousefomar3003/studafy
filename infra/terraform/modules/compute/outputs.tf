@@ -13,6 +13,16 @@ output "execution_role_arn" {
   value       = aws_iam_role.execution.arn
 }
 
+output "api_task_role_arn" {
+  description = "API ECS task role with attachment access and reports/* read access."
+  value       = aws_iam_role.api_task.arn
+}
+
+output "workers_task_role_arn" {
+  description = "Workers ECS task role with reports/* upload-only access."
+  value       = aws_iam_role.workers_task.arn
+}
+
 output "migrations_execution_role_arn" {
   description = "Dedicated ECS execution role limited to the migration image and PostgreSQL secret."
   value       = aws_iam_role.migrations_execution.arn

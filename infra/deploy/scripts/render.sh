@@ -65,7 +65,11 @@ PGBOUNCER_SECRET_ARN="$(terraform -chdir="$TF_DIR" output -raw pgbouncer_connect
 PGBOUNCER_HOST="$(terraform -chdir="$TF_DIR" output -raw pgbouncer_private_ip)"
 POSTGRES_SECRET_ARN="$(terraform -chdir="$TF_DIR" output -raw postgres_connection_secret_arn)"
 MIGRATIONS_EXECUTION_ROLE_ARN="$(terraform -chdir="$TF_DIR" output -raw compute_migrations_execution_role_arn)"
-export REDIS_SECRET_ARN PGBOUNCER_SECRET_ARN PGBOUNCER_HOST POSTGRES_SECRET_ARN MIGRATIONS_EXECUTION_ROLE_ARN
+API_TASK_ROLE_ARN="$(terraform -chdir="$TF_DIR" output -raw compute_api_task_role_arn)"
+WORKERS_TASK_ROLE_ARN="$(terraform -chdir="$TF_DIR" output -raw compute_workers_task_role_arn)"
+S3_APP_FILES_BUCKET="$(terraform -chdir="$TF_DIR" output -raw storage_app_files_bucket_id)"
+export REDIS_SECRET_ARN PGBOUNCER_SECRET_ARN PGBOUNCER_HOST POSTGRES_SECRET_ARN
+export MIGRATIONS_EXECUTION_ROLE_ARN API_TASK_ROLE_ARN WORKERS_TASK_ROLE_ARN S3_APP_FILES_BUCKET
 
 SERVICE_UPPER="$(echo "$SERVICE" | tr '[:lower:]' '[:upper:]')"
 export "${SERVICE_UPPER}_IMAGE=${REPO_URL}:${IMAGE_TAG}"

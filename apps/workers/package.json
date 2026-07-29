@@ -12,9 +12,14 @@
     "smoke-test": "bun run scripts/smoke-test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1097.0",
+    "@pdf-lib/fontkit": "1.1.1",
+    "@studafy/attendance-reporting": "workspace:*",
     "@studafy/constants": "workspace:*",
     "bullmq": "5.79.3",
+    "exceljs": "4.4.0",
     "ioredis": "5.10.1",
+    "pdf-lib": "1.17.1",
     "postgres": "3.4.9",
     "zod": "4.1.12"
   },

@@ -57,7 +57,7 @@ describe("problem+json envelope", () => {
   test("every mapped status produces a body satisfying the shared schema", async () => {
     // apiProblemSchema is the contract. It is deliberately not parsed in production — onError runs
     // inside Hono's catch, so a throw there would re-enter onError — which makes this the oracle.
-    for (const status of [400, 401, 403, 404, 409, 429, 500] as const) {
+    for (const status of [400, 401, 403, 404, 409, 429, 500, 503] as const) {
       const { app } = buildApp((a) =>
         a.get("/x", () => {
           throw new HTTPException(status, { message: "m" });

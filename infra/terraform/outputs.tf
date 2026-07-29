@@ -78,6 +78,16 @@ output "postgres_address" {
   value       = module.postgres.address
 }
 
+output "postgres_read_replica_instance_id" {
+  description = "Postgres reporting read-replica identifier."
+  value       = module.postgres.read_replica_instance_id
+}
+
+output "postgres_read_replica_address" {
+  description = "Postgres reporting read-replica endpoint (host only)."
+  value       = module.postgres.read_replica_address
+}
+
 output "postgres_connection_secret_arn" {
   description = "Secrets Manager ARN holding host, port, dbname, username, password and sslmode. Grant secretsmanager:GetSecretValue to the roles that need it — the password itself is never a Terraform output."
   value       = module.postgres.connection_secret_arn
@@ -265,6 +275,16 @@ output "compute_ecs_cluster_name" {
 output "compute_ecs_execution_role_arn" {
   description = "Shared ECS task execution role ARN. Pass as ECS_EXECUTION_ROLE_ARN."
   value       = module.compute.execution_role_arn
+}
+
+output "compute_api_task_role_arn" {
+  description = "API runtime role for object-storage access."
+  value       = module.compute.api_task_role_arn
+}
+
+output "compute_workers_task_role_arn" {
+  description = "Workers runtime role for report artifact uploads."
+  value       = module.compute.workers_task_role_arn
 }
 
 output "compute_api_target_group_arn" {

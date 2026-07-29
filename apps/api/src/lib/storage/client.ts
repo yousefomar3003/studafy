@@ -1,107 +1,111 @@
-/**
- * Object storage client (ST-103).
- *
- * Built on Bun's native S3 support rather than @aws-sdk/client-s3. The AWS SDK would add a large
- * dependency tree to an app whose only storage needs are presign, head, copy, and delete -- all of
- * which Bun.S3Client covers natively, with no install step and no bundling concern for
- * infra/docker/api.Dockerfile. It speaks plain S3, so MinIO or any other S3-compatible provider
- * works by setting S3_ENDPOINT.
- *
- * The client is optional throughout. Dev and test environments run without object storage
- * configured, and the app must still boot: routes that need storage answer 503 (see
- * requireStorage below), and read paths degrade to a null download URL rather than failing the
- * whole request. That is why every consumer takes `StorageService | null` instead of reaching for
- * a module-level singleton.
- */
-
+import {
+  CopyObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ERROR_CODES } from "@studafy/constants";
-import { S3Client } from "bun";
 
 import { CodedHttpException } from "../../coded-http-exception";
 
 import type { Env } from "../../env";
 
-/** How a pre-signed URL may be used. */
 export type PresignMethod = "GET" | "PUT";
 
 export interface PresignedUrl {
   url: string;
-  /** Absolute expiry, for the client to reason about without re-deriving the TTL. */
   expiresAt: Date;
 }
 
 export interface StorageService {
-  /** Seconds a generated URL stays valid. */
   readonly ttlSeconds: number;
-  presign(key: string, method: PresignMethod, contentType?: string): PresignedUrl;
+  presign(
+    key: string,
+    method: PresignMethod,
+    contentType?: string,
+    ttlOverrideSeconds?: number,
+  ): PresignedUrl | Promise<PresignedUrl>;
   exists(key: string): Promise<boolean>;
   size(key: string): Promise<number>;
   copy(sourceKey: string, destinationKey: string): Promise<void>;
   remove(key: string): Promise<void>;
 }
 
-/**
- * Construct the storage service, or return null when object storage is not configured.
- *
- * env.ts validates the credential variables as an all-or-nothing group, so a partially configured
- * environment fails at startup rather than here. Checking the bucket alone is therefore sufficient
- * to distinguish "configured" from "not configured".
- */
 export function createStorageService(env: Env): StorageService | null {
-  if (!env.S3_APP_FILES_BUCKET) return null;
+  if (!env.S3_APP_FILES_BUCKET || !env.S3_REGION) return null;
 
+  const bucket = env.S3_APP_FILES_BUCKET;
   const client = new S3Client({
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
     region: env.S3_REGION,
-    bucket: env.S3_APP_FILES_BUCKET,
-    ...(env.S3_ENDPOINT ? { endpoint: env.S3_ENDPOINT } : {}),
+    ...(env.S3_ENDPOINT ? { endpoint: env.S3_ENDPOINT, forcePathStyle: true } : {}),
+    ...(env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY
+      ? {
+          credentials: {
+            accessKeyId: env.S3_ACCESS_KEY_ID,
+            secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+          },
+        }
+      : {}),
   });
-
   const ttlSeconds = env.S3_PRESIGN_TTL_SECONDS;
 
   return {
     ttlSeconds,
 
-    presign(key, method, contentType) {
-      // Purely local: an HMAC over the request's canonical form. No network call, so this is safe
-      // to do while holding a database transaction open -- though callers avoid it anyway.
-      const url = client.presign(key, {
-        method,
-        expiresIn: ttlSeconds,
-        ...(contentType ? { type: contentType } : {}),
-      });
-      return { url, expiresAt: new Date(Date.now() + ttlSeconds * 1000) };
+    async presign(key, method, contentType, ttlOverrideSeconds) {
+      const expiresIn = ttlOverrideSeconds ?? ttlSeconds;
+      const command =
+        method === "PUT"
+          ? new PutObjectCommand({
+              Bucket: bucket,
+              Key: key,
+              ...(contentType ? { ContentType: contentType } : {}),
+            })
+          : new GetObjectCommand({
+              Bucket: bucket,
+              Key: key,
+              ResponseContentDisposition: `attachment; filename="${key.split("/").at(-1) ?? "download"}"`,
+            });
+      const url = await getSignedUrl(client, command, { expiresIn });
+      return { url, expiresAt: new Date(Date.now() + expiresIn * 1000) };
     },
 
     async exists(key) {
-      return client.exists(key);
+      try {
+        await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+        return true;
+      } catch (error) {
+        const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+          ?.httpStatusCode;
+        if (status === 404) return false;
+        throw error;
+      }
     },
 
     async size(key) {
-      return client.size(key);
+      const result = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+      return Number(result.ContentLength ?? 0);
     },
 
     async copy(sourceKey, destinationKey) {
-      // S3 has no move. The runbook spells this out: the temp -> permanent transition is a
-      // CopyObject followed by a DeleteObject, and the delete is the caller's second step so a
-      // failed copy leaves the source intact to retry against.
-      await client.write(destinationKey, client.file(sourceKey));
+      await client.send(
+        new CopyObjectCommand({
+          Bucket: bucket,
+          Key: destinationKey,
+          CopySource: encodeURIComponent(`${bucket}/${sourceKey}`),
+        }),
+      );
     },
 
     async remove(key) {
-      await client.delete(key);
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
     },
   };
 }
 
-/**
- * Return the storage service or refuse the request.
- *
- * 503 rather than 500: the request is well-formed and would succeed against a properly configured
- * deployment, so this is "the server is missing a dependency", not "the server is broken". A caller
- * seeing it should retry later or escalate, not rewrite their request.
- */
 export function requireStorage(storage: StorageService | null): StorageService {
   if (!storage) {
     throw new CodedHttpException(
