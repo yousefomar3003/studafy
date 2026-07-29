@@ -183,6 +183,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  // Approval queue (ST-115). Atomic bulk approve/reject with per-item partial-failure.
+  // Gated on APPROVAL_REVIEW permission via requirePermission middleware.
+  "POST /api/approvals/bulk-decision",
 ];
 
 /**

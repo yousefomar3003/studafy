@@ -206,6 +206,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/discipline/incidents/{incidentId}/resolve",
   "POST /api/discipline/incidents/{incidentId}/actions",
   "PATCH /api/discipline/incidents/{incidentId}/actions/{actionId}",
+  // Approval queue (ST-115). Atomic bulk approve/reject with per-item partial-failure.
+  // Audit row is written by auditAction middleware on the route.
+  "POST /api/approvals/bulk-decision",
 ];
 
 function collectSourceFiles(dir: string): string[] {
