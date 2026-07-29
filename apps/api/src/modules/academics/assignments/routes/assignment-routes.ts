@@ -98,11 +98,11 @@ function tenantFrom(c: Context<AppEnv>): {
  * storage should still be able to list assignments; failing the whole request over a download link
  * would take out the feature to protect an attachment.
  */
-function toAttachmentResponse(
+async function toAttachmentResponse(
   row: AttachmentRow,
   storage: StorageService | null,
-): AssignmentAttachment {
-  const presigned = storage ? storage.presign(row.storage_key, "GET") : null;
+): Promise<AssignmentAttachment> {
+  const presigned = storage ? await storage.presign(row.storage_key, "GET") : null;
 
   return {
     id: row.id,
@@ -161,11 +161,15 @@ async function hydrate(
     rows.map((row) => row.id),
   );
 
-  return rows.map((row) =>
-    toAssignmentResponse(
-      row,
-      (byAssignment.get(row.id) ?? []).map((attachment) =>
-        toAttachmentResponse(attachment, storage),
+  return Promise.all(
+    rows.map(async (row) =>
+      toAssignmentResponse(
+        row,
+        await Promise.all(
+          (byAssignment.get(row.id) ?? []).map((attachment) =>
+            toAttachmentResponse(attachment, storage),
+          ),
+        ),
       ),
     ),
   );
@@ -537,7 +541,7 @@ export function assignmentRoutes(
       confirmAttachment(tx, active, auth.schoolId, auth.userId, assignmentId, body),
     );
 
-    return c.json(toAttachmentResponse(row, active), 201);
+    return c.json(await toAttachmentResponse(row, active), 201);
   });
 
   routes.openapi(deleteAttachmentRoute, async (c) => {

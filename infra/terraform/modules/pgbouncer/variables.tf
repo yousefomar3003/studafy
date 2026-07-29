@@ -23,6 +23,11 @@ variable "postgres_connection_secret_arn" {
   type        = string
 }
 
+variable "read_replica_host" {
+  description = "PostgreSQL reporting replica endpoint. api_read and workers_read pools route here."
+  type        = string
+}
+
 variable "listen_port" {
   description = "TCP port PgBouncer listens on. Must match the network module's pgbouncer_port so the security group rule and the listener agree — pass both from the same root variable."
   type        = number
@@ -84,6 +89,23 @@ variable "service_pools" {
   validation {
     condition     = alltrue([for name, _ in var.service_pools : can(regex("^[a-z][a-z0-9_]*$", name))])
     error_message = "each service_pools key must be lowercase alphanumeric/underscore, starting with a letter (used verbatim as a PgBouncer database name)."
+  }
+}
+
+variable "read_pools" {
+  description = "PgBouncer database aliases routed to read_replica_host."
+  type = map(object({
+    pool_size         = number
+    reserve_pool_size = optional(number, 0)
+  }))
+  default = {
+    api_read     = { pool_size = 15, reserve_pool_size = 5 }
+    workers_read = { pool_size = 15, reserve_pool_size = 5 }
+  }
+
+  validation {
+    condition     = contains(keys(var.read_pools), "api_read") && contains(keys(var.read_pools), "workers_read")
+    error_message = "read_pools must contain api_read and workers_read."
   }
 }
 

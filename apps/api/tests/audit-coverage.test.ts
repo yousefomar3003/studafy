@@ -181,6 +181,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grades/config/schemes",
   // Attendance sessions. Tenant-scoped session management with auditAction middleware.
   "POST /api/attendance/records/batch",
+  "POST /api/attendance/reports/export",
   "POST /api/attendance/sessions",
   "PATCH /api/attendance/sessions/{sessionId}",
   // Attendance corrections (ST-109). Amends a submitted record; the before/after diff reaches

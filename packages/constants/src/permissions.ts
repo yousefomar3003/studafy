@@ -132,6 +132,8 @@ export const PERMISSIONS = {
   ATTENDANCE_RECORD_CREATE: "attendance:record:create",
   ATTENDANCE_RECORD_READ: "attendance:record:read",
   ATTENDANCE_RECORD_CORRECT: "attendance:record:correct",
+  ATTENDANCE_REPORT_READ: "attendance:report:read",
+  ATTENDANCE_REPORT_EXPORT: "attendance:report:export",
   // Amend a record whose correction window has closed. Deliberately withheld from INSTRUCTOR:
   // holding it is what distinguishes a principal's administrative override from a teacher's
   // routine same-week fix.

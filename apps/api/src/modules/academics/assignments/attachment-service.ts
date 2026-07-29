@@ -106,7 +106,7 @@ export async function createUploadUrl(
   await assertCanManageClass(tx, classId);
 
   const storageKey = buildTempKey(schoolId, randomUUID(), params.file_name);
-  const presigned = storage.presign(storageKey, "PUT", params.content_type);
+  const presigned = await storage.presign(storageKey, "PUT", params.content_type);
 
   return {
     upload_url: presigned.url,

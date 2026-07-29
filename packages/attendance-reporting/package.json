@@ -1,0 +1,30 @@
+{
+  "name": "@studafy/attendance-reporting",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir dist --packages=external && tsc --project tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist --noEmit false",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "postgres": "3.4.9",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@studafy/config": "workspace:*",
+    "@studafy/tsconfig": "workspace:*",
+    "@types/bun": "1.3.14",
+    "typescript": "^5.9.3"
+  }
+}

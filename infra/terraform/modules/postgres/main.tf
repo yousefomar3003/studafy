@@ -112,6 +112,26 @@ resource "aws_db_instance" "this" {
 # One secret holds everything a caller needs to connect — apps read it once via
 # secretsmanager:GetSecretValue rather than assembling a connection string from several
 # Terraform outputs. The master password never appears in a `terraform output`.
+resource "aws_db_instance" "read_replica" {
+  identifier = "${var.name_prefix}-postgres-read"
+
+  replicate_source_db = aws_db_instance.this.identifier
+  instance_class      = var.instance_class
+  port                = var.port
+
+  storage_encrypted      = true
+  db_subnet_group_name   = var.db_subnet_group_name
+  vpc_security_group_ids = var.security_group_ids
+  parameter_group_name   = aws_db_parameter_group.this.name
+  publicly_accessible    = false
+
+  auto_minor_version_upgrade = var.auto_minor_version_upgrade
+  apply_immediately          = var.apply_immediately
+  deletion_protection        = var.deletion_protection
+  skip_final_snapshot        = true
+  copy_tags_to_snapshot      = true
+}
+
 resource "aws_secretsmanager_secret" "postgres" {
   name        = "${var.name_prefix}-postgres-connection"
   description = "Postgres master credential and connection info for ${var.name_prefix}. Read at runtime; never committed to *.tfvars."

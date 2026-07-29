@@ -32,7 +32,11 @@ import {
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
-import { attendanceCorrectionRoutes, attendanceSessionRoutes } from "./modules/attendance";
+import {
+  attendanceCorrectionRoutes,
+  attendanceReportRoutes,
+  attendanceSessionRoutes,
+} from "./modules/attendance";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -83,6 +87,8 @@ export interface AppOptions {
   redis?: RedisClient | null;
   /** Database client for routes that need it (webhook ingestion). Pass `null` to disable. */
   database?: Database | null;
+  /** Read-replica pool for analytical routes. Defaults to database outside production. */
+  readDatabase?: Database | null;
   /**
    * JWT key store for signing and JWKS endpoint.
    *
@@ -150,6 +156,7 @@ export function createApp({
   generateRequestId,
   redis,
   database,
+  readDatabase,
   keyStore,
   jwtIssuer = "studafy",
   jwtAudience = "studafy-api",
@@ -535,6 +542,10 @@ export function createApp({
   // ATTENDANCE_CORRECTION_OVERRIDE deciding whether a caller may correct past the school's window.
   if (database) {
     app.route("/", attendanceCorrectionRoutes(database, redis ?? null));
+    app.route(
+      "/",
+      attendanceReportRoutes(database, readDatabase ?? database, redis ?? null, storage),
+    );
   }
 
   // Discipline incidents and actions: teacher reporting, principal management (actions,

@@ -111,7 +111,7 @@ export async function createSubmissionUploadUrl(
   await assertOwnsSubmission(tx, schoolId, submissionId);
 
   const storageKey = buildTempKey(schoolId, randomUUID(), params.file_name);
-  const presigned = storage.presign(storageKey, "PUT", params.content_type);
+  const presigned = await storage.presign(storageKey, "PUT", params.content_type);
 
   return {
     upload_url: presigned.url,

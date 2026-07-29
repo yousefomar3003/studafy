@@ -72,6 +72,62 @@ resource "aws_iam_role_policy_attachment" "execution_secrets" {
   policy_arn = each.value
 }
 
+resource "aws_iam_role" "api_task" {
+  name               = "${var.name_prefix}-api-task"
+  description        = "Runtime role for API object-storage operations."
+  assume_role_policy = data.aws_iam_policy_document.execution_trust.json
+}
+
+data "aws_iam_policy_document" "api_storage" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject",
+    ]
+    resources = [
+      "${var.app_files_bucket_arn}/temp/*",
+      "${var.app_files_bucket_arn}/permanent/*",
+    ]
+  }
+
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:GetObject"]
+    resources = ["${var.app_files_bucket_arn}/reports/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "api_storage" {
+  name   = "${var.name_prefix}-api-storage"
+  role   = aws_iam_role.api_task.id
+  policy = data.aws_iam_policy_document.api_storage.json
+}
+
+resource "aws_iam_role" "workers_task" {
+  name               = "${var.name_prefix}-workers-task"
+  description        = "Runtime role for attendance report artifact uploads."
+  assume_role_policy = data.aws_iam_policy_document.execution_trust.json
+}
+
+data "aws_iam_policy_document" "workers_reports" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:PutObject",
+      "s3:AbortMultipartUpload",
+    ]
+    resources = ["${var.app_files_bucket_arn}/reports/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "workers_reports" {
+  name   = "${var.name_prefix}-workers-reports"
+  role   = aws_iam_role.workers_task.id
+  policy = data.aws_iam_policy_document.workers_reports.json
+}
+
 # The one-off migration task can resolve only the direct PostgreSQL credential. Keeping it off the
 # shared application execution role prevents a migration task definition from selecting unrelated
 # application, Redis, PgBouncer, or ERPNext secrets.

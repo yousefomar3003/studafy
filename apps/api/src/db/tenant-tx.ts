@@ -1,4 +1,4 @@
-import type { Database } from "./client";
+import type { Database, DatabasePools } from "./client";
 import type { TransactionSql } from "postgres";
 
 export interface TenantContext {
@@ -14,13 +14,27 @@ export interface OpenTenantTransaction<T> {
   rollback: () => Promise<void>;
 }
 
+export interface TenantTxOptions {
+  useReadReplica?: boolean;
+}
+
+function selectDatabase(database: Database | DatabasePools, options: TenantTxOptions): Database {
+  if (typeof database === "function") return database;
+  return options.useReadReplica ? database.readReplica : database.primary;
+}
+
 export async function withTenantTx<T>(
-  database: Database,
+  database: Database | DatabasePools,
   context: TenantContext,
   fn: (tx: TransactionSql) => Promise<T>,
+  options: TenantTxOptions = {},
 ): Promise<T> {
+  const selected = selectDatabase(database, options);
   let result: T | undefined;
-  await database.begin(async (tx) => {
+  await selected.begin(async (tx) => {
+    if (options.useReadReplica) {
+      await tx`SET TRANSACTION READ ONLY`;
+    }
     await configureTenantTx(tx, context);
     result = await fn(tx);
   });

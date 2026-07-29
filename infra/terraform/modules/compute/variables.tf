@@ -58,3 +58,8 @@ variable "secrets_service_iam_policy_arns" {
   type        = map(string)
   default     = {}
 }
+
+variable "app_files_bucket_arn" {
+  description = "ARN of the application files bucket used to scope API and worker task-role access."
+  type        = string
+}

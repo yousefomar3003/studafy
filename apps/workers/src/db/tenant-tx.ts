@@ -29,9 +29,11 @@ export async function withTenantTx<T>(
   sql: Sql,
   context: TenantContext,
   fn: (tx: TransactionSql) => Promise<T>,
+  options: { readOnly?: boolean } = {},
 ): Promise<T> {
   let result: T | undefined;
   await sql.begin(async (tx) => {
+    if (options.readOnly) await tx`SET TRANSACTION READ ONLY`;
     await configureTenantTx(tx, context);
     result = await fn(tx);
   });

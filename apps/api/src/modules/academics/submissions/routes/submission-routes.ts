@@ -96,11 +96,11 @@ function tenantFrom(c: Context<AppEnv>): {
  * layout is guessable enough that publishing one school's keys would hand a reader the shape of
  * every other school's. The pre-signed URL is the only handle a client gets, and it expires.
  */
-function toAttachmentResponse(
+async function toAttachmentResponse(
   row: SubmissionAttachmentRow,
   storage: StorageService | null,
-): SubmissionAttachment {
-  const presigned = storage ? storage.presign(row.storage_key, "GET") : null;
+): Promise<SubmissionAttachment> {
+  const presigned = storage ? await storage.presign(row.storage_key, "GET") : null;
 
   return {
     id: row.id,
@@ -179,13 +179,17 @@ async function hydrate(
     rows.map((row) => row.id),
   );
 
-  return rows.map((row) =>
-    toSubmissionResponse(
-      row,
-      (bySubmission.get(row.id) ?? []).map((attachment) =>
-        toAttachmentResponse(attachment, storage),
+  return Promise.all(
+    rows.map(async (row) =>
+      toSubmissionResponse(
+        row,
+        await Promise.all(
+          (bySubmission.get(row.id) ?? []).map((attachment) =>
+            toAttachmentResponse(attachment, storage),
+          ),
+        ),
+        viewerIsStaff,
       ),
-      viewerIsStaff,
     ),
   );
 }
@@ -575,7 +579,7 @@ export function submissionRoutes(
       confirmSubmissionAttachment(tx, active, auth.schoolId, auth.userId, submissionId, body),
     );
 
-    return c.json(toAttachmentResponse(row, active), 201);
+    return c.json(await toAttachmentResponse(row, active), 201);
   });
 
   routes.openapi(deleteAttachmentRoute, async (c) => {

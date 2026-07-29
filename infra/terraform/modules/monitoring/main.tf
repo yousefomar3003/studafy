@@ -1,7 +1,10 @@
 locals {
   ecs_services = toset(["api", "realtime", "workers"])
   rds_instances = merge(
-    { postgres = var.postgres_instance_id },
+    {
+      postgres      = var.postgres_instance_id
+      postgres_read = var.postgres_read_replica_instance_id
+    },
     var.mariadb_instance_id == null ? {} : { mariadb = var.mariadb_instance_id },
   )
 }
@@ -23,6 +26,23 @@ resource "aws_cloudwatch_metric_alarm" "rds_cpu" {
   ok_actions          = []
 
   dimensions = { DBInstanceIdentifier = each.value }
+}
+
+resource "aws_cloudwatch_metric_alarm" "postgres_replica_lag" {
+  alarm_name          = "${var.name_prefix}-postgres-replica-lag-high"
+  alarm_description   = "PostgreSQL reporting replica lag has exceeded 60 seconds for 10 minutes."
+  namespace           = "AWS/RDS"
+  metric_name         = "ReplicaLag"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 60
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "breaching"
+  alarm_actions       = []
+  ok_actions          = []
+
+  dimensions = { DBInstanceIdentifier = var.postgres_read_replica_instance_id }
 }
 
 resource "aws_cloudwatch_metric_alarm" "postgres_storage" {
@@ -134,6 +154,22 @@ resource "aws_cloudwatch_dashboard" "operations" {
             ["AWS/ECS", "CPUUtilization", "ClusterName", var.ecs_cluster_name, "ServiceName", "${var.name_prefix}-${service}", { label = "${service} CPU" }],
             [".", "MemoryUtilization", ".", ".", ".", ".", { label = "${service} memory" }],
           ]])
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 12
+        width  = 12
+        height = 6
+        properties = {
+          title  = "PostgreSQL replica lag"
+          region = var.aws_region
+          stat   = "Average"
+          period = 300
+          metrics = [
+            ["AWS/RDS", "ReplicaLag", "DBInstanceIdentifier", var.postgres_read_replica_instance_id],
+          ]
         }
       },
     ]

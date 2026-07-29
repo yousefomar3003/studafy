@@ -35,6 +35,7 @@ const STATUS_TITLES = new Map<number, string>([
   [409, "Conflict"],
   [429, "Too Many Requests"],
   [500, "Internal Server Error"],
+  [503, "Service Unavailable"],
 ]);
 
 // Error codes are never redeclared here — @studafy/constants is the single source of truth.

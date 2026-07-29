@@ -157,6 +157,7 @@ const EXPECTED_MUTATING_ROUTES = [
   // Attendance sessions. Tenant-scoped session management protected by requireAuth; school-level
   // data with no cross-user row-level permission.
   "POST /api/attendance/records/batch",
+  "POST /api/attendance/reports/export",
   "POST /api/attendance/sessions",
   "PATCH /api/attendance/sessions/{sessionId}",
   // Attendance corrections (ST-109). Guarded by requirePermission() on

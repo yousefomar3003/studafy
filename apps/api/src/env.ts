@@ -75,6 +75,11 @@ export const envSchema = z
     DATABASE_USER: z.string().min(1).optional(),
     DATABASE_PASSWORD: z.string().min(1).optional(),
     DATABASE_CA_CERT: z.string().min(1).optional(),
+    // Analytics are isolated on a dedicated PgBouncer database backed by an RDS read replica.
+    // Local development and tests may omit these values and reuse the primary pool.
+    READ_DATABASE_HOST: z.string().min(1).optional(),
+    READ_DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    READ_DATABASE_NAME: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1).optional(),
     ERPNEXT_WEBHOOK_SECRET: z.string().min(1).optional(),
     // ERPNext integration (ST-089). All optional — activates only when both are set.
@@ -211,14 +216,10 @@ export const envSchema = z
       });
     }
 
-    // Object storage: the four credential/bucket variables must be present or absent together.
-    // A half-configured client is worse than none — it would construct successfully and fail at
-    // the first presign, at which point the failure is a runtime 500 on a user's upload rather
-    // than a startup error naming the missing variable.
+    // Bucket and region activate storage. Access keys are optional because production uses an ECS
+    // task role; when supplied for local S3-compatible storage they must remain a complete pair.
     const storageVars = [
       ["S3_REGION", env.S3_REGION],
-      ["S3_ACCESS_KEY_ID", env.S3_ACCESS_KEY_ID],
-      ["S3_SECRET_ACCESS_KEY", env.S3_SECRET_ACCESS_KEY],
       ["S3_APP_FILES_BUCKET", env.S3_APP_FILES_BUCKET],
     ] as const;
     const storageSetCount = storageVars.filter(([, value]) => value !== undefined).length;
@@ -231,6 +232,13 @@ export const envSchema = z
         code: "custom",
         path: ["S3_APP_FILES_BUCKET"],
         message: `All object storage variables must be set together. Missing: ${missing}`,
+      });
+    }
+    if ((env.S3_ACCESS_KEY_ID === undefined) !== (env.S3_SECRET_ACCESS_KEY === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["S3_ACCESS_KEY_ID"],
+        message: "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set together",
       });
     }
 
@@ -253,6 +261,21 @@ export const envSchema = z
           message: `${key} is required in production`,
         });
       }
+    }
+
+    if (env.READ_DATABASE_HOST === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["READ_DATABASE_HOST"],
+        message: "READ_DATABASE_HOST is required in production",
+      });
+    }
+    if (env.READ_DATABASE_NAME === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["READ_DATABASE_NAME"],
+        message: "READ_DATABASE_NAME is required in production",
+      });
     }
   });
 

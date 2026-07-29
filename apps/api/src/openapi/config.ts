@@ -120,6 +120,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "/api/attendance/records/{recordId}/history.",
     },
     {
+      name: "Attendance Reports",
+      description:
+        "Tenant-scoped attendance summary, trend, and asynchronous export endpoints for school administrators.",
+    },
+    {
       name: "Assignments",
       description:
         "Class-scoped coursework. Authenticated and tenant-scoped, then scoped again within the " +

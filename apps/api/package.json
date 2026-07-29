@@ -17,12 +17,15 @@
     "openapi:generate": "bun run scripts/generate-openapi.ts && prettier --write openapi.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1097.0",
+    "@aws-sdk/s3-request-presigner": "3.1097.0",
     "@hono/zod-openapi": "1.5.1",
     "@scalar/hono-api-reference": "0.11.11",
+    "@studafy/attendance-reporting": "workspace:*",
     "@studafy/constants": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
-    "hono": "4.12.28",
     "bullmq": "5.79.3",
+    "hono": "4.12.28",
     "ioredis": "5.10.1",
     "jose": "6.2.3",
     "postgres": "3.4.9",
