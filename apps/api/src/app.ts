@@ -52,7 +52,7 @@ import {
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { disciplineRoutes } from "./modules/discipline";
-import { gradebookConfigRoutes, gradeEntryRoutes } from "./modules/grades";
+import { approvalQueueRoutes, gradebookConfigRoutes, gradeEntryRoutes } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -529,6 +529,15 @@ export function createApp({
   // GRADE_READ / GRADE_UPDATE permissions and class-level teacher authorization.
   if (database) {
     app.route("/", gradeEntryRoutes(database));
+  }
+
+  // Approval queue — unified pending-approvals feed for administrators. Queries grade
+  // submissions (status = submitted) and timetable versions (status = pending) into a single
+  // list with type-specific diff payloads. Bulk decision delegates to the existing grade and
+  // timetable decision functions with per-item partial-failure reporting. Gated on
+  // APPROVAL_REVIEW permission (ORG_ADMIN+).
+  if (database) {
+    app.route("/", approvalQueueRoutes(database));
   }
 
   // Attendance sessions (ST-107). Idempotent session management per class period with
