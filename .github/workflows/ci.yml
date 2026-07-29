@@ -22,7 +22,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun pm cache rm && bun install --frozen-lockfile --ignore-scripts
       # The security suite imports the Hono app, which reaches @studafy/constants and
       # @studafy/shared-schemas through their built dist/ -- and dist/ is gitignored, so it
       # only exists once something builds it. This job invokes `bun test` directly rather than
@@ -50,7 +50,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun pm cache rm && bun install --frozen-lockfile --ignore-scripts
       - name: Build the workspace packages the API imports
         run: bunx turbo run build --filter=@studafy/api^...
       - name: Run API integration tests
@@ -99,7 +99,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun pm cache rm && bun install --frozen-lockfile --ignore-scripts
       - name: Migrate and audit tenant RLS coverage
         env:
           DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
@@ -180,7 +180,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun pm cache rm && bun install --frozen-lockfile --ignore-scripts
       - run: bun run format:check
       - run: bunx turbo run lint check-types test build --filter=!@studafy/mobile
       - name: Regenerate the permission matrix and fail on drift
@@ -283,7 +283,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun pm cache rm && bun install --frozen-lockfile --ignore-scripts
       - name: Conventional commit gate
         run: |
           if printf 'bad message\n' | bunx commitlint; then
