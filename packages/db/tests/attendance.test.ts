@@ -414,9 +414,11 @@ integrationTest(
         {
           table_name: "attendance_records",
           indexes: [
+            "idx_attendance_records_analytics",
             "idx_attendance_records_school_recorded_by",
             "idx_attendance_records_school_session_student",
             "idx_attendance_records_school_student_created",
+            "idx_attendance_records_student_stats",
             "pk_attendance_records",
             // ST-109: leads with id, so a correction can find one record across every partition.
             "uq_attendance_records_id_school_created",
@@ -425,6 +427,7 @@ integrationTest(
         {
           table_name: "attendance_sessions",
           indexes: [
+            "idx_attendance_sessions_reports",
             "idx_attendance_sessions_school_class_date",
             "idx_attendance_sessions_school_taken_by",
             "pk_attendance_sessions",
@@ -720,9 +723,9 @@ integrationTest(
         expect(row.app_update).toBe(true);
         expect(row.app_delete).toBe(true);
         expect(row.public_select).toBe(false);
-        // Sessions: pkey + candidate key + 2 declared indexes. Records: pkey + 3 declared indexes
+        // Sessions: pkey + candidate key + 3 declared indexes. Records: pkey + 5 declared indexes
         // + the ST-109 candidate key, which a unique constraint on the parent builds on every leaf.
-        expect(row.index_count).toBe(row.relname.startsWith("attendance_sessions") ? "4" : "5");
+        expect(row.index_count).toBe(row.relname.startsWith("attendance_sessions") ? "5" : "7");
       }
 
       // The parents and the registries themselves.
@@ -1499,7 +1502,9 @@ integrationTest(
         );
         return rows.map((row) => row["QUERY PLAN"]).join("\n");
       });
-      expect(rosterPlan).toContain("school_id_attendance_session_id");
+      // PostgreSQL truncates generated leaf-index names at 63 bytes and may append a collision
+      // suffix now that reporting adds a second session-led index. Assert the stable prefix.
+      expect(rosterPlan).toContain("school_id_attendance_session_i");
 
       const historyPruned = await explainRelations(
         database,

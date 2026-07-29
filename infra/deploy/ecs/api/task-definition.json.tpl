@@ -5,6 +5,7 @@
   "cpu": "${API_CPU}",
   "memory": "${API_MEMORY}",
   "executionRoleArn": "${ECS_EXECUTION_ROLE_ARN}",
+  "taskRoleArn": "${API_TASK_ROLE_ARN}",
   "containerDefinitions": [
     {
       "name": "api",
@@ -20,12 +21,19 @@
         { "name": "RELEASE_VERSION", "value": "${IMAGE_TAG}" },
         { "name": "DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },
         { "name": "DATABASE_PORT", "value": "6432" },
-        { "name": "DATABASE_NAME", "value": "api" }
+        { "name": "DATABASE_NAME", "value": "api" },
+        { "name": "READ_DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },
+        { "name": "READ_DATABASE_PORT", "value": "6432" },
+        { "name": "READ_DATABASE_NAME", "value": "api_read" },
+        { "name": "S3_REGION", "value": "${AWS_REGION}" },
+        { "name": "S3_APP_FILES_BUCKET", "value": "${S3_APP_FILES_BUCKET}" },
+        { "name": "S3_PRESIGN_TTL_SECONDS", "value": "900" }
       ],
       "secrets": [
         { "name": "DATABASE_USER", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_username::" },
         { "name": "DATABASE_PASSWORD", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_password::" },
-        { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" }
+        { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" },
+        { "name": "REDIS_URL", "valueFrom": "${REDIS_SECRET_ARN}:queue_url::" }
       ],
       "healthCheck": {
         "command": [

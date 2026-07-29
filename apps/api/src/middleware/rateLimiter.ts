@@ -139,6 +139,7 @@ if tokens < 1 then
   else
     retryAfter = ttl
   end
+  local retryAfter = rate > 0 and math.ceil((1 - tokens) / rate) or ttl
   return {math.floor(tokens), 0, retryAfter}
 end
 

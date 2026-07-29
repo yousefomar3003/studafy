@@ -111,6 +111,8 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `attendance:record:create`       | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `attendance:record:read`         | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
 | `attendance:record:correct`      | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
+| `attendance:report:read`         | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `attendance:report:export`       | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `attendance:correction:override` | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `parent:link`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `parent:unlink`                  | ✅          | ✅        |         |            |                    |         |        |       |               |

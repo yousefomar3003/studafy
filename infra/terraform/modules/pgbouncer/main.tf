@@ -208,6 +208,8 @@ locals {
     pgbouncer_secret_arn     = aws_secretsmanager_secret.pgbouncer.arn
     listen_port              = var.listen_port
     service_pools            = var.service_pools
+    read_pools               = var.read_pools
+    read_replica_host        = var.read_replica_host
     max_client_conn          = var.max_client_conn
     default_pool_size        = var.default_pool_size
     stats_username           = local.stats_username

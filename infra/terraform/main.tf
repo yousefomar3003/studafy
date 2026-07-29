@@ -61,6 +61,7 @@ module "pgbouncer" {
   subnet_id                      = module.network.private_app_subnet_ids[0]
   security_group_ids             = [module.network.pgbouncer_security_group_id]
   postgres_connection_secret_arn = module.postgres.connection_secret_arn
+  read_replica_host              = module.postgres.read_replica_address
   listen_port                    = var.pgbouncer_port
   instance_type                  = var.pgbouncer_instance_type
   key_name                       = var.pgbouncer_key_name
@@ -94,7 +95,7 @@ module "secrets" {
   # its Redis cache/queue DB slots (docs/runbooks/redis-conventions.md).
   services = merge(
     {
-      api        = { shared_secret_arns = [module.pgbouncer.connection_secret_arn] }
+      api        = { shared_secret_arns = [module.pgbouncer.connection_secret_arn, module.redis.auth_secret_arn] }
       migrations = { shared_secret_arns = [module.postgres.connection_secret_arn] }
       realtime   = { shared_secret_arns = [module.redis.auth_secret_arn] }
       workers    = { shared_secret_arns = [module.redis.auth_secret_arn, module.pgbouncer.connection_secret_arn] }
@@ -241,9 +242,10 @@ module "cdn" {
 module "compute" {
   source = "./modules/compute"
 
-  name_prefix        = module.naming.name_prefix
-  vpc_id             = module.network.vpc_id
-  https_listener_arn = module.edge.https_listener_arn
+  name_prefix          = module.naming.name_prefix
+  vpc_id               = module.network.vpc_id
+  https_listener_arn   = module.edge.https_listener_arn
+  app_files_bucket_arn = module.storage.app_files_bucket_arn
 
   secrets_service_iam_policy_arns = module.secrets.service_iam_policy_arns
 }
@@ -251,12 +253,13 @@ module "compute" {
 module "monitoring" {
   source = "./modules/monitoring"
 
-  name_prefix                = module.naming.name_prefix
-  aws_region                 = var.aws_region
-  postgres_instance_id       = module.postgres.db_instance_id
-  mariadb_instance_id        = local.erpnext_plane_enabled ? module.mariadb[0].db_instance_id : null
-  redis_replication_group_id = module.redis.replication_group_id
-  ecs_cluster_name           = module.compute.cluster_name
+  name_prefix                       = module.naming.name_prefix
+  aws_region                        = var.aws_region
+  postgres_instance_id              = module.postgres.db_instance_id
+  postgres_read_replica_instance_id = module.postgres.read_replica_instance_id
+  mariadb_instance_id               = local.erpnext_plane_enabled ? module.mariadb[0].db_instance_id : null
+  redis_replication_group_id        = module.redis.replication_group_id
+  ecs_cluster_name                  = module.compute.cluster_name
 }
 
 # MariaDB for the ERPNext + Frappe Education plane. staging/prod only — see local.erpnext_plane_enabled.

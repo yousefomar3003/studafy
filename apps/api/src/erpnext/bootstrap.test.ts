@@ -36,7 +36,6 @@ describe("bootstrapErpNextSite", () => {
       return { data: {}, status: 200, headers: new Headers() };
     }) as typeof client.post;
     client.put = (async () => {
-      putCalled = true;
       return { data: {}, status: 200, headers: new Headers() };
     }) as typeof client.put;
 

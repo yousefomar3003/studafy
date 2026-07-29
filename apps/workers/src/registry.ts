@@ -1,9 +1,10 @@
 import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 
-import { databaseUrlFrom, loadEnv } from "./env";
+import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
+import { processAttendanceExport } from "./queues/reports";
 
 import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
 import type { QueueName } from "@studafy/constants";
@@ -22,7 +23,9 @@ export interface QueueDefinition {
 // injected into each queue definition. Read through loadEnv() rather than process.env directly, so
 // production's discrete DATABASE_HOST/USER/PASSWORD are honoured — reading DATABASE_URL raw would
 // silently fall back to its localhost default in every deployed environment.
-const databaseUrl = databaseUrlFrom(loadEnv());
+const workerEnv = loadEnv();
+const databaseUrl = databaseUrlFrom(workerEnv);
+const readDatabaseUrl = readDatabaseUrlFrom(workerEnv);
 
 /**
  * Placeholder processor for a queue that has no domain logic yet. It exists so the worker
@@ -81,7 +84,19 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.REPORTS,
     concurrency: 3,
-    processor: placeholderProcessor(QUEUE_NAMES.REPORTS),
+    processor: async (job: Job) => {
+      if (job.name !== JOB_NAMES.GENERATE_ATTENDANCE_EXPORT) {
+        return { processed: false, reason: "unknown report job" };
+      }
+      return processAttendanceExport(job, {
+        primaryDatabaseUrl: databaseUrl,
+        readDatabaseUrl,
+        s3Region: workerEnv.S3_REGION,
+        s3Endpoint: workerEnv.S3_ENDPOINT,
+        bucket: workerEnv.S3_APP_FILES_BUCKET,
+        databaseCaCert: workerEnv.DATABASE_CA_CERT,
+      });
+    },
   },
   {
     name: QUEUE_NAMES.IMPORTS,

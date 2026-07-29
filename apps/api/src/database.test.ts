@@ -21,6 +21,8 @@ describe("database", () => {
         DATABASE_USER: "api",
         DATABASE_PASSWORD: "secret",
         DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+        READ_DATABASE_HOST: "pgbouncer.internal",
+        READ_DATABASE_NAME: "api_read",
       }),
     );
     expect(database).not.toBeNull();

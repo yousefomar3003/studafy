@@ -5,22 +5,46 @@ import { z } from "zod";
  * that an invalid environment fails fast — before any Redis connection is opened — with a named,
  * readable error.
  */
-export const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
-  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
-  DATABASE_URL: z.string().min(1).default("postgres://localhost:5432/studafy"),
-  // Production supplies the database as discrete parts rather than a URL: the ECS task definition
-  // takes host/port/name from the PgBouncer template and user/password from Secrets Manager, which
-  // cannot be concatenated into a URL there. Optional, because local development and tests set
-  // DATABASE_URL instead. See databaseUrlFrom().
-  DATABASE_HOST: z.string().min(1).optional(),
-  DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
-  DATABASE_NAME: z.string().min(1).optional(),
-  DATABASE_USER: z.string().min(1).optional(),
-  DATABASE_PASSWORD: z.string().optional(),
-  SCHOOL_IDS: z.string().min(1).default(""),
-});
+export const envSchema = z
+  .object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
+    SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
+    DATABASE_URL: z.string().min(1).default("postgres://localhost:5432/studafy"),
+    // Production supplies the database as discrete parts rather than a URL: the ECS task definition
+    // takes host/port/name from the PgBouncer template and user/password from Secrets Manager, which
+    // cannot be concatenated into a URL there. Optional, because local development and tests set
+    // DATABASE_URL instead. See databaseUrlFrom().
+    DATABASE_HOST: z.string().min(1).optional(),
+    DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    DATABASE_NAME: z.string().min(1).optional(),
+    DATABASE_USER: z.string().min(1).optional(),
+    DATABASE_PASSWORD: z.string().optional(),
+    DATABASE_CA_CERT: z.string().min(1).optional(),
+    READ_DATABASE_URL: z.string().min(1).optional(),
+    READ_DATABASE_HOST: z.string().min(1).optional(),
+    READ_DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    READ_DATABASE_NAME: z.string().min(1).optional(),
+    S3_ENDPOINT: z.string().url().optional(),
+    S3_REGION: z.string().min(1).optional(),
+    S3_APP_FILES_BUCKET: z.string().min(1).optional(),
+    SCHOOL_IDS: z.string().min(1).default(""),
+  })
+  .superRefine((env, context) => {
+    if (env.NODE_ENV !== "production") return;
+    for (const [name, value] of [
+      ["READ_DATABASE_HOST", env.READ_DATABASE_HOST],
+      ["READ_DATABASE_NAME", env.READ_DATABASE_NAME],
+    ] as const) {
+      if (value === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: [name],
+          message: `${name} is required in production`,
+        });
+      }
+    }
+  });
 
 export type Env = z.infer<typeof envSchema>;
 
@@ -45,6 +69,17 @@ export function databaseUrlFrom(env: Env): string {
   const credentials = `${encodeURIComponent(env.DATABASE_USER)}:${encodeURIComponent(password)}`;
 
   return `postgresql://${credentials}@${env.DATABASE_HOST}:${port}/${name}`;
+}
+
+export function readDatabaseUrlFrom(env: Env): string {
+  if (env.READ_DATABASE_HOST === undefined) {
+    return env.READ_DATABASE_URL ?? databaseUrlFrom(env);
+  }
+  const port = env.READ_DATABASE_PORT ?? env.DATABASE_PORT ?? 6432;
+  const name = env.READ_DATABASE_NAME ?? env.DATABASE_NAME ?? "api_read";
+  const username = env.DATABASE_USER ?? "";
+  const password = env.DATABASE_PASSWORD ?? "";
+  return `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${env.READ_DATABASE_HOST}:${port}/${name}`;
 }
 
 /**

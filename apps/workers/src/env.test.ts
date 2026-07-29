@@ -17,12 +17,12 @@ describe("loadEnv", () => {
   test("parses and coerces provided values", () => {
     expect(
       loadEnv({
-        NODE_ENV: "production",
+        NODE_ENV: "test",
         REDIS_URL: "redis://redis.internal:6380",
         SHUTDOWN_TIMEOUT_MS: "30000",
       }),
     ).toEqual({
-      NODE_ENV: "production",
+      NODE_ENV: "test",
       REDIS_URL: "redis://redis.internal:6380",
       SHUTDOWN_TIMEOUT_MS: 30_000,
       DATABASE_URL: "postgres://localhost:5432/studafy",
@@ -42,5 +42,19 @@ describe("loadEnv", () => {
 
   test("throws for an unknown NODE_ENV", () => {
     expect(() => loadEnv({ NODE_ENV: "staging" })).toThrow(EnvValidationError);
+  });
+
+  test("requires a distinct read pool in production", () => {
+    expect(() => loadEnv({ NODE_ENV: "production" })).toThrow(EnvValidationError);
+    expect(
+      loadEnv({
+        NODE_ENV: "production",
+        READ_DATABASE_HOST: "pgbouncer.internal",
+        READ_DATABASE_NAME: "workers_read",
+      }),
+    ).toMatchObject({
+      READ_DATABASE_HOST: "pgbouncer.internal",
+      READ_DATABASE_NAME: "workers_read",
+    });
   });
 });

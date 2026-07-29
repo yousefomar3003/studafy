@@ -210,6 +210,34 @@ export function idempotencyMiddleware({
       } else {
         resolve({ bodyHash, status: res.status, headers: {}, body: "" });
       }
+      const responseBody = await res.text();
+      const responseHeaders: Record<string, string> = {};
+      res.headers.forEach((value, name) => {
+        responseHeaders[name] = value;
+      });
+
+      const entry: StoredResponse = {
+        bodyHash,
+        status: res.status,
+        headers: responseHeaders,
+        body: responseBody,
+      };
+
+      // Don't cache server errors (5xx) — they may be transient, and a retry
+      // should re-invoke the handler rather than replay the same error.
+      // The in-flight promise is resolved so concurrent waiters get the same
+      // error response without hanging.
+      if (res.status >= 500) {
+        resolve(entry);
+        return;
+      }
+
+      // Store in Redis and resolve the in-flight promise.
+      await storeResponse(redis, key, entry, windowSeconds);
+      resolve(entry);
+
+      // Rebuild the response for the current request since c.res may have been consumed.
+      c.res = buildResponse(entry);
     } catch (err) {
       reject(err);
       throw err;

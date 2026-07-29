@@ -143,6 +143,8 @@ describe("loadEnv", () => {
         DATABASE_USER: "studafy_app",
         DATABASE_PASSWORD: "secret",
         DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----",
+        READ_DATABASE_HOST: "db-read",
+        READ_DATABASE_NAME: "api_read",
       }).RELEASE_VERSION,
     ).toBe("unknown");
   });
