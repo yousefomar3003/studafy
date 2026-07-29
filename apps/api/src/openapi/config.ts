@@ -150,5 +150,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Gradebook configuration endpoints. Authenticated and tenant-scoped. " +
         "Manages assessment categories with weighted scoring and versioned grading schemes.",
     },
+    {
+      name: "Grade Entry",
+      description:
+        "Grade entry endpoints. Authenticated and tenant-scoped. " +
+        "Manage the grade entry grid including bulk grade updates and submission status transitions.",
+    },
   ],
 };

@@ -38,7 +38,7 @@ RUN bench get-app education --branch version-15.2 https://github.com/frappe/educ
 # PYTHONPATH (below) rather than installed as a proper bench app, since it's a one-shot loader
 # script, not a Frappe app with its own doctypes/migrations.
 COPY --chown=frappe:frappe infra/deploy/erpnext/seed/ /home/frappe/frappe-bench/erpnext_seed/
-ENV PYTHONPATH=/home/frappe/frappe-bench:${PYTHONPATH}
+ENV PYTHONPATH=/home/frappe/frappe-bench
 
 # No EXPOSE, no ENTRYPOINT/CMD override: modules/erpnext's task-definition templates set the
 # actual command per role (gunicorn for backend, node for websocket, bench worker/schedule for
