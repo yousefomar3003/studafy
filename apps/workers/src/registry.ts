@@ -1,6 +1,7 @@
 import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 
 import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
+import { processBillingJob } from "./queues/billing";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
@@ -112,7 +113,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.BILLING,
     concurrency: 1,
-    processor: placeholderProcessor(QUEUE_NAMES.BILLING),
+    processor: async (job) => processBillingJob(job, databaseUrl),
   },
   {
     name: QUEUE_NAMES.OUTBOX_RELAY,
