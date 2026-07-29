@@ -34,6 +34,18 @@ const attendanceThresholdSchema = z.number().min(0).max(100).openapi({
   example: 75,
 });
 
+const attendanceCorrectionWindowHoursSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(8760)
+  .openapi({
+    description:
+      "Hours after a session's business date during which a teacher may still correct its " +
+      "attendance records. Past it, only a principal may correct, as an out-of-window override.",
+    example: 48,
+  });
+
 // ---------------------------------------------------------------------------
 // Request (PATCH body)
 // ---------------------------------------------------------------------------
@@ -56,6 +68,9 @@ export const updateSchoolSettingsBodySchema = z
       description: "When true, parents can view their own child's resolved discipline incidents.",
       example: false,
     }),
+    attendance_correction_window_hours: attendanceCorrectionWindowHoursSchema.optional().openapi({
+      description: "Attendance correction window, in hours.",
+    }),
   })
   .strict()
   .openapi("UpdateSchoolSettings");
@@ -77,6 +92,9 @@ export const schoolSettingsResponseSchema = z
     parent_discipline_visibility: z.boolean().openapi({
       description: "When true, parents can view their own child's resolved discipline incidents.",
       example: false,
+    }),
+    attendance_correction_window_hours: attendanceCorrectionWindowHoursSchema.openapi({
+      description: "Attendance correction window, in hours.",
     }),
     created_at: z
       .string()

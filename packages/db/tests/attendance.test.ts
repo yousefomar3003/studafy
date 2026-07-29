@@ -334,11 +334,16 @@ integrationTest(
             "ck_attendance_records_minutes_late",
             "ck_attendance_records_reason",
             "ck_attendance_records_timestamps",
+            // ST-109: the correction generation counter, and the candidate key a version-chain
+            // row references. The unique key carries created_at because a unique constraint on a
+            // partitioned table must contain every partitioning column.
+            "ck_attendance_records_version",
             "fk_attendance_records_recorded_by",
             "fk_attendance_records_school",
             "fk_attendance_records_session",
             "fk_attendance_records_student",
             "pk_attendance_records",
+            "uq_attendance_records_id_school_created",
           ],
         },
         {
@@ -413,6 +418,8 @@ integrationTest(
             "idx_attendance_records_school_session_student",
             "idx_attendance_records_school_student_created",
             "pk_attendance_records",
+            // ST-109: leads with id, so a correction can find one record across every partition.
+            "uq_attendance_records_id_school_created",
           ],
         },
         {
@@ -713,8 +720,9 @@ integrationTest(
         expect(row.app_update).toBe(true);
         expect(row.app_delete).toBe(true);
         expect(row.public_select).toBe(false);
-        // Sessions: pkey + candidate key + 2 declared indexes. Records: pkey + 3 declared indexes.
-        expect(row.index_count).toBe(row.relname.startsWith("attendance_sessions") ? "4" : "4");
+        // Sessions: pkey + candidate key + 2 declared indexes. Records: pkey + 3 declared indexes
+        // + the ST-109 candidate key, which a unique constraint on the parent builds on every leaf.
+        expect(row.index_count).toBe(row.relname.startsWith("attendance_sessions") ? "4" : "5");
       }
 
       // The parents and the registries themselves.
@@ -1311,6 +1319,9 @@ integrationTest(
         "recorded_by_user_id",
         "created_at",
         "updated_at",
+        // ST-109: a counter, not a copy of the history. What each generation held lives in
+        // app.attendance_record_versions; the record keeps only which generation it is on.
+        "version",
       ]);
     } finally {
       await database.cleanup();

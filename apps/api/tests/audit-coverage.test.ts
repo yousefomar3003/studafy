@@ -183,6 +183,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/attendance/records/batch",
   "POST /api/attendance/sessions",
   "PATCH /api/attendance/sessions/{sessionId}",
+  // Attendance corrections (ST-109). Amends a submitted record; the before/after diff reaches
+  // audit_logs from the service, alongside the immutable version-chain row.
+  "PATCH /api/attendance/records/{recordId}",
   // Learning materials (ST-106). Storage-triggered upload flow with AI visibility.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",

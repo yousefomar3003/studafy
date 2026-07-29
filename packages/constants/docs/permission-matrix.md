@@ -109,6 +109,9 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `material:delete`                | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `material:manageAi`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `attendance:record:create`       | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
+| `attendance:record:read`         | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
+| `attendance:record:correct`      | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
+| `attendance:correction:override` | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `parent:link`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `parent:unlink`                  | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `disciplineIncident:create`      | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
