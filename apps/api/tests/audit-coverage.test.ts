@@ -217,6 +217,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/evaluations/{evaluationId}/share",
   "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
   "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  // Approval queue (ST-115). Unified pending-approvals feed + bulk approve/reject decisions.
+  "POST /api/approvals/bulk-decision",
 ];
 
 function collectSourceFiles(dir: string): string[] {
