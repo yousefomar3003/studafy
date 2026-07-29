@@ -53,6 +53,7 @@
   "INVOICE_ALREADY_EXISTS": "الفاتورة موجودة بالفعل",
   "INVOICE_GENERATION_FAILED": "فشل إنشاء الفاتورة",
   "INVOICE_STUDENT_NOT_FOUND": "لم يتم العثور على طالب الفاتورة",
+  "EXPENSE_NOT_FOUND": "لم يتم العثور على المصروف",
   "ERPNEXT_SITE_CREATION_FAILED": "فشل إنشاء موقع ERPNext",
   "ERPNEXT_COMPANY_CREATION_FAILED": "فشل إنشاء شركة ERPNext",
   "LIMIT_EXCEEDED_STUDENT_CAP": "تم الوصول إلى الحد الأقصى للطلاب. قم بترقية خطتك لإضافة المزيد",
