@@ -73,6 +73,8 @@ const EXPECTED_PATHS = [
   "/api/admin/users/{userId}/devices",
   "/api/admin/users/{userId}/devices/{deviceId}",
   "/api/admin/users/{userId}/providers/{provider}",
+  "/api/approvals/bulk-decision",
+  "/api/approvals/queue",
   "/api/attendance/records/batch",
   "/api/attendance/records/{recordId}",
   "/api/attendance/records/{recordId}/history",

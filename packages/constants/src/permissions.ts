@@ -89,6 +89,8 @@ export const PERMISSIONS = {
   REPORT_EXPORT: "report:export",
   REPORT_VIEW_FINANCIAL: "report:viewFinancial",
 
+  APPROVAL_REVIEW: "approval:review",
+
   AUDIT_LOG_READ: "auditLog:read",
   AUDIT_LOG_EXPORT: "auditLog:export",
 

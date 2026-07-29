@@ -531,6 +531,15 @@ export function createApp({
     app.route("/", gradeEntryRoutes(database));
   }
 
+  // Approval queue — unified pending-approvals feed for administrators. Queries grade
+  // submissions (status = submitted) and timetable versions (status = pending) into a single
+  // list with type-specific diff payloads. Bulk decision delegates to the existing grade and
+  // timetable decision functions with per-item partial-failure reporting. Gated on
+  // APPROVAL_REVIEW permission (ORG_ADMIN+).
+  if (database) {
+    app.route("/", approvalQueueRoutes(database));
+  }
+
   // Attendance sessions (ST-107). Idempotent session management per class period with
   // batch record-keeping. Gated on ATTENDANCE_RECORD_CREATE permission.
   if (database) {

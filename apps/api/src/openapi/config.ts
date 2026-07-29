@@ -174,5 +174,11 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Principals create evaluation cycles with criteria templates, score teachers against them, " +
         "and share completed evaluations to grant teacher read access.",
     },
+    {
+      name: "Approval Queue",
+      description:
+        "Approval queue for administrators. Authenticated and permission-gated. " +
+        "Unified pending-approvals feed plus bulk approve/reject.",
+    },
   ],
 };

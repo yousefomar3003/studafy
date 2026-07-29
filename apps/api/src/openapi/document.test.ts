@@ -205,6 +205,8 @@ describe("structure", () => {
         "/api/students/{studentId}/guardians/{userId}",
         "/api/teachers",
 
+        "/api/approvals/bulk-decision",
+        "/api/approvals/queue",
         "/api/teachers/me",
         "/api/teachers/{teacherId}",
         "/api/users",
