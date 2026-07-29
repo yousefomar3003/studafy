@@ -1,4 +1,5 @@
 export { feeStructureRoutes } from "./fee-structures/routes";
+export { expenseRoutes } from "./expenses/routes";
 export { EnvCredentialResolver } from "./client/credential-resolver";
 export { TenantErpNext, TenantErpNextFactory } from "./client/tenant-client";
 export type {

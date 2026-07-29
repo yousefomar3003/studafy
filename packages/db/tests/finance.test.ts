@@ -17,6 +17,7 @@ const FINANCE_TABLES = [
   "erpnext_id_mappings",
   "finance_sync_outbox",
   "fee_structure_cache",
+  "expense_cache",
 ] as const;
 
 type Database = Awaited<ReturnType<typeof testDatabase>>;
@@ -127,7 +128,14 @@ integrationTest(
       expect(enums.map(({ type, values }) => ({ type, values }))).toEqual([
         {
           type: "finance_entity_type",
-          values: ["invoice", "payment", "fee_schedule", "fee_structure", "fee_category"],
+          values: [
+            "invoice",
+            "payment",
+            "fee_schedule",
+            "fee_structure",
+            "fee_category",
+            "expense",
+          ],
         },
         {
           type: "finance_sync_outbox_status",
@@ -167,7 +175,9 @@ integrationTest(
         ),
       ).toBe(true);
       expect(
-        tables.filter((row) => row.name !== "fee_structure_cache").every((row) => row.app_delete),
+        tables
+          .filter((row) => !["fee_structure_cache", "expense_cache"].includes(row.name))
+          .every((row) => row.app_delete),
       ).toBe(true);
 
       const policies = await database.sql<{ table_name: string; name: string }[]>`

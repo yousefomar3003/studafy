@@ -52,7 +52,12 @@ import {
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
-import { EnvCredentialResolver, feeStructureRoutes, TenantErpNextFactory } from "./modules/finance";
+import {
+  EnvCredentialResolver,
+  expenseRoutes,
+  feeStructureRoutes,
+  TenantErpNextFactory,
+} from "./modules/finance";
 import { approvalQueueRoutes, gradebookConfigRoutes, gradeEntryRoutes } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
@@ -294,20 +299,17 @@ export function createApp({
   // read model. The Host header selects the tenant's Frappe site, so the client is built per
   // school rather than shared. Idempotency on /api/finance/* is already wired above.
   if (database) {
-    app.route(
-      "/",
-      feeStructureRoutes(
-        database,
-        new TenantErpNextFactory({
-          resolver: new EnvCredentialResolver({
-            baseUrl: process.env.ERPNEXT_API_URL,
-            apiKey: process.env.ERPNEXT_API_KEY,
-          }),
-          logger,
-          redis,
-        }),
-      ),
-    );
+    const erpnextFactory = new TenantErpNextFactory({
+      resolver: new EnvCredentialResolver({
+        baseUrl: process.env.ERPNEXT_API_URL,
+        apiKey: process.env.ERPNEXT_API_KEY,
+      }),
+      logger,
+      redis,
+    });
+
+    app.route("/", feeStructureRoutes(database, erpnextFactory));
+    app.route("/", expenseRoutes(database, erpnextFactory, storage));
   }
 
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.

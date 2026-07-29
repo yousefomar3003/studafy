@@ -96,6 +96,8 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   // second system: a burst that this app would shrug off can still exhaust ERPNext's workers.
   "/api/finance/fee-structures": "default",
   "/api/finance/fee-structures/*": "default",
+  "/api/finance/expenses": "default",
+  "/api/finance/expenses/*": "default",
   // AI (metered, tenant+user scoped)
   // "/api/ai/*": "ai",
 };

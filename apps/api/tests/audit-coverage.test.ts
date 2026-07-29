@@ -205,6 +205,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // resulting fee_structure_cache projection with its before/after amounts.
   "POST /api/finance/fee-structures",
   "PATCH /api/finance/fee-structures/{feeStructureId}",
+  "POST /api/finance/expenses",
+  "PATCH /api/finance/expenses/{expenseId}",
+  "POST /api/finance/expenses/upload-url",
+  "POST /api/finance/expenses/{expenseId}/attachments",
   "POST /api/discipline/incidents",
   "PATCH /api/discipline/incidents/{incidentId}",
   "POST /api/discipline/incidents/{incidentId}/resolve",
