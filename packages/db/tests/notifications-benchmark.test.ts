@@ -87,8 +87,8 @@ benchmarkTest(
         return row!.id;
       });
 
-      // The recipient. Creating them active fires the seeding trigger, so their 24 preference rows
-      // exist exactly as they would in production -- the send path reads them.
+      // The recipient. Creating them active fires the seeding trigger, so their full preference
+      // matrix exists exactly as it would in production -- the send path reads it.
       const recipient = await asApp(undefined, school, async (tx) => {
         const [user] = await tx<{ id: string }[]>`
           INSERT INTO app.users (school_id, email, normalized_email, status)
@@ -99,10 +99,21 @@ benchmarkTest(
       });
 
       await asApp(recipient, school, async (tx) => {
-        const [preferences] = await tx<{ count: string }[]>`
-          SELECT count(*)::text AS count FROM app.notification_preferences
+        // Read from the enums rather than hardcoding the product. What this guards is "the trigger
+        // really did seed the whole matrix, so the measurement below runs against production-shaped
+        // data" — not the size of the type vocabulary, which notifications.test.ts pins. Hardcoding
+        // it meant one added notification type failed this benchmark during setup, before it ever
+        // measured anything.
+        const [preferences] = await tx<{ seeded: number; expected: number }[]>`
+          SELECT
+            (SELECT count(*) FROM app.notification_preferences)::int AS seeded,
+            (
+              (SELECT count(*) FROM pg_catalog.pg_enum WHERE enumtypid = 'app.notification_type'::regtype)
+              *
+              (SELECT count(*) FROM pg_catalog.pg_enum WHERE enumtypid = 'app.notification_channel'::regtype)
+            )::int AS expected
         `;
-        expect(preferences!.count).toBe("24");
+        expect(preferences!.seeded).toBe(preferences!.expected);
 
         // A realistic device set: several live routes plus a revoked one the partial index must skip.
         await tx`

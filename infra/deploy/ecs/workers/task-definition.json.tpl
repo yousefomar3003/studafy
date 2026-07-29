@@ -10,9 +10,16 @@
       "name": "workers",
       "image": "${WORKERS_IMAGE}",
       "essential": true,
-      "environment": [{ "name": "NODE_ENV", "value": "production" }],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },
+        { "name": "DATABASE_PORT", "value": "6432" },
+        { "name": "DATABASE_NAME", "value": "api" }
+      ],
       "secrets": [
-        { "name": "REDIS_URL", "valueFrom": "${REDIS_SECRET_ARN}:queue_url::" }
+        { "name": "REDIS_URL", "valueFrom": "${REDIS_SECRET_ARN}:queue_url::" },
+        { "name": "DATABASE_USER", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_username::" },
+        { "name": "DATABASE_PASSWORD", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_password::" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "bun healthcheck.ts"],

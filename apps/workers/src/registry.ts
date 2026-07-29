@@ -1,8 +1,11 @@
-import { QUEUE_NAMES } from "@studafy/constants";
+import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 
+import { databaseUrlFrom, loadEnv } from "./env";
 import { processStudentImport } from "./queues/imports/worker";
+import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
 
+import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
 import type { QueueName } from "@studafy/constants";
 import type { Job } from "bullmq";
 
@@ -15,9 +18,11 @@ export interface QueueDefinition {
   processor: Processor;
 }
 
-// The import processor needs the database URL. It is read from the environment
-// at registry construction time so it can be injected into the queue definition.
-const databaseUrl = process.env.DATABASE_URL ?? "postgres://localhost:5432/studafy";
+// The DB-backed processors need a connection string, resolved once at registry construction and
+// injected into each queue definition. Read through loadEnv() rather than process.env directly, so
+// production's discrete DATABASE_HOST/USER/PASSWORD are honoured — reading DATABASE_URL raw would
+// silently fall back to its localhost default in every deployed environment.
+const databaseUrl = databaseUrlFrom(loadEnv());
 
 /**
  * Placeholder processor for a queue that has no domain logic yet. It exists so the worker
@@ -45,11 +50,31 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.NOTIFICATIONS,
     concurrency: 10,
+    // One Worker per queue name, so every notification job type is dispatched from here. A second
+    // Worker on this name would compete for the same jobs rather than add a stream.
+    //
+    // New job types discriminate on job.name, which is what BullMQ gives producers to say what a
+    // job is. The bulk-invite branch below still discriminates on payload shape because that is
+    // how it was written and its producer names jobs "process-bulk-invite" without relying on it.
     processor: async (job: Job) => {
+      if (job.name === JOB_NAMES.EVALUATE_ATTENDANCE_ALERTS) {
+        const data = job.data as Partial<AttendanceAlertJobData>;
+        if (data.schoolId && data.sessionDate && Array.isArray(data.studentIds)) {
+          return processAttendanceAlert(
+            data as AttendanceAlertJobData,
+            databaseUrl,
+            job.id ?? null,
+          );
+        }
+        return { processed: false, reason: "missing job data" };
+      }
+
       const data = job.data as { bulkInviteId?: string; schoolId?: string };
       if (data.bulkInviteId && data.schoolId) {
         return processBulkInvite(data as { bulkInviteId: string; schoolId: string }, databaseUrl);
       }
+      // registry.test.ts calls every processor with `{ data: {} }` and requires a defined result,
+      // so this fallback is load-bearing rather than defensive.
       return { processed: true };
     },
   },

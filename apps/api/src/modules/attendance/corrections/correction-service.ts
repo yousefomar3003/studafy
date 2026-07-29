@@ -61,6 +61,11 @@ export interface CorrectedAttendanceRecordRow {
   recorded_by_user_id: string | null;
   version: number;
   out_of_window: boolean;
+  /**
+   * The parent session's business date. Carried out so the route can enqueue the ST-110 alert job
+   * without re-reading the session — a correction to 'absent' can create a threshold breach.
+   */
+  session_date: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -93,6 +98,7 @@ interface CorrectionSubject {
   student_id: string;
   attendance_session_id: string;
   class_id: string;
+  session_date: string;
   session_status: AttendanceSessionStatus;
   in_window: boolean;
 }
@@ -144,6 +150,7 @@ async function loadCorrectionSubject(
       r.student_id,
       r.attendance_session_id,
       s.class_id,
+      s.session_date::text    AS session_date,
       s.status::text          AS session_status,
       CURRENT_TIMESTAMP < (
         (s.session_date::timestamp AT TIME ZONE COALESCE(st.timezone, 'Africa/Casablanca'))
@@ -176,6 +183,7 @@ async function loadCorrectionSubject(
     student_id: row.student_id as string,
     attendance_session_id: row.attendance_session_id as string,
     class_id: row.class_id as string,
+    session_date: row.session_date as string,
     session_status: row.session_status as AttendanceSessionStatus,
     in_window: row.in_window as boolean,
   };
@@ -349,6 +357,7 @@ export async function correctAttendanceRecord(
     recorded_by_user_id: updated.recorded_by_user_id as string | null,
     version: updated.version as number,
     out_of_window: outOfWindow,
+    session_date: subject.session_date,
     created_at: updated.created_at as Date,
     updated_at: updated.updated_at as Date,
   };

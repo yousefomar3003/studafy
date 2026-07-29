@@ -10,10 +10,42 @@ export const envSchema = z.object({
   REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
   DATABASE_URL: z.string().min(1).default("postgres://localhost:5432/studafy"),
+  // Production supplies the database as discrete parts rather than a URL: the ECS task definition
+  // takes host/port/name from the PgBouncer template and user/password from Secrets Manager, which
+  // cannot be concatenated into a URL there. Optional, because local development and tests set
+  // DATABASE_URL instead. See databaseUrlFrom().
+  DATABASE_HOST: z.string().min(1).optional(),
+  DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  DATABASE_NAME: z.string().min(1).optional(),
+  DATABASE_USER: z.string().min(1).optional(),
+  DATABASE_PASSWORD: z.string().optional(),
   SCHOOL_IDS: z.string().min(1).default(""),
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+/**
+ * The connection string to use, whichever way the environment expressed it.
+ *
+ * Discrete DATABASE_HOST/USER/PASSWORD win over DATABASE_URL when present, because they are what
+ * production sets and DATABASE_URL still carries its local-development default — preferring the
+ * URL would silently point a deployed worker at localhost.
+ *
+ * The password is URL-encoded: Secrets Manager generates passwords containing characters that are
+ * structural in a URI (`@`, `/`, `:`), and one of those would otherwise truncate the host.
+ */
+export function databaseUrlFrom(env: Env): string {
+  if (env.DATABASE_HOST === undefined || env.DATABASE_USER === undefined) {
+    return env.DATABASE_URL;
+  }
+
+  const port = env.DATABASE_PORT ?? 5432;
+  const name = env.DATABASE_NAME ?? "postgres";
+  const password = env.DATABASE_PASSWORD ?? "";
+  const credentials = `${encodeURIComponent(env.DATABASE_USER)}:${encodeURIComponent(password)}`;
+
+  return `postgresql://${credentials}@${env.DATABASE_HOST}:${port}/${name}`;
+}
 
 /**
  * Thrown when environment variables fail validation. The distinct name makes a bootstrap failure
