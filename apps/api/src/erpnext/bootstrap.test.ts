@@ -24,7 +24,7 @@ describe("bootstrapErpNextSite", () => {
   test("returns correct site config on success", async () => {
     const client = createMockClient();
     const postCalls: unknown[][] = [];
-    const putCalled = false;
+    let putCalled = false;
 
     const originalPost = client.post.bind(client);
     const originalPut = client.put.bind(client);
@@ -36,6 +36,7 @@ describe("bootstrapErpNextSite", () => {
       return { data: {}, status: 200, headers: new Headers() };
     }) as typeof client.post;
     client.put = (async () => {
+      putCalled = true;
       return { data: {}, status: 200, headers: new Headers() };
     }) as typeof client.put;
 
