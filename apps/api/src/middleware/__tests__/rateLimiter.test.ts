@@ -2,10 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 
-import { createApp } from "../../app";
 import { buildRateLimitKey, resolveRouteClass } from "../../config/rateLimits";
-import { createInflightTracker } from "../../lifecycle";
-import { createLogger } from "../../logger";
 import { createRedisClient } from "../../redis";
 import { requestIdMiddleware, errorHandlerMiddleware } from "../index";
 import { rateLimiterMiddleware, extractClientIp } from "../rateLimiter";
@@ -36,9 +33,17 @@ async function createTestClient(): Promise<RedisClient | null> {
     });
     await client.connect();
     await client.ping();
+    await flushRateLimitKeys(client);
     return client;
   } catch {
     return null;
+  }
+}
+
+async function flushRateLimitKeys(client: RedisClient): Promise<void> {
+  const keys = await client.keys("rl:*");
+  if (keys.length > 0) {
+    await client.del(...keys);
   }
 }
 
@@ -47,11 +52,8 @@ const buildApp = (
   routeClass?: string,
   routes?: (app: Hono<AppEnv>) => void,
 ) => {
-  const app = createApp({
-    isReady: () => true,
-    tracker: createInflightTracker(),
-    logger: createLogger({ destination: () => {} }), // eslint-disable-line @typescript-eslint/no-empty-function
-  });
+  const app = new Hono<AppEnv>();
+  app.use("*", requestIdMiddleware({ logger: silentLogger }));
   app.use(
     "*",
     rateLimiterMiddleware({
@@ -59,6 +61,7 @@ const buildApp = (
       routeClass: routeClass as "auth" | "ai" | "default" | undefined,
     }),
   );
+  app.onError(errorHandlerMiddleware(silentLogger));
   routes?.(app);
   return app;
 };
@@ -178,11 +181,11 @@ describe("token consumption (requires Redis)", () => {
 
     try {
       const budget = { maxTokens: 3, refillRate: 0, windowSeconds: 60 };
-      const app = buildApp(client, "auth", (a) => {
-        a.get("/test", (c) => c.json({ ok: true }));
-      });
-      // Override budget via direct middleware registration
-      app.use("/test", rateLimiterMiddleware({ redis: client, routeClass: "auth", budget }));
+      const app = new Hono<AppEnv>();
+      app.use("*", requestIdMiddleware({ logger: silentLogger }));
+      app.use("*", rateLimiterMiddleware({ redis: client, routeClass: "auth", budget }));
+      app.onError(errorHandlerMiddleware(silentLogger));
+      app.get("/test", (c) => c.json({ ok: true }));
 
       // Consume all 3 tokens
       for (let i = 0; i < 3; i++) {
@@ -194,6 +197,9 @@ describe("token consumption (requires Redis)", () => {
       const blocked = await app.request("/test");
       expect(blocked.status).toBe(429);
     } finally {
+      const window = Math.floor(Date.now() / 1000 / 60);
+      await client.del(`rl:auth:unknown:${window}:tokens`);
+      await client.del(`rl:auth:unknown:${window}:ts`);
       await client.quit();
     }
   });

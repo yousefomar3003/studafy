@@ -54,6 +54,10 @@ export const DOMAIN_EVENTS = {
   TIMETABLE_APPROVED: "timetable.approved",
   TIMETABLE_REJECTED: "timetable.rejected",
 
+  // Grade workflow — submission lifecycle and visibility transitions.
+  GRADES_SUBMITTED: "grades.submitted",
+  GRADES_PUBLISHED: "grades.published",
+
   // Attendance alerting (ST-110). Raised by the alert worker once a student's absences cross a
   // school's configured threshold and the linked parents have been notified — so consumers see
   // the breach, not each individual absence.

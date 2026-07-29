@@ -26,6 +26,7 @@ describe("bootstrapErpNextSite", () => {
     const postCalls: unknown[][] = [];
 
     const originalPost = client.post.bind(client);
+    const originalPut = client.put.bind(client);
     client.post = (async (path: string, body?: unknown) => {
       postCalls.push([path, body]);
       if (path.includes("/resource/Company")) {
@@ -33,6 +34,9 @@ describe("bootstrapErpNextSite", () => {
       }
       return { data: {}, status: 200, headers: new Headers() };
     }) as typeof client.post;
+    client.put = (async () => {
+      return { data: {}, status: 200, headers: new Headers() };
+    }) as typeof client.put;
 
     const params: SiteBootstrapParams = {
       schoolId: "00000000-0000-0000-0000-000000000001",
@@ -54,6 +58,7 @@ describe("bootstrapErpNextSite", () => {
     expect(postCalls[1][0]).toBe("/api/resource/Company");
 
     client.post = originalPost;
+    client.put = originalPut;
   });
 
   test("propagates ErpNextError from site creation", async () => {

@@ -300,6 +300,10 @@ export const gradeSubmissionSchema = z
     decided_by_user_id: uuidSchema.nullable().openapi({
       description: "Who approved/rejected it (set by trigger on approval transitions).",
     }),
+    rejection_reason: z.string().nullable().openapi({
+      description: "Reason for rejection. Set only when status is 'rejected'.",
+      example: "Scores are not yet final.",
+    }),
     submitted_at: dateTimeSchema.nullable().openapi({
       description: "When it was submitted (set by trigger).",
     }),
@@ -385,6 +389,60 @@ export const submissionStatusUpdateBodySchema = z
   .openapi("SubmissionStatusUpdateBody");
 
 export type SubmissionStatusUpdateBody = z.infer<typeof submissionStatusUpdateBodySchema>;
+
+// ---------------------------------------------------------------------------
+// Grade submission workflow bodies (ST-114)
+// ---------------------------------------------------------------------------
+
+export const submitBodySchema = z
+  .object({
+    updated_at: z.string().openapi({
+      description:
+        "Concurrency token from the client's last read of the submission. " +
+        "If it does not match the current row, the update is rejected with 409.",
+      example: "2026-07-29T10:00:00.000Z",
+    }),
+  })
+  .openapi("SubmitGradeBody");
+
+export type SubmitBody = z.infer<typeof submitBodySchema>;
+
+export const decideActionSchema = z.enum(["approve", "reject"]).openapi({
+  description: "Administrative decision on a submitted grade.",
+  example: "approve",
+});
+
+export const decideBodySchema = z
+  .object({
+    action: decideActionSchema,
+    rejection_reason: z.string().min(1).nullable().optional().openapi({
+      description:
+        "Reason for rejection. Required when action is 'reject', ignored when 'approve'.",
+      example: "Scores are not yet final; please review the midterm adjustment.",
+    }),
+    updated_at: z.string().openapi({
+      description:
+        "Concurrency token from the client's last read of the submission. " +
+        "If it does not match the current row, the update is rejected with 409.",
+      example: "2026-07-29T10:00:00.000Z",
+    }),
+  })
+  .openapi("DecideGradeBody");
+
+export type DecideBody = z.infer<typeof decideBodySchema>;
+
+export const unlockBodySchema = z
+  .object({
+    updated_at: z.string().openapi({
+      description:
+        "Concurrency token from the client's last read of the submission. " +
+        "If it does not match the current row, the update is rejected with 409.",
+      example: "2026-07-29T10:00:00.000Z",
+    }),
+  })
+  .openapi("UnlockGradeBody");
+
+export type UnlockBody = z.infer<typeof unlockBodySchema>;
 
 // ---------------------------------------------------------------------------
 // Response shapes

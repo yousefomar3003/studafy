@@ -166,7 +166,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/attendance/records/{recordId}",
   // Grade entry (ST-113). Guarded by requirePermission() on GRADE_UPDATE.
   "PATCH /api/grades/gradebooks/{gradebookId}/grades",
-  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/status",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
   // Discipline incidents & actions. Guarded per method by requirePermissionIn() on
   // DISCIPLIN_INCIDENT_CREATE/READ/UPDATE/RESOLVE and DISCIPLINE_ACTION_CREATE/READ/UPDATE.
   "POST /api/discipline/incidents",

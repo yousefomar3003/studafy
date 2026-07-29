@@ -406,7 +406,8 @@ integrationTest(
         `;
         await tx`
           UPDATE app.grade_submissions
-          SET status = 'rejected', decided_by_user_id = ${a.staffUser}
+          SET status = 'rejected', decided_by_user_id = ${a.staffUser},
+            rejection_reason = 'Insufficient evidence'
           WHERE id = ${a.secondSubmission}
         `;
         let [row] = await tx<{ status: string }[]>`
