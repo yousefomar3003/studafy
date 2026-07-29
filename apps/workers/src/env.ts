@@ -29,9 +29,20 @@ export const envSchema = z
     S3_REGION: z.string().min(1).optional(),
     S3_APP_FILES_BUCKET: z.string().min(1).optional(),
     SCHOOL_IDS: z.string().min(1).default(""),
+    // ERPNext integration — required for billing queue. Both must be set together.
+    ERPNEXT_API_URL: z.string().url().optional(),
+    ERPNEXT_API_KEY: z.string().min(1).optional(),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;
+    if ((env.ERPNEXT_API_URL === undefined) !== (env.ERPNEXT_API_KEY === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["ERPNEXT_API_URL"],
+        message: "ERPNEXT_API_URL and ERPNEXT_API_KEY must be set together",
+      });
+    }
+
     for (const [name, value] of [
       ["READ_DATABASE_HOST", env.READ_DATABASE_HOST],
       ["READ_DATABASE_NAME", env.READ_DATABASE_NAME],
