@@ -44,8 +44,11 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 
 # Build workspace dependencies first so generate step can resolve them.
 # turbo's dependsOn: ["^build"] should handle this transitively, but turbo 2.10.3
-# has a bug where @studafy/shared-schemas:build is not scheduled when using filters.
-RUN bun run --cwd packages/constants build && bun run --cwd packages/shared-schemas build
+# has a bug where @studafy/shared-schemas:build and @studafy/attendance-reporting:build
+# are not scheduled when using filters.
+RUN bun run --cwd packages/constants build \
+ && bun run --cwd packages/shared-schemas build \
+ && bun run --cwd packages/attendance-reporting build
 RUN bunx turbo run build --filter=@studafy/api
 
 FROM oven/bun:${BUN_VERSION}-alpine AS runtime

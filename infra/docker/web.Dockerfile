@@ -32,7 +32,9 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
     echo "bun install failed after 3 attempts" >&2; exit 1
 
 # Pre-build workspace deps that turbo fails to schedule in filtered runs (turbo 2.10.3 bug).
-RUN bun run --cwd packages/constants build && bun run --cwd packages/shared-schemas build
+RUN bun run --cwd packages/constants build \
+ && bun run --cwd packages/shared-schemas build \
+ && bun run --cwd packages/attendance-reporting build
 # turbo builds @studafy/ui first (turbo.json: dependsOn ["^build"]) because
 # apps/web/package.json declares it as a dependency, then apps/web's `vite build` itself.
 RUN bunx turbo run build --filter=@studafy/web
