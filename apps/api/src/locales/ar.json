@@ -111,5 +111,11 @@
   "DISCIPLINE_INCIDENT_CANNOT_RESOLVE": "غير مسموح لك بحل الحوادث التأديبية",
   "DISCIPLINE_INCIDENT_PARENT_VISIBILITY_DISABLED": "رؤية ولي الأمر للحوادث التأديبية معطلة لهذه المدرسة",
   "DISCIPLINE_ACTION_NOT_FOUND": "لم يتم العثور على الإجراء التأديبي",
-  "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION": "هذا التحول في الحالة غير مسموح به لإجراء تأديبي"
+  "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION": "هذا التحول في الحالة غير مسموح به لإجراء تأديبي",
+  "EVALUATION_NOT_FOUND": "لم يتم العثور على تقييم المعلم",
+  "EVALUATION_INVALID_STATUS_TRANSITION": "هذا التحول في الحالة غير مسموح به لتقييم المعلم",
+  "EVALUATION_ALREADY_SHARED": "تمت مشاركة هذا التقييم بالفعل مع المعلم",
+  "EVALUATION_NOT_SHARED": "لم تتم مشاركة هذا التقييم مع المعلم",
+  "EVALUATION_TEMPLATE_NOT_FOUND": "لم يتم العثور على قالب معايير التقييم",
+  "EVALUATION_SCORE_NOT_FOUND": "لم يتم العثور على درجة التقييم"
 }

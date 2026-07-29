@@ -206,8 +206,18 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/discipline/incidents/{incidentId}/resolve",
   "POST /api/discipline/incidents/{incidentId}/actions",
   "PATCH /api/discipline/incidents/{incidentId}/actions/{actionId}",
-  // Approval queue (ST-115). Atomic bulk approve/reject with per-item partial-failure.
-  // Audit row is written by auditAction middleware on the route.
+  // Teacher evaluations: criteria templates, scoring, narrative, share-with-teacher.
+  // Principal-only mutations. Audit rows written by auditAction middleware.
+  "POST /api/evaluations/templates",
+  "PATCH /api/evaluations/templates/{templateId}",
+  "DELETE /api/evaluations/templates/{templateId}",
+  "POST /api/evaluations",
+  "PATCH /api/evaluations/{evaluationId}",
+  "POST /api/evaluations/{evaluationId}/submit",
+  "POST /api/evaluations/{evaluationId}/share",
+  "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  // Approval queue (ST-115). Unified pending-approvals feed + bulk approve/reject decisions.
   "POST /api/approvals/bulk-decision",
 ];
 

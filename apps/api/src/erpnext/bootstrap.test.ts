@@ -24,6 +24,7 @@ describe("bootstrapErpNextSite", () => {
   test("returns correct site config on success", async () => {
     const client = createMockClient();
     const postCalls: unknown[][] = [];
+    let putCalled = false;
 
     const originalPost = client.post.bind(client);
     const originalPut = client.put.bind(client);
@@ -35,6 +36,7 @@ describe("bootstrapErpNextSite", () => {
       return { data: {}, status: 200, headers: new Headers() };
     }) as typeof client.post;
     client.put = (async () => {
+      putCalled = true;
       return { data: {}, status: 200, headers: new Headers() };
     }) as typeof client.put;
 
@@ -53,6 +55,7 @@ describe("bootstrapErpNextSite", () => {
     expect(result.companyAbbr).toBe("SPRI");
     expect(result.companyId).toBe("SPRI Company");
 
+    expect(putCalled).toBe(true);
     expect(postCalls.length).toBeGreaterThanOrEqual(2);
     expect(postCalls[0][0]).toContain("/api/method/erpnext");
     expect(postCalls[1][0]).toBe("/api/resource/Company");

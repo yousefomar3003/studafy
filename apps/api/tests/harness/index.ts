@@ -42,6 +42,12 @@ export {
   createDisciplineAction,
   type DisciplineIncidentRecord,
   type DisciplineActionRecord,
+  createEvaluationCriteriaTemplate,
+  createTeacherEvaluation,
+  createEvaluationScore,
+  type EvaluationCriteriaTemplateRecord,
+  type TeacherEvaluationRecord,
+  type EvaluationScoreRecord,
 } from "./factories";
 
 export {

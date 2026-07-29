@@ -42,9 +42,13 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
     done; \
     echo "bun install failed after 3 attempts" >&2; exit 1
 
-# turbo's task graph (dependsOn: ["^build"] in turbo.json) builds apps/api's workspace
-# dependencies before apps/api itself; today that's none, but the filter stays correct if that
-# changes rather than silently going stale.
+# Build workspace dependencies first so generate step can resolve them.
+# turbo's dependsOn: ["^build"] should handle this transitively, but turbo 2.10.3
+# has a bug where @studafy/shared-schemas:build and @studafy/attendance-reporting:build
+# are not scheduled when using filters.
+RUN bun run --cwd packages/constants build \
+ && bun run --cwd packages/shared-schemas build \
+ && bun run --cwd packages/attendance-reporting build
 RUN bunx turbo run build --filter=@studafy/api
 
 FROM oven/bun:${BUN_VERSION}-alpine AS runtime
