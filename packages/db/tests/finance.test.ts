@@ -186,7 +186,7 @@ integrationTest(
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'app' AND c.relname = ANY(${FINANCE_TABLES as unknown as string[]})
       `;
-      expect(policies).toHaveLength(6);
+      expect(policies).toHaveLength(FINANCE_TABLES.length);
       expect(policies.every((policy) => policy.name === "tenant_isolation")).toBe(true);
 
       // No local ledger: no table in this migration's schema names an account, journal, or ledger.
