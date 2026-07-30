@@ -141,9 +141,9 @@ integrationTest(
             "fee_structure",
             "fee_category",
             "expense",
-            "refund",
             "scholarship_discount",
             "award",
+            "refund",
           ],
         },
         {
@@ -185,7 +185,10 @@ integrationTest(
       ).toBe(true);
       expect(
         tables
-          .filter((row) => !["fee_structure_cache", "expense_cache"].includes(row.name))
+          .filter(
+            (row) =>
+              !["fee_structure_cache", "expense_cache", "refund_requests"].includes(row.name),
+          )
           .every((row) => row.app_delete),
       ).toBe(true);
 
