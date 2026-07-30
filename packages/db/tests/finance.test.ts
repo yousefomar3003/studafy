@@ -21,6 +21,9 @@ const FINANCE_TABLES = [
   // ST-121. Adding the name here is enough: the policy-count assertion below derives from
   // FINANCE_TABLES.length, and the tenant-isolation and cross-tenant-leakage loops iterate it.
   "payment_idempotency_logs",
+  // ST-124. Refund processing tables.
+  "refund_idempotency_logs",
+  "refund_requests",
 ] as const;
 
 type Database = Awaited<ReturnType<typeof testDatabase>>;
@@ -138,6 +141,7 @@ integrationTest(
             "fee_structure",
             "fee_category",
             "expense",
+            "refund",
             "scholarship_discount",
             "award",
           ],

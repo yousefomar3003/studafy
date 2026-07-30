@@ -223,7 +223,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/scholarship-discounts/awards/{awardId}/confirm",
   // Refund processing (ST-124). Maker-checker workflow gated on BILLING_REFUND permission
   // via requirePermission middleware in routes.ts.
-  "POST /api/finance/refunds",
+  "POST /api/finance/refunds/initiate",
   "POST /api/finance/refunds/{refundId}/approve",
   "POST /api/finance/refunds/{refundId}/reject",
 ];

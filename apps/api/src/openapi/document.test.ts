@@ -120,9 +120,17 @@ describe("structure", () => {
         "/api/finance/expenses/{expenseId}/attachments",
         "/api/finance/payments",
         "/api/finance/payments/{paymentId}",
+        // Refund processing (ST-124). Maker-checker workflow with ERPNext Credit Notes.
+        "/api/finance/refunds",
+        "/api/finance/refunds/{refundId}",
+        "/api/finance/refunds/{refundId}/approve",
+        "/api/finance/refunds/{refundId}/reject",
+        "/api/finance/refunds/initiate",
         // ST-121. Public by design: authenticated by HMAC over the raw body, so it is absent from the
         // authentication-boundary list below.
         "/api/finance/webhooks/erpnext/payment-confirmed",
+        // ST-124. Same HMAC-based auth as payment-confirmed; absent from the auth-boundary list below.
+        "/api/finance/webhooks/erpnext/refund-processed",
         "/api/finance/scholarship-discounts",
         "/api/finance/scholarship-discounts/awards",
         "/api/finance/scholarship-discounts/awards/{awardId}/confirm",
@@ -423,6 +431,8 @@ describe("security", () => {
         "GET /api/finance/payments/{paymentId}",
         "GET /api/finance/scholarship-discounts",
         "GET /api/finance/scholarship-discounts/awards",
+        "GET /api/finance/refunds",
+        "GET /api/finance/refunds/{refundId}",
         "GET /api/finance/students/{studentId}/installments",
         "GET /api/academics/assignments",
         "GET /api/academics/assignments/{assignmentId}",
@@ -560,6 +570,9 @@ describe("security", () => {
         "POST /api/finance/expenses/upload-url",
         "POST /api/finance/expenses/{expenseId}/attachments",
         "POST /api/finance/payments",
+        "POST /api/finance/refunds/initiate",
+        "POST /api/finance/refunds/{refundId}/approve",
+        "POST /api/finance/refunds/{refundId}/reject",
         "POST /api/finance/scholarship-discounts/awards",
         "POST /api/finance/scholarship-discounts/awards/{awardId}/confirm",
         "POST /api/finance/reconciliation/run",
