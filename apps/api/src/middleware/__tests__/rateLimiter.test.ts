@@ -213,7 +213,6 @@ describe("token consumption (requires Redis)", () => {
       const app = new Hono<AppEnv>();
       app.use("*", rateLimiterMiddleware({ redis: client, routeClass: "auth", budget }));
       app.use("*", requestIdMiddleware({ logger: silentLogger }));
-      app.use("*", rateLimiterMiddleware({ redis: client, routeClass: "auth", budget }));
       app.onError(errorHandlerMiddleware(silentLogger));
       app.get("/test", (c) => c.json({ ok: true }));
 
