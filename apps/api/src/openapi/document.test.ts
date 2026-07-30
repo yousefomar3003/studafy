@@ -234,6 +234,7 @@ describe("structure", () => {
         "/api/subscriptions/checkout",
         "/api/subscriptions/plans",
         "/api/subscriptions/portal",
+        "/api/subscriptions/school/checkout",
         "/api/subscriptions/webhook/stripe",
         "/api/teachers",
 
@@ -588,6 +589,7 @@ describe("security", () => {
         "POST /api/students/{studentId}/guardians",
         "POST /api/subscriptions/checkout",
         "POST /api/subscriptions/portal",
+        "POST /api/subscriptions/school/checkout",
         "POST /api/teachers",
         "POST /api/users",
         "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
