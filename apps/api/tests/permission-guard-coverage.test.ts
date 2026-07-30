@@ -175,6 +175,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // already holds it, so the FINANCE role gains this surface without a matrix change.
   "POST /api/finance/fee-structures",
   "PATCH /api/finance/fee-structures/{feeStructureId}",
+  "POST /api/finance/expenses",
+  "PATCH /api/finance/expenses/{expenseId}",
+  "POST /api/finance/expenses/upload-url",
+  "POST /api/finance/expenses/{expenseId}/attachments",
   "POST /api/discipline/incidents",
   "PATCH /api/discipline/incidents/{incidentId}",
   "POST /api/discipline/incidents/{incidentId}/resolve",

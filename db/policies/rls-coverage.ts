@@ -83,6 +83,7 @@ approved_flexible_columns(table_name, column_name) AS (
     ('notifications', 'metadata'),
     ('outbox_events', 'payload'),
     ('payment_cache', 'erpnext_payload'),
+    ('expense_cache', 'erpnext_payload'),
     ('student_imports', 'rows_data'),
     ('student_imports', 'errors'),
     ('student_imports', 'summary')

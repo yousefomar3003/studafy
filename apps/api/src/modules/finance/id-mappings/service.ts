@@ -24,7 +24,7 @@ import type { TransactionSql } from "postgres";
 
 /** Mirrors the `app.finance_entity_type` enum; 'fee_structure'/'fee_category' added in 000060. */
 export type FinanceEntityType =
-  "invoice" | "payment" | "fee_schedule" | "fee_structure" | "fee_category";
+  "invoice" | "payment" | "fee_schedule" | "fee_structure" | "fee_category" | "expense";
 
 export interface ErpNextIdMapping {
   id: string;
