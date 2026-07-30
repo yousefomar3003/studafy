@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 
+import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 
@@ -49,6 +50,11 @@ export function reconciliationRoutes(
   logger: Logger,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  routes.use(
+    "/api/finance/reconciliation/run",
+    auditAction("insert", "finance_reconciliation_logs"),
+  );
 
   routes.openapi(runReconciliationRoute, async (c) => {
     const apiKey = c.req.header("X-Api-Key");

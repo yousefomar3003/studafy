@@ -179,6 +179,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/finance/expenses/{expenseId}",
   "POST /api/finance/expenses/upload-url",
   "POST /api/finance/expenses/{expenseId}/attachments",
+  // ST-122. Fee schedule generation gated on BILLING_UPDATE via requirePermission middleware.
+  "POST /api/finance/fee-schedules/generate",
+  // ST-122. Internal API-key-authenticated reconciliation job; listed here for inventory accuracy
+  // but added to GUARD_EXEMPT_ROUTES below because there is no bearer token to check.
+  "POST /api/finance/reconciliation/run",
   // ST-121. Guarded by billing:update. The payment-confirmed webhook is not listed here because it
   // carries no requirePermission — it authenticates by HMAC over the raw body, not by a bearer token.
   "POST /api/finance/payments",
@@ -239,6 +244,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "DELETE /api/auth/devices/{deviceId}",
   // Webhook — HMAC-authenticated, not bearer.
   "POST /erpnext/webhooks",
+  // Daily reconciliation (ST-122) — API-key-authenticated, not bearer; no JWT to check.
+  "POST /api/finance/reconciliation/run",
   // Account activation (ST-078) — public self-service onboarding. Authorized by the invitation
   // token in the path plus a verified Microsoft OIDC identity, not by a bearer permission; there is
   // no other user's data to protect.
