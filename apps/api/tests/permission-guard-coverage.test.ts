@@ -179,6 +179,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/finance/expenses/{expenseId}",
   "POST /api/finance/expenses/upload-url",
   "POST /api/finance/expenses/{expenseId}/attachments",
+  // ST-121. Guarded by billing:update. The payment-confirmed webhook is not listed here because it
+  // carries no requirePermission — it authenticates by HMAC over the raw body, not by a bearer token.
+  "POST /api/finance/payments",
   "POST /api/discipline/incidents",
   "PATCH /api/discipline/incidents/{incidentId}",
   "POST /api/discipline/incidents/{incidentId}/resolve",

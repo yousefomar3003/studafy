@@ -2,7 +2,9 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { ERPNEXT_DOC_EVENT_MAP } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
+import { withTenantTx } from "../db/tenant-tx";
 import { auditAction, emitAuditLog } from "../middleware/auditEmitter";
+import { projectPaymentEntry } from "../modules/finance/payments/projection";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
 
@@ -11,6 +13,7 @@ import { verifyWebhookSignature } from "./signature";
 import type { Database } from "../db";
 import type { Logger } from "../logger";
 import type { AppEnv } from "../middleware/requestId";
+import type { ErpNextPaymentEntry } from "../modules/finance/payments/projection";
 
 const webhookBodySchema = z
   .object({
@@ -46,6 +49,7 @@ async function projectToCache(
   schoolId: string,
   eventName: string,
   data: Record<string, unknown>,
+  logger: Logger,
 ): Promise<void> {
   const now = new Date().toISOString();
   const docname = String(data.name ?? data.docname ?? "");
@@ -89,29 +93,17 @@ async function projectToCache(
       break;
     }
     case "erpnext.paymentReceived": {
-      const amount = Number(data.paid_amount ?? data.total_amount ?? 0);
-      await db.unsafe(
-        `INSERT INTO app.payment_cache (
-          school_id, student_id, currency_id, erpnext_docname, erpnext_status,
-          amount_minor, payment_date, erpnext_payload, last_synced_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
-        ON CONFLICT (school_id, erpnext_docname) DO UPDATE SET
-          erpnext_status = EXCLUDED.erpnext_status,
-          amount_minor = EXCLUDED.amount_minor,
-          erpnext_payload = EXCLUDED.erpnext_payload,
-          last_synced_at = EXCLUDED.last_synced_at,
-          updated_at = NOW()`,
-        [
-          schoolId,
-          String(data.student_id ?? data.party ?? ""),
-          String(data.currency ?? data.currency_id ?? ""),
-          docname,
-          status,
-          amount,
-          String(data.posting_date ?? data.transaction_date ?? now),
-          JSON.stringify(data),
-          now,
-        ],
+      // ST-121 replaced this arm's inline SQL with the shared projection in
+      // modules/finance/payments/projection.ts. The previous version could not succeed: it passed
+      // `String(data.student_id ?? data.party ?? "")` into a uuid column, an ISO currency *code* into
+      // the currency_id uuid foreign key, and a raw decimal paid_amount into the integer
+      // amount_minor. The shared function resolves the student, looks the currency up in
+      // app.currencies, and converts through the currency's own exponent (3 for JOD, not 2).
+      //
+      // It also runs inside a tenant transaction rather than on a bare pool connection, so the write
+      // is covered by the same RLS context that the rest of this ingestion uses.
+      await withTenantTx(db, { schoolId }, (tx) =>
+        projectPaymentEntry(tx, schoolId, data as ErpNextPaymentEntry, logger),
       );
       break;
     }
@@ -290,7 +282,7 @@ export function erpNextWebhookRoutes(db: Database, logger: Logger): OpenAPIHono<
         `;
       });
 
-      await projectToCache(db, schoolId, eventName, body.data as Record<string, unknown>);
+      await projectToCache(db, schoolId, eventName, body.data as Record<string, unknown>, logger);
     } catch (err) {
       logger.error({ err, event_id: body.event_id }, "webhook ingestion failed");
       // Detail is withheld from the client by the 5xx arm of errorHandlerMiddleware; the cause is

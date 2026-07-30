@@ -11,8 +11,9 @@ import type { MiddlewareHandler } from "hono";
  *
  * When a client sends an `Idempotency-Key` header on a POST request, this middleware:
  *
- * 1. Captures the handler's response (status, headers, body) and stores it in Redis
- *    keyed by the idempotency key, with a 24-hour TTL.
+ * 1. Captures a *successful* handler response (status, headers, body) and stores it in Redis
+ *    keyed by the idempotency key, with a 24-hour TTL. Responses of 400 and above are not
+ *    stored — a retry after a failure should re-invoke the handler, not replay the failure.
  * 2. On replay (same key + same body), returns the stored response verbatim.
  * 3. On body mismatch (same key, different body), rejects with 409 Conflict.
  * 4. On concurrent duplicates (same key, same body while first is in-flight), the
@@ -189,6 +190,15 @@ export function idempotencyMiddleware({
       await next();
       const res = c.res.clone();
 
+      // Read the body exactly once. An earlier version of this block read it twice — once inside a
+      // `status < 400` branch and again in a duplicated fall-through — and the second `res.text()`
+      // resolved to `""` because the first had already consumed the stream. That empty entry then
+      // overwrote the good one in Redis, so every replay answered with the right status and an empty
+      // body. It went unnoticed because the replay tests only run when Redis is reachable.
+      //
+      // Two branches found this independently and deleted opposite halves: ST-121 kept the
+      // `status < 400` gate below, the other kept the fall-through that also stored 4xx. The
+      // `status < 400` semantics won on merge deliberately — see the comment on that branch.
       const responseBody = await res.text();
       const responseHeaders: Record<string, string> = {};
       res.headers.forEach((value, name) => {
@@ -202,21 +212,21 @@ export function idempotencyMiddleware({
         body: responseBody,
       };
 
-      // Don't cache server errors (5xx) — they may be transient, and a retry
-      // should re-invoke the handler rather than replay the same error.
-      // The in-flight promise is resolved so concurrent waiters get the same
-      // error response without hanging.
-      if (res.status >= 500) {
-        resolve(entry);
-        return;
+      // Only successful responses are stored. A failure is not a result worth replaying: a 5xx may be
+      // transient, and a 4xx means nothing was created, so in both cases a retry should re-invoke the
+      // handler rather than be answered from cache. That matters most on
+      // POST /api/finance/payments — a cached 4xx there would wedge the client's idempotency key
+      // against a payment that was never made, while the durable guard in
+      // app.payment_idempotency_logs is what actually prevents a double post.
+      if (res.status < 400) {
+        await storeResponse(redis, key, entry, windowSeconds);
+        // Rebuild the response for the current request since c.res may have been consumed.
+        c.res = buildResponse(entry);
       }
 
-      // Store in Redis and resolve the in-flight promise.
-      await storeResponse(redis, key, entry, windowSeconds);
+      // Resolved regardless of status, and with the real body either way, so a concurrent duplicate
+      // sees the same outcome as the request it waited on instead of hanging or getting an empty one.
       resolve(entry);
-
-      // Rebuild the response for the current request since c.res may have been consumed.
-      c.res = buildResponse(entry);
     } catch (err) {
       reject(err);
       throw err;
