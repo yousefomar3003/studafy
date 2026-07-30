@@ -259,6 +259,7 @@ export type StudentDemographics = z.infer<typeof studentDemographicsSchema>;
 
 export const guardianSchema = z
   .object({
+    family_id: uuidSchema.openapi({ description: "Household that owns this guardian link." }),
     parent_user_id: uuidSchema.openapi({ description: "Guardian's user ID." }),
     relationship: parentRelationshipSchema,
     created_at: dateTimeSchema,
@@ -271,6 +272,10 @@ export const guardianSchema = z
 
 export const linkGuardianBodySchema = z
   .object({
+    family_id: uuidSchema.optional().openapi({
+      description:
+        "Existing household UUID. When omitted, the parent's oldest household is reused or created.",
+    }),
     parent_user_id: uuidSchema.openapi({
       description: "User ID of the parent to link. Must have the PARENT role.",
     }),
@@ -342,6 +347,10 @@ export const createStudentBodySchema = z
     guardians: z
       .array(
         z.object({
+          family_id: uuidSchema.optional().openapi({
+            description:
+              "Existing household UUID. When omitted, the guardian's oldest household is reused or created.",
+          }),
           parent_user_id: uuidSchema.openapi({ description: "Guardian's user ID." }),
           relationship: parentRelationshipSchema,
         }),

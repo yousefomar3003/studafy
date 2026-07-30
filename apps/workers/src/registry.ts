@@ -5,7 +5,7 @@ import { processBillingJob } from "./queues/billing";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
-import { processAttendanceExport } from "./queues/reports";
+import { processAttendanceExport, processFinanceExport } from "./queues/reports";
 
 import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
 import type { QueueName } from "@studafy/constants";
@@ -86,6 +86,17 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     name: QUEUE_NAMES.REPORTS,
     concurrency: 3,
     processor: async (job: Job) => {
+      if (job.name === JOB_NAMES.GENERATE_FINANCE_REPORT) {
+        return processFinanceExport(job, {
+          primaryDatabaseUrl: databaseUrl,
+          s3Region: workerEnv.S3_REGION,
+          s3Endpoint: workerEnv.S3_ENDPOINT,
+          bucket: workerEnv.S3_APP_FILES_BUCKET,
+          databaseCaCert: workerEnv.DATABASE_CA_CERT,
+          erpnextBaseUrl: workerEnv.ERPNEXT_API_URL,
+          erpnextApiKey: workerEnv.ERPNEXT_API_KEY,
+        });
+      }
       if (job.name !== JOB_NAMES.GENERATE_ATTENDANCE_EXPORT) {
         return { processed: false, reason: "unknown report job" };
       }

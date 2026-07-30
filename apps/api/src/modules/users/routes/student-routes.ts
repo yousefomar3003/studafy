@@ -376,7 +376,14 @@ export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
     const body = c.req.valid("json");
 
     const guardian = await withTenantTx(database, tenantFrom(c), (tx) =>
-      linkParentToStudent(tx, auth.schoolId, studentId, body.parent_user_id, body.relationship),
+      linkParentToStudent(
+        tx,
+        auth.schoolId,
+        studentId,
+        body.parent_user_id,
+        body.relationship,
+        body.family_id,
+      ),
     );
 
     return c.json(guardian, 201);

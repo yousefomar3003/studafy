@@ -56,6 +56,7 @@ import {
   EnvCredentialResolver,
   expenseRoutes,
   feeStructureRoutes,
+  financeReportRoutes,
   installmentRoutes,
   paymentRoutes,
   paymentWebhookRoutes,
@@ -82,7 +83,7 @@ import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { schoolSettingsRoutes } from "./modules/tenancy/settings/route";
 import { emailVerificationRoutes } from "./modules/tenancy/verification/route";
-import { userRoutes, studentRoutes, teacherRoutes } from "./modules/users";
+import { familyRoutes, userRoutes, studentRoutes, teacherRoutes } from "./modules/users";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -344,6 +345,7 @@ export function createApp({
     });
 
     app.route("/", feeStructureRoutes(database, erpnextFactory));
+    app.route("/", financeReportRoutes(database, erpnextFactory, redis ?? null, storage));
     app.route("/", expenseRoutes(database, erpnextFactory, storage));
     app.route("/", paymentRoutes(database, erpnextFactory));
     app.route("/", scholarshipDiscountRoutes(database, erpnextFactory));
@@ -518,6 +520,7 @@ export function createApp({
   // field projection and role-based view scoping. Gated on STUDENT_* permissions.
   if (database) {
     app.route("/", studentRoutes(database));
+    app.route("/", familyRoutes(database));
   }
 
   // Student CSV import (upload → validate → confirm → async processing).

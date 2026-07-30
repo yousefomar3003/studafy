@@ -74,7 +74,7 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `billing:refund`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `billing:viewInvoices`           | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
 | `report:read`                    | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
-| `report:export`                  | ✅          | ✅        |         |            |                    |         |        |       |               |
+| `report:export`                  | ✅          | ✅        | ✅      |            |                    |         |        |       |               |
 | `report:viewFinancial`           | ✅          | ✅        | ✅      |            |                    |         |        |       |               |
 | `approval:review`                | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `auditLog:read`                  | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |

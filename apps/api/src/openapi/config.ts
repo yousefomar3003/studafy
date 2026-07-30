@@ -62,6 +62,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "decimal places, not two.",
     },
     {
+      name: "Families",
+      description:
+        "Tenant-scoped household management. Administrators manage guardian links; parents may " +
+        "read only households where they are the primary parent or a linked guardian.",
+    },
+    {
       name: "Invitations",
       description:
         "User invitation management. Authenticated. Invitations are bound to an email and role, " +

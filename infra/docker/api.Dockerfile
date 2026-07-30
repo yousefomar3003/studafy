@@ -48,7 +48,8 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 # are not scheduled when using filters.
 RUN bun run --cwd packages/constants build \
  && bun run --cwd packages/shared-schemas build \
- && bun run --cwd packages/attendance-reporting build
+ && bun run --cwd packages/attendance-reporting build \
+ && bun run --cwd packages/finance-reporting build
 RUN bunx turbo run build --filter=@studafy/api
 
 FROM oven/bun:${BUN_VERSION}-alpine AS runtime

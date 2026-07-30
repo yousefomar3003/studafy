@@ -56,6 +56,10 @@ export class ErpNextClient {
     return this.request<T>("POST", path, body);
   }
 
+  async get<T = unknown>(path: string): Promise<ErpNextResponse<T>> {
+    return this.request<T>("GET", path);
+  }
+
   private async request<T>(
     method: string,
     path: string,
