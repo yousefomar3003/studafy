@@ -133,6 +133,7 @@ const EXPECTED_PATHS = [
   "/api/subscriptions/checkout",
   "/api/subscriptions/plans",
   "/api/subscriptions/portal",
+  "/api/subscriptions/school/checkout",
   "/api/subscriptions/webhook/stripe",
   "/api/imports/students",
   "/api/imports/students/template",
