@@ -86,6 +86,8 @@ approved_flexible_columns(table_name, column_name) AS (
     ('expense_cache', 'erpnext_payload'),
     ('award_cache', 'erpnext_payload'),
     ('scholarship_discount_cache', 'erpnext_payload'),
+    ('installment_cache', 'erpnext_payload'),
+    ('finance_reconciliation_logs', 'unresolved_divergences'),
     ('student_imports', 'rows_data'),
     ('student_imports', 'errors'),
     ('student_imports', 'summary')

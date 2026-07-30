@@ -270,6 +270,19 @@ describe("emit", () => {
           studentId: uid,
           approvedByUserId: uid,
         },
+        [DOMAIN_EVENTS.FEE_INSTALLMENT_OVERDUE]: {
+          studentId: uid,
+          scheduleId: uid,
+          dueDate: "2026-06-15",
+          outstandingAmountMinor: 100000,
+        },
+        [DOMAIN_EVENTS.FINANCE_RECONCILIATION_DIVERGENCE]: {
+          schoolId: uid,
+          studentId: uid,
+          erpnextFeeScheduleId: "FS-001",
+          erpnextOutstanding: 5000,
+          localOutstanding: 8000,
+        },
       };
 
       await database!.sql.begin(async (tx) => {

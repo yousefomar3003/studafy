@@ -56,8 +56,10 @@ import {
   EnvCredentialResolver,
   expenseRoutes,
   feeStructureRoutes,
+  installmentRoutes,
   paymentRoutes,
   paymentWebhookRoutes,
+  reconciliationRoutes,
   scholarshipDiscountRoutes,
   TenantErpNextFactory,
 } from "./modules/finance";
@@ -342,6 +344,8 @@ export function createApp({
     app.route("/", expenseRoutes(database, erpnextFactory, storage));
     app.route("/", paymentRoutes(database, erpnextFactory));
     app.route("/", scholarshipDiscountRoutes(database, erpnextFactory));
+    app.route("/", installmentRoutes(database, erpnextFactory));
+    app.route("/", reconciliationRoutes(database, erpnextFactory, logger));
   }
 
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.

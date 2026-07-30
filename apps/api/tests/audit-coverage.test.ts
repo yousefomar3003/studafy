@@ -209,6 +209,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/finance/expenses/{expenseId}",
   "POST /api/finance/expenses/upload-url",
   "POST /api/finance/expenses/{expenseId}/attachments",
+  // Fee schedule generation (ST-122). Per-student installments derived from a fee structure.
+  // Audit row written by auditAction middleware in installments/routes.ts.
+  "POST /api/finance/fee-schedules/generate",
+  // Daily finance reconciliation (ST-122). Internal API-key-authenticated job that logs each run
+  // to finance_reconciliation_logs. Audit row written by auditAction middleware in
+  // finance/jobs/reconciliation.routes.ts.
+  "POST /api/finance/reconciliation/run",
   // ST-121. auditAction("insert", "payment_cache") declares the intent; emitAuditLog writes the row
   // inside the forwarder's own transaction so it commits with the payment or not at all.
   "POST /api/finance/payments",

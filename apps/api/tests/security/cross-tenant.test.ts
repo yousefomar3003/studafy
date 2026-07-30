@@ -47,6 +47,8 @@ interface TenantFixture {
   usageMeter: string;
   secondarySubscription: string;
   outboxEvent: string;
+  installmentCache: string;
+  reconciliationLog: string;
 }
 
 interface SeededFixture {
@@ -279,6 +281,25 @@ async function seedTenant(
       INSERT INTO app.outbox_events (school_id, event_name, payload)
       VALUES (${school}, 'security.probed', '{"probe":true}'::jsonb) RETURNING id::text AS id
     `;
+    const [currencyRow] = await transaction<{ id: string }[]>`
+      SELECT id FROM app.currencies WHERE code = 'JOD' LIMIT 1
+    `;
+    const [installment] = await transaction<{ id: string }[]>`
+      INSERT INTO app.installment_cache
+        (school_id, erpnext_fee_schedule_id, student_id, due_date, total_amount_minor,
+         paid_amount_minor, outstanding_amount_minor, currency_id, status, erpnext_payload,
+         synced_at)
+      VALUES (${school}, ${`FSCHED-ST051-${suffix}`}, ${student!.id}, '2026-07-15', 10000,
+         10000, 0, ${currencyRow!.id}, 'paid', '{}'::jsonb,
+         CURRENT_TIMESTAMP) RETURNING id
+    `;
+    const [reconLog] = await transaction<{ id: string }[]>`
+      INSERT INTO app.finance_reconciliation_logs
+        (school_id, job_run_at, records_checked, drift_detected_count, auto_healed_count,
+         unresolved_divergences, status)
+      VALUES (${school}, CURRENT_TIMESTAMP, 0, 0, 0, '[]'::jsonb, 'success')
+      RETURNING id
+    `;
 
     return {
       school,
@@ -300,6 +321,8 @@ async function seedTenant(
       usageMeter: usage!.id,
       secondarySubscription: secondarySubscription!.id,
       outboxEvent: outbox!.id,
+      installmentCache: installment!.id,
+      reconciliationLog: reconLog!.id,
     };
   });
 }
@@ -354,6 +377,16 @@ function probeRelations(value: TenantFixture): ProbeRelation[] {
       table: "outbox_events",
       predicate: `id = ${value.outboxEvent}::bigint`,
       primaryKey: value.outboxEvent,
+    },
+    {
+      table: "installment_cache",
+      predicate: uuid("id", value.installmentCache),
+      primaryKey: value.installmentCache,
+    },
+    {
+      table: "finance_reconciliation_logs",
+      predicate: uuid("id", value.reconciliationLog),
+      primaryKey: value.reconciliationLog,
     },
   ];
 }
@@ -471,6 +504,8 @@ async function assertCrossTenantCrud(value: SeededFixture): Promise<void> {
       `INSERT INTO app.ai_messages (school_id, conversation_id, question, answer, prompt_tokens, completion_tokens, total_tokens, expires_at) VALUES ('${value.b.school}', '${value.b.conversation}', 'cross?', 'blocked', 1, 1, 2, CURRENT_TIMESTAMP + INTERVAL '1 day')`,
       `INSERT INTO app.ai_message_citations (school_id, ai_message_id, material_chunk_id, citation_order) VALUES ('${value.b.school}', '${value.b.message}', '${value.b.materialChunk}', 2)`,
       `INSERT INTO app.ai_usage_meters (school_id, student_id, ai_subscription_id, total_tokens) VALUES ('${value.b.school}', '${value.b.secondaryStudent}', '${value.b.secondarySubscription}', 1)`,
+      `INSERT INTO app.installment_cache (school_id, erpnext_fee_schedule_id, student_id, due_date, total_amount_minor, paid_amount_minor, outstanding_amount_minor, currency_id, status, erpnext_payload, synced_at) VALUES ('${value.b.school}', 'FSCHED-CROSS', '${value.b.student}', '2026-07-15', 10000, 0, 10000, (SELECT id FROM app.currencies WHERE code = 'JOD' LIMIT 1), 'pending', '{}'::jsonb, CURRENT_TIMESTAMP)`,
+      `INSERT INTO app.finance_reconciliation_logs (school_id, job_run_at, records_checked, drift_detected_count, auto_healed_count, unresolved_divergences, status) VALUES ('${value.b.school}', CURRENT_TIMESTAMP, 0, 0, 0, '[]'::jsonb, 'success')`,
     ].map(async (statement) => {
       try {
         await withTenantTransaction(probePool!, tenantA, (transaction) =>

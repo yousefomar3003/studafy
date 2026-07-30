@@ -63,6 +63,13 @@ export const DOMAIN_EVENTS = {
   // the breach, not each individual absence.
   ATTENDANCE_ALERT_RAISED: "attendance.alertRaised",
 
+  // Finance reconciliation (ST-122). Raised by the daily reconciliation job when an installment
+  // passes its due date and remains unpaid — triggers parent notification via the outbox relay.
+  FEE_INSTALLMENT_OVERDUE: "fee.installmentOverdue",
+  // Raised when the reconciliation job detects a cache-vs-ERPNext divergence that persists after
+  // a self-healing re-pull. Contains exact entity IDs for manual investigation.
+  FINANCE_RECONCILIATION_DIVERGENCE: "finance.reconciliationDivergence",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

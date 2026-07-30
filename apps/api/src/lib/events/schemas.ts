@@ -186,6 +186,21 @@ export const eventPayloadSchemas = {
     approvedByUserId: uid,
   }),
 
+  // ── Finance reconciliation (ST-122) ────────────────────────────────
+  [DOMAIN_EVENTS.FEE_INSTALLMENT_OVERDUE]: z.object({
+    studentId: uid,
+    scheduleId: uid,
+    dueDate: z.string().date(),
+    outstandingAmountMinor: z.number().int(),
+  }),
+  [DOMAIN_EVENTS.FINANCE_RECONCILIATION_DIVERGENCE]: z.object({
+    schoolId: uid,
+    studentId: uid,
+    erpnextFeeScheduleId: z.string(),
+    erpnextOutstanding: z.number(),
+    localOutstanding: z.number(),
+  }),
+
   // ── ERPNext (freeform — external system payloads) ─────────────────────
   [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: z.record(z.string(), z.unknown()),
   [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: z.record(z.string(), z.unknown()),
