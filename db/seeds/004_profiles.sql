@@ -129,13 +129,38 @@ WHERE school_id = current_setting('app.school_id')::uuid
 ON CONFLICT (school_id, user_id) DO NOTHING;
 
 -- Parent-child link: Frank Johnson is Alice's father
-INSERT INTO app.parent_child_links (school_id, parent_user_id, student_id, relationship)
+INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
 SELECT
   current_setting('app.school_id')::uuid,
+  COALESCE(NULLIF(btrim(parent.display_name), ''), 'Frank Johnson') || ' Family',
+  parent.id
+FROM app.users parent
+WHERE parent.school_id = current_setting('app.school_id')::uuid
+  AND parent.normalized_email = 'parent.frank@demo-academy.local'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM app.families family
+    WHERE family.school_id = parent.school_id
+      AND family.primary_parent_user_id = parent.id
+  );
+
+INSERT INTO app.parent_child_links
+  (school_id, family_id, parent_user_id, student_id, relationship)
+SELECT
+  current_setting('app.school_id')::uuid,
+  family.id,
   parent.id,
   student.id,
   'father'::app.parent_relationship
 FROM app.users parent
+JOIN LATERAL (
+  SELECT id
+  FROM app.families
+  WHERE school_id = parent.school_id
+    AND primary_parent_user_id = parent.id
+  ORDER BY created_at, id
+  LIMIT 1
+) family ON true
 JOIN app.users student_user
   ON student_user.school_id = parent.school_id
   AND student_user.normalized_email = 'student.alice@demo-academy.local'

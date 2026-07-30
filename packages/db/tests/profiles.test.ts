@@ -95,6 +95,22 @@ async function createUser(database: Database, school: string, localPart: string)
   });
 }
 
+async function createFamily(
+  database: Database,
+  school: string,
+  primaryParentUserId: string,
+): Promise<string> {
+  return asRole(database, "studafy_app", async (tx) => {
+    await tx`SELECT set_config('app.school_id', ${school}, true)`;
+    const [row] = await tx<{ id: string }[]>`
+      INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+      VALUES (${school}, 'Profile fixture family', ${primaryParentUserId})
+      RETURNING id
+    `;
+    return row!.id;
+  });
+}
+
 integrationTest(
   "installs the exact profile schema, enums, ownership, grants, and forced policies",
   async () => {
@@ -219,10 +235,11 @@ integrationTest(
       SELECT conname AS name, pg_get_constraintdef(oid) AS definition
       FROM pg_constraint WHERE connamespace = 'app'::regnamespace
         AND conname = ANY(ARRAY['fk_students_user', 'fk_teachers_user',
-          'fk_parent_child_links_parent_user', 'fk_parent_child_links_student'])
+          'fk_parent_child_links_parent_user', 'fk_parent_child_links_student',
+          'fk_parent_child_links_family'])
       ORDER BY conname
     `;
-      expect(foreignKeys).toHaveLength(4);
+      expect(foreignKeys).toHaveLength(5);
       expect(
         foreignKeys.every((fk) => fk.definition.includes("ON UPDATE RESTRICT ON DELETE RESTRICT")),
       ).toBe(true);
@@ -232,6 +249,9 @@ integrationTest(
       expect(
         foreignKeys.find((fk) => fk.name === "fk_parent_child_links_student")!.definition,
       ).toContain("(student_id, school_id) REFERENCES app.students(id, school_id)");
+      expect(
+        foreignKeys.find((fk) => fk.name === "fk_parent_child_links_family")!.definition,
+      ).toContain("(family_id, school_id) REFERENCES app.families(id, school_id)");
     } finally {
       await database.cleanup();
     }
@@ -271,6 +291,7 @@ integrationTest(
         expect(row!.normalized).toBe("adm-001");
         return row!.id;
       });
+      const familyA = await createFamily(database, a, parentA);
 
       await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${b}, true)`;
@@ -304,8 +325,9 @@ integrationTest(
         RETURNING normalized_employee_number AS normalized
       `;
         expect(teacher!.normalized).toBe("teach-x");
-        await tx`INSERT INTO app.parent_child_links (school_id,parent_user_id,student_id,relationship)
-        VALUES (${a},${parentA},${studentA},'guardian')`;
+        await tx`INSERT INTO app.parent_child_links
+          (school_id,parent_user_id,student_id,family_id,relationship)
+        VALUES (${a},${parentA},${studentA},${familyA},'guardian')`;
       });
       await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${b}, true)`;
@@ -332,20 +354,23 @@ integrationTest(
       );
       await expectDenied(
         database,
-        `INSERT INTO app.parent_child_links (school_id,parent_user_id,student_id,relationship)
-       VALUES ('${a}','${parentA}','${studentA}','guardian')`,
+        `INSERT INTO app.parent_child_links
+          (school_id,parent_user_id,student_id,family_id,relationship)
+       VALUES ('${a}','${parentA}','${studentA}','${familyA}','guardian')`,
         a,
       );
       await expectDenied(
         database,
-        `INSERT INTO app.parent_child_links (school_id,parent_user_id,student_id,relationship)
-       VALUES ('${a}','${foreignParent}','${studentA}','guardian')`,
+        `INSERT INTO app.parent_child_links
+          (school_id,parent_user_id,student_id,family_id,relationship)
+       VALUES ('${a}','${foreignParent}','${studentA}','${familyA}','guardian')`,
         a,
       );
       await expectDenied(
         database,
-        `INSERT INTO app.parent_child_links (school_id,parent_user_id,student_id,relationship)
-       VALUES ('${a}','${parentA}','${studentA}','custodian')`,
+        `INSERT INTO app.parent_child_links
+          (school_id,parent_user_id,student_id,family_id,relationship)
+       VALUES ('${a}','${parentA}','${studentA}','${familyA}','custodian')`,
         a,
       );
       await expectDenied(
@@ -377,6 +402,7 @@ integrationTest(
       const teacherUser = await createUser(database, a, "rls-teacher");
       const parentUser = await createUser(database, a, "rls-parent");
       const foreignUser = await createUser(database, b, "rls-foreign");
+      const family = await createFamily(database, a, parentUser);
       let student = "";
       // ST-085: seed the scoped app.students row as studafy_admin (see the studentA fixture above).
       await asRole(database, "studafy_admin", async (tx) => {
@@ -387,8 +413,9 @@ integrationTest(
         student = row!.id;
         await tx`INSERT INTO app.teachers (school_id,user_id,employee_number)
         VALUES (${a},${teacherUser},'RLS-T')`;
-        await tx`INSERT INTO app.parent_child_links (school_id,parent_user_id,student_id,relationship)
-        VALUES (${a},${parentUser},${student},'guardian')`;
+        await tx`INSERT INTO app.parent_child_links
+          (school_id,parent_user_id,student_id,family_id,relationship)
+        VALUES (${a},${parentUser},${student},${family},'guardian')`;
       });
 
       for (const table of PROFILE_TABLES) {
@@ -496,6 +523,7 @@ integrationTest(
         AND c.oid IS NULL ORDER BY i.relname
     `;
       expect(nonConstraint.map((row) => row.name)).toEqual([
+        "idx_parent_child_links_school_family_student_parent",
         "idx_parent_child_links_school_student_parent",
         "idx_students_nationality_country_id",
       ]);
@@ -517,6 +545,7 @@ integrationTest(
       const studentUser = await createUser(database, a, "plan-student");
       const teacherUser = await createUser(database, a, "plan-teacher");
       const parentUser = await createUser(database, a, "plan-parent");
+      const family = await createFamily(database, a, parentUser);
       // ST-085: seed the scoped app.students row as studafy_admin (see the studentA fixture above).
       await asRole(database, "studafy_admin", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${a}, true)`;
@@ -525,8 +554,9 @@ integrationTest(
         VALUES (${a},${studentUser},'PLAN-S','Plan','Student') RETURNING id`;
         await tx`INSERT INTO app.teachers (school_id,user_id,employee_number)
         VALUES (${a},${teacherUser},'PLAN-T')`;
-        await tx`INSERT INTO app.parent_child_links (school_id,parent_user_id,student_id,relationship)
-        VALUES (${a},${parentUser},${student!.id},'guardian')`;
+        await tx`INSERT INTO app.parent_child_links
+          (school_id,parent_user_id,student_id,family_id,relationship)
+        VALUES (${a},${parentUser},${student!.id},${family},'guardian')`;
       });
 
       const planNames = await asRole(database, "studafy_app", async (tx) => {

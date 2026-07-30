@@ -298,10 +298,30 @@ async function linkParentByEmail(
   `;
 
   if (!existingLink) {
+    const [existingFamily] = await tx<{ id: string }[]>`
+      SELECT id
+      FROM app.families
+      WHERE school_id = ${schoolId}
+        AND primary_parent_user_id = ${parentUserId}::uuid
+      ORDER BY created_at, id
+      LIMIT 1
+    `;
+    const familyId =
+      existingFamily?.id ??
+      (
+        await tx<{ id: string }[]>`
+          INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+          VALUES (${schoolId}, left(${parentEmail}, 200), ${parentUserId}::uuid)
+          RETURNING id
+        `
+      )[0]!.id;
+
     await tx`
-      INSERT INTO app.parent_child_links (school_id, parent_user_id, student_id, relationship)
+      INSERT INTO app.parent_child_links
+        (school_id, family_id, parent_user_id, student_id, relationship)
       VALUES (
         ${schoolId},
+        ${familyId}::uuid,
         ${parentUserId}::uuid,
         ${studentId}::uuid,
         ${relationship}::app.parent_relationship
