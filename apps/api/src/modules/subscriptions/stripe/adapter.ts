@@ -48,7 +48,7 @@ export class StripeAdapter implements PaymentProviderPort {
     const session = await this.stripe.checkout.sessions.create({
       customer: input.customerId,
       mode: "subscription",
-      line_items: [{ price: input.priceId, quantity: 1 }],
+      line_items: [{ price: input.priceId, quantity: input.quantity ?? 1 }],
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
       metadata: input.metadata,

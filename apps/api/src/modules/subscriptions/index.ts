@@ -1,4 +1,5 @@
 export { checkoutRoutes } from "./routes/checkout-routes";
+export { schoolCheckoutRoutes } from "./routes/school-checkout-routes";
 export { webhookRoutes } from "./routes/webhook-routes";
 export { planRoutes } from "./routes/plan-routes";
 export { adminSubscriptionRoutes } from "./routes/admin-routes";
@@ -8,6 +9,7 @@ export { handleStripeWebhook, registerWebhookHandler } from "./stripe/webhook";
 export { syncPlanPrices } from "./services/price-sync-service";
 export {
   createSchoolCheckoutSession,
+  createTieredSchoolCheckoutSession,
   createBillingPortalSession,
 } from "./services/checkout-service";
 export { getActivePlans, getSchoolSubscription } from "./services/subscription-service";

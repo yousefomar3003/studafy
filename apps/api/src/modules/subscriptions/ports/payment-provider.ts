@@ -22,6 +22,7 @@ export interface CreateCustomerResult {
 export interface CreateCheckoutSessionInput {
   customerId: string;
   priceId: string;
+  quantity?: number;
   successUrl: string;
   cancelUrl: string;
   metadata: Record<string, string>;
