@@ -1,0 +1,58 @@
+import { NOTIFICATION_TYPES } from "@studafy/constants";
+
+import { NOTIFICATION_CHANNELS } from "../types";
+
+import type { LocaleTemplateSet } from "./types";
+
+export const EN_TEMPLATES = {
+  [NOTIFICATION_TYPES.ASSIGNMENT_DUE_SOON]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{assignmentName} is due {dueDate}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{courseName} — {assignmentName} due {dueDate}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Your assignment {assignmentName} in {courseName} is due on {dueDate}. Submit before the deadline.",
+  },
+  [NOTIFICATION_TYPES.GRADE_POSTED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Grade posted for {assignmentName}: {grade}",
+    [NOTIFICATION_CHANNELS.PUSH]: "Grade: {grade} on {assignmentName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Your grade for {assignmentName} in {courseName} has been posted: {grade}.",
+  },
+  [NOTIFICATION_TYPES.ENROLLMENT_APPROVED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "You have been enrolled in {courseName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "Enrolled in {courseName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "Your enrollment in {courseName} has been approved.",
+  },
+  [NOTIFICATION_TYPES.COURSE_PUBLISHED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{courseName} is now available",
+    [NOTIFICATION_CHANNELS.PUSH]: "New course: {courseName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "A new course is now available: {courseName}.",
+  },
+  [NOTIFICATION_TYPES.DISCUSSION_REPLY]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "New reply from {replierName} in {discussionTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{replierName} replied to {discussionTitle}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      '{replierName} has replied to "{discussionTitle}" in {courseName}.',
+  },
+  [NOTIFICATION_TYPES.STUDY_GROUP_INVITE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{inviterName} invited you to {groupName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "Study group invite: {groupName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      '{inviterName} has invited you to join the study group "{groupName}".',
+  },
+  [NOTIFICATION_TYPES.CERTIFICATE_ISSUED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Certificate issued for {courseName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "Certificate: {courseName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "Your certificate for {courseName} is now available.",
+  },
+  [NOTIFICATION_TYPES.SUPPORT_MESSAGE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{subject}",
+    [NOTIFICATION_CHANNELS.PUSH]: "New message: {subject}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "You have a new support message regarding: {subject}.",
+  },
+  [NOTIFICATION_TYPES.ATTENDANCE_ALERT]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Attendance alert for {courseName} on {date}",
+    [NOTIFICATION_CHANNELS.PUSH]: "Alert: {courseName} — {date}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "This is an attendance alert for {courseName}. Absences were recorded on {date}.",
+  },
+} as const satisfies LocaleTemplateSet;
