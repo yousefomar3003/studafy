@@ -1,0 +1,56 @@
+import { NOTIFICATION_TYPES } from "@studafy/constants";
+
+import { NOTIFICATION_CHANNELS } from "../types";
+
+import type { LocaleTemplateSet } from "./types";
+
+export const AR_TEMPLATES = {
+  [NOTIFICATION_TYPES.ASSIGNMENT_DUE_SOON]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "موعد تسليم {assignmentName} هو {dueDate}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{courseName} — {assignmentName} مستحق في {dueDate}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "الواجب {assignmentName} في مادة {courseName} مستحق في {dueDate}. يرجى التسليم قبل الموعد النهائي.",
+  },
+  [NOTIFICATION_TYPES.GRADE_POSTED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تم نشر درجة {assignmentName}: {grade}",
+    [NOTIFICATION_CHANNELS.PUSH]: "الدرجة: {grade} في {assignmentName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "تم نشر درجتك في {assignmentName} لمادة {courseName}: {grade}.",
+  },
+  [NOTIFICATION_TYPES.ENROLLMENT_APPROVED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تم تسجيلك في {courseName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "مسجل في {courseName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "تمت الموافقة على تسجيلك في {courseName}.",
+  },
+  [NOTIFICATION_TYPES.COURSE_PUBLISHED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "مادة {courseName} متاحة الآن",
+    [NOTIFICATION_CHANNELS.PUSH]: "مادة جديدة: {courseName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "مادة جديدة متاحة الآن: {courseName}.",
+  },
+  [NOTIFICATION_TYPES.DISCUSSION_REPLY]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "رد جديد من {replierName} في {discussionTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{replierName} رد على {discussionTitle}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      'قام {replierName} بالرد على "{discussionTitle}" في مادة {courseName}.',
+  },
+  [NOTIFICATION_TYPES.STUDY_GROUP_INVITE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{inviterName} يدعوك للانضمام إلى {groupName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "دعوة مجموعة دراسة: {groupName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      'قام {inviterName} بدعوتك للانضمام إلى مجموعة الدراسة "{groupName}".',
+  },
+  [NOTIFICATION_TYPES.CERTIFICATE_ISSUED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تم إصدار شهادة لـ {courseName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "شهادة: {courseName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "شهادتك لمادة {courseName} متاحة الآن.",
+  },
+  [NOTIFICATION_TYPES.SUPPORT_MESSAGE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{subject}",
+    [NOTIFICATION_CHANNELS.PUSH]: "رسالة جديدة: {subject}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "لديك رسالة دعم جديدة بخصوص: {subject}.",
+  },
+  [NOTIFICATION_TYPES.ATTENDANCE_ALERT]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تنبيه حضور لـ {courseName} في {date}",
+    [NOTIFICATION_CHANNELS.PUSH]: "تنبيه: {courseName} — {date}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "هذا تنبيه حضور لمادة {courseName}. تم تسجيل غيابات في {date}.",
+  },
+} as const satisfies LocaleTemplateSet;
