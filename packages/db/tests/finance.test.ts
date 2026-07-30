@@ -138,6 +138,8 @@ integrationTest(
             "fee_structure",
             "fee_category",
             "expense",
+            "scholarship_discount",
+            "award",
           ],
         },
         {

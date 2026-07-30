@@ -276,6 +276,39 @@ export async function generateInvoice(
     description: c.description ?? undefined,
   }));
 
+  // Query confirmed scholarship/discount awards for this student.
+  interface ConfirmedAward {
+    discount_type: string;
+    amount: number;
+    scope: string;
+    fee_category: string | null;
+  }
+  const confirmedAwards = await tx<ConfirmedAward[]>`
+    SELECT sdc.discount_type, sdc.amount, sdc.scope, sdc.fee_category
+    FROM app.award_cache ac
+    JOIN app.scholarship_discount_cache sdc ON sdc.id = ac.scholarship_discount_id
+    WHERE ac.school_id = ${schoolId}::uuid
+      AND ac.student_id = ${params.studentId}::uuid
+      AND ac.award_status = 'confirmed'
+  `;
+
+  const totalAmount = items.reduce((sum, item) => sum + item.rate * item.qty, 0);
+  let discountAmount = 0;
+  const percentageAwards: number[] = [];
+
+  for (const award of confirmedAwards) {
+    if (award.discount_type === "fixed") {
+      discountAmount += Number(award.amount);
+    } else if (award.discount_type === "percentage") {
+      percentageAwards.push(Number(award.amount));
+    }
+  }
+
+  if (percentageAwards.length > 0) {
+    const combinedPercentage = percentageAwards.reduce((s, p) => s + p, 0);
+    discountAmount += totalAmount * (combinedPercentage / 100);
+  }
+
   const payload: Record<string, unknown> = {
     customer: customerId,
     currency: currencyCode,
@@ -283,6 +316,10 @@ export async function generateInvoice(
     posting_date: new Date().toISOString().slice(0, 10),
     custom_school_id: schoolId,
   };
+  if (discountAmount > 0) {
+    payload.apply_discount_on = "Grand Total";
+    payload.discount_amount = Math.round(discountAmount * 100) / 100;
+  }
   if (params.dueDate) {
     payload.due_date = params.dueDate;
   }

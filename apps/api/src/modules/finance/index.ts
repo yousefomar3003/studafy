@@ -2,6 +2,7 @@ export { feeStructureRoutes } from "./fee-structures/routes";
 export { expenseRoutes } from "./expenses/routes";
 export { paymentRoutes } from "./payments/routes";
 export { paymentWebhookRoutes } from "./webhooks/payment-confirmed";
+export { scholarshipDiscountRoutes } from "./scholarships/routes";
 export { EnvCredentialResolver } from "./client/credential-resolver";
 export { TenantErpNext, TenantErpNextFactory } from "./client/tenant-client";
 export type {

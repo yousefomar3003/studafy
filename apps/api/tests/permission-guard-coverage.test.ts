@@ -212,6 +212,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // Approval queue (ST-115). Atomic bulk approve/reject with per-item partial-failure.
   // Gated on APPROVAL_REVIEW permission via requirePermission middleware.
   "POST /api/approvals/bulk-decision",
+  // Scholarship/discount awards (ST-119 extension). Maker-checker workflow gated on
+  // BILLING_UPDATE permission via requirePermission middleware.
+  "POST /api/finance/scholarship-discounts/awards",
+  "POST /api/finance/scholarship-discounts/awards/{awardId}/confirm",
 ];
 
 /**

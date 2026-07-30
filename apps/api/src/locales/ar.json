@@ -58,6 +58,10 @@
   "PAYMENT_NOT_FOUND": "لم يتم العثور على الدفعة",
   "PAYMENT_IN_PROGRESS": "لم تكتمل محاولة سابقة لتسجيل هذه الدفعة. انتظر لحظة وتحقق من الدفعة قبل المحاولة مرة أخرى — ولا تعد إرسالها بمفتاح جديد",
   "PAYMENT_IDEMPOTENCY_KEY_REQUIRED": "يلزم إرسال ترويسة Idempotency-Key لتسجيل الدفعة",
+  "SCHOLARSHIP_DISCOUNT_NOT_FOUND": "لم يتم العثور على المنحة أو الخصم",
+  "AWARD_NOT_FOUND": "لم يتم العثور على الجائزة",
+  "AWARD_INVALID_STATUS_TRANSITION": "الجائزة ليست في حالة صالحة لهذه العملية",
+  "AWARD_CONFIRM_SELF": "يجب أن يكون المانح والمؤكّد مستخدمين مختلفين",
   "ERPNEXT_SITE_CREATION_FAILED": "فشل إنشاء موقع ERPNext",
   "ERPNEXT_COMPANY_CREATION_FAILED": "فشل إنشاء شركة ERPNext",
   "LIMIT_EXCEEDED_STUDENT_CAP": "تم الوصول إلى الحد الأقصى للطلاب. قم بترقية خطتك لإضافة المزيد",
@@ -130,5 +134,12 @@
   "EVALUATION_ALREADY_SHARED": "تمت مشاركة هذا التقييم بالفعل مع المعلم",
   "EVALUATION_NOT_SHARED": "لم تتم مشاركة هذا التقييم مع المعلم",
   "EVALUATION_TEMPLATE_NOT_FOUND": "لم يتم العثور على قالب معايير التقييم",
-  "EVALUATION_SCORE_NOT_FOUND": "لم يتم العثور على درجة التقييم"
+  "EVALUATION_SCORE_NOT_FOUND": "لم يتم العثور على درجة التقييم",
+  "STRIPE_NOT_CONFIGURED": "الدفع عبر Stripe غير مهيأ لهذا النظام",
+  "STRIPE_API_ERROR": "حدث خطأ أثناء الاتصال بـ Stripe",
+  "STRIPE_WEBHOOK_INVALID": "حمولة أو توقيع webhook من Stripe غير صالح",
+  "STRIPE_PRICE_SYNC_FAILED": "فشل مزامنة الخطط والأسعار مع Stripe",
+  "STRIPE_LIVE_KEY_IN_DEV": "لا يمكن استخدام مفتاح Stripe الحي في بيئة التطوير",
+  "SUBSCRIPTION_NOT_FOUND": "لم يتم العثور على اشتراك نشط لهذه المدرسة",
+  "SUBSCRIPTION_CHECKOUT_FAILED": "فشل إنشاء جلسة الدفع"
 }

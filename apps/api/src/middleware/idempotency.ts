@@ -195,6 +195,10 @@ export function idempotencyMiddleware({
       // resolved to `""` because the first had already consumed the stream. That empty entry then
       // overwrote the good one in Redis, so every replay answered with the right status and an empty
       // body. It went unnoticed because the replay tests only run when Redis is reachable.
+      //
+      // Two branches found this independently and deleted opposite halves: ST-121 kept the
+      // `status < 400` gate below, the other kept the fall-through that also stored 4xx. The
+      // `status < 400` semantics won on merge deliberately — see the comment on that branch.
       const responseBody = await res.text();
       const responseHeaders: Record<string, string> = {};
       res.headers.forEach((value, name) => {

@@ -1,0 +1,109 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renderNotification — snapshot tests en ASSIGNMENT_DUE_SOON / in_app renders correctly 1`] = `"Homework 5 is due 2026-08-15"`;
+
+exports[`renderNotification — snapshot tests en ASSIGNMENT_DUE_SOON / push renders correctly 1`] = `"Algebra II — Homework 5 due 2026-08-15"`;
+
+exports[`renderNotification — snapshot tests en ASSIGNMENT_DUE_SOON / email renders correctly 1`] = `"Your assignment Homework 5 in Algebra II is due on 2026-08-15. Submit before the deadline."`;
+
+exports[`renderNotification — snapshot tests en GRADE_POSTED / in_app renders correctly 1`] = `"Grade posted for Lab Report 3: A-"`;
+
+exports[`renderNotification — snapshot tests en GRADE_POSTED / push renders correctly 1`] = `"Grade: A- on Lab Report 3"`;
+
+exports[`renderNotification — snapshot tests en GRADE_POSTED / email renders correctly 1`] = `"Your grade for Lab Report 3 in Biology 101 has been posted: A-."`;
+
+exports[`renderNotification — snapshot tests en ENROLLMENT_APPROVED / in_app renders correctly 1`] = `"You have been enrolled in World History"`;
+
+exports[`renderNotification — snapshot tests en ENROLLMENT_APPROVED / push renders correctly 1`] = `"Enrolled in World History"`;
+
+exports[`renderNotification — snapshot tests en ENROLLMENT_APPROVED / email renders correctly 1`] = `"Your enrollment in World History has been approved."`;
+
+exports[`renderNotification — snapshot tests en COURSE_PUBLISHED / in_app renders correctly 1`] = `"Introduction to Python is now available"`;
+
+exports[`renderNotification — snapshot tests en COURSE_PUBLISHED / push renders correctly 1`] = `"New course: Introduction to Python"`;
+
+exports[`renderNotification — snapshot tests en COURSE_PUBLISHED / email renders correctly 1`] = `"A new course is now available: Introduction to Python."`;
+
+exports[`renderNotification — snapshot tests en DISCUSSION_REPLY / in_app renders correctly 1`] = `"New reply from Jane Smith in Week 4: Shakespeare"`;
+
+exports[`renderNotification — snapshot tests en DISCUSSION_REPLY / push renders correctly 1`] = `"Jane Smith replied to Week 4: Shakespeare"`;
+
+exports[`renderNotification — snapshot tests en DISCUSSION_REPLY / email renders correctly 1`] = `"Jane Smith has replied to "Week 4: Shakespeare" in English Literature."`;
+
+exports[`renderNotification — snapshot tests en STUDY_GROUP_INVITE / in_app renders correctly 1`] = `"John Doe invited you to Calculus Study Group"`;
+
+exports[`renderNotification — snapshot tests en STUDY_GROUP_INVITE / push renders correctly 1`] = `"Study group invite: Calculus Study Group"`;
+
+exports[`renderNotification — snapshot tests en STUDY_GROUP_INVITE / email renders correctly 1`] = `"John Doe has invited you to join the study group "Calculus Study Group"."`;
+
+exports[`renderNotification — snapshot tests en CERTIFICATE_ISSUED / in_app renders correctly 1`] = `"Certificate issued for Data Structures"`;
+
+exports[`renderNotification — snapshot tests en CERTIFICATE_ISSUED / push renders correctly 1`] = `"Certificate: Data Structures"`;
+
+exports[`renderNotification — snapshot tests en CERTIFICATE_ISSUED / email renders correctly 1`] = `"Your certificate for Data Structures is now available."`;
+
+exports[`renderNotification — snapshot tests en SUPPORT_MESSAGE / in_app renders correctly 1`] = `"Issue with login"`;
+
+exports[`renderNotification — snapshot tests en SUPPORT_MESSAGE / push renders correctly 1`] = `"New message: Issue with login"`;
+
+exports[`renderNotification — snapshot tests en SUPPORT_MESSAGE / email renders correctly 1`] = `"You have a new support message regarding: Issue with login."`;
+
+exports[`renderNotification — snapshot tests en ATTENDANCE_ALERT / in_app renders correctly 1`] = `"Attendance alert for Physics on 2026-07-28"`;
+
+exports[`renderNotification — snapshot tests en ATTENDANCE_ALERT / push renders correctly 1`] = `"Alert: Physics — 2026-07-28"`;
+
+exports[`renderNotification — snapshot tests en ATTENDANCE_ALERT / email renders correctly 1`] = `"This is an attendance alert for Physics. Absences were recorded on 2026-07-28."`;
+
+exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / in_app renders correctly 1`] = `"موعد تسليم Homework 5 هو 2026-08-15"`;
+
+exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / push renders correctly 1`] = `"Algebra II — Homework 5 مستحق في 2026-08-15"`;
+
+exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / email renders correctly 1`] = `"الواجب Homework 5 في مادة Algebra II مستحق في 2026-08-15. يرجى التسليم قبل الموعد النهائي."`;
+
+exports[`renderNotification — snapshot tests ar GRADE_POSTED / in_app renders correctly 1`] = `"تم نشر درجة Lab Report 3: A-"`;
+
+exports[`renderNotification — snapshot tests ar GRADE_POSTED / push renders correctly 1`] = `"الدرجة: A- في Lab Report 3"`;
+
+exports[`renderNotification — snapshot tests ar GRADE_POSTED / email renders correctly 1`] = `"تم نشر درجتك في Lab Report 3 لمادة Biology 101: A-."`;
+
+exports[`renderNotification — snapshot tests ar ENROLLMENT_APPROVED / in_app renders correctly 1`] = `"تم تسجيلك في World History"`;
+
+exports[`renderNotification — snapshot tests ar ENROLLMENT_APPROVED / push renders correctly 1`] = `"مسجل في World History"`;
+
+exports[`renderNotification — snapshot tests ar ENROLLMENT_APPROVED / email renders correctly 1`] = `"تمت الموافقة على تسجيلك في World History."`;
+
+exports[`renderNotification — snapshot tests ar COURSE_PUBLISHED / in_app renders correctly 1`] = `"مادة Introduction to Python متاحة الآن"`;
+
+exports[`renderNotification — snapshot tests ar COURSE_PUBLISHED / push renders correctly 1`] = `"مادة جديدة: Introduction to Python"`;
+
+exports[`renderNotification — snapshot tests ar COURSE_PUBLISHED / email renders correctly 1`] = `"مادة جديدة متاحة الآن: Introduction to Python."`;
+
+exports[`renderNotification — snapshot tests ar DISCUSSION_REPLY / in_app renders correctly 1`] = `"رد جديد من Jane Smith في Week 4: Shakespeare"`;
+
+exports[`renderNotification — snapshot tests ar DISCUSSION_REPLY / push renders correctly 1`] = `"Jane Smith رد على Week 4: Shakespeare"`;
+
+exports[`renderNotification — snapshot tests ar DISCUSSION_REPLY / email renders correctly 1`] = `"قام Jane Smith بالرد على "Week 4: Shakespeare" في مادة English Literature."`;
+
+exports[`renderNotification — snapshot tests ar STUDY_GROUP_INVITE / in_app renders correctly 1`] = `"John Doe يدعوك للانضمام إلى Calculus Study Group"`;
+
+exports[`renderNotification — snapshot tests ar STUDY_GROUP_INVITE / push renders correctly 1`] = `"دعوة مجموعة دراسة: Calculus Study Group"`;
+
+exports[`renderNotification — snapshot tests ar STUDY_GROUP_INVITE / email renders correctly 1`] = `"قام John Doe بدعوتك للانضمام إلى مجموعة الدراسة "Calculus Study Group"."`;
+
+exports[`renderNotification — snapshot tests ar CERTIFICATE_ISSUED / in_app renders correctly 1`] = `"تم إصدار شهادة لـ Data Structures"`;
+
+exports[`renderNotification — snapshot tests ar CERTIFICATE_ISSUED / push renders correctly 1`] = `"شهادة: Data Structures"`;
+
+exports[`renderNotification — snapshot tests ar CERTIFICATE_ISSUED / email renders correctly 1`] = `"شهادتك لمادة Data Structures متاحة الآن."`;
+
+exports[`renderNotification — snapshot tests ar SUPPORT_MESSAGE / in_app renders correctly 1`] = `"Issue with login"`;
+
+exports[`renderNotification — snapshot tests ar SUPPORT_MESSAGE / push renders correctly 1`] = `"رسالة جديدة: Issue with login"`;
+
+exports[`renderNotification — snapshot tests ar SUPPORT_MESSAGE / email renders correctly 1`] = `"لديك رسالة دعم جديدة بخصوص: Issue with login."`;
+
+exports[`renderNotification — snapshot tests ar ATTENDANCE_ALERT / in_app renders correctly 1`] = `"تنبيه حضور لـ Physics في 2026-07-28"`;
+
+exports[`renderNotification — snapshot tests ar ATTENDANCE_ALERT / push renders correctly 1`] = `"تنبيه: Physics — 2026-07-28"`;
+
+exports[`renderNotification — snapshot tests ar ATTENDANCE_ALERT / email renders correctly 1`] = `"هذا تنبيه حضور لمادة Physics. تم تسجيل غيابات في 2026-07-28."`;

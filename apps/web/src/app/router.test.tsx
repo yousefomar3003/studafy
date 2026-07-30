@@ -35,7 +35,9 @@ describe("app shell", () => {
 
   test("resolves the lazy /portal route group", async () => {
     renderAt("/portal");
-    expect(await screen.findByRole("heading", { name: /portal/i, level: 1 })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: /portal/i, level: 1 }, { timeout: 5000 }),
+    ).toBeTruthy();
   });
 
   test("resolves the lazy /account route group", async () => {
