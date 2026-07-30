@@ -261,7 +261,7 @@ deserves.
 ## Schema notes
 
 `app.payment_cache` was created by migration `000015` and, until ST-121, only ever received rows
-_from_ ERPNext. Migration `000066` gives it a lifecycle rather than creating a second table —
+_from_ ERPNext. Migration `000069` gives it a lifecycle rather than creating a second table —
 `000015`'s own header forbids a duplicate read-model of the same document.
 
 Added: `erpnext_invoice_id`, `payment_mode`, `status`, `receipt_url`, `idempotency_key`,
