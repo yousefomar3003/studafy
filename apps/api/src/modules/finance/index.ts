@@ -2,6 +2,8 @@ export { feeStructureRoutes } from "./fee-structures/routes";
 export { expenseRoutes } from "./expenses/routes";
 export { paymentRoutes } from "./payments/routes";
 export { paymentWebhookRoutes } from "./webhooks/payment-confirmed";
+export { refundRoutes } from "./refunds/routes";
+export { refundWebhookRoutes } from "./webhooks/refund-processed";
 export { scholarshipDiscountRoutes } from "./scholarships/routes";
 export { installmentRoutes } from "./installments/routes";
 export { reconciliationRoutes } from "./jobs/reconciliation.routes";

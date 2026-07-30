@@ -143,5 +143,10 @@
   "STRIPE_PRICE_SYNC_FAILED": "فشل مزامنة الخطط والأسعار مع Stripe",
   "STRIPE_LIVE_KEY_IN_DEV": "لا يمكن استخدام مفتاح Stripe الحي في بيئة التطوير",
   "SUBSCRIPTION_NOT_FOUND": "لم يتم العثور على اشتراك نشط لهذه المدرسة",
-  "SUBSCRIPTION_CHECKOUT_FAILED": "فشل إنشاء جلسة الدفع"
+  "SUBSCRIPTION_CHECKOUT_FAILED": "فشل إنشاء جلسة الدفع",
+  "REFUND_NOT_FOUND": "لم يتم العثور على طلب استرداد",
+  "REFUND_INVALID_STATUS": "حالة طلب الاسترداد غير مناسبة لهذه العملية",
+  "REFUND_CONFIRM_SELF": "لا يمكن الموافقة على طلب الاسترداد أو رفضه من قبل المستخدم الذي قام بإنشائه",
+  "REFUND_IN_PROGRESS": "طلب الاسترداد قيد المعالجة بالفعل",
+  "REFUND_IDEMPOTENCY_KEY_REQUIRED": "مطلوب رأس Idempotency-Key لبدء طلب استرداد"
 }
