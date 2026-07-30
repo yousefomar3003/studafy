@@ -17,6 +17,12 @@
 
 SET ROLE studafy_admin;
 
+-- Ensure fee_structure_cache has a composite unique key (id, school_id) so
+-- installment_cache's tenant-scoped foreign key can reference it at the same
+-- school_id position on both sides (RLS coverage TENANT_COMPOSITE_FOREIGN_KEY).
+ALTER TABLE app.fee_structure_cache
+  ADD CONSTRAINT uq_fee_structure_cache_id_school UNIQUE (id, school_id);
+
 -- ---------------------------------------------------------------------------
 -- 1. installment_cache - per-installment read-model projection
 -- ---------------------------------------------------------------------------
@@ -51,7 +57,7 @@ CREATE TABLE app.installment_cache (
     ON UPDATE RESTRICT ON DELETE RESTRICT,
 
   CONSTRAINT fk_installment_cache_fee_structure
-    FOREIGN KEY (fee_structure_id) REFERENCES app.fee_structure_cache (id)
+    FOREIGN KEY (fee_structure_id, school_id) REFERENCES app.fee_structure_cache (id, school_id)
     ON UPDATE RESTRICT ON DELETE SET NULL,
 
   CONSTRAINT fk_installment_cache_currency
