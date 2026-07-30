@@ -227,6 +227,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
   // Approval queue (ST-115). Unified pending-approvals feed + bulk approve/reject decisions.
   "POST /api/approvals/bulk-decision",
+  // Scholarship/discount awards (ST-119 extension). Maker-checker workflow for applying
+  // scholarships/discounts to students. Audit rows written by auditAction middleware.
+  "POST /api/finance/scholarship-discounts/awards",
+  "POST /api/finance/scholarship-discounts/awards/{awardId}/confirm",
 ];
 
 function collectSourceFiles(dir: string): string[] {
