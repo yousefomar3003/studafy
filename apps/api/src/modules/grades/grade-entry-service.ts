@@ -9,6 +9,7 @@ import {
   getGradebookByClassId,
   getGradebookById,
 } from "./config/gradebook-config-service";
+import { refreshStudentTermSummary } from "./published/service";
 
 import type { UpdateGradeEntry } from "./config/schemas";
 import type { TransactionSql } from "postgres";
@@ -296,19 +297,27 @@ export async function bulkUpdateGrades(
 
   // Verify all grades belong to this gradebook (through their submission).
   const submissionIds = [...new Set(existingGrades.map((g) => g.grade_submission_id))];
-  const [submissionsExist] = await tx<{ count: string }[]>`
-    SELECT COUNT(*)::text AS count
+  const owningSubmissions = await tx<{ id: string; status: string }[]>`
+    SELECT id, status
     FROM app.grade_submissions
     WHERE school_id = ${schoolId}::uuid
       AND gradebook_id = ${gradebookId}::uuid
       AND id = ANY (${submissionIds}::uuid[])
   `;
 
-  if (Number(submissionsExist?.count ?? 0) !== submissionIds.length) {
+  if (owningSubmissions.length !== submissionIds.length) {
     throw new CodedHttpException(
       403,
       ERROR_CODES.AUTHZ_FORBIDDEN,
       "One or more grade records do not belong to this gradebook",
+    );
+  }
+
+  if (owningSubmissions.some((submission) => submission.status !== "draft")) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.CONFLICT_STATE_MISMATCH,
+      "Grades can only be edited while their submission is in draft status",
     );
   }
 
@@ -336,7 +345,8 @@ export async function bulkUpdateGrades(
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${entry.id}::uuid
         AND school_id = ${schoolId}::uuid
-        AND updated_at = ${entry.updated_at}::timestamptz
+        AND date_trunc('milliseconds', updated_at)
+          = date_trunc('milliseconds', ${entry.updated_at}::timestamptz)
       RETURNING id, school_id, grade_submission_id,
                 score, max_score, weight, label,
                 created_at, updated_at
@@ -504,7 +514,8 @@ export async function submitSubmission(
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ${submissionId}::uuid
       AND school_id = ${schoolId}::uuid
-      AND updated_at = ${updatedAt}::timestamptz
+      AND date_trunc('milliseconds', updated_at)
+        = date_trunc('milliseconds', ${updatedAt}::timestamptz)
     RETURNING id, school_id, gradebook_id, student_id,
               submitted_by_user_id, decided_by_user_id,
               rejection_reason,
@@ -579,7 +590,8 @@ export async function decideSubmission(
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${submissionId}::uuid
         AND school_id = ${schoolId}::uuid
-        AND updated_at = ${updatedAt}::timestamptz
+        AND date_trunc('milliseconds', updated_at)
+          = date_trunc('milliseconds', ${updatedAt}::timestamptz)
       RETURNING id, school_id, gradebook_id, student_id,
                 submitted_by_user_id, decided_by_user_id,
                 rejection_reason,
@@ -611,7 +623,8 @@ export async function decideSubmission(
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ${submissionId}::uuid
       AND school_id = ${schoolId}::uuid
-      AND updated_at = ${updatedAt}::timestamptz
+      AND date_trunc('milliseconds', updated_at)
+        = date_trunc('milliseconds', ${updatedAt}::timestamptz)
     RETURNING id, school_id, gradebook_id, student_id,
               submitted_by_user_id, decided_by_user_id,
               rejection_reason,
@@ -654,6 +667,8 @@ export async function decideSubmission(
     newValues: { status: "published" },
   });
 
+  await refreshStudentTermSummary(tx, schoolId, published.student_id, published.gradebook_id);
+
   await emit(tx, DOMAIN_EVENTS.GRADES_PUBLISHED, {
     submissionId,
     gradebookId: published.gradebook_id,
@@ -692,7 +707,8 @@ export async function unlockSubmission(
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ${submissionId}::uuid
       AND school_id = ${schoolId}::uuid
-      AND updated_at = ${updatedAt}::timestamptz
+      AND date_trunc('milliseconds', updated_at)
+        = date_trunc('milliseconds', ${updatedAt}::timestamptz)
     RETURNING id, school_id, gradebook_id, student_id,
               submitted_by_user_id, decided_by_user_id,
               rejection_reason,
@@ -738,7 +754,8 @@ export async function updateSubmissionStatus(
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ${submissionId}::uuid
       AND school_id = ${schoolId}::uuid
-      AND updated_at = ${updatedAt}::timestamptz
+      AND date_trunc('milliseconds', updated_at)
+        = date_trunc('milliseconds', ${updatedAt}::timestamptz)
     RETURNING id, school_id, gradebook_id, student_id,
               submitted_by_user_id, decided_by_user_id,
               rejection_reason,

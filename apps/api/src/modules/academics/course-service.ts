@@ -1,4 +1,7 @@
+import { ERROR_CODES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
+
+import { CodedHttpException } from "../../coded-http-exception";
 
 import type { TransactionSql } from "postgres";
 
@@ -15,6 +18,7 @@ export interface CourseRow {
   code: string;
   name: string;
   description: string | null;
+  credit_hours: number;
   status: CatalogStatus;
   created_at: Date;
   updated_at: Date;
@@ -31,6 +35,7 @@ export interface CreateCourseParams {
   code: string;
   name: string;
   description?: string | null;
+  credit_hours?: number;
   status?: string;
 }
 
@@ -38,6 +43,7 @@ export interface UpdateCourseParams {
   code?: string;
   name?: string;
   description?: string | null;
+  credit_hours?: number;
   status?: string;
 }
 
@@ -59,6 +65,7 @@ export async function listCourses(
   const [rows, countResult] = await Promise.all([
     tx<CourseRow[]>`
       SELECT c.id, c.school_id, c.subject_id, c.code, c.name, c.description,
+             c.credit_hours::float8 AS credit_hours,
              c.status, c.created_at, c.updated_at
       FROM app.courses AS c
       WHERE c.school_id = ${schoolId}
@@ -86,7 +93,8 @@ export async function getCourse(
   courseId: string,
 ): Promise<CourseRow | undefined> {
   const [row] = await tx<CourseRow[]>`
-    SELECT id, school_id, subject_id, code, name, description, status,
+    SELECT id, school_id, subject_id, code, name, description,
+           credit_hours::float8 AS credit_hours, status,
            created_at, updated_at
     FROM app.courses
     WHERE id = ${courseId} AND school_id = ${schoolId}
@@ -109,16 +117,19 @@ export async function createCourse(
   }
 
   const [row] = await tx<CourseRow[]>`
-    INSERT INTO app.courses (school_id, subject_id, code, name, description, status)
+    INSERT INTO app.courses
+      (school_id, subject_id, code, name, description, credit_hours, status)
     VALUES (
       ${schoolId},
       ${params.subject_id},
       ${params.code},
       ${params.name},
       ${params.description ?? null},
+      ${params.credit_hours ?? 1},
       ${params.status ?? "draft"}::app.catalog_status
     )
-    RETURNING id, school_id, subject_id, code, name, description, status,
+    RETURNING id, school_id, subject_id, code, name, description,
+              credit_hours::float8 AS credit_hours, status,
               created_at, updated_at
   `;
 
@@ -136,15 +147,44 @@ export async function updateCourse(
     throw new HTTPException(404, { message: "Course not found" });
   }
 
+  if (params.credit_hours !== undefined && existing.credit_hours !== params.credit_hours) {
+    const [published] = await tx<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM app.classes AS c
+        JOIN app.gradebooks AS gb
+          ON gb.class_id = c.id AND gb.school_id = c.school_id
+        JOIN app.grade_submissions AS gs
+          ON gs.gradebook_id = gb.id AND gs.school_id = gb.school_id
+        WHERE c.school_id = ${schoolId}
+          AND c.course_id = ${courseId}
+          AND gs.status = 'published'
+      ) AS exists
+    `;
+
+    if (published?.exists) {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.CONFLICT_STATE_MISMATCH,
+        "Course credit hours cannot change after grades have been published",
+      );
+    }
+  }
+
   const [row] = await tx<CourseRow[]>`
     UPDATE app.courses
     SET code = COALESCE(${params.code ?? null}, code),
         name = COALESCE(${params.name ?? null}, name),
         description = COALESCE(${params.description ?? null}, description),
+        credit_hours = COALESCE(
+          ${params.credit_hours !== undefined ? String(params.credit_hours) : null}::numeric(6,2),
+          credit_hours
+        ),
         status = COALESCE(${params.status ?? null}::app.catalog_status, status),
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${courseId} AND school_id = ${schoolId}
-    RETURNING id, school_id, subject_id, code, name, description, status,
+    RETURNING id, school_id, subject_id, code, name, description,
+              credit_hours::float8 AS credit_hours, status,
               created_at, updated_at
   `;
 

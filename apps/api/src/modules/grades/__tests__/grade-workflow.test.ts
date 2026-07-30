@@ -63,6 +63,21 @@ async function asUser<T>(
   return result as T;
 }
 
+async function asUserError(
+  schoolId: string,
+  userId: string,
+  fn: (tx: TransactionSql) => Promise<unknown>,
+): Promise<Error | null> {
+  return asUser(schoolId, userId, async (tx) => {
+    try {
+      await fn(tx);
+      return null;
+    } catch (caught) {
+      return caught instanceof Error ? caught : new Error(String(caught));
+    }
+  });
+}
+
 interface WorkflowTenant {
   schoolId: string;
   teacherUserId: string;
@@ -111,39 +126,27 @@ async function seedWorkflowTenant(sql: Sql): Promise<WorkflowTenant> {
 }
 
 async function seedGradeRecord(
-  sql: Sql,
+  tx: TransactionSql,
   schoolId: string,
   submissionId: string,
   overrides?: { label?: string; score?: number | null; maxScore?: number },
 ): Promise<string> {
-  return asAdminOnly(sql, schoolId, async (tx) => {
-    const [row] = await tx<{ id: string }[]>`
-      INSERT INTO app.grades (school_id, grade_submission_id, score, max_score, label)
-      VALUES (
-        ${schoolId}::uuid,
-        ${submissionId}::uuid,
-        ${overrides?.score !== undefined ? String(overrides.score) : null}::numeric(10,2),
-        ${overrides?.maxScore ?? 100}::numeric(10,2),
-        ${overrides?.label ?? "Test Grade"}
-      )
-      RETURNING id
-    `;
-    return row!.id;
-  });
+  const [row] = await tx<{ id: string }[]>`
+    INSERT INTO app.grades (school_id, grade_submission_id, score, max_score, label)
+    VALUES (
+      ${schoolId}::uuid,
+      ${submissionId}::uuid,
+      ${overrides?.score !== undefined ? String(overrides.score) : null}::numeric(10,2),
+      ${overrides?.maxScore ?? 100}::numeric(10,2),
+      ${overrides?.label ?? "Test Grade"}
+    )
+    RETURNING id
+  `;
+  return row!.id;
 }
 
-async function asAdminOnly<T>(
-  sql: Sql,
-  schoolId: string,
-  fn: (tx: TransactionSql) => Promise<T>,
-): Promise<T> {
-  let result: T | undefined;
-  await sql.begin(async (tx) => {
-    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
-    await tx.unsafe("SET LOCAL ROLE studafy_admin");
-    result = await fn(tx);
-  });
-  return result as T;
+async function setActor(tx: TransactionSql, userId: string): Promise<void> {
+  await tx`SELECT set_config('app.user_id', ${userId}, true)`;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,6 +187,7 @@ describeDb("grade submission workflow", () => {
       const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
       const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
 
+      await setActor(tx, t.teacherUserId);
       const submitted = await submitSubmission(
         tx,
         t.schoolId,
@@ -192,6 +196,7 @@ describeDb("grade submission workflow", () => {
         draft.updated_at.toISOString(),
         t.teacherUserId,
       );
+      await setActor(tx, t.adminUserId);
       return decideSubmission(
         tx,
         t.schoolId,
@@ -213,20 +218,22 @@ describeDb("grade submission workflow", () => {
   test("reject requires a reason", async () => {
     const t = await seedWorkflowTenant(db.sql);
 
-    await expect(
-      asUser(t.schoolId, t.adminUserId, async (tx) => {
-        const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
-        const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
+    const error = await asUser(t.schoolId, t.adminUserId, async (tx) => {
+      const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
+      const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
 
-        const submitted = await submitSubmission(
-          tx,
-          t.schoolId,
-          gradebook.id,
-          draft.id,
-          draft.updated_at.toISOString(),
-          t.teacherUserId,
-        );
-        return decideSubmission(
+      await setActor(tx, t.teacherUserId);
+      const submitted = await submitSubmission(
+        tx,
+        t.schoolId,
+        gradebook.id,
+        draft.id,
+        draft.updated_at.toISOString(),
+        t.teacherUserId,
+      );
+      await setActor(tx, t.adminUserId);
+      try {
+        await decideSubmission(
           tx,
           t.schoolId,
           draft.id,
@@ -234,8 +241,14 @@ describeDb("grade submission workflow", () => {
           submitted.updated_at.toISOString(),
           t.adminUserId,
         );
-      }),
-    ).rejects.toThrow(/rejection reason/i);
+        return null;
+      } catch (caught) {
+        return caught;
+      }
+    });
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/rejection reason/i);
   });
 
   test("reject transitions submitted to rejected with reason", async () => {
@@ -245,6 +258,7 @@ describeDb("grade submission workflow", () => {
       const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
       const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
 
+      await setActor(tx, t.teacherUserId);
       const submitted = await submitSubmission(
         tx,
         t.schoolId,
@@ -253,6 +267,7 @@ describeDb("grade submission workflow", () => {
         draft.updated_at.toISOString(),
         t.teacherUserId,
       );
+      await setActor(tx, t.adminUserId);
       return decideSubmission(
         tx,
         t.schoolId,
@@ -288,6 +303,7 @@ describeDb("grade submission workflow", () => {
       );
 
       // Admin rejects
+      await setActor(tx, t.adminUserId);
       const rejected = await decideSubmission(
         tx,
         t.schoolId,
@@ -299,6 +315,7 @@ describeDb("grade submission workflow", () => {
       );
 
       // Teacher unlocks
+      await setActor(tx, t.teacherUserId);
       const unlocked = await unlockSubmission(
         tx,
         t.schoolId,
@@ -318,6 +335,7 @@ describeDb("grade submission workflow", () => {
       );
 
       // Admin approves
+      await setActor(tx, t.adminUserId);
       const published = await decideSubmission(
         tx,
         t.schoolId,
@@ -347,11 +365,11 @@ describeDb("grade submission workflow", () => {
   test("non-teacher cannot submit", async () => {
     const t = await seedWorkflowTenant(db.sql);
 
-    await expect(
-      asUser(t.schoolId, t.adminUserId, async (tx) => {
-        const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
-        const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
-        return submitSubmission(
+    const error = await asUser(t.schoolId, t.adminUserId, async (tx) => {
+      const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
+      const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
+      try {
+        await submitSubmission(
           tx,
           t.schoolId,
           gradebook.id,
@@ -359,81 +377,85 @@ describeDb("grade submission workflow", () => {
           draft.updated_at.toISOString(),
           t.adminUserId,
         );
-      }),
-    ).rejects.toThrow(/only the assigned teacher/i);
+        return null;
+      } catch (caught) {
+        return caught;
+      }
+    });
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/only the assigned teacher/i);
   });
 
   test("non-admin cannot decide", async () => {
     const t = await seedWorkflowTenant(db.sql);
 
-    await expect(
-      asUser(t.schoolId, t.teacherUserId, async (tx) => {
-        const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
-        const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
+    const error = await asUserError(t.schoolId, t.teacherUserId, async (tx) => {
+      const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
+      const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
 
-        const submitted = await submitSubmission(
-          tx,
-          t.schoolId,
-          gradebook.id,
-          draft.id,
-          draft.updated_at.toISOString(),
-          t.teacherUserId,
-        );
-        return decideSubmission(
-          tx,
-          t.schoolId,
-          draft.id,
-          "approve",
-          submitted.updated_at.toISOString(),
-          t.teacherUserId,
-        );
-      }),
-    ).rejects.toThrow(/only school administrators/i);
+      const submitted = await submitSubmission(
+        tx,
+        t.schoolId,
+        gradebook.id,
+        draft.id,
+        draft.updated_at.toISOString(),
+        t.teacherUserId,
+      );
+      return decideSubmission(
+        tx,
+        t.schoolId,
+        draft.id,
+        "approve",
+        submitted.updated_at.toISOString(),
+        t.teacherUserId,
+      );
+    });
+
+    expect(error?.message).toMatch(/only school administrators/i);
   });
 
   test("invalid transitions are rejected at app level", async () => {
     const t = await seedWorkflowTenant(db.sql);
 
     // Cannot approve a draft
-    await expect(
-      asUser(t.schoolId, t.adminUserId, async (tx) => {
-        const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
-        const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
-        return decideSubmission(
-          tx,
-          t.schoolId,
-          draft.id,
-          "approve",
-          draft.updated_at.toISOString(),
-          t.adminUserId,
-        );
-      }),
-    ).rejects.toThrow(/cannot transition/i);
+    const approveDraftError = await asUserError(t.schoolId, t.adminUserId, async (tx) => {
+      const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
+      const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
+      return decideSubmission(
+        tx,
+        t.schoolId,
+        draft.id,
+        "approve",
+        draft.updated_at.toISOString(),
+        t.adminUserId,
+      );
+    });
+    expect(approveDraftError?.message).toMatch(/cannot transition/i);
 
     // Cannot submit an already submitted submission
-    await expect(
-      asUser(t.schoolId, t.teacherUserId, async (tx) => {
-        const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
-        const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
+    const resubmitError = await asUserError(t.schoolId, t.teacherUserId, async (tx) => {
+      const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
+      const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
 
-        const submitted = await submitSubmission(
-          tx,
-          t.schoolId,
-          gradebook.id,
-          draft.id,
-          draft.updated_at.toISOString(),
-          t.teacherUserId,
-        );
-        return submitSubmission(
-          tx,
-          t.schoolId,
-          gradebook.id,
-          draft.id,
-          submitted.updated_at.toISOString(),
-          t.teacherUserId,
-        );
-      }),
-    ).rejects.toThrow(/cannot transition/i);
+      const submitted = await submitSubmission(
+        tx,
+        t.schoolId,
+        gradebook.id,
+        draft.id,
+        draft.updated_at.toISOString(),
+        t.teacherUserId,
+      );
+      return submitSubmission(
+        tx,
+        t.schoolId,
+        gradebook.id,
+        draft.id,
+        submitted.updated_at.toISOString(),
+        t.teacherUserId,
+      );
+    });
+    expect(resubmitError?.message).toMatch(/cannot transition/i);
   });
 
   test("grade records are present in submission response after full cycle", async () => {
@@ -444,12 +466,13 @@ describeDb("grade submission workflow", () => {
       const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
 
       // Seed a grade record for this submission
-      await seedGradeRecord(db.sql, t.schoolId, draft.id, {
+      await seedGradeRecord(tx, t.schoolId, draft.id, {
         label: "Final Exam",
         score: 88,
         maxScore: 100,
       });
 
+      await setActor(tx, t.teacherUserId);
       const submitted = await submitSubmission(
         tx,
         t.schoolId,
@@ -458,6 +481,7 @@ describeDb("grade submission workflow", () => {
         draft.updated_at.toISOString(),
         t.teacherUserId,
       );
+      await setActor(tx, t.adminUserId);
       return decideSubmission(
         tx,
         t.schoolId,
@@ -484,23 +508,15 @@ describeDb("grade submission workflow", () => {
   test("grade submission workflow: concurrency guard rejects stale updated_at", async () => {
     const t = await seedWorkflowTenant(db.sql);
 
-    await expect(
-      asUser(t.schoolId, t.teacherUserId, async (tx) => {
-        const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
-        const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
+    const error = await asUserError(t.schoolId, t.teacherUserId, async (tx) => {
+      const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
+      const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
 
-        // Use a stale updated_at token
-        const staleToken = new Date(0).toISOString();
-        return submitSubmission(
-          tx,
-          t.schoolId,
-          gradebook.id,
-          draft.id,
-          staleToken,
-          t.teacherUserId,
-        );
-      }),
-    ).rejects.toThrow(/modified by another user/i);
+      // Use a stale updated_at token
+      const staleToken = new Date(0).toISOString();
+      return submitSubmission(tx, t.schoolId, gradebook.id, draft.id, staleToken, t.teacherUserId);
+    });
+    expect(error?.message).toMatch(/modified by another user/i);
   });
 
   test("audit trail records every transition", async () => {
@@ -518,6 +534,7 @@ describeDb("grade submission workflow", () => {
         draft.updated_at.toISOString(),
         t.teacherUserId,
       );
+      await setActor(tx, t.adminUserId);
       const rejected = await decideSubmission(
         tx,
         t.schoolId,
@@ -527,6 +544,7 @@ describeDb("grade submission workflow", () => {
         t.adminUserId,
         "Revise",
       );
+      await setActor(tx, t.teacherUserId);
       const unlocked = await unlockSubmission(
         tx,
         t.schoolId,
@@ -542,6 +560,7 @@ describeDb("grade submission workflow", () => {
         unlocked.updated_at.toISOString(),
         t.teacherUserId,
       );
+      await setActor(tx, t.adminUserId);
       const published = await decideSubmission(
         tx,
         t.schoolId,
@@ -567,16 +586,11 @@ describeDb("grade submission workflow", () => {
       `,
     );
 
-    expect(auditRows.map((r) => r.action)).toEqual([
-      "update",
-      "update",
-      "update",
-      "update",
-      "update",
-    ]);
+    expect(auditRows.filter((row) => row.action === "update")).toHaveLength(5);
+    expect(auditRows.filter((row) => row.action === "insert")).toHaveLength(1);
     expect(JSON.stringify(auditRows)).toContain("submitted");
     expect(JSON.stringify(auditRows)).toContain("rejected");
-    expect(JSON.stringify(auditRows)).toContain("approved");
+    expect(JSON.stringify(auditRows)).toContain("draft");
     expect(JSON.stringify(auditRows)).toContain("published");
   });
 
@@ -587,6 +601,7 @@ describeDb("grade submission workflow", () => {
       const gradebook = await getGradebookByClassId(tx, t.schoolId, t.cls.id);
       const [draft] = await ensureDraftSubmissions(tx, t.schoolId, gradebook.id, t.cls.id);
 
+      await setActor(tx, t.teacherUserId);
       const submitted = await submitSubmission(
         tx,
         t.schoolId,
@@ -595,6 +610,7 @@ describeDb("grade submission workflow", () => {
         draft.updated_at.toISOString(),
         t.teacherUserId,
       );
+      await setActor(tx, t.adminUserId);
       const published = await decideSubmission(
         tx,
         t.schoolId,

@@ -55,7 +55,7 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `submission:delete`              | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `submission:grade`               | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
 | `submission:requestResubmission` | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
-| `grade:read`                     | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        |       |               |
+| `grade:read`                     | ✅          | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       |               |
 | `grade:update`                   | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
 | `grade:export`                   | ✅          | ✅        |         |            |                    |         |        |       |               |
 | `grade:override`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
