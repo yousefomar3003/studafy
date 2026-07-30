@@ -19,8 +19,8 @@
 --     paid amount. The gateway forwards the request and returns ERPNext's refusal unchanged.
 --   * It does not backfill any existing data — there are no refund requests before this feature.
 --
--- Depends on 000004 (app.schools), 000005 (app.currencies), 000015 (app.payment_cache),
--- 000015 (app.finance_entity_type, app.erpnext_webhook_dedup).
+-- Depends on 000004 (app.schools), 000005 (app.currencies), 000008 (app.students),
+-- 000015 (app.payment_cache, app.finance_entity_type, app.erpnext_webhook_dedup).
 -- EBR count: 3 (refund_requests, refund_idempotency_logs, refund entity type)
 
 SELECT set_config('app.school_id', '00000000-0000-0000-0000-000000000000', true);
@@ -30,6 +30,19 @@ SET ROLE studafy_admin;
 -- 1. Extend the entity type enum for crosswalk / idempotency
 -- ---------------------------------------------------------------------------
 ALTER TYPE app.finance_entity_type ADD VALUE IF NOT EXISTS 'refund';
+
+-- ---------------------------------------------------------------------------
+-- 1b. Ensure parent tables have composite (id, school_id) unique constraints
+--     so refund_requests' tenant-scoped FKs can reference them (RLS coverage
+--     TENANT_COMPOSITE_FOREIGN_KEY).
+-- ---------------------------------------------------------------------------
+
+-- app.payment_cache has PK (id) only — add the composite unique.
+ALTER TABLE app.payment_cache
+  ADD CONSTRAINT uq_payment_cache_id_school
+    UNIQUE (id, school_id);
+
+-- app.students already has uq_students_id_school from 000008, no action needed.
 
 -- ---------------------------------------------------------------------------
 -- 2. app.refund_requests — maker-checker workflow table
@@ -61,11 +74,11 @@ CREATE TABLE app.refund_requests (
     ON UPDATE RESTRICT ON DELETE RESTRICT,
 
   CONSTRAINT fk_refund_requests_payment_entry
-    FOREIGN KEY (payment_entry_id) REFERENCES app.payment_cache (id)
+    FOREIGN KEY (payment_entry_id, school_id) REFERENCES app.payment_cache (id, school_id)
     ON UPDATE RESTRICT ON DELETE SET NULL,
 
   CONSTRAINT fk_refund_requests_student
-    FOREIGN KEY (student_id) REFERENCES app.students (id)
+    FOREIGN KEY (student_id, school_id) REFERENCES app.students (id, school_id)
     ON UPDATE RESTRICT ON DELETE RESTRICT,
 
   CONSTRAINT fk_refund_requests_currency
