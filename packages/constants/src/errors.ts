@@ -119,6 +119,12 @@ export const ERROR_CODES = {
   // Finance gateway — fee structures (ST-119).
   FEE_STRUCTURE_NOT_FOUND: "FEE_STRUCTURE_NOT_FOUND",
 
+  // Finance gateway — fee schedules / installments (ST-122).
+  FEE_SCHEDULE_NOT_FOUND: "FEE_SCHEDULE_NOT_FOUND",
+
+  // Finance reconciliation — cache drift that could not be auto-healed (ST-122).
+  RECONCILIATION_DIVERGENCE: "RECONCILIATION_DIVERGENCE",
+
   // Invoice generation — billing worker.
   INVOICE_ALREADY_EXISTS: "INVOICE_ALREADY_EXISTS",
   INVOICE_GENERATION_FAILED: "INVOICE_GENERATION_FAILED",
