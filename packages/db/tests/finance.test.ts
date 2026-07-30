@@ -18,6 +18,9 @@ const FINANCE_TABLES = [
   "finance_sync_outbox",
   "fee_structure_cache",
   "expense_cache",
+  // ST-121. Adding the name here is enough: the policy-count assertion below derives from
+  // FINANCE_TABLES.length, and the tenant-isolation and cross-tenant-leakage loops iterate it.
+  "payment_idempotency_logs",
 ] as const;
 
 type Database = Awaited<ReturnType<typeof testDatabase>>;
@@ -350,6 +353,155 @@ integrationTest(
 
       // FORCE applies to the table owner too; missing owner context cannot read rows.
       await expectDenied(database, "SELECT * FROM app.payment_cache", undefined, "studafy_admin");
+    } finally {
+      await database.cleanup();
+    }
+  },
+  30_000,
+);
+
+integrationTest(
+  "installs ST-121's payment lifecycle columns, idempotency guard, and reconciliation indexes",
+  async () => {
+    const database = await migratedDatabase();
+    try {
+      const { a, b, currency } = await createSchools(database);
+      const studentA = await createStudent(database, a, "st121-a");
+
+      // --- payment_cache gains a lifecycle without disturbing the 000015 columns ---------------
+      const columns = await database.sql<
+        { name: string; nullable: string; default: string | null }[]
+      >`
+        SELECT column_name AS name, is_nullable AS nullable, column_default AS default
+        FROM information_schema.columns
+        WHERE table_schema = 'app' AND table_name = 'payment_cache'
+          AND column_name IN ('erpnext_invoice_id', 'payment_mode', 'status',
+                              'receipt_url', 'idempotency_key', 'confirmed_at')
+        ORDER BY column_name
+      `;
+      expect(columns.map((c) => c.name)).toEqual([
+        "confirmed_at",
+        "erpnext_invoice_id",
+        "idempotency_key",
+        "payment_mode",
+        "receipt_url",
+        "status",
+      ]);
+      // payment_mode and erpnext_invoice_id must stay nullable: a payment projected from ERPNext that
+      // this gateway did not forward knows neither.
+      expect(columns.find((c) => c.name === "payment_mode")!.nullable).toBe("YES");
+      expect(columns.find((c) => c.name === "erpnext_invoice_id")!.nullable).toBe("YES");
+      // status is NOT NULL with a default, which is what keeps every pre-ST-121 insert site working.
+      const status = columns.find((c) => c.name === "status")!;
+      expect(status.nullable).toBe("NO");
+      expect(status.default).toContain("pending");
+
+      // --- The lifecycle constraints actually bite -----------------------------------------------
+      await expectDenied(
+        database,
+        `INSERT INTO app.payment_cache
+           (school_id, student_id, currency_id, erpnext_docname, erpnext_status,
+            amount_minor, payment_date, status, last_synced_at)
+         VALUES ('${a}', '${studentA}', '${currency}', 'ST121-BAD-1', 'submitted',
+                 500, '2026-01-01', 'confirmed', now())`,
+        a,
+      );
+      await expectDenied(
+        database,
+        `INSERT INTO app.payment_cache
+           (school_id, student_id, currency_id, erpnext_docname, erpnext_status,
+            amount_minor, payment_date, payment_mode, last_synced_at)
+         VALUES ('${a}', '${studentA}', '${currency}', 'ST121-BAD-2', 'submitted',
+                 500, '2026-01-01', 'crypto', now())`,
+        a,
+      );
+      await expectDenied(
+        database,
+        `INSERT INTO app.payment_cache
+           (school_id, student_id, currency_id, erpnext_docname, erpnext_status,
+            amount_minor, payment_date, status, last_synced_at)
+         VALUES ('${a}', '${studentA}', '${currency}', 'ST121-BAD-3', 'submitted',
+                 500, '2026-01-01', 'refunded', now())`,
+        a,
+      );
+
+      // A coherent confirmed row is accepted, and every supported mode round-trips.
+      await asRole(database, "studafy_app", async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${a}, true)`;
+        for (const mode of ["cash", "bank_transfer", "card_external"]) {
+          await tx`
+            INSERT INTO app.payment_cache
+              (school_id, student_id, currency_id, erpnext_docname, erpnext_status,
+               amount_minor, payment_date, payment_mode, status, confirmed_at,
+               erpnext_invoice_id, receipt_url, idempotency_key, last_synced_at)
+            VALUES (${a}, ${studentA}, ${currency}, ${`ST121-OK-${mode}`}, 'submitted',
+                    12345, '2026-01-01', ${mode}, 'confirmed', now(),
+                    'ACC-SINV-1', '/printview?doctype=Payment%20Entry&name=x',
+                    ${`key-${mode}`}, now())
+          `;
+        }
+      });
+
+      // --- The idempotency guard is tenant-scoped -----------------------------------------------
+      const hash = "c".repeat(64);
+      await asRole(database, "studafy_app", async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${a}, true)`;
+        await tx`
+          INSERT INTO app.payment_idempotency_logs (school_id, idempotency_key, request_hash)
+          VALUES (${a}, 'shared-key', ${hash})
+        `;
+      });
+      // Same key, same school: refused by idx_payment_idempotency_unique. This index is the
+      // mechanism behind "exactly one Payment Entry per Idempotency-Key".
+      await expectDenied(
+        database,
+        `INSERT INTO app.payment_idempotency_logs (school_id, idempotency_key, request_hash)
+         VALUES ('${a}', 'shared-key', '${hash}')`,
+        a,
+      );
+      // Same key, different school: permitted. A client's key namespace is its own.
+      await asRole(database, "studafy_app", async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${b}, true)`;
+        await tx`
+          INSERT INTO app.payment_idempotency_logs (school_id, idempotency_key, request_hash)
+          VALUES (${b}, 'shared-key', ${hash})
+        `;
+      });
+      // A malformed hash cannot be stored, so it can never fail to match a legitimate retry.
+      await expectDenied(
+        database,
+        `INSERT INTO app.payment_idempotency_logs (school_id, idempotency_key, request_hash)
+         VALUES ('${a}', 'bad-hash', 'NOTAHASH')`,
+        a,
+      );
+
+      // --- Indexes exist under the names the plan and the query planner expect -------------------
+      const indexes = await database.sql<{ name: string }[]>`
+        SELECT indexname AS name FROM pg_indexes
+        WHERE schemaname = 'app' AND indexname IN (
+          'idx_payment_idempotency_unique',
+          'idx_payment_cache_invoice_student',
+          'idx_payment_cache_status'
+        )
+        ORDER BY indexname
+      `;
+      expect(indexes.map((i) => i.name)).toEqual([
+        "idx_payment_cache_invoice_student",
+        "idx_payment_cache_status",
+        "idx_payment_idempotency_unique",
+      ]);
+
+      // ST-121 also asked for a "fast webhook match index on Payment Entry ID". It is deliberately
+      // absent: uq_payment_cache_school_erpnext_docname from 000015 already indexes exactly
+      // (school_id, erpnext_docname). Asserted so the omission cannot be re-added by accident.
+      const duplicateEntryIndexes = await database.sql<{ name: string }[]>`
+        SELECT indexname AS name FROM pg_indexes
+        WHERE schemaname = 'app' AND tablename = 'payment_cache'
+          AND indexdef LIKE '%erpnext_docname%'
+      `;
+      expect(duplicateEntryIndexes.map((i) => i.name)).toEqual([
+        "uq_payment_cache_school_erpnext_docname",
+      ]);
     } finally {
       await database.cleanup();
     }

@@ -9,6 +9,11 @@ Source: [`apps/api/src/modules/finance`](../../apps/api/src/modules/finance) and
 [`apps/api/src/erpnext`](../../apps/api/src/erpnext). The generated contract is
 [`apps/api/openapi.json`](../../apps/api/openapi.json); this document explains what a schema cannot.
 
+**Payments have their own guide:** [`finance-payments-guide.md`](finance-payments-guide.md) (ST-121)
+covers `POST /api/finance/payments`, the three-phase idempotency protocol that makes a payment post
+exactly once, and the ERPNext confirmation webhook. Read it before touching anything that forwards
+money.
+
 ## What the gateway owns
 
 Three things ERPNext cannot know about:
@@ -206,3 +211,13 @@ runs _outside_ the handler's tenant transaction, on the raw pool via `db.unsafe`
 `app.school_id` set — and every finance cache table has forced RLS. It also passes ERPNext's
 currency _code_ into `currency_id`, which is a `uuid` foreign key. Both of those want checking
 before a fourth table is added to the same path.
+
+**ST-121 fixed exactly these two defects for the payment arm, and that arm is now the pattern to
+follow.** `erpnext.paymentReceived` delegates to
+[`projectPaymentEntry`](../../apps/api/src/modules/finance/payments/projection.ts), which takes a
+`tx` and runs inside `withTenantTx`, resolves the currency through `app.currencies` before touching
+`currency_id`, converts the decimal amount with the currency's own exponent, and resolves
+`student_id` to a real UUID rather than casting an ERPNext party name. The invoice, credit-note, and
+fee-schedule arms beside it still carry the original bugs — they pass currency codes and ERPNext
+party names into `uuid` columns and raw decimals into `*_minor` columns, and none of them can
+succeed on a real payload. Each wants the same treatment.

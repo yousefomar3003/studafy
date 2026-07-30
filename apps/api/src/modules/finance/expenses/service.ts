@@ -1,9 +1,9 @@
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { ErpNextError } from "../../../erpnext/client";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
+import { translateErpNextError as translateSharedErpNextError } from "../erpnext-errors";
 import { upsertMapping } from "../id-mappings/service";
 
 import type { StorageService } from "../../../lib/storage";
@@ -122,39 +122,14 @@ function totalFromDoc(doc: ErpNextExpenseDoc): number {
   return Number(doc.total_amount ?? doc.total_claimed_amount ?? 0);
 }
 
+/**
+ * Expense-shaped view of the shared translation (ST-121 moved the body to ../erpnext-errors so
+ * payments could share it). Only the 404 differs between the two callers.
+ */
 function translateErpNextError(error: unknown): never {
-  if (!(error instanceof ErpNextError)) throw error;
-
-  if (error.kind === "circuit_open") {
-    throw new CodedHttpException(
-      503,
-      ERROR_CODES.ERPNEXT_CIRCUIT_OPEN,
-      "ERPNext is unreachable; requests are paused while it recovers",
-    );
-  }
-  if (error.kind === "timeout") {
-    throw new CodedHttpException(
-      504,
-      ERROR_CODES.ERPNEXT_TIMEOUT,
-      "ERPNext did not respond in time",
-    );
-  }
-  if (error.kind === "network") {
-    throw new CodedHttpException(503, ERROR_CODES.ERPNEXT_UNAVAILABLE, "ERPNext is unreachable");
-  }
-
-  if (error.status === 404) {
-    throw new CodedHttpException(404, ERROR_CODES.EXPENSE_NOT_FOUND, "Expense not found");
-  }
-  if (error.status >= 500) {
-    throw new CodedHttpException(503, ERROR_CODES.ERPNEXT_UNAVAILABLE, "ERPNext is unreachable");
-  }
-
-  throw new CodedHttpException(
-    error.status === 429 ? 429 : 400,
-    error.status === 429 ? ERROR_CODES.RATE_LIMIT_EXCEEDED : ERROR_CODES.VALIDATION_FAILED,
-    error.message,
-  );
+  translateSharedErpNextError(error, {
+    notFound: { code: ERROR_CODES.EXPENSE_NOT_FOUND, message: "Expense not found" },
+  });
 }
 
 function toErpNextPayload(

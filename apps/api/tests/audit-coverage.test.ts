@@ -209,6 +209,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/finance/expenses/{expenseId}",
   "POST /api/finance/expenses/upload-url",
   "POST /api/finance/expenses/{expenseId}/attachments",
+  // ST-121. auditAction("insert", "payment_cache") declares the intent; emitAuditLog writes the row
+  // inside the forwarder's own transaction so it commits with the payment or not at all.
+  "POST /api/finance/payments",
   "POST /api/discipline/incidents",
   "PATCH /api/discipline/incidents/{incidentId}",
   "POST /api/discipline/incidents/{incidentId}/resolve",

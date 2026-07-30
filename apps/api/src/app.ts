@@ -56,6 +56,8 @@ import {
   EnvCredentialResolver,
   expenseRoutes,
   feeStructureRoutes,
+  paymentRoutes,
+  paymentWebhookRoutes,
   TenantErpNextFactory,
 } from "./modules/finance";
 import {
@@ -274,8 +276,15 @@ export function createApp({
 
   // ERPNext webhook ingestion — mounted only when a database is available. The route is public
   // (no auth middleware) because ERPNext authenticates via HMAC signature, not a session token.
+  //
+  // The payment-confirmation receiver (ST-121) is mounted alongside it and for the same reason: it
+  // authenticates by HMAC over the raw body, so it must sit outside the bearer-token chain. It gets
+  // its own URL rather than sharing the generic one because payment confirmation carries an SLA the
+  // rest of the ingest does not, and a single-purpose path can be monitored and alerted on its own.
+  // Both share one projection (modules/finance/payments/projection.ts) and one dedup table.
   if (database) {
     app.route("/", erpNextWebhookRoutes(database, logger));
+    app.route("/", paymentWebhookRoutes(database, logger));
   }
 
   // School self-registration — public, no authentication. Protected by Turnstile captcha and
@@ -315,6 +324,7 @@ export function createApp({
 
     app.route("/", feeStructureRoutes(database, erpnextFactory));
     app.route("/", expenseRoutes(database, erpnextFactory, storage));
+    app.route("/", paymentRoutes(database, erpnextFactory));
   }
 
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.

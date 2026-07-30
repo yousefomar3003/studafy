@@ -448,3 +448,119 @@ describe("body preservation", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression — storage semantics, with an in-memory Redis stand-in
+// ---------------------------------------------------------------------------
+
+/**
+ * The replay tests above only run when Redis is reachable on localhost:6390, which is how a real
+ * replay bug survived in this file's blind spot: the middleware read the response body twice, and the
+ * second read — on an already-consumed stream — stored an empty body over the good one. Every replay
+ * answered with the correct status and no payload.
+ *
+ * These tests use a minimal in-memory stand-in so they always run. Only `get` and `set` are
+ * exercised by the middleware, so the surface is small enough to fake honestly.
+ */
+function createFakeRedis(): { client: RedisClient; store: Map<string, string> } {
+  const store = new Map<string, string>();
+  const client = {
+    get: async (key: string) => store.get(key) ?? null,
+    set: async (key: string, value: string) => {
+      store.set(key, value);
+      return "OK";
+    },
+  } as unknown as RedisClient;
+  return { client, store };
+}
+
+describe("storage semantics (no Redis required)", () => {
+  test("replays the original body, not an empty one", async () => {
+    resetIdempotencyInflight();
+    const { client } = createFakeRedis();
+
+    const app = buildApp(client);
+    let callCount = 0;
+    app.post("/test", (c) => {
+      callCount++;
+      return c.json({ id: callCount, name: "item" }, 201);
+    });
+
+    const body = '{"value":"hello"}';
+    const headers = { "Idempotency-Key": "regression-body" };
+
+    const res1 = await app.request("/test", { method: "POST", body, headers });
+    expect(res1.status).toBe(201);
+    expect(await res1.json()).toEqual({ id: 1, name: "item" });
+
+    const res2 = await app.request("/test", { method: "POST", body, headers });
+    expect(res2.status).toBe(201);
+    // The assertion that fails against the double-read bug: this was `{}` from an empty body.
+    expect(await res2.json()).toEqual({ id: 1, name: "item" });
+    expect(callCount).toBe(1);
+  });
+
+  test("stores the response exactly once", async () => {
+    resetIdempotencyInflight();
+    const { client, store } = createFakeRedis();
+
+    const app = buildApp(client);
+    app.post("/test", (c) => c.json({ ok: true }, 201));
+
+    await app.request("/test", {
+      method: "POST",
+      body: '{"a":1}',
+      headers: { "Idempotency-Key": "regression-single-write" },
+    });
+
+    const stored = store.get("idem:regression-single-write");
+    expect(stored).toBeDefined();
+    // A non-empty body proves the surviving write is the one that read a live stream.
+    expect(JSON.parse(stored!).body).toBe(JSON.stringify({ ok: true }));
+  });
+
+  test("does not store a 4xx, so a retry re-invokes the handler", async () => {
+    resetIdempotencyInflight();
+    const { client, store } = createFakeRedis();
+
+    const app = buildApp(client);
+    let callCount = 0;
+    app.post("/test", (c) => {
+      callCount++;
+      return c.json({ error: "nope" }, 400);
+    });
+
+    const body = '{"a":1}';
+    const headers = { "Idempotency-Key": "regression-4xx" };
+
+    const res1 = await app.request("/test", { method: "POST", body, headers });
+    expect(res1.status).toBe(400);
+    expect(store.has("idem:regression-4xx")).toBe(false);
+
+    // Load-bearing for POST /api/finance/payments: a cached 4xx would wedge the key against a payment
+    // that was never created. The durable guard in app.payment_idempotency_logs is what stops a
+    // genuine double post.
+    const res2 = await app.request("/test", { method: "POST", body, headers });
+    expect(res2.status).toBe(400);
+    expect(callCount).toBe(2);
+  });
+
+  test("does not store a 5xx", async () => {
+    resetIdempotencyInflight();
+    const { client, store } = createFakeRedis();
+
+    const app = buildApp(client);
+    let callCount = 0;
+    app.post("/test", (c) => {
+      callCount++;
+      return c.json({ error: "boom" }, 500);
+    });
+
+    const headers = { "Idempotency-Key": "regression-5xx" };
+    await app.request("/test", { method: "POST", body: '{"a":1}', headers });
+    expect(store.has("idem:regression-5xx")).toBe(false);
+
+    await app.request("/test", { method: "POST", body: '{"a":1}', headers });
+    expect(callCount).toBe(2);
+  });
+});

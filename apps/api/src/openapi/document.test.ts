@@ -116,6 +116,11 @@ describe("structure", () => {
         "/api/finance/expenses/summary",
         "/api/finance/expenses/upload-url",
         "/api/finance/expenses/{expenseId}/attachments",
+        "/api/finance/payments",
+        "/api/finance/payments/{paymentId}",
+        // ST-121. Public by design: authenticated by HMAC over the raw body, so it is absent from the
+        // authentication-boundary list below.
+        "/api/finance/webhooks/erpnext/payment-confirmed",
         "/api/evaluations",
         "/api/evaluations/{evaluationId}",
         "/api/evaluations/{evaluationId}/scores",
@@ -403,6 +408,8 @@ describe("security", () => {
         "GET /api/finance/expenses",
         "GET /api/finance/expenses/summary",
         "GET /api/finance/expenses/{expenseId}",
+        "GET /api/finance/payments",
+        "GET /api/finance/payments/{paymentId}",
         "GET /api/academics/assignments",
         "GET /api/academics/assignments/{assignmentId}",
         "GET /api/academics/assignments/{assignmentId}/submissions",
@@ -535,6 +542,7 @@ describe("security", () => {
         "POST /api/finance/expenses",
         "POST /api/finance/expenses/upload-url",
         "POST /api/finance/expenses/{expenseId}/attachments",
+        "POST /api/finance/payments",
         "POST /api/auth/providers/link/start",
         "POST /api/imports/students/upload",
         "POST /api/imports/students/{importId}/confirm",

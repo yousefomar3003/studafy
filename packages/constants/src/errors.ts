@@ -127,6 +127,16 @@ export const ERROR_CODES = {
   // Finance gateway — expenses.
   EXPENSE_NOT_FOUND: "EXPENSE_NOT_FOUND",
 
+  // Finance gateway — payments (ST-121). Reusing a key for a different body is reported with the
+  // existing CONFLICT_IDEMPOTENCY_KEY_MISMATCH above rather than a payment-specific twin; the
+  // condition is not payment-specific and one code for it keeps client handling uniform.
+  PAYMENT_NOT_FOUND: "PAYMENT_NOT_FOUND",
+  // Distinct from a mismatch, because the client acts differently: an earlier request with this key
+  // reached ERPNext and its outcome is not yet known, so the answer is to wait and re-read rather
+  // than to change anything. Never retry-with-a-new-key on this one — that is the double charge.
+  PAYMENT_IN_PROGRESS: "PAYMENT_IN_PROGRESS",
+  PAYMENT_IDEMPOTENCY_KEY_REQUIRED: "PAYMENT_IDEMPOTENCY_KEY_REQUIRED",
+
   // Import — CSV import lifecycle.
   IMPORT_NOT_FOUND: "IMPORT_NOT_FOUND",
   IMPORT_INVALID_STATE: "IMPORT_INVALID_STATE",
