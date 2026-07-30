@@ -556,6 +556,7 @@ describeDb("course service", () => {
         code: "CALC101",
         name: "Calculus I",
         description: "Intro calculus",
+        credit_hours: 3.5,
       }),
     );
 
@@ -563,6 +564,7 @@ describeDb("course service", () => {
     expect(course.code).toBe("CALC101");
     expect(course.name).toBe("Calculus I");
     expect(course.description).toBe("Intro calculus");
+    expect(course.credit_hours).toBe(3.5);
     expect(course.subject_id).toBe(subject.id);
     expect(course.status).toBe("draft");
   });
@@ -631,9 +633,13 @@ describeDb("course service", () => {
     );
 
     const updated = await withTx((tx) =>
-      updateCourse(tx, school.id, course.id, { name: "English Composition I" }),
+      updateCourse(tx, school.id, course.id, {
+        name: "English Composition I",
+        credit_hours: 2.5,
+      }),
     );
     expect(updated.name).toBe("English Composition I");
+    expect(updated.credit_hours).toBe(2.5);
   });
 
   test("deleteCourse hard-deletes an unreferenced course", async () => {

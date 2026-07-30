@@ -178,6 +178,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Submit, decide, and unlock grade submissions for review and approval.",
     },
     {
+      name: "Published Grades",
+      description:
+        "Read-only, tenant-scoped published grade snapshots for students and linked parents, " +
+        "including term and cumulative summaries.",
+    },
+    {
       name: "Evaluations",
       description:
         "Teacher evaluation management. Authenticated and tenant-scoped. " +

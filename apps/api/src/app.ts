@@ -53,7 +53,12 @@ import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
 import { EnvCredentialResolver, feeStructureRoutes, TenantErpNextFactory } from "./modules/finance";
-import { approvalQueueRoutes, gradebookConfigRoutes, gradeEntryRoutes } from "./modules/grades";
+import {
+  approvalQueueRoutes,
+  gradebookConfigRoutes,
+  gradeEntryRoutes,
+  publishedGradeRoutes,
+} from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -551,6 +556,12 @@ export function createApp({
   // GRADE_READ / GRADE_UPDATE permissions and class-level teacher authorization.
   if (database) {
     app.route("/", gradeEntryRoutes(database));
+  }
+
+  // Published grades (ST-116). Student/parent-only snapshots with explicit relationship
+  // authorization, synchronous term summaries, and optional Redis cache-aside reads.
+  if (database) {
+    app.route("/", publishedGradeRoutes(database, redis ?? null, logger));
   }
 
   // Approval queue — unified pending-approvals feed for administrators. Queries grade

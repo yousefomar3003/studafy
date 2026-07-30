@@ -6,6 +6,7 @@ import { createStorageService } from "./lib/storage";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
 import { KeyStore } from "./modules/auth";
+import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
 import { checkRedis, closeRedis, createRedisClient } from "./redis";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a port.
@@ -27,6 +28,12 @@ const tracker = createInflightTracker();
 const database = createDatabase(env);
 const readDatabase = createReadDatabase(env, database);
 const redis = env.REDIS_URL ? createRedisClient({ url: env.REDIS_URL, logger }) : null;
+const gradePublishedSubscriber = redis
+  ? await startGradePublishedSubscriber({ redis, logger }).catch((err) => {
+      logger.error({ err }, "failed to start grades.published cache subscriber");
+      return null;
+    })
+  : null;
 
 // Persists CORS/CSRF rejections off the request path. Returns a no-op sink when no database is
 // configured, so nothing downstream has to branch on that.
@@ -95,6 +102,7 @@ const shutdown = (signal: string) => {
     keyStore.destroy();
     // Drains buffered security events. Must run before closeDatabase, which it writes through.
     await securityEventSink.close();
+    await gradePublishedSubscriber?.close();
     await closeRedis(redis);
     await closeDatabasePools(database, readDatabase);
     logger.info({ signal }, "shutdown complete");

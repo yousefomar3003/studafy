@@ -284,13 +284,14 @@ export async function createSubject(
 export interface CourseRecord {
   id: string;
   code: string;
+  creditHours: number;
 }
 
 export async function createCourse(
   sql: Sql,
   schoolId: string,
   subjectId: string,
-  overrides?: { code?: string; name?: string },
+  overrides?: { code?: string; name?: string; creditHours?: number },
 ): Promise<CourseRecord> {
   const code = overrides?.code ?? `CRS-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
 
@@ -299,13 +300,20 @@ export async function createCourse(
     // ST-085: role_scope_visibility (a restrictive SELECT policy) also gates INSERT ... RETURNING, so
     // seed this scoped table as studafy_admin. See createStudent for the full rationale.
 
-    const [course] = await tx<{ id: string; code: string }[]>`
-      INSERT INTO app.courses (school_id, subject_id, code, name, status)
-      VALUES (${schoolId}, ${subjectId}, ${code}, ${overrides?.name ?? `Course ${code}`}, 'active')
-      RETURNING id, code
+    const [course] = await tx<{ id: string; code: string; creditHours: string }[]>`
+      INSERT INTO app.courses (school_id, subject_id, code, name, credit_hours, status)
+      VALUES (
+        ${schoolId},
+        ${subjectId},
+        ${code},
+        ${overrides?.name ?? `Course ${code}`},
+        ${overrides?.creditHours ?? 1},
+        'active'
+      )
+      RETURNING id, code, credit_hours AS "creditHours"
     `;
 
-    return course!;
+    return { ...course!, creditHours: Number(course!.creditHours) };
   });
 }
 

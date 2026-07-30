@@ -16,6 +16,7 @@
   "OAUTH_PROVIDER_ERROR": "خطأ في مزود OAuth",
   "REQUIRES_ADMIN_APPROVAL": "يتطلب هذا الحساب موافقة المسؤول قبل تفعيله",
   "AUTHZ_FORBIDDEN": "تم رفض الوصول",
+  "ACCESS_DENIED": "تم رفض الوصول",
   "AUTHZ_ROLE_NOT_FOUND": "لم يتم العثور على الدور المطلوب",
   "AUTHZ_PERMISSION_NOT_FOUND": "لم يتم العثور على الصلاحية المطلوبة",
   "CHANNEL_NOT_AUTHORIZED": "هذه العملية غير متاحة من هذا العميل",

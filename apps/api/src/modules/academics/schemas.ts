@@ -318,6 +318,10 @@ export const courseSchema = z
       .openapi({ description: "Short unique code within the school.", example: "CALC101" }),
     name: z.string().openapi({ description: "Human-readable name.", example: "Calculus I" }),
     description: z.string().nullable().openapi({ description: "Optional description." }),
+    credit_hours: z.number().positive().openapi({
+      description: "Academic credits used to weight term and cumulative GPA.",
+      example: 3,
+    }),
     status: catalogStatusSchema,
     created_at: dateTimeSchema,
     updated_at: dateTimeSchema,
@@ -345,6 +349,10 @@ export const createCourseBodySchema = z
       .nullable()
       .optional()
       .openapi({ description: "Optional description." }),
+    credit_hours: z.number().positive().default(1).openapi({
+      description: "Academic credits used to weight term and cumulative GPA.",
+      example: 3,
+    }),
     status: catalogStatusSchema.default("draft"),
   })
   .openapi("CreateCourseBody");
@@ -361,6 +369,10 @@ export const updateCourseBodySchema = z
       .nullable()
       .optional()
       .openapi({ description: "Optional description." }),
+    credit_hours: z.number().positive().optional().openapi({
+      description: "Academic credits; immutable after a course has published grades.",
+      example: 3,
+    }),
     status: catalogStatusSchema.optional(),
   })
   .openapi("UpdateCourseBody");

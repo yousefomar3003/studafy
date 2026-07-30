@@ -376,7 +376,7 @@ export async function deleteCategory(
 /**
  * Default grade boundaries per scheme type, derived from school_settings.grading_scheme.
  */
-function getDefaultBoundaries(schemeType: GradingSchemeType): GradeBoundary[] {
+export function getDefaultBoundaries(schemeType: GradingSchemeType): GradeBoundary[] {
   switch (schemeType) {
     case "letter":
       return [
@@ -735,6 +735,23 @@ export async function linkScheme(
 ): Promise<void> {
   const gradebook = await getGradebookById(tx, schoolId, gradebookId);
   const scheme = await getScheme(tx, schoolId, schemeId);
+
+  const [published] = await tx<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM app.grade_submissions
+      WHERE school_id = ${schoolId}::uuid
+        AND gradebook_id = ${gradebookId}::uuid
+        AND status = 'published'
+    ) AS exists
+  `;
+  if (published?.exists) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.CONFLICT_STATE_MISMATCH,
+      "The grading scheme cannot change after grades have been published",
+    );
+  }
 
   // Verify the scheme belongs to the same term as the gradebook's class.
   const [classInfo] = await tx<{ term_id: string }[]>`
