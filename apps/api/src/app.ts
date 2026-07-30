@@ -60,6 +60,8 @@ import {
   paymentRoutes,
   paymentWebhookRoutes,
   reconciliationRoutes,
+  refundRoutes,
+  refundWebhookRoutes,
   scholarshipDiscountRoutes,
   TenantErpNextFactory,
 } from "./modules/finance";
@@ -303,6 +305,7 @@ export function createApp({
   if (database) {
     app.route("/", erpNextWebhookRoutes(database, logger));
     app.route("/", paymentWebhookRoutes(database, logger));
+    app.route("/", refundWebhookRoutes(database, logger));
   }
 
   // School self-registration — public, no authentication. Protected by Turnstile captcha and
@@ -344,6 +347,7 @@ export function createApp({
     app.route("/", expenseRoutes(database, erpnextFactory, storage));
     app.route("/", paymentRoutes(database, erpnextFactory));
     app.route("/", scholarshipDiscountRoutes(database, erpnextFactory));
+    app.route("/", refundRoutes(database, erpnextFactory));
     app.route("/", installmentRoutes(database, erpnextFactory));
     app.route("/", reconciliationRoutes(database, erpnextFactory, logger));
   }
