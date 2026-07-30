@@ -7,6 +7,7 @@ import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
 import { KeyStore } from "./modules/auth";
 import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
+import { StripeAdapter } from "./modules/subscriptions";
 import { checkRedis, closeRedis, createRedisClient } from "./redis";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a port.
@@ -44,6 +45,16 @@ const securityEventSink = createSecurityEventSink({ database, logger });
 // refusing to start over a feature the developer may not be touching.
 const storage = createStorageService(env);
 
+// Stripe billing adapter. Null when STRIPE_SECRET_KEY is absent — the checkout and webhook routes
+// still register but answer 503 at request time.
+const stripeProvider =
+  env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET
+    ? new StripeAdapter({
+        secretKey: env.STRIPE_SECRET_KEY,
+        webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+      })
+    : null;
+
 const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
   logger.info({ kid }, "jwt key rotated");
 });
@@ -67,6 +78,7 @@ const app = createApp({
   jwtRefreshTtlSeconds: env.JWT_REFRESH_TTL_SECONDS,
   securityEventSink,
   storage,
+  stripeProvider,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",

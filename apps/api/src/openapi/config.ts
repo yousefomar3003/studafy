@@ -196,5 +196,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Approval queue for administrators. Authenticated and permission-gated. " +
         "Unified pending-approvals feed plus bulk approve/reject.",
     },
+    {
+      name: "Subscriptions",
+      description:
+        "Subscription billing and plan management. Stripe-backed. Routes register even when " +
+        "Stripe is unconfigured — they answer 503 at request time with a clear error code. " +
+        "The webhook endpoint is public and authenticated by Stripe's signature header.",
+    },
   ],
 };

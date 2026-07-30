@@ -131,6 +131,9 @@ export const envSchema = z
     // Lifetime of a pre-signed URL. Bounded to the 15–60 minute window ST-103 specifies: short
     // enough that a leaked URL expires before it is useful, long enough to survive a slow upload.
     S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(900).max(3600).default(900),
+    // Stripe billing integration. All optional — activates only when both are set.
+    STRIPE_SECRET_KEY: z.string().min(1).optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
   })
   .superRefine((env, context) => {
     // Checked before the NODE_ENV gate below: this constraint keys off the deployment tier, and a
@@ -239,6 +242,22 @@ export const envSchema = z
         code: "custom",
         path: ["S3_ACCESS_KEY_ID"],
         message: "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set together",
+      });
+    }
+
+    // Stripe: both SK and webhook secret must be present or both absent.
+    if (env.STRIPE_SECRET_KEY !== undefined && env.STRIPE_WEBHOOK_SECRET === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["STRIPE_WEBHOOK_SECRET"],
+        message: "STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set",
+      });
+    }
+    if (env.STRIPE_WEBHOOK_SECRET !== undefined && env.STRIPE_SECRET_KEY === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["STRIPE_SECRET_KEY"],
+        message: "STRIPE_SECRET_KEY is required when STRIPE_WEBHOOK_SECRET is set",
       });
     }
 

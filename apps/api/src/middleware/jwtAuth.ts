@@ -72,6 +72,7 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/auth/oauth",
   "/api/auth/login",
   "/api/schools/register",
+  "/api/subscriptions/webhook/stripe",
 ];
 
 function isInvitationSubPath(path: string, action: "verify" | "activate"): boolean {
