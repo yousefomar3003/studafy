@@ -241,6 +241,11 @@ const EXPECTED_MUTATING_ROUTES = [
   // scholarships/discounts to students. Audit rows written by auditAction middleware.
   "POST /api/finance/scholarship-discounts/awards",
   "POST /api/finance/scholarship-discounts/awards/{awardId}/confirm",
+  // Refund processing (ST-124). Maker-checker workflow for ERPNext Credit Note refunds.
+  // Audit rows written by auditAction middleware in routes.ts.
+  "POST /api/finance/refunds",
+  "POST /api/finance/refunds/{refundId}/approve",
+  "POST /api/finance/refunds/{refundId}/reject",
 ];
 
 function collectSourceFiles(dir: string): string[] {
