@@ -92,6 +92,7 @@ describe("structure", () => {
     expect(Object.keys(document.paths ?? {}).sort()).toEqual(
       [
         "/.well-known/jwks.json",
+        "/api/admin/subscriptions/sync-prices",
         "/api/admin/users/{userId}/devices",
         "/api/admin/users/{userId}/devices/{deviceId}",
         "/api/admin/users/{userId}/providers/{provider}",
@@ -214,6 +215,10 @@ describe("structure", () => {
         "/api/students/{studentId}",
         "/api/students/{studentId}/guardians",
         "/api/students/{studentId}/guardians/{userId}",
+        "/api/subscriptions/checkout",
+        "/api/subscriptions/plans",
+        "/api/subscriptions/portal",
+        "/api/subscriptions/webhook/stripe",
         "/api/teachers",
 
         "/api/approvals/bulk-decision",
@@ -463,6 +468,7 @@ describe("security", () => {
         "GET /api/students",
         "GET /api/students/{studentId}",
         "GET /api/students/{studentId}/guardians",
+        "GET /api/subscriptions/plans",
         "GET /api/teachers",
         "GET /api/teachers/me",
         "GET /api/teachers/{teacherId}",
@@ -525,6 +531,7 @@ describe("security", () => {
         "POST /api/academics/years",
         "POST /api/academics/years/{yearId}/rollover",
         "POST /api/academics/years/{yearId}/terms",
+        "POST /api/admin/subscriptions/sync-prices",
         "POST /api/attendance/records/batch",
         "POST /api/attendance/reports/export",
         "POST /api/attendance/sessions",
@@ -552,6 +559,8 @@ describe("security", () => {
         "POST /api/invitations/{id}/revoke",
         "POST /api/students",
         "POST /api/students/{studentId}/guardians",
+        "POST /api/subscriptions/checkout",
+        "POST /api/subscriptions/portal",
         "POST /api/teachers",
         "POST /api/users",
         "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",

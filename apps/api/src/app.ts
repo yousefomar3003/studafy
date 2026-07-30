@@ -66,6 +66,12 @@ import {
   publishedGradeRoutes,
 } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
+import {
+  checkoutRoutes,
+  webhookRoutes,
+  planRoutes,
+  adminSubscriptionRoutes,
+} from "./modules/subscriptions";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { schoolSettingsRoutes } from "./modules/tenancy/settings/route";
@@ -82,6 +88,7 @@ import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
 import type { KeyStore } from "./modules/auth";
+import type { PaymentProviderPort } from "./modules/subscriptions";
 import type { RedisClient } from "./redis";
 
 export interface AppOptions {
@@ -151,6 +158,13 @@ export interface AppOptions {
    * modules/academics/assignments/routes/assignment-routes.ts.
    */
   storage?: StorageService | null;
+  /**
+   * Stripe payment provider for subscription billing.
+   *
+   * Nullable: when absent, checkout, portal, and webhook routes still register (so the OpenAPI
+   * contract does not depend on a deployment's environment) and answer 503 at request time.
+   */
+  stripeProvider?: PaymentProviderPort | null;
 }
 
 /**
@@ -178,6 +192,7 @@ export function createApp({
   docsEnabled = false,
   microsoftIdentityVerifier,
   storage = null,
+  stripeProvider = null,
 }: AppOptions): OpenAPIHono<AppEnv> {
   const eventSink = securityEventSink ?? createNoopSecurityEventSink();
   // The defaultHook makes request-validation failures throw into errorHandlerMiddleware instead of
@@ -618,6 +633,15 @@ export function createApp({
   // Provides read access to provisioning status and manual provisioning trigger.
   if (database) {
     app.route("/", provisioningRoutes(database, logger));
+  }
+
+  // Stripe subscription billing. Routes register even without a provider so the OpenAPI contract
+  // is stable; they answer 503 at request time when the provider is absent.
+  if (database) {
+    app.route("/", planRoutes(database));
+    app.route("/", checkoutRoutes(database, stripeProvider));
+    app.route("/", webhookRoutes(database, stripeProvider, logger));
+    app.route("/", adminSubscriptionRoutes(database, stripeProvider, logger));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:

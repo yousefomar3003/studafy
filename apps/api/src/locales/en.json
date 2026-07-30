@@ -131,5 +131,12 @@
   "EVALUATION_ALREADY_SHARED": "This evaluation has already been shared with the teacher",
   "EVALUATION_NOT_SHARED": "This evaluation has not been shared with the teacher",
   "EVALUATION_TEMPLATE_NOT_FOUND": "Evaluation criteria template not found",
-  "EVALUATION_SCORE_NOT_FOUND": "Evaluation score not found"
+  "EVALUATION_SCORE_NOT_FOUND": "Evaluation score not found",
+  "STRIPE_NOT_CONFIGURED": "Stripe billing is not configured for this deployment",
+  "STRIPE_API_ERROR": "An error occurred while communicating with Stripe",
+  "STRIPE_WEBHOOK_INVALID": "Invalid Stripe webhook payload or signature",
+  "STRIPE_PRICE_SYNC_FAILED": "Failed to sync plans and prices with Stripe",
+  "STRIPE_LIVE_KEY_IN_DEV": "Stripe live API key cannot be used in a development environment",
+  "SUBSCRIPTION_NOT_FOUND": "No active subscription found for this school",
+  "SUBSCRIPTION_CHECKOUT_FAILED": "Failed to create checkout session"
 }

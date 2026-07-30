@@ -34,8 +34,12 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
     done; \
     echo "bun install failed after 3 attempts" >&2; exit 1
 
-# turbo builds @studafy/constants first (turbo.json: dependsOn ["^build"]) because
-# apps/workers/package.json declares it as a dependency, then apps/workers itself.
+# Build workspace dependencies first so the turbo filter bug doesn't skip them.
+# turbo's dependsOn: ["^build"] should handle this transitively, but turbo 2.10.3
+# has a bug where @studafy/shared-schemas:build and @studafy/attendance-reporting:build
+# are not scheduled when using filters.
+RUN bun run --cwd packages/constants build \
+ && bun run --cwd packages/attendance-reporting build
 RUN bunx turbo run build --filter=@studafy/workers
 
 FROM oven/bun:${BUN_VERSION}-alpine AS runtime
