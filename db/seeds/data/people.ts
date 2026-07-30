@@ -140,12 +140,35 @@ export async function seedPeople(sql: Sql, school: SchoolCtx): Promise<PeopleCtx
   const parents: SeededPerson[] = MOCK_PERSONAS.filter((p) => p.group === "parent").map(toPerson);
 
   // Parent -> child links. Parents carry the GUEST role; the relationship lives here (ST-052 decision).
+  const parentPersonas = MOCK_PERSONAS.filter((persona) => persona.group === "parent");
+  const familyIdByParentKey = new Map<string, string>(
+    parentPersonas.map((persona) => [persona.key, uuid()]),
+  );
+  const familyRows = parentPersonas.map((persona) => ({
+    id: familyIdByParentKey.get(persona.key)!,
+    school_id: schoolId,
+    display_name: `${displayName(persona)} Family`,
+    primary_parent_user_id: userIdByKey.get(persona.key)!,
+  }));
+  if (familyRows.length > 0) {
+    await sql`
+      INSERT INTO app.families ${sql(
+        familyRows,
+        "id",
+        "school_id",
+        "display_name",
+        "primary_parent_user_id",
+      )}
+    `;
+  }
+
   const studentIdByKey = new Map<string, string>(
     studentPersonas.map((persona, index) => [persona.key, students[index]!.studentId]),
   );
   const linkRows = MOCK_PERSONAS.flatMap((persona) =>
     (persona.children ?? []).map((child) => ({
       school_id: schoolId,
+      family_id: familyIdByParentKey.get(persona.key)!,
       parent_user_id: userIdByKey.get(persona.key)!,
       student_id: studentIdByKey.get(child.studentKey)!,
       relationship: child.relationship,
@@ -156,6 +179,7 @@ export async function seedPeople(sql: Sql, school: SchoolCtx): Promise<PeopleCtx
       INSERT INTO app.parent_child_links ${sql(
         linkRows,
         "school_id",
+        "family_id",
         "parent_user_id",
         "student_id",
         "relationship",

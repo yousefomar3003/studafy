@@ -117,6 +117,13 @@ const EXPECTED_MUTATING_ROUTES = [
   // Student guardians. Link/unlink parent-child relationships with audit trails.
   "POST /api/students/{studentId}/guardians",
   "DELETE /api/students/{studentId}/guardians/{userId}",
+  // Family households and family-scoped guardian links (ST-126).
+  "POST /api/families",
+  "PATCH /api/families/{familyId}",
+  "DELETE /api/families/{familyId}",
+  "POST /api/families/{familyId}/links",
+  "PATCH /api/families/{familyId}/links/{parentUserId}/{studentId}",
+  "DELETE /api/families/{familyId}/links/{parentUserId}/{studentId}",
   // Teacher profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards.
   // Audit rows are written from inside the service transactions.
   "POST /api/teachers",
@@ -209,6 +216,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/finance/expenses/{expenseId}",
   "POST /api/finance/expenses/upload-url",
   "POST /api/finance/expenses/{expenseId}/attachments",
+  "POST /api/finance/reports/export",
   // Fee schedule generation (ST-122). Per-student installments derived from a fee structure.
   // Audit row written by auditAction middleware in installments/routes.ts.
   "POST /api/finance/fee-schedules/generate",

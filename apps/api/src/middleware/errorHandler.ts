@@ -48,6 +48,7 @@ const STATUS_TITLES = new Map<number, string>([
   [404, "Not Found"],
   [409, "Conflict"],
   [410, "Gone"],
+  [422, "Unprocessable Content"],
   [429, "Too Many Requests"],
   [500, "Internal Server Error"],
   [503, "Service Unavailable"],
@@ -61,6 +62,7 @@ const STATUS_ERROR_CODES = new Map<number, ErrorCode>([
   [404, ERROR_CODES.RESOURCE_NOT_FOUND],
   [409, ERROR_CODES.CONFLICT_STATE_MISMATCH],
   [410, ERROR_CODES.TENANT_CLOSED],
+  [422, ERROR_CODES.VALIDATION_FAILED],
   [429, ERROR_CODES.RATE_LIMIT_EXCEEDED],
 ]);
 

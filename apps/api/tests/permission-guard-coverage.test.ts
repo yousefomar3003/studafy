@@ -95,6 +95,13 @@ const EXPECTED_MUTATING_ROUTES = [
   // requirePermission() guards for STUDENT_READ and STUDENT_UPDATE.
   "POST /api/students/{studentId}/guardians",
   "DELETE /api/students/{studentId}/guardians/{userId}",
+  // Family household management is guarded by PARENT_LINK/PARENT_UNLINK.
+  "POST /api/families",
+  "PATCH /api/families/{familyId}",
+  "DELETE /api/families/{familyId}",
+  "POST /api/families/{familyId}/links",
+  "PATCH /api/families/{familyId}/links/{parentUserId}/{studentId}",
+  "DELETE /api/families/{familyId}/links/{parentUserId}/{studentId}",
   // Student CSV imports. Upload and confirm are mutating; guarded by STUDENT_IMPORT permission.
   "POST /api/imports/students/upload",
   "POST /api/imports/students/{importId}/confirm",
@@ -179,6 +186,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/finance/expenses/{expenseId}",
   "POST /api/finance/expenses/upload-url",
   "POST /api/finance/expenses/{expenseId}/attachments",
+  "POST /api/finance/reports/export",
   // ST-122. Fee schedule generation gated on BILLING_UPDATE via requirePermission middleware.
   "POST /api/finance/fee-schedules/generate",
   // ST-122. Internal API-key-authenticated reconciliation job; listed here for inventory accuracy

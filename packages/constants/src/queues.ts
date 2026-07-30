@@ -26,6 +26,7 @@ export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export const JOB_NAMES = {
   EVALUATE_ATTENDANCE_ALERTS: "evaluate-attendance-alerts",
   GENERATE_ATTENDANCE_EXPORT: "generate-attendance-export",
+  GENERATE_FINANCE_REPORT: "generate-finance-report",
   GENERATE_INVOICE: "generate-invoice",
   GENERATE_BATCH_INVOICES: "generate-batch-invoices",
 } as const;

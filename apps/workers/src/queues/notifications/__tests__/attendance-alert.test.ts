@@ -228,9 +228,21 @@ async function seedFixture(
         VALUES (${schoolId}::uuid, ${`p${i}-${tag}@t.local`}, ${`p${i}-${tag}@t.local`}, 'Parent', 'active')
         RETURNING id
       `;
+      const [family] = await tx<{ id: string }[]>`
+        INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+        VALUES (${schoolId}::uuid, ${`Parent ${i + 1} family`}, ${parent!.id}::uuid)
+        RETURNING id
+      `;
       await tx`
-        INSERT INTO app.parent_child_links (school_id, parent_user_id, student_id, relationship)
-        VALUES (${schoolId}::uuid, ${parent!.id}::uuid, ${studentId}::uuid, 'guardian')
+        INSERT INTO app.parent_child_links
+          (school_id, family_id, parent_user_id, student_id, relationship)
+        VALUES (
+          ${schoolId}::uuid,
+          ${family!.id}::uuid,
+          ${parent!.id}::uuid,
+          ${studentId}::uuid,
+          'guardian'
+        )
       `;
       parentIds.push(parent!.id);
     }

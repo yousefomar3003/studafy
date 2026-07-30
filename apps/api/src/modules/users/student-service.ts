@@ -32,6 +32,7 @@ export interface StudentRow {
 }
 
 export interface GuardianRow {
+  family_id: string;
   parent_user_id: string;
   relationship: ParentRelationship;
   created_at: Date;
@@ -166,7 +167,7 @@ export async function getStudentGuardians(
   studentId: string,
 ): Promise<GuardianRow[]> {
   const rows = await tx<GuardianRow[]>`
-    SELECT pcl.parent_user_id, pcl.relationship, pcl.created_at
+    SELECT pcl.family_id, pcl.parent_user_id, pcl.relationship, pcl.created_at
     FROM app.parent_child_links pcl
     WHERE pcl.student_id = ${studentId}::uuid
       AND pcl.school_id = ${schoolId}
@@ -271,10 +272,18 @@ export async function createStudent(
   // Create guardian links.
   if (params.guardians && params.guardians.length > 0) {
     for (const guardian of params.guardians) {
+      const familyId = await resolveGuardianFamily(
+        tx,
+        schoolId,
+        guardian.parent_user_id,
+        guardian.family_id,
+      );
       await tx`
-        INSERT INTO app.parent_child_links (school_id, parent_user_id, student_id, relationship)
+        INSERT INTO app.parent_child_links
+          (school_id, family_id, parent_user_id, student_id, relationship)
         VALUES (
           ${schoolId},
+          ${familyId}::uuid,
           ${guardian.parent_user_id}::uuid,
           ${student.id},
           ${guardian.relationship}::app.parent_relationship
@@ -401,12 +410,91 @@ export async function updateStudent(
 // Parent-child linking
 // ---------------------------------------------------------------------------
 
+async function resolveGuardianFamily(
+  tx: TransactionSql,
+  schoolId: string,
+  parentUserId: string,
+  requestedFamilyId?: string,
+): Promise<string> {
+  const [parent] = await tx<{ id: string }[]>`
+    SELECT user_row.id
+    FROM app.users AS user_row
+    JOIN app.user_roles AS role
+      ON role.school_id = user_row.school_id
+     AND role.user_id = user_row.id
+     AND role.role = 'PARENT'::app.user_role
+    WHERE user_row.school_id = ${schoolId}::uuid
+      AND user_row.id = ${parentUserId}::uuid
+  `;
+  if (!parent) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.PARENT_INVALID_ROLE,
+      "User does not have the PARENT role.",
+    );
+  }
+
+  if (requestedFamilyId) {
+    const [family] = await tx<{ id: string }[]>`
+      SELECT id
+      FROM app.families
+      WHERE school_id = ${schoolId}::uuid
+        AND id = ${requestedFamilyId}::uuid
+    `;
+    if (!family) throw new HTTPException(404, { message: "Family not found" });
+    return family.id;
+  }
+
+  const [existing] = await tx<{ id: string }[]>`
+    SELECT family.id
+    FROM app.families AS family
+    WHERE family.school_id = ${schoolId}::uuid
+      AND (
+        family.primary_parent_user_id = ${parentUserId}::uuid
+        OR EXISTS (
+          SELECT 1
+          FROM app.parent_child_links AS link
+          WHERE link.school_id = family.school_id
+            AND link.family_id = family.id
+            AND link.parent_user_id = ${parentUserId}::uuid
+        )
+      )
+    ORDER BY family.created_at, family.id
+    LIMIT 1
+  `;
+  if (existing) return existing.id;
+
+  const [created] = await tx<{ id: string; display_name: string }[]>`
+    INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+    SELECT
+      ${schoolId}::uuid,
+      left(COALESCE(NULLIF(btrim(display_name), ''), 'Family'), 200),
+      id
+    FROM app.users
+    WHERE school_id = ${schoolId}::uuid
+      AND id = ${parentUserId}::uuid
+    RETURNING id, display_name
+  `;
+  if (!created) throw new HTTPException(404, { message: "Parent user not found" });
+  await emitAuditLog(tx, {
+    action: "insert",
+    targetTable: "families",
+    targetId: created.id,
+    newValues: {
+      display_name: created.display_name,
+      primary_parent_user_id: parentUserId,
+    },
+  });
+  return created.id;
+}
+
 export async function linkParentToStudent(
   tx: TransactionSql,
   schoolId: string,
   studentId: string,
   parentUserId: string,
   relationship: ParentRelationship,
+  familyId?: string,
 ): Promise<GuardianRow> {
   const [student] = await tx<{ id: string }[]>`
     SELECT id FROM app.students
@@ -452,17 +540,26 @@ export async function linkParentToStudent(
     );
   }
 
+  const resolvedFamilyId = await resolveGuardianFamily(tx, schoolId, parentUserId, familyId);
+
   const [row] = await tx<GuardianRow[]>`
-    INSERT INTO app.parent_child_links (school_id, parent_user_id, student_id, relationship)
-    VALUES (${schoolId}, ${parentUserId}::uuid, ${studentId}::uuid, ${relationship}::app.parent_relationship)
-    RETURNING parent_user_id, relationship, created_at
+    INSERT INTO app.parent_child_links
+      (school_id, family_id, parent_user_id, student_id, relationship)
+    VALUES (
+      ${schoolId},
+      ${resolvedFamilyId}::uuid,
+      ${parentUserId}::uuid,
+      ${studentId}::uuid,
+      ${relationship}::app.parent_relationship
+    )
+    RETURNING family_id, parent_user_id, relationship, created_at
   `;
 
   await emitAuditLog(tx, {
     action: "insert",
     targetTable: "parent_child_links",
     targetId: studentId,
-    newValues: { parent_user_id: parentUserId, relationship },
+    newValues: { family_id: resolvedFamilyId, parent_user_id: parentUserId, relationship },
   });
 
   return row!;

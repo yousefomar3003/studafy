@@ -197,9 +197,15 @@ async function seed(): Promise<Fixture> {
 
   // Everything below has no factory; seed it directly under the tenant transaction.
   const extra = await asAppUser(schoolId, admin.id, async (tx) => {
+    const [family] = await tx<{ id: string }[]>`
+      INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+      VALUES (${schoolId}, 'Row-scope family', ${parent.id})
+      RETURNING id
+    `;
     await tx`
-      INSERT INTO app.parent_child_links (school_id, parent_user_id, student_id, relationship)
-      VALUES (${schoolId}, ${parent.id}, ${studentA.id}, 'mother')
+      INSERT INTO app.parent_child_links
+        (school_id, parent_user_id, student_id, family_id, relationship)
+      VALUES (${schoolId}, ${parent.id}, ${studentA.id}, ${family!.id}, 'mother')
     `;
 
     // Timetable version (draft) + one slot for class A taught by teacher A.

@@ -258,10 +258,21 @@ beforeAll(async () => {
         )
       `;
     }
+    const [family] = await tx<{ id: string }[]>`
+      INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+      VALUES (${school.id}::uuid, 'Published grades family', ${parent.id}::uuid)
+      RETURNING id
+    `;
     await tx`
       INSERT INTO app.parent_child_links
-        (school_id, parent_user_id, student_id, relationship)
-      VALUES (${school.id}::uuid, ${parent.id}::uuid, ${student.id}::uuid, 'guardian')
+        (school_id, parent_user_id, student_id, family_id, relationship)
+      VALUES (
+        ${school.id}::uuid,
+        ${parent.id}::uuid,
+        ${student.id}::uuid,
+        ${family!.id}::uuid,
+        'guardian'
+      )
     `;
     return scheme!.id;
   });

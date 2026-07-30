@@ -179,9 +179,15 @@ async function seedTenant(sql: Sql) {
   // A linked parent, and an unlinked one in the same school as the control.
   const parent = await createUser(sql, school.id);
   const strangerParent = await createUser(sql, school.id);
+  const [family] = await sql<{ id: string }[]>`
+    INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+    VALUES (${school.id}, 'Submission fixture family', ${parent.id})
+    RETURNING id
+  `;
   await sql`
-    INSERT INTO app.parent_child_links (school_id, parent_user_id, student_id, relationship)
-    VALUES (${school.id}, ${parent.id}, ${studentA.id}, 'mother')
+    INSERT INTO app.parent_child_links
+      (school_id, family_id, parent_user_id, student_id, relationship)
+    VALUES (${school.id}, ${family!.id}, ${parent.id}, ${studentA.id}, 'mother')
   `;
 
   return {

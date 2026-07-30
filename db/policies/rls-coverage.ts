@@ -88,6 +88,10 @@ approved_flexible_columns(table_name, column_name) AS (
     ('scholarship_discount_cache', 'erpnext_payload'),
     ('installment_cache', 'erpnext_payload'),
     ('finance_reconciliation_logs', 'unresolved_divergences'),
+    -- ST-126 stores validated, report-specific ERPNext filter snapshots so a queued worker can
+    -- reproduce the exact request. The stable relational fields (tenant, requester, type, format,
+    -- status and object metadata) remain normalized and constrained.
+    ('finance_report_jobs', 'parameters'),
     ('student_imports', 'rows_data'),
     ('student_imports', 'errors'),
     ('student_imports', 'summary')

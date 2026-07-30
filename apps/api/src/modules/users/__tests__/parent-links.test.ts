@@ -56,10 +56,22 @@ afterAll(async () => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function withTx<T>(fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
+async function withTx<T>(schoolId: string, fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
+  const [actor] = await db.sql<{ id: string }[]>`
+    SELECT id
+    FROM app.users
+    WHERE school_id = ${schoolId}
+    ORDER BY created_at, id
+    LIMIT 1
+  `;
   let result: T | undefined;
   await db.sql.begin(async (tx) => {
-    await tx`SELECT set_config('role', 'studafy_app', true)`;
+    await tx`
+      SELECT set_config('app.school_id', ${schoolId}, true),
+             set_config('app.user_id', ${actor!.id}, true),
+             set_config('app.request_id', ${crypto.randomUUID()}, true),
+             set_config('statement_timeout', '5000', true)
+    `;
     result = await fn(tx);
   });
   return result as T;
@@ -69,6 +81,16 @@ async function createParentUser(schoolId: string, email?: string) {
   const user = await createUserFactory(db.sql, schoolId, { email });
   await assignRole(db.sql, schoolId, user.id, "PARENT");
   return user;
+}
+
+async function expectServiceError(run: () => Promise<unknown>): Promise<void> {
+  let received: unknown;
+  try {
+    await run();
+  } catch (error) {
+    received = error;
+  }
+  expect(received).toBeInstanceOf(Error);
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +105,7 @@ describeDb("linkParentToStudent", () => {
     });
     const parent = await createParentUser(school.id, "parent1@test.local");
 
-    const guardian = await withTx((tx) =>
+    const guardian = await withTx(school.id, (tx) =>
       linkParentToStudent(tx, school.id, student.id, parent.id, "mother"),
     );
 
@@ -100,9 +122,13 @@ describeDb("linkParentToStudent", () => {
     });
     const parent = await createParentUser(school.id, "parent2@test.local");
 
-    await withTx((tx) => linkParentToStudent(tx, school.id, student.id, parent.id, "father"));
+    await withTx(school.id, (tx) =>
+      linkParentToStudent(tx, school.id, student.id, parent.id, "father"),
+    );
 
-    const guardians = await withTx((tx) => getStudentGuardians(tx, school.id, student.id));
+    const guardians = await withTx(school.id, (tx) =>
+      getStudentGuardians(tx, school.id, student.id),
+    );
 
     expect(guardians.length).toBe(1);
     expect(guardians[0]!.parent_user_id).toBe(parent.id);
@@ -116,19 +142,23 @@ describeDb("linkParentToStudent", () => {
     });
     const parent = await createParentUser(school.id, "parent3@test.local");
 
-    await withTx((tx) => linkParentToStudent(tx, school.id, student.id, parent.id, "guardian"));
+    await withTx(school.id, (tx) =>
+      linkParentToStudent(tx, school.id, student.id, parent.id, "guardian"),
+    );
 
-    await expect(
-      withTx((tx) => linkParentToStudent(tx, school.id, student.id, parent.id, "guardian")),
-    ).rejects.toThrow();
+    await expectServiceError(() =>
+      withTx(school.id, (tx) =>
+        linkParentToStudent(tx, school.id, student.id, parent.id, "guardian"),
+      ),
+    );
   });
 
   test("rejects non-existent student", async () => {
     const school = await createSchool(db.sql);
     const parent = await createParentUser(school.id, "parent4@test.local");
 
-    await expect(
-      withTx((tx) =>
+    await expectServiceError(() =>
+      withTx(school.id, (tx) =>
         linkParentToStudent(
           tx,
           school.id,
@@ -137,7 +167,7 @@ describeDb("linkParentToStudent", () => {
           "mother",
         ),
       ),
-    ).rejects.toThrow();
+    );
   });
 
   test("rejects non-existent parent user", async () => {
@@ -146,8 +176,8 @@ describeDb("linkParentToStudent", () => {
       email: "student5@test.local",
     });
 
-    await expect(
-      withTx((tx) =>
+    await expectServiceError(() =>
+      withTx(school.id, (tx) =>
         linkParentToStudent(
           tx,
           school.id,
@@ -156,7 +186,7 @@ describeDb("linkParentToStudent", () => {
           "mother",
         ),
       ),
-    ).rejects.toThrow();
+    );
   });
 
   test("rejects user without PARENT role", async () => {
@@ -168,9 +198,11 @@ describeDb("linkParentToStudent", () => {
       email: "regular@test.local",
     });
 
-    await expect(
-      withTx((tx) => linkParentToStudent(tx, school.id, student.id, regularUser.id, "mother")),
-    ).rejects.toThrow();
+    await expectServiceError(() =>
+      withTx(school.id, (tx) =>
+        linkParentToStudent(tx, school.id, student.id, regularUser.id, "mother"),
+      ),
+    );
   });
 
   test("allows same parent linked to different students", async () => {
@@ -183,11 +215,19 @@ describeDb("linkParentToStudent", () => {
     });
     const parent = await createParentUser(school.id, "parent7@test.local");
 
-    await withTx((tx) => linkParentToStudent(tx, school.id, student1.id, parent.id, "mother"));
-    await withTx((tx) => linkParentToStudent(tx, school.id, student2.id, parent.id, "mother"));
+    await withTx(school.id, (tx) =>
+      linkParentToStudent(tx, school.id, student1.id, parent.id, "mother"),
+    );
+    await withTx(school.id, (tx) =>
+      linkParentToStudent(tx, school.id, student2.id, parent.id, "mother"),
+    );
 
-    const guardians1 = await withTx((tx) => getStudentGuardians(tx, school.id, student1.id));
-    const guardians2 = await withTx((tx) => getStudentGuardians(tx, school.id, student2.id));
+    const guardians1 = await withTx(school.id, (tx) =>
+      getStudentGuardians(tx, school.id, student1.id),
+    );
+    const guardians2 = await withTx(school.id, (tx) =>
+      getStudentGuardians(tx, school.id, student2.id),
+    );
 
     expect(guardians1.length).toBe(1);
     expect(guardians2.length).toBe(1);
@@ -201,10 +241,16 @@ describeDb("linkParentToStudent", () => {
     const parent1 = await createParentUser(school.id, "parent8a@test.local");
     const parent2 = await createParentUser(school.id, "parent8b@test.local");
 
-    await withTx((tx) => linkParentToStudent(tx, school.id, student.id, parent1.id, "mother"));
-    await withTx((tx) => linkParentToStudent(tx, school.id, student.id, parent2.id, "father"));
+    await withTx(school.id, (tx) =>
+      linkParentToStudent(tx, school.id, student.id, parent1.id, "mother"),
+    );
+    await withTx(school.id, (tx) =>
+      linkParentToStudent(tx, school.id, student.id, parent2.id, "father"),
+    );
 
-    const guardians = await withTx((tx) => getStudentGuardians(tx, school.id, student.id));
+    const guardians = await withTx(school.id, (tx) =>
+      getStudentGuardians(tx, school.id, student.id),
+    );
     expect(guardians.length).toBe(2);
   });
 });
@@ -221,11 +267,15 @@ describeDb("unlinkParentFromStudent", () => {
     });
     const parent = await createParentUser(school.id, "unlink-parent1@test.local");
 
-    await withTx((tx) => linkParentToStudent(tx, school.id, student.id, parent.id, "mother"));
+    await withTx(school.id, (tx) =>
+      linkParentToStudent(tx, school.id, student.id, parent.id, "mother"),
+    );
 
-    await withTx((tx) => unlinkParentFromStudent(tx, school.id, student.id, parent.id));
+    await withTx(school.id, (tx) => unlinkParentFromStudent(tx, school.id, student.id, parent.id));
 
-    const guardians = await withTx((tx) => getStudentGuardians(tx, school.id, student.id));
+    const guardians = await withTx(school.id, (tx) =>
+      getStudentGuardians(tx, school.id, student.id),
+    );
     expect(guardians.length).toBe(0);
   });
 
@@ -236,9 +286,9 @@ describeDb("unlinkParentFromStudent", () => {
     });
     const parent = await createParentUser(school.id, "unlink-parent2@test.local");
 
-    await expect(
-      withTx((tx) => unlinkParentFromStudent(tx, school.id, student.id, parent.id)),
-    ).rejects.toThrow();
+    await expectServiceError(() =>
+      withTx(school.id, (tx) => unlinkParentFromStudent(tx, school.id, student.id, parent.id)),
+    );
   });
 
   test("unlink only removes the specified pair", async () => {
@@ -249,12 +299,18 @@ describeDb("unlinkParentFromStudent", () => {
     const parent1 = await createParentUser(school.id, "unlink-parent3a@test.local");
     const parent2 = await createParentUser(school.id, "unlink-parent3b@test.local");
 
-    await withTx((tx) => linkParentToStudent(tx, school.id, student.id, parent1.id, "mother"));
-    await withTx((tx) => linkParentToStudent(tx, school.id, student.id, parent2.id, "father"));
+    await withTx(school.id, (tx) =>
+      linkParentToStudent(tx, school.id, student.id, parent1.id, "mother"),
+    );
+    await withTx(school.id, (tx) =>
+      linkParentToStudent(tx, school.id, student.id, parent2.id, "father"),
+    );
 
-    await withTx((tx) => unlinkParentFromStudent(tx, school.id, student.id, parent1.id));
+    await withTx(school.id, (tx) => unlinkParentFromStudent(tx, school.id, student.id, parent1.id));
 
-    const guardians = await withTx((tx) => getStudentGuardians(tx, school.id, student.id));
+    const guardians = await withTx(school.id, (tx) =>
+      getStudentGuardians(tx, school.id, student.id),
+    );
     expect(guardians.length).toBe(1);
     expect(guardians[0]!.parent_user_id).toBe(parent2.id);
   });
