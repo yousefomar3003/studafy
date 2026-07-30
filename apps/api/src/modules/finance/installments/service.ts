@@ -110,7 +110,7 @@ export async function listInstallments(
   const [rows, [count]] = await Promise.all([
     tx<Record<string, unknown>[]>`
       SELECT ${tx.unsafe(CACHE_COLUMNS)}
-      FROM app.fee_schedule_cache AS fsc
+      FROM app.installment_cache AS fsc
       JOIN app.currencies AS c ON c.id = fsc.currency_id
       WHERE ${conditions}${statusFilter}${dateFromFilter}${dateToFilter}
       ORDER BY fsc.due_date ASC, fsc.erpnext_fee_schedule_id
@@ -118,7 +118,7 @@ export async function listInstallments(
     `,
     tx<{ total: number }[]>`
       SELECT count(*)::int AS total
-      FROM app.fee_schedule_cache AS fsc
+      FROM app.installment_cache AS fsc
       WHERE ${conditions}${statusFilter}${dateFromFilter}${dateToFilter}
     `,
   ]);
@@ -185,7 +185,7 @@ async function projectToCache(
   }
 
   const [row] = await tx<Record<string, unknown>[]>`
-    INSERT INTO app.fee_schedule_cache (
+    INSERT INTO app.installment_cache (
       school_id, student_id, erpnext_fee_schedule_id, fee_structure_id,
       due_date, total_amount_minor, paid_amount_minor, outstanding_amount_minor,
       currency_id, status, erpnext_payload, synced_at
@@ -222,7 +222,7 @@ async function projectToCache(
 
   const [projected] = await tx<Record<string, unknown>[]>`
     SELECT ${tx.unsafe(CACHE_COLUMNS)}
-    FROM app.fee_schedule_cache AS fsc
+    FROM app.installment_cache AS fsc
     JOIN app.currencies AS c ON c.id = fsc.currency_id
     WHERE fsc.school_id = ${schoolId}::uuid AND fsc.erpnext_fee_schedule_id = ${erpnextName}
   `;
@@ -307,7 +307,7 @@ export async function generateFeeSchedule(
 
     await emitAuditLog(tx, {
       action: "insert",
-      targetTable: "fee_schedule_cache",
+      targetTable: "installment_cache",
       targetId: schoolId,
       newValues: {
         erpnext_doctype: FEE_SCHEDULE_DOCTYPE,

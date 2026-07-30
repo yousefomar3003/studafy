@@ -79,7 +79,7 @@ const generateFeeScheduleRoute = createRoute({
     "Forwards fee schedule generation payloads to ERPNext for each student in the request. " +
     "Supports monthly, quarterly, term-wise, and yearly schedule types. " +
     "ERPNext computes per-installment amounts and assigns due dates; results are projected " +
-    "into the local fee_schedule_cache read model. " +
+    "into the local installment_cache read model. " +
     "ERPNext's own rejection messages are returned verbatim on 400.",
   security: [{ bearerAuth: [] }],
   request: {
@@ -100,7 +100,7 @@ export function installmentRoutes(
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  routes.use("/api/finance/fee-schedules/generate", auditAction("insert", "fee_schedule_cache"));
+  routes.use("/api/finance/fee-schedules/generate", auditAction("insert", "installment_cache"));
 
   routes.use(
     "/api/finance/students/{studentId}/installments",

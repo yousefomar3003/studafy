@@ -70,7 +70,7 @@ async function flagOverdueInstallments(
   logger?: Logger,
 ): Promise<OverdueItem[]> {
   const overdue = await tx<OverdueItem[]>`
-    UPDATE app.fee_schedule_cache
+    UPDATE app.installment_cache
     SET status = 'overdue',
         updated_at = CURRENT_TIMESTAMP
     WHERE school_id = ${schoolId}::uuid
@@ -131,7 +131,7 @@ async function detectAndHealDrift(
     SELECT id, student_id, erpnext_fee_schedule_id, due_date,
            total_amount_minor, paid_amount_minor, outstanding_amount_minor,
            currency_id, status
-    FROM app.fee_schedule_cache
+    FROM app.installment_cache
     WHERE school_id = ${schoolId}::uuid
       AND status IN ('pending', 'partially_paid', 'overdue')
   `;
@@ -210,7 +210,7 @@ async function detectAndHealDrift(
     }
 
     await tx`
-      UPDATE app.fee_schedule_cache
+      UPDATE app.installment_cache
       SET total_amount_minor      = ${totalMinor.toString()}::bigint,
           paid_amount_minor       = ${paidMinor.toString()}::bigint,
           outstanding_amount_minor = ${outstandingMinor.toString()}::bigint,
@@ -224,7 +224,7 @@ async function detectAndHealDrift(
 
     const recheck = await tx<{ outstanding_amount_minor: number }[]>`
       SELECT outstanding_amount_minor
-      FROM app.fee_schedule_cache
+      FROM app.installment_cache
       WHERE school_id = ${schoolId}::uuid
         AND erpnext_fee_schedule_id = ${row.erpnext_fee_schedule_id}
     `;

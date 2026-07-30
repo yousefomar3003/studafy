@@ -28,7 +28,7 @@ const runReconciliationRoute = createRoute({
   summary: "Run daily finance reconciliation across all schools",
   description:
     "Triggers the daily reconciliation job for every school. Flags overdue installments, " +
-    "detects fee_schedule_cache drift against ERPNext AR/GL, auto-heals by re-pulling " +
+    "detects installment_cache drift against ERPNext AR/GL, auto-heals by re-pulling " +
     "authoritative DocType snapshots, and logs unresolved divergences for alerting.\n\n" +
     "Authenticated via an internal service API key (X-Api-Key header), not a user bearer token.",
   security: [{ bearerAuth: [] }],

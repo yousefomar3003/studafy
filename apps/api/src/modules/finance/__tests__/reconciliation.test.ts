@@ -128,7 +128,7 @@ describe("reconciliation integration", () => {
         const studentId = await seedStudent(database.sql, schoolId);
         const currencyId = await getCurrencyId(database.sql, "JOD");
 
-        await seedFeeScheduleCache(database.sql, schoolId, studentId, currencyId, {
+        await seedInstallmentCache(database.sql, schoolId, studentId, currencyId, {
           erpnext_fee_schedule_id: "FS-OVERDUE-1",
           due_date: "2020-01-01",
           total_amount_minor: 100000,
@@ -153,7 +153,7 @@ describe("reconciliation integration", () => {
           expect(result.status).toBe("drift_corrected");
 
           const [row] = await tx<{ status: string }[]>`
-            SELECT status FROM app.fee_schedule_cache
+            SELECT status FROM app.installment_cache
             WHERE school_id = ${schoolId}::uuid AND erpnext_fee_schedule_id = 'FS-OVERDUE-1'
           `;
           expect(row!.status).toBe("overdue");
@@ -177,7 +177,7 @@ describe("reconciliation integration", () => {
         const currencyId = await getCurrencyId(database.sql, "JOD");
 
         // Seed with stale outstanding (500 local vs 300 ERPNext)
-        await seedFeeScheduleCache(database.sql, schoolId, studentId, currencyId, {
+        await seedInstallmentCache(database.sql, schoolId, studentId, currencyId, {
           erpnext_fee_schedule_id: "FS-DRIFT-1",
           due_date: "2099-12-31",
           total_amount_minor: 100000,
@@ -204,7 +204,7 @@ describe("reconciliation integration", () => {
           expect(result.status).toBe("drift_corrected");
 
           const [row] = await tx<{ outstanding_amount_minor: number; status: string }[]>`
-            SELECT outstanding_amount_minor, status FROM app.fee_schedule_cache
+            SELECT outstanding_amount_minor, status FROM app.installment_cache
             WHERE school_id = ${schoolId}::uuid AND erpnext_fee_schedule_id = 'FS-DRIFT-1'
           `;
           expect(row!.outstanding_amount_minor).toBe(30000);
@@ -228,7 +228,7 @@ describe("reconciliation integration", () => {
         const studentId = await seedStudent(database.sql, schoolId);
         const currencyId = await getCurrencyId(database.sql, "JOD");
 
-        await seedFeeScheduleCache(database.sql, schoolId, studentId, currencyId, {
+        await seedInstallmentCache(database.sql, schoolId, studentId, currencyId, {
           erpnext_fee_schedule_id: "FS-DIVERGE-1",
           due_date: "2099-12-31",
           total_amount_minor: 100000,
@@ -281,7 +281,7 @@ describe("reconciliation integration", () => {
   );
 
   integrationTest(
-    "RLS prevents cross-tenant access to fee_schedule_cache",
+    "RLS prevents cross-tenant access to installment_cache",
     async () => {
       const database = await createTestDatabase();
       try {
@@ -297,7 +297,7 @@ describe("reconciliation integration", () => {
           await tx`SELECT set_config('app.school_id', ${schoolA}, true)`.execute();
           await tx.unsafe("SET LOCAL ROLE studafy_app");
 
-          await seedFeeScheduleCache(tx, schoolA, studentA, currencyId, {
+          await seedInstallmentCache(tx, schoolA, studentA, currencyId, {
             erpnext_fee_schedule_id: "FS-RLS-A",
             due_date: "2099-12-31",
             total_amount_minor: 100000,
@@ -312,7 +312,7 @@ describe("reconciliation integration", () => {
           await tx`SELECT set_config('app.school_id', ${schoolB}, true)`.execute();
           await tx.unsafe("SET LOCAL ROLE studafy_app");
 
-          await seedFeeScheduleCache(tx, schoolB, studentB, currencyId, {
+          await seedInstallmentCache(tx, schoolB, studentB, currencyId, {
             erpnext_fee_schedule_id: "FS-RLS-B",
             due_date: "2099-12-31",
             total_amount_minor: 200000,
@@ -322,7 +322,7 @@ describe("reconciliation integration", () => {
           });
 
           const rows = await tx<{ erpnext_fee_schedule_id: string }[]>`
-            SELECT erpnext_fee_schedule_id FROM app.fee_schedule_cache
+            SELECT erpnext_fee_schedule_id FROM app.installment_cache
             WHERE school_id = ${schoolB}::uuid
           `;
           expect(rows).toHaveLength(1);
@@ -380,7 +380,7 @@ async function getCurrencyId(sql: Sql | TransactionSql, code: string) {
   return row!.id;
 }
 
-async function seedFeeScheduleCache(
+async function seedInstallmentCache(
   sql: Sql | TransactionSql,
   schoolId: string,
   studentId: string,
@@ -395,7 +395,7 @@ async function seedFeeScheduleCache(
   },
 ) {
   await sql`
-    INSERT INTO app.fee_schedule_cache (
+    INSERT INTO app.installment_cache (
       school_id, student_id, erpnext_fee_schedule_id, due_date,
       total_amount_minor, paid_amount_minor, outstanding_amount_minor,
       currency_id, status, erpnext_payload, synced_at

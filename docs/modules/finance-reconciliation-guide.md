@@ -9,7 +9,7 @@ The Studafy finance gateway is a **pass-through** to each school's ERPNext site.
 - Sales Invoice creation and outstanding amount calculation
 - Payment entry allocation and AR/GL reconciliation
 
-The local PostgreSQL tables (`fee_schedule_cache`, `payment_cache`, `invoice_cache`) are **read-model projections** for fast UI rendering. They are never the source of truth—ERPNext is.
+The local PostgreSQL tables (`installment_cache`, `payment_cache`, `invoice_cache`) are **read-model projections** for fast UI rendering. They are never the source of truth—ERPNext is.
 
 ### Pass-Through Principle
 
@@ -17,11 +17,11 @@ The gateway authenticates callers, scopes requests to the tenant's ERPNext site 
 
 ### Single Source of Truth
 
-ERPNext/Frappe Education Fee Schedules drive installment statuses. `fee_schedule_cache` stores local read-model projections for quick UI rendering. The daily reconciliation job ensures these projections stay accurate.
+ERPNext/Frappe Education Fee Schedules drive installment statuses. `installment_cache` stores local read-model projections for quick UI rendering. The daily reconciliation job ensures these projections stay accurate.
 
 ---
 
-## Table: `fee_schedule_cache`
+## Table: `installment_cache`
 
 Per-installment read model of one ERPNext Fee Schedule entry.
 
@@ -43,9 +43,9 @@ Per-installment read model of one ERPNext Fee Schedule entry.
 
 ### Indexes
 
-- `idx_fee_schedule_cache_unique`: `(school_id, erpnext_fee_schedule_id)` — 1:1 mapping
-- `idx_fee_schedule_cache_student`: `(school_id, student_id, due_date ASC)` — student lookup
-- `idx_fee_schedule_cache_status`: `(school_id, status, due_date) WHERE status IN ('pending', 'partially_paid', 'overdue')` — reconciliation queries
+- `idx_installment_cache_unique`: `(school_id, erpnext_fee_schedule_id)` — 1:1 mapping
+- `idx_installment_cache_student`: `(school_id, student_id, due_date ASC)` — student lookup
+- `idx_installment_cache_status`: `(school_id, status, due_date) WHERE status IN ('pending', 'partially_paid', 'overdue')` — reconciliation queries
 
 ### Status Transitions
 
@@ -96,11 +96,11 @@ Audit trail for daily reconciliation runs.
 For each school in `app.schools`:
 
 1. **Phase 1 — Overdue Flagging**
-   - Updates `fee_schedule_cache` rows where `due_date < CURRENT_DATE` and `status IN ('pending', 'partially_paid')` to `status = 'overdue'`
+   - Updates `installment_cache` rows where `due_date < CURRENT_DATE` and `status IN ('pending', 'partially_paid')` to `status = 'overdue'`
    - Emits `fee.installmentOverdue` domain event for each newly overdue installment
 
 2. **Phase 2 — Drift Detection**
-   - Queries every active (non-`paid`) `fee_schedule_cache` row
+   - Queries every active (non-`paid`) `installment_cache` row
    - For each row, fetches the authoritative Fee Schedule document from ERPNext via `GET /api/resource/Fee Schedule/{name}`
    - Compares `outstanding_amount_minor` with ERPNext's `outstanding_amount`
 
@@ -198,7 +198,7 @@ If the automated reconciliation cannot resolve a divergence:
 
 4. Manually update the cache via the webhook refresh or a direct SQL update (admin only):
    ```sql
-   UPDATE app.fee_schedule_cache
+   UPDATE app.installment_cache
    SET outstanding_amount_minor = <correct-value>,
        paid_amount_minor = <correct-value>,
        status = '<computed-status>',
@@ -221,12 +221,12 @@ If the automated reconciliation cannot resolve a divergence:
 
 ## Related Files
 
-| File                                                                | Purpose                          |
-| ------------------------------------------------------------------- | -------------------------------- |
-| `db/migrations/000070_create_fee_schedule_cache_reconciliation.sql` | Schema definition                |
-| `apps/api/src/modules/finance/installments/schemas.ts`              | Zod schemas for installments API |
-| `apps/api/src/modules/finance/installments/service.ts`              | Installment read/write logic     |
-| `apps/api/src/modules/finance/installments/routes.ts`               | Installment route handlers       |
-| `apps/api/src/modules/finance/jobs/reconciliation.job.ts`           | Reconciliation engine            |
-| `apps/api/src/modules/finance/jobs/reconciliation.routes.ts`        | Reconciliation trigger route     |
-| `apps/api/src/modules/finance/__tests__/reconciliation.test.ts`     | Integration/unit tests           |
+| File                                                               | Purpose                          |
+| ------------------------------------------------------------------ | -------------------------------- |
+| `db/migrations/000070_create_installment_cache_reconciliation.sql` | Schema definition                |
+| `apps/api/src/modules/finance/installments/schemas.ts`             | Zod schemas for installments API |
+| `apps/api/src/modules/finance/installments/service.ts`             | Installment read/write logic     |
+| `apps/api/src/modules/finance/installments/routes.ts`              | Installment route handlers       |
+| `apps/api/src/modules/finance/jobs/reconciliation.job.ts`          | Reconciliation engine            |
+| `apps/api/src/modules/finance/jobs/reconciliation.routes.ts`       | Reconciliation trigger route     |
+| `apps/api/src/modules/finance/__tests__/reconciliation.test.ts`    | Integration/unit tests           |
