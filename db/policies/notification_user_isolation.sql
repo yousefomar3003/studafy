@@ -60,3 +60,26 @@ CREATE POLICY user_devices_owner ON app.user_devices
   AS RESTRICTIVE FOR ALL TO studafy_app
   USING (user_id = app.current_user_id())
   WITH CHECK (user_id = app.current_user_id());
+
+-- Added by 000074 (ST-139). Quiet hours, timezone and locale are the same class of data as channel
+-- preferences -- they belong to exactly one user -- so they take the same policy shape.
+--
+-- The notification dispatcher reads these rows for users other than itself. It can, because it runs
+-- under withSystemTenantTx, which elevates to studafy_admin; this policy names studafy_app, so it
+-- does not apply to that session. Tenant isolation still does, because it is permissive and applies
+-- to every role including the table owner under FORCE ROW LEVEL SECURITY. That is the same
+-- elevation the attendance alert worker already depends on, and the reason 000056's
+-- app.student_absence_days exists rather than a broader grant.
+CREATE POLICY user_notification_settings_owner ON app.user_notification_settings
+  AS RESTRICTIVE FOR ALL TO studafy_app
+  USING (user_id = app.current_user_id())
+  WITH CHECK (user_id = app.current_user_id());
+
+-- Why app.notification_dispatch_logs, app.notification_idempotency_keys and
+-- app.notification_dead_letters take no restrictive policy
+--
+-- None of them is a user's own data. The dispatch log is operational audit: the question it exists
+-- to answer -- "the parents were not told, why" -- can only be asked by someone reading rows
+-- addressed to other people, so fencing it per recipient would make it useless. The user-facing
+-- inbox is app.notifications, which is already fenced above. The idempotency ledger and the
+-- dead-letter table are worker-internal and no user-facing query reads them at all.

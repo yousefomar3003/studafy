@@ -34,11 +34,7 @@ if (schoolIds.length > 0) {
       db: relayDb,
       redis: relayRedis,
       config: { batchSize: 100, pollIntervalMs: 1_000, schoolIds },
-      logger: {
-        info: (fields, msg) => console.log(JSON.stringify({ ...fields, msg })),
-        warn: (fields, msg) => console.warn(JSON.stringify({ ...fields, msg })),
-        error: (fields, msg) => console.error(JSON.stringify({ ...fields, msg })),
-      },
+      logger: workerLogger,
     });
   });
 }

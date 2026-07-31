@@ -1,6 +1,9 @@
 import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
+import { Queue } from "bullmq";
 
+import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
+import { workerLogger } from "./log";
 import { processBillingJob } from "./queues/billing";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
@@ -9,6 +12,11 @@ import { processDigest } from "./queues/notifications/email";
 import { processAttendanceExport, processFinanceExport } from "./queues/reports";
 
 import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
+import type { FailedHandler } from "./queues/notifications/dead-letter";
+import type {
+  DeliverNotificationJobData,
+  DispatchNotificationJobData,
+} from "./queues/notifications/dispatcher.worker";
 import type { QueueName } from "@studafy/constants";
 import type { Job } from "bullmq";
 
@@ -19,6 +27,15 @@ export interface QueueDefinition {
   /** Number of jobs this process runs concurrently for this queue. */
   concurrency: number;
   processor: Processor;
+  /**
+   * Terminal-failure hook, attached by `createBullmqWorker`. Optional, so the queues with no
+   * dead-letter policy are unchanged.
+   *
+   * Synchronous by type on purpose: BullMQ emits `failed` on every attempt and does not await its
+   * listeners, so a handler that returned a promise would be one nobody holds. It may start async
+   * work; it owns its own error handling.
+   */
+  onFailed?: FailedHandler;
 }
 
 // The DB-backed processors need a connection string, resolved once at registry construction and
@@ -39,6 +56,27 @@ function placeholderProcessor(name: QueueName): Processor {
     console.log(`[${name}] processed job ${job.id} (${job.name})`);
     return { processed: true };
   };
+}
+
+/**
+ * The queue the dispatcher fans channel deliveries out onto — the `notifications` queue itself,
+ * since that is where the delivery processor lives.
+ *
+ * Created lazily rather than at module scope, and that matters: registry.test.ts imports this
+ * module, and constructing a BullMQ `Queue` opens a Redis connection. A module-scope queue would
+ * make a pure unit test require a live Redis. Nothing in that test reaches a branch that dispatches,
+ * so the connection is never opened there.
+ */
+let deliveryQueue: Queue | null = null;
+
+function enqueueDelivery(data: DeliverNotificationJobData): Promise<void> {
+  deliveryQueue ??= new Queue(QUEUE_NAMES.NOTIFICATIONS, {
+    connection: createRedisConnection(workerEnv) as never,
+  });
+
+  return deliveryQueue
+    .add(JOB_NAMES.DELIVER_NOTIFICATION, data, DELIVERY_JOB_OPTIONS)
+    .then(() => undefined);
 }
 
 /**
@@ -86,6 +124,10 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       // so this fallback is load-bearing rather than defensive.
       return { processed: true };
     },
+    // Terminal failures on this queue are dead-lettered to app.notification_dead_letters and raise
+    // `notification.dispatchFailed`. Only this queue carries the hook — it is the only one whose
+    // jobs a person is waiting on.
+    onFailed: deadLetterListener(databaseUrl, workerLogger),
   },
   {
     name: QUEUE_NAMES.REPORTS,

@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { PERMISSIONS } from "@studafy/constants";
+import { PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
+import { Queue } from "bullmq";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
@@ -19,6 +20,7 @@ import {
   submitBodySchema,
   unlockBodySchema,
 } from "../config/schemas";
+import { enqueueNotificationDispatch } from "../enqueue-dispatch";
 import {
   assertCanManageGradebook,
   bulkUpdateGrades,
@@ -31,6 +33,7 @@ import {
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { RedisClient } from "../../../redis";
 import type { GradeRow, GradeSubmissionWithGrades } from "../grade-entry-service";
 import type { Context } from "hono";
 
@@ -230,8 +233,18 @@ const unlockSubmissionRoute = createRoute({
 // Route factory
 // ---------------------------------------------------------------------------
 
-export function gradeEntryRoutes(database: Database): OpenAPIHono<AppEnv> {
+export function gradeEntryRoutes(
+  database: Database,
+  redis: RedisClient | null = null,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  // Nullable for the same reason every other producer in this app is: REDIS_URL is optional, and
+  // dev, test and the OpenAPI generator all run without it. Without Redis the API still publishes
+  // grades perfectly well; it simply notifies nobody.
+  const notificationsQueue = redis
+    ? new Queue(QUEUE_NAMES.NOTIFICATIONS, { connection: redis as never })
+    : null;
 
   routes.use(
     "/api/grades/gradebooks/{gradebookId}/entry",
@@ -345,6 +358,20 @@ export function gradeEntryRoutes(database: Database): OpenAPIHono<AppEnv> {
         body.rejection_reason,
       );
     });
+
+    // ST-139: approve chains straight through to published, so this is the moment the student and
+    // their parents become notifiable.
+    //
+    // Enqueued after the transaction commits, not inside it — a job referencing rows that were
+    // rolled back is worse than a job that was never queued. The cost is a genuine gap: a crash
+    // between COMMIT and this line loses the notification for that publication, and only a replay
+    // recovers it. Same trade, for the same reason, as ../attendance/enqueue-alerts.ts.
+    if (submission.status === "published") {
+      await enqueueNotificationDispatch(notificationsQueue, c, {
+        schoolId: auth.schoolId,
+        submissionId,
+      });
+    }
 
     return c.json(toSubmissionResponse({ ...submission, grades: [] }), 200);
   });

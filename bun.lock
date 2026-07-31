@@ -28,6 +28,7 @@
         "@studafy/attendance-reporting": "workspace:*",
         "@studafy/constants": "workspace:*",
         "@studafy/finance-reporting": "workspace:*",
+        "@studafy/notification-templates": "workspace:*",
         "@studafy/shared-schemas": "workspace:*",
         "bullmq": "5.79.3",
         "hono": "4.12.28",
@@ -102,6 +103,7 @@
         "@studafy/attendance-reporting": "workspace:*",
         "@studafy/constants": "workspace:*",
         "@studafy/finance-reporting": "workspace:*",
+        "@studafy/notification-templates": "workspace:*",
         "bidi-js": "1.0.3",
         "bullmq": "5.79.3",
         "exceljs": "4.4.0",
@@ -202,6 +204,19 @@
         "@types/bun": "1.3.14",
         "typescript": "^5.9.3",
         "xmllint-wasm": "5.2.0",
+      },
+    },
+    "packages/notification-templates": {
+      "name": "@studafy/notification-templates",
+      "version": "0.0.0",
+      "dependencies": {
+        "@studafy/constants": "workspace:*",
+      },
+      "devDependencies": {
+        "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
+        "@types/bun": "1.3.14",
+        "typescript": "^5.9.3",
       },
     },
     "packages/shared-schemas": {
@@ -613,6 +628,8 @@
     "@studafy/finance-reporting": ["@studafy/finance-reporting@workspace:packages/finance-reporting"],
 
     "@studafy/mobile": ["@studafy/mobile@workspace:apps/mobile"],
+
+    "@studafy/notification-templates": ["@studafy/notification-templates@workspace:packages/notification-templates"],
 
     "@studafy/realtime": ["@studafy/realtime@workspace:apps/realtime"],
 

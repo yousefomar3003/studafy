@@ -16,6 +16,28 @@ export const QUEUE_NAMES = {
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
 /**
+ * Parking lots for jobs that exhausted their retries. Deliberately NOT in QUEUE_NAMES.
+ *
+ * QUEUE_NAMES is the set of queues apps/workers runs a BullMQ `Worker` for, and
+ * `QueueDefinition.name` is typed `QueueName` — so keeping dead-letter names in a separate constant
+ * with a separate type makes "attach a worker to a dead-letter queue" a compile error rather than a
+ * review comment. That is stricter than the runtime bijection registry.test.ts already enforces,
+ * and it keeps that bijection meaning what it says: a queue in QUEUE_NAMES has a real processor.
+ *
+ * The durable dead-letter record is app.notification_dead_letters (000074), not a Redis list. A
+ * queue with no worker never completes a job, so `removeOnComplete` never fires and it grows without
+ * bound; BullMQ's own failed set already retains the job data, `failedReason` and per-attempt
+ * stacks for the 30-day `removeOnFail` window, and already supports `job.retry()`. This constant
+ * reserves the name for the operator replay tool that drains it.
+ */
+export const DEAD_LETTER_QUEUE_NAMES = {
+  NOTIFICATIONS: "notifications-dlq",
+} as const;
+
+export type DeadLetterQueueName =
+  (typeof DEAD_LETTER_QUEUE_NAMES)[keyof typeof DEAD_LETTER_QUEUE_NAMES];
+
+/**
  * BullMQ job names, for queues that carry more than one kind of work.
  *
  * A queue name says which worker picks the job up; a job name says what it is. The `notifications`

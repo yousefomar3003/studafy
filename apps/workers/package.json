@@ -20,6 +20,7 @@
     "@studafy/attendance-reporting": "workspace:*",
     "@studafy/constants": "workspace:*",
     "@studafy/finance-reporting": "workspace:*",
+    "@studafy/notification-templates": "workspace:*",
     "bidi-js": "1.0.3",
     "bullmq": "5.79.3",
     "exceljs": "4.4.0",
