@@ -72,7 +72,7 @@ approved_globals(table_name) AS (
     ('security_events'),
     -- SES delivery feedback (R-08). Global by construction: SNS webhook notifications arrive before
     -- any tenant context exists, and an address suppression is a property of the address, not of any
-    -- one school. See db/migrations/000074_create_email_channel_tables.sql for the full rationale.
+    -- one school. See db/migrations/000077_create_email_channel_tables.sql for the full rationale.
     ('email_events'),
     ('email_suppressions')
 ),

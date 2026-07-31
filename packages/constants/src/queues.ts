@@ -52,6 +52,12 @@ export const JOB_NAMES = {
   GENERATE_INVOICE: "generate-invoice",
   GENERATE_BATCH_INVOICES: "generate-batch-invoices",
   SEND_DIGESTS: "send-digests",
+  // Notification dispatch (ST-139). DISPATCH resolves recipients and decides what each of them
+  // should receive; DELIVER carries one already-decided message to one recipient on one channel.
+  // They are separate jobs because the fan-out is transactional and idempotent while the delivery
+  // is an external call — retrying the second must not re-run the first.
+  DISPATCH_NOTIFICATION: "dispatch-notification",
+  DELIVER_NOTIFICATION: "deliver-notification",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

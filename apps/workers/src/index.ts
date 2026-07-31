@@ -2,6 +2,7 @@ import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv } from "./env";
+import { workerLogger } from "./log";
 import {
   createSesSender,
   scheduleDigestJob,

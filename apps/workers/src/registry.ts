@@ -8,6 +8,12 @@ import { processBillingJob } from "./queues/billing";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
+import { deadLetterListener } from "./queues/notifications/dead-letter";
+import { processNotificationDelivery } from "./queues/notifications/delivery.worker";
+import {
+  DELIVERY_JOB_OPTIONS,
+  processNotificationDispatch,
+} from "./queues/notifications/dispatcher.worker";
 import { processDigest } from "./queues/notifications/email";
 import { processAttendanceExport, processFinanceExport } from "./queues/reports";
 
@@ -107,6 +113,30 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
             data as AttendanceAlertJobData,
             databaseUrl,
             job.id ?? null,
+          );
+        }
+        return { processed: false, reason: "missing job data" };
+      }
+
+      if (job.name === JOB_NAMES.DISPATCH_NOTIFICATION) {
+        const data = job.data as Partial<DispatchNotificationJobData>;
+        if (data.schoolId && data.eventId && data.eventType && data.submissionId) {
+          return processNotificationDispatch(data as DispatchNotificationJobData, {
+            databaseUrl,
+            enqueueDelivery,
+            jobId: job.id ?? null,
+          });
+        }
+        return { processed: false, reason: "missing job data" };
+      }
+
+      if (job.name === JOB_NAMES.DELIVER_NOTIFICATION) {
+        const data = job.data as Partial<DeliverNotificationJobData>;
+        if (data.schoolId && data.dispatchLogId && data.recipientId && data.channel) {
+          return processNotificationDelivery(
+            data as DeliverNotificationJobData,
+            databaseUrl,
+            workerLogger,
           );
         }
         return { processed: false, reason: "missing job data" };
