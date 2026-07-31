@@ -55,6 +55,7 @@ import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
 import {
   EnvCredentialResolver,
   expenseRoutes,
+  familyFinancialViewRoutes,
   feeStructureRoutes,
   financeReportRoutes,
   installmentRoutes,
@@ -348,6 +349,7 @@ export function createApp({
 
     app.route("/", feeStructureRoutes(database, erpnextFactory));
     app.route("/", financeReportRoutes(database, erpnextFactory, redis ?? null, storage));
+    app.route("/", familyFinancialViewRoutes(database, process.env.PAYMENT_REDIRECT_BASE_URL));
     app.route("/", expenseRoutes(database, erpnextFactory, storage));
     app.route("/", paymentRoutes(database, erpnextFactory));
     app.route("/", scholarshipDiscountRoutes(database, erpnextFactory));
