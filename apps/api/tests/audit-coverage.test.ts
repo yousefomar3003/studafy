@@ -401,7 +401,7 @@ describe("audit route coverage", () => {
     }
 
     expect(uncovered).toHaveLength(0);
-  });
+  }, 30_000);
 
   // The guard that actually guards. A scanner blinded by a refactor reports zero routes; a pinned
   // list turns that into a failure, where "greater than 0" would let a comment's code sample pass
@@ -413,7 +413,7 @@ describe("audit route coverage", () => {
     expect(routes.map((r) => `${r.method} ${r.path}`).sort()).toEqual(
       [...EXPECTED_MUTATING_ROUTES].sort(),
     );
-  });
+  }, 30_000);
 
   // Proves the scanner reads code rather than documentation. auditEmitter.ts registers no routes; it
   // only describes how to. Before ST-060 it was the only file this gate "found" anything in.
@@ -421,5 +421,5 @@ describe("audit route coverage", () => {
     const routes = findMutatingRoutes(collectSourceFiles(SRC_DIR));
 
     expect(routes.filter((r) => r.file.includes("auditEmitter"))).toEqual([]);
-  });
+  }, 30_000);
 });

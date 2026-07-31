@@ -142,6 +142,8 @@ describe("structure", () => {
         "/api/finance/scholarship-discounts/awards",
         "/api/finance/scholarship-discounts/awards/{awardId}/confirm",
         "/api/finance/reconciliation/run",
+        // ST-127. Parent-facing household financial view.
+        "/api/finance/families/{familyId}",
         "/api/finance/students/{studentId}/installments",
         "/api/evaluations",
         "/api/evaluations/{evaluationId}",
@@ -454,6 +456,7 @@ describe("security", () => {
         "GET /api/finance/reports/family-statement/{familyId}",
         "GET /api/finance/reports/general-ledger",
         "GET /api/finance/reports/joinvoice/{invoiceId}",
+        "GET /api/finance/families/{familyId}",
         "GET /api/finance/students/{studentId}/installments",
         "GET /api/academics/assignments",
         "GET /api/academics/assignments/{assignmentId}",

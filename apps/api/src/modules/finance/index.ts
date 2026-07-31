@@ -8,6 +8,7 @@ export { scholarshipDiscountRoutes } from "./scholarships/routes";
 export { installmentRoutes } from "./installments/routes";
 export { reconciliationRoutes } from "./jobs/reconciliation.routes";
 export { financeReportRoutes } from "./reports/routes";
+export { familyFinancialViewRoutes } from "./family/routes";
 export { runGlobalReconciliation } from "./jobs/reconciliation.job";
 export { EnvCredentialResolver } from "./client/credential-resolver";
 export { TenantErpNext, TenantErpNextFactory } from "./client/tenant-client";

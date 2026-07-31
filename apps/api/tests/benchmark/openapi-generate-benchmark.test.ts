@@ -106,6 +106,7 @@ const EXPECTED_PATHS = [
   "/api/finance/webhooks/erpnext/payment-confirmed",
   "/api/finance/webhooks/erpnext/refund-processed",
   "/api/finance/reconciliation/run",
+  "/api/finance/families/{familyId}",
   "/api/finance/students/{studentId}/installments",
   "/api/discipline/incidents",
   "/api/discipline/incidents/{incidentId}",
