@@ -4,10 +4,10 @@
 # Build from the repo root:
 #   docker build -f infra/docker/workers.Dockerfile -t studafy/workers .
 #
-# apps/workers depends on the workspace package @studafy/constants (see
-# apps/workers/package.json), but `bun build --target bun` bundles it (and every other
-# dependency) directly into apps/workers/dist/index.js — the runtime stage copies only that file,
-# never node_modules.
+# apps/workers depends on workspace packages such as @studafy/constants and
+# @studafy/notification-templates (see apps/workers/package.json), but `bun build --target bun`
+# bundles them (and every other dependency) directly into apps/workers/dist/index.js — the runtime
+# stage copies only that file, never node_modules.
 
 ARG BUN_VERSION=1.3.14
 
@@ -40,7 +40,8 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 # are not scheduled when using filters.
 RUN bun run --cwd packages/constants build \
  && bun run --cwd packages/attendance-reporting build \
- && bun run --cwd packages/finance-reporting build
+ && bun run --cwd packages/finance-reporting build \
+ && bun run --cwd packages/notification-templates build
 RUN bunx turbo run build --filter=@studafy/workers
 
 FROM oven/bun:${BUN_VERSION}-alpine AS runtime

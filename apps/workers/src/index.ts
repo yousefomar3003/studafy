@@ -2,6 +2,7 @@ import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
 import { loadEnv } from "./env";
+import { workerLogger } from "./log";
 import { startRelay } from "./queues/outbox-relay";
 import { QUEUE_REGISTRY } from "./registry";
 import { shutdownWorkers, startWorkers } from "./worker";
@@ -28,11 +29,7 @@ if (schoolIds.length > 0) {
       db: relayDb,
       redis: relayRedis,
       config: { batchSize: 100, pollIntervalMs: 1_000, schoolIds },
-      logger: {
-        info: (fields, msg) => console.log(JSON.stringify({ ...fields, msg })),
-        warn: (fields, msg) => console.warn(JSON.stringify({ ...fields, msg })),
-        error: (fields, msg) => console.error(JSON.stringify({ ...fields, msg })),
-      },
+      logger: workerLogger,
     });
   });
 }

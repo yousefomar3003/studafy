@@ -3,6 +3,25 @@ import { describe, expect, test } from "bun:test";
 
 import { DOMAIN_EVENTS, ERPNEXT_DOC_EVENT_MAP } from "./events";
 
+describe("DOMAIN_EVENTS", () => {
+  // app.outbox_events.event_name carries exactly this CHECK (000022). A name that violates it is
+  // accepted by TypeScript, published by nothing, and fails only at INSERT time in production —
+  // inside whatever transaction was trying to emit it. ST-139's ticket specified a three-segment
+  // `notification.dispatch.failed`, which is what this test exists to have caught.
+  test("every event name matches the outbox event_name CHECK", () => {
+    const outboxNamePattern = /^[a-z][a-zA-Z]*\.[a-z][a-zA-Z]*$/;
+
+    for (const value of Object.values(DOMAIN_EVENTS)) {
+      expect(value).toMatch(outboxNamePattern);
+    }
+  });
+
+  test("every event name is unique", () => {
+    const values = Object.values(DOMAIN_EVENTS);
+    expect(new Set(values).size).toBe(values.length);
+  });
+});
+
 describe("ERPNEXT_DOC_EVENT_MAP", () => {
   test("all mapped values are valid DOMAIN_EVENTS", () => {
     const allEvents = Object.values(DOMAIN_EVENTS);

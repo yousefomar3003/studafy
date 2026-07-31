@@ -5,10 +5,11 @@ Source of truth for queue names: `QUEUE_NAMES` in
 repo should hardcode a queue name string — import `QUEUE_NAMES` (or `QueueName`) instead, so a
 rename can't silently split a queue in two.
 
-This is a scaffold. Every processor in [`src/registry.ts`](../src/registry.ts) is currently a
-placeholder that logs and resolves — it exists so the worker bootstrap has a real job to process
-end-to-end (see `scripts/smoke-test.ts`). The table below records what each queue is _for_ and its
-starting concurrency; the actual processing logic lands in separate tickets, one per queue.
+Some processors in [`src/registry.ts`](../src/registry.ts) are still placeholders that log and
+resolve — they exist so the worker bootstrap has a real job to process end-to-end (see
+`scripts/smoke-test.ts`), and `ai-ingestion`, `outbox-relay` and `provisioning` are still in that
+state. `notifications`, `reports`, `imports` and `billing` carry real logic. The table below records
+what each queue is _for_ and its starting concurrency.
 
 | Queue           | `QUEUE_NAMES` key | Concurrency | Purpose                                                                                                                                                                                                                                                                                                                        |
 | --------------- | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -18,6 +19,25 @@ starting concurrency; the actual processing logic lands in separate tickets, one
 | `imports`       | `IMPORTS`         | 2           | Bulk data imports (e.g. roster/enrollment imports). Kept low to bound the load a single large import puts on the database.                                                                                                                                                                                                     |
 | `billing`       | `BILLING`         | 1           | **ERPNext invoice generation.** `generate-invoice` creates a single Sales Invoice via ERPNext API; `generate-batch-invoices` processes a grade/class cohort with 10-way inner concurrency. Concurrency of 1 by design — ordering per school matters. Each batch job manages its own parallelism via an in-process worker pool. |
 | `outbox-relay`  | `OUTBOX_RELAY`    | 5           | Relays the transactional outbox (domain events captured in the database, see `packages/constants/src/events.ts`) to downstream consumers.                                                                                                                                                                                      |
+| `provisioning`  | `PROVISIONING`    | 2           | Tenant provisioning work following school registration.                                                                                                                                                                                                                                                                        |
+
+## Dead-letter queues
+
+`DEAD_LETTER_QUEUE_NAMES` in `packages/constants/src/queues.ts` is a **separate** constant with a
+separate type, and that separation is deliberate: `QUEUE_NAMES` means "queues this process runs a
+`Worker` for", and `QueueDefinition.name` is typed `QueueName`. Putting a dead-letter name in
+`QUEUE_NAMES` would make attaching a worker to a parking lot a valid program — and a parking lot
+with a consumer is just a sixth retry. `registry.test.ts` asserts both halves: one registry entry
+per `QUEUE_NAMES` value, and no registry entry for any `DEAD_LETTER_QUEUE_NAMES` value.
+
+| Dead-letter queue   | Origin queue    | Durable record                  |
+| ------------------- | --------------- | ------------------------------- |
+| `notifications-dlq` | `notifications` | `app.notification_dead_letters` |
+
+The Redis queue is a reserved name for a future operator replay tool; nothing writes to it today.
+The record of a terminal failure is the database row, written by a BullMQ `failed` listener — see
+[`docs/architecture/SAD_21_notification_dispatch_flow.md`](../../../docs/architecture/SAD_21_notification_dispatch_flow.md)
+for why that listener keys on `job.finishedOn` rather than on an attempt count.
 
 ## Adding a queue
 

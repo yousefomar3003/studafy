@@ -49,7 +49,8 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 RUN bun run --cwd packages/constants build \
  && bun run --cwd packages/shared-schemas build \
  && bun run --cwd packages/attendance-reporting build \
- && bun run --cwd packages/finance-reporting build
+ && bun run --cwd packages/finance-reporting build \
+ && bun run --cwd packages/notification-templates build
 RUN bunx turbo run build --filter=@studafy/api
 
 FROM oven/bun:${BUN_VERSION}-alpine AS runtime

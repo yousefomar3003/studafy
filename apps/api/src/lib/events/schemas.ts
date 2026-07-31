@@ -201,6 +201,22 @@ export const eventPayloadSchemas = {
     localOutstanding: z.number(),
   }),
 
+  // ── Notification dispatch (ST-139) ────────────────────────────────
+  // Correlation handles only. The error message and stack live in app.notification_dead_letters,
+  // which is tenant-isolated; this payload is published verbatim onto the Redis pub/sub channel
+  // `events:{school_id}:{event_name}` with no redaction, and outbox rows are never reaped — so a
+  // dispatch stack (recipient addresses, provider request ids) must not travel in it. A consumer
+  // that needs detail follows deadLetterId into the table.
+  [DOMAIN_EVENTS.NOTIFICATION_DISPATCH_FAILED]: z.object({
+    deadLetterId: uid,
+    jobId: z.string(),
+    jobName: z.string(),
+    queueName: z.string(),
+    attemptsMade: z.number().int().positive(),
+    errorClass: z.string().max(200),
+    failedAt: z.string(),
+  }),
+
   // ── ERPNext (freeform — external system payloads) ─────────────────────
   [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: z.record(z.string(), z.unknown()),
   [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: z.record(z.string(), z.unknown()),
