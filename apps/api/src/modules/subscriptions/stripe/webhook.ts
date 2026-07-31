@@ -40,7 +40,28 @@ registerWebhookHandler("checkout.session.completed", async (tx, data, _eventId) 
   if (!session.customer || !session.subscription) return;
 
   const schoolId = session.metadata?.school_id;
+  const studentId = session.metadata?.student_id;
+
   if (!schoolId) return;
+
+  if (studentId) {
+    await tx`
+      INSERT INTO app.ai_subscriptions (school_id, student_id, status, current_period_start, current_period_end)
+      VALUES (
+        ${schoolId}::uuid,
+        ${studentId}::uuid,
+        'trialing'::app.subscription_status,
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP + INTERVAL '30 days'
+      )
+      ON CONFLICT (school_id, student_id) DO UPDATE SET
+        status = 'trialing'::app.subscription_status,
+        current_period_start = CURRENT_TIMESTAMP,
+        current_period_end = CURRENT_TIMESTAMP + INTERVAL '30 days',
+        updated_at = CURRENT_TIMESTAMP
+    `;
+    return;
+  }
 
   await tx`
     UPDATE app.subscriptions

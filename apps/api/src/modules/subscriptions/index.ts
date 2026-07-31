@@ -1,5 +1,6 @@
 export { checkoutRoutes } from "./routes/checkout-routes";
 export { schoolCheckoutRoutes } from "./routes/school-checkout-routes";
+export { aiCheckoutRoutes } from "./routes/ai-checkout-routes";
 export { webhookRoutes } from "./routes/webhook-routes";
 export { planRoutes } from "./routes/plan-routes";
 export { adminSubscriptionRoutes } from "./routes/admin-routes";
@@ -10,6 +11,7 @@ export { syncPlanPrices } from "./services/price-sync-service";
 export {
   createSchoolCheckoutSession,
   createTieredSchoolCheckoutSession,
+  createAiCheckoutSession,
   createBillingPortalSession,
 } from "./services/checkout-service";
 export { getActivePlans, getSchoolSubscription } from "./services/subscription-service";

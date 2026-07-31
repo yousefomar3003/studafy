@@ -141,6 +141,7 @@ const EXPECTED_PATHS = [
   "/api/students/{studentId}",
   "/api/students/{studentId}/guardians",
   "/api/students/{studentId}/guardians/{userId}",
+  "/api/subscriptions/ai/checkout",
   "/api/subscriptions/checkout",
   "/api/subscriptions/plans",
   "/api/subscriptions/portal",

@@ -76,6 +76,7 @@ import { importRoutes } from "./modules/imports";
 import {
   checkoutRoutes,
   schoolCheckoutRoutes,
+  aiCheckoutRoutes,
   webhookRoutes,
   planRoutes,
   adminSubscriptionRoutes,
@@ -663,6 +664,7 @@ export function createApp({
     app.route("/", planRoutes(database));
     app.route("/", checkoutRoutes(database, stripeProvider));
     app.route("/", schoolCheckoutRoutes(database, stripeProvider));
+    app.route("/", aiCheckoutRoutes(database, stripeProvider));
     app.route("/", webhookRoutes(database, stripeProvider, logger));
     app.route("/", adminSubscriptionRoutes(database, stripeProvider, logger));
   }

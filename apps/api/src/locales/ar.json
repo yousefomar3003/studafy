@@ -149,6 +149,7 @@
   "STRIPE_LIVE_KEY_IN_DEV": "لا يمكن استخدام مفتاح Stripe الحي في بيئة التطوير",
   "SUBSCRIPTION_NOT_FOUND": "لم يتم العثور على اشتراك نشط لهذه المدرسة",
   "SUBSCRIPTION_CHECKOUT_FAILED": "فشل إنشاء جلسة الدفع",
+  "AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE": "يجب أن يكون اشتراك المدرسة نشطاً لشراء الوصول إلى الذكاء الاصطناعي",
   "REFUND_NOT_FOUND": "لم يتم العثور على طلب استرداد",
   "REFUND_INVALID_STATUS": "حالة طلب الاسترداد غير مناسبة لهذه العملية",
   "REFUND_CONFIRM_SELF": "لا يمكن الموافقة على طلب الاسترداد أو رفضه من قبل المستخدم الذي قام بإنشائه",
