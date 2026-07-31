@@ -49,6 +49,7 @@ const EXPECTED_PATHS = [
   "/.well-known/jwks.json",
   "/healthz",
   "/readyz",
+  "/email/webhooks/sns",
   "/erpnext/webhooks",
   "/api/invitations",
   "/api/invitations/bulk",
