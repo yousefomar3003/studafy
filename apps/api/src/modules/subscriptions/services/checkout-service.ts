@@ -232,3 +232,109 @@ export async function createTieredSchoolCheckoutSession(
     return { url: session.url, sessionId: session.sessionId };
   });
 }
+
+export interface AiCheckoutParams {
+  schoolId: string;
+  priceId: string;
+  studentId: string;
+  successUrl: string;
+  cancelUrl: string;
+  tenantContext: TenantContext;
+}
+
+export async function createAiCheckoutSession(
+  database: Database,
+  provider: PaymentProviderPort,
+  params: AiCheckoutParams,
+): Promise<CheckoutResult> {
+  const { schoolId, priceId, studentId, successUrl, cancelUrl, tenantContext } = params;
+
+  return withTenantTx(database, tenantContext, async (tx) => {
+    const [school] = await tx<{ id: string; name: string; stripe_customer_id: string | null }[]>`
+      SELECT id, name, stripe_customer_id
+      FROM app.schools
+      WHERE id = ${schoolId}::uuid
+      LIMIT 1
+    `;
+
+    if (!school) {
+      throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "School not found");
+    }
+
+    const [sub] = await tx<{ status: string }[]>`
+      SELECT status::text AS status
+      FROM app.subscriptions
+      WHERE school_id = ${schoolId}::uuid
+      LIMIT 1
+    `;
+
+    if (!sub || sub.status !== "active") {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE,
+        "Cannot purchase AI access: school subscription is not active",
+      );
+    }
+
+    const [student] = await tx<{ id: string }[]>`
+      SELECT id
+      FROM app.students
+      WHERE id = ${studentId}::uuid AND school_id = ${schoolId}::uuid AND status = 'enrolled'
+      LIMIT 1
+    `;
+
+    if (!student) {
+      throw new CodedHttpException(
+        404,
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        "Enrolled student not found",
+      );
+    }
+
+    const [price] = await tx<{ stripe_price_id: string | null }[]>`
+      SELECT pp.stripe_price_id
+      FROM app.plan_prices pp
+      WHERE pp.id = ${priceId}::uuid AND pp.is_active = true AND pp.stripe_price_id IS NOT NULL
+      LIMIT 1
+    `;
+
+    if (!price) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.SUBSCRIPTION_CHECKOUT_FAILED,
+        "Selected price is not available or not synced to Stripe",
+      );
+    }
+
+    let customerId = school.stripe_customer_id;
+
+    if (!customerId) {
+      const customer = await provider.createCustomer({
+        name: school.name,
+        email: "",
+        metadata: { school_id: schoolId },
+      });
+
+      customerId = customer.providerCustomerId;
+
+      await tx`
+        UPDATE app.schools
+        SET stripe_customer_id = ${customerId}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${schoolId}::uuid
+      `;
+    }
+
+    const session = await provider.createCheckoutSession({
+      customerId,
+      priceId: price.stripe_price_id!,
+      successUrl,
+      cancelUrl,
+      metadata: {
+        school_id: schoolId,
+        student_id: studentId,
+      },
+    });
+
+    return { url: session.url, sessionId: session.sessionId };
+  });
+}
