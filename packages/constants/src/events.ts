@@ -63,6 +63,13 @@ export const DOMAIN_EVENTS = {
   // the breach, not each individual absence.
   ATTENDANCE_ALERT_RAISED: "attendance.alertRaised",
 
+  // Parent digest (deliverability R-08). Raised by the workers digest producer, once per parent
+  // per run, aggregating the parent-facing outbox events (attendance.alertRaised,
+  // fee.installmentOverdue) that accumulated since the previous run. The email dispatcher sends
+  // it through the same channel as every other transactional email, so the delivery ledger, dedup,
+  // and SES correlation all apply unchanged.
+  DIGEST_SENT: "digest.sent",
+
   // Finance reconciliation (ST-122). Raised by the daily reconciliation job when an installment
   // passes its due date and remains unpaid — triggers parent notification via the outbox relay.
   FEE_INSTALLMENT_OVERDUE: "fee.installmentOverdue",

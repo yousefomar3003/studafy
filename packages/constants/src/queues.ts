@@ -29,6 +29,7 @@ export const JOB_NAMES = {
   GENERATE_FINANCE_REPORT: "generate-finance-report",
   GENERATE_INVOICE: "generate-invoice",
   GENERATE_BATCH_INVOICES: "generate-batch-invoices",
+  SEND_DIGESTS: "send-digests",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

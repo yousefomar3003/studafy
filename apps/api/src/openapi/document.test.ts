@@ -260,6 +260,7 @@ describe("structure", () => {
         "/api/users/{userId}",
         "/api/users/{userId}/deactivate",
         "/api/users/{userId}/role",
+        "/email/webhooks/sns",
         "/erpnext/webhooks",
         "/healthz",
         "/readyz",

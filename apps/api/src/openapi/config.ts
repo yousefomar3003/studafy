@@ -52,6 +52,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "request body, not by a session token.",
     },
     {
+      name: "Email",
+      description:
+        "Inbound SES event ingestion (deliverability R-08). Authenticated by Amazon SNS's RSA " +
+        "signature over the canonical message, verified against SNS's regional signing certificate, " +
+        "and gated on the configured topic ARN.",
+    },
+    {
       name: "Finance",
       description:
         "Outbound gateway to each school's ERPNext site. Authenticated and tenant-scoped. " +

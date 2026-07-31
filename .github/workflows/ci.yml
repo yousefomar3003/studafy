@@ -73,6 +73,22 @@ jobs:
       - name: Run session lifecycle tests (ST-071)
         run: bun run test:auth
         working-directory: apps/api
+      # Database-backed SES → SNS webhook suite (deliverability R-08): ledger insert, suppression
+      # upsert, delivery transition, and at-least-once redelivery against the real unique constraint.
+      # Its own step because test:integration globs only tests/harness and this suite lives under
+      # tests/email. Self-skips in the quality job, which has no database.
+      - name: Email webhook DB integration (deliverability R-08)
+        run: bun test tests/email/webhook.db.test.ts --timeout 60000
+        working-directory: apps/api
+      # Database-backed ERPNext webhook suite: the happy path's dedup + audit + outbox rows in one
+      # tenant transaction, the outbox payload's jsonb-object encoding (a double-encoded JSON string
+      # here would silently corrupt every relay consumer), and the invoice/fee-schedule cache
+      # projections (student + currency resolution, currency-exponent minor units). Its own step for
+      # the same reason as the email suite: test:integration globs only tests/harness. Self-skips in
+      # the quality job.
+      - name: ERPNext webhook DB integration
+        run: bun test tests/erpnext/webhook.db.test.ts --timeout 60000
+        working-directory: apps/api
       - name: Invitation verification timing benchmark (valid vs miss)
         env:
           INVITATION_VERIFICATION_BENCHMARK: "1"

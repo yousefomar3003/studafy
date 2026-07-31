@@ -150,6 +150,7 @@ describe("emit", () => {
           role: "STUDENT",
           expiresAt: new Date().toISOString(),
           invitedByUserId: uid,
+          token: "tok_abc123",
         },
         [DOMAIN_EVENTS.INVITATION_REVOKED]: {
           invitationId: uid,
@@ -166,6 +167,7 @@ describe("emit", () => {
           schoolId: uid,
           email: "test@example.com",
           expiresAt: new Date().toISOString(),
+          token: "tok_abc123",
         },
         [DOMAIN_EVENTS.SCHOOL_EMAIL_VERIFIED]: {
           schoolId: uid,
@@ -232,6 +234,19 @@ describe("emit", () => {
           absentDays: 3,
           boundaryDate: "2026-07-29",
           parentUserIds: [uid],
+        },
+        [DOMAIN_EVENTS.DIGEST_SENT]: {
+          parentUserId: uid,
+          email: "test@example.com",
+          digestDate: "2026-07-30",
+          items: [
+            {
+              kind: "attendance_alert",
+              studentName: "Amina",
+              text: "Amina has been absent for 3 consecutive school days.",
+              occurredAt: "2026-07-29T10:00:00.000Z",
+            },
+          ],
         },
         [DOMAIN_EVENTS.TIMETABLE_APPROVED]: {
           timetableVersionId: uid,

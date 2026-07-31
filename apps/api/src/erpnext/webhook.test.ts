@@ -14,9 +14,9 @@ import { createLogger } from "../logger";
  * unchanged from before the conversion (ERPNext reads the status, not the body).
  *
  * Every case here returns before the handler touches the database, which is why createUnusableDatabase
- * suffices and this runs in the `quality` job with no Postgres. The two paths that do reach the
- * database — the happy 200 and the ingestion-failure 500 — are not covered here; they need a real
- * database and belong in the `database-migrations` job.
+ * suffices and this runs in the `quality` job with no Postgres. The paths that do reach the database
+ * — the happy-path 200 (dedup + audit + outbox rows) and the ingestion-failure 500 — live in
+ * tests/erpnext/webhook.db.test.ts, run by the `api-integration` job.
  */
 
 const SECRET = "test-webhook-secret";

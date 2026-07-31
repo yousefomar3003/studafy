@@ -25,6 +25,10 @@ export const eventPayloadSchemas = {
     schoolId: uid,
     email: z.string().email(),
     expiresAt: z.string().datetime(),
+    // The one-time verification token, so the email dispatcher can build the verify link. The raw
+    // token normally exists only in the API response; the outbox is the one other place the same
+    // bearer credential must travel, because the email is sent asynchronously from this event.
+    token: z.string().min(1),
   }),
   [DOMAIN_EVENTS.SCHOOL_EMAIL_VERIFIED]: z.object({
     schoolId: uid,
@@ -46,6 +50,10 @@ export const eventPayloadSchemas = {
     role: z.string(),
     expiresAt: z.string().datetime(),
     invitedByUserId: uid.nullable(),
+    // The one-time invitation token, so the email dispatcher can build the accept link. The raw
+    // token normally exists only in the API response; the outbox is the one other place the same
+    // bearer credential must travel, because the email is sent asynchronously from this event.
+    token: z.string().min(1),
   }),
   [DOMAIN_EVENTS.INVITATION_REVOKED]: z.object({
     invitationId: uid,
@@ -142,6 +150,27 @@ export const eventPayloadSchemas = {
     absentDays: z.number().int().positive(),
     boundaryDate: z.string().date(),
     parentUserIds: z.array(uid),
+  }),
+
+  // ── Digest ────────────────────────────────────────────────────────────
+  // One event per parent per digest run, produced by the workers digest producer from the
+  // parent-facing outbox events that accumulated since the previous run. It carries everything
+  // the email dispatcher needs to render, so the producer owns the aggregation and the channel
+  // stays a dumb renderer.
+  [DOMAIN_EVENTS.DIGEST_SENT]: z.object({
+    parentUserId: uid,
+    email: z.string().email(),
+    digestDate: z.string().date(),
+    items: z
+      .array(
+        z.object({
+          kind: z.enum(["attendance_alert", "fee_overdue"]),
+          studentName: z.string().nullable(),
+          text: z.string().min(1),
+          occurredAt: z.string().datetime(),
+        }),
+      )
+      .min(1),
   }),
 
   // ── Timetable ───────────────────────────────────────────────────────

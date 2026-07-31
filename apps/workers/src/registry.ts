@@ -5,6 +5,7 @@ import { processBillingJob } from "./queues/billing";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
+import { processDigest } from "./queues/notifications/email";
 import { processAttendanceExport, processFinanceExport } from "./queues/reports";
 
 import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
@@ -71,6 +72,10 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           );
         }
         return { processed: false, reason: "missing job data" };
+      }
+
+      if (job.name === JOB_NAMES.SEND_DIGESTS) {
+        return processDigest(databaseUrl);
       }
 
       const data = job.data as { bulkInviteId?: string; schoolId?: string };

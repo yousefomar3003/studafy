@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 
+import { emailEventWebhookRoutes } from "./email/webhook";
 import { ErpNextClient } from "./erpnext/client";
 import { erpNextWebhookRoutes } from "./erpnext/webhook";
 import { healthRoutes } from "./health";
@@ -310,6 +311,15 @@ export function createApp({
     app.route("/", erpNextWebhookRoutes(database, logger));
     app.route("/", paymentWebhookRoutes(database, logger));
     app.route("/", refundWebhookRoutes(database, logger));
+  }
+
+  // SES → SNS email-event webhook (deliverability R-08). Mounted with the other webhooks for the
+  // same reason: it authenticates by SNS's RSA signature plus a topic ARN allowlist, not by a
+  // session token, so it must sit outside the bearer-token chain. It is mounted only when a
+  // database is available because ingestion writes the event ledger, suppression list, and delivery
+  // status.
+  if (database) {
+    app.route("/", emailEventWebhookRoutes(database, logger));
   }
 
   // School self-registration — public, no authentication. Protected by Turnstile captcha and

@@ -82,6 +82,9 @@ export const envSchema = z
     READ_DATABASE_NAME: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1).optional(),
     ERPNEXT_WEBHOOK_SECRET: z.string().min(1).optional(),
+    // SNS topic ARN for SES email-event webhook ingestion (deliverability R-08). Optional: when
+    // absent, the webhook route answers 500 so a misconfigured topic cannot silently pass as secure.
+    EMAIL_EVENTS_SNS_TOPIC_ARN: z.string().min(1).optional(),
     // ERPNext integration (ST-089). All optional — activates only when both are set.
     ERPNEXT_API_URL: z.string().url().optional(),
     ERPNEXT_API_KEY: z.string().min(1).optional(),

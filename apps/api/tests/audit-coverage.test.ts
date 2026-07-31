@@ -62,6 +62,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // Audit rows are written from the route's service transaction.
   "POST /api/auth/login/oauth",
   "POST /erpnext/webhooks",
+  // SES → SNS email-event webhook (deliverability R-08). Global, pre-tenant surface: auditAction
+  // declares the intent, but no app.audit_logs row is written because the ledger insert into
+  // app.email_events *is* the audit record — see src/email/webhook.ts.
+  "POST /email/webhooks/sns",
   // Session lifecycle (ST-071). All four mutate app.refresh_tokens. The revocation paths write
   // their audit rows from inside the service transaction rather than from the route, so that a
   // revocation and its audit record commit or roll back together — see

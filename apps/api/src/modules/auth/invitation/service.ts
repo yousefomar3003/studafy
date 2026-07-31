@@ -175,6 +175,7 @@ export function createInvitationService(options: InvitationServiceOptions = {}) 
         role: params.role,
         expiresAt: expiresAt.toISOString(),
         invitedByUserId: params.invitedByUserId ?? null,
+        token,
       });
 
       logger.info(
@@ -342,6 +343,7 @@ export function createInvitationService(options: InvitationServiceOptions = {}) 
         role: old.role,
         expiresAt: expiresAt.toISOString(),
         invitedByUserId: old.invited_by_user_id,
+        token,
       });
 
       logger.info(

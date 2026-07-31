@@ -4,6 +4,8 @@ import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../db/tenant-tx";
 import { auditAction, emitAuditLog } from "../middleware/auditEmitter";
+import { projectFeeScheduleEntry } from "../modules/finance/fee-schedules/projection";
+import { projectInvoiceEntry } from "../modules/finance/invoices/projection";
 import { projectPaymentEntry } from "../modules/finance/payments/projection";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
@@ -13,7 +15,10 @@ import { verifyWebhookSignature } from "./signature";
 import type { Database } from "../db";
 import type { Logger } from "../logger";
 import type { AppEnv } from "../middleware/requestId";
+import type { ErpNextFeeSchedule } from "../modules/finance/fee-schedules/projection";
+import type { ErpNextSalesInvoice } from "../modules/finance/invoices/projection";
 import type { ErpNextPaymentEntry } from "../modules/finance/payments/projection";
+import type { JSONValue } from "postgres";
 
 const webhookBodySchema = z
   .object({
@@ -43,6 +48,10 @@ function resolveEventName(doctype: string, action: string): string | undefined {
 /**
  * Project an ERPNext document into the appropriate finance cache table. Best-effort: if it fails,
  * the outbox event is still relayed and a downstream consumer can retry.
+ *
+ * Every arm delegates to a shared projection in modules/finance and runs inside a tenant
+ * transaction rather than on a bare pool connection, so the write is covered by the same RLS context
+ * and commit boundary as the outbox and audit rows recorded for this event.
  */
 async function projectToCache(
   db: Database,
@@ -51,91 +60,36 @@ async function projectToCache(
   data: Record<string, unknown>,
   logger: Logger,
 ): Promise<void> {
-  const now = new Date().toISOString();
-  const docname = String(data.name ?? data.docname ?? "");
-  const status = String(data.status ?? data.docstatus ?? "");
-  if (!docname) return;
-
   switch (eventName) {
     case "erpnext.invoiceSubmitted":
-    case "erpnext.creditNoteIssued": {
-      const totalAmount = Number(data.grand_total ?? data.total ?? 0);
-      const outstandingAmount = Number(
-        data.outstanding_amount ?? data.grand_total ?? data.total ?? 0,
-      );
-      await db.unsafe(
-        `INSERT INTO app.invoice_cache (
-          school_id, student_id, currency_id, erpnext_docname, erpnext_status,
-          total_amount_minor, outstanding_amount_minor, issued_date, due_date,
-          erpnext_payload, last_synced_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)
-        ON CONFLICT (school_id, erpnext_docname) DO UPDATE SET
-          erpnext_status = EXCLUDED.erpnext_status,
-          total_amount_minor = EXCLUDED.total_amount_minor,
-          outstanding_amount_minor = EXCLUDED.outstanding_amount_minor,
-          erpnext_payload = EXCLUDED.erpnext_payload,
-          last_synced_at = EXCLUDED.last_synced_at,
-          updated_at = NOW()`,
-        [
-          schoolId,
-          String(data.student_id ?? data.customer ?? ""),
-          String(data.currency ?? data.currency_id ?? ""),
-          docname,
-          status,
-          totalAmount,
-          outstandingAmount,
-          String(data.posting_date ?? data.transaction_date ?? now),
-          String(data.due_date ?? ""),
-          JSON.stringify(data),
-          now,
-        ],
+    case "erpnext.creditNoteIssued":
+      // ST-121 follow-on: the invoice arm previously passed `String(data.student_id ?? data.customer
+      // ?? "")` into a uuid column, an ISO currency *code* into the currency_id uuid foreign key,
+      // and a raw decimal into total_amount_minor. All three are hard failures on any real payload
+      // (see modules/finance/invoices/projection.ts).
+      await withTenantTx(db, { schoolId }, (tx) =>
+        projectInvoiceEntry(tx, schoolId, data as ErpNextSalesInvoice, logger),
       );
       break;
-    }
-    case "erpnext.paymentReceived": {
+    case "erpnext.paymentReceived":
       // ST-121 replaced this arm's inline SQL with the shared projection in
       // modules/finance/payments/projection.ts. The previous version could not succeed: it passed
       // `String(data.student_id ?? data.party ?? "")` into a uuid column, an ISO currency *code* into
       // the currency_id uuid foreign key, and a raw decimal paid_amount into the integer
       // amount_minor. The shared function resolves the student, looks the currency up in
       // app.currencies, and converts through the currency's own exponent (3 for JOD, not 2).
-      //
-      // It also runs inside a tenant transaction rather than on a bare pool connection, so the write
-      // is covered by the same RLS context that the rest of this ingestion uses.
       await withTenantTx(db, { schoolId }, (tx) =>
         projectPaymentEntry(tx, schoolId, data as ErpNextPaymentEntry, logger),
       );
       break;
-    }
-    case "erpnext.feeDue": {
-      const totalAmount = Number(data.total_amount ?? 0);
-      await db.unsafe(
-        `INSERT INTO app.fee_schedule_cache (
-          school_id, academic_year_id, term_id, currency_id, erpnext_docname,
-          erpnext_status, title, total_amount_minor, erpnext_payload, last_synced_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
-        ON CONFLICT (school_id, erpnext_docname) DO UPDATE SET
-          erpnext_status = EXCLUDED.erpnext_status,
-          title = EXCLUDED.title,
-          total_amount_minor = EXCLUDED.total_amount_minor,
-          erpnext_payload = EXCLUDED.erpnext_payload,
-          last_synced_at = EXCLUDED.last_synced_at,
-          updated_at = NOW()`,
-        [
-          schoolId,
-          String(data.academic_year_id ?? ""),
-          String(data.term_id ?? ""),
-          String(data.currency ?? data.currency_id ?? ""),
-          docname,
-          status,
-          String(data.fee_name ?? data.title ?? docname),
-          totalAmount,
-          JSON.stringify(data),
-          now,
-        ],
+    case "erpnext.feeDue":
+      // Same bug class as the invoice arm: an ISO currency code into the currency_id uuid foreign
+      // key, a raw decimal into total_amount_minor, and names into the academic_year_id/term_id
+      // uuids (see modules/finance/fee-schedules/projection.ts).
+      await withTenantTx(db, { schoolId }, (tx) =>
+        projectFeeScheduleEntry(tx, schoolId, data as ErpNextFeeSchedule, logger),
       );
       break;
-    }
   }
 }
 
@@ -276,9 +230,14 @@ export function erpNextWebhookRoutes(db: Database, logger: Logger): OpenAPIHono<
           userAgent: c.req.header("user-agent"),
         });
 
+        // tx.json(), not JSON.stringify() + ::jsonb. With an explicit ::jsonb cast postgres.js infers
+        // the parameter type as jsonb and JSON-encodes the string it was given, producing a jsonb
+        // *string* rather than an object. app.outbox_events.payload has no jsonb_typeof CHECK, so the
+        // mistake would store silently and corrupt every consumer downstream (see the same note in
+        // apps/workers/src/queues/notifications/attendance-alert.worker.ts).
         await tx`
           INSERT INTO app.outbox_events (school_id, event_name, payload)
-          VALUES (${schoolId}, ${eventName}, ${JSON.stringify(body.data)}::jsonb)
+          VALUES (${schoolId}, ${eventName}, ${tx.json(body.data as unknown as JSONValue)})
         `;
       });
 
