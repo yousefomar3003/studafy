@@ -2,12 +2,13 @@ import { NOTIFICATION_TYPES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import { NOTIFICATION_CATALOG, NOTIFICATION_CHANNELS } from "../catalog";
-import { AR_TEMPLATES } from "../catalog/templates/ar";
-import { EN_TEMPLATES } from "../catalog/templates/en";
-import { renderNotification } from "../catalog/templates/renderer";
+import { NOTIFICATION_CATALOG } from "../registry";
+import { AR_TEMPLATES } from "../templates/ar";
+import { EN_TEMPLATES } from "../templates/en";
+import { renderNotification } from "../templates/renderer";
+import { NOTIFICATION_CHANNELS } from "../types";
 
-import type { NotificationChannel } from "../catalog";
+import type { NotificationChannel } from "../types";
 
 const ALL_CHANNELS: NotificationChannel[] = [
   NOTIFICATION_CHANNELS.IN_APP,

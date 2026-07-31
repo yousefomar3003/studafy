@@ -599,7 +599,7 @@ export function createApp({
   // validation, updated_at concurrency guard, and submission status transitions. Gated on
   // GRADE_READ / GRADE_UPDATE permissions and class-level teacher authorization.
   if (database) {
-    app.route("/", gradeEntryRoutes(database));
+    app.route("/", gradeEntryRoutes(database, redis ?? null));
   }
 
   // Published grades (ST-116). Student/parent-only snapshots with explicit relationship

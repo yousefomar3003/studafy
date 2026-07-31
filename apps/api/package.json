@@ -24,6 +24,7 @@
     "@studafy/attendance-reporting": "workspace:*",
     "@studafy/constants": "workspace:*",
     "@studafy/finance-reporting": "workspace:*",
+    "@studafy/notification-templates": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
     "bullmq": "5.79.3",
     "hono": "4.12.28",

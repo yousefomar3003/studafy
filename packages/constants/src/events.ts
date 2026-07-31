@@ -70,6 +70,13 @@ export const DOMAIN_EVENTS = {
   // a self-healing re-pull. Contains exact entity IDs for manual investigation.
   FINANCE_RECONCILIATION_DIVERGENCE: "finance.reconciliationDivergence",
 
+  // Notification dispatch (ST-139). Raised when a dispatch job has exhausted every retry and been
+  // dead-lettered, so an operator can be paged. Note the name is two segments, not three:
+  // app.outbox_events.event_name carries a CHECK of `^[a-z][a-zA-Z]*\.[a-z][a-zA-Z]*$`, and a
+  // `notification.dispatch.failed` would be rejected at INSERT time — inside the very transaction
+  // trying to record the failure, so the alert would be lost in production and nowhere else.
+  NOTIFICATION_DISPATCH_FAILED: "notification.dispatchFailed",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

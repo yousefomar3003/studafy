@@ -283,6 +283,15 @@ describe("emit", () => {
           erpnextOutstanding: 5000,
           localOutstanding: 8000,
         },
+        [DOMAIN_EVENTS.NOTIFICATION_DISPATCH_FAILED]: {
+          deadLetterId: uid,
+          jobId: "42",
+          jobName: "dispatch-notification",
+          queueName: "notifications",
+          attemptsMade: 5,
+          errorClass: "Error",
+          failedAt: new Date().toISOString(),
+        },
       };
 
       await database!.sql.begin(async (tx) => {
