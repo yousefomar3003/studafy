@@ -162,6 +162,7 @@ export async function registerSchool(
       schoolId,
       email: params.email,
       expiresAt: verificationExpiresAt.toISOString(),
+      token: verificationToken,
     });
 
     // ── 4d. Create admin user ──────────────────────────────────────────────
@@ -290,6 +291,7 @@ export async function registerSchool(
       role: "ORG_ADMIN",
       expiresAt: expiresAt.toISOString(),
       invitedByUserId: adminUserId,
+      token,
     });
 
     logger.info(

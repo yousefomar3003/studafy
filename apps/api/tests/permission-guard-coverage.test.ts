@@ -44,6 +44,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/providers/link/start",
   "POST /api/schools/register",
   "POST /erpnext/webhooks",
+  "POST /email/webhooks/sns",
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
@@ -257,6 +258,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "DELETE /api/auth/devices/{deviceId}",
   // Webhook — HMAC-authenticated, not bearer.
   "POST /erpnext/webhooks",
+  // SES → SNS email-event webhook (R-08) — SNS-signature-authenticated, not bearer.
+  "POST /email/webhooks/sns",
   // Daily reconciliation (ST-122) — API-key-authenticated, not bearer; no JWT to check.
   "POST /api/finance/reconciliation/run",
   // Account activation (ST-078) — public self-service onboarding. Authorized by the invitation

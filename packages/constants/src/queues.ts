@@ -51,6 +51,7 @@ export const JOB_NAMES = {
   GENERATE_FINANCE_REPORT: "generate-finance-report",
   GENERATE_INVOICE: "generate-invoice",
   GENERATE_BATCH_INVOICES: "generate-batch-invoices",
+  SEND_DIGESTS: "send-digests",
   // Notification dispatch (ST-139). DISPATCH resolves recipients and decides what each of them
   // should receive; DELIVER carries one already-decided message to one recipient on one channel.
   // They are separate jobs because the fan-out is transactional and idempotent while the delivery

@@ -1,8 +1,14 @@
 import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
-import { loadEnv } from "./env";
+import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
+import {
+  createSesSender,
+  scheduleDigestJob,
+  startEmailDispatcher,
+  TokenBucket,
+} from "./queues/notifications/email";
 import { startRelay } from "./queues/outbox-relay";
 import { QUEUE_REGISTRY } from "./registry";
 import { shutdownWorkers, startWorkers } from "./worker";
@@ -34,6 +40,36 @@ if (schoolIds.length > 0) {
   });
 }
 
+// Email channel: a second polling loop that consumes email-relevant outbox events directly, on its
+// own postgres pool, pacing sends through an in-process token bucket. databaseUrlFrom() — not the
+// raw DATABASE_URL default — so a deployed worker honours the discrete production DB settings.
+const emailDb = postgres(databaseUrlFrom(env), { max: 4, idle_timeout: 20, prepare: false });
+const emailLogger = {
+  info: (fields: Record<string, unknown>, msg: string) =>
+    console.log(JSON.stringify({ ...fields, msg })),
+  warn: (fields: Record<string, unknown>, msg: string) =>
+    console.warn(JSON.stringify({ ...fields, msg })),
+  error: (fields: Record<string, unknown>, msg: string) =>
+    console.error(JSON.stringify({ ...fields, msg })),
+};
+const emailDispatcher = startEmailDispatcher({
+  db: emailDb,
+  sender: createSesSender(env, emailLogger),
+  limiter: new TokenBucket(env.EMAIL_MAX_RATE_PER_SECOND),
+  config: {
+    batchSize: env.EMAIL_BATCH_SIZE,
+    pollIntervalMs: env.EMAIL_POLL_INTERVAL_MS,
+    ratePerSecond: env.EMAIL_MAX_RATE_PER_SECOND,
+    frontendUrl: env.FRONTEND_URL,
+  },
+  logger: emailLogger,
+});
+
+// Digest scheduler: idempotently register the daily 06:00 parent-digest on the notifications
+// queue. Its own Redis connection so the upsert never contends with worker polling.
+const digestRedis = createRedisConnection(env);
+void scheduleDigestJob(digestRedis).then(() => digestRedis.disconnect());
+
 console.log(
   `Workers started for queues: ${QUEUE_REGISTRY.map((definition) => definition.name).join(", ")} (${env.NODE_ENV})`,
 );
@@ -49,11 +85,13 @@ const shutdown = (signal: string) => {
   console.log(`Received ${signal}, waiting for active jobs to finish…`);
 
   relayHandle?.stop();
+  emailDispatcher.stop();
 
   void shutdownWorkers(workers, env.SHUTDOWN_TIMEOUT_MS).then(async () => {
     connection.disconnect();
     relayRedis.disconnect();
     await relayDb.end({ timeout: 5 });
+    await emailDb.end({ timeout: 5 });
     console.log("Shutdown complete.");
     process.exit(0);
   });

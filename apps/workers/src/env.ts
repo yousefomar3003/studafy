@@ -32,6 +32,20 @@ export const envSchema = z
     // ERPNext integration — required for billing queue. Both must be set together.
     ERPNEXT_API_URL: z.string().url().optional(),
     ERPNEXT_API_KEY: z.string().min(1).optional(),
+    // SES transactional email (deliverability R-08). When SES_REGION is unset the email dispatcher
+    // runs in dry-run mode: it renders, dedups, and records deliveries exactly as in production but
+    // never calls AWS — the dev/test path, and a loud warning is logged at startup when a deployed
+    // worker has no region.
+    SES_REGION: z.string().min(1).optional(),
+    SES_FROM_ADDRESS: z.string().email().default("invitations@mail.studafy.com"),
+    // Base URL for the action links embedded in emails. The verify/activate endpoints are the
+    // API's (the only surface with an ALB), so the link host is the app's public origin.
+    FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+    // Email dispatcher tunables. See queues/notifications/email/dispatcher.ts for how they bound
+    // the polling loop.
+    EMAIL_MAX_RATE_PER_SECOND: z.coerce.number().positive().default(5),
+    EMAIL_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(1_000),
+    EMAIL_BATCH_SIZE: z.coerce.number().int().positive().default(25),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;

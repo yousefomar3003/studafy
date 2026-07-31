@@ -11,6 +11,11 @@ describe("loadEnv", () => {
       SHUTDOWN_TIMEOUT_MS: 10_000,
       DATABASE_URL: "postgres://localhost:5432/studafy",
       SCHOOL_IDS: "",
+      SES_FROM_ADDRESS: "invitations@mail.studafy.com",
+      FRONTEND_URL: "http://localhost:5173",
+      EMAIL_MAX_RATE_PER_SECOND: 5,
+      EMAIL_POLL_INTERVAL_MS: 1_000,
+      EMAIL_BATCH_SIZE: 25,
     });
   });
 
@@ -27,6 +32,11 @@ describe("loadEnv", () => {
       SHUTDOWN_TIMEOUT_MS: 30_000,
       DATABASE_URL: "postgres://localhost:5432/studafy",
       SCHOOL_IDS: "",
+      SES_FROM_ADDRESS: "invitations@mail.studafy.com",
+      FRONTEND_URL: "http://localhost:5173",
+      EMAIL_MAX_RATE_PER_SECOND: 5,
+      EMAIL_POLL_INTERVAL_MS: 1_000,
+      EMAIL_BATCH_SIZE: 25,
     });
   });
 

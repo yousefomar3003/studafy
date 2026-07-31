@@ -300,6 +300,7 @@ export async function resendVerificationEmail(
       schoolId: school.id,
       email: school.email,
       expiresAt: expiresAt.toISOString(),
+      token,
     });
 
     logger.info({ school_id: school.id, email: school.email }, "verification email resent");

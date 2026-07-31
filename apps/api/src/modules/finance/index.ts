@@ -36,3 +36,13 @@ export {
   type ErpNextPaymentEntry,
   type PaymentStatus,
 } from "./payments/projection";
+export {
+  projectInvoiceEntry,
+  type ErpNextSalesInvoice,
+  type ProjectInvoiceResult,
+} from "./invoices/projection";
+export {
+  projectFeeScheduleEntry,
+  type ErpNextFeeSchedule,
+  type ProjectFeeScheduleResult,
+} from "./fee-schedules/projection";

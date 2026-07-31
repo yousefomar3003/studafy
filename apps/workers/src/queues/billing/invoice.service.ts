@@ -104,10 +104,9 @@ async function buildStudentCustomerId(
   schoolId: string,
   studentId: string,
 ): Promise<string> {
-  const [student] = await tx<{ admission_no: string; full_name: string }[]>`
-    SELECT s.admission_no, u.full_name
+  const [student] = await tx<{ admission_number: string }[]>`
+    SELECT s.admission_number
     FROM app.students s
-    JOIN app.users u ON u.id = s.user_id
     WHERE s.id = ${studentId}::uuid AND s.school_id = ${schoolId}::uuid
   `;
   if (!student) {
@@ -117,7 +116,7 @@ async function buildStudentCustomerId(
       `Student ${studentId} not found`,
     );
   }
-  return student.admission_no;
+  return student.admission_number;
 }
 
 class CodedError extends Error {

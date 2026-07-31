@@ -69,7 +69,12 @@ approved_globals(table_name) AS (
     -- Boundary rejections raised before authentication (ST-067). Global by construction: the
     -- requests it records never established a tenant, so there is no school_id to isolate by.
     -- See db/migrations/000028_create_security_events_table.sql for the full rationale.
-    ('security_events')
+    ('security_events'),
+    -- SES delivery feedback (R-08). Global by construction: SNS webhook notifications arrive before
+    -- any tenant context exists, and an address suppression is a property of the address, not of any
+    -- one school. See db/migrations/000077_create_email_channel_tables.sql for the full rationale.
+    ('email_events'),
+    ('email_suppressions')
 ),
 approved_flexible_columns(table_name, column_name) AS (
   VALUES
@@ -92,6 +97,8 @@ approved_flexible_columns(table_name, column_name) AS (
     -- reproduce the exact request. The stable relational fields (tenant, requester, type, format,
     -- status and object metadata) remain normalized and constrained.
     ('finance_report_jobs', 'parameters'),
+    -- R-08: the raw, externally-defined SES SNS event payload is audited verbatim in email_events.
+    ('email_events', 'payload'),
     ('student_imports', 'rows_data'),
     ('student_imports', 'errors'),
     ('student_imports', 'summary')
