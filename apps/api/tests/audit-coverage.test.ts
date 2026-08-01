@@ -62,6 +62,20 @@ const EXPECTED_MUTATING_ROUTES = [
   // Audit rows are written from the route's service transaction.
   "POST /api/auth/login/oauth",
   "POST /erpnext/webhooks",
+  // Stripe billing webhook (ST-132). Global, pre-tenant surface authenticated by signature.
+  // auditAction declares the mutation; the app.audit_logs rows are written from inside the
+  // processor's own transaction — see src/modules/subscriptions/stripe/webhook-processor.ts — so a
+  // status transition and its record commit or roll back together. Declared against `subscriptions`
+  // although the same processor also writes `ai_subscriptions` rows via the school→AI cascade; the
+  // service emits the action that actually occurred, as the submissions routes below already do.
+  //
+  // NOTE: the other five /api/subscriptions/* mutating routes are invisible to this scanner. Their
+  // files build their sub-app as `const app = new OpenAPIHono(...)` and register with
+  // `app.openapi(...)`, and findMutatingRoutes only inspects style-2 routes in files containing
+  // `routes.openapi(`. Naming the variable `routes` — as this webhook module and erpnext/webhook.ts
+  // both do — is what puts a route in front of the gate. Bringing the rest into coverage means
+  // renaming them and deciding an audit action for each, which is its own change.
+  "POST /api/subscriptions/webhook/stripe",
   // SES → SNS email-event webhook (deliverability R-08). Global, pre-tenant surface: auditAction
   // declares the intent, but no app.audit_logs row is written because the ledger insert into
   // app.email_events *is* the audit record — see src/email/webhook.ts.

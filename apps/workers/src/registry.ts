@@ -4,7 +4,7 @@ import { Queue } from "bullmq";
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
 import { workerLogger } from "./log";
-import { processBillingJob } from "./queues/billing";
+import { billingDeadLetterListener, processBillingJob } from "./queues/billing";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
@@ -202,6 +202,11 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     name: QUEUE_NAMES.BILLING,
     concurrency: 1,
     processor: async (job) => processBillingJob(job, databaseUrl),
+    // Terminal failures of `process-billing-event` park the app.billing_events row itself (ST-132).
+    // The row already holds the verbatim provider payload, the reason and the attempt count, so it
+    // is the dead-letter record — a separate table would be a second copy of data this one has in
+    // full. ERPNext invoice jobs share this queue and are ignored by the listener.
+    onFailed: billingDeadLetterListener(databaseUrl, workerLogger),
   },
   {
     name: QUEUE_NAMES.OUTBOX_RELAY,

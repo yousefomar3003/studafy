@@ -45,6 +45,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/schools/register",
   "POST /erpnext/webhooks",
   "POST /email/webhooks/sns",
+  "POST /api/subscriptions/webhook/stripe",
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
@@ -260,6 +261,10 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /erpnext/webhooks",
   // SES → SNS email-event webhook (R-08) — SNS-signature-authenticated, not bearer.
   "POST /email/webhooks/sns",
+  // Stripe billing webhook (ST-132) — authenticated by the Stripe-Signature HMAC over the raw
+  // request body, not by a bearer token. Stripe holds no Studafy identity and no permission could
+  // be checked against one, so this is the same exemption the two webhooks above take.
+  "POST /api/subscriptions/webhook/stripe",
   // Daily reconciliation (ST-122) — API-key-authenticated, not bearer; no JWT to check.
   "POST /api/finance/reconciliation/run",
   // Account activation (ST-078) — public self-service onboarding. Authorized by the invitation

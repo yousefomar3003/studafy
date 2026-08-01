@@ -677,7 +677,9 @@ export function createApp({
     app.route("/", checkoutRoutes(database, stripeProvider));
     app.route("/", schoolCheckoutRoutes(database, stripeProvider));
     app.route("/", aiCheckoutRoutes(database, stripeProvider));
-    app.route("/", webhookRoutes(database, stripeProvider, logger));
+    // The event sink is threaded in so a rejected webhook signature rides the same ST-082 alerting
+    // path as a CSRF or rate-limit rejection, rather than a second one invented for billing.
+    app.route("/", webhookRoutes(database, stripeProvider, logger, { eventSink, redis }));
     app.route("/", adminSubscriptionRoutes(database, stripeProvider, logger));
   }
 

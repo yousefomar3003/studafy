@@ -66,8 +66,27 @@ export interface SyncPriceResult {
   providerPriceId: string;
 }
 
+/**
+ * One verified inbound webhook, normalized off the provider's envelope.
+ *
+ * `id` and `effectiveAt` are envelope fields, not payload fields, and both are load-bearing:
+ *
+ * - `id` is the idempotency key the processor claims on (app.billing_events.provider_event_id).
+ *   It must be the *event's* identity, never the identity of the object the event describes --
+ *   several events can concern one subscription, and keying on the object id would make the second
+ *   of them look like a replay of the first and silently drop it.
+ * - `effectiveAt` is when the provider says the change happened. Delivery order is not guaranteed,
+ *   so every ordering decision is made on this and never on receipt time.
+ *
+ * `data` stays the provider's own object, unmodelled: what a `customer.subscription.updated`
+ * carries is the provider's business, and this port does not pretend to normalize it.
+ */
 export interface ParsedWebhookEvent {
+  id: string;
   type: string;
+  effectiveAt: Date;
+  /** False for provider test-mode traffic. Recorded so a test event is never mistaken for real billing. */
+  livemode: boolean;
   data: Record<string, unknown>;
 }
 
