@@ -1,0 +1,61 @@
+name: Setup Bun workspace
+description: >-
+  Install Bun, restore the dependency cache, and install the workspace from the lockfile with
+  retries. Used by every CI job so the install behaviour is defined once.
+
+inputs:
+  bun-version:
+    description: Bun version to install. Keep in step with the version in package.json's engines.
+    required: false
+    default: 1.3.14
+
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.bun-version }}
+
+    # Keyed on the lockfile: any dependency change produces a new key, and an unchanged lockfile
+    # reuses the previous run's downloads. The restore-keys prefix means a lockfile change still
+    # starts from the most recent cache rather than from nothing, so adding one package does not
+    # re-download the other eleven hundred.
+    #
+    # This replaces a `bun pm cache rm` that every job used to run before installing. That command
+    # guaranteed a completely cold download on every job of every run — five jobs x ~1130 packages —
+    # which is both slow and the reason a single flaky tarball fetch could fail the build. The cache
+    # is content-addressed and `--frozen-lockfile` pins the resolved tree, so there is nothing a
+    # stale cache entry can silently change; clearing it bought no safety it does not already have.
+    - uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: bun-install-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          bun-install-${{ runner.os }}-
+
+    # Retried because installing is a network operation against a third-party registry, and a
+    # registry hiccup is not a broken build. Observed failure: `Fail extracting tarball for
+    # "storybook"` on a run whose lockfile resolved cleanly and whose other 1130 packages installed.
+    #
+    # `--frozen-lockfile` is what makes retrying safe: every attempt resolves to exactly the same
+    # tree, so a retry can only re-fetch what the first attempt failed to fetch. It can never quietly
+    # resolve a different version to work around the failure.
+    #
+    # Backoff is deliberate rather than a tight loop: a registry returning errors needs a moment, and
+    # three immediate retries would just fail three times faster.
+    - name: Install workspace dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        for attempt in 1 2 3; do
+          if bun install --frozen-lockfile --ignore-scripts; then
+            exit 0
+          fi
+          if [ "$attempt" -lt 3 ]; then
+            delay=$((attempt * 15))
+            echo "::warning::bun install failed (attempt ${attempt}/3); retrying in ${delay}s"
+            sleep "$delay"
+          fi
+        done
+        echo "::error::bun install failed after 3 attempts"
+        exit 1

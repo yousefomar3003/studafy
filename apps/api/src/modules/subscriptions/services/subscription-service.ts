@@ -67,34 +67,12 @@ export async function requireSchoolSubscription(
   return sub;
 }
 
-export async function transitionSubscriptionStatus(
-  tx: TransactionSql,
-  currentStatus: string,
-  newStatus: string,
-  stripeSubscriptionId: string,
-): Promise<void> {
-  await tx`
-    UPDATE app.subscriptions
-    SET status = ${newStatus}::app.subscription_status, updated_at = CURRENT_TIMESTAMP
-    WHERE stripe_subscription_id = ${stripeSubscriptionId}
-  `;
-}
-
-export async function updateSubscriptionPeriod(
-  tx: TransactionSql,
-  stripeSubscriptionId: string,
-  periodStart: Date,
-  periodEnd: Date,
-): Promise<void> {
-  await tx`
-    UPDATE app.subscriptions
-    SET
-      current_period_start = ${periodStart.toISOString()}::timestamptz,
-      current_period_end = ${periodEnd.toISOString()}::timestamptz,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE stripe_subscription_id = ${stripeSubscriptionId}
-  `;
-}
+// transitionSubscriptionStatus and updateSubscriptionPeriod lived here until ST-132. The first took
+// a `currentStatus` argument and never read it -- it applied whatever status it was handed, which is
+// precisely the unguarded transition this module now refuses to perform. Both were only ever called
+// by the old webhook handler; the status change, the period write and the audit row are now one
+// statement in stripe/webhook-processor.ts, guarded by the state machine, so leaving these behind
+// would leave a second, unguarded way to move a subscription.
 
 export async function getActivePlans(database: import("postgres").Sql): Promise<PlanWithPrices[]> {
   const plans = await database<

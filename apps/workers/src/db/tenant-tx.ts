@@ -79,6 +79,31 @@ export async function withSystemTenantTx<T>(
 }
 
 /**
+ * A system transaction whose tenant is not known at BEGIN time.
+ *
+ * The billing-event retry (ST-132) is the one caller. It starts from a `provider_event_id` and has
+ * to read `app.billing_events` — a global, `studafy_admin`-only table — before it can say which
+ * school the event concerns. There is no `school_id` to hand `withSystemTenantTx`, and guessing one
+ * would be worse than having none.
+ *
+ * Tenant isolation is therefore *not* armed here. The caller must set `app.school_id` before
+ * touching any RLS-forced table; `processBillingEvent` in @studafy/billing does exactly that, in the
+ * same transaction, the moment attribution succeeds. Prefer `withSystemTenantTx` anywhere the tenant
+ * is known up front — this is the narrower tool, not the more convenient one.
+ */
+export async function withSystemTx<T>(
+  sql: Sql,
+  fn: (tx: TransactionSql) => Promise<T>,
+): Promise<T> {
+  let result: T | undefined;
+  await sql.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    result = await fn(tx);
+  });
+  return result as T;
+}
+
+/**
  * `set_config(..., true)` is transaction-local, exactly like SET LOCAL — including for the special
  * `role` setting. That is what makes this safe under PgBouncer transaction pooling: the settings
  * evaporate at COMMIT or ROLLBACK rather than leaking to whoever gets the connection next.

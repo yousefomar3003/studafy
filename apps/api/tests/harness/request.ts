@@ -8,6 +8,7 @@ import { AUTH_CHANNELS, KeyStore, signAccessToken } from "../../src/modules/auth
 import type { Database } from "../../src/db";
 import type { AppEnv } from "../../src/middleware/requestId";
 import type { AuthChannel } from "../../src/modules/auth";
+import type { PaymentProviderPort } from "../../src/modules/subscriptions";
 import type { RedisClient } from "../../src/redis";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { Role } from "@studafy/constants";
@@ -43,6 +44,16 @@ export interface TestAppOptions {
   database: Database | null;
   redis?: RedisClient | null;
   docsEnabled?: boolean;
+  /**
+   * A payment provider for the billing routes. Defaults to `null`, which is what production does
+   * without Stripe credentials: the routes still register so the OpenAPI contract is stable, and
+   * answer 503 at request time.
+   *
+   * Tests supply a stub rather than a real StripeAdapter because signature verification is the one
+   * thing that cannot be exercised without the real signing secret — so the stub decides what
+   * `parseWebhook` accepts, and the route sees exactly the same success and failure shapes.
+   */
+  stripeProvider?: PaymentProviderPort | null;
 }
 
 /** A test app plus the key store whose keys its tokens must be signed with. */
@@ -78,6 +89,7 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
     docsEnabled: options.docsEnabled ?? false,
+    stripeProvider: options.stripeProvider ?? null,
   });
 
   return { app, keyStore, ready: keyStore.init() };

@@ -100,6 +100,13 @@ const EXEMPT_PATHS = [
   // Bearer header) a cross-site page could forge; the token arrives as a one-shot credential,
   // identical in security posture to the activation endpoint above.
   "/api/auth/login",
+  // Stripe billing webhook (ST-132). Same posture as the ERPNext entry above — authenticated by an
+  // HMAC signature over the raw request body, with no cookie to forge and no way to read one — but
+  // it needs naming explicitly because it lives under /api/ rather than at a top-level path like
+  // /erpnext/webhooks or /email/webhooks/sns. Without this entry the check below rejects every
+  // Stripe delivery with 403 missing_token before the handler runs: Stripe sends no session cookie
+  // and no Authorization header, so neither the exemption list nor the Bearer exemption covered it.
+  "/api/subscriptions/webhook/stripe",
 ];
 
 type CsrfFailureReason = "missing_token" | "token_mismatch";

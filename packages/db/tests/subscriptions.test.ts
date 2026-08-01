@@ -292,40 +292,36 @@ integrationTest(
           await expectDenied(database, `SELECT * FROM app.${table}`, bad);
       }
 
+      // effective_at is NOT NULL since 000078 (ST-132): a webhook that cannot say when the provider
+      // thinks it happened cannot be ordered, and ordering is what makes out-of-order delivery safe.
+      const event = (provider: string, id: string, type: string) =>
+        `INSERT INTO app.billing_events (provider, provider_event_id, event_type, effective_at)
+         VALUES ('${provider}', '${id}', '${type}', '2026-01-01T00:00:00Z')`;
+
       // studafy_app has no grant on billing_events at all -- denied before RLS is even reached.
       await expectDenied(database, "SELECT * FROM app.billing_events");
-      await expectDenied(
-        database,
-        `INSERT INTO app.billing_events (provider, provider_event_id, event_type)
-         VALUES ('stripe', 'evt_1', 'invoice.paid')`,
-      );
+      await expectDenied(database, event("stripe", "evt_1", "invoice.paid"));
 
       // studafy_admin, the intended caller, may insert and read without any tenant context.
       const inserted = await asRole(database, "studafy_admin", async (tx) => {
-        await tx`
-          INSERT INTO app.billing_events (provider, provider_event_id, event_type)
-          VALUES ('stripe', 'evt_1', 'invoice.paid')
-        `;
+        await tx.unsafe(event("stripe", "evt_1", "invoice.paid"));
         return tx<{ count: string }[]>`SELECT count(*)::text AS count FROM app.billing_events`;
       });
       expect(inserted[0]!.count).toBe("1");
 
       // Replaying the exact same provider event id is deduped by
-      // uq_billing_events_provider_event_id.
+      // uq_billing_events_provider_event_id. This is the constraint the webhook processor's
+      // INSERT ... ON CONFLICT DO NOTHING claim relies on, so it is also the concurrency control.
       await expectDenied(
         database,
-        `INSERT INTO app.billing_events (provider, provider_event_id, event_type)
-         VALUES ('stripe', 'evt_1', 'invoice.paid')`,
+        event("stripe", "evt_1", "invoice.paid"),
         undefined,
         "studafy_admin",
       );
 
       // A different provider may reuse the same event id string -- the natural key is the pair.
       await asRole(database, "studafy_admin", async (tx) => {
-        await tx`
-          INSERT INTO app.billing_events (provider, provider_event_id, event_type)
-          VALUES ('paddle', 'evt_1', 'subscription.updated')
-        `;
+        await tx.unsafe(event("paddle", "evt_1", "subscription.updated"));
       });
       const total = await asRole(
         database,
@@ -333,6 +329,43 @@ integrationTest(
         (tx) => tx<{ count: string }[]>`SELECT count(*)::text AS count FROM app.billing_events`,
       );
       expect(total[0]!.count).toBe("2");
+
+      // ST-132 processing columns. The row is mutable across retries -- that is the amendment 000078
+      // makes to 000016's append-only description -- but a status must still agree with its evidence:
+      // processed_at exists exactly when the status is 'processed', and a failure must say why.
+      await asRole(database, "studafy_admin", async (tx) => {
+        await tx`
+          UPDATE app.billing_events
+          SET status = 'processed', processed_at = CURRENT_TIMESTAMP, attempt_count = 1
+          WHERE provider = 'stripe' AND provider_event_id = 'evt_1'
+        `;
+      });
+
+      await expectDenied(
+        database,
+        `UPDATE app.billing_events SET status = 'processed'
+         WHERE provider = 'paddle' AND provider_event_id = 'evt_1'`,
+        undefined,
+        "studafy_admin",
+      );
+
+      await expectDenied(
+        database,
+        `UPDATE app.billing_events SET status = 'dlq'
+         WHERE provider = 'paddle' AND provider_event_id = 'evt_1'`,
+        undefined,
+        "studafy_admin",
+      );
+
+      // Half an attribution is refused: a row claiming a subscription type it has no id for would
+      // read to the fold query as "this subscription has no history".
+      await expectDenied(
+        database,
+        `UPDATE app.billing_events SET subscription_type = 'school'
+         WHERE provider = 'paddle' AND provider_event_id = 'evt_1'`,
+        undefined,
+        "studafy_admin",
+      );
     } finally {
       await database.cleanup();
     }

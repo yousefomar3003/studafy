@@ -58,6 +58,11 @@ export const JOB_NAMES = {
   // is an external call — retrying the second must not re-run the first.
   DISPATCH_NOTIFICATION: "dispatch-notification",
   DELIVER_NOTIFICATION: "deliver-notification",
+  // Stripe webhook retry (ST-132). Carries only a provider event id: the verified payload is already
+  // durable in app.billing_events, and a job that carried a copy could disagree with it. Signature
+  // verification is not repeated on retry — it happened once, at intake, over the raw bytes, which
+  // is the only moment it can be done at all.
+  PROCESS_BILLING_EVENT: "process-billing-event",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

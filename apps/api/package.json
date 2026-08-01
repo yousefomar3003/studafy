@@ -22,6 +22,7 @@
     "@hono/zod-openapi": "1.5.1",
     "@scalar/hono-api-reference": "0.11.11",
     "@studafy/attendance-reporting": "workspace:*",
+    "@studafy/billing": "workspace:*",
     "@studafy/constants": "workspace:*",
     "@studafy/finance-reporting": "workspace:*",
     "@studafy/notification-templates": "workspace:*",

@@ -1,8 +1,15 @@
 import { JOB_NAMES } from "@studafy/constants";
 import postgres from "postgres";
 
+import { workerLogger } from "../../log";
+
+import { processStripeBillingEvent } from "./billing-event.service";
 import { generateInvoice, generateBatchInvoices } from "./invoice.service";
-import { generateInvoiceSchema, generateBatchInvoicesSchema } from "./schemas";
+import {
+  generateInvoiceSchema,
+  generateBatchInvoicesSchema,
+  processBillingEventSchema,
+} from "./schemas";
 
 import type {
   BillingJobData,
@@ -31,6 +38,17 @@ export async function processBillingJob(
       return { processed: false, reason: "invalid job data", errors: parsed.error.issues };
     }
     return processBatchInvoices(parsed.data, databaseUrl);
+  }
+
+  // Stripe webhook retry (ST-132). Shares this queue because it is billing work and the queue is
+  // named for what it carries, not for which provider it talks to; it shares nothing else with the
+  // ERPNext invoice jobs above, which are untouched by it.
+  if (job.name === JOB_NAMES.PROCESS_BILLING_EVENT) {
+    const parsed = processBillingEventSchema.safeParse(job.data);
+    if (!parsed.success) {
+      return { processed: false, reason: "invalid job data", errors: parsed.error.issues };
+    }
+    return processStripeBillingEvent(parsed.data, databaseUrl, workerLogger);
   }
 
   return { processed: false, reason: "unknown billing job" };
