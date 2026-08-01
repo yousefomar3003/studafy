@@ -72,6 +72,35 @@ export interface BillingAuditEntry {
  */
 export type BillingAuditWriter = (tx: TransactionSql, entry: BillingAuditEntry) => Promise<void>;
 
+/** One entitlement-affecting transition, reported to the host process (ST-133). */
+export interface EntitlementChange {
+  kind: SubscriptionKind;
+  schoolId: string;
+  /** `app.subscriptions.id` for a school change, `app.ai_subscriptions.id` for an AI one. */
+  subscriptionId: string;
+  /** Non-null exactly when `kind === "ai"`. */
+  studentId: string | null;
+  previousStatus: SubscriptionStatus;
+  status: SubscriptionStatus;
+}
+
+/**
+ * Records an entitlement change inside the caller's transaction: the version bump and the outbox row.
+ *
+ * Injected for the same reason `BillingAuditWriter` is. The outbox emitter, its Zod payload schemas
+ * and the entitlement version table all belong to the host process, and a second copy of them here
+ * would be a second place they could drift. It also keeps this package free of any apps/api import.
+ *
+ * Must throw on failure. The caller's transaction rolling back is what keeps a transition whose
+ * entitlement change was never published from committing -- an unpublished transition would leave
+ * every cache and every outstanding token believing the old state indefinitely, which is precisely
+ * the failure ST-133 exists to remove.
+ */
+export type EntitlementChangePublisher = (
+  tx: TransactionSql,
+  change: EntitlementChange,
+) => Promise<void>;
+
 /**
  * The logging surface this package needs.
  *
@@ -96,6 +125,12 @@ export interface VerifiedBillingEvent {
 
 export interface ProcessOptions {
   emitAudit: BillingAuditWriter;
+  /**
+   * Required, not optional. A transition that silently published nothing is the exact failure this
+   * port exists to prevent, and an optional field would make forgetting it a no-op at every call
+   * site rather than a compile error at the three that exist.
+   */
+  publishEntitlementChange: EntitlementChangePublisher;
   logger: BillingLogger;
   /** Correlates the audit row with the HTTP request that caused it, when there was one. */
   requestId?: string | null;
@@ -340,6 +375,18 @@ async function applyTransition(
 
   await audit(options, tx, target.kind, target.id, target.status, next);
 
+  // Same guard as the audit row above, and load-bearing for the same reason: no status change means
+  // no entitlement change, so no version bump and no cache churn. A redelivery that folds to the
+  // status already stored publishes nothing.
+  await options.publishEntitlementChange(tx, {
+    kind: target.kind,
+    schoolId: target.schoolId,
+    subscriptionId: target.id,
+    studentId: target.studentId,
+    previousStatus: target.status,
+    status: next,
+  });
+
   if (target.kind === "school") {
     await cascadeToAiSubscriptions(tx, options, target, next);
   }
@@ -371,8 +418,8 @@ async function cascadeToAiSubscriptions(
   const cascade = resolveAiCascade(target.status, next);
   if (cascade === null) return;
 
-  const affected = await tx<{ id: string; status: SubscriptionStatus }[]>`
-    SELECT id, status::text AS status
+  const affected = await tx<{ id: string; student_id: string; status: SubscriptionStatus }[]>`
+    SELECT id, student_id, status::text AS status
     FROM app.ai_subscriptions
     WHERE school_id = ${target.schoolId}::uuid
       AND status::text = ANY(${[...LIVE_STATUSES]})
@@ -389,6 +436,17 @@ async function cascadeToAiSubscriptions(
 
   for (const row of affected) {
     await audit(options, tx, "ai", row.id, row.status, cascade);
+    // One per cascaded student, in the same transaction as the school's own change. A school
+    // cancellation with two live AI rows therefore publishes exactly one subscription.statusChanged
+    // and two aiSubscription.statusChanged.
+    await options.publishEntitlementChange(tx, {
+      kind: "ai",
+      schoolId: target.schoolId,
+      subscriptionId: row.id,
+      studentId: row.student_id,
+      previousStatus: row.status,
+      status: cascade,
+    });
   }
 
   options.logger.info(

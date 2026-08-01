@@ -28,6 +28,18 @@ import type { MiddlewareHandler } from "hono";
 // Options
 // ---------------------------------------------------------------------------
 
+/**
+ * The subset of the entitlement service this middleware needs.
+ *
+ * Declared here as a structural type rather than imported from the subscriptions module so the auth
+ * boundary does not depend on billing: anything that can answer "what version is this school on" is
+ * a valid reader, which is also what makes the unit tests able to supply a counting fake.
+ */
+export interface EntitlementVersionReader {
+  /** The school's current entitlement version. Must throw rather than guess. */
+  currentVersion(schoolId: string): Promise<number>;
+}
+
 export interface JwtAuthOptions {
   /** Key store holding the live signing/verification keys. */
   keyStore: KeyStore;
@@ -37,6 +49,12 @@ export interface JwtAuthOptions {
    * every request so it cannot pass unnoticed in a deployed environment.
    */
   denylist: JtiDenylist | null;
+  /**
+   * Entitlement staleness check (ST-133). `null` disables it — same shape and same rationale as
+   * `denylist`: dev, tests and the OpenAPI generator all run without Redis, and a warning on every
+   * request keeps it from passing unnoticed in a deployed environment.
+   */
+  entitlements?: EntitlementVersionReader | null;
   /** Required `iss` claim. Threaded from env.JWT_ISSUER. */
   issuer: string;
   /** Required `aud` claim. Threaded from env.JWT_AUDIENCE. */
@@ -153,13 +171,16 @@ export class AuthException extends HTTPException {
  * 2. Header parse — no crypto, no I/O. Catches the entire class of unauthenticated requests.
  * 3. Signature, `exp`, `iss`/`aud`, and claim shape — one RSA verification against the key the
  *    token's own `kid` resolves to. This dominates the measured cost of the whole middleware.
- * 4. Revocation lookup — a single Redis `EXISTS`, and the only network hop in the path.
+ * 4. Revocation lookup — a single Redis `EXISTS`, and the first network hop in the path.
+ * 5. Entitlement freshness — one more Redis `GET`, and only for a token that is otherwise valid.
  *
- * Step 4 running last is the part that matters most: a tampered or expired token is rejected
+ * Steps 4 and 5 running last is the part that matters most: a tampered or expired token is rejected
  * without ever touching Redis, so a flood of garbage tokens costs no cache I/O at all. Inverting
  * 3 and 4 would put a network round-trip in front of every forged request.
  * tests/auth/short-circuit.test.ts holds this ordering by counting denylist lookups — a status
  * code alone cannot tell the two arrangements apart.
+ *
+ * 5 sits after 4 rather than before it so a revoked token never pays for the second lookup.
  */
 /**
  * Whether a path is exempt from authentication.
@@ -181,6 +202,7 @@ function isPublicPath(path: string, publicPaths: readonly string[]): boolean {
 export function jwtAuthMiddleware({
   keyStore,
   denylist,
+  entitlements = null,
   issuer,
   audience,
   publicPaths = DEFAULT_PUBLIC_PATHS,
@@ -250,7 +272,42 @@ export function jwtAuthMiddleware({
       log?.warn("jti denylist unavailable — token revocation is not enforced");
     }
 
-    // --- 4. Hydrate context -------------------------------------------------
+    // --- 4. Entitlement freshness -------------------------------------------
+    if (entitlements) {
+      let current: number;
+      try {
+        current = await entitlements.currentVersion(payload.school_id);
+      } catch (err) {
+        // Fail closed, matching the denylist three lines above. Redis is already a hard dependency
+        // of this middleware, so failing open here would buy no additional availability while
+        // accepting entitlement decisions of unknown freshness — the exact failure ST-133 exists to
+        // remove. The cost is real and accepted: a Redis outage becomes an authentication outage
+        // rather than up to JWT_ACCESS_TTL_SECONDS of service for a canceled school.
+        log?.error({ err }, "entitlement version lookup failed");
+        throw new HTTPException(503, { message: "Authentication temporarily unavailable" });
+      }
+
+      // Strictly less-than, never inequality. A token minted a moment ahead of the cached value must
+      // not be rejected, and neither must a pre-ST-133 token carrying the genesis version 1 — which
+      // is exactly what a school with no counter row resolves to.
+      if (payload.entitlements_ver < current) {
+        log?.warn(
+          { reason: "entitlements_stale", claim: payload.entitlements_ver, current },
+          "authentication failed",
+        );
+        // 401 with its own code, not a generic one: the credential is no longer acceptable and the
+        // remedy is to obtain a new one, which is what 401 means. /api/auth/refresh is already in
+        // DEFAULT_PUBLIC_PATHS, so a client receiving this always recovers in a single call.
+        throw new AuthException(
+          ERROR_CODES.AUTH_ENTITLEMENTS_STALE,
+          "Entitlements have changed; obtain a new access token",
+        );
+      }
+    } else {
+      log?.warn("entitlement version reader unavailable — token staleness is not enforced");
+    }
+
+    // --- 5. Hydrate context -------------------------------------------------
     const auth: AuthContext = {
       userId: payload.sub,
       schoolId: payload.school_id,

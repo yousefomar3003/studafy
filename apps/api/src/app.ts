@@ -82,6 +82,7 @@ import {
   webhookRoutes,
   planRoutes,
   adminSubscriptionRoutes,
+  createEntitlementService,
 } from "./modules/subscriptions";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -265,12 +266,22 @@ export function createApp({
   // boundary to drift onto different connections or key prefixes.
   const jtiDenylist = redis ? createJtiDenylist(redis) : null;
 
+  // The entitlement service (ST-133). Shared between the JWT middleware's staleness check and any
+  // route that needs to resolve entitlements, for the same reason the denylist is shared: one
+  // instance makes it structurally impossible for the two sides to drift onto different key
+  // prefixes. Requires a database — without one there is nothing to resolve against, and the
+  // middleware degrades to the same "not enforced" warning it gives without a denylist.
+  const entitlements = database
+    ? createEntitlementService({ database, redis: redis ?? null, logger })
+    : null;
+
   if (keyStore) {
     app.use(
       "/api/*",
       jwtAuthMiddleware({
         keyStore,
         denylist: jtiDenylist,
+        entitlements,
         issuer: jwtIssuer,
         audience: jwtAudience,
       }),

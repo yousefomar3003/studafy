@@ -13,8 +13,18 @@ export interface AccessTokenClaims {
   /** All roles the user holds in the tenant (from user_roles). */
   roles: Role[];
   /**
-   * Monotonically increasing version counter for the user's entitlements. Bumped whenever
-   * roles or permissions change, allowing caches to invalidate without token revocation.
+   * The school's entitlement version at the moment this token was minted (ST-133).
+   *
+   * A monotonically increasing counter held in `app.entitlement_versions`, bumped whenever the
+   * school's subscription state changes. jwtAuthMiddleware rejects a token whose value is below the
+   * current one with AUTH_ENTITLEMENTS_STALE, so a subscription change takes effect within seconds
+   * instead of waiting out the token's TTL.
+   *
+   * An absent counter row means version 1, which is also the value every token minted before ST-133
+   * carries — so those tokens remain valid until their school's first real subscription change.
+   *
+   * Scope note: this tracks *subscription* changes only. A role change does not bump it today; that
+   * is a known gap, not an implied guarantee.
    */
   entitlements_ver: number;
   /** Unique token identifier — a v4 UUID, unique across the whole platform. */

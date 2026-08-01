@@ -6,6 +6,7 @@
   "AUTH_TOKEN_EXPIRED": "انتهت صلاحية رمز المصادقة",
   "AUTH_TOKEN_INVALID": "رمز المصادقة غير صالح",
   "AUTH_SESSION_NOT_FOUND": "لم يتم العثور على الجلسة",
+  "AUTH_ENTITLEMENTS_STALE": "تغيرت الاشتراكات؛ يرجى الحصول على رمز وصول جديد",
   "INVITATION_INVALID": "الدعوة غير صالحة",
   "EXPIRED": "انتهت صلاحية الدعوة",
   "REVOKED": "تم إلغاء الدعوة",

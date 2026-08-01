@@ -1,4 +1,4 @@
-import { DOMAIN_EVENTS, type DomainEvent } from "@studafy/constants";
+import { DOMAIN_EVENTS, SUBSCRIPTION_STATUSES, type DomainEvent } from "@studafy/constants";
 import { z } from "zod";
 
 const uid = z.string().uuid();
@@ -244,6 +244,35 @@ export const eventPayloadSchemas = {
     attemptsMade: z.number().int().positive(),
     errorClass: z.string().max(200),
     failedAt: z.string(),
+  }),
+
+  // ── Subscription state transitions (ST-133) ───────────────────────
+  // Emitted by the billing state machine inside the transaction that applies the status change.
+  //
+  // Correlation handles and enum values only — no plan names, no amounts, no customer identifiers.
+  // Like NOTIFICATION_DISPATCH_FAILED above, these are published verbatim onto the Redis pub/sub
+  // channel `events:{school_id}:{event_name}` with no redaction, and outbox rows are never reaped.
+  //
+  // entitlementsVersion is the value the emitting transaction's version bump returned. It is what
+  // makes invalidation version-guarded rather than a blind DEL: a consumer that arrives out of order
+  // can refuse to move the cached version backwards, and the JWT middleware sees the new version the
+  // moment the cache is written rather than waiting for someone to re-resolve from Postgres. The
+  // `>= 2` floor mirrors ck_entitlement_versions_version — an absent row is version 1, so the first
+  // persisted bump is 2 and no event can ever carry the genesis value.
+  [DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED]: z.object({
+    schoolId: uid,
+    subscriptionId: uid,
+    previousStatus: z.enum(SUBSCRIPTION_STATUSES),
+    status: z.enum(SUBSCRIPTION_STATUSES),
+    entitlementsVersion: z.number().int().min(2),
+  }),
+  [DOMAIN_EVENTS.AI_SUBSCRIPTION_STATUS_CHANGED]: z.object({
+    schoolId: uid,
+    studentId: uid,
+    aiSubscriptionId: uid,
+    previousStatus: z.enum(SUBSCRIPTION_STATUSES),
+    status: z.enum(SUBSCRIPTION_STATUSES),
+    entitlementsVersion: z.number().int().min(2),
   }),
 
   // ── ERPNext (freeform — external system payloads) ─────────────────────

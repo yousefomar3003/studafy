@@ -99,9 +99,9 @@ export async function issueTokenPair(
   config: SessionTokenConfig,
   params: IssueTokenPairParams,
 ): Promise<IssuedTokenPair> {
-  const [roles, subscriptionStatus] = await Promise.all([
+  const [roles, claims] = await Promise.all([
     readUserRoles(tx, params.userId),
-    readSubscriptionStatus(tx),
+    readSessionClaims(tx),
   ]);
 
   const minted = mintOpaqueToken(params.schoolId, params.userId);
@@ -149,9 +149,9 @@ export async function issueTokenPair(
       sub: params.userId,
       school_id: params.schoolId,
       roles,
-      entitlements_ver: 1,
+      entitlements_ver: claims.entitlementsVersion,
       channel: params.channel,
-      subscription_status: subscriptionStatus,
+      subscription_status: claims.status,
     },
     {
       issuer: config.issuer,
@@ -192,20 +192,51 @@ async function readUserRoles(tx: TransactionSql, userId: string): Promise<Role[]
   return rows.map((row) => row.role);
 }
 
+/** The two tenant-scoped claims an access token carries beyond the caller's own identity. */
+interface SessionClaims {
+  status: SubscriptionStatus;
+  entitlementsVersion: number;
+}
+
 /**
- * Read the tenant's current subscription lifecycle status.
+ * Read the tenant's subscription lifecycle status and entitlement version, in one round trip.
  *
- * Defaults to "trialing" if no subscription row exists — a defensive fallback for tenants
- * that have not yet been fully provisioned. The provisioning pipeline creates the subscription
- * row, but there is a window between school creation and provisioning completion where the row
- * may not exist yet.
+ * Both default for a tenant whose provisioning has not yet written a row: "trialing" is the
+ * long-standing defensive fallback (school creation and provisioning completion are not atomic, and
+ * there is a window where `app.subscriptions` has nothing), and 1 is the entitlement genesis — an
+ * absent `app.entitlement_versions` row *is* version 1, with the first bump writing 2.
+ *
+ * That genesis value is why this change needs no backfill and forces no re-login: every token minted
+ * before ST-133 carries a hardcoded `entitlements_ver: 1`, which is exactly what a school with no
+ * counter row resolves to, and jwtAuthMiddleware compares with `<` rather than `!==`. Those tokens
+ * stay valid until the school's first real subscription change, which is precisely when they should
+ * stop being.
+ *
+ * Two scalar subqueries rather than a join: `app.subscriptions` and `app.entitlement_versions` are
+ * independent single-row lookups, and a join between them would return no row at all when either
+ * side is missing — losing the fallback this function exists to provide.
  */
-async function readSubscriptionStatus(tx: TransactionSql): Promise<SubscriptionStatus> {
-  const [row] = await tx<{ status: SubscriptionStatus }[]>`
-    SELECT status FROM app.subscriptions
-    WHERE school_id = current_setting('app.school_id')::uuid
+async function readSessionClaims(tx: TransactionSql): Promise<SessionClaims> {
+  const [row] = await tx<{ status: SubscriptionStatus; version: string }[]>`
+    SELECT
+      COALESCE(
+        (SELECT status::text FROM app.subscriptions
+          WHERE school_id = current_setting('app.school_id')::uuid),
+        'trialing'
+      ) AS status,
+      COALESCE(
+        (SELECT version FROM app.entitlement_versions
+          WHERE school_id = current_setting('app.school_id')::uuid
+            AND subject_type = 'school'
+            AND subject_id = current_setting('app.school_id')::uuid),
+        1
+      )::text AS version
   `;
-  return row?.status ?? "trialing";
+
+  return {
+    status: row?.status ?? "trialing",
+    entitlementsVersion: Number(row?.version ?? 1),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -295,6 +326,11 @@ export async function rotateRefreshToken(
       const accessJti = randomUUID();
       const accessExpiresAt = new Date(Date.now() + config.accessTtlSeconds * 1000);
 
+      // Hoisted above the concurrent pair below for the same reason as childId and accessJti: every
+      // value both statements need has to exist before either starts. This is the one round trip the
+      // inline `await readSubscriptionStatus(tx)` used to cost here, now returning both claims.
+      const claims = await readSessionClaims(tx);
+
       // Signing and persistence are independent once the locked row has supplied the claims. Run
       // them together, but do not commit until both succeed: a signing failure therefore rolls the
       // inserted child and parent transition back as one unit.
@@ -304,9 +340,9 @@ export async function rotateRefreshToken(
           sub: session.user_id,
           school_id: session.school_id,
           roles: session.roles,
-          entitlements_ver: 1,
+          entitlements_ver: claims.entitlementsVersion,
           channel: session.channel,
-          subscription_status: await readSubscriptionStatus(tx),
+          subscription_status: claims.status,
         },
         {
           issuer: config.issuer,

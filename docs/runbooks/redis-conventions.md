@@ -80,6 +80,24 @@ What this means for anything using DB 0 as a cache:
   cache with unbounded key growth and no natural TTL — it needs a second, separate Redis instance
   with its own `maxmemory-policy`, not a third logical DB on this one.
 
+## Key namespaces on DB 0
+
+Every key family in use, so a new one can be checked against the list before it is added. All of
+these carry a TTL, per the `noeviction` constraint above.
+
+| Prefix                           | Owner                                                               | TTL       | Notes                                                                                                                                                                          |
+| -------------------------------- | ------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sch:{schoolId}:…`               | `apps/api/src/cache.ts`                                             | Varies    | The tenant-scoped default. `cacheKey()` is the only way to build one, and the branded `CacheKey` type is what enforces that.                                                   |
+| `auth:jti:denylist:{jti}`        | `apps/api/src/modules/auth/denylist.ts`                             | Token exp | Not `sch:`-prefixed on purpose: a `jti` is globally unique, and revocation is checked before any tenant context exists.                                                        |
+| `rl:{scope}:{identity}:{window}` | `apps/api/src/config/rateLimits.ts`                                 | Window    | Fails open — a Redis outage must not block traffic.                                                                                                                            |
+| `cb:erpnext:{key}:{f\|o\|p}`     | `apps/api/src/erpnext/circuit-breaker.ts`                           | Varies    | Circuit-breaker state per upstream.                                                                                                                                            |
+| `ent:{schoolId}`                 | `apps/api/src/modules/subscriptions/entitlements/cache.ts` (ST-133) | 300s      | School entitlement. Value is `<version>\|<json>`; a bodyless `<version>\|` is an invalidation floor. Written by compare-and-set Lua.                                           |
+| `ent:ai:{studentId}`             | Same                                                                | 300s      | One student's AI entitlement. Not school-prefixed, so it cannot be `SCAN`-invalidated by a school change — the entry carries a `schoolVersion` the reader revalidates instead. |
+
+The two `ent:` families are deliberately outside the `sch:` namespace: the ticket specifies those
+key names exactly, and `cacheKey()` cannot produce them. See the header comment in
+`entitlements/cache.ts` for why widening `cacheKey()` was rejected rather than done.
+
 ## Failover
 
 The pair fails over automatically (`automatic_failover_enabled = true`, `multi_az_enabled =

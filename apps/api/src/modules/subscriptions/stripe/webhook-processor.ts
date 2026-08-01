@@ -39,6 +39,7 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { withSystemTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { emitWebhookSignatureFailure } from "../billing-anomaly-events";
+import { publishEntitlementChange } from "../entitlements/entitlement-change-publisher";
 
 import type { Database, DatabasePools } from "../../../db/client";
 import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
@@ -107,7 +108,12 @@ export async function handleStripeWebhook(
       processBillingEvent(
         tx,
         { id: event.id, type: event.type, effectiveAt: event.effectiveAt, data: event.data },
-        { emitAudit: auditWriter, logger: deps.logger, requestId: context.requestId },
+        {
+          emitAudit: auditWriter,
+          publishEntitlementChange,
+          logger: deps.logger,
+          requestId: context.requestId,
+        },
       ),
     );
 
