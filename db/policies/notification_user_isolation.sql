@@ -61,6 +61,7 @@ CREATE POLICY user_devices_owner ON app.user_devices
   USING (user_id = app.current_user_id())
   WITH CHECK (user_id = app.current_user_id());
 
+
 -- Added by 000074 (ST-139). Quiet hours, timezone and locale are the same class of data as channel
 -- preferences -- they belong to exactly one user -- so they take the same policy shape.
 --
