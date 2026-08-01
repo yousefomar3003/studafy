@@ -96,10 +96,24 @@ export class StripeAdapter implements PaymentProviderPort {
     return { providerPriceId: price.id };
   }
 
+  /**
+   * Verify the Stripe signature over the *raw* bytes and normalize the envelope.
+   *
+   * constructEvent both verifies and parses, in that order, which is the property that matters: the
+   * signature covers the exact bytes Stripe sent, so `payload` must never be a re-serialization of
+   * an already-parsed object. It throws on a bad or absent signature; callers turn that into a 400.
+   *
+   * `created` is Unix seconds. Multiplying is not cosmetic -- passing it to Date unscaled would put
+   * every event in January 1970, which sorts every real event ahead of it and quietly inverts the
+   * out-of-order handling this timestamp exists to drive.
+   */
   async parseWebhook(payload: Buffer, signature: string): Promise<ParsedWebhookEvent> {
     const event = this.stripe.webhooks.constructEvent(payload, signature, this.webhookSecret);
     return {
+      id: event.id,
       type: event.type,
+      effectiveAt: new Date(event.created * 1000),
+      livemode: event.livemode,
       data: event.data.object as unknown as Record<string, unknown>,
     };
   }

@@ -27,7 +27,8 @@ export type SecurityEventType =
   | "csrf_token_mismatch"
   | "cors_origin_rejected"
   | "auth_rate_limit_block"
-  | "auth_token_reuse_detected";
+  | "auth_token_reuse_detected"
+  | "stripe_webhook_signature_invalid";
 
 /** One boundary rejection, as the middleware observed it. */
 export interface SecurityEvent {

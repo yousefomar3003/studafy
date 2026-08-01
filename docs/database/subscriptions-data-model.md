@@ -15,11 +15,19 @@ one mutable row per tenant avoids the derived, duplicated-fact problem the
 [normalization standard](./migration-policy.md#normalization-standard) warns about: the current
 status is the current status, not something recomputed by scanning history at read time.
 
-| Table              | Scope               | Key columns                                                       |
-| ------------------ | ------------------- | ----------------------------------------------------------------- |
-| `subscriptions`    | One row per school  | `plan_id`, `status`, `current_period_start`, `current_period_end` |
-| `ai_subscriptions` | One row per student | `status`, `current_period_start`, `current_period_end`            |
-| `billing_events`   | Global, append-only | `provider`, `provider_event_id`, `event_type`, `payload`          |
+| Table              | Scope                     | Key columns                                                                        |
+| ------------------ | ------------------------- | ---------------------------------------------------------------------------------- |
+| `subscriptions`    | One row per school        | `plan_id`, `status`, `current_period_start`, `current_period_end`                  |
+| `ai_subscriptions` | One row per student       | `status`, `current_period_start`, `current_period_end`                             |
+| `billing_events`   | Global, mutable per event | `provider`, `provider_event_id`, `event_type`, `effective_at`, `status`, `payload` |
+
+> **Amended by ST-132.** `billing_events` was append-only when 000016 created it, because it only
+> ever recorded "seen it". Processing an event introduced retries, and
+> [`000078_normalize_billing_events.sql`](../../db/migrations/000078_normalize_billing_events.sql)
+> made the row mutable in place: `status`, `processed_at`, `attempt_count` and `last_error` change
+> across attempts, while `(provider, provider_event_id)` stays the identity — because that unique
+> constraint _is_ the deduplication guarantee, and a row-per-attempt model would have to give it up.
+> `DELETE` is still withheld.
 
 `ai_subscriptions` carries no `plan_id`. It is a single AI-feature entitlement toggle scoped to one
 student, not a school-plan choice -- the ticket's own description distinguishes the two tables by
@@ -38,17 +46,27 @@ stateDiagram-v2
   trialing --> canceled: trial ends without conversion
   active --> past_due: renewal payment fails
   past_due --> active: payment recovered
-  past_due --> canceled: dunning exhausted
+  past_due --> grace_period: dunning exhausted
+  grace_period --> active: payment recovered in the grace window
+  grace_period --> closed: grace window exhausted
   active --> canceled: voluntary cancellation
   active --> expired: period lapses without renewal
   canceled --> [*]
   expired --> [*]
+  closed --> [*]
 ```
 
-`trialing`, `active`, and `past_due` are the live states in which the school or student retains
-access; `canceled` and `expired` are terminal. Every transition is an `UPDATE` of the existing row
-driven by a processed `billing_events` row -- the events table is the durable evidence of _why_ a
-transition happened; the subscription row only ever reflects _what_ the current state is.
+`trialing`, `active`, `past_due` and `grace_period` are the live states in which the school or
+student retains access; `canceled`, `expired` and `closed` are terminal and have no outgoing edges.
+Every transition is an `UPDATE` of the existing row driven by a processed `billing_events` row -- the
+events table is the durable evidence of _why_ a transition happened; the subscription row only ever
+reflects _what_ the current state is.
+
+`grace_period` and `closed` were added by 000042 (ST-092) after this diagram was first written.
+The full transition tables for both subscription types, the Stripe event vocabulary they are driven
+by, the school→AI cascade, and what happens to an event that maps to no legal transition are in
+**[stripe-webhook-state-machine.md](./stripe-webhook-state-machine.md)** (ST-132). This diagram is
+the summary; that document is the specification.
 
 ## Keys and functional dependencies
 

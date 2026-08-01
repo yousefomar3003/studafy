@@ -208,13 +208,22 @@ class MockAdapter implements PaymentProviderPort {
     if (!signature) {
       throw new PaymentProviderError(400, "VALIDATION_FAILED" as never, "Signature is required");
     }
-    const data = JSON.parse(payload.toString()) as {
+    // The envelope, not just the object: `id` is the idempotency key the processor claims on and
+    // `created` is what every ordering decision is made against, so an adapter that dropped them
+    // would satisfy the type and break deduplication (ST-132).
+    const event = JSON.parse(payload.toString()) as {
+      id?: string;
       type?: string;
+      created?: number;
+      livemode?: boolean;
       data?: Record<string, unknown>;
     };
     return {
-      type: data.type ?? "unknown",
-      data: data.data ?? {},
+      id: event.id ?? "evt_mock",
+      type: event.type ?? "unknown",
+      effectiveAt: new Date((event.created ?? 0) * 1000),
+      livemode: event.livemode ?? false,
+      data: event.data ?? {},
     };
   }
 

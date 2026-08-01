@@ -24,4 +24,22 @@ export const generateBatchInvoicesSchema = z.object({
 
 export type GenerateBatchInvoicesJobData = z.infer<typeof generateBatchInvoicesSchema>;
 
-export type BillingJobData = GenerateInvoiceJobData | GenerateBatchInvoicesJobData;
+/**
+ * Stripe webhook retry (ST-132).
+ *
+ * The provider event id and nothing else. The verified payload is already in `app.billing_events`,
+ * written by the claim in the transaction that later failed; a job carrying its own copy could
+ * disagree with the row and there would be no way to say which was right.
+ *
+ * No `schoolId`, unlike every other job here: the event is looked up before its school is known, and
+ * an event that could not be attributed is exactly the kind most likely to need retrying.
+ */
+export const processBillingEventSchema = z.object({
+  version: z.literal(1),
+  providerEventId: z.string().min(1),
+});
+
+export type ProcessBillingEventJobData = z.infer<typeof processBillingEventSchema>;
+
+export type BillingJobData =
+  GenerateInvoiceJobData | GenerateBatchInvoicesJobData | ProcessBillingEventJobData;
