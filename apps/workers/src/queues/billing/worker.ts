@@ -4,6 +4,7 @@ import postgres from "postgres";
 import { workerLogger } from "../../log";
 
 import { processStripeBillingEvent } from "./billing-event.service";
+import { runDunningSweep } from "./dunning-sweep";
 import { generateInvoice, generateBatchInvoices } from "./invoice.service";
 import {
   generateInvoiceSchema,
@@ -51,7 +52,25 @@ export async function processBillingJob(
     return processStripeBillingEvent(parsed.data, databaseUrl, workerLogger);
   }
 
+  // Daily grace-period sweep (ST-134). Carries no payload -- the scheduler registers it with no
+  // data, and the sweep reads every school's grace state straight from the database. The sweep
+  // owns its own postgres connection rather than running inside the job's, because it spans many
+  // tenant transactions and each school commits on its own.
+  if (job.name === JOB_NAMES.RUN_DUNNING) {
+    return processDunningSweep(databaseUrl);
+  }
+
   return { processed: false, reason: "unknown billing job" };
+}
+
+async function processDunningSweep(databaseUrl: string): Promise<unknown> {
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    return runDunningSweep(sql, new Date(), workerLogger);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }
 
 async function processSingleInvoice(

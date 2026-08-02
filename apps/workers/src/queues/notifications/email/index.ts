@@ -17,6 +17,7 @@ export {
   renderDigestEmail,
   renderDunningEmail,
   renderInvitationEmail,
+  renderSubscriptionDunningEmail,
   renderVerificationEmail,
 } from "./templates";
 export type {
@@ -27,5 +28,6 @@ export type {
   EmailTemplate,
   InvitationEmailData,
   RenderedEmail,
+  SubscriptionDunningEmailData,
   VerificationEmailData,
 } from "./templates";

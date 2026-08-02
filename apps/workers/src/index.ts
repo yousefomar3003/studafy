@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
+import { scheduleDunningJob } from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
 import {
   createSesSender,
@@ -94,6 +95,10 @@ const emailDispatcher = startEmailDispatcher({
 // queue. Its own Redis connection so the upsert never contends with worker polling.
 const digestRedis = createRedisConnection(env);
 void scheduleDigestJob(digestRedis).then(() => digestRedis.disconnect());
+
+// Dunning scheduler: idempotently register the daily 04:00 grace-period sweep on the billing queue.
+const dunningRedis = createRedisConnection(env);
+void scheduleDunningJob(dunningRedis).then(() => dunningRedis.disconnect());
 
 console.log(
   `Workers started for queues: ${QUEUE_REGISTRY.map((definition) => definition.name).join(", ")} (${env.NODE_ENV})`,

@@ -96,6 +96,14 @@ export const DOMAIN_EVENTS = {
   SUBSCRIPTION_STATUS_CHANGED: "subscription.statusChanged",
   AI_SUBSCRIPTION_STATUS_CHANGED: "aiSubscription.statusChanged",
 
+  // Grace-period dunning (ST-134). Raised by the billing dunning sweep, once per school subscription
+  // per stage of the reminder sequence, for each recipient the reminder is addressed to (the
+  // school's ORG_ADMIN users). The email dispatcher consumes it through the same channel as every
+  // other transactional email. Two segments, not three, for the reason NOTIFICATION_DISPATCH_FAILED
+  // documents below: `subscription.dunningReminderSent` would be rejected by the outbox CHECK at
+  // INSERT time, inside the very transaction trying to record the reminder.
+  SUBSCRIPTION_DUNNING_SENT: "subscription.dunningSent",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",
