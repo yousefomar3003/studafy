@@ -120,3 +120,9 @@ jobs:
           ignore-unfixed: true
           exit-code: ${{ matrix.trivy_exit_code }}
           trivyignores: .trivyignore
+        env:
+          # trivy's default vuln-DB mirror (mirror.gcr.io) intermittently black-holes connections
+          # from GH Actions runners (SYN never completes, so the download hangs ~7m then fails).
+          # ghcr.io shares GitHub's infrastructure with the runner and is reliably reachable.
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_JAVA_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-java-db:1
