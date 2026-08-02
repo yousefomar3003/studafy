@@ -38,6 +38,11 @@ export const envSchema = z
     // worker has no region.
     SES_REGION: z.string().min(1).optional(),
     SES_FROM_ADDRESS: z.string().email().default("invitations@mail.studafy.com"),
+    // FCM push notifications (ST-139). A Google service-account JSON string. When unset the push
+    // channel runs in dry-run mode: it resolves devices, applies the per-user cap and advances
+    // dispatch logs exactly as in production but never calls FCM — the dev/test path, and a loud
+    // warning is logged when a deployed worker has no service account.
+    FIREBASE_SERVICE_ACCOUNT: z.string().min(1).optional(),
     // Base URL for the action links embedded in emails. The verify/activate endpoints are the
     // API's (the only surface with an ALB), so the link host is the app's public origin.
     FRONTEND_URL: z.string().url().default("http://localhost:5173"),

@@ -25,6 +25,7 @@
     "bidi-js": "1.0.3",
     "bullmq": "5.79.3",
     "exceljs": "4.4.0",
+    "firebase-admin": "14.2.0",
     "ioredis": "5.10.1",
     "pdf-lib": "1.17.1",
     "postgres": "3.4.9",

@@ -15,6 +15,7 @@ import {
   processNotificationDispatch,
 } from "./queues/notifications/dispatcher.worker";
 import { processDigest } from "./queues/notifications/email";
+import { createFcmSender } from "./queues/notifications/push";
 import { processAttendanceExport, processFinanceExport } from "./queues/reports";
 
 import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
@@ -23,6 +24,7 @@ import type {
   DeliverNotificationJobData,
   DispatchNotificationJobData,
 } from "./queues/notifications/dispatcher.worker";
+import type { PushSender } from "./queues/notifications/push";
 import type { QueueName } from "@studafy/constants";
 import type { Job } from "bullmq";
 
@@ -86,6 +88,21 @@ function enqueueDelivery(data: DeliverNotificationJobData): Promise<void> {
 }
 
 /**
+ * The push sender, built once on first use rather than at module scope.
+ *
+ * Lazy for the same reason `deliveryQueue` is: registry.test.ts imports this module, and in the
+ * common case (no FIREBASE_SERVICE_ACCOUNT) construction is harmless, but when one is configured
+ * it parses and validates the service account and initialises the Firebase app — work that belongs
+ * on the first push job, not in a test import.
+ */
+let pushSenderInstance: PushSender | null = null;
+
+function pushSender(): PushSender {
+  pushSenderInstance ??= createFcmSender(workerEnv, workerLogger);
+  return pushSenderInstance;
+}
+
+/**
  * One entry per queue in `QUEUE_NAMES` — see `docs/queue-catalog.md` for what each queue is for
  * and why it has the concurrency it does. The workers bootstrap (`src/worker.ts`) starts exactly
  * one BullMQ `Worker` per entry.
@@ -133,11 +150,11 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       if (job.name === JOB_NAMES.DELIVER_NOTIFICATION) {
         const data = job.data as Partial<DeliverNotificationJobData>;
         if (data.schoolId && data.dispatchLogId && data.recipientId && data.channel) {
-          return processNotificationDelivery(
-            data as DeliverNotificationJobData,
+          return processNotificationDelivery(data as DeliverNotificationJobData, {
             databaseUrl,
-            workerLogger,
-          );
+            log: workerLogger,
+            push: pushSender(),
+          });
         }
         return { processed: false, reason: "missing job data" };
       }

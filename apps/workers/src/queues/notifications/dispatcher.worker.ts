@@ -73,6 +73,11 @@ export interface DeliverNotificationJobData {
   notificationType: string;
   title: string;
   body: string;
+  /**
+   * The deep-link route, resolved from the event context. Optional because delivery jobs enqueued
+   * before the push channel read it exist without one; new jobs always carry it.
+   */
+  route?: string;
 }
 
 export type DeliveryEnqueuer = (data: DeliverNotificationJobData) => Promise<void>;
@@ -633,6 +638,7 @@ async function dispatchOne(
     notificationType,
     title: prepared.title,
     body: prepared.body,
+    route: params.route,
   });
 
   // Only now is the delivery someone else's problem, and only now may the reservation be confirmed.
