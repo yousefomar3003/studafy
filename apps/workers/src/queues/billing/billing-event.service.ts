@@ -29,6 +29,8 @@ import { emitAuditLog } from "../../db/audit";
 import { withSystemTx } from "../../db/tenant-tx";
 import { describeError, isTerminalFailure } from "../notifications/dead-letter";
 
+import { publishEntitlementChange } from "./entitlement-change-publisher";
+
 import type { DeadLetterLogger, FailedHandler } from "../notifications/dead-letter";
 import type { BillingLogger, ProcessOutcome } from "@studafy/billing";
 
@@ -100,7 +102,7 @@ export async function processStripeBillingEvent(
           effectiveAt: row.effective_at,
           data: row.payload,
         },
-        { emitAudit: emitAuditLog, logger: log },
+        { emitAudit: emitAuditLog, publishEntitlementChange, logger: log },
       );
 
       return { processed: true, outcome: result.outcome };

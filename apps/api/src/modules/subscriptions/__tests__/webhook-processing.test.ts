@@ -18,6 +18,7 @@ import postgres from "postgres";
 
 import { integrationEnabled } from "../../../../tests/harness";
 import { withSystemTx } from "../../../db/tenant-tx";
+import { publishEntitlementChange } from "../entitlements/entitlement-change-publisher";
 import { handleStripeWebhook } from "../stripe/webhook-processor";
 
 import {
@@ -260,6 +261,7 @@ describe("audit", () => {
             },
             {
               emitAudit: () => Promise.reject(new Error("audit write refused")),
+              publishEntitlementChange,
               logger: silentLogger,
             },
           ),

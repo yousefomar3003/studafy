@@ -38,6 +38,14 @@ export interface AttributionTarget {
   /** Our row's uuid -- the audit `target_id` and the `billing_events.subscription_id`. */
   id: string;
   schoolId: string;
+  /**
+   * The student this AI add-on belongs to, or `null` for a school subscription (ST-133).
+   *
+   * Carried so the entitlement change publisher can key the student's version counter and cache
+   * entry without a second lookup. `app.ai_subscriptions.student_id` is NOT NULL, so this is
+   * non-null exactly when `kind === "ai"`.
+   */
+  studentId: string | null;
   status: SubscriptionStatus;
 }
 
@@ -110,7 +118,7 @@ export async function resolveTarget(
     if (existing.length > 0) {
       const row = existing[0]!;
       await linkProviderSubscription(tx, "ai", row.id, stripeSubscriptionId);
-      return { kind: "ai", id: row.id, schoolId, status: row.status };
+      return { kind: "ai", id: row.id, schoolId, studentId, status: row.status };
     }
 
     // Only Checkout completing creates an entitlement. A later event naming a student we have no
@@ -119,7 +127,9 @@ export async function resolveTarget(
     if (eventType !== "checkout.session.completed") return null;
 
     const created = await createAiSubscription(tx, schoolId, studentId, stripeSubscriptionId);
-    return created === null ? null : { kind: "ai", id: created, schoolId, status: "trialing" };
+    return created === null
+      ? null
+      : { kind: "ai", id: created, schoolId, studentId, status: "trialing" };
   }
 
   const school = await tx<{ id: string; status: SubscriptionStatus }[]>`
@@ -133,7 +143,7 @@ export async function resolveTarget(
 
   const row = school[0]!;
   await linkProviderSubscription(tx, "school", row.id, stripeSubscriptionId);
-  return { kind: "school", id: row.id, schoolId, status: row.status };
+  return { kind: "school", id: row.id, schoolId, studentId: null, status: row.status };
 }
 
 async function findByProviderSubscriptionId(
@@ -141,14 +151,20 @@ async function findByProviderSubscriptionId(
   schoolId: string,
   stripeSubscriptionId: string,
 ): Promise<AttributionTarget | null> {
-  const ai = await tx<{ id: string; status: SubscriptionStatus }[]>`
-    SELECT id, status::text AS status
+  const ai = await tx<{ id: string; student_id: string; status: SubscriptionStatus }[]>`
+    SELECT id, student_id, status::text AS status
     FROM app.ai_subscriptions
     WHERE school_id = ${schoolId}::uuid AND stripe_subscription_id = ${stripeSubscriptionId}
     LIMIT 1
   `;
   if (ai.length > 0) {
-    return { kind: "ai", id: ai[0]!.id, schoolId, status: ai[0]!.status };
+    return {
+      kind: "ai",
+      id: ai[0]!.id,
+      schoolId,
+      studentId: ai[0]!.student_id,
+      status: ai[0]!.status,
+    };
   }
 
   const school = await tx<{ id: string; status: SubscriptionStatus }[]>`
@@ -158,7 +174,13 @@ async function findByProviderSubscriptionId(
     LIMIT 1
   `;
   if (school.length > 0) {
-    return { kind: "school", id: school[0]!.id, schoolId, status: school[0]!.status };
+    return {
+      kind: "school",
+      id: school[0]!.id,
+      schoolId,
+      studentId: null,
+      status: school[0]!.status,
+    };
   }
 
   return null;

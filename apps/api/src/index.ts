@@ -7,7 +7,7 @@ import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
 import { KeyStore } from "./modules/auth";
 import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
-import { StripeAdapter } from "./modules/subscriptions";
+import { startEntitlementInvalidationSubscriber, StripeAdapter } from "./modules/subscriptions";
 import { checkRedis, closeRedis, createRedisClient } from "./redis";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a port.
@@ -32,6 +32,15 @@ const redis = env.REDIS_URL ? createRedisClient({ url: env.REDIS_URL, logger }) 
 const gradePublishedSubscriber = redis
   ? await startGradePublishedSubscriber({ redis, logger }).catch((err) => {
       logger.error({ err }, "failed to start grades.published cache subscriber");
+      return null;
+    })
+  : null;
+// The fast half of ST-133's invalidation. The durable half is the workers-side poller; a failure to
+// start here degrades propagation to that poller's interval rather than breaking correctness, so it
+// is logged and swallowed exactly as the grades subscriber above is.
+const entitlementInvalidationSubscriber = redis
+  ? await startEntitlementInvalidationSubscriber({ redis, logger }).catch((err) => {
+      logger.error({ err }, "failed to start entitlement invalidation subscriber");
       return null;
     })
   : null;
@@ -115,6 +124,7 @@ const shutdown = (signal: string) => {
     // Drains buffered security events. Must run before closeDatabase, which it writes through.
     await securityEventSink.close();
     await gradePublishedSubscriber?.close();
+    await entitlementInvalidationSubscriber?.close();
     await closeRedis(redis);
     await closeDatabasePools(database, readDatabase);
     logger.info({ signal }, "shutdown complete");

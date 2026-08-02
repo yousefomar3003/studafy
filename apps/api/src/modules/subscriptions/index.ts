@@ -25,6 +25,19 @@ export {
   createBillingPortalSession,
 } from "./services/checkout-service";
 export { getActivePlans, getSchoolSubscription } from "./services/subscription-service";
+// Entitlement resolution and cache (ST-133). The version bump and the outbox emit are deliberately
+// NOT exported: they are the billing state machine's injected port, wired at the two processors, and
+// nothing else should be able to move a version counter.
+export { createEntitlementService } from "./entitlements/service";
+export type { EntitlementService, EntitlementServiceDeps } from "./entitlements/service";
+export type { AiEntitlement, SchoolEntitlement, EntitlementQuotas } from "./entitlements/resolve";
+export {
+  ENTITLEMENT_CACHE_TTL_SECONDS,
+  aiEntitlementCacheKey,
+  entitlementCacheKey,
+} from "./entitlements/cache";
+export { startEntitlementInvalidationSubscriber } from "./subscribers/entitlement-invalidation.subscriber";
+export type { EntitlementInvalidationSubscriber } from "./subscribers/entitlement-invalidation.subscriber";
 export type {
   PaymentProviderPort,
   CreateCustomerInput,

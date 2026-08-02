@@ -8,6 +8,11 @@ export const ERROR_CODES = {
   AUTH_TOKEN_EXPIRED: "AUTH_TOKEN_EXPIRED",
   AUTH_TOKEN_INVALID: "AUTH_TOKEN_INVALID",
   AUTH_SESSION_NOT_FOUND: "AUTH_SESSION_NOT_FOUND",
+  // The token is cryptographically valid and unrevoked, but its entitlements_ver claim predates the
+  // subject's current entitlement version (ST-133) — a subscription changed after it was minted.
+  // Distinct from AUTH_TOKEN_INVALID so a client can tell "refresh and retry" apart from "your
+  // credential is bad"; the remedy is one call to POST /api/auth/refresh.
+  AUTH_ENTITLEMENTS_STALE: "AUTH_ENTITLEMENTS_STALE",
 
   // Invitation verification — public invitation lifecycle resolution.
   INVITATION_INVALID: "INVITATION_INVALID",

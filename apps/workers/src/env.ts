@@ -46,6 +46,10 @@ export const envSchema = z
     EMAIL_MAX_RATE_PER_SECOND: z.coerce.number().positive().default(5),
     EMAIL_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(1_000),
     EMAIL_BATCH_SIZE: z.coerce.number().int().positive().default(25),
+    // ST-133. 500ms rather than the email dispatcher's 1s: this consumer carries the <5s entitlement
+    // propagation SLA, and the poll interval is the dominant term in that budget.
+    ENTITLEMENT_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(500),
+    ENTITLEMENT_BATCH_SIZE: z.coerce.number().int().positive().default(100),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;

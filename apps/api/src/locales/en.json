@@ -3,6 +3,7 @@
   "AUTH_TOKEN_EXPIRED": "Authentication token has expired",
   "AUTH_TOKEN_INVALID": "Invalid authentication token",
   "AUTH_SESSION_NOT_FOUND": "Session not found",
+  "AUTH_ENTITLEMENTS_STALE": "Entitlements have changed; obtain a new access token",
   "INVITATION_INVALID": "Invitation is invalid",
   "EXPIRED": "Invitation has expired",
   "REVOKED": "Invitation has been revoked",

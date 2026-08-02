@@ -307,6 +307,21 @@ describe("emit", () => {
           errorClass: "Error",
           failedAt: new Date().toISOString(),
         },
+        [DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED]: {
+          schoolId: uid,
+          subscriptionId: uid,
+          previousStatus: "trialing",
+          status: "active",
+          entitlementsVersion: 2,
+        },
+        [DOMAIN_EVENTS.AI_SUBSCRIPTION_STATUS_CHANGED]: {
+          schoolId: uid,
+          studentId: uid,
+          aiSubscriptionId: uid,
+          previousStatus: "active",
+          status: "canceled",
+          entitlementsVersion: 2,
+        },
       };
 
       await database!.sql.begin(async (tx) => {

@@ -12,6 +12,7 @@ import { AUTH_CHANNELS, KeyStore, signAccessToken } from "../../src/modules/auth
 
 import type { LogFields, Logger } from "../../src/logger";
 import type { AppEnv } from "../../src/middleware";
+import type { EntitlementVersionReader } from "../../src/middleware/jwtAuth";
 import type { DenylistEntry, JtiDenylist } from "../../src/modules/auth";
 import type { Role } from "@studafy/constants";
 
@@ -108,6 +109,49 @@ export function createFakeDenylist(): FakeDenylist {
 }
 
 // ---------------------------------------------------------------------------
+// In-memory entitlement version reader
+// ---------------------------------------------------------------------------
+
+export interface FakeEntitlements extends EntitlementVersionReader {
+  /** How many times currentVersion was consulted. The ordering tests assert on this. */
+  readonly lookups: number;
+  /** Set the version every subsequent lookup reports. */
+  setVersion(version: number): void;
+  /** Make the next and all subsequent lookups throw, simulating a Redis outage. */
+  failWith(err: Error): void;
+}
+
+/**
+ * An in-process EntitlementVersionReader.
+ *
+ * In-memory rather than a real service for the same reasons as createFakeDenylist: the suites run in
+ * CI without Redis or a database, and `lookups` can be counted exactly — which is the only way to
+ * prove the check runs *after* signature verification rather than before it.
+ */
+export function createFakeEntitlements(initialVersion = 1): FakeEntitlements {
+  let version = initialVersion;
+  let lookups = 0;
+  let failure: Error | null = null;
+
+  return {
+    get lookups() {
+      return lookups;
+    },
+    setVersion(next: number) {
+      version = next;
+    },
+    failWith(err: Error) {
+      failure = err;
+    },
+    currentVersion() {
+      lookups += 1;
+      if (failure) return Promise.reject(failure);
+      return Promise.resolve(version);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Probe app
 // ---------------------------------------------------------------------------
 
@@ -115,6 +159,7 @@ export interface ProbeApp {
   app: OpenAPIHono<AppEnv>;
   keyStore: KeyStore;
   denylist: FakeDenylist;
+  entitlements: FakeEntitlements;
   lines: CapturedLine[];
   /** What the echo route saw in `c.get("auth")` on the most recent request that reached it. */
   lastAuth: () => unknown;
@@ -128,20 +173,27 @@ export interface ProbeApp {
  * handler — around a freshly initialized KeyStore.
  */
 export async function createProbeApp(
-  options: { denylist?: FakeDenylist | null } = {},
+  options: { denylist?: FakeDenylist | null; entitlements?: FakeEntitlements | null } = {},
 ): Promise<ProbeApp> {
   const { logger, lines } = createCapturingLogger();
   const keyStore = new KeyStore(60_000);
   await keyStore.init();
 
   const denylist = options.denylist === undefined ? createFakeDenylist() : options.denylist;
+  // Defaults to a reader reporting the genesis version 1, which is what mintToken puts in the claim.
+  // Every pre-existing suite therefore keeps passing the new check without knowing it exists.
+  const entitlements =
+    options.entitlements === undefined ? createFakeEntitlements() : options.entitlements;
 
   let observedAuth: unknown = undefined;
   let calls = 0;
 
   const app = new OpenAPIHono<AppEnv>();
   app.use("*", requestIdMiddleware({ logger }));
-  app.use("/api/*", jwtAuthMiddleware({ keyStore, denylist, issuer: ISSUER, audience: AUDIENCE }));
+  app.use(
+    "/api/*",
+    jwtAuthMiddleware({ keyStore, denylist, entitlements, issuer: ISSUER, audience: AUDIENCE }),
+  );
   app.get("/api/echo", (c) => {
     calls += 1;
     observedAuth = c.get("auth");
@@ -167,6 +219,7 @@ export async function createProbeApp(
     // Callers that pass `denylist: null` get a stub back so the shape stays uniform; they are
     // asserting on the null-denylist branch and never read it.
     denylist: denylist ?? createFakeDenylist(),
+    entitlements: entitlements ?? createFakeEntitlements(),
     lines,
     lastAuth: () => observedAuth,
     handlerCalls: () => calls,

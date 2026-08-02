@@ -16,6 +16,8 @@ describe("loadEnv", () => {
       EMAIL_MAX_RATE_PER_SECOND: 5,
       EMAIL_POLL_INTERVAL_MS: 1_000,
       EMAIL_BATCH_SIZE: 25,
+      ENTITLEMENT_POLL_INTERVAL_MS: 500,
+      ENTITLEMENT_BATCH_SIZE: 100,
     });
   });
 
@@ -37,6 +39,8 @@ describe("loadEnv", () => {
       EMAIL_MAX_RATE_PER_SECOND: 5,
       EMAIL_POLL_INTERVAL_MS: 1_000,
       EMAIL_BATCH_SIZE: 25,
+      ENTITLEMENT_POLL_INTERVAL_MS: 500,
+      ENTITLEMENT_BATCH_SIZE: 100,
     });
   });
 

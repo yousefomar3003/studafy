@@ -84,6 +84,18 @@ export const DOMAIN_EVENTS = {
   // trying to record the failure, so the alert would be lost in production and nowhere else.
   NOTIFICATION_DISPATCH_FAILED: "notification.dispatchFailed",
 
+  // Subscription state transitions (ST-133). Raised by the billing state machine inside the same
+  // transaction that applies the status change, the audit row and — for a school leaving a live
+  // state — the AI cascade. The entitlement invalidator consumes them to overwrite the entitlement
+  // cache and is what makes a Stripe cancellation take effect within seconds rather than within the
+  // access token's 15-minute lifetime.
+  //
+  // Two segments, not three, for the reason NOTIFICATION_DISPATCH_FAILED documents below:
+  // `subscription.status.changed` would be rejected by the outbox CHECK constraint at INSERT time,
+  // inside the webhook transaction recording the change.
+  SUBSCRIPTION_STATUS_CHANGED: "subscription.statusChanged",
+  AI_SUBSCRIPTION_STATUS_CHANGED: "aiSubscription.statusChanged",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

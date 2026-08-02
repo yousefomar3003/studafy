@@ -41,6 +41,8 @@ export type {
   BillingAuditEntry,
   BillingAuditWriter,
   BillingLogger,
+  EntitlementChange,
+  EntitlementChangePublisher,
   ProcessOptions,
   ProcessOutcome,
   VerifiedBillingEvent,

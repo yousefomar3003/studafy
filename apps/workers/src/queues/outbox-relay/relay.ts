@@ -1,5 +1,7 @@
 import IORedis from "ioredis";
 
+import { loadSchoolIds } from "../notifications/email/schools";
+
 import { claimBatch } from "./claim";
 import { incrementFailed, incrementPublished, recordLag } from "./metrics";
 
@@ -13,8 +15,18 @@ export interface RelayConfig {
   batchSize: number;
   /** Milliseconds to sleep when an entire poll cycle finds zero unrelayed rows. */
   pollIntervalMs: number;
-  /** Schools to relay for. Queried once at startup; refresh by restarting the process. */
-  schoolIds: string[];
+  /**
+   * Schools to relay for, or `null` to discover them from `app.schools` each cycle.
+   *
+   * `null` is the normal deployment. An explicit list is an override for tests and for pinning a
+   * relay to a subset of tenants; it was previously the only source, which meant the relay silently
+   * did not start when the variable was unset — the state it has been in in production.
+   *
+   * Re-reading each cycle rather than once at startup is what lets a newly registered school be
+   * relayed without a worker restart. The read is one indexed scan of a small global table against
+   * the same pool the relay already holds.
+   */
+  schoolIds: string[] | null;
 }
 
 export interface RelayLogger {
@@ -67,7 +79,8 @@ async function relayBatch(ctx: RelayContext, schoolId: string): Promise<number> 
  */
 async function pollOnce(ctx: RelayContext): Promise<number> {
   let total = 0;
-  for (const schoolId of ctx.config.schoolIds) {
+  const schoolIds = ctx.config.schoolIds ?? (await loadSchoolIds(ctx.db));
+  for (const schoolId of schoolIds) {
     try {
       const count = await relayBatch(ctx, schoolId);
       total += count;
@@ -110,7 +123,10 @@ export function startRelay(ctx: RelayContext): RelayHandle {
   };
 
   ctx.logger.info(
-    { schools: ctx.config.schoolIds.length, batchSize: ctx.config.batchSize },
+    {
+      schools: ctx.config.schoolIds?.length ?? "discovered per cycle",
+      batchSize: ctx.config.batchSize,
+    },
     "outbox relay started",
   );
   void loop();

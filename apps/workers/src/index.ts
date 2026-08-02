@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
+import { startEntitlementInvalidator } from "./queues/entitlements";
 import {
   createSesSender,
   scheduleDigestJob,
@@ -23,22 +24,46 @@ const workers = startWorkers(QUEUE_REGISTRY, connection);
 
 // Outbox relay: separate polling loop alongside BullMQ workers. Uses its own postgres and Redis
 // connections because the BullMQ connection is tied to the queue DB and the relay needs pub/sub.
-const schoolIds = env.SCHOOL_IDS.split(",").filter(Boolean);
-const relayDb = postgres(env.DATABASE_URL, { max: 2, idle_timeout: 20, prepare: false });
+// SCHOOL_IDS is an override, not a requirement. It was previously the only source, which meant the
+// relay did not start at all unless it was set — and it is absent from the ECS task definition, so
+// the relay has never run in production and every pub/sub consumer downstream of it has been inert.
+// Falling back to app.schools (a global, RLS-free table) makes the relay self-configuring, and
+// re-reading it each cycle means a newly registered school no longer waits for a worker restart.
+const configuredSchoolIds = env.SCHOOL_IDS.split(",").filter(Boolean);
+const relayDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
 const relayRedis = createRedisConnection(env);
 
 let relayHandle: RelayHandle | null = null;
 
-if (schoolIds.length > 0) {
-  void relayRedis.connect().then(() => {
-    relayHandle = startRelay({
-      db: relayDb,
-      redis: relayRedis,
-      config: { batchSize: 100, pollIntervalMs: 1_000, schoolIds },
-      logger: workerLogger,
-    });
+void relayRedis.connect().then(() => {
+  relayHandle = startRelay({
+    db: relayDb,
+    redis: relayRedis,
+    config: {
+      batchSize: 100,
+      // 500ms rather than 1s: this is the fast path for ST-133's <5s propagation SLA.
+      pollIntervalMs: 500,
+      schoolIds: configuredSchoolIds.length > 0 ? configuredSchoolIds : null,
+    },
+    logger: workerLogger,
   });
-}
+});
+
+// Entitlement invalidation (ST-133): the durable consumer the propagation SLA rests on. Started
+// unconditionally, like the email dispatcher and unlike the relay above, because losing an
+// invalidation means serving a canceled school until the cache TTL expires.
+const entitlementDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const entitlementRedis = createRedisConnection(env);
+const entitlementInvalidator = startEntitlementInvalidator({
+  db: entitlementDb,
+  redis: entitlementRedis,
+  config: {
+    batchSize: env.ENTITLEMENT_BATCH_SIZE,
+    pollIntervalMs: env.ENTITLEMENT_POLL_INTERVAL_MS,
+    concurrency: 16,
+  },
+  logger: workerLogger,
+});
 
 // Email channel: a second polling loop that consumes email-relevant outbox events directly, on its
 // own postgres pool, pacing sends through an in-process token bucket. databaseUrlFrom() — not the
@@ -86,12 +111,15 @@ const shutdown = (signal: string) => {
 
   relayHandle?.stop();
   emailDispatcher.stop();
+  entitlementInvalidator.stop();
 
   void shutdownWorkers(workers, env.SHUTDOWN_TIMEOUT_MS).then(async () => {
     connection.disconnect();
     relayRedis.disconnect();
+    entitlementRedis.disconnect();
     await relayDb.end({ timeout: 5 });
     await emailDb.end({ timeout: 5 });
+    await entitlementDb.end({ timeout: 5 });
     console.log("Shutdown complete.");
     process.exit(0);
   });
