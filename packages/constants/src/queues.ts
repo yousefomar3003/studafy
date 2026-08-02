@@ -63,6 +63,10 @@ export const JOB_NAMES = {
   // verification is not repeated on retry — it happened once, at intake, over the raw bytes, which
   // is the only moment it can be done at all.
   PROCESS_BILLING_EVENT: "process-billing-event",
+  // Grace-period dunning (ST-134). Scheduled job: drives the dunning email sequence, suspends
+  // subscriptions whose grace window has elapsed, and stamps nothing itself — the deadline is set
+  // by the state machine when a subscription enters `grace_period`. Carries no payload.
+  RUN_DUNNING: "run-dunning",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

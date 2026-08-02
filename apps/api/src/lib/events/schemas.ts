@@ -275,6 +275,22 @@ export const eventPayloadSchemas = {
     entitlementsVersion: z.number().int().min(2),
   }),
 
+  // ── Grace-period dunning (ST-134) ──────────────────────────────────
+  // Raised by the billing dunning sweep once per school subscription per stage of the reminder
+  // sequence, for each ORG_ADMIN the reminder is addressed to. The payload mirrors what
+  // apps/workers/src/queues/billing/dunning-sweep.ts writes raw -- same convention as
+  // SUBSCRIPTION_STATUS_CHANGED above: a divergence here surfaces as a dropped invalidation, never
+  // as a crash. schoolId/subscriptionId are correlation handles for pub/sub subscribers; the email
+  // dispatcher renders from the rest.
+  [DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT]: z.object({
+    schoolId: uid,
+    subscriptionId: uid,
+    email: z.string().email(),
+    planName: z.string().min(1),
+    dueDate: z.string().datetime(),
+    gracePeriodEndsAt: z.string().datetime(),
+  }),
+
   // ── ERPNext (freeform — external system payloads) ─────────────────────
   [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: z.record(z.string(), z.unknown()),
   [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: z.record(z.string(), z.unknown()),

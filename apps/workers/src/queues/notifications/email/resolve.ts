@@ -8,7 +8,12 @@
 
 import { DOMAIN_EVENTS } from "@studafy/constants";
 
-import { renderDigestEmail, renderInvitationEmail, renderVerificationEmail } from "./templates";
+import {
+  renderDigestEmail,
+  renderInvitationEmail,
+  renderSubscriptionDunningEmail,
+  renderVerificationEmail,
+} from "./templates";
 
 import type { EmailTemplate, RenderedEmail } from "./templates";
 
@@ -50,6 +55,17 @@ interface DigestPayload {
     text: string;
     occurredAt: string;
   }[];
+}
+
+/**
+ * The dunning reminder payload the billing sweep writes (ST-134). The schoolId and subscriptionId it
+ * carries are correlation handles for subscribers; this renderer needs only the fields below.
+ */
+interface SubscriptionDunningPayload {
+  email: string;
+  planName: string;
+  dueDate: string;
+  gracePeriodEndsAt: string;
 }
 
 /**
@@ -97,6 +113,19 @@ export function resolveEmail(
         }),
       };
     }
+    case DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT: {
+      const payload = row.payload as unknown as SubscriptionDunningPayload;
+      return {
+        template: "dunning",
+        recipient: payload.email,
+        content: renderSubscriptionDunningEmail({
+          schoolName: context.schoolName,
+          planName: payload.planName,
+          dueDate: payload.dueDate,
+          gracePeriodEndsAt: payload.gracePeriodEndsAt,
+        }),
+      };
+    }
     default:
       throw new Error(`no email template for outbox event ${row.event_name}`);
   }
@@ -107,4 +136,5 @@ export const EMAIL_EVENT_NAMES: readonly string[] = [
   DOMAIN_EVENTS.INVITATION_SENT,
   DOMAIN_EVENTS.SCHOOL_VERIFICATION_EMAIL_SENT,
   DOMAIN_EVENTS.DIGEST_SENT,
+  DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT,
 ];

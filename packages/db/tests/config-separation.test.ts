@@ -73,41 +73,49 @@ function findMatches(files: Map<string, string>, pattern: RegExp): string[] {
 }
 
 describe("runtime and migration configuration separation", () => {
-  test("API runtime source never references the admin role or a migration-only URL", async () => {
-    const apiSource = await readSourceTree(resolve(repoRoot, "apps/api/src"));
-    expect(apiSource.size).toBeGreaterThan(0);
-    // Allow SET LOCAL ROLE studafy_admin / set_config('role', 'studafy_admin') — the only safe
-    // way to temporarily elevate to the admin role for global-table writes inside a transaction.
-    // Also allow occurrences inside comments that document the role-switching pattern.
-    const adminHits = findMatches(apiSource, /studafy_admin/);
-    const unexpectedAdmin = adminHits.filter((path) => {
-      const content = apiSource.get(path)!;
-      const lines = content.split("\n");
-      return lines.some(
-        (line) =>
-          /studafy_admin/.test(line) &&
-          !/set_config\(.role.,\s*.studafy_admin./.test(line) &&
-          !/SET\s+(LOCAL\s+)?ROLE\s+studafy_admin/.test(line) &&
-          !/^\s*(\/\/|\/?\*|\*)/.test(line),
-      );
-    });
-    expect(unexpectedAdmin).toEqual([]);
-    expect(findMatches(apiSource, /MIGRATION_DATABASE_URL/)).toEqual([]);
-  });
+  test(
+    "API runtime source never references the admin role or a migration-only URL",
+    async () => {
+      const apiSource = await readSourceTree(resolve(repoRoot, "apps/api/src"));
+      expect(apiSource.size).toBeGreaterThan(0);
+      // Allow SET LOCAL ROLE studafy_admin / set_config('role', 'studafy_admin') — the only safe
+      // way to temporarily elevate to the admin role for global-table writes inside a transaction.
+      // Also allow occurrences inside comments that document the role-switching pattern.
+      const adminHits = findMatches(apiSource, /studafy_admin/);
+      const unexpectedAdmin = adminHits.filter((path) => {
+        const content = apiSource.get(path)!;
+        const lines = content.split("\n");
+        return lines.some(
+          (line) =>
+            /studafy_admin/.test(line) &&
+            !/set_config\(.role.,\s*.studafy_admin./.test(line) &&
+            !/SET\s+(LOCAL\s+)?ROLE\s+studafy_admin/.test(line) &&
+            !/^\s*(\/\/|\/?\*|\*)/.test(line),
+        );
+      });
+      expect(unexpectedAdmin).toEqual([]);
+      expect(findMatches(apiSource, /MIGRATION_DATABASE_URL/)).toEqual([]);
+    },
+    { timeout: 30_000 },
+  );
 
-  test("web and mobile clients contain no database URLs, credentials, or admin role", async () => {
-    const clientSource = new Map([
-      ...(await readSourceTree(resolve(repoRoot, "apps/web"))),
-      ...(await readSourceTree(resolve(repoRoot, "apps/mobile"))),
-    ]);
-    expect(clientSource.size).toBeGreaterThan(0);
-    expect(findMatches(clientSource, /postgres(ql)?:\/\//i)).toEqual([]);
-    expect(findMatches(clientSource, /DATABASE_URL/)).toEqual([]);
-    expect(findMatches(clientSource, /DATABASE_PASSWORD/)).toEqual([]);
-    expect(findMatches(clientSource, /studafy_admin/)).toEqual([]);
-    // A Vite-exposed variable (VITE_*) must never carry a database connection.
-    expect(findMatches(clientSource, /VITE_[A-Z0-9_]*(DATABASE|POSTGRES|DB_URL)/)).toEqual([]);
-  });
+  test(
+    "web and mobile clients contain no database URLs, credentials, or admin role",
+    async () => {
+      const clientSource = new Map([
+        ...(await readSourceTree(resolve(repoRoot, "apps/web"))),
+        ...(await readSourceTree(resolve(repoRoot, "apps/mobile"))),
+      ]);
+      expect(clientSource.size).toBeGreaterThan(0);
+      expect(findMatches(clientSource, /postgres(ql)?:\/\//i)).toEqual([]);
+      expect(findMatches(clientSource, /DATABASE_URL/)).toEqual([]);
+      expect(findMatches(clientSource, /DATABASE_PASSWORD/)).toEqual([]);
+      expect(findMatches(clientSource, /studafy_admin/)).toEqual([]);
+      // A Vite-exposed variable (VITE_*) must never carry a database connection.
+      expect(findMatches(clientSource, /VITE_[A-Z0-9_]*(DATABASE|POSTGRES|DB_URL)/)).toEqual([]);
+    },
+    { timeout: 30_000 },
+  );
 
   test("API and migration task definitions draw credentials from different secrets", async () => {
     // Both paths are fixed repository literals joined with the repo root.

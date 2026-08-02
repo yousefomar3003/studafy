@@ -25,6 +25,8 @@
  *   5. **Apply and audit**, together.
  */
 
+import { SUBSCRIPTION_STATUSES } from "@studafy/constants";
+
 import { resolveSchoolId, resolveTarget } from "./attribution";
 import {
   attributeEvent,
@@ -45,6 +47,23 @@ import type { AttributionTarget } from "./attribution";
 import type { SubscriptionKind } from "./state-machine";
 import type { SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
+
+// ---------------------------------------------------------------------------
+// Grace window policy (ST-134)
+// ---------------------------------------------------------------------------
+
+/**
+ * How long a subscription stays in `grace_period` before it must be closed.
+ *
+ * The window is measured from the moment the subscription enters `grace_period` (ST-134): the
+ * scheduled dunning job reads `grace_period_ends_at`, set here in the same transaction as the
+ * status change, and suspends when it passes. A school subscription is the platform bill and gets
+ * 14 days; an AI add-on is suspended sooner, at 7. Expressed in calendar days.
+ */
+export const GRACE_PERIOD_DAYS: Readonly<Record<SubscriptionKind, number>> = {
+  school: 14,
+  ai: 7,
+};
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -333,8 +352,18 @@ async function applyCustomerSideEffects(
  * same event are still worth persisting, and an idempotent UPDATE is cheaper to reason about than a
  * branch. What is conditional is the *audit row*: `app.audit_logs` records changes, and a row
  * asserting `active -> active` would be noise in the one table that has to stay readable.
+ *
+ * Also the single writer of `grace_period_ends_at` (ST-134). Entering `grace_period` stamps the
+ * deadline `GRACE_PERIOD_DAYS` out from the moment of the transition; leaving it clears the column.
+ * Both are conditional on the actual boundary being crossed, so a redelivered `dunning_exhausted`
+ * event that folds to the status already stored neither re-stamps nor clears. A subscription can
+ * only be in `grace_period` through this function, so the deadline and the status cannot drift.
+ *
+ * Exported so the scheduled suspension path (system-transition.ts) drives the same audited,
+ * entitlement-propagated, AI-cascading transition the webhook path does, rather than a second,
+ * quieter writer.
  */
-async function applyTransition(
+export async function applyTransition(
   tx: TransactionSql,
   options: ProcessOptions,
   target: AttributionTarget,
@@ -348,6 +377,18 @@ async function applyTransition(
   const periodStart = period?.start.toISOString() ?? null;
   const periodEnd = period?.end.toISOString() ?? null;
 
+  // ST-134. `CURRENT_TIMESTAMP` because the transaction has no clock of its own and the DB clock is
+  // the one the scheduled job's cutoff comparisons run against. A retried event applied late stamps
+  // late, which mildly under-enforces rather than over-enforces: access outlives the intended window
+  // by the retry delay, and the audit row records exactly when the deadline was set.
+  const enteringGrace =
+    next === SUBSCRIPTION_STATUSES.GRACE_PERIOD &&
+    target.status !== SUBSCRIPTION_STATUSES.GRACE_PERIOD;
+  const leavingGrace =
+    target.status === SUBSCRIPTION_STATUSES.GRACE_PERIOD &&
+    next !== SUBSCRIPTION_STATUSES.GRACE_PERIOD;
+  const graceDays = GRACE_PERIOD_DAYS[target.kind];
+
   if (target.kind === "school") {
     await tx`
       UPDATE app.subscriptions
@@ -357,6 +398,11 @@ async function applyTransition(
           stripe_subscription_item_id = COALESCE(
             ${extractSubscriptionItemId(payload)}::text, stripe_subscription_item_id
           ),
+          grace_period_ends_at = CASE
+            WHEN ${enteringGrace} THEN CURRENT_TIMESTAMP + make_interval(days => ${graceDays})
+            WHEN ${leavingGrace} THEN NULL
+            ELSE grace_period_ends_at
+          END,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ${target.id}::uuid
     `;
@@ -366,6 +412,11 @@ async function applyTransition(
       SET status = ${next}::app.subscription_status,
           current_period_start = COALESCE(${periodStart}::timestamptz, current_period_start),
           current_period_end = COALESCE(${periodEnd}::timestamptz, current_period_end),
+          grace_period_ends_at = CASE
+            WHEN ${enteringGrace} THEN CURRENT_TIMESTAMP + make_interval(days => ${graceDays})
+            WHEN ${leavingGrace} THEN NULL
+            ELSE grace_period_ends_at
+          END,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ${target.id}::uuid
     `;

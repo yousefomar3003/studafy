@@ -36,7 +36,7 @@ export {
   extractSubscriptionItemId,
 } from "./event-mapping";
 
-export { processBillingEvent, reprocessClaimedEvent } from "./process";
+export { processBillingEvent, reprocessClaimedEvent, GRACE_PERIOD_DAYS } from "./process";
 export type {
   BillingAuditEntry,
   BillingAuditWriter,
@@ -47,6 +47,9 @@ export type {
   ProcessOutcome,
   VerifiedBillingEvent,
 } from "./process";
+
+export { applySystemTransition } from "./system-transition";
+export type { SystemTransitionInput, SystemTransitionOutcome } from "./system-transition";
 
 export {
   AI_TRANSITIONS,

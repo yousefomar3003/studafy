@@ -322,6 +322,14 @@ describe("emit", () => {
           status: "canceled",
           entitlementsVersion: 2,
         },
+        [DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT]: {
+          schoolId: uid,
+          subscriptionId: uid,
+          email: "test@example.com",
+          planName: "Standard Plan",
+          dueDate: new Date().toISOString(),
+          gracePeriodEndsAt: new Date().toISOString(),
+        },
       };
 
       await database!.sql.begin(async (tx) => {

@@ -38,6 +38,24 @@ export interface DunningEmailData {
   dueDate: string;
 }
 
+/**
+ * The school-facing dunning reminder (ST-134), for the platform subscription's grace period.
+ *
+ * Distinct from `DunningEmailData` above, which anticipates a student-fee dunning flow and is not
+ * yet wired to any event. A reminder about the school's own bill has no student and no reliable
+ * amount -- the subscription row names its plan but not the price -- so it carries the plan name,
+ * the period that went unpaid, and the lockout deadline instead.
+ */
+export interface SubscriptionDunningEmailData {
+  schoolName: string;
+  /** The display name of the plan the school is billed for, e.g. "Growth". */
+  planName: string;
+  /** ISO datetime of the period end that went unpaid. */
+  dueDate: string;
+  /** ISO datetime after which the school loses access. */
+  gracePeriodEndsAt: string;
+}
+
 export interface AlertEmailData {
   schoolName: string;
   studentName: string;
@@ -111,6 +129,16 @@ export function renderDunningEmail(data: DunningEmailData): RenderedEmail {
   const bodyHtml = `<p>A payment of <strong>${escapeHtml(formatAmountMinor(data.amountMinor))}</strong> for ${escapeHtml(data.studentName)} was due on ${formatDateLabel(data.dueDate)} and is now overdue.</p><p>Please arrange payment through the school portal.</p>`;
   return {
     subject: `Payment due reminder for ${data.studentName}`,
+    text,
+    html: shell(data.schoolName, bodyHtml),
+  };
+}
+
+export function renderSubscriptionDunningEmail(data: SubscriptionDunningEmailData): RenderedEmail {
+  const text = `Your Studafy subscription payment for the ${data.planName} plan was due on ${formatDateLabel(data.dueDate)} and is now overdue. ${data.schoolName} will lose access on ${formatDateLabel(data.gracePeriodEndsAt)} unless payment is arranged. Please contact your billing contact or the Studafy support team.`;
+  const bodyHtml = `<p>Your Studafy subscription payment for the <strong>${escapeHtml(data.planName)}</strong> plan was due on ${formatDateLabel(data.dueDate)} and is now overdue.</p><p>${escapeHtml(data.schoolName)} will lose access on <strong>${formatDateLabel(data.gracePeriodEndsAt)}</strong> unless payment is arranged.</p><p>Please contact your billing contact or the Studafy support team.</p>`;
+  return {
+    subject: `Action required: ${data.schoolName}'s Studafy payment is overdue`,
     text,
     html: shell(data.schoolName, bodyHtml),
   };
