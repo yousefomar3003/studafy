@@ -127,6 +127,7 @@ integrationTest(
         "expired",
         "grace_period",
         "closed",
+        "paused",
       ]);
 
       const tenantTables = await database.sql<
