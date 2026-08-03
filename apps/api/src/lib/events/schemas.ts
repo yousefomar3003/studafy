@@ -246,6 +246,22 @@ export const eventPayloadSchemas = {
     failedAt: z.string(),
   }),
 
+  // ── Inbox read state (ST-142) ────────────────────────────────────────
+  // Raised by the inbox API inside the transaction that applies read_at. userId is the recipient
+  // whose devices/badge a consumer must update; unreadCount is the fresh value, computed in the
+  // emitting transaction, so a badge consumer broadcasts it without a database round-trip. Both
+  // events ride the pub/sub channel `events:{school_id}:{event_name}`, so schoolId needs no place
+  // in the payload.
+  [DOMAIN_EVENTS.NOTIFICATION_READ]: z.object({
+    userId: uid,
+    notificationId: uid,
+    unreadCount: z.number().int().nonnegative(),
+  }),
+  [DOMAIN_EVENTS.NOTIFICATION_ALL_READ]: z.object({
+    userId: uid,
+    unreadCount: z.number().int().nonnegative(),
+  }),
+
   // ── Subscription state transitions (ST-133) ───────────────────────
   // Emitted by the billing state machine inside the transaction that applies the status change.
   //

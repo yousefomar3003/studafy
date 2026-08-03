@@ -234,6 +234,12 @@ describe("structure", () => {
         "/api/invitations/bulk/{bulkInviteId}/retry",
         "/api/invitations/{id}/regenerate",
         "/api/invitations/{id}/revoke",
+        // In-app inbox (ST-142). Personal per-recipient notifications: list, unread count,
+        // and read-state mutations, all RLS-fenced to the authenticated user.
+        "/api/notifications",
+        "/api/notifications/read-all",
+        "/api/notifications/{notificationId}/read",
+        "/api/notifications/unread-count",
         "/api/schools/current/settings",
         "/api/schools/register",
         "/api/schools/resend-verification",
@@ -511,6 +517,9 @@ describe("security", () => {
         "GET /api/invitations/bulk",
         "GET /api/invitations/bulk/{bulkInviteId}",
         "GET /api/invitations/bulk/{bulkInviteId}/recipients",
+        // In-app inbox (ST-142). Personal per-recipient notifications, RLS-fenced to the user.
+        "GET /api/notifications",
+        "GET /api/notifications/unread-count",
         "GET /api/schools/current/settings",
         "PATCH /api/schools/current/settings",
         "GET /api/students",
@@ -616,6 +625,9 @@ describe("security", () => {
         "POST /api/families/{familyId}/links",
         "POST /api/invitations/{id}/regenerate",
         "POST /api/invitations/{id}/revoke",
+        // In-app inbox (ST-142). Read-state mutations are self-service on the caller's own rows.
+        "POST /api/notifications/{notificationId}/read",
+        "POST /api/notifications/read-all",
         "POST /api/students",
         "POST /api/students/{studentId}/guardians",
         "POST /api/subscriptions/ai/checkout",

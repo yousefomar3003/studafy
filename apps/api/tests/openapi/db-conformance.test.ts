@@ -39,6 +39,10 @@ const MIGRATIONS = path.join(import.meta.dir, "..", "..", "..", "..", "db", "mig
 
 const USERS_MIGRATION = path.join(MIGRATIONS, "000007_create_users_and_identity_tables.sql");
 const GLOBAL_MIGRATION = path.join(MIGRATIONS, "000004_create_global_tables.sql");
+const NOTIFICATIONS_MIGRATION = path.join(
+  MIGRATIONS,
+  "000017_create_notification_and_device_tables.sql",
+);
 
 interface Column {
   name: string;
@@ -93,6 +97,7 @@ function parseMaxLength(sql: string, column: string): number {
 
 const usersSql = await Bun.file(USERS_MIGRATION).text();
 const globalSql = await Bun.file(GLOBAL_MIGRATION).text();
+const notificationsSql = await Bun.file(NOTIFICATIONS_MIGRATION).text();
 
 const document = await buildOpenApiDocument();
 const schemas = document.components?.schemas as Record<string, Record<string, never>>;
@@ -111,6 +116,7 @@ interface JsonSchema {
 
 const userComponent = schemas.User as JsonSchema;
 const schoolComponent = schemas.School as JsonSchema;
+const notificationComponent = schemas.Notification as JsonSchema;
 
 const typesOf = (schema: JsonSchema): string[] =>
   Array.isArray(schema.type) ? schema.type : schema.type === undefined ? [] : [schema.type];
@@ -217,5 +223,44 @@ describe("School component mirrors app.schools", () => {
   // tenant root cannot be tenant-scoped, and db/policies/rls-coverage.ts enforces that.
   test("has no school_id — it is the tenant root, not a tenant-scoped table", () => {
     expect(schoolComponent.properties).not.toHaveProperty("school_id");
+  });
+});
+
+describe("Notification component mirrors app.notifications", () => {
+  const columns = parseColumns(notificationsSql, "app.notifications");
+
+  test("exposes every column", () => {
+    expect(Object.keys(notificationComponent.properties ?? {}).sort()).toEqual(
+      columns.map((c) => c.name).sort(),
+    );
+  });
+
+  test("marks every exposed column required", () => {
+    expect([...(notificationComponent.required ?? [])].sort()).toEqual(
+      columns.map((c) => c.name).sort(),
+    );
+  });
+
+  test("mirrors each column's nullability into its type", () => {
+    for (const column of columns) {
+      const property = notificationComponent.properties?.[column.name];
+      expect(property, `Notification.${column.name} is missing`).toBeDefined();
+      expect(
+        typesOf(property!).includes("null"),
+        `app.notifications.${column.name} is ${column.nullable ? "nullable" : "NOT NULL"}, ` +
+          `so Notification.${column.name} type ${JSON.stringify(property!.type)} is wrong`,
+      ).toBe(column.nullable);
+    }
+  });
+
+  test("types uuid columns as format: uuid", () => {
+    for (const column of ["id", "school_id", "user_id"]) {
+      expect(notificationComponent.properties?.[column]?.format).toBe("uuid");
+    }
+  });
+
+  // metadata is JSONB and JSONB-only; the wire model must stay an object, never a scalar or array.
+  test("types metadata as an object", () => {
+    expect(typesOf(notificationComponent.properties?.metadata ?? {})).toContain("object");
   });
 });

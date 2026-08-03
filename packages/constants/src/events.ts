@@ -84,6 +84,12 @@ export const DOMAIN_EVENTS = {
   // trying to record the failure, so the alert would be lost in production and nowhere else.
   NOTIFICATION_DISPATCH_FAILED: "notification.dispatchFailed",
 
+  // Inbox read state (ST-142). Raised in the same transaction that applies `read_at`, carrying the
+  // recipient's new unread count so a badge consumer can refresh event-driven without re-querying.
+  // Two segments, not three, for the reason NOTIFICATION_DISPATCH_FAILED documents above.
+  NOTIFICATION_READ: "notification.read",
+  NOTIFICATION_ALL_READ: "notification.allRead",
+
   // Subscription state transitions (ST-133). Raised by the billing state machine inside the same
   // transaction that applies the status change, the audit row and — for a school leaving a live
   // state — the AI cascade. The entitlement invalidator consumes them to overwrite the entitlement

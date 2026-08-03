@@ -236,6 +236,12 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/refunds/initiate",
   "POST /api/finance/refunds/{refundId}/approve",
   "POST /api/finance/refunds/{refundId}/reject",
+  // In-app inbox (ST-142). Personal per-user read state; RLS already fences every row to the
+  // authenticated user (user_id = app.current_user_id()), so the caller's identity is sufficient
+  // authorization and there is no other user's row to protect. Listed here for inventory accuracy
+  // and added to GUARD_EXEMPT_ROUTES below for the same reason the session-lifecycle routes are.
+  "POST /api/notifications/{notificationId}/read",
+  "POST /api/notifications/read-all",
 ];
 
 /**
@@ -344,6 +350,11 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  // In-app inbox (ST-142) — personal per-user read state; the caller's own rows only. RLS
+  // (`user_id = app.current_user_id()`) is the fence, so the bearer identity is sufficient
+  // authorization — same rationale as the session-lifecycle routes above.
+  "POST /api/notifications/{notificationId}/read",
+  "POST /api/notifications/read-all",
 ]);
 
 // ---------------------------------------------------------------------------
