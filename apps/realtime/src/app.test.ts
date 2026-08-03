@@ -1,12 +1,19 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 
 import { createApp } from "./app";
 import { signToken } from "./auth";
 import { createConnectionTracker } from "./lifecycle";
+import { resetMetrics, snapshot } from "./metrics";
 import { createRoomManager } from "./rooms";
 
 const SECRET = "test-secret";
+
+// metrics.ts is a module-level singleton shared across every test file in this run — reset it so
+// this file's /metrics assertions don't depend on what outbox-fanout.test.ts did first.
+beforeEach(() => {
+  resetMetrics();
+});
 
 /**
  * The `/ws` handshake's success path performs a real Bun WebSocket upgrade, which needs a live
@@ -23,6 +30,7 @@ const buildApp = () =>
     jwtSecret: SECRET,
     rooms: createRoomManager(),
     tracker: createConnectionTracker(),
+    metrics: snapshot,
   });
 
 describe("health routes", () => {
@@ -38,9 +46,16 @@ describe("health routes", () => {
       jwtSecret: SECRET,
       rooms: createRoomManager(),
       tracker: createConnectionTracker(),
+      metrics: snapshot,
     });
     const res = await notReadyApp.request("/readyz");
     expect(res.status).toBe(503);
+  });
+
+  test("GET /metrics returns the fan-out counters", async () => {
+    const res = await buildApp().request("/metrics");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: 0, roomDeliveries: 0, dropped: 0 });
   });
 });
 

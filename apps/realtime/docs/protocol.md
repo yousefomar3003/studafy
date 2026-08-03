@@ -111,27 +111,38 @@ the target room receives verbatim:
 | `payload`     | arbitrary JSON     | event-specific data; the gateway does not interpret it                                                                  |
 | `publishedAt` | ISO-8601 date-time | when the publisher produced the event                                                                                   |
 
-#### Open question: `DOMAIN_EVENTS`
+#### `type` and `DOMAIN_EVENTS`
 
-`@studafy/constants` already defines a `DOMAIN_EVENTS` enum for the rest of the platform. This
-ticket's envelope leaves `type` as a free string rather than constraining it to that enum, because
-not every domain event necessarily belongs on a realtime channel and this ticket has no publisher
-to validate the mapping against yet. When the first real publisher lands, either constrain `type`
-to (a subset of) `DOMAIN_EVENTS`, or document why realtime event names are a separate namespace.
+`@studafy/constants` defines a `DOMAIN_EVENTS` enum for the rest of the platform. `type` stays a
+free string at the schema level (`eventEnvelopeSchema`) rather than a `DomainEvent` union, because
+the gateway also fans out direct room-channel publishes whose `type` isn't necessarily a domain
+event (see [Redis wiring](#redis-wiring) below). The first real publisher has since landed: the
+outbox-relay bridge (`src/outbox-fanout.ts`) constrains its own envelopes to a fixed, explicitly
+registered subset of `DOMAIN_EVENTS` — see [`docs/event-routing.md`](event-routing.md) for that
+routing table and the payload-is-ids-only contract it depends on.
 
 ## Redis wiring
 
-- **Channel name = room key.** A publisher does `PUBLISH school:123:role:STUDENT <envelope JSON>`.
-  There is no separate channel-naming scheme to keep in sync with room keys.
-- **One pattern subscription.** The gateway issues a single `PSUBSCRIBE school:*:role:*` at
-  startup (`src/subscriber.ts`) rather than subscribing/unsubscribing per room as clients join and
-  leave. This means fan-out delivery never races a room's membership changes — the gateway is
-  always listening on every room's channel, and `src/rooms.ts`'s in-memory membership map is what
-  actually decides who receives a given message.
-- **Validation at the boundary.** Every message received on the pattern subscription is parsed and
-  validated against `eventEnvelopeSchema`, and its `room` field is checked against the channel it
-  arrived on. A message that fails either check is logged and dropped — it never reaches a client
-  — so one producer's bad publish cannot corrupt delivery for every other room.
+Two independent Redis pub/sub connections feed the same in-memory room broadcast
+(`src/index.ts`'s `broadcast`), because a subscribed ioredis client can only run pub/sub commands
+and each connection's pattern subscriptions would otherwise have to filter the other's messages
+off the same `"pmessage"` event stream:
+
+1. **Direct room publish** (`src/subscriber.ts`) — **channel name = room key.** A publisher does
+   `PUBLISH school:123:role:STUDENT <envelope JSON>`; there is no separate channel-naming scheme to
+   keep in sync with room keys. One `PSUBSCRIBE school:*:role:*` at startup, rather than
+   subscribing/unsubscribing per room as clients join and leave — fan-out delivery never races a
+   room's membership changes, since the gateway is always listening on every room's channel and
+   `src/rooms.ts`'s in-memory membership map is what decides who actually receives a message.
+   Every message is parsed and validated against `eventEnvelopeSchema`, and its `room` field is
+   checked against the channel it arrived on; a message that fails either check is logged and
+   dropped rather than reaching a client.
+2. **Outbox-relayed events** (`src/outbox-fanout.ts`) — bridges `apps/workers`' outbox relay,
+   which publishes to `events:{schoolId}:{event_name}` with a raw, envelope-less payload (see
+   [`docs/event-routing.md`](event-routing.md)). One `PSUBSCRIBE events:*:{event_name}` per
+   registered route; an event with no route is never subscribed to, so it's never received at all.
+   `src/outbox-fanout.ts` is what builds the `EventEnvelope` for these — one per target room, with
+   a fresh `id` and `publishedAt` — since the outbox relay never wraps its publish in one.
 
 ## Example flow
 

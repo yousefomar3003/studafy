@@ -4,6 +4,8 @@ import { createApp } from "./app";
 import { createRedisSubscriber } from "./connection";
 import { loadEnv } from "./env";
 import { createConnectionTracker, gracefulShutdown } from "./lifecycle";
+import { snapshot } from "./metrics";
+import { subscribeToOutboxEvents } from "./outbox-fanout";
 import { createRoomManager } from "./rooms";
 import { subscribeToRooms } from "./subscriber";
 
@@ -25,11 +27,28 @@ function broadcast(envelope: EventEnvelope): void {
   }
 }
 
+// Two dedicated connections, not one shared: a subscribed ioredis client can only run pub/sub
+// commands, and separating them means subscribeToRooms's `school:*:role:*` pattern and
+// subscribeToOutboxEvents's `events:*:{event_name}` patterns never have to filter each other's
+// pmessages off the same "pmessage" event stream.
 const redisSubscriber = createRedisSubscriber(env);
-const unsubscribe = subscribeToRooms(redisSubscriber, broadcast);
+const unsubscribeRooms = subscribeToRooms(redisSubscriber, broadcast);
+
+const outboxSubscriber = createRedisSubscriber(env);
+const unsubscribeOutbox = subscribeToOutboxEvents(outboxSubscriber, broadcast);
+
+const unsubscribe = async (): Promise<void> => {
+  await Promise.all([unsubscribeRooms(), unsubscribeOutbox()]);
+};
 
 const state = { ready: true };
-const app = createApp({ isReady: () => state.ready, jwtSecret: env.WS_JWT_SECRET, rooms, tracker });
+const app = createApp({
+  isReady: () => state.ready,
+  jwtSecret: env.WS_JWT_SECRET,
+  rooms,
+  tracker,
+  metrics: snapshot,
+});
 
 const server = Bun.serve({
   port: env.PORT,
@@ -60,6 +79,7 @@ const shutdown = (signal: string) => {
   }).then(() => {
     server.stop();
     redisSubscriber.disconnect();
+    outboxSubscriber.disconnect();
     console.log("Shutdown complete.");
     process.exit(0);
   });
