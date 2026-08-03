@@ -279,6 +279,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // modules/notifications/notification-service.ts.
   "POST /api/notifications/{notificationId}/read",
   "POST /api/notifications/read-all",
+  // Notification preferences (ST-143). Audit rows are written from inside
+  // notification-preferences-service.ts's updatePreferences, alongside the preference writes — see
+  // routes/notification-preferences-routes.ts.
+  "PATCH /api/notification-preferences",
 ];
 
 function collectSourceFiles(dir: string): string[] {

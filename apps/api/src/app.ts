@@ -75,7 +75,7 @@ import {
   publishedGradeRoutes,
 } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
-import { notificationRoutes } from "./modules/notifications";
+import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import {
   checkoutRoutes,
   schoolCheckoutRoutes,
@@ -549,6 +549,15 @@ export function createApp({
   // notification.allRead outbox events for cross-device badge sync.
   if (database) {
     app.route("/", notificationRoutes(database));
+  }
+
+  // Notification preferences (ST-143). The authenticated user's own per-type, per-channel toggles,
+  // digest mode on eligible types, and personal attendance-alert threshold. Self-service on the
+  // caller's own rows for the same RLS reason as the inbox routes above; mandatory types and digest
+  // eligibility are rejected with 422 here and rejected again by CHECK constraints in the database
+  // (migration 000083), so the rule holds regardless of caller.
+  if (database) {
+    app.route("/", notificationPreferencesRoutes(database));
   }
 
   // Student profiles (CRUD). Demographics, guardians, and admission data with finance-visible

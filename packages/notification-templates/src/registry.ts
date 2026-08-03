@@ -95,4 +95,14 @@ export const NOTIFICATION_CATALOG = {
       route: "/courses/{courseId}/attendance",
     },
   },
+  [NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/announcements",
+    },
+  },
 } as const satisfies NotificationCatalog;

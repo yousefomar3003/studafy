@@ -107,3 +107,23 @@ exports[`renderNotification — snapshot tests ar ATTENDANCE_ALERT / in_app rend
 exports[`renderNotification — snapshot tests ar ATTENDANCE_ALERT / push renders correctly 1`] = `"تنبيه: Physics — 2026-07-28"`;
 
 exports[`renderNotification — snapshot tests ar ATTENDANCE_ALERT / email renders correctly 1`] = `"هذا تنبيه حضور لمادة Physics. تم تسجيل غيابات في 2026-07-28."`;
+
+exports[`renderNotification — snapshot tests en ADMIN_ANNOUNCEMENT / in_app renders correctly 1`] = `"Campus closed Friday"`;
+
+exports[`renderNotification — snapshot tests en ADMIN_ANNOUNCEMENT / push renders correctly 1`] = `"Announcement: Campus closed Friday"`;
+
+exports[`renderNotification — snapshot tests en ADMIN_ANNOUNCEMENT / email renders correctly 1`] = `
+"Campus closed Friday
+
+The campus will be closed for maintenance on Friday. Classes resume Monday."
+`;
+
+exports[`renderNotification — snapshot tests ar ADMIN_ANNOUNCEMENT / in_app renders correctly 1`] = `"Campus closed Friday"`;
+
+exports[`renderNotification — snapshot tests ar ADMIN_ANNOUNCEMENT / push renders correctly 1`] = `"إعلان: Campus closed Friday"`;
+
+exports[`renderNotification — snapshot tests ar ADMIN_ANNOUNCEMENT / email renders correctly 1`] = `
+"Campus closed Friday
+
+The campus will be closed for maintenance on Friday. Classes resume Monday."
+`;

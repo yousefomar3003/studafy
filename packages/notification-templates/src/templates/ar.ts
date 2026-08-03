@@ -53,4 +53,9 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "تنبيه: {courseName} — {date}",
     [NOTIFICATION_CHANNELS.EMAIL]: "هذا تنبيه حضور لمادة {courseName}. تم تسجيل غيابات في {date}.",
   },
+  [NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{title}",
+    [NOTIFICATION_CHANNELS.PUSH]: "إعلان: {title}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "{title}\n\n{summary}",
+  },
 } as const satisfies LocaleTemplateSet;

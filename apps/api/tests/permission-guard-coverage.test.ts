@@ -242,6 +242,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // and added to GUARD_EXEMPT_ROUTES below for the same reason the session-lifecycle routes are.
   "POST /api/notifications/{notificationId}/read",
   "POST /api/notifications/read-all",
+  // Notification preferences (ST-143). Self-service on the caller's own rows; the mandatory-type
+  // and digest-eligibility rules are enforced in the handler and, redundantly, by CHECK constraints
+  // in migration 000083 — there is no other user's row this could reach.
+  "PATCH /api/notification-preferences",
 ];
 
 /**
@@ -355,6 +359,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // authorization — same rationale as the session-lifecycle routes above.
   "POST /api/notifications/{notificationId}/read",
   "POST /api/notifications/read-all",
+  // Notification preferences (ST-143) — personal per-user rows; RLS
+  // (`notification_preferences_owner`, `user_id = app.current_user_id()`) is the fence.
+  "PATCH /api/notification-preferences",
 ]);
 
 // ---------------------------------------------------------------------------

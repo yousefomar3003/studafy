@@ -22,10 +22,14 @@ const NOTIFICATION_TYPES = [
   "STUDY_GROUP_INVITE",
   "CERTIFICATE_ISSUED",
   "SUPPORT_MESSAGE",
-  // ST-110. Appended by 000057 via ALTER TYPE ... ADD VALUE, so it sorts last in pg_enum order —
-  // which is what the enum assertion below compares against. DEFAULT_PREFERENCES is derived from
-  // this list, so the activation trigger's seeded matrix grows with it.
+  // ST-110. Appended by 000057 via ALTER TYPE ... ADD VALUE, so it sorts after the original eight in
+  // pg_enum order — which is what the enum assertion below compares against. DEFAULT_PREFERENCES is
+  // derived from this list, so the activation trigger's seeded matrix grows with it.
   "ATTENDANCE_ALERT",
+  // ST-143. Appended by 000082, same mechanism. The one type MANDATORY_NOTIFICATION_TYPES holds —
+  // the trigger always seeds enabled = true, which is also the only value
+  // ck_notification_preferences_mandatory_enabled (000083) permits for it.
+  "ADMIN_ANNOUNCEMENT",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;
