@@ -10,6 +10,15 @@
  *   grace_period ──→ active   (payment recovered within grace window)
  *   grace_period ──→ closed   (grace window exhausted)
  *   *        ──→ closed       (terminal — no transitions out)
+ *
+ *   AI subscriptions only:
+ *   *      ──→ paused  (the student's school was suspended)
+ *   paused ──→ active  (the school was reactivated — resumable, unlike `closed`)
+ *
+ * `paused` is a distinct state from `closed` on purpose: `closed` is terminal (SAD §11), so a
+ * suspension that needs a resume path cannot reuse it without giving `closed` an outgoing edge
+ * every other document says it does not have. See packages/billing/src/state-machine.ts for the
+ * transition table (school subscriptions never enter `paused`).
  */
 export const SUBSCRIPTION_STATUSES = {
   TRIALING: "trialing",
@@ -19,6 +28,7 @@ export const SUBSCRIPTION_STATUSES = {
   CANCELED: "canceled",
   EXPIRED: "expired",
   CLOSED: "closed",
+  PAUSED: "paused",
 } as const;
 
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[keyof typeof SUBSCRIPTION_STATUSES];

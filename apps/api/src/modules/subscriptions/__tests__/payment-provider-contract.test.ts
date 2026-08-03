@@ -17,6 +17,8 @@ import type {
   ParsedWebhookEvent,
   LookupProductResult,
   LookupPriceResult,
+  PauseSubscriptionInput,
+  ResumeSubscriptionInput,
   PaymentProviderPort,
 } from "../ports/payment-provider";
 
@@ -36,6 +38,8 @@ export function contractTests(name: string, createAdapter: AdapterFactory): void
       expect(typeof adapter.parseWebhook).toBe("function");
       expect(typeof adapter.lookupProductById).toBe("function");
       expect(typeof adapter.lookupPriceById).toBe("function");
+      expect(typeof adapter.pauseSubscription).toBe("function");
+      expect(typeof adapter.resumeSubscription).toBe("function");
     });
 
     test("createCustomer rejects empty name with PaymentProviderError", async () => {
@@ -102,6 +106,30 @@ export function contractTests(name: string, createAdapter: AdapterFactory): void
       expect(result).toBeNull();
     });
 
+    test("pauseSubscription rejects empty providerSubscriptionId with PaymentProviderError", async () => {
+      const adapter = createAdapter();
+      await expect(adapter.pauseSubscription({ providerSubscriptionId: "" })).rejects.toThrow(
+        PaymentProviderError,
+      );
+    });
+
+    test("resumeSubscription rejects empty providerSubscriptionId with PaymentProviderError", async () => {
+      const adapter = createAdapter();
+      await expect(adapter.resumeSubscription({ providerSubscriptionId: "" })).rejects.toThrow(
+        PaymentProviderError,
+      );
+    });
+
+    test("pauseSubscription and resumeSubscription resolve for a known subscription id", async () => {
+      const adapter = createAdapter();
+      await expect(
+        adapter.pauseSubscription({ providerSubscriptionId: "sub_mock" }),
+      ).resolves.toBeUndefined();
+      await expect(
+        adapter.resumeSubscription({ providerSubscriptionId: "sub_mock" }),
+      ).resolves.toBeUndefined();
+    });
+
     test("all errors are instances of PaymentProviderError", async () => {
       const adapter = createAdapter();
 
@@ -144,6 +172,14 @@ export function contractTests(name: string, createAdapter: AdapterFactory): void
         {
           name: "parseWebhook",
           call: () => adapter.parseWebhook(Buffer.from("{}"), ""),
+        },
+        {
+          name: "pauseSubscription",
+          call: () => adapter.pauseSubscription({ providerSubscriptionId: "" }),
+        },
+        {
+          name: "resumeSubscription",
+          call: () => adapter.resumeSubscription({ providerSubscriptionId: "" }),
         },
       ];
 
@@ -233,6 +269,26 @@ class MockAdapter implements PaymentProviderPort {
 
   async lookupPriceById(_providerPriceId: string): Promise<LookupPriceResult | null> {
     return null;
+  }
+
+  async pauseSubscription(input: PauseSubscriptionInput): Promise<void> {
+    if (!input.providerSubscriptionId) {
+      throw new PaymentProviderError(
+        400,
+        "VALIDATION_FAILED" as never,
+        "providerSubscriptionId is required",
+      );
+    }
+  }
+
+  async resumeSubscription(input: ResumeSubscriptionInput): Promise<void> {
+    if (!input.providerSubscriptionId) {
+      throw new PaymentProviderError(
+        400,
+        "VALIDATION_FAILED" as never,
+        "providerSubscriptionId is required",
+      );
+    }
   }
 }
 

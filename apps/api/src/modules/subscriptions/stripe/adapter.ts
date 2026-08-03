@@ -6,6 +6,8 @@ import type {
   CreateCustomerInput,
   CreateCustomerResult,
   PaymentProviderPort,
+  PauseSubscriptionInput,
+  ResumeSubscriptionInput,
   SyncPriceInput,
   SyncPriceResult,
   SyncProductInput,
@@ -147,5 +149,26 @@ export class StripeAdapter implements PaymentProviderPort {
       }
       throw error;
     }
+  }
+
+  /**
+   * `pause_collection: { behavior: "void" }` stops Stripe from generating or charging invoices
+   * without ending the subscription -- the subscription object itself still reports its prior
+   * status (Stripe's own `paused` status is a separate, distinct thing this port does not use), so
+   * there is nothing here for `deriveIntent`'s `customer.subscription.paused` mapping to see. The
+   * local `paused` status this call backs is recorded by the caller in the same transaction, not
+   * inferred from a webhook.
+   */
+  async pauseSubscription(input: PauseSubscriptionInput): Promise<void> {
+    await this.stripe.subscriptions.update(input.providerSubscriptionId, {
+      pause_collection: { behavior: "void" },
+    });
+  }
+
+  /** Clearing `pause_collection` resumes normal invoicing from the subscription's existing cycle. */
+  async resumeSubscription(input: ResumeSubscriptionInput): Promise<void> {
+    await this.stripe.subscriptions.update(input.providerSubscriptionId, {
+      pause_collection: null,
+    });
   }
 }

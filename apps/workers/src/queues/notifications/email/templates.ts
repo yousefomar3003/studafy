@@ -10,7 +10,14 @@
  */
 
 export type EmailTemplate =
-  "invitation" | "verification" | "dunning" | "digest" | "alert" | "seat-drift";
+  | "invitation"
+  | "verification"
+  | "dunning"
+  | "digest"
+  | "alert"
+  | "seat-drift"
+  | "ai-subscription-paused"
+  | "ai-subscription-resumed";
 
 export interface RenderedEmail {
   subject: string;
@@ -80,6 +87,15 @@ export interface SeatDriftEmailData {
   proratedAmountMinor: number | null;
   currency: string | null;
   effectivePeriodEnd: string | null;
+}
+
+/**
+ * The AI-subscription pause/resume notification, for a school-suspension/reactivation event. Sent
+ * to the student directly (not to the school's ORG_ADMINs, unlike the dunning/seat-drift templates
+ * above): a student's own AI access is what changed.
+ */
+export interface AiSubscriptionPauseResumeEmailData {
+  schoolName: string;
 }
 
 export interface DigestItem {
@@ -187,6 +203,30 @@ export function renderSeatDriftEmail(data: SeatDriftEmailData): RenderedEmail {
   const bodyHtml = `<p>${escapeHtml(data.schoolName)} now has <strong>${data.activeSeatCount}</strong> enrolled students but pays for <strong>${data.billedSeatCount}</strong> ${data.billedSeatCount === 1 ? "seat" : "seats"} on the <strong>${escapeHtml(data.planName)}</strong> plan.</p><p>We will reduce your plan to <strong>${data.activeSeatCount}</strong> ${data.activeSeatCount === 1 ? "seat" : "seats"}${effectiveLabel}. Unused seats stop billing from that date.</p>`;
   return {
     subject: `${data.schoolName}'s Studafy seats have been updated`,
+    text,
+    html: shell(data.schoolName, bodyHtml),
+  };
+}
+
+export function renderAiSubscriptionPausedEmail(
+  data: AiSubscriptionPauseResumeEmailData,
+): RenderedEmail {
+  const text = `Your AI study assistant on Studafy has been paused because ${data.schoolName} is currently suspended. It will resume automatically once ${data.schoolName} is reactivated. Contact your school administrator for details.`;
+  const bodyHtml = `<p>Your AI study assistant on Studafy has been paused because <strong>${escapeHtml(data.schoolName)}</strong> is currently suspended.</p><p>It will resume automatically once ${escapeHtml(data.schoolName)} is reactivated. Contact your school administrator for details.</p>`;
+  return {
+    subject: "Your Studafy AI access has been paused",
+    text,
+    html: shell(data.schoolName, bodyHtml),
+  };
+}
+
+export function renderAiSubscriptionResumedEmail(
+  data: AiSubscriptionPauseResumeEmailData,
+): RenderedEmail {
+  const text = `Good news: ${data.schoolName} has been reactivated, and your AI study assistant on Studafy is available again.`;
+  const bodyHtml = `<p>Good news: <strong>${escapeHtml(data.schoolName)}</strong> has been reactivated, and your AI study assistant on Studafy is available again.</p>`;
+  return {
+    subject: "Your Studafy AI access has resumed",
     text,
     html: shell(data.schoolName, bodyHtml),
   };

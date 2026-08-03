@@ -314,6 +314,24 @@ export const eventPayloadSchemas = {
   // proratedAmountMinor/currency are set on upgrades only (Stripe's invoice-preview amount, billed
   // immediately); effectivePeriodEnd is set on downgrades only (next renewal, when the lower seat
   // count starts billing).
+  // ── AI subscription pause/resume (school suspension) ──────────────
+  // Raised by pauseAiSubscriptionsForSchoolSuspension / resumeAiSubscriptionsForSchoolReactivation
+  // (apps/api/src/modules/subscriptions/services/school-suspension-service.ts), once per affected
+  // student, in the same transaction as the AI subscription's status change. schoolId/
+  // aiSubscriptionId are correlation handles; the email dispatcher renders from `email` alone.
+  [DOMAIN_EVENTS.AI_SUBSCRIPTION_PAUSED]: z.object({
+    schoolId: uid,
+    aiSubscriptionId: uid,
+    studentId: uid,
+    email: z.string().email(),
+  }),
+  [DOMAIN_EVENTS.AI_SUBSCRIPTION_RESUMED]: z.object({
+    schoolId: uid,
+    aiSubscriptionId: uid,
+    studentId: uid,
+    email: z.string().email(),
+  }),
+
   [DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED]: z.object({
     schoolId: uid,
     subscriptionId: uid,

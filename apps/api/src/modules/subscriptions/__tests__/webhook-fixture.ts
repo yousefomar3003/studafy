@@ -77,6 +77,8 @@ export function createProviderStub(): ProviderStub {
     syncPrice: unsupported,
     lookupProductById: unsupported,
     lookupPriceById: unsupported,
+    pauseSubscription: unsupported,
+    resumeSubscription: unsupported,
   } as ProviderStub;
 
   return stub;

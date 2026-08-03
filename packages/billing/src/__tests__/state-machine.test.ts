@@ -55,11 +55,26 @@ describe("transition tables", () => {
     }
   });
 
-  test("live and terminal states partition the enum", () => {
+  // `paused` is deliberately a third bucket, not folded into either set: it is not live (the whole
+  // point of a school-suspension pause is that access stops) and not terminal (it has a real
+  // outgoing edge back to `active`, see AI_TRANSITIONS). Every other status is still exactly one of
+  // live or terminal.
+  test("live and terminal states partition the enum, apart from the one paused exception", () => {
     const union = new Set([...LIVE_STATUSES, ...TERMINAL_STATUSES]);
-    expect(union.size).toBe(ALL_STATUSES.length);
-    for (const status of ALL_STATUSES) expect(union.has(status)).toBe(true);
+    expect(union.size).toBe(ALL_STATUSES.length - 1);
+    for (const status of ALL_STATUSES) {
+      if (status === "paused") {
+        expect(union.has(status)).toBe(false);
+        continue;
+      }
+      expect(union.has(status)).toBe(true);
+    }
     for (const status of LIVE_STATUSES) expect(TERMINAL_STATUSES.has(status)).toBe(false);
+  });
+
+  test("paused is neither live nor terminal", () => {
+    expect(LIVE_STATUSES.has("paused")).toBe(false);
+    expect(TERMINAL_STATUSES.has("paused")).toBe(false);
   });
 
   test("genesis is a live state", () => {
@@ -86,13 +101,53 @@ describe("resolveTransition", () => {
   });
 
   test("every terminal state refuses every intent", () => {
-    const intents = ["trial_started", "activated", "payment_failed", "canceled"] as const;
+    const intents = [
+      "trial_started",
+      "activated",
+      "payment_failed",
+      "canceled",
+      "school_suspended",
+      "school_reactivated",
+    ] as const;
     for (const from of TERMINAL_STATUSES) {
       for (const intent of intents) {
         expect(resolveTransition("school", from, intent)).toBeNull();
         expect(resolveTransition("ai", from, intent)).toBeNull();
       }
     }
+  });
+});
+
+describe("school-suspension pause/resume (AI subscriptions only)", () => {
+  test("school_suspended pauses an AI subscription from every live status", () => {
+    for (const from of LIVE_STATUSES) {
+      expect(resolveTransition("ai", from, "school_suspended")).toBe("paused");
+    }
+  });
+
+  test("school_suspended has no meaning for a school subscription", () => {
+    for (const from of LIVE_STATUSES) {
+      expect(resolveTransition("school", from, "school_suspended")).toBeNull();
+    }
+  });
+
+  test("school_reactivated resumes a paused AI subscription to active", () => {
+    expect(resolveTransition("ai", "paused", "school_reactivated")).toBe("active");
+  });
+
+  test("school_reactivated is illegal from anywhere but paused", () => {
+    for (const from of [...LIVE_STATUSES, ...TERMINAL_STATUSES]) {
+      expect(resolveTransition("ai", from, "school_reactivated")).toBeNull();
+    }
+  });
+
+  test("re-suspending an already-paused AI subscription is illegal, not a self-edge", () => {
+    expect(resolveTransition("ai", "paused", "school_suspended")).toBeNull();
+  });
+
+  test("a paused AI subscription can still be canceled or expired outright", () => {
+    expect(resolveTransition("ai", "paused", "canceled")).toBe("canceled");
+    expect(resolveTransition("ai", "paused", "expired")).toBe("expired");
   });
 });
 
