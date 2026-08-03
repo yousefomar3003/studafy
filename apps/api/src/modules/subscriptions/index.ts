@@ -4,6 +4,9 @@ export { aiCheckoutRoutes } from "./routes/ai-checkout-routes";
 export { webhookRoutes } from "./routes/webhook-routes";
 export { planRoutes } from "./routes/plan-routes";
 export { adminSubscriptionRoutes } from "./routes/admin-routes";
+export { billingOverviewRoutes } from "./routes/billing-overview-routes";
+export { invoiceRoutes } from "./routes/invoice-routes";
+export { cancellationRoutes } from "./routes/cancellation-routes";
 export { StripeAdapter } from "./stripe/adapter";
 export type { StripeAdapterOptions } from "./stripe/adapter";
 export { handleStripeWebhook } from "./stripe/webhook-processor";
@@ -25,6 +28,11 @@ export {
   createBillingPortalSession,
 } from "./services/checkout-service";
 export { getActivePlans, getSchoolSubscription } from "./services/subscription-service";
+export type { SchoolSubscription } from "./services/subscription-service";
+export { getBillingOverview } from "./services/billing-overview-service";
+export type { BillingOverview } from "./services/billing-overview-service";
+export { listSchoolInvoices } from "./services/invoice-service";
+export { scheduleCancellation, reverseCancellation } from "./services/cancellation-service";
 export {
   pauseAiSubscriptionsForSchoolSuspension,
   resumeAiSubscriptionsForSchoolReactivation,
@@ -56,4 +64,9 @@ export type {
   ParsedWebhookEvent,
   PauseSubscriptionInput,
   ResumeSubscriptionInput,
+  ScheduleCancellationInput,
+  ReverseCancellationInput,
+  ListInvoicesInput,
+  ListInvoicesResult,
+  InvoiceSummary,
 } from "./ports/payment-provider";

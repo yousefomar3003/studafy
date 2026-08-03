@@ -246,6 +246,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // and digest-eligibility rules are enforced in the handler and, redundantly, by CHECK constraints
   // in migration 000083 — there is no other user's row this could reach.
   "PATCH /api/notification-preferences",
+  // School billing portal (ST-137). Guarded by requirePermission(ORGANIZATION_MANAGE_BILLING) in
+  // cancellation-routes.ts.
+  "POST /api/subscriptions/current/cancel",
+  "POST /api/subscriptions/current/cancel/reverse",
 ];
 
 /**

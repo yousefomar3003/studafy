@@ -111,6 +111,38 @@ export interface ResumeSubscriptionInput {
   providerSubscriptionId: string;
 }
 
+export interface ScheduleCancellationInput {
+  providerSubscriptionId: string;
+}
+
+export interface ReverseCancellationInput {
+  providerSubscriptionId: string;
+}
+
+export interface ListInvoicesInput {
+  customerId: string;
+  limit?: number;
+  startingAfter?: string;
+}
+
+export interface InvoiceSummary {
+  id: string;
+  status: string | null;
+  amountDue: number;
+  amountPaid: number;
+  currency: string;
+  created: Date;
+  periodStart: Date;
+  periodEnd: Date;
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+}
+
+export interface ListInvoicesResult {
+  invoices: InvoiceSummary[];
+  hasMore: boolean;
+}
+
 export interface PaymentProviderPort {
   createCustomer(input: CreateCustomerInput): Promise<CreateCustomerResult>;
   createCheckoutSession(input: CreateCheckoutSessionInput): Promise<CreateCheckoutSessionResult>;
@@ -132,4 +164,14 @@ export interface PaymentProviderPort {
    * Resume billing a subscription paused via `pauseSubscription`. Idempotent for the same reason.
    */
   resumeSubscription(input: ResumeSubscriptionInput): Promise<void>;
+  /**
+   * Schedule a subscription to cancel at the end of its current billing period. Does not end access
+   * immediately and does not itself move local subscription status -- the eventual
+   * `customer.subscription.deleted` webhook is what does that, through the existing state machine.
+   */
+  scheduleCancellation(input: ScheduleCancellationInput): Promise<void>;
+  /** Undo a pending end-of-period cancellation. No-op if the subscription was not scheduled to cancel. */
+  reverseCancellation(input: ReverseCancellationInput): Promise<void>;
+  /** List invoices billed to a customer, newest first. */
+  listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult>;
 }

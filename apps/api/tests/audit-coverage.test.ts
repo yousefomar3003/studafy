@@ -283,6 +283,13 @@ const EXPECTED_MUTATING_ROUTES = [
   // notification-preferences-service.ts's updatePreferences, alongside the preference writes — see
   // routes/notification-preferences-routes.ts.
   "PATCH /api/notification-preferences",
+  // School billing portal (ST-137). Cancellation is the one mutating pair in this feature; the
+  // GET overview/invoices and the POST portal-session route stay on the `app` naming convention the
+  // rest of the subscriptions module uses (see the NOTE above), matching the checkout routes'
+  // existing, documented blind spot. Audit rows are written from inside the service transactions in
+  // cancellation-service.ts, alongside the cancel_at_period_end / retention_state change.
+  "POST /api/subscriptions/current/cancel",
+  "POST /api/subscriptions/current/cancel/reverse",
 ];
 
 function collectSourceFiles(dir: string): string[] {

@@ -8,6 +8,10 @@ import type {
   PaymentProviderPort,
   PauseSubscriptionInput,
   ResumeSubscriptionInput,
+  ScheduleCancellationInput,
+  ReverseCancellationInput,
+  ListInvoicesInput,
+  ListInvoicesResult,
   SyncPriceInput,
   SyncPriceResult,
   SyncProductInput,
@@ -170,5 +174,47 @@ export class StripeAdapter implements PaymentProviderPort {
     await this.stripe.subscriptions.update(input.providerSubscriptionId, {
       pause_collection: null,
     });
+  }
+
+  /**
+   * `cancel_at_period_end: true` keeps the subscription active (and billing) through its current
+   * period; Stripe reports the change back as `customer.subscription.updated` with `status` still
+   * `active`, which the state machine correctly treats as a self-edge. The eventual
+   * `customer.subscription.deleted` at period end is what moves local status to `canceled`.
+   */
+  async scheduleCancellation(input: ScheduleCancellationInput): Promise<void> {
+    await this.stripe.subscriptions.update(input.providerSubscriptionId, {
+      cancel_at_period_end: true,
+    });
+  }
+
+  async reverseCancellation(input: ReverseCancellationInput): Promise<void> {
+    await this.stripe.subscriptions.update(input.providerSubscriptionId, {
+      cancel_at_period_end: false,
+    });
+  }
+
+  async listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult> {
+    const page = await this.stripe.invoices.list({
+      customer: input.customerId,
+      limit: input.limit ?? 20,
+      starting_after: input.startingAfter,
+    });
+
+    return {
+      invoices: page.data.map((invoice) => ({
+        id: invoice.id ?? "",
+        status: invoice.status,
+        amountDue: invoice.amount_due,
+        amountPaid: invoice.amount_paid,
+        currency: invoice.currency.toUpperCase(),
+        created: new Date(invoice.created * 1000),
+        periodStart: new Date(invoice.period_start * 1000),
+        periodEnd: new Date(invoice.period_end * 1000),
+        hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+        invoicePdf: invoice.invoice_pdf ?? null,
+      })),
+      hasMore: page.has_more,
+    };
   }
 }
