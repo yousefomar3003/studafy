@@ -19,3 +19,5 @@ export type {
   ChannelTemplates,
   LocaleTemplateSet,
 } from "@studafy/notification-templates";
+
+export { notificationRoutes } from "./routes/notification-routes";

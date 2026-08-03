@@ -307,6 +307,15 @@ describe("emit", () => {
           errorClass: "Error",
           failedAt: new Date().toISOString(),
         },
+        [DOMAIN_EVENTS.NOTIFICATION_READ]: {
+          userId: uid,
+          notificationId: uid,
+          unreadCount: 1,
+        },
+        [DOMAIN_EVENTS.NOTIFICATION_ALL_READ]: {
+          userId: uid,
+          unreadCount: 0,
+        },
         [DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED]: {
           schoolId: uid,
           subscriptionId: uid,

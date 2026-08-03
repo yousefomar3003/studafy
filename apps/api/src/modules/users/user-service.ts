@@ -1,8 +1,7 @@
-import { ERROR_CODES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
-import { CodedHttpException } from "../../coded-http-exception";
 import { withTenantTx } from "../../db/tenant-tx";
+import { decodeKeysetCursor, encodeKeysetCursor } from "../../lib/keyset-cursor";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { adminRevokeUserSessions, REVOCATION_REASONS } from "../auth/services/revocation-service";
 
@@ -78,33 +77,6 @@ export interface DeactivateUserResult {
 }
 
 // ---------------------------------------------------------------------------
-// Cursor helpers
-// ---------------------------------------------------------------------------
-
-function encodeCursor(createdAt: Date, id: string): string {
-  return Buffer.from(JSON.stringify({ created_at: createdAt.toISOString(), id })).toString(
-    "base64url",
-  );
-}
-
-function decodeCursor(cursor: string): { created_at: string; id: string } {
-  try {
-    const decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
-    if (
-      typeof decoded !== "object" ||
-      decoded === null ||
-      typeof decoded.created_at !== "string" ||
-      typeof decoded.id !== "string"
-    ) {
-      throw new Error("invalid cursor shape");
-    }
-    return decoded;
-  } catch {
-    throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Invalid pagination cursor");
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
 
@@ -136,7 +108,7 @@ export async function listUsers(
 
   const cursorFilter = params.cursor
     ? (() => {
-        const { created_at, id } = decodeCursor(params.cursor);
+        const { created_at, id } = decodeKeysetCursor(params.cursor);
         return tx` AND (u.created_at, u.id) < (${created_at}::timestamptz, ${id}::uuid)`;
       })()
     : tx``;
@@ -169,7 +141,7 @@ export async function listUsers(
   const sliced = hasMore ? rows.slice(0, params.limit) : rows;
   const next_cursor =
     hasMore && sliced.length > 0
-      ? encodeCursor(sliced[sliced.length - 1]!.created_at, sliced[sliced.length - 1]!.id)
+      ? encodeKeysetCursor(sliced[sliced.length - 1]!.created_at, sliced[sliced.length - 1]!.id)
       : null;
 
   return {

@@ -75,6 +75,7 @@ import {
   publishedGradeRoutes,
 } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
+import { notificationRoutes } from "./modules/notifications";
 import {
   checkoutRoutes,
   schoolCheckoutRoutes,
@@ -539,6 +540,15 @@ export function createApp({
   // and ROLE_* permissions, with web-only channel guard on all mutations.
   if (database) {
     app.route("/", userRoutes(database, jtiDenylist));
+  }
+
+  // In-app notification inbox (ST-142). The authenticated user's own notifications: keyset-paginated
+  // list, unread count, and mark-read/mark-all-read. No permission or channel guard — RLS fences
+  // every row to its owner, so no role can reach anyone else's inbox, and mark-read must work from
+  // mobile. Read-state mutations return the new unread count and raise notification.read /
+  // notification.allRead outbox events for cross-device badge sync.
+  if (database) {
+    app.route("/", notificationRoutes(database));
   }
 
   // Student profiles (CRUD). Demographics, guardians, and admission data with finance-visible
