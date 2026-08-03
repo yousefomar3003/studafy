@@ -110,6 +110,14 @@ export const DOMAIN_EVENTS = {
   // INSERT time, inside the very transaction trying to record the reminder.
   SUBSCRIPTION_DUNNING_SENT: "subscription.dunningSent",
 
+  // Nightly seat reconciliation (ST-136). Raised by the billing seat-reconciliation sweep, once per
+  // school subscription in which the enrolled-student count drifted from the billed seat quantity,
+  // for each ORG_ADMIN the drift report is addressed to. The email dispatcher consumes it through
+  // the same channel as every other transactional email. Two segments, not three, for the reason
+  // NOTIFICATION_DISPATCH_FAILED documents below: `subscription.seatDriftReported` would be
+  // rejected by the outbox CHECK at INSERT time, inside the very transaction recording the report.
+  SUBSCRIPTION_SEAT_DRIFT_REPORTED: "subscription.seatDriftReported",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

@@ -307,6 +307,27 @@ export const eventPayloadSchemas = {
     gracePeriodEndsAt: z.string().datetime(),
   }),
 
+  // ── Seat reconciliation (ST-136) ───────────────────────────────────
+  // Raised by the billing seat-reconciliation sweep once per school subscription with drift
+  // (enrolled count ≠ billed seat quantity), for each ORG_ADMIN the drift report is addressed to.
+  // The payload mirrors what apps/workers/src/queues/billing/seat-reconciliation.ts writes raw.
+  // proratedAmountMinor/currency are set on upgrades only (Stripe's invoice-preview amount, billed
+  // immediately); effectivePeriodEnd is set on downgrades only (next renewal, when the lower seat
+  // count starts billing).
+  [DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED]: z.object({
+    schoolId: uid,
+    subscriptionId: uid,
+    email: z.string().email(),
+    planName: z.string().min(1),
+    activeSeatCount: z.number().int().nonnegative(),
+    billedSeatCount: z.number().int().nonnegative(),
+    delta: z.number().int(),
+    direction: z.enum(["upgrade", "downgrade"]),
+    proratedAmountMinor: z.number().int().nonnegative().nullable(),
+    currency: z.string().min(1).nullable(),
+    effectivePeriodEnd: z.string().datetime().nullable(),
+  }),
+
   // ── ERPNext (freeform — external system payloads) ─────────────────────
   [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: z.record(z.string(), z.unknown()),
   [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: z.record(z.string(), z.unknown()),

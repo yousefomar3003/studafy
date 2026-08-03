@@ -67,6 +67,11 @@ export const JOB_NAMES = {
   // subscriptions whose grace window has elapsed, and stamps nothing itself — the deadline is set
   // by the state machine when a subscription enters `grace_period`. Carries no payload.
   RUN_DUNNING: "run-dunning",
+  // Nightly seat reconciliation (ST-136). Scheduled job: reconciles each active subscription's
+  // enrolled-student count against the billed Stripe seat quantity — prorated upgrade on drift up,
+  // next-cycle downgrade on drift down, and a drift report to the school's ORG_ADMINs. Carries no
+  // payload: the sweep reads every school's seats and Stripe state straight from the database.
+  RUN_SEAT_RECONCILIATION: "run-seat-reconciliation",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

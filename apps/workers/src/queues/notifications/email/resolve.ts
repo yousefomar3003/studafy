@@ -11,6 +11,7 @@ import { DOMAIN_EVENTS } from "@studafy/constants";
 import {
   renderDigestEmail,
   renderInvitationEmail,
+  renderSeatDriftEmail,
   renderSubscriptionDunningEmail,
   renderVerificationEmail,
 } from "./templates";
@@ -66,6 +67,22 @@ interface SubscriptionDunningPayload {
   planName: string;
   dueDate: string;
   gracePeriodEndsAt: string;
+}
+
+/**
+ * The seat-drift report payload the billing sweep writes (ST-136). Same convention as the dunning
+ * payload below: schoolId/subscriptionId are correlation handles; this renderer needs only the
+ * fields the template uses.
+ */
+interface SeatDriftPayload {
+  email: string;
+  planName: string;
+  activeSeatCount: number;
+  billedSeatCount: number;
+  direction: "upgrade" | "downgrade";
+  proratedAmountMinor: number | null;
+  currency: string | null;
+  effectivePeriodEnd: string | null;
 }
 
 /**
@@ -126,6 +143,23 @@ export function resolveEmail(
         }),
       };
     }
+    case DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED: {
+      const payload = row.payload as unknown as SeatDriftPayload;
+      return {
+        template: "seat-drift",
+        recipient: payload.email,
+        content: renderSeatDriftEmail({
+          schoolName: context.schoolName,
+          planName: payload.planName,
+          activeSeatCount: payload.activeSeatCount,
+          billedSeatCount: payload.billedSeatCount,
+          direction: payload.direction,
+          proratedAmountMinor: payload.proratedAmountMinor,
+          currency: payload.currency,
+          effectivePeriodEnd: payload.effectivePeriodEnd,
+        }),
+      };
+    }
     default:
       throw new Error(`no email template for outbox event ${row.event_name}`);
   }
@@ -137,4 +171,5 @@ export const EMAIL_EVENT_NAMES: readonly string[] = [
   DOMAIN_EVENTS.SCHOOL_VERIFICATION_EMAIL_SENT,
   DOMAIN_EVENTS.DIGEST_SENT,
   DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT,
+  DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED,
 ];

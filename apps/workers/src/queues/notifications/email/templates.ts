@@ -9,7 +9,8 @@
  * All copy is English-only (a localization pass is a separate concern, not this ticket).
  */
 
-export type EmailTemplate = "invitation" | "verification" | "dunning" | "digest" | "alert";
+export type EmailTemplate =
+  "invitation" | "verification" | "dunning" | "digest" | "alert" | "seat-drift";
 
 export interface RenderedEmail {
   subject: string;
@@ -60,6 +61,25 @@ export interface AlertEmailData {
   schoolName: string;
   studentName: string;
   body: string;
+}
+
+/**
+ * The seat-drift report (ST-136), for the platform subscription's nightly seat reconciliation.
+ *
+ * One report per reconciliation, addressed to the school's ORG_ADMINs. `direction` distinguishes
+ * the two drift cases: an upgrade bills a prorated charge now (`proratedAmountMinor`/`currency`),
+ * a downgrade takes effect at the next renewal (`effectivePeriodEnd`).
+ */
+export interface SeatDriftEmailData {
+  schoolName: string;
+  /** The display name of the plan the school is billed for, e.g. "Growth". */
+  planName: string;
+  activeSeatCount: number;
+  billedSeatCount: number;
+  direction: "upgrade" | "downgrade";
+  proratedAmountMinor: number | null;
+  currency: string | null;
+  effectivePeriodEnd: string | null;
 }
 
 export interface DigestItem {
@@ -139,6 +159,34 @@ export function renderSubscriptionDunningEmail(data: SubscriptionDunningEmailDat
   const bodyHtml = `<p>Your Studafy subscription payment for the <strong>${escapeHtml(data.planName)}</strong> plan was due on ${formatDateLabel(data.dueDate)} and is now overdue.</p><p>${escapeHtml(data.schoolName)} will lose access on <strong>${formatDateLabel(data.gracePeriodEndsAt)}</strong> unless payment is arranged.</p><p>Please contact your billing contact or the Studafy support team.</p>`;
   return {
     subject: `Action required: ${data.schoolName}'s Studafy payment is overdue`,
+    text,
+    html: shell(data.schoolName, bodyHtml),
+  };
+}
+
+export function renderSeatDriftEmail(data: SeatDriftEmailData): RenderedEmail {
+  const delta = data.activeSeatCount - data.billedSeatCount;
+  if (data.direction === "upgrade") {
+    const amountLabel =
+      data.proratedAmountMinor !== null && data.currency !== null
+        ? `${formatAmountMinor(data.proratedAmountMinor)} ${data.currency.toUpperCase()}`
+        : "";
+    const text = `${data.schoolName} now has ${data.activeSeatCount} enrolled students but pays for ${data.billedSeatCount} ${data.billedSeatCount === 1 ? "seat" : "seats"} on the ${data.planName} plan. We have added ${delta} ${delta === 1 ? "seat" : "seats"} to bring your plan in line with your enrolment.${amountLabel ? ` A prorated charge of ${amountLabel} has been billed immediately.` : ""}`;
+    const bodyHtml = `<p>${escapeHtml(data.schoolName)} now has <strong>${data.activeSeatCount}</strong> enrolled students but pays for <strong>${data.billedSeatCount}</strong> ${data.billedSeatCount === 1 ? "seat" : "seats"} on the <strong>${escapeHtml(data.planName)}</strong> plan.</p><p>We have added <strong>${delta}</strong> ${delta === 1 ? "seat" : "seats"} to bring your plan in line with your enrolment.${amountLabel ? ` A prorated charge of <strong>${escapeHtml(amountLabel)}</strong> has been billed immediately.` : ""}</p>`;
+    return {
+      subject: `${data.schoolName}'s Studafy seats have been updated`,
+      text,
+      html: shell(data.schoolName, bodyHtml),
+    };
+  }
+
+  const effectiveLabel = data.effectivePeriodEnd
+    ? ` at the next renewal (${formatDateLabel(data.effectivePeriodEnd)})`
+    : "";
+  const text = `${data.schoolName} now has ${data.activeSeatCount} enrolled students but pays for ${data.billedSeatCount} ${data.billedSeatCount === 1 ? "seat" : "seats"} on the ${data.planName} plan. We will reduce your plan to ${data.activeSeatCount} ${data.activeSeatCount === 1 ? "seat" : "seats"}${effectiveLabel}. Unused seats stop billing from that date.`;
+  const bodyHtml = `<p>${escapeHtml(data.schoolName)} now has <strong>${data.activeSeatCount}</strong> enrolled students but pays for <strong>${data.billedSeatCount}</strong> ${data.billedSeatCount === 1 ? "seat" : "seats"} on the <strong>${escapeHtml(data.planName)}</strong> plan.</p><p>We will reduce your plan to <strong>${data.activeSeatCount}</strong> ${data.activeSeatCount === 1 ? "seat" : "seats"}${effectiveLabel}. Unused seats stop billing from that date.</p>`;
+  return {
+    subject: `${data.schoolName}'s Studafy seats have been updated`,
     text,
     html: shell(data.schoolName, bodyHtml),
   };
