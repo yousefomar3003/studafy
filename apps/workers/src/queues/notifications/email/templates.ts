@@ -112,6 +112,24 @@ export interface DigestEmailData {
   items: DigestItem[];
 }
 
+/**
+ * One aggregated line in a recipient's daily notification digest (notification.digestSent).
+ * title/body are the notification's own rendered text, carried through unchanged rather than
+ * reformatted per kind — see notification-digest-producer.ts.
+ */
+export interface NotificationDigestItem {
+  title: string;
+  body: string;
+  /** ISO datetime the underlying notification was created. */
+  occurredAt: string;
+}
+
+export interface NotificationDigestEmailData {
+  schoolName: string;
+  digestDate: string;
+  items: NotificationDigestItem[];
+}
+
 /** The one piece of user-controlled content that reaches the HTML shell. */
 function escapeHtml(value: string): string {
   return value
@@ -204,6 +222,24 @@ export function renderSeatDriftEmail(data: SeatDriftEmailData): RenderedEmail {
   return {
     subject: `${data.schoolName}'s Studafy seats have been updated`,
     text,
+    html: shell(data.schoolName, bodyHtml),
+  };
+}
+
+export function renderNotificationDigestEmail(data: NotificationDigestEmailData): RenderedEmail {
+  const itemsHtml = data.items
+    .map(
+      (item) =>
+        `<li style="margin-bottom:12px"><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.body)}<br><span style="font-size:12px;color:#6b7280">${formatDateLabel(item.occurredAt)}</span></li>`,
+    )
+    .join("");
+  const countLabel = data.items.length === 1 ? "1 update" : `${data.items.length} updates`;
+  const bodyHtml = `<p>Here is your daily digest from ${escapeHtml(data.schoolName)}.</p><ul style="margin:16px 0;padding-left:20px">${itemsHtml}</ul><p>Log in to Studafy for details.</p>`;
+  return {
+    subject: `Your daily digest from ${data.schoolName} (${countLabel})`,
+    text: `Here is your daily digest from ${data.schoolName}.\n\n${data.items
+      .map((item) => `- ${item.title}: ${item.body} (${formatDateLabel(item.occurredAt)})`)
+      .join("\n")}\n\nLog in to Studafy for details.`,
     html: shell(data.schoolName, bodyHtml),
   };
 }

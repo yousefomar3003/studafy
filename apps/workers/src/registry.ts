@@ -14,7 +14,7 @@ import {
   DELIVERY_JOB_OPTIONS,
   processNotificationDispatch,
 } from "./queues/notifications/dispatcher.worker";
-import { processDigest } from "./queues/notifications/email";
+import { processDigest, processNotificationDigest } from "./queues/notifications/email";
 import { createFcmSender } from "./queues/notifications/push";
 import { processAttendanceExport, processFinanceExport } from "./queues/reports";
 
@@ -161,6 +161,10 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
 
       if (job.name === JOB_NAMES.SEND_DIGESTS) {
         return processDigest(databaseUrl);
+      }
+
+      if (job.name === JOB_NAMES.SEND_NOTIFICATION_DIGESTS) {
+        return processNotificationDigest(databaseUrl);
       }
 
       const data = job.data as { bulkInviteId?: string; schoolId?: string };

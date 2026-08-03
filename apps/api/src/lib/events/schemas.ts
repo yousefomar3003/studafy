@@ -173,6 +173,28 @@ export const eventPayloadSchemas = {
       .min(1),
   }),
 
+  // One event per recipient per run, produced by the workers notification-digest producer from
+  // whichever app.notifications rows that recipient has opted to receive by email as a digest
+  // (notification_type is one of DIGEST_ELIGIBLE_NOTIFICATION_TYPES minus ATTENDANCE_ALERT, which
+  // keeps its own DIGEST_SENT pipeline above). title/body are carried verbatim from the
+  // already-rendered notification row, so this producer stays a pure aggregator rather than a
+  // second place notification copy is written.
+  [DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT]: z.object({
+    userId: uid,
+    email: z.string().email(),
+    digestDate: z.string().date(),
+    items: z
+      .array(
+        z.object({
+          notificationType: z.string().min(1),
+          title: z.string().min(1),
+          body: z.string().min(1),
+          occurredAt: z.string().datetime(),
+        }),
+      )
+      .min(1),
+  }),
+
   // ── Timetable ───────────────────────────────────────────────────────
   [DOMAIN_EVENTS.TIMETABLE_APPROVED]: z.object({
     timetableVersionId: uid,

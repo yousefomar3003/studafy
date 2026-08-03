@@ -52,6 +52,10 @@ export const JOB_NAMES = {
   GENERATE_INVOICE: "generate-invoice",
   GENERATE_BATCH_INVOICES: "generate-batch-invoices",
   SEND_DIGESTS: "send-digests",
+  // Daily notification digest. Distinct from SEND_DIGESTS above, which is the parent-specific
+  // attendance/fee digest — this one is the general, per-recipient digest driven by
+  // app.notification_preferences.digest (ST-143).
+  SEND_NOTIFICATION_DIGESTS: "send-notification-digests",
   // Notification dispatch (ST-139). DISPATCH resolves recipients and decides what each of them
   // should receive; DELIVER carries one already-decided message to one recipient on one channel.
   // They are separate jobs because the fan-out is transactional and idempotent while the delivery

@@ -8,6 +8,9 @@ export type {
 export { scheduleDigestJob } from "./digest-scheduler";
 export { processDigest } from "./digest-producer";
 export type { DigestResult } from "./digest-producer";
+export { scheduleNotificationDigestJob } from "./notification-digest-scheduler";
+export { processNotificationDigest } from "./notification-digest-producer";
+export type { NotificationDigestResult } from "./notification-digest-producer";
 export { TokenBucket } from "./rate-limiter";
 export type { Now, RateLimiter } from "./rate-limiter";
 export { createSesSender, isRetryableSendError } from "./sender";
@@ -17,6 +20,7 @@ export {
   renderDigestEmail,
   renderDunningEmail,
   renderInvitationEmail,
+  renderNotificationDigestEmail,
   renderSubscriptionDunningEmail,
   renderVerificationEmail,
 } from "./templates";
@@ -27,6 +31,8 @@ export type {
   DunningEmailData,
   EmailTemplate,
   InvitationEmailData,
+  NotificationDigestEmailData,
+  NotificationDigestItem,
   RenderedEmail,
   SubscriptionDunningEmailData,
   VerificationEmailData,

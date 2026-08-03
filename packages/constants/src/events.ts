@@ -70,6 +70,15 @@ export const DOMAIN_EVENTS = {
   // and SES correlation all apply unchanged.
   DIGEST_SENT: "digest.sent",
 
+  // Daily notification digest. Raised by the workers notification-digest producer, once per
+  // recipient per run, aggregating whichever in-app notifications of a digest-eligible type
+  // (see DIGEST_ELIGIBLE_NOTIFICATION_TYPES) that user has opted to receive by email as a daily
+  // digest rather than immediately (app.notification_preferences.digest). Deliberately distinct
+  // from DIGEST_SENT above: that event is the parent-specific attendance/fee digest and predates
+  // the preferences digest flag; this one is the general, preference-driven digest ST-143 added
+  // the flag for.
+  NOTIFICATION_DIGEST_SENT: "notification.digestSent",
+
   // Finance reconciliation (ST-122). Raised by the daily reconciliation job when an installment
   // passes its due date and remains unpaid — triggers parent notification via the outbox relay.
   FEE_INSTALLMENT_OVERDUE: "fee.installmentOverdue",

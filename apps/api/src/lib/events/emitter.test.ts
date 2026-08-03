@@ -248,6 +248,19 @@ describe("emit", () => {
             },
           ],
         },
+        [DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT]: {
+          userId: uid,
+          email: "test@example.com",
+          digestDate: "2026-07-30",
+          items: [
+            {
+              notificationType: "COURSE_PUBLISHED",
+              title: "New course published",
+              body: "Intro to Biology is now available.",
+              occurredAt: "2026-07-29T10:00:00.000Z",
+            },
+          ],
+        },
         [DOMAIN_EVENTS.TIMETABLE_APPROVED]: {
           timetableVersionId: uid,
           termId: uid,
