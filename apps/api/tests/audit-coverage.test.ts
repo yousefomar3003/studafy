@@ -272,6 +272,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/refunds/initiate",
   "POST /api/finance/refunds/{refundId}/approve",
   "POST /api/finance/refunds/{refundId}/reject",
+  // In-app inbox (ST-142). Personal per-user read state: RLS already fences every row to
+  // user_id = app.current_user_id(), so the mutation is self-service on the caller's own rows.
+  // Audit rows are written from inside the service transactions alongside the read-state change
+  // and the notification.read / notification.allRead outbox events — see
+  // modules/notifications/notification-service.ts.
+  "POST /api/notifications/{notificationId}/read",
+  "POST /api/notifications/read-all",
 ];
 
 function collectSourceFiles(dir: string): string[] {

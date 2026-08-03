@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { emit } from "../../lib/events/emitter";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../lib/keyset-cursor";
+import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import type { TransactionSql } from "postgres";
 
@@ -104,6 +105,8 @@ export async function countUnread(tx: TransactionSql, schoolId: string): Promise
  * current count rather than a 404 — the resource exists, it is simply no longer unread. The
  * `notification.read` outbox event is raised only when this call actually transitions the row
  * (unread -> read), and carries the new count so a badge consumer can refresh without re-querying.
+ * The audit row for the transition is written in the same transaction (SAD section 15), so the
+ * read-state change, its audit record, and the outbox event commit or roll back together.
  *
  * A row that is neither owned nor present answers 404. RLS already hides anyone else's rows, so
  * "not yours" and "does not exist" are deliberately the same response.
@@ -114,14 +117,14 @@ export async function markNotificationRead(
   userId: string,
   notificationId: string,
 ): Promise<number> {
-  const updated = await tx`
+  const updated = await tx<{ id: string; read_at: Date }[]>`
     UPDATE app.notifications
     SET read_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${notificationId}::uuid
       AND school_id = ${schoolId}
       AND read_at IS NULL
-    RETURNING id
+    RETURNING id, read_at
   `;
 
   if (updated.length === 0) {
@@ -137,6 +140,13 @@ export async function markNotificationRead(
   const unreadCount = await countUnread(tx, schoolId);
 
   if (updated.length > 0) {
+    await emitAuditLog(tx, {
+      action: "update",
+      targetTable: "notifications",
+      targetId: notificationId,
+      oldValues: { read_at: null },
+      newValues: { read_at: updated[0]!.read_at, unread_count: unreadCount },
+    });
     await emit(tx, DOMAIN_EVENTS.NOTIFICATION_READ, {
       userId,
       notificationId,
@@ -150,23 +160,38 @@ export async function markNotificationRead(
 /**
  * Mark every unread notification of the authenticated user read, and return the fresh unread count
  * (zero, absent a concurrent delivery). One `notification.allRead` event regardless of how many rows
- * transitioned — the fact is "the inbox was cleared", not "each row was read".
+ * transitioned — the fact is "the inbox was cleared", not "each row was read". The sweep's audit
+ * row (SAD section 15) is written in the same transaction as the update and the outbox event.
  */
 export async function markAllRead(
   tx: TransactionSql,
   schoolId: string,
   userId: string,
 ): Promise<number> {
-  const result = await tx`
+  const updated = await tx<{ read_at: Date }[]>`
     UPDATE app.notifications
     SET read_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
     WHERE school_id = ${schoolId} AND read_at IS NULL
+    RETURNING read_at
   `;
 
   const unreadCount = await countUnread(tx, schoolId);
 
-  if (result.count > 0) {
+  if (updated.length > 0) {
+    await emitAuditLog(tx, {
+      action: "update",
+      targetTable: "notifications",
+      // The aggregate target is the inbox owner: the action cleared a user's whole inbox, which no
+      // single notification row could stand for.
+      targetId: userId,
+      oldValues: { read_at: null },
+      newValues: {
+        read_at: updated[0]!.read_at,
+        unread_count: unreadCount,
+        marked_count: updated.length,
+      },
+    });
     await emit(tx, DOMAIN_EVENTS.NOTIFICATION_ALL_READ, { userId, unreadCount });
   }
 

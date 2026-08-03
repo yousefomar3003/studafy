@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 
 import { withTenantTx } from "../../../db/tenant-tx";
+import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
@@ -135,6 +136,10 @@ const markAllReadRoute = createRoute({
  * (`notifications_owner_*` policies in 000017) already restricts every row to
  * `user_id = app.current_user_id()`, so no role can see or touch anyone else's row regardless of
  * permissions, and marking read from a mobile session must work exactly as well as from a web one.
+ * The two read-state mutations are self-service on the caller's own rows and are therefore exempt
+ * from requirePermission() (permission-guard-coverage.test.ts), but they do declare an audit action
+ * below; the app.audit_logs rows are written from inside the service transactions, alongside the
+ * outbox events.
  *
  * Every mutation returns the fresh `unread_count` so the acting client's badge updates
  * synchronously. Cross-device updates are the job of the `notification.read` / `notification.allRead`
@@ -146,6 +151,9 @@ const markAllReadRoute = createRoute({
  */
 export function notificationRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  routes.use("/api/notifications/{notificationId}/read", auditAction("update", "notifications"));
+  routes.use("/api/notifications/read-all", auditAction("update", "notifications"));
 
   routes.openapi(listNotificationsRoute, async (c) => {
     const auth = requireAuth(c);
