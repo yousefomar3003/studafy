@@ -36,6 +36,26 @@
  *
  * `canceled`, `expired` and `closed` have no outgoing edges. A stray `customer.subscription.updated`
  * claiming a canceled subscription is active resolves to `null` and is parked, never applied.
+ *
+ * ## Pause/resume on school suspension
+ *
+ * This is what the AI_TRANSITIONS divergence below was left for. A school's *entity* status
+ * (`app.school_status`) going `suspended` is not a subscription-status event at all -- no provider
+ * sends it, and it is not the school *subscription* leaving a live state either (that is
+ * `resolveAiCascade`'s job, and it is a different axis). It is a new, system-initiated intent:
+ * `school_suspended` moves a student's AI subscription to `paused`, and `school_reactivated` moves
+ * it back to `active`. Applied via `applySystemTransition`, the same entry point the dunning sweep
+ * uses, from `apps/api/src/modules/subscriptions/services/school-suspension-service.ts`.
+ *
+ * `paused` cannot reuse `closed`: `closed` is terminal by the rule above, and a state that must be
+ * resumable cannot also have no outgoing edges. It is intentionally excluded from both
+ * `TERMINAL_STATUSES` (it has a real way out) and `LIVE_STATUSES` (the whole point is that access
+ * stops), so entitlement resolution treats it as not-active with no code of its own to write.
+ *
+ * Resume always targets `active`, never "whatever it was before the pause". The state machine is
+ * stateless by design -- carrying a `paused_from` would be the first place that stopped being true --
+ * and a school suspension is orthogonal to payment health: if the underlying payment situation is
+ * still bad, the next Stripe webhook re-derives `past_due` or `grace_period` on its own.
  */
 
 import { SUBSCRIPTION_STATUSES } from "@studafy/constants";
@@ -64,7 +84,11 @@ export type BillingEventIntent =
   | "dunning_exhausted"
   | "grace_exhausted"
   | "canceled"
-  | "expired";
+  | "expired"
+  /** System-initiated, not a provider event: the student's school was suspended. AI-only. */
+  | "school_suspended"
+  /** System-initiated, not a provider event: the student's school was reactivated. AI-only. */
+  | "school_reactivated";
 
 /** States with no outgoing edges. */
 export const TERMINAL_STATUSES: ReadonlySet<SubscriptionStatus> = new Set([
@@ -150,16 +174,34 @@ export const SCHOOL_TRANSITIONS: TransitionTable = {
 /**
  * AI subscription transitions (`app.ai_subscriptions.status`).
  *
- * Identical to the school table, and that is a finding rather than an oversight: both columns are
- * the same `app.subscription_status` enum and both describe the same paid-access lifecycle, which is
- * exactly what docs/database/subscriptions-data-model.md already says. What makes an AI subscription
- * different is not its own transitions but the cross-entity rule below -- it is additionally gated on
- * its school, and no provider event expresses that.
+ * Starts identical to the school table -- both columns are the same `app.subscription_status` enum
+ * and both describe the same paid-access lifecycle, which is exactly what
+ * docs/database/subscriptions-data-model.md already says. What makes an AI subscription different is
+ * not its provider-driven transitions but two things no provider event expresses: the cross-entity
+ * cascade below, and the school-suspension pause/resume edges added here.
  *
- * Kept as a separate binding rather than an alias so ST-136 can diverge it without touching the
- * school lifecycle, and so `resolveTransition` reads the same either way.
+ * Kept as a separate binding rather than an alias so this divergence does not touch the school
+ * lifecycle, and so `resolveTransition` reads the same either way.
+ *
+ * `school_suspended` is legal from every live status, never from a terminal one (a canceled AI
+ * subscription has nothing left to pause) and never from `paused` itself (re-suspending an already
+ * paused row is a no-op the caller detects via `applySystemTransition`'s `illegal` outcome, not a
+ * self-edge -- there is no provider redelivery to tolerate here, unlike the self-edges above).
+ * `school_reactivated` is legal only from `paused`, and always targets `active` -- see the header's
+ * "Pause/resume on school suspension" section for why.
  */
-export const AI_TRANSITIONS: TransitionTable = { ...SCHOOL_TRANSITIONS };
+export const AI_TRANSITIONS: TransitionTable = {
+  ...SCHOOL_TRANSITIONS,
+
+  "trialing:school_suspended": SUBSCRIPTION_STATUSES.PAUSED,
+  "active:school_suspended": SUBSCRIPTION_STATUSES.PAUSED,
+  "past_due:school_suspended": SUBSCRIPTION_STATUSES.PAUSED,
+  "grace_period:school_suspended": SUBSCRIPTION_STATUSES.PAUSED,
+
+  "paused:school_reactivated": SUBSCRIPTION_STATUSES.ACTIVE,
+  "paused:canceled": SUBSCRIPTION_STATUSES.CANCELED,
+  "paused:expired": SUBSCRIPTION_STATUSES.EXPIRED,
+};
 
 const TRANSITION_TABLES: Readonly<Record<SubscriptionKind, TransitionTable>> = {
   school: SCHOOL_TRANSITIONS,

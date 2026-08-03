@@ -127,6 +127,15 @@ export const DOMAIN_EVENTS = {
   // rejected by the outbox CHECK at INSERT time, inside the very transaction recording the report.
   SUBSCRIPTION_SEAT_DRIFT_REPORTED: "subscription.seatDriftReported",
 
+  // AI subscription pause/resume on school suspension. Raised by the school-suspension service
+  // (apps/api/src/modules/subscriptions/services/school-suspension-service.ts) inside the same
+  // transaction that transitions the AI subscription to/from `paused`, once per affected student.
+  // Distinct from AI_SUBSCRIPTION_STATUS_CHANGED above, which only drives entitlement-cache
+  // invalidation: these are notification-worthy in their own right, addressed to the student, and
+  // consumed by the email dispatcher the same way SUBSCRIPTION_DUNNING_SENT is.
+  AI_SUBSCRIPTION_PAUSED: "aiSubscription.paused",
+  AI_SUBSCRIPTION_RESUMED: "aiSubscription.resumed",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

@@ -9,6 +9,8 @@
 import { DOMAIN_EVENTS } from "@studafy/constants";
 
 import {
+  renderAiSubscriptionPausedEmail,
+  renderAiSubscriptionResumedEmail,
   renderDigestEmail,
   renderInvitationEmail,
   renderNotificationDigestEmail,
@@ -95,6 +97,15 @@ interface SeatDriftPayload {
   proratedAmountMinor: number | null;
   currency: string | null;
   effectivePeriodEnd: string | null;
+}
+
+/**
+ * The AI subscription pause/resume payload the school-suspension service writes (school
+ * suspension/reactivation). schoolId/aiSubscriptionId/studentId are correlation handles; this
+ * renderer needs only `email` -- the recipient is the student, not an ORG_ADMIN.
+ */
+interface AiSubscriptionPauseResumePayload {
+  email: string;
 }
 
 /**
@@ -188,6 +199,22 @@ export function resolveEmail(
         }),
       };
     }
+    case DOMAIN_EVENTS.AI_SUBSCRIPTION_PAUSED: {
+      const payload = row.payload as unknown as AiSubscriptionPauseResumePayload;
+      return {
+        template: "ai-subscription-paused",
+        recipient: payload.email,
+        content: renderAiSubscriptionPausedEmail({ schoolName: context.schoolName }),
+      };
+    }
+    case DOMAIN_EVENTS.AI_SUBSCRIPTION_RESUMED: {
+      const payload = row.payload as unknown as AiSubscriptionPauseResumePayload;
+      return {
+        template: "ai-subscription-resumed",
+        recipient: payload.email,
+        content: renderAiSubscriptionResumedEmail({ schoolName: context.schoolName }),
+      };
+    }
     default:
       throw new Error(`no email template for outbox event ${row.event_name}`);
   }
@@ -201,4 +228,6 @@ export const EMAIL_EVENT_NAMES: readonly string[] = [
   DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT,
   DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT,
   DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED,
+  DOMAIN_EVENTS.AI_SUBSCRIPTION_PAUSED,
+  DOMAIN_EVENTS.AI_SUBSCRIPTION_RESUMED,
 ];

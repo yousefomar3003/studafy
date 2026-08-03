@@ -103,6 +103,14 @@ export interface LookupPriceResult {
   interval: string;
 }
 
+export interface PauseSubscriptionInput {
+  providerSubscriptionId: string;
+}
+
+export interface ResumeSubscriptionInput {
+  providerSubscriptionId: string;
+}
+
 export interface PaymentProviderPort {
   createCustomer(input: CreateCustomerInput): Promise<CreateCustomerResult>;
   createCheckoutSession(input: CreateCheckoutSessionInput): Promise<CreateCheckoutSessionResult>;
@@ -114,4 +122,14 @@ export interface PaymentProviderPort {
   parseWebhook(payload: Buffer, signature: string): Promise<ParsedWebhookEvent>;
   lookupProductById(providerProductId: string): Promise<LookupProductResult | null>;
   lookupPriceById(providerPriceId: string): Promise<LookupPriceResult | null>;
+  /**
+   * Stop billing a subscription without canceling it. Used to pause a student's AI subscription
+   * when their school is suspended; must be resumable via `resumeSubscription`. Idempotent: pausing
+   * an already-paused subscription is a no-op update, not an error.
+   */
+  pauseSubscription(input: PauseSubscriptionInput): Promise<void>;
+  /**
+   * Resume billing a subscription paused via `pauseSubscription`. Idempotent for the same reason.
+   */
+  resumeSubscription(input: ResumeSubscriptionInput): Promise<void>;
 }
