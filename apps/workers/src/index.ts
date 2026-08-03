@@ -8,6 +8,7 @@ import { startEntitlementInvalidator } from "./queues/entitlements";
 import {
   createSesSender,
   scheduleDigestJob,
+  scheduleNotificationDigestJob,
   startEmailDispatcher,
   TokenBucket,
 } from "./queues/notifications/email";
@@ -95,6 +96,14 @@ const emailDispatcher = startEmailDispatcher({
 // queue. Its own Redis connection so the upsert never contends with worker polling.
 const digestRedis = createRedisConnection(env);
 void scheduleDigestJob(digestRedis).then(() => digestRedis.disconnect());
+
+// Notification digest scheduler: idempotently register the daily 06:30 per-recipient digest
+// (ST-143's preferences.digest flag) on the notifications queue, its own hour after the parent
+// digest above so the two never contend for the same outbox-insert window.
+const notificationDigestRedis = createRedisConnection(env);
+void scheduleNotificationDigestJob(notificationDigestRedis).then(() =>
+  notificationDigestRedis.disconnect(),
+);
 
 // Dunning scheduler: idempotently register the daily 04:00 grace-period sweep on the billing queue.
 const dunningRedis = createRedisConnection(env);

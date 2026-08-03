@@ -11,6 +11,7 @@ import { DOMAIN_EVENTS } from "@studafy/constants";
 import {
   renderDigestEmail,
   renderInvitationEmail,
+  renderNotificationDigestEmail,
   renderSeatDriftEmail,
   renderSubscriptionDunningEmail,
   renderVerificationEmail,
@@ -54,6 +55,17 @@ interface DigestPayload {
     kind: "attendance_alert" | "fee_overdue";
     studentName: string | null;
     text: string;
+    occurredAt: string;
+  }[];
+}
+
+interface NotificationDigestPayload {
+  email: string;
+  digestDate: string;
+  items: {
+    notificationType: string;
+    title: string;
+    body: string;
     occurredAt: string;
   }[];
 }
@@ -130,6 +142,22 @@ export function resolveEmail(
         }),
       };
     }
+    case DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT: {
+      const payload = row.payload as unknown as NotificationDigestPayload;
+      return {
+        // Reuses the "digest" app.email_template label rather than adding a new enum value: the
+        // event name on the outbox row (and email_deliveries.outbox_event_id) already distinguish
+        // this from the parent digest for anyone auditing deliveries, so a second label would say
+        // nothing a join can't already answer.
+        template: "digest",
+        recipient: payload.email,
+        content: renderNotificationDigestEmail({
+          schoolName: context.schoolName,
+          digestDate: payload.digestDate,
+          items: payload.items,
+        }),
+      };
+    }
     case DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT: {
       const payload = row.payload as unknown as SubscriptionDunningPayload;
       return {
@@ -170,6 +198,7 @@ export const EMAIL_EVENT_NAMES: readonly string[] = [
   DOMAIN_EVENTS.INVITATION_SENT,
   DOMAIN_EVENTS.SCHOOL_VERIFICATION_EMAIL_SENT,
   DOMAIN_EVENTS.DIGEST_SENT,
+  DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT,
   DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT,
   DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED,
 ];
