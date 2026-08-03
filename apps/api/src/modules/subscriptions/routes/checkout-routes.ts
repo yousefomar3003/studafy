@@ -1,10 +1,13 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
+import { requireChannel } from "../../../middleware/channelGuard";
 import { standardResponses } from "../../../openapi/responses";
+import { AUTH_CHANNELS } from "../../auth/channels";
 import {
   createSchoolCheckoutSession,
   createBillingPortalSession,
@@ -71,7 +74,8 @@ const portalRoute = createRoute({
   operationId: "createBillingPortalSession",
   summary: "Open Stripe billing portal",
   description:
-    "Creates a Stripe billing portal session so the school admin can manage their subscription.",
+    "Creates a Stripe billing portal session so the school admin can manage their payment method. " +
+    "Admin-only, web-origin only.",
   security: [{ bearerAuth: [] }],
   request: {
     body: { content: { "application/json": { schema: PortalRequestSchema } } },
@@ -89,6 +93,11 @@ export function checkoutRoutes(
   provider: PaymentProviderPort | null,
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
+
+  // Portal-session, specifically: managing the payment method on file is an admin action, unlike
+  // starting a checkout, which any authenticated staff session may do today.
+  app.use("/api/subscriptions/portal", requireChannel(AUTH_CHANNELS.WEB));
+  app.use("/api/subscriptions/portal", requirePermission(PERMISSIONS.ORGANIZATION_MANAGE_BILLING));
 
   app.openapi(checkoutRoute, async (c) => {
     const active = requireProvider(provider);

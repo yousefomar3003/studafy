@@ -14,6 +14,10 @@ export interface SchoolSubscription {
   currentPeriodEnd: Date;
   stripeSubscriptionId: string | null;
   stripeSubscriptionItemId: string | null;
+  cancelAtPeriodEnd: boolean;
+  cancellationRequestedAt: Date | null;
+  cancellationReason: string | null;
+  retentionState: string;
 }
 
 export interface PlanWithPrices {
@@ -44,7 +48,11 @@ export async function getSchoolSubscription(
       s.current_period_start AS "currentPeriodStart",
       s.current_period_end AS "currentPeriodEnd",
       s.stripe_subscription_id AS "stripeSubscriptionId",
-      s.stripe_subscription_item_id AS "stripeSubscriptionItemId"
+      s.stripe_subscription_item_id AS "stripeSubscriptionItemId",
+      s.cancel_at_period_end AS "cancelAtPeriodEnd",
+      s.cancellation_requested_at AS "cancellationRequestedAt",
+      s.cancellation_reason AS "cancellationReason",
+      s.retention_state::text AS "retentionState"
     FROM app.subscriptions s
     WHERE s.school_id = ${schoolId}::uuid
     LIMIT 1

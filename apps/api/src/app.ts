@@ -83,6 +83,9 @@ import {
   webhookRoutes,
   planRoutes,
   adminSubscriptionRoutes,
+  billingOverviewRoutes,
+  invoiceRoutes,
+  cancellationRoutes,
   createEntitlementService,
 } from "./modules/subscriptions";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
@@ -711,6 +714,12 @@ export function createApp({
     // path as a CSRF or rate-limit rejection, rather than a second one invented for billing.
     app.route("/", webhookRoutes(database, stripeProvider, logger, { eventSink, redis }));
     app.route("/", adminSubscriptionRoutes(database, stripeProvider, logger));
+    // School billing portal (ST-137): current plan/seats/cancellation overview, invoices read
+    // through to the provider, and end-of-period cancellation. The payment-method portal session
+    // link already exists at POST /api/subscriptions/portal (checkoutRoutes above).
+    app.route("/", billingOverviewRoutes(database));
+    app.route("/", invoiceRoutes(database, stripeProvider));
+    app.route("/", cancellationRoutes(database, stripeProvider));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:

@@ -75,6 +75,9 @@ function createProviderSpy(): PaymentProviderPort & {
     async resumeSubscription(input: { providerSubscriptionId: string }) {
       resumed.push(input.providerSubscriptionId);
     },
+    scheduleCancellation: unsupported,
+    reverseCancellation: unsupported,
+    listInvoices: unsupported,
   };
 }
 

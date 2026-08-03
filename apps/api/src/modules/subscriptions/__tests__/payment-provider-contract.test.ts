@@ -19,6 +19,10 @@ import type {
   LookupPriceResult,
   PauseSubscriptionInput,
   ResumeSubscriptionInput,
+  ScheduleCancellationInput,
+  ReverseCancellationInput,
+  ListInvoicesInput,
+  ListInvoicesResult,
   PaymentProviderPort,
 } from "../ports/payment-provider";
 
@@ -40,6 +44,9 @@ export function contractTests(name: string, createAdapter: AdapterFactory): void
       expect(typeof adapter.lookupPriceById).toBe("function");
       expect(typeof adapter.pauseSubscription).toBe("function");
       expect(typeof adapter.resumeSubscription).toBe("function");
+      expect(typeof adapter.scheduleCancellation).toBe("function");
+      expect(typeof adapter.reverseCancellation).toBe("function");
+      expect(typeof adapter.listInvoices).toBe("function");
     });
 
     test("createCustomer rejects empty name with PaymentProviderError", async () => {
@@ -289,6 +296,33 @@ class MockAdapter implements PaymentProviderPort {
         "providerSubscriptionId is required",
       );
     }
+  }
+
+  async scheduleCancellation(input: ScheduleCancellationInput): Promise<void> {
+    if (!input.providerSubscriptionId) {
+      throw new PaymentProviderError(
+        400,
+        "VALIDATION_FAILED" as never,
+        "providerSubscriptionId is required",
+      );
+    }
+  }
+
+  async reverseCancellation(input: ReverseCancellationInput): Promise<void> {
+    if (!input.providerSubscriptionId) {
+      throw new PaymentProviderError(
+        400,
+        "VALIDATION_FAILED" as never,
+        "providerSubscriptionId is required",
+      );
+    }
+  }
+
+  async listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult> {
+    if (!input.customerId) {
+      throw new PaymentProviderError(400, "VALIDATION_FAILED" as never, "customerId is required");
+    }
+    return { invoices: [], hasMore: false };
   }
 }
 
