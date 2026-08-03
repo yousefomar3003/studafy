@@ -352,6 +352,18 @@ describe("emit", () => {
           currency: "usd",
           effectivePeriodEnd: null,
         },
+        [DOMAIN_EVENTS.AI_SUBSCRIPTION_PAUSED]: {
+          schoolId: uid,
+          aiSubscriptionId: uid,
+          studentId: uid,
+          email: "test@example.com",
+        },
+        [DOMAIN_EVENTS.AI_SUBSCRIPTION_RESUMED]: {
+          schoolId: uid,
+          aiSubscriptionId: uid,
+          studentId: uid,
+          email: "test@example.com",
+        },
       };
 
       await database!.sql.begin(async (tx) => {

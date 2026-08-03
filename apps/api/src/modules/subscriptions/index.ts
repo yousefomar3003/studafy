@@ -25,6 +25,11 @@ export {
   createBillingPortalSession,
 } from "./services/checkout-service";
 export { getActivePlans, getSchoolSubscription } from "./services/subscription-service";
+export {
+  pauseAiSubscriptionsForSchoolSuspension,
+  resumeAiSubscriptionsForSchoolReactivation,
+} from "./services/school-suspension-service";
+export type { SchoolAiSubscriptionTransitionResult } from "./services/school-suspension-service";
 // Entitlement resolution and cache (ST-133). The version bump and the outbox emit are deliberately
 // NOT exported: they are the billing state machine's injected port, wired at the two processors, and
 // nothing else should be able to move a version counter.
@@ -49,4 +54,6 @@ export type {
   SyncPriceInput,
   SyncPriceResult,
   ParsedWebhookEvent,
+  PauseSubscriptionInput,
+  ResumeSubscriptionInput,
 } from "./ports/payment-provider";
