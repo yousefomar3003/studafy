@@ -8,6 +8,7 @@ import { parseRoomKey, roomKey } from "./rooms";
 
 import type { AuthClaims } from "./auth";
 import type { ConnectionTracker } from "./lifecycle";
+import type { FanoutMetrics } from "./metrics";
 import type { ClientMessage, SystemMessage } from "./protocol";
 import type { RoomManager } from "./rooms";
 import type { Context } from "hono";
@@ -42,6 +43,7 @@ export interface AppOptions {
   jwtSecret: string;
   rooms: RoomManager<RawSocket>;
   tracker: ConnectionTracker<RawSocket>;
+  metrics: () => FanoutMetrics;
 }
 
 /**
@@ -50,10 +52,16 @@ export interface AppOptions {
  * upgrading — an invalid token never reaches the WebSocket layer. On a valid token the connection
  * auto-joins its home room (`school:{schoolId}:role:{role}`, derived from the token's claims).
  */
-export function createApp({ isReady, jwtSecret, rooms, tracker }: AppOptions): Hono<Bindings> {
+export function createApp({
+  isReady,
+  jwtSecret,
+  rooms,
+  tracker,
+  metrics,
+}: AppOptions): Hono<Bindings> {
   const app = new Hono<Bindings>();
 
-  app.route("/", healthRoutes(isReady));
+  app.route("/", healthRoutes(isReady, metrics));
 
   app.get(
     "/ws",

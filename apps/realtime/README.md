@@ -2,18 +2,21 @@
 
 Bun + [Hono](https://hono.dev) WebSocket gateway for Studafy. It authenticates a connection with a
 JWT handshake stub, joins it to a room (`school:{schoolId}:role:{role}`), and fans out messages
-published to Redis to every member of the target room.
+published to Redis — both direct room publishes and outbox-relayed domain events — to every member
+of the target room.
 
 See [`docs/protocol.md`](docs/protocol.md) for the full protocol spec (handshake, room naming,
-message envelopes, Redis wiring).
+message envelopes, Redis wiring), and [`docs/event-routing.md`](docs/event-routing.md) for which
+domain events fan out to which rooms.
 
 ## Routes
 
-| Method | Path       | Purpose             | Response                                                            |
-| ------ | ---------- | ------------------- | ------------------------------------------------------------------- |
-| `GET`  | `/healthz` | Liveness            | `200 { "status": "ok" }` while the process is alive                 |
-| `GET`  | `/readyz`  | Readiness           | `200 { "status": "ready" }`, or `503 { "status": "shutting_down" }` |
-| `GET`  | `/ws`      | WebSocket handshake | `101` upgrade on a valid `?token=`, `401` otherwise                 |
+| Method | Path       | Purpose             | Response                                                                          |
+| ------ | ---------- | ------------------- | --------------------------------------------------------------------------------- |
+| `GET`  | `/healthz` | Liveness            | `200 { "status": "ok" }` while the process is alive                               |
+| `GET`  | `/readyz`  | Readiness           | `200 { "status": "ready" }`, or `503 { "status": "shutting_down" }`               |
+| `GET`  | `/metrics` | Fan-out counters    | `200` JSON snapshot of `src/metrics.ts` (`received`, `roomDeliveries`, `dropped`) |
+| `GET`  | `/ws`      | WebSocket handshake | `101` upgrade on a valid `?token=`, `401` otherwise                               |
 
 ## Architecture
 
@@ -27,16 +30,24 @@ message envelopes, Redis wiring).
 - [`src/rooms.ts`](src/rooms.ts) — `roomKey`/`parseRoomKey` (the room-naming convention) and
   `createRoomManager`, an in-memory, framework-agnostic membership map.
 - [`src/connection.ts`](src/connection.ts) — the Redis connection factory for the pub/sub
-  subscriber.
+  subscribers (one instance per subscriber — see `src/index.ts`).
 - [`src/subscriber.ts`](src/subscriber.ts) — `subscribeToRooms`: one `PSUBSCRIBE
 school:*:role:*`, validates each message, forwards it to a caller-supplied handler.
-- [`src/health.ts`](src/health.ts) — liveness/readiness routes, mirrors `apps/api`.
+- [`src/event-routing.ts`](src/event-routing.ts) — `EVENT_ROUTES`: which rooms an outbox-relayed
+  domain event fans out to, given its school. Narrative table in
+  [`docs/event-routing.md`](docs/event-routing.md).
+- [`src/outbox-fanout.ts`](src/outbox-fanout.ts) — `subscribeToOutboxEvents`: bridges
+  `apps/workers`' outbox-relay Redis channels (`events:{schoolId}:{event_name}`) into
+  `EventEnvelope`s for the routes in `src/event-routing.ts`.
+- [`src/metrics.ts`](src/metrics.ts) — in-process fan-out counters, exposed via `GET /metrics`.
+- [`src/health.ts`](src/health.ts) — liveness/readiness/metrics routes, mirrors `apps/api`.
 - [`src/app.ts`](src/app.ts) — the Hono app: health routes plus the `/ws` handshake and connection
   handlers (join home room on open, handle `join`/`leave` control messages, leave all rooms on
   close).
 - [`src/lifecycle.ts`](src/lifecycle.ts) — `createConnectionTracker` and `gracefulShutdown`.
-- [`src/index.ts`](src/index.ts) — process entrypoint: loads env, opens the Redis subscriber,
-  wires Redis messages to room broadcast, starts `Bun.serve`, wires `SIGTERM`/`SIGINT`.
+- [`src/index.ts`](src/index.ts) — process entrypoint: loads env, opens both Redis subscribers
+  (rooms and outbox events), wires both to room broadcast, starts `Bun.serve`, wires
+  `SIGTERM`/`SIGINT`.
 
 ## Environment
 
