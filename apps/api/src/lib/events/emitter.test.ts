@@ -330,6 +330,19 @@ describe("emit", () => {
           dueDate: new Date().toISOString(),
           gracePeriodEndsAt: new Date().toISOString(),
         },
+        [DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED]: {
+          schoolId: uid,
+          subscriptionId: uid,
+          email: "test@example.com",
+          planName: "Standard Plan",
+          activeSeatCount: 3,
+          billedSeatCount: 2,
+          delta: 1,
+          direction: "upgrade",
+          proratedAmountMinor: 9_999,
+          currency: "usd",
+          effectivePeriodEnd: null,
+        },
       };
 
       await database!.sql.begin(async (tx) => {

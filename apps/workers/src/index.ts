@@ -3,7 +3,7 @@ import postgres from "postgres";
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
-import { scheduleDunningJob } from "./queues/billing";
+import { scheduleDunningJob, scheduleSeatReconciliationJob } from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
 import {
   createSesSender,
@@ -99,6 +99,14 @@ void scheduleDigestJob(digestRedis).then(() => digestRedis.disconnect());
 // Dunning scheduler: idempotently register the daily 04:00 grace-period sweep on the billing queue.
 const dunningRedis = createRedisConnection(env);
 void scheduleDunningJob(dunningRedis).then(() => dunningRedis.disconnect());
+
+// Seat-reconciliation scheduler (ST-136): idempotently register the daily 05:00 seat sweep on the
+// billing queue, an hour after the dunning sweep so a school suspended overnight is no longer
+// `active` and is skipped.
+const seatReconciliationRedis = createRedisConnection(env);
+void scheduleSeatReconciliationJob(seatReconciliationRedis).then(() =>
+  seatReconciliationRedis.disconnect(),
+);
 
 console.log(
   `Workers started for queues: ${QUEUE_REGISTRY.map((definition) => definition.name).join(", ")} (${env.NODE_ENV})`,

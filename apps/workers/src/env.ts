@@ -32,6 +32,11 @@ export const envSchema = z
     // ERPNext integration — required for billing queue. Both must be set together.
     ERPNEXT_API_URL: z.string().url().optional(),
     ERPNEXT_API_KEY: z.string().min(1).optional(),
+    // Stripe seat reconciliation (ST-136). Optional because the seat-reconciliation job is not the
+    // billing queue's only consumer: when unset, every other billing job still runs, the scheduled
+    // reconciliation fails loudly rather than silently skipping, and the env validation below
+    // rejects it outright in production — billing must never silently stop reconciling.
+    STRIPE_SECRET_KEY: z.string().min(1).optional(),
     // SES transactional email (deliverability R-08). When SES_REGION is unset the email dispatcher
     // runs in dry-run mode: it renders, dedups, and records deliveries exactly as in production but
     // never calls AWS — the dev/test path, and a loud warning is logged at startup when a deployed
@@ -63,6 +68,16 @@ export const envSchema = z
         code: "custom",
         path: ["ERPNEXT_API_URL"],
         message: "ERPNEXT_API_URL and ERPNEXT_API_KEY must be set together",
+      });
+    }
+
+    // Seat reconciliation touches Stripe (ST-136). Silently skipping billing is worse than a
+    // failed deploy, so a deployed worker without the secret fails fast at bootstrap.
+    if (env.STRIPE_SECRET_KEY === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["STRIPE_SECRET_KEY"],
+        message: "STRIPE_SECRET_KEY is required in production",
       });
     }
 

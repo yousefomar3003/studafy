@@ -65,10 +65,12 @@ describe("loadEnv", () => {
         NODE_ENV: "production",
         READ_DATABASE_HOST: "pgbouncer.internal",
         READ_DATABASE_NAME: "workers_read",
+        STRIPE_SECRET_KEY: "sk_test_prod",
       }),
     ).toMatchObject({
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
+      STRIPE_SECRET_KEY: "sk_test_prod",
     });
   });
 });

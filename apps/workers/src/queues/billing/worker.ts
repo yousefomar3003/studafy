@@ -11,6 +11,8 @@ import {
   generateBatchInvoicesSchema,
   processBillingEventSchema,
 } from "./schemas";
+import { runSeatReconciliation } from "./seat-reconciliation";
+import { StripeSeatSubscriptionProvider } from "./stripe-seat-provider";
 
 import type {
   BillingJobData,
@@ -60,7 +62,35 @@ export async function processBillingJob(
     return processDunningSweep(databaseUrl);
   }
 
+  // Nightly seat reconciliation (ST-136). Same shape as the dunning sweep: no payload, its own
+  // postgres connection, one tenant transaction per school. Unlike the dunning sweep it talks to
+  // Stripe, so it also needs the Stripe secret -- billing must not silently skip reconciliation,
+  // so a missing key is a thrown error (the registry re-queues it) rather than a dry run.
+  if (job.name === JOB_NAMES.RUN_SEAT_RECONCILIATION) {
+    return processSeatReconciliation(databaseUrl);
+  }
+
   return { processed: false, reason: "unknown billing job" };
+}
+
+async function processSeatReconciliation(databaseUrl: string): Promise<unknown> {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error("STRIPE_SECRET_KEY is required to run seat reconciliation");
+  }
+
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    return runSeatReconciliation(
+      sql,
+      new StripeSeatSubscriptionProvider(secretKey),
+      new Date(),
+      workerLogger,
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }
 
 async function processDunningSweep(databaseUrl: string): Promise<unknown> {
