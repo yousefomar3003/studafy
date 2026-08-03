@@ -210,6 +210,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Unified pending-approvals feed plus bulk approve/reject.",
     },
     {
+      name: "Notifications",
+      description:
+        "In-app inbox. Authenticated and user-scoped: every notification belongs to exactly one " +
+        "recipient, and row-level security fences the inbox to the authenticated user. Read-state " +
+        "mutations return the fresh unread count so a client's badge updates synchronously.",
+    },
+    {
       name: "Subscriptions",
       description:
         "Subscription billing and plan management. Stripe-backed. Routes register even when " +
