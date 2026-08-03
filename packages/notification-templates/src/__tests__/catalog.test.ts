@@ -70,6 +70,8 @@ describe("templates — completeness", () => {
                       "inviterName",
                       "subject",
                       "date",
+                      "title",
+                      "summary",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -117,6 +119,10 @@ describe("renderNotification — snapshot tests", () => {
     [NOTIFICATION_TYPES.ATTENDANCE_ALERT]: {
       courseName: "Physics",
       date: "2026-07-28",
+    },
+    [NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT]: {
+      title: "Campus closed Friday",
+      summary: "The campus will be closed for maintenance on Friday. Classes resume Monday.",
     },
   } as const;
 

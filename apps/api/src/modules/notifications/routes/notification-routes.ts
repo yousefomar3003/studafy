@@ -26,7 +26,7 @@ import type { Context } from "hono";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function tenantFrom(c: Context<AppEnv>): {
+export function tenantFrom(c: Context<AppEnv>): {
   schoolId: string;
   userId: string;
   requestId?: string;

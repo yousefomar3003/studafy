@@ -52,4 +52,8 @@ export interface NotificationTypeVars {
     courseName: string;
     date: string;
   };
+  ADMIN_ANNOUNCEMENT: {
+    title: string;
+    summary: string;
+  };
 }

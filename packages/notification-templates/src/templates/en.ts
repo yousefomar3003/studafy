@@ -55,4 +55,9 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "This is an attendance alert for {courseName}. Absences were recorded on {date}.",
   },
+  [NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{title}",
+    [NOTIFICATION_CHANNELS.PUSH]: "Announcement: {title}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "{title}\n\n{summary}",
+  },
 } as const satisfies LocaleTemplateSet;

@@ -21,3 +21,4 @@ export type {
 } from "@studafy/notification-templates";
 
 export { notificationRoutes } from "./routes/notification-routes";
+export { notificationPreferencesRoutes } from "./routes/notification-preferences-routes";

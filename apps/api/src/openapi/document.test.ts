@@ -240,6 +240,9 @@ describe("structure", () => {
         "/api/notifications/read-all",
         "/api/notifications/{notificationId}/read",
         "/api/notifications/unread-count",
+        // Notification preferences (ST-143). Per-user channel toggles, digest mode, and personal
+        // attendance-alert threshold, all RLS-fenced to the authenticated user.
+        "/api/notification-preferences",
         "/api/schools/current/settings",
         "/api/schools/register",
         "/api/schools/resend-verification",
@@ -520,6 +523,9 @@ describe("security", () => {
         // In-app inbox (ST-142). Personal per-recipient notifications, RLS-fenced to the user.
         "GET /api/notifications",
         "GET /api/notifications/unread-count",
+        // Notification preferences (ST-143). Self-service on the caller's own rows.
+        "GET /api/notification-preferences",
+        "PATCH /api/notification-preferences",
         "GET /api/schools/current/settings",
         "PATCH /api/schools/current/settings",
         "GET /api/students",
