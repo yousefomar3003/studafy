@@ -224,6 +224,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  // Generic object storage gateway (SAD §22). Authorized per content class by requirePermissionIn()
+  // in the handler — the required permission arrives in the request body, so the mount-time
+  // requirePermission() form cannot see it. Exempted below on that basis.
+  "POST /api/storage/uploads/request-upload",
+  "POST /api/storage/uploads/confirm",
   // Approval queue (ST-115). Atomic bulk approve/reject with per-item partial-failure.
   // Gated on APPROVAL_REVIEW permission via requirePermission middleware.
   "POST /api/approvals/bulk-decision",
@@ -366,6 +371,13 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Notification preferences (ST-143) — personal per-user rows; RLS
   // (`notification_preferences_owner`, `user_id = app.current_user_id()`) is the fence.
   "PATCH /api/notification-preferences",
+  // Generic object storage gateway (SAD §22) — authorized per content class. The class (and thus
+  // the required permission) is in the request body, so it is asserted in the handler via
+  // requirePermissionIn() rather than mounted at route time — the same per-method pattern the
+  // discipline and evaluation routes use, but with no class-independent READ gate to mount. A
+  // caller still cannot reach a class's upload without holding that class's permission.
+  "POST /api/storage/uploads/request-upload",
+  "POST /api/storage/uploads/confirm",
 ]);
 
 // ---------------------------------------------------------------------------

@@ -78,6 +78,14 @@ function fakeStorage(seed: Record<string, number> = {}): StorageService & {
     async size(key) {
       return objects.get(key) ?? 0;
     },
+    async head(key) {
+      return objects.has(key)
+        ? { contentType: "application/pdf", sizeBytes: objects.get(key) ?? 0 }
+        : null;
+    },
+    async checksumSha256(_key) {
+      return "abcdef";
+    },
     async copy(source, destination) {
       objects.set(destination, objects.get(source) ?? 0);
     },

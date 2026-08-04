@@ -144,6 +144,8 @@ const EXPECTED_PATHS = [
   "/api/schools/current/settings",
   "/api/schools/{schoolId}/provision",
   "/api/schools/{schoolId}/provisioning-status",
+  "/api/storage/uploads/confirm",
+  "/api/storage/uploads/request-upload",
   "/api/students",
   "/api/students/{studentId}",
   "/api/students/{studentId}/guardians",

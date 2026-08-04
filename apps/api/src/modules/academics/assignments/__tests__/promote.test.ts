@@ -39,6 +39,16 @@ function fakeStorage(
       calls.push(`size:${key}`);
       return objects.get(key) ?? 0;
     },
+    async head(key) {
+      calls.push(`head:${key}`);
+      return objects.has(key)
+        ? { contentType: "application/pdf", sizeBytes: objects.get(key) ?? 0 }
+        : null;
+    },
+    async checksumSha256(key) {
+      calls.push(`checksum:${key}`);
+      return "abcdef";
+    },
     async copy(source, destination) {
       calls.push(`copy:${source}->${destination}`);
       objects.set(destination, objects.get(source) ?? 0);

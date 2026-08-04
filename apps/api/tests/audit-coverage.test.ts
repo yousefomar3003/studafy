@@ -224,6 +224,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm.
+  // auditAction declares the mutation, but no app.audit_logs row is written: the staged object
+  // under temp/ IS the audit record, an infra-level event with no database row to pair it with —
+  // the same precedent as the SES email webhook above. The object's lifecycle is itself traceable
+  // via the school-prefixed key, which is the application half of the storage tenant boundary.
+  "POST /api/storage/uploads/request-upload",
+  "POST /api/storage/uploads/confirm",
   // Discipline incidents and actions (ST-XXX). Teacher reporting, principal management,
   // parent visibility. Audit rows written by auditAction middleware.
   // Finance gateway (ST-119). Both writes call ERPNext synchronously; the audit row records the
