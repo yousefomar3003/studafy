@@ -4,6 +4,7 @@ import { Queue } from "bullmq";
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
 import { workerLogger } from "./log";
+import { processIngestJob } from "./queues/ai-ingestion/worker";
 import { billingDeadLetterListener, processBillingJob } from "./queues/billing";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
@@ -18,6 +19,7 @@ import { processDigest, processNotificationDigest } from "./queues/notifications
 import { createFcmSender } from "./queues/notifications/push";
 import { processAttendanceExport, processFinanceExport } from "./queues/reports";
 
+import type { AiIngestionJobData } from "./queues/ai-ingestion/job";
 import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
 import type { FailedHandler } from "./queues/notifications/dead-letter";
 import type {
@@ -111,7 +113,22 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.AI_INGESTION,
     concurrency: 2,
-    processor: placeholderProcessor(QUEUE_NAMES.AI_INGESTION),
+    // Ingests a material: claim the row, extract + chunk its text, store app.material_chunks. The
+    // `missing job data` guard keeps the registry unit test (and any stray producer) from opening a
+    // database connection for an empty payload.
+    processor: async (job: Job) => {
+      const data = job.data as Partial<AiIngestionJobData>;
+      if (!data.materialId || !data.schoolId) {
+        return { processed: false, reason: "missing job data" };
+      }
+      return processIngestJob(job, {
+        databaseUrl,
+        databaseCaCert: workerEnv.DATABASE_CA_CERT,
+        s3Region: workerEnv.S3_REGION,
+        s3Endpoint: workerEnv.S3_ENDPOINT,
+        bucket: workerEnv.S3_APP_FILES_BUCKET,
+      });
+    },
   },
   {
     name: QUEUE_NAMES.NOTIFICATIONS,
