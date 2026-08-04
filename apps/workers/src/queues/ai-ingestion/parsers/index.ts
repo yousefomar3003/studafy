@@ -2,12 +2,14 @@ import { UnsupportedFormatError } from "../errors";
 
 import { parseDocx } from "./docx";
 import { parsePdf } from "./pdf";
+import { parsePptx } from "./pptx";
 
 import type { ParsedDocument } from "../types";
 
 /** MIME types the ingestion pipeline can parse, and their parsers. */
 const PDF_MIME_TYPES = new Set(["application/pdf", "application/x-pdf", "text/pdf"]);
 const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const PPTX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 /**
  * Parse a document's bytes into reading-order blocks. The format is chosen by the material's stored
@@ -21,6 +23,9 @@ export async function parseDocument(bytes: Uint8Array, mimeType: string): Promis
   }
   if (mimeType === DOCX_MIME_TYPE) {
     return parseDocx(bytes);
+  }
+  if (mimeType === PPTX_MIME_TYPE) {
+    return parsePptx(bytes);
   }
   throw new UnsupportedFormatError(`unsupported mime type: ${mimeType}`);
 }

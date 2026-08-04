@@ -48,6 +48,7 @@ export async function parseDocx(bytes: Uint8Array): Promise<ParsedDocument> {
       text: paragraph.text,
       kind: paragraph.heading ? "heading" : "body",
       pageNumber: null,
+      slideNumber: null,
     });
   }
 
