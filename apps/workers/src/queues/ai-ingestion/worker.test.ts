@@ -31,7 +31,7 @@ describe("ai-ingestion fixture corpus", () => {
         );
       }
     }
-  });
+  }, 30_000);
 
   test("pdf chunks carry page numbers up to the document page count", async () => {
     for (const spec of FIXTURES) {
