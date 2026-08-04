@@ -3,8 +3,13 @@ import { eventEnvelopeSchema } from "./protocol";
 import type { EventEnvelope } from "./protocol";
 import type IORedis from "ioredis";
 
-/** Matches every room channel (`school:{schoolId}:role:{ROLE}`) with one pattern subscription. */
-const ROOM_CHANNEL_PATTERN = "school:*:role:*";
+/**
+ * Matches every room channel with one pattern subscription: the school-wide room
+ * (`school:{schoolId}`), role rooms (`school:{schoolId}:role:{ROLE}`), and user rooms
+ * (`school:{schoolId}:user:{userId}`) all share the `school:` prefix, and Redis's glob `*` spans
+ * `:` like any other character, so a single `school:*` pattern covers all three.
+ */
+const ROOM_CHANNEL_PATTERN = "school:*";
 
 export type EnvelopeHandler = (envelope: EventEnvelope) => void;
 

@@ -61,5 +61,51 @@ describe("signToken / verifyToken", () => {
       SECRET,
     );
     expect(() => verifyToken(token, SECRET)).not.toThrow();
+    expect(verifyToken(token, SECRET).exp).toBe(oneHourFromNow);
+  });
+
+  test("expired token carries TOKEN_EXPIRED, everything else carries TOKEN_INVALID", () => {
+    const oneHourAgo = Math.floor(Date.now() / 1000) - 3600;
+    const expiredToken = signToken(
+      { sub: "user-1", schoolId: "school-1", role: "STUDENT", exp: oneHourAgo },
+      SECRET,
+    );
+    try {
+      verifyToken(expiredToken, SECRET);
+      throw new Error("expected verifyToken to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(TokenVerificationError);
+      expect((error as TokenVerificationError).code).toBe("TOKEN_EXPIRED");
+    }
+
+    try {
+      verifyToken("not-a-jwt", SECRET);
+      throw new Error("expected verifyToken to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(TokenVerificationError);
+      expect((error as TokenVerificationError).code).toBe("TOKEN_INVALID");
+    }
+  });
+});
+
+describe("verifyToken performance", () => {
+  test("p95 verification latency stays under the connection auth budget", () => {
+    const token = signToken({ sub: "user-1", schoolId: "school-1", role: "STUDENT" }, SECRET);
+    const iterations = 1000;
+    const durations: number[] = [];
+
+    for (let i = 0; i < iterations; i++) {
+      const start = performance.now();
+      verifyToken(token, SECRET);
+      durations.push(performance.now() - start);
+    }
+
+    durations.sort((a, b) => a - b);
+    const p95 = durations[Math.floor(iterations * 0.95)];
+
+    // The 100ms p95 acceptance budget covers the whole connection (network + upgrade + this
+    // check); token verification itself is synchronous HMAC + JSON parsing with no I/O, so it
+    // must stay far under that to leave headroom for the rest of the handshake.
+    expect(p95).toBeLessThan(10);
   });
 });

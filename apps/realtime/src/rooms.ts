@@ -1,20 +1,36 @@
-import { ROOM_KEY_PATTERN } from "./protocol";
+import { parseRoomKeyParts } from "./protocol";
 
-import type { RoomKey } from "./protocol";
+import type { ParsedRoomKey, RoomKey } from "./protocol";
 import type { Role } from "@studafy/constants";
 
-/** Builds the canonical room key for a school/role pair — the sole place this format is written. */
-export function roomKey(schoolId: string, role: Role): RoomKey {
+export type { ParsedRoomKey } from "./protocol";
+
+/** The school-wide room — every connection for a tenant, regardless of role. */
+export function schoolRoomKey(schoolId: string): RoomKey {
+  return `school:${schoolId}`;
+}
+
+/** The room for every connection of a given role within a school. */
+export function roleRoomKey(schoolId: string, role: Role): RoomKey {
   return `school:${schoolId}:role:${role}`;
 }
 
-/** Inverse of {@link roomKey}. Callers must pass an already-validated {@link RoomKey}. */
-export function parseRoomKey(room: RoomKey): { schoolId: string; role: string } {
-  const match = room.match(ROOM_KEY_PATTERN);
-  if (!match) {
+/** The room for a single user's connection(s) within a school — for direct, targeted delivery. */
+export function userRoomKey(schoolId: string, userId: string): RoomKey {
+  return `school:${schoolId}:user:${userId}`;
+}
+
+/**
+ * Inverse of {@link schoolRoomKey}/{@link roleRoomKey}/{@link userRoomKey}. Callers must pass an
+ * already-validated {@link RoomKey}. Every variant carries `schoolId`, since that field alone is
+ * what authorization checks (join/leave must stay within the caller's own school) need.
+ */
+export function parseRoomKey(room: RoomKey): ParsedRoomKey {
+  const parsed = parseRoomKeyParts(room);
+  if (!parsed) {
     throw new Error(`"${room}" is not a valid room key`);
   }
-  return { schoolId: match[1], role: match[2] };
+  return parsed;
 }
 
 /**

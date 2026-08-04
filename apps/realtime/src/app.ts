@@ -3,13 +3,13 @@ import { upgradeWebSocket } from "hono/bun";
 
 import { TokenVerificationError, verifyToken } from "./auth";
 import { healthRoutes } from "./health";
-import { clientMessageSchema } from "./protocol";
-import { parseRoomKey, roomKey } from "./rooms";
+import { clientMessageSchema, REAUTH_REQUIRED_CLOSE_CODE } from "./protocol";
+import { parseRoomKey, roleRoomKey, schoolRoomKey, userRoomKey } from "./rooms";
 
 import type { AuthClaims } from "./auth";
 import type { ConnectionTracker } from "./lifecycle";
 import type { FanoutMetrics } from "./metrics";
-import type { ClientMessage, SystemMessage } from "./protocol";
+import type { ClientMessage, RoomKey, SystemMessage } from "./protocol";
 import type { RoomManager } from "./rooms";
 import type { Context } from "hono";
 import type { WSContext } from "hono/ws";
@@ -38,6 +38,29 @@ function send(ws: WSContext, message: SystemMessage): void {
   ws.send(JSON.stringify(message));
 }
 
+/**
+ * Re-auth protocol: `verifyToken` only proves the token was valid *at handshake time*. Without
+ * this, a socket that connected with a token carrying an `exp` would stay a member of its rooms
+ * indefinitely after that `exp` passes, since nothing re-checks it. If the claims carry an `exp`,
+ * schedule a timer for exactly that instant that warns the client (`system.reauth_required`) and
+ * closes the socket (see docs/protocol.md#re-auth-protocol) so it must reconnect with a fresh
+ * token rather than staying authorized past its stated expiry. Tokens without `exp` never expire,
+ * so there is nothing to schedule.
+ */
+function scheduleReauth(
+  claims: AuthClaims,
+  ws: WSContext,
+): ReturnType<typeof setTimeout> | undefined {
+  if (claims.exp === undefined) {
+    return undefined;
+  }
+  const msUntilExpiry = Math.max(0, claims.exp * 1000 - Date.now());
+  return setTimeout(() => {
+    send(ws, { type: "system.reauth_required", reason: "token expired" });
+    raw(ws).close(REAUTH_REQUIRED_CLOSE_CODE, "token expired");
+  }, msUntilExpiry);
+}
+
 export interface AppOptions {
   isReady: () => boolean;
   jwtSecret: string;
@@ -50,7 +73,10 @@ export interface AppOptions {
  * Builds the Hono application: health routes plus the `/ws` handshake. The handshake is plain
  * Hono middleware (`GET /ws?token=...`) that verifies the JWT stub and rejects with 401 *before*
  * upgrading — an invalid token never reaches the WebSocket layer. On a valid token the connection
- * auto-joins its home room (`school:{schoolId}:role:{role}`, derived from the token's claims).
+ * auto-joins its three home rooms, all derived from the token's claims: the school-wide room
+ * (`school:{schoolId}`), its role room (`school:{schoolId}:role:{role}`), and its user room
+ * (`school:{schoolId}:user:{userId}`). A token carrying `exp` also gets a re-auth timer (see
+ * `scheduleReauth`) so authorization doesn't silently outlive what the token actually granted.
  */
 export function createApp({
   isReady,
@@ -68,13 +94,13 @@ export function createApp({
     async (c, next) => {
       const token = c.req.query("token");
       if (!token) {
-        return c.json({ error: "missing token query parameter" }, 401);
+        return c.json({ error: "missing token query parameter", code: "TOKEN_MISSING" }, 401);
       }
       try {
         c.set("claims", verifyToken(token, jwtSecret));
       } catch (error) {
         if (error instanceof TokenVerificationError) {
-          return c.json({ error: error.message }, 401);
+          return c.json({ error: error.message, code: error.code }, 401);
         }
         throw error;
       }
@@ -82,19 +108,28 @@ export function createApp({
     },
     upgradeWebSocket((c: Context<Bindings>) => {
       const claims = c.get("claims");
-      const homeRoom = roomKey(claims.schoolId, claims.role);
+      const homeRooms: readonly RoomKey[] = [
+        schoolRoomKey(claims.schoolId),
+        roleRoomKey(claims.schoolId, claims.role),
+        userRoomKey(claims.schoolId, claims.userId),
+      ];
+      let reauthTimer: ReturnType<typeof setTimeout> | undefined;
 
       return {
         onOpen(_event, ws) {
           const socket = raw(ws);
           tracker.add(socket);
-          rooms.join(homeRoom, socket);
-          send(ws, { type: "system.joined", room: homeRoom });
+          for (const room of homeRooms) {
+            rooms.join(room, socket);
+            send(ws, { type: "system.joined", room });
+          }
+          reauthTimer = scheduleReauth(claims, ws);
         },
         onMessage(event, ws) {
           handleClientMessage(event.data, ws, claims, rooms);
         },
         onClose(_event, ws) {
+          clearTimeout(reauthTimer);
           const socket = raw(ws);
           tracker.remove(socket);
           rooms.leaveAll(socket);

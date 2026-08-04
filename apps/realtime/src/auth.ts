@@ -19,6 +19,8 @@ export interface AuthClaims {
   userId: string;
   schoolId: string;
   role: Role;
+  /** Seconds since epoch. Undefined means the token never expires — see the re-auth protocol in app.ts. */
+  exp?: number;
 }
 
 const claimsSchema = z.object({
@@ -29,10 +31,21 @@ const claimsSchema = z.object({
   exp: z.number().int().positive().optional(),
 });
 
+/**
+ * `code` drives the re-auth protocol (see docs/protocol.md#re-auth-protocol): `TOKEN_EXPIRED` tells
+ * the client its credentials are merely stale — get a fresh token and reconnect. Every other cause
+ * is `TOKEN_INVALID` — the token itself is untrustworthy (bad signature, wrong shape, unknown
+ * role), so blindly retrying the same token is pointless.
+ */
+export type TokenVerificationErrorCode = "TOKEN_EXPIRED" | "TOKEN_INVALID";
+
 export class TokenVerificationError extends Error {
-  constructor(reason: string) {
+  readonly code: TokenVerificationErrorCode;
+
+  constructor(reason: string, code: TokenVerificationErrorCode = "TOKEN_INVALID") {
     super(`Token verification failed: ${reason}`);
     this.name = "TokenVerificationError";
+    this.code = code;
   }
 }
 
@@ -78,10 +91,15 @@ export function verifyToken(token: string, secret: string): AuthClaims {
   }
 
   if (parsed.data.exp !== undefined && parsed.data.exp * 1000 < Date.now()) {
-    throw new TokenVerificationError("token expired");
+    throw new TokenVerificationError("token expired", "TOKEN_EXPIRED");
   }
 
-  return { userId: parsed.data.sub, schoolId: parsed.data.schoolId, role: parsed.data.role };
+  return {
+    userId: parsed.data.sub,
+    schoolId: parsed.data.schoolId,
+    role: parsed.data.role,
+    exp: parsed.data.exp,
+  };
 }
 
 /**

@@ -1,9 +1,11 @@
 # @studafy/realtime
 
 Bun + [Hono](https://hono.dev) WebSocket gateway for Studafy. It authenticates a connection with a
-JWT handshake stub, joins it to a room (`school:{schoolId}:role:{role}`), and fans out messages
+JWT handshake stub, joins it to its three home rooms (`school:{schoolId}`,
+`school:{schoolId}:role:{role}`, `school:{schoolId}:user:{userId}`), and fans out messages
 published to Redis — both direct room publishes and outbox-relayed domain events — to every member
-of the target room.
+of the target room. A connection whose token expires is warned and closed (re-auth protocol)
+rather than left silently authorized past its stated expiry.
 
 See [`docs/protocol.md`](docs/protocol.md) for the full protocol spec (handshake, room naming,
 message envelopes, Redis wiring), and [`docs/event-routing.md`](docs/event-routing.md) for which
@@ -24,15 +26,17 @@ domain events fan out to which rooms.
   `apps/api`/`apps/workers`).
 - [`src/auth.ts`](src/auth.ts) — the JWT handshake stub: HS256 sign/verify against
   `WS_JWT_SECRET`. Documented limitations and the follow-up ticket are in
-  [`docs/protocol.md`](docs/protocol.md#jwt-handshake-stub-and-its-limits).
-- [`src/protocol.ts`](src/protocol.ts) — the room key format and the three Zod-validated message
-  shapes (`ClientMessage`, `SystemMessage`, `EventEnvelope`).
-- [`src/rooms.ts`](src/rooms.ts) — `roomKey`/`parseRoomKey` (the room-naming convention) and
-  `createRoomManager`, an in-memory, framework-agnostic membership map.
+  [`docs/protocol.md`](docs/protocol.md#jwt-handshake-stub-and-its-limits). `TokenVerificationError`
+  carries a `code` (`TOKEN_EXPIRED` vs `TOKEN_INVALID`) that drives the re-auth protocol.
+- [`src/protocol.ts`](src/protocol.ts) — `parseRoomKeyParts` (the room key grammar, three kinds:
+  school/role/user) and the four Zod-validated message shapes (`ClientMessage`, `SystemMessage`,
+  `EventEnvelope`, plus `REAUTH_REQUIRED_CLOSE_CODE`).
+- [`src/rooms.ts`](src/rooms.ts) — `schoolRoomKey`/`roleRoomKey`/`userRoomKey`/`parseRoomKey` (the
+  room-naming convention) and `createRoomManager`, an in-memory, framework-agnostic membership map.
 - [`src/connection.ts`](src/connection.ts) — the Redis connection factory for the pub/sub
   subscribers (one instance per subscriber — see `src/index.ts`).
-- [`src/subscriber.ts`](src/subscriber.ts) — `subscribeToRooms`: one `PSUBSCRIBE
-school:*:role:*`, validates each message, forwards it to a caller-supplied handler.
+- [`src/subscriber.ts`](src/subscriber.ts) — `subscribeToRooms`: one `PSUBSCRIBE school:*`,
+  validates each message, forwards it to a caller-supplied handler.
 - [`src/event-routing.ts`](src/event-routing.ts) — `EVENT_ROUTES`: which rooms an outbox-relayed
   domain event fans out to, given its school. Narrative table in
   [`docs/event-routing.md`](docs/event-routing.md).
@@ -42,8 +46,8 @@ school:*:role:*`, validates each message, forwards it to a caller-supplied handl
 - [`src/metrics.ts`](src/metrics.ts) — in-process fan-out counters, exposed via `GET /metrics`.
 - [`src/health.ts`](src/health.ts) — liveness/readiness/metrics routes, mirrors `apps/api`.
 - [`src/app.ts`](src/app.ts) — the Hono app: health routes plus the `/ws` handshake and connection
-  handlers (join home room on open, handle `join`/`leave` control messages, leave all rooms on
-  close).
+  handlers (join all three home rooms on open, schedule the re-auth timer, handle `join`/`leave`
+  control messages, leave all rooms on close).
 - [`src/lifecycle.ts`](src/lifecycle.ts) — `createConnectionTracker` and `gracefulShutdown`.
 - [`src/index.ts`](src/index.ts) — process entrypoint: loads env, opens both Redis subscribers
   (rooms and outbox events), wires both to room broadcast, starts `Bun.serve`, wires
@@ -73,14 +77,20 @@ bun run smoke-test   # end-to-end: real WebSocket clients, real Redis publish, a
 ### Why the split between `bun test` and `smoke-test`
 
 `hono/bun`'s WebSocket upgrade needs a live `Bun.serve` server object — `app.request()` (used by
-`bun test`) doesn't provide one, so a real upgrade can't be driven from a unit test. `bun test`
-covers everything that doesn't require an actual socket or Redis: env validation, the JWT stub,
-protocol schemas, room membership, the Redis message subscriber (against a fake emitter), and the
-handshake's _rejection_ path (missing/invalid/expired token — those return a plain HTTP 401 before
-ever reaching the upgrade). `scripts/smoke-test.ts` covers what's left: a real client connecting
-with a valid token, joining its home room, an explicit `join` to a second room, and a real Redis
-`PUBLISH` fanning out to the right room members (and _not_ to a client in a different school). This
-mirrors `apps/workers`' split between its unit tests and its Redis-required `smoke-test.ts`.
+most of `src/app.test.ts`) doesn't provide one, so a real upgrade can't be driven that way. It
+_can_ be driven by starting a real `Bun.serve` inside a `bun test` file, though, and that needs no
+Redis — only the fan-out step does. So the split is by Redis dependency, not by "real socket or
+not":
+
+- `bun test` covers everything that doesn't require Redis, including real WebSocket upgrades:
+  env validation, the JWT stub, protocol schemas, room membership, the Redis message subscriber
+  (against a fake emitter), the handshake's _rejection_ path (missing/invalid/expired token —
+  those return a plain HTTP 401 before ever reaching the upgrade), and — in
+  [`src/app.ws.test.ts`](src/app.ws.test.ts), against a real `Bun.serve` — the cross-tenant room
+  probe tests and the re-auth close-and-reconnect flow. These run in CI on every push.
+- `scripts/smoke-test.ts` covers what's left: a real Redis `PUBLISH` fanning out to the right room
+  members (and _not_ to a client in a different school). This mirrors `apps/workers`' split
+  between its unit tests and its Redis-required `smoke-test.ts`.
 
 ## Graceful shutdown
 

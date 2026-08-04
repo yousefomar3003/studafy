@@ -7,17 +7,45 @@ import { z } from "zod";
  * narrative spec this module implements.
  */
 
-/** Captures `[full, schoolId, role]` — exported so `rooms.ts` can parse a key without re-deriving the shape. */
-export const ROOM_KEY_PATTERN = /^school:([^:]+):role:([A-Z_]+)$/;
-const ROOM_ROLES: readonly string[] = Object.values(ROLES);
+const ROOM_ROLES = new Set<string>(Object.values(ROLES));
 
-/** `school:{schoolId}:role:{ROLE}`, the one room-naming convention the whole gateway shares. */
-export const roomKeySchema = z
-  .string()
-  .regex(ROOM_KEY_PATTERN, "must be school:{schoolId}:role:{ROLE}")
-  .refine((value) => ROOM_ROLES.includes(value.match(ROOM_KEY_PATTERN)?.[2] ?? ""), {
-    message: `role segment must be one of: ${ROOM_ROLES.join(", ")}`,
-  });
+export type ParsedRoomKey =
+  | { kind: "school"; schoolId: string }
+  | { kind: "role"; schoolId: string; role: string }
+  | { kind: "user"; schoolId: string; userId: string };
+
+/**
+ * Parses and validates a room key by splitting on `:` rather than matching one regex. Three room
+ * kinds share the `school:{schoolId}` prefix (the multi-tenancy boundary): the bare school room,
+ * a role room, and a per-user room. A single regex covering all three needs two `+`-quantified
+ * groups in sequence, which trips eslint's `security/detect-unsafe-regex` heuristic even though
+ * each group is unambiguously anchored by a distinct literal separator — splitting sidesteps that
+ * false positive and is arguably easier to follow besides. Exported so `rooms.ts`'s `parseRoomKey`
+ * doesn't re-derive this shape, and so `roomKeySchema` below can validate against it directly.
+ */
+export function parseRoomKeyParts(value: string): ParsedRoomKey | undefined {
+  const parts = value.split(":");
+  const [prefix, schoolId, kindSegment, id] = parts;
+  if (prefix !== "school" || !schoolId) {
+    return undefined;
+  }
+  if (parts.length === 2) {
+    return { kind: "school", schoolId };
+  }
+  if (parts.length === 4 && kindSegment === "role" && id && ROOM_ROLES.has(id)) {
+    return { kind: "role", schoolId, role: id };
+  }
+  if (parts.length === 4 && kindSegment === "user" && id) {
+    return { kind: "user", schoolId, userId: id };
+  }
+  return undefined;
+}
+
+/** `school:{schoolId}`, `school:{schoolId}:role:{ROLE}`, or `school:{schoolId}:user:{userId}`. */
+export const roomKeySchema = z.string().refine((value) => parseRoomKeyParts(value) !== undefined, {
+  message:
+    "must be school:{schoolId}, school:{schoolId}:role:{ROLE}, or school:{schoolId}:user:{userId}",
+});
 export type RoomKey = z.infer<typeof roomKeySchema>;
 
 /**
@@ -40,10 +68,20 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
-/** Gateway -> client acks/errors for the control channel — distinct from domain event envelopes. */
+/**
+ * Gateway -> client acks/errors for the control channel — distinct from domain event envelopes.
+ * `system.reauth_required` is the re-auth protocol's signal: sent immediately before the gateway
+ * closes the socket with close code 4401 because the connection's token reached its `exp` while
+ * the socket was still open. It is not a rejection of the current message — the client should
+ * obtain a fresh token and reconnect, not treat it as fatal the way `system.error` usually is.
+ */
 export const systemMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("system.joined"), room: roomKeySchema }),
   z.object({ type: z.literal("system.left"), room: roomKeySchema }),
   z.object({ type: z.literal("system.error"), message: z.string() }),
+  z.object({ type: z.literal("system.reauth_required"), reason: z.string() }),
 ]);
 export type SystemMessage = z.infer<typeof systemMessageSchema>;
+
+/** Close code the gateway uses when it closes a socket because its token expired mid-connection. */
+export const REAUTH_REQUIRED_CLOSE_CODE = 4401;
