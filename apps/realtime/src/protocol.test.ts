@@ -1,23 +1,36 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import { clientMessageSchema, eventEnvelopeSchema, roomKeySchema } from "./protocol";
+import {
+  clientMessageSchema,
+  eventEnvelopeSchema,
+  roomKeySchema,
+  systemMessageSchema,
+} from "./protocol";
 
 describe("roomKeySchema", () => {
-  test("accepts a well-formed room key with a known role", () => {
+  test("accepts a bare school room key", () => {
+    expect(roomKeySchema.safeParse("school:123").success).toBe(true);
+  });
+
+  test("accepts a well-formed role room key with a known role", () => {
     expect(roomKeySchema.safeParse("school:123:role:STUDENT").success).toBe(true);
+  });
+
+  test("accepts a well-formed user room key", () => {
+    expect(roomKeySchema.safeParse("school:123:user:user-1").success).toBe(true);
   });
 
   test("rejects a room key with an unknown role", () => {
     expect(roomKeySchema.safeParse("school:123:role:WIZARD").success).toBe(false);
   });
 
-  test("rejects a room key missing the role segment", () => {
-    expect(roomKeySchema.safeParse("school:123").success).toBe(false);
-  });
-
   test("rejects a role segment that isn't uppercase", () => {
     expect(roomKeySchema.safeParse("school:123:role:student").success).toBe(false);
+  });
+
+  test("rejects an empty schoolId", () => {
+    expect(roomKeySchema.safeParse("school:").success).toBe(false);
   });
 });
 
@@ -59,5 +72,15 @@ describe("clientMessageSchema", () => {
   test("rejects an unknown message type", () => {
     const result = clientMessageSchema.safeParse({ type: "ping" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("systemMessageSchema", () => {
+  test("accepts a reauth_required message", () => {
+    const result = systemMessageSchema.safeParse({
+      type: "system.reauth_required",
+      reason: "token expired",
+    });
+    expect(result.success).toBe(true);
   });
 });

@@ -17,15 +17,29 @@ a WebSocket handshake request, so a query parameter is the standard way to authe
 gateway verifies the token (see [JWT stub](#jwt-handshake-stub-and-its-limits) below) **before**
 upgrading:
 
-| Outcome                          | Response                                           |
-| -------------------------------- | -------------------------------------------------- |
-| Missing `token`                  | `401 { "error": "missing token query parameter" }` |
-| Malformed / mis-signed / expired | `401 { "error": "<reason>" }`                      |
-| Valid token                      | `101 Switching Protocols`, connection upgrades     |
+| Outcome                               | Response                                                                    |
+| ------------------------------------- | --------------------------------------------------------------------------- |
+| Missing `token`                       | `401 { "error": "missing token query parameter", "code": "TOKEN_MISSING" }` |
+| Expired token                         | `401 { "error": "<reason>", "code": "TOKEN_EXPIRED" }`                      |
+| Malformed / mis-signed / unknown role | `401 { "error": "<reason>", "code": "TOKEN_INVALID" }`                      |
+| Valid token                           | `101 Switching Protocols`, connection upgrades                              |
 
-On a successful upgrade the connection is automatically joined to its **home room**,
-`school:{schoolId}:role:{role}`, derived from the token's `schoolId` and `role` claims. The
-gateway sends a `system.joined` message for that room immediately after upgrading.
+`code` is what a client should branch on, not the free-text `error` (which is for logs):
+`TOKEN_EXPIRED` means the credentials are merely stale — get a fresh token and retry the handshake.
+`TOKEN_MISSING` / `TOKEN_INVALID` mean the request itself is broken; retrying with the same token
+is pointless. See [Re-auth protocol](#re-auth-protocol) for the full flow, including what happens
+when a token expires _after_ a successful upgrade.
+
+On a successful upgrade the connection is automatically joined to three **home rooms**, all
+derived from the token's claims:
+
+| Room                              | Membership                                                |
+| --------------------------------- | --------------------------------------------------------- |
+| `school:{schoolId}`               | every connection for the tenant, regardless of role       |
+| `school:{schoolId}:role:{role}`   | every connection with that role, within the tenant        |
+| `school:{schoolId}:user:{userId}` | this user's connection(s) — for direct, targeted delivery |
+
+The gateway sends one `system.joined` message per room, immediately after upgrading.
 
 ### JWT handshake stub and its limits
 
@@ -46,19 +60,48 @@ Claims (JWT payload):
 | `role`     | one of `ROLES` (`@studafy/constants`) | yes      | the role the room key's `role` segment uses |
 | `exp`      | number (seconds since epoch)          | no       | standard JWT expiry                         |
 
+### Re-auth protocol
+
+`verifyToken` only proves a token was valid _at handshake time_. Without a follow-up mechanism, a
+connection that opened with a token carrying `exp` would stay a member of its rooms forever after
+that `exp` passes — nothing would ever re-check it. Instead:
+
+1. If the claims carry `exp`, the gateway schedules a timer for exactly that instant. A token with
+   no `exp` never expires and gets no timer.
+2. When the timer fires, the gateway sends `{ "type": "system.reauth_required", "reason": "token
+expired" }`, then closes the socket with close code **`4401`** (reason `"token expired"`).
+3. The client is expected to obtain a fresh token (however it does that outside this protocol) and
+   reconnect via a normal `GET /ws?token=<new token>` handshake — there is no in-place token swap
+   on an existing socket. A reconnect after a `4401` close, or after a `401` with `code:
+"TOKEN_EXPIRED"`, is the entire "expired-token reconnect flow": the client is not expected to
+   distinguish the two: both mean "the token expired, not the connection request itself, so get a
+   new one and retry."
+4. A `401` with `code: "TOKEN_MISSING"` or `"TOKEN_INVALID"`, or any WebSocket close code other
+   than `4401`, is not part of this protocol — don't retry those with the same token.
+
 ## Rooms
 
-A room key has exactly one shape: `school:{schoolId}:role:{ROLE}` (`src/rooms.ts`'s `roomKey` /
-`parseRoomKey` are the only place this format is constructed or parsed). `schoolId` is the
-multi-tenancy boundary: **a client may only join or leave rooms within its own `schoolId`** — the
-gateway rejects a `join`/`leave` for any other school's room with a `system.error`. It does not
-further restrict which role's room a client may join within its own school (e.g. an instructor can
-subscribe to the student room in the same school); that is a coarser authorization model than the
-platform's full permission matrix (`docs/adr/0002-fixed-roles-authorization.md`) and is a known
-simplification — a future ticket can tighten it if a concrete requirement needs to.
+A room key has one of three shapes, all sharing the `school:{schoolId}` prefix — the multi-tenancy
+boundary (`src/protocol.ts`'s `parseRoomKeyParts` is the only place this grammar is parsed;
+`src/rooms.ts`'s `schoolRoomKey` / `roleRoomKey` / `userRoomKey` are the only places it's built):
 
-Every connection auto-joins its home room at handshake. It can join additional rooms (in the same
-school) with a control message:
+| Shape                             | Meaning                                                       |
+| --------------------------------- | ------------------------------------------------------------- |
+| `school:{schoolId}`               | every connection for the tenant, regardless of role           |
+| `school:{schoolId}:role:{ROLE}`   | every connection with that role, within the tenant            |
+| `school:{schoolId}:user:{userId}` | a single user's connection(s) — for direct, targeted delivery |
+
+**A client may only join or leave rooms within its own `schoolId`** — the gateway rejects a
+`join`/`leave` for any other school's room with a `system.error`. This is the tenant-isolation
+boundary: it is enforced regardless of room kind, and is what makes cross-tenant room subscription
+impossible (see `src/app.ws.test.ts`'s probe tests). It does not further restrict which role's or
+user's room a client may join within its own school (e.g. an instructor can subscribe to the
+student room in the same school); that is a coarser authorization model than the platform's full
+permission matrix (`docs/adr/0002-fixed-roles-authorization.md`) and is a known simplification — a
+future ticket can tighten it if a concrete requirement needs to.
+
+Every connection auto-joins all three of its home rooms at handshake. It can join additional rooms
+(in the same school) with a control message:
 
 ```json
 { "type": "join", "room": "school:123:role:INSTRUCTOR" }
@@ -86,7 +129,11 @@ mean different things (control-plane ack vs. domain event) and grow independentl
 { "type": "system.joined", "room": "school:123:role:STUDENT" }
 { "type": "system.left", "room": "school:123:role:STUDENT" }
 { "type": "system.error", "message": "cannot join a room outside your own school" }
+{ "type": "system.reauth_required", "reason": "token expired" }
 ```
+
+`system.reauth_required` always precedes a `4401` close — see [Re-auth
+protocol](#re-auth-protocol).
 
 ### 3. Redis -> gateway -> room members: the event envelope (`EventEnvelope`)
 
@@ -103,13 +150,13 @@ the target room receives verbatim:
 }
 ```
 
-| Field         | Type               | Meaning                                                                                                                 |
-| ------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `id`          | UUID               | unique per publish, for dedup/logging on the consumer side                                                              |
-| `type`        | string             | domain event name (free-form; not drawn from `DOMAIN_EVENTS` today — see [Open question](#open-question-domain_events)) |
-| `room`        | room key           | must equal the Redis channel it was published on (enforced, see below)                                                  |
-| `payload`     | arbitrary JSON     | event-specific data; the gateway does not interpret it                                                                  |
-| `publishedAt` | ISO-8601 date-time | when the publisher produced the event                                                                                   |
+| Field         | Type               | Meaning                                                                                                        |
+| ------------- | ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `id`          | UUID               | unique per publish, for dedup/logging on the consumer side                                                     |
+| `type`        | string             | domain event name — free string at the schema level; see [`type` and `DOMAIN_EVENTS`](#type-and-domain_events) |
+| `room`        | room key           | must equal the Redis channel it was published on (enforced, see below)                                         |
+| `payload`     | arbitrary JSON     | event-specific data; the gateway does not interpret it                                                         |
+| `publishedAt` | ISO-8601 date-time | when the publisher produced the event                                                                          |
 
 #### `type` and `DOMAIN_EVENTS`
 
@@ -129,10 +176,12 @@ and each connection's pattern subscriptions would otherwise have to filter the o
 off the same `"pmessage"` event stream:
 
 1. **Direct room publish** (`src/subscriber.ts`) — **channel name = room key.** A publisher does
-   `PUBLISH school:123:role:STUDENT <envelope JSON>`; there is no separate channel-naming scheme to
-   keep in sync with room keys. One `PSUBSCRIBE school:*:role:*` at startup, rather than
-   subscribing/unsubscribing per room as clients join and leave — fan-out delivery never races a
-   room's membership changes, since the gateway is always listening on every room's channel and
+   `PUBLISH school:123:role:STUDENT <envelope JSON>` (or the bare `school:123` / `school:123:user:456`
+   channel); there is no separate channel-naming scheme to keep in sync with room keys. One
+   `PSUBSCRIBE school:*` at startup, rather than subscribing/unsubscribing per room as clients join
+   and leave — Redis's glob `*` spans `:` like any other character, so this one pattern covers all
+   three room kinds, and a single subscription means fan-out delivery never races a room's
+   membership changes, since the gateway is always listening on every room's channel and
    `src/rooms.ts`'s in-memory membership map is what decides who actually receives a message.
    Every message is parsed and validated against `eventEnvelopeSchema`, and its `room` field is
    checked against the channel it arrived on; a message that fails either check is logged and
@@ -146,10 +195,12 @@ off the same `"pmessage"` event stream:
 
 ## Example flow
 
-1. Client connects: `GET /ws?token=<signed JWT for schoolId=123, role=STUDENT>`.
-2. Gateway verifies the token, upgrades, joins the connection to `school:123:role:STUDENT`, sends
-   `{"type":"system.joined","room":"school:123:role:STUDENT"}`.
+1. Client connects: `GET /ws?token=<signed JWT for sub=user-1, schoolId=123, role=STUDENT>`.
+2. Gateway verifies the token, upgrades, joins the connection to `school:123`,
+   `school:123:role:STUDENT`, and `school:123:user:user-1`, sending a `system.joined` for each.
 3. `apps/api` (or any publisher) runs `PUBLISH school:123:role:STUDENT '{"id":"...","type":"announcement.posted","room":"school:123:role:STUDENT","payload":{...},"publishedAt":"..."}'`.
 4. The gateway's subscriber receives it on the pattern subscription, validates it, and sends the
    envelope verbatim to every member of `school:123:role:STUDENT` — including the client from
    step 1.
+5. Later, that connection's token reaches its `exp`. The gateway sends `system.reauth_required`
+   and closes the socket with code `4401`. The client fetches a fresh token and repeats step 1.

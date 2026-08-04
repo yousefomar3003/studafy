@@ -25,7 +25,7 @@ function fakeRedis() {
     psubscribed,
     punsubscribed,
     emitPmessage: (channel: string, message: string) => {
-      emitter.emit("pmessage", "school:*:role:*", channel, message);
+      emitter.emit("pmessage", "school:*", channel, message);
     },
   };
 }
@@ -42,7 +42,7 @@ describe("subscribeToRooms", () => {
   test("subscribes to the room channel pattern immediately", () => {
     const { redis, psubscribed } = fakeRedis();
     subscribeToRooms(redis, () => undefined);
-    expect(psubscribed).toEqual(["school:*:role:*"]);
+    expect(psubscribed).toEqual(["school:*"]);
   });
 
   test("forwards a valid envelope whose room matches the channel", () => {
@@ -53,6 +53,28 @@ describe("subscribeToRooms", () => {
     emitPmessage("school:1:role:STUDENT", JSON.stringify(validEnvelope));
 
     expect(received).toEqual([validEnvelope]);
+  });
+
+  test("forwards a valid envelope on the bare school-room channel", () => {
+    const { redis, emitPmessage } = fakeRedis();
+    const received: EventEnvelope[] = [];
+    subscribeToRooms(redis, (envelope) => received.push(envelope));
+
+    const schoolEnvelope: EventEnvelope = { ...validEnvelope, room: "school:1" };
+    emitPmessage("school:1", JSON.stringify(schoolEnvelope));
+
+    expect(received).toEqual([schoolEnvelope]);
+  });
+
+  test("forwards a valid envelope on a user-room channel", () => {
+    const { redis, emitPmessage } = fakeRedis();
+    const received: EventEnvelope[] = [];
+    subscribeToRooms(redis, (envelope) => received.push(envelope));
+
+    const userEnvelope: EventEnvelope = { ...validEnvelope, room: "school:1:user:user-1" };
+    emitPmessage("school:1:user:user-1", JSON.stringify(userEnvelope));
+
+    expect(received).toEqual([userEnvelope]);
   });
 
   test("drops a message that is not valid JSON", () => {
@@ -94,6 +116,6 @@ describe("subscribeToRooms", () => {
     emitPmessage("school:1:role:STUDENT", JSON.stringify(validEnvelope));
 
     expect(received).toEqual([]);
-    expect(punsubscribed).toEqual(["school:*:role:*"]);
+    expect(punsubscribed).toEqual(["school:*"]);
   });
 });

@@ -24,6 +24,10 @@ beforeEach(() => {
  * `app.request()` can drive without a real server: health routes and the handshake's rejection
  * path, which never reaches the upgrade.
  */
+async function jsonBody(res: Response): Promise<{ error: string; code: string }> {
+  return res.json() as Promise<{ error: string; code: string }>;
+}
+
 const buildApp = () =>
   createApp({
     isReady: () => true,
@@ -63,12 +67,16 @@ describe("GET /ws handshake", () => {
   test("rejects a connection with no token", async () => {
     const res = await buildApp().request("/ws");
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "missing token query parameter" });
+    expect(await res.json()).toEqual({
+      error: "missing token query parameter",
+      code: "TOKEN_MISSING",
+    });
   });
 
   test("rejects a connection with a malformed token", async () => {
     const res = await buildApp().request("/ws?token=not-a-jwt");
     expect(res.status).toBe(401);
+    expect((await jsonBody(res)).code).toBe("TOKEN_INVALID");
   });
 
   test("rejects a connection with a token signed by a different secret", async () => {
@@ -78,9 +86,10 @@ describe("GET /ws handshake", () => {
     );
     const res = await buildApp().request(`/ws?token=${token}`);
     expect(res.status).toBe(401);
+    expect((await jsonBody(res)).code).toBe("TOKEN_INVALID");
   });
 
-  test("rejects an expired token", async () => {
+  test("rejects an expired token with the re-auth error code", async () => {
     const expired = Math.floor(Date.now() / 1000) - 3600;
     const token = signToken(
       { sub: "user-1", schoolId: "school-1", role: "STUDENT", exp: expired },
@@ -88,5 +97,6 @@ describe("GET /ws handshake", () => {
     );
     const res = await buildApp().request(`/ws?token=${token}`);
     expect(res.status).toBe(401);
+    expect((await jsonBody(res)).code).toBe("TOKEN_EXPIRED");
   });
 });

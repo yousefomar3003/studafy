@@ -1,19 +1,44 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import { createRoomManager, parseRoomKey, roomKey } from "./rooms";
+import { createRoomManager, parseRoomKey, roleRoomKey, schoolRoomKey, userRoomKey } from "./rooms";
 
-describe("roomKey", () => {
+describe("schoolRoomKey", () => {
+  test("formats school:{schoolId}", () => {
+    expect(schoolRoomKey("school-1")).toBe("school:school-1");
+  });
+});
+
+describe("roleRoomKey", () => {
   test("formats school:{schoolId}:role:{role}", () => {
-    expect(roomKey("school-1", "STUDENT")).toBe("school:school-1:role:STUDENT");
+    expect(roleRoomKey("school-1", "STUDENT")).toBe("school:school-1:role:STUDENT");
+  });
+});
+
+describe("userRoomKey", () => {
+  test("formats school:{schoolId}:user:{userId}", () => {
+    expect(userRoomKey("school-1", "user-1")).toBe("school:school-1:user:user-1");
   });
 });
 
 describe("parseRoomKey", () => {
-  test("recovers schoolId and role from a room key", () => {
+  test("recovers schoolId from a bare school room key", () => {
+    expect(parseRoomKey("school:school-1")).toEqual({ kind: "school", schoolId: "school-1" });
+  });
+
+  test("recovers schoolId and role from a role room key", () => {
     expect(parseRoomKey("school:school-1:role:STUDENT")).toEqual({
+      kind: "role",
       schoolId: "school-1",
       role: "STUDENT",
+    });
+  });
+
+  test("recovers schoolId and userId from a user room key", () => {
+    expect(parseRoomKey("school:school-1:user:user-1")).toEqual({
+      kind: "user",
+      schoolId: "school-1",
+      userId: "user-1",
     });
   });
 
