@@ -75,6 +75,14 @@ export interface AiEntitlement {
   status: SubscriptionStatus | null;
   /** Structurally false whenever the school is not active. */
   active: boolean;
+  /**
+   * The AI subscription's billing window, ISO-8601, or null when the student has no AI subscription
+   * row. ST-155's quota meter keys its monthly token budget on this window rather than a calendar
+   * month: the budget must reset at the renewal that starts a fresh billing cycle, which a calendar
+   * key cannot express for a subscription renewed mid-month.
+   */
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
 }
 
 interface ResolutionRow {
@@ -86,6 +94,8 @@ interface ResolutionRow {
   plan_code: string | null;
   ai_status: SubscriptionStatus | null;
   ai_active: boolean;
+  ai_period_start: Date | null;
+  ai_period_end: Date | null;
   school_version: string;
   ai_version: string;
 }
@@ -115,6 +125,8 @@ function resolutionQuery(tx: TransactionSql, studentId: string | null) {
       s.current_period_end AS current_period_end,
       p.code AS plan_code,
       ai.status::text AS ai_status,
+      ai.current_period_start AS ai_period_start,
+      ai.current_period_end AS ai_period_end,
       COALESCE(
         s.status::text = ANY(${[...LIVE_STATUSES]}) AND ai.status::text = ANY(${[...LIVE_STATUSES]}),
         false
@@ -203,6 +215,8 @@ export async function resolveAiEntitlement(
         status: null,
         // No subscription row means no AI add-on was ever bought. Absent is not entitled.
         active: false,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
       },
     };
   }
@@ -227,6 +241,8 @@ export async function resolveAiEntitlement(
       schoolVersion: school.version,
       status: row.ai_status,
       active: row.ai_active,
+      currentPeriodStart: row.ai_period_start?.toISOString() ?? null,
+      currentPeriodEnd: row.ai_period_end?.toISOString() ?? null,
     },
   };
 }
