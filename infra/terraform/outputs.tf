@@ -238,6 +238,11 @@ output "monitoring_alarm_arns" {
   value       = module.monitoring.alarm_arns
 }
 
+output "monitoring_realtime_probe_function_name" {
+  description = "Name of the synthetic realtime probe Lambda. null in dev, where the probe is not provisioned."
+  value       = module.monitoring.realtime_probe_function_name
+}
+
 # module.cdn is not instantiated for dev (main.tf's count), so every output below is null there —
 # one(...) rather than [0] indexing so `terraform output` doesn't error out on an empty list.
 output "cdn_web_bundle_bucket_id" {

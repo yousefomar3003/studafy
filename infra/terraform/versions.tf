@@ -20,5 +20,11 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    # Used by modules/monitoring to zip the realtime probe Lambda handler. Needs no provider block
+    # of its own — it is a pure local file operation.
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.6"
+    }
   }
 }

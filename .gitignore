@@ -24,6 +24,8 @@ terraform.rc
 *.tfvars.json
 !infra/terraform/environments/**/*.tfvars
 # .terraform.lock.hcl is deliberately NOT ignored: it pins provider checksums.
+# The realtime probe Lambda's deployment zip is built by the archive provider at plan/apply time.
+infra/terraform/modules/monitoring/lambda/realtime-probe/index.zip
 
 # Environment
 .env

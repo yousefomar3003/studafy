@@ -260,6 +260,18 @@ module "monitoring" {
   mariadb_instance_id               = local.erpnext_plane_enabled ? module.mariadb[0].db_instance_id : null
   redis_replication_group_id        = module.redis.replication_group_id
   ecs_cluster_name                  = module.compute.cluster_name
+
+  # Synthetic realtime probe (ST-149): staging/prod only — dev has no deployed realtime gateway
+  # to probe, and the acceptance criteria explicitly scope the probe to staging/prod. It connects
+  # through the public edge (wss://edge_domain_name/ws, the real client path), shares the app
+  # security group whose Redis ingress already admits app-tier traffic, and reads WS_JWT_SECRET +
+  # the Redis connection info from Secrets Manager.
+  probe_enabled            = var.environment != "dev"
+  realtime_ws_url          = "wss://${var.edge_domain_name}/ws"
+  realtime_jwt_secret_arn  = module.secrets.service_secret_arns["realtime"]
+  redis_auth_secret_arn    = module.redis.auth_secret_arn
+  probe_subnet_ids         = module.network.private_app_subnet_ids
+  probe_security_group_ids = [module.network.app_security_group_id]
 }
 
 # MariaDB for the ERPNext + Frappe Education plane. staging/prod only — see local.erpnext_plane_enabled.
