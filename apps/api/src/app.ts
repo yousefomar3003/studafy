@@ -33,6 +33,7 @@ import {
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
+import { aiEntitlementGate, aiUsageRoutes, createAiTokenMeter } from "./modules/ai";
 import {
   attendanceCorrectionRoutes,
   attendanceReportRoutes,
@@ -720,6 +721,17 @@ export function createApp({
     app.route("/", billingOverviewRoutes(database));
     app.route("/", invoiceRoutes(database, stripeProvider));
     app.route("/", cancellationRoutes(database, stripeProvider));
+  }
+
+  // AI entitlement & quota gate (ST-155). Mounted only when both a database (to resolve
+  // entitlements) and Redis (to meter the monthly token budget) are present. The gate deliberately
+  // does not fail open like rate limiting: an admitted request it could not meter would spend
+  // unbilled budget, so the whole surface is absent rather than un-metered. Routes under /api/ai/*
+  // that predate this gate are likewise absent until both dependencies exist.
+  if (database && redis && entitlements) {
+    const aiMeter = createAiTokenMeter({ redis });
+    app.use("/api/ai/*", aiEntitlementGate({ entitlements, meter: aiMeter }));
+    app.route("/", aiUsageRoutes({ entitlements, meter: aiMeter }));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:

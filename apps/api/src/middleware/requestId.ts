@@ -2,6 +2,7 @@ import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
 
 import type { AuthContext } from "./authContext";
 import type { Logger } from "../logger";
+import type { AiEntitlementContext, AiQuotaHandle } from "../modules/ai/gate/entitlement-gate";
 import type { MiddlewareHandler } from "hono";
 
 /**
@@ -90,6 +91,17 @@ export interface AppVariables {
   log: Logger;
   locale: string;
   auth?: AuthContext;
+  /**
+   * The resolved AI entitlement verdict and budget, set by aiEntitlementGate (ST-155) for every
+   * `/api/ai/*` request that passes its gates.
+   */
+  aiEntitlement?: AiEntitlementContext;
+  /**
+   * The live quota reservation, set by aiEntitlementGate for requests that consume quota. AI route
+   * handlers commit their actual usage through this handle; the gate releases it if they never
+   * settle. Read with getAiQuota(c).
+   */
+  aiQuota?: AiQuotaHandle;
 }
 
 export interface AppEnv {
