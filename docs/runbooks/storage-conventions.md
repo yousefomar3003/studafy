@@ -22,15 +22,17 @@ every school:
 temp/<schoolId>/<objectId>/<filename>
 reports/<schoolId>/<objectId>/<filename>
 permanent/<schoolId>/<objectId>/<filename>
+quarantine/<schoolId>/<objectId>/<filename>
 ```
 
 ## `app-files` bucket
 
-| Top-level prefix | Purpose                                                                    | Lifecycle                 |
-| ---------------- | -------------------------------------------------------------------------- | ------------------------- |
-| `temp/`          | Staging area for pre-signed uploads before the app confirms/processes them | Expires after 1 day (24h) |
-| `reports/`       | Generated exports (e.g. PDF/CSV reports) offered for download              | Expires after 7 days      |
-| `permanent/`     | Confirmed, long-lived user content (avatars, assignment attachments, etc.) | No expiration             |
+| Top-level prefix | Purpose                                                                                          | Lifecycle                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `temp/`          | Staging area for pre-signed uploads before the app confirms/processes them                       | Expires after 1 day (24h)                                         |
+| `reports/`       | Generated exports (e.g. PDF/CSV reports) offered for download                                    | Expires after 7 days                                              |
+| `permanent/`     | Confirmed, long-lived user content (avatars, assignment attachments, etc.)                       | No expiration                                                     |
+| `quarantine/`    | Objects a malware scan flagged. Never served; copied here, then the `permanent/` copy is deleted | No expiration (retain for forensics; expiry is a future decision) |
 
 Flow for a pre-signed upload:
 
@@ -49,6 +51,14 @@ Flow for a pre-signed upload:
 Objects under `reports/<schoolId>/...` are written directly by whatever generates the report and
 are expected to be re-generated on demand, so a 7-day expiry is a storage-cost bound, not a data
 loss risk.
+
+Objects under `quarantine/<schoolId>/...` are written only by the workers' `file-scan` queue when
+ClamAV flags a confirmed material. The worker copies the object from `permanent/` to
+`quarantine/` first, then deletes the `permanent/` copy, then flips the material to `quarantined`
+— that ordering is the crash-recovery checkpoint: a run that dies between the delete and the flip
+is retried by re-scanning the `quarantine/` copy rather than being mis-labelled as a scan failure.
+Nothing in the app ever serves from this prefix, so an infected object is unreachable the moment
+the `permanent/` copy is gone.
 
 ## `backups-archive` bucket
 

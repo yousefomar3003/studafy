@@ -693,9 +693,11 @@ export function createApp({
   }
 
   // Learning materials: CRUD, pre-signed upload flow, AI visibility toggle.
-  // Storage client is optional — upload endpoints return 503 when unconfigured.
+  // Storage client is optional — upload endpoints return 503 when unconfigured. Redis is optional
+  // the same way: when absent, confirm still flips the material to 'scanning' but no scan job is
+  // enqueued.
   if (database) {
-    app.route("/", materialRoutes(database));
+    app.route("/", materialRoutes(database, storage, redis ?? null));
   }
 
   // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm,

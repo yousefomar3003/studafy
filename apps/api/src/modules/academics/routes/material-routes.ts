@@ -1,4 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
+import { Queue } from "bullmq";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
@@ -28,8 +30,9 @@ import {
 } from "../schemas";
 
 import type { Database } from "../../../db/client";
+import type { StorageService } from "../../../lib/storage";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { StorageClient } from "../material-service";
+import type { RedisClient } from "../../../redis";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -112,7 +115,8 @@ const confirmMaterialUploadRoute = createRoute({
   summary: "Confirm a material upload",
   description:
     "Confirms that the file was uploaded to storage. Transitions the material to " +
-    "processing state. The ingestion worker picks it up from there.",
+    "scanning state and enqueues a malware scan. The scan worker flips it to ready (clean) " +
+    "or quarantined (infected).",
   security: [{ bearerAuth: [] }],
   request: {
     params: materialIdParamSchema,
@@ -124,7 +128,7 @@ const confirmMaterialUploadRoute = createRoute({
   responses: standardResponses(
     {
       200: {
-        description: "Material confirmed, now in processing state.",
+        description: "Material confirmed, now in scanning state.",
         schema: materialSchema,
       },
     },
@@ -222,9 +226,15 @@ function tenantFrom(c: Context<AppEnv>): {
 
 export function materialRoutes(
   database: Database,
-  storage?: StorageClient | null,
+  storage?: StorageService | null,
+  redis?: RedisClient | null,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  // One queue handle per process, like importRoutes. Null when Redis is unavailable: the confirm
+  // endpoint still flips the material to 'scanning' and answers 200, and the scan simply never
+  // runs — the same degraded mode the import and report producers use.
+  const scanQueue = redis ? new Queue(QUEUE_NAMES.SCAN, { connection: redis as never }) : null;
 
   // Audit declarations
   routes.use("/api/academics/materials/upload", auditAction("insert", "materials"));
@@ -273,11 +283,11 @@ export function materialRoutes(
       initiateUpload(tx, auth.schoolId, auth.userId, body),
     );
 
-    const presigned = await storage.createPresignedUpload(result.storage_key, body.mime_type);
+    const presigned = await storage.presign(result.storage_key, "PUT", body.mime_type);
 
     return c.json(
       {
-        upload_url: presigned.uploadUrl,
+        upload_url: presigned.url,
         storage_key: result.storage_key,
         expires_at: presigned.expiresAt.toISOString(),
       },
@@ -293,6 +303,27 @@ export function materialRoutes(
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
       confirmUpload(tx, auth.schoolId, materialId, body.storage_key, body.checksum_sha256),
     );
+
+    // Hand the confirmed material to the file-scan worker. The status flip above is the claim: the
+    // worker only touches materials still in 'scanning', so a retry (or a duplicate enqueue) can
+    // never scan the same object twice or notify the uploader twice.
+    if (scanQueue && row.ingest_status === "scanning") {
+      await scanQueue.add(
+        JOB_NAMES.SCAN_MATERIAL,
+        {
+          schoolId: auth.schoolId,
+          materialId: row.id,
+          storageKey: row.storage_key,
+          uploadedByUserId: row.uploaded_by_user_id,
+        },
+        {
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5_000 },
+          removeOnComplete: { age: 7 * 24 * 60 * 60 },
+          removeOnFail: { age: 30 * 24 * 60 * 60 },
+        },
+      );
+    }
 
     return c.json(row, 200);
   });

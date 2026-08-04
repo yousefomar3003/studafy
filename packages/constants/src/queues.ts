@@ -11,6 +11,9 @@ export const QUEUE_NAMES = {
   BILLING: "billing",
   OUTBOX_RELAY: "outbox-relay",
   PROVISIONING: "provisioning",
+  // Malware scanning of uploaded objects (ClamAV). Consumes one job per confirmed material; the
+  // verdict decides whether the material becomes available (ready) or is quarantined.
+  SCAN: "file-scan",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -76,6 +79,10 @@ export const JOB_NAMES = {
   // next-cycle downgrade on drift down, and a drift report to the school's ORG_ADMINs. Carries no
   // payload: the sweep reads every school's seats and Stripe state straight from the database.
   RUN_SEAT_RECONCILIATION: "run-seat-reconciliation",
+  // Malware scan of a confirmed material. Carries the material id, its permanent storage
+  // key, and the user to notify if the verdict is not clean. One job per confirm, at most once:
+  // the worker claims the material by its 'scanning' status and flips it to a terminal state.
+  SCAN_MATERIAL: "scan-material",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

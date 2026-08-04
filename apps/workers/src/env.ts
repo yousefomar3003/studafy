@@ -48,6 +48,19 @@ export const envSchema = z
     // dispatch logs exactly as in production but never calls FCM — the dev/test path, and a loud
     // warning is logged when a deployed worker has no service account.
     FIREBASE_SERVICE_ACCOUNT: z.string().min(1).optional(),
+    // Malware scanning (file-scan queue). CLAMAV_HOST is optional in dev/test so the queue still
+    // boots and scans fail closed at job time; the production validation below makes it mandatory,
+    // the same reasoning as STRIPE_SECRET_KEY — silently serving un-scanned files is worse than a
+    // failed deploy. CLAMAV_PORT/CLAMAV_TIMEOUT_MS/CLAMAV_MAX_FILE_BYTES mirror clamd's ListenPort,
+    // timeout and StreamMaxLength defaults.
+    CLAMAV_HOST: z.string().min(1).optional(),
+    CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
+    CLAMAV_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+    CLAMAV_MAX_FILE_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(25 * 1024 * 1024),
     // Base URL for the action links embedded in emails. The verify/activate endpoints are the
     // API's (the only surface with an ALB), so the link host is the app's public origin.
     FRONTEND_URL: z.string().url().default("http://localhost:5173"),
@@ -78,6 +91,17 @@ export const envSchema = z
         code: "custom",
         path: ["STRIPE_SECRET_KEY"],
         message: "STRIPE_SECRET_KEY is required in production",
+      });
+    }
+
+    // Malware scanning is a hard fail-closed gate: without a ClamAV host a deployed worker could
+    // confirm materials and never scan them. Fail fast at bootstrap rather than let files sit in
+    // 'scanning' or, worse, appear to complete without a verdict.
+    if (env.CLAMAV_HOST === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["CLAMAV_HOST"],
+        message: "CLAMAV_HOST is required in production",
       });
     }
 

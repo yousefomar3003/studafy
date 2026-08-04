@@ -23,12 +23,13 @@ import { ERROR_CODES } from "@studafy/constants";
 import { CodedHttpException } from "../../coded-http-exception";
 
 /** Top-level lifecycle categories on the app-files bucket. See the runbook's table. */
-export type StorageCategory = "temp" | "reports" | "permanent";
+export type StorageCategory = "temp" | "reports" | "permanent" | "quarantine";
 
 const STORAGE_CATEGORIES: ReadonlySet<string> = new Set<StorageCategory>([
   "temp",
   "reports",
   "permanent",
+  "quarantine",
 ]);
 
 /** A key decomposed into its four segments. */
@@ -105,6 +106,16 @@ export function buildTempKey(schoolId: string, objectId: string, filename: strin
 /** Key for confirmed, long-lived content. No expiration. */
 export function buildPermanentKey(schoolId: string, objectId: string, filename: string): string {
   return buildKey("permanent", schoolId, objectId, filename);
+}
+
+/**
+ * Key for an object a malware scan quarantined. Written by the file-scan worker, which copies the
+ * `permanent/` object here and deletes the served copy; nothing is ever served from this prefix.
+ * The API has no writer today but the category belongs to the scheme so `parseStorageKey` can read
+ * these keys and no code has to special-case a fourth prefix.
+ */
+export function buildQuarantineKey(schoolId: string, objectId: string, filename: string): string {
+  return buildKey("quarantine", schoolId, objectId, filename);
 }
 
 /**

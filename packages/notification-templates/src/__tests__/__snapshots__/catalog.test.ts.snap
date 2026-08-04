@@ -127,3 +127,27 @@ exports[`renderNotification — snapshot tests ar ADMIN_ANNOUNCEMENT / email ren
 
 The campus will be closed for maintenance on Friday. Classes resume Monday."
 `;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_QUARANTINED / in_app renders correctly 1`] = `"eicar-test.txt was blocked by a malware scan"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_QUARANTINED / push renders correctly 1`] = `"Upload blocked: eicar-test.txt"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_QUARANTINED / email renders correctly 1`] = `"Your file "eicar-test.txt" was blocked because it is infected with Win.Test.EICAR_HDB-1. It will not be served."`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_FAILED / in_app renders correctly 1`] = `"notes.pdf could not be scanned"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_FAILED / push renders correctly 1`] = `"Upload not scanned: notes.pdf"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_FAILED / email renders correctly 1`] = `"Your file "notes.pdf" could not be scanned and was not made available. Please upload it again."`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_QUARANTINED / in_app renders correctly 1`] = `"تم حظر eicar-test.txt بسبب فحص مكافحة الفيروسات"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_QUARANTINED / push renders correctly 1`] = `"تم حظر التحميل: eicar-test.txt"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_QUARANTINED / email renders correctly 1`] = `"تم حظر ملف "eicar-test.txt" لأنه مصاب بـ Win.Test.EICAR_HDB-1. لن يتم نشره."`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_FAILED / in_app renders correctly 1`] = `"تعذر فحص notes.pdf"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_FAILED / push renders correctly 1`] = `"لم يتم فحص التحميل: notes.pdf"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_FAILED / email renders correctly 1`] = `"تعذر فحص ملف "notes.pdf" ولم يتم نشره. يرجى إعادة تحميله."`;

@@ -125,6 +125,13 @@ export const eventPayloadSchemas = {
   }),
   [DOMAIN_EVENTS.MATERIAL_AI_ENABLED]: z.object({ materialId: uid }),
   [DOMAIN_EVENTS.MATERIAL_AI_DISABLED]: z.object({ materialId: uid }),
+  // The worker's quarantine transaction. schoolId is on the outbox row already but is repeated so
+  // consumers can ignore the row and trust the payload. `virus` is the ClamAV signature name.
+  [DOMAIN_EVENTS.MATERIAL_QUARANTINED]: z.object({
+    materialId: uid,
+    schoolId: uid,
+    virus: z.string(),
+  }),
 
   // ── Study Group ───────────────────────────────────────────────────────
   [DOMAIN_EVENTS.STUDY_GROUP_CREATED]: z.object({ groupId: uid }),

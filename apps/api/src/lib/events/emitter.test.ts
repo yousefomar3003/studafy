@@ -223,6 +223,11 @@ describe("emit", () => {
         [DOMAIN_EVENTS.MATERIAL_UPLOADED]: { materialId: uid, classId: uid },
         [DOMAIN_EVENTS.MATERIAL_AI_ENABLED]: { materialId: uid },
         [DOMAIN_EVENTS.MATERIAL_AI_DISABLED]: { materialId: uid },
+        [DOMAIN_EVENTS.MATERIAL_QUARANTINED]: {
+          materialId: uid,
+          schoolId: uid,
+          virus: "Eicar-Test-Signature",
+        },
         [DOMAIN_EVENTS.STUDY_GROUP_CREATED]: { groupId: uid },
         [DOMAIN_EVENTS.STUDY_GROUP_JOINED]: { groupId: uid },
         [DOMAIN_EVENTS.CERTIFICATE_ISSUED]: { certificateId: uid, studentId: uid },

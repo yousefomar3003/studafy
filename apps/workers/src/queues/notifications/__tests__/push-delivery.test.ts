@@ -88,8 +88,10 @@ async function seedPushFixture(tokens: string[]): Promise<Fixture> {
     const devices: { id: string; token: string }[] = [];
     for (const [index, token] of tokens.entries()) {
       const [device] = await tx<{ id: string }[]>`
-        INSERT INTO app.user_devices (school_id, user_id, fcm_token, platform, last_seen)
+        INSERT INTO app.user_devices
+          (school_id, user_id, fcm_token, platform, created_at, last_seen)
         VALUES (${schoolId}::uuid, ${userId}::uuid, ${token}, 'android',
+                CURRENT_TIMESTAMP - (${index} * interval '1 minute'),
                 CURRENT_TIMESTAMP - (${index} * interval '1 minute'))
         RETURNING id
       `;

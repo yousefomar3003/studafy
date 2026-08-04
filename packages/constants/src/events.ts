@@ -40,6 +40,10 @@ export const DOMAIN_EVENTS = {
   MATERIAL_UPLOADED: "material.uploaded",
   MATERIAL_AI_ENABLED: "material.aiEnabled",
   MATERIAL_AI_DISABLED: "material.aiDisabled",
+  // Raised by the file-scan worker, in the same transaction that quarantines the material, once
+  // ClamAV returned an infected verdict. The reporter's in-app notification is the row next to it;
+  // consumers (e.g. an email alert for school admins) follow this event.
+  MATERIAL_QUARANTINED: "material.quarantined",
 
   STUDY_GROUP_CREATED: "studyGroup.created",
   STUDY_GROUP_JOINED: "studyGroup.joined",

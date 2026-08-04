@@ -58,4 +58,14 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "إعلان: {title}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{title}\n\n{summary}",
   },
+  [NOTIFICATION_TYPES.MATERIAL_SCAN_QUARANTINED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تم حظر {fileName} بسبب فحص مكافحة الفيروسات",
+    [NOTIFICATION_CHANNELS.PUSH]: "تم حظر التحميل: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: 'تم حظر ملف "{fileName}" لأنه مصاب بـ {virus}. لن يتم نشره.',
+  },
+  [NOTIFICATION_TYPES.MATERIAL_SCAN_FAILED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تعذر فحص {fileName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "لم يتم فحص التحميل: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: 'تعذر فحص ملف "{fileName}" ولم يتم نشره. يرجى إعادة تحميله.',
+  },
 } as const satisfies LocaleTemplateSet;

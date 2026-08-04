@@ -60,4 +60,16 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "Announcement: {title}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{title}\n\n{summary}",
   },
+  [NOTIFICATION_TYPES.MATERIAL_SCAN_QUARANTINED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{fileName} was blocked by a malware scan",
+    [NOTIFICATION_CHANNELS.PUSH]: "Upload blocked: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      'Your file "{fileName}" was blocked because it is infected with {virus}. It will not be served.',
+  },
+  [NOTIFICATION_TYPES.MATERIAL_SCAN_FAILED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{fileName} could not be scanned",
+    [NOTIFICATION_CHANNELS.PUSH]: "Upload not scanned: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      'Your file "{fileName}" could not be scanned and was not made available. Please upload it again.',
+  },
 } as const satisfies LocaleTemplateSet;

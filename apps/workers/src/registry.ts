@@ -17,6 +17,7 @@ import {
 import { processDigest, processNotificationDigest } from "./queues/notifications/email";
 import { createFcmSender } from "./queues/notifications/push";
 import { processAttendanceExport, processFinanceExport } from "./queues/reports";
+import { createScanS3, materialScanFailedListener, processMaterialScan } from "./queues/scan";
 
 import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
 import type { FailedHandler } from "./queues/notifications/dead-letter";
@@ -218,6 +219,31 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       }
       return processStudentImport(data as { importId: string; schoolId: string }, databaseUrl);
     },
+  },
+  {
+    name: QUEUE_NAMES.SCAN,
+    concurrency: 2,
+    // One job per confirmed material. Concurrency 2: each scan holds a clamd connection and streams
+    // the object once, and the clean-file availability budget is dominated by scan latency — two in
+    // flight keeps that low without oversubscribing a Fargate-sized container's clamd pool.
+    processor: (job: Job) =>
+      processMaterialScan(job, {
+        databaseUrl,
+        databaseCaCert: workerEnv.DATABASE_CA_CERT,
+        s3: workerEnv.S3_REGION
+          ? createScanS3({ region: workerEnv.S3_REGION, endpoint: workerEnv.S3_ENDPOINT })
+          : null,
+        bucket: workerEnv.S3_APP_FILES_BUCKET,
+        clamd: {
+          host: workerEnv.CLAMAV_HOST ?? "",
+          port: workerEnv.CLAMAV_PORT,
+          timeoutMs: workerEnv.CLAMAV_TIMEOUT_MS,
+          maxFileBytes: workerEnv.CLAMAV_MAX_FILE_BYTES,
+        },
+      }),
+    // Terminal failures fail closed: the material is marked failed (never available) and the
+    // uploader is alerted. See scan-material.worker.ts.
+    onFailed: materialScanFailedListener(databaseUrl, workerLogger),
   },
   {
     name: QUEUE_NAMES.BILLING,

@@ -12,6 +12,9 @@ describe("loadEnv", () => {
       DATABASE_URL: "postgres://localhost:5432/studafy",
       SCHOOL_IDS: "",
       SES_FROM_ADDRESS: "invitations@mail.studafy.com",
+      CLAMAV_PORT: 3310,
+      CLAMAV_TIMEOUT_MS: 30_000,
+      CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
       FRONTEND_URL: "http://localhost:5173",
       EMAIL_MAX_RATE_PER_SECOND: 5,
       EMAIL_POLL_INTERVAL_MS: 1_000,
@@ -35,6 +38,9 @@ describe("loadEnv", () => {
       DATABASE_URL: "postgres://localhost:5432/studafy",
       SCHOOL_IDS: "",
       SES_FROM_ADDRESS: "invitations@mail.studafy.com",
+      CLAMAV_PORT: 3310,
+      CLAMAV_TIMEOUT_MS: 30_000,
+      CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
       FRONTEND_URL: "http://localhost:5173",
       EMAIL_MAX_RATE_PER_SECOND: 5,
       EMAIL_POLL_INTERVAL_MS: 1_000,
@@ -66,11 +72,13 @@ describe("loadEnv", () => {
         READ_DATABASE_HOST: "pgbouncer.internal",
         READ_DATABASE_NAME: "workers_read",
         STRIPE_SECRET_KEY: "sk_test_prod",
+        CLAMAV_HOST: "clamd.internal",
       }),
     ).toMatchObject({
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
       STRIPE_SECRET_KEY: "sk_test_prod",
+      CLAMAV_HOST: "clamd.internal",
     });
   });
 });
