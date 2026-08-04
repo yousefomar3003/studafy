@@ -76,6 +76,7 @@ import {
 } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
+import { storageRoutes } from "./modules/storage";
 import {
   checkoutRoutes,
   schoolCheckoutRoutes,
@@ -696,6 +697,13 @@ export function createApp({
   if (database) {
     app.route("/", materialRoutes(database));
   }
+
+  // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm,
+  // reusing the temp/ -> permanent/ scheme the assignments/submissions/materials flows use.
+  // Database-free, so it mounts regardless of the database guard above; `storage` is nullable and
+  // the endpoints answer 503 when it is absent. Authorization is per content class, asserted in
+  // the handler via requirePermissionIn().
+  app.route("/", storageRoutes(storage));
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.
   // Provides read access to provisioning status and manual provisioning trigger.

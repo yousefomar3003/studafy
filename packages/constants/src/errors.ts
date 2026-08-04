@@ -218,6 +218,8 @@ export const ERROR_CODES = {
   STORAGE_KEY_FORBIDDEN: "STORAGE_KEY_FORBIDDEN",
   STORAGE_OBJECT_NOT_FOUND: "STORAGE_OBJECT_NOT_FOUND",
   STORAGE_NOT_CONFIGURED: "STORAGE_NOT_CONFIGURED",
+  // The object's server-computed SHA-256 did not match the checksum the client supplied at confirm.
+  STORAGE_CHECKSUM_MISMATCH: "STORAGE_CHECKSUM_MISMATCH",
 
   // Materials — upload, ingestion, and AI visibility.
   MATERIAL_NOT_FOUND: "MATERIAL_NOT_FOUND",

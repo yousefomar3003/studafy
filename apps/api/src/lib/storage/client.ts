@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   CopyObjectCommand,
   DeleteObjectCommand,
@@ -20,6 +22,12 @@ export interface PresignedUrl {
   expiresAt: Date;
 }
 
+/** What S3 actually stored for an object -- read back from the bucket, never from the caller. */
+export interface ObjectMetadata {
+  contentType: string;
+  sizeBytes: number;
+}
+
 export interface StorageService {
   readonly ttlSeconds: number;
   presign(
@@ -30,6 +38,15 @@ export interface StorageService {
   ): PresignedUrl | Promise<PresignedUrl>;
   exists(key: string): Promise<boolean>;
   size(key: string): Promise<number>;
+  /**
+   * Metadata as stored, or null when the object does not exist.
+   *
+   * Unlike exists()+size(), this is a single HEAD round trip, and the returned contentType is the
+   * value bound at PUT time -- the real object, not whatever a client claimed in a request body.
+   */
+  head(key: string): Promise<ObjectMetadata | null>;
+  /** SHA-256 of the object body, streamed from storage. */
+  checksumSha256(key: string): Promise<string>;
   copy(sourceKey: string, destinationKey: string): Promise<void>;
   remove(key: string): Promise<void>;
 }
@@ -88,6 +105,34 @@ export function createStorageService(env: Env): StorageService | null {
     async size(key) {
       const result = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
       return Number(result.ContentLength ?? 0);
+    },
+
+    async head(key) {
+      try {
+        const result = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+        return {
+          contentType: result.ContentType ?? "application/octet-stream",
+          sizeBytes: Number(result.ContentLength ?? 0),
+        };
+      } catch (error) {
+        const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+          ?.httpStatusCode;
+        if (status === 404) return null;
+        throw error;
+      }
+    },
+
+    async checksumSha256(key) {
+      const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+      const body = response.Body as AsyncIterable<Uint8Array> | undefined;
+      if (!body) {
+        throw new Error("Object body is not streamable");
+      }
+      const hash = createHash("sha256");
+      for await (const chunk of body) {
+        hash.update(chunk);
+      }
+      return hash.digest("hex");
     },
 
     async copy(sourceKey, destinationKey) {

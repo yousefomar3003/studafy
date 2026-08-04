@@ -249,6 +249,8 @@ describe("structure", () => {
         "/api/schools/verify-email/{token}",
         "/api/schools/{schoolId}/provision",
         "/api/schools/{schoolId}/provisioning-status",
+        "/api/storage/uploads/confirm",
+        "/api/storage/uploads/request-upload",
         "/api/students",
         "/api/students/{studentId}",
         "/api/students/{studentId}/guardians",
@@ -640,6 +642,8 @@ describe("security", () => {
         // In-app inbox (ST-142). Read-state mutations are self-service on the caller's own rows.
         "POST /api/notifications/{notificationId}/read",
         "POST /api/notifications/read-all",
+        "POST /api/storage/uploads/confirm",
+        "POST /api/storage/uploads/request-upload",
         "POST /api/students",
         "POST /api/students/{studentId}/guardians",
         "POST /api/subscriptions/ai/checkout",

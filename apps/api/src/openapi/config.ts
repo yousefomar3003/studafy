@@ -223,5 +223,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Stripe is unconfigured — they answer 503 at request time with a clear error code. " +
         "The webhook endpoint is public and authenticated by Stripe's signature header.",
     },
+    {
+      name: "Storage",
+      description:
+        "Generic object-storage gateway. Content-class-gated pre-signed upload and confirm, " +
+        "reusing the temp/ -> permanent/ lifecycle scheme. Answers 503 when object storage is not " +
+        "configured, and is authorized per content class.",
+    },
   ],
 };
