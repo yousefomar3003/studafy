@@ -11,7 +11,7 @@ bun run build        # production build to dist/
 bun run preview      # serve the production build locally
 bun run check-types  # tsc --noEmit
 bun run lint         # eslint .
-bun test             # run the smoke test (happy-dom + @testing-library/react)
+bun test             # bun test (happy-dom + @testing-library/react)
 ```
 
 ## Route map
@@ -44,16 +44,46 @@ StrictMode
 └─ ErrorBoundary            // src/components/ErrorBoundary.tsx — render/provider errors
    └─ AppProviders          // src/app/providers.tsx
       └─ QueryClientProvider // TanStack Query (client from src/app/query-client.ts)
-         └─ RouterProvider   // route-level errors via RouteError (errorElement)
+         └─ RealtimeProvider // RealtimeClient (src/lib/realtime) + useRealtime hooks
+            └─ RouterProvider   // route-level errors via RouteError (errorElement)
 ```
 
 Add new app-wide providers inside `AppProviders`.
 
+## Realtime client
+
+`src/lib/realtime/` implements the WebSocket client for the gateway (`apps/realtime`):
+
+| Module             | Responsibility                                                    |
+| ------------------ | ----------------------------------------------------------------- |
+| `protocol.ts`      | Wire grammar (`EventEnvelope`, system messages), close-code 4401. |
+| `client.ts`        | `RealtimeClient`: auth, jittered-backoff reconnect, resubscribe.  |
+| `invalidations.ts` | Event name → TanStack Query invalidation map.                     |
+| `backoff.ts`       | Pure reconnect delay computation.                                 |
+| `connection.tsx`   | `RealtimeProvider` + `useRealtime` / `useRealtimeConnection`.     |
+
+`AppProviders` wires one `RealtimeClient` behind the query client. The base URL comes from
+`VITE_REALTIME_BASE_URL` (default `ws://localhost:3001`); auth is supplied by
+`getRealtimeToken()` (`src/lib/realtime/token.ts`).
+
+### Query-key contract
+
+When an event arrives, the client invalidates every query whose key starts with one of the event's
+prefixes in `EVENT_QUERY_INVALIDATIONS`, and — on a successful reconnect — all mapped prefixes.
+
+| Wire event         | Query-key prefixes invalidated     |
+| ------------------ | ---------------------------------- |
+| `grades.published` | `["approval-queue"]`, `["grades"]` |
+
+New screens that consume server state should use a prefix covered here (or extend the map alongside
+a gateway route in `apps/realtime/src/event-routing.ts`); otherwise their data goes stale until the
+next reconnect.
+
 ## Shared schemas
 
-`@studafy/shared-schemas` (Zod primitives) is **not** a dependency yet — the shell needs none. When
-a route needs one, add `"@studafy/shared-schemas": "workspace:*"` to `package.json` and import it;
-do not redefine schema primitives locally.
+`@studafy/shared-schemas` (Zod primitives) is a dependency used by the realtime wire validation and
+will be shared as more routes need it. Import the workspace package rather than redefining schema
+primitives locally.
 
 ## Build-size expectation
 
