@@ -150,6 +150,168 @@ async function buildDocx(
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
+// ---- PPTX ------------------------------------------------------------------------------------
+
+const P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main";
+const A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main";
+const R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const OFFICE_REL_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+interface PptxSlide {
+  /** The slide's title placeholder text, or null for a title-less slide. */
+  title: string | null;
+  bullets: string[];
+  /** The speaker notes, when the slide has a notes part. */
+  notes?: string;
+}
+
+const PPTX_ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="${OFFICE_REL_TYPE}/officeDocument" Target="ppt/presentation.xml"/>
+</Relationships>`;
+
+const pptxContentTypes = (
+  overrides: string,
+): string => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  ${overrides}
+</Types>`;
+
+const presentationXml = (
+  slideCount: number,
+): string => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:a="${A_NS}" xmlns:r="${R_NS}" xmlns:p="${P_NS}">
+  <p:sldIdLst>${Array.from(
+    { length: slideCount },
+    (_, index) => `<p:sldId id="${256 + index}" r:id="rId${index + 1}"/>`,
+  ).join("")}</p:sldIdLst>
+</p:presentation>`;
+
+const presentationRelsXml = (
+  slideCount: number,
+): string => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${Array.from(
+    { length: slideCount },
+    (_, index) =>
+      `<Relationship Id="rId${index + 1}" Type="${OFFICE_REL_TYPE}/slide" Target="slides/slide${index + 1}.xml"/>`,
+  ).join("\n  ")}
+</Relationships>`;
+
+const slideXml = (slide: PptxSlide, id: number): string => {
+  const titleShape =
+    slide.title === null
+      ? ""
+      : `<p:sp>
+      <p:nvSpPr>
+        <p:cNvPr id="${id}" name="Title ${id}"/>
+        <p:cNvSpPr/>
+        <p:nvPr><p:ph type="title"/></p:nvPr>
+      </p:nvSpPr>
+      <p:spPr/>
+      <p:txBody><a:bodyPr/><a:p><a:r><a:t>${escapeXml(slide.title)}</a:t></a:r></a:p></p:txBody>
+    </p:sp>`;
+  const bodyShape = slide.bullets
+    .map(
+      (bullet) => `<p:sp>
+      <p:nvSpPr>
+        <p:cNvPr id="${id}" name="Content Placeholder ${id}"/>
+        <p:cNvSpPr/>
+        <p:nvPr><p:ph type="body" idx="1"/></p:nvPr>
+      </p:nvSpPr>
+      <p:spPr/>
+      <p:txBody><a:bodyPr/><a:p><a:r><a:t>${escapeXml(bullet)}</a:t></a:r></a:p></p:txBody>
+    </p:sp>`,
+    )
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="${A_NS}" xmlns:r="${R_NS}" xmlns:p="${P_NS}">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="${id}" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr/>
+      ${titleShape}
+      ${bodyShape}
+    </p:spTree>
+  </p:cSld>
+</p:sld>`;
+};
+
+const notesXml = (notes: string): string => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:notes xmlns:a="${A_NS}" xmlns:r="${R_NS}" xmlns:p="${P_NS}">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr/>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Notes Placeholder 2"/>
+          <p:cNvSpPr/>
+          <p:nvPr><p:ph type="body" idx="1"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr/>
+        <p:txBody><a:bodyPr/><a:p><a:r><a:t>${escapeXml(notes)}</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:notes>`;
+
+const slideRelsXml = (
+  notesSlideNumber: number | null,
+): string => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="${OFFICE_REL_TYPE}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+  ${
+    notesSlideNumber === null
+      ? ""
+      : `<Relationship Id="rId2" Type="${OFFICE_REL_TYPE}/notesSlide" Target="../notesSlides/notesSlide${notesSlideNumber}.xml"/>`
+  }
+</Relationships>`;
+
+async function buildPptx(slides: PptxSlide[]): Promise<Buffer> {
+  const zip = new JSZip();
+  const overrides = [
+    `<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>`,
+  ];
+  slides.forEach((slide, index) => {
+    const n = index + 1;
+    overrides.push(
+      `<Override PartName="/ppt/slides/slide${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`,
+    );
+    if (slide.notes !== undefined) {
+      overrides.push(
+        `<Override PartName="/ppt/notesSlides/notesSlide${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>`,
+      );
+    }
+  });
+  zip.file("[Content_Types].xml", pptxContentTypes(overrides.join("\n  ")));
+  zip.file("_rels/.rels", PPTX_ROOT_RELS);
+  zip.file("ppt/presentation.xml", presentationXml(slides.length));
+  zip.file("ppt/_rels/presentation.xml.rels", presentationRelsXml(slides.length));
+  slides.forEach((slide, index) => {
+    const n = index + 1;
+    zip.file(`ppt/slides/slide${n}.xml`, slideXml(slide, 1 + n * 10));
+    zip.file(
+      `ppt/slides/_rels/slide${n}.xml.rels`,
+      slideRelsXml(slide.notes !== undefined ? n : null),
+    );
+    if (slide.notes !== undefined) {
+      zip.file(`ppt/notesSlides/notesSlide${n}.xml`, notesXml(slide.notes));
+    }
+  });
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
 // ---- Corpus content --------------------------------------------------------------------------
 
 const PDF_PAGES: Record<string, { title: string; sections: PdfSection[] }[]> = {
@@ -616,6 +778,53 @@ const DOCX_CONTENT: Record<
   },
 };
 
+const PPTX_DECKS: Record<string, PptxSlide[]> = {
+  "photosynthesis-deck.pptx": [
+    {
+      title: "Photosynthesis",
+      bullets: [
+        "Photosynthesis converts light energy into chemical energy stored in glucose.",
+        "It happens in the chloroplasts of plant cells.",
+      ],
+      notes: "Opening slide: connect the reaction to the big picture.",
+    },
+    {
+      title: "Light Reactions",
+      bullets: [
+        "Chlorophyll absorbs mostly red and blue light.",
+        "Light energy splits water molecules during photolysis.",
+      ],
+    },
+    {
+      title: "The Calvin Cycle",
+      bullets: [
+        "The Calvin cycle fixes carbon dioxide into organic molecules.",
+        "It uses ATP and NADPH produced in the light reactions.",
+      ],
+      notes: "Emphasize that the cycle repeats three times.",
+    },
+  ],
+  "solar-system-deck.pptx": [
+    {
+      title: "The Solar System",
+      bullets: [
+        "The Sun contains most of the mass of the solar system.",
+        "Eight planets orbit the Sun in elliptical paths.",
+      ],
+      notes: "Introduce the scale of distances between the planets.",
+    },
+    {
+      title: null,
+      bullets: [
+        "Jupiter is the largest planet by mass.",
+        "Saturn's rings are made of ice and rock.",
+        "Neptune was discovered by calculation before observation.",
+      ],
+      notes: "Cover the gas giants and how each was found.",
+    },
+  ],
+};
+
 // ---- Corrupt / unsupported --------------------------------------------------------------------
 
 const CORRUPT: Record<string, Uint8Array> = {
@@ -626,7 +835,13 @@ const CORRUPT: Record<string, Uint8Array> = {
   "corrupt-empty.pdf": Buffer.alloc(0),
   "corrupt-not-a-docx.docx": Buffer.from("definitely not a zip archive", "utf8"),
   "corrupt-empty.docx": Buffer.alloc(0),
+  "corrupt-not-a-pptx.pptx": Buffer.from(
+    "This file claims to be a PPTX but is actually plain text.",
+    "utf8",
+  ),
+  "corrupt-empty.pptx": Buffer.alloc(0),
   "unsupported-legacy-doc.doc": Buffer.from("fake legacy binary document", "utf8"),
+  "unsupported-legacy-ppt.ppt": Buffer.from("fake legacy binary presentation", "utf8"),
 };
 
 // ---- Run --------------------------------------------------------------------------------------
@@ -650,6 +865,13 @@ async function main(): Promise<void> {
         join(FILES_DIR, spec.file),
         await buildDocx(content.title, content.intro, content.sections),
       );
+    } else if (spec.kind === "pptx") {
+      const deck = PPTX_DECKS[spec.file];
+      if (!deck) throw new Error(`Missing PPTX content for ${spec.file}`);
+      if (spec.slides !== deck.length) {
+        throw new Error(`Manifest slide count for ${spec.file} does not match its content`);
+      }
+      writeFileSync(join(FILES_DIR, spec.file), await buildPptx(deck));
     } else if (spec.kind === "corrupt") {
       let bytes: Uint8Array | undefined = CORRUPT[spec.file];
       if (spec.file === "corrupt-truncated-pdf.pdf") {
@@ -659,6 +881,11 @@ async function main(): Promise<void> {
         const zip = new JSZip();
         zip.file("[Content_Types].xml", CONTENT_TYPES_XML);
         zip.file("_rels/.rels", RELS_XML);
+        bytes = await zip.generateAsync({ type: "nodebuffer" });
+      } else if (spec.file === "corrupt-pptx-missing-presentation.pptx") {
+        const zip = new JSZip();
+        zip.file("[Content_Types].xml", pptxContentTypes(""));
+        zip.file("_rels/.rels", PPTX_ROOT_RELS);
         bytes = await zip.generateAsync({ type: "nodebuffer" });
       }
       if (bytes === undefined) throw new Error(`Missing corrupt content for ${spec.file}`);

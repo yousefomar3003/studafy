@@ -167,7 +167,12 @@ function buildBlocks(lines: Line[][], bodySize: number, outline: OutlineSection[
   for (const [pageIndex, pageLines] of lines.entries()) {
     const outlineTitle = outlineByPage.get(pageIndex);
     if (outlineTitle) {
-      blocks.push({ text: outlineTitle, kind: "heading", pageNumber: pageIndex + 1 });
+      blocks.push({
+        text: outlineTitle,
+        kind: "heading",
+        pageNumber: pageIndex + 1,
+        slideNumber: null,
+      });
     }
     for (const line of pageLines) {
       if (line.text === "") continue;
@@ -179,6 +184,7 @@ function buildBlocks(lines: Line[][], bodySize: number, outline: OutlineSection[
         text: line.text,
         kind: heading ? "heading" : "body",
         pageNumber: pageIndex + 1,
+        slideNumber: null,
       });
     }
   }

@@ -20,6 +20,7 @@ export function chunkBlocks(
   let buffer: string[] = [];
   let currentPage: number | null = null;
   let currentSection: string | null = null;
+  let currentSlide: number | null = null;
   let nextIndex = 0;
 
   const flush = (): void => {
@@ -37,6 +38,13 @@ export function chunkBlocks(
   };
 
   for (const block of blocks) {
+    // A slide is an authoring boundary: PPTX blocks carry their slide and a chunk must never
+    // straddle one, even when a slide has no title heading to flush on.
+    if (block.slideNumber !== null && block.slideNumber !== currentSlide) {
+      flush();
+      currentSlide = block.slideNumber;
+    }
+
     if (block.kind === "heading") {
       flush();
       currentSection = block.text;

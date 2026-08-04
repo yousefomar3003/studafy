@@ -16,7 +16,7 @@ const readFixture = async (file: string): Promise<Uint8Array> =>
 describe("ai-ingestion fixture corpus", () => {
   test("valid documents yield chunks containing their anchors and section headings", async () => {
     for (const spec of FIXTURES) {
-      if (spec.kind !== "pdf" && spec.kind !== "docx") continue;
+      if (spec.kind !== "pdf" && spec.kind !== "docx" && spec.kind !== "pptx") continue;
       const chunks = await buildIngestChunks(await readFixture(spec.file), spec.mimeType);
 
       expect(chunks.length, `${spec.file} produced no chunks`).toBeGreaterThan(0);
@@ -31,7 +31,7 @@ describe("ai-ingestion fixture corpus", () => {
         );
       }
     }
-  });
+  }, 30_000);
 
   test("pdf chunks carry page numbers up to the document page count", async () => {
     for (const spec of FIXTURES) {
@@ -42,6 +42,29 @@ describe("ai-ingestion fixture corpus", () => {
         .filter((page): page is number => page !== null);
       expect(pages.length, `${spec.file} lost all page numbers`).toBe(chunks.length);
       expect(Math.max(...pages)).toBe(spec.pages!);
+    }
+  });
+
+  test("pptx decks chunk one per slide with slide-number anchors and captured notes", async () => {
+    for (const spec of FIXTURES) {
+      if (spec.kind !== "pptx") continue;
+      const chunks = await buildIngestChunks(await readFixture(spec.file), spec.mimeType);
+
+      expect(chunks, `${spec.file} did not chunk one-per-slide`).toHaveLength(spec.slides!);
+      expect(chunks.map((chunk) => chunk.pageNumber)).toEqual(
+        Array.from({ length: spec.slides! }, (_, index) => index + 1),
+      );
+
+      const content = chunks.map((chunk) => chunk.content).join("\n");
+      for (const anchor of spec.anchors ?? []) {
+        expect(content, `${spec.file} lost anchor "${anchor}"`).toContain(anchor);
+      }
+      const sectionTitles = new Set(chunks.map((chunk) => chunk.sectionTitle).filter(Boolean));
+      for (const heading of spec.headings ?? []) {
+        expect(sectionTitles.has(heading), `${spec.file} did not detect heading "${heading}"`).toBe(
+          true,
+        );
+      }
     }
   });
 
@@ -60,11 +83,11 @@ describe("ai-ingestion fixture corpus", () => {
 describe("chunkBlocks", () => {
   test("headings flush the current chunk and become the section title", () => {
     const blocks: ParsedBlock[] = [
-      { text: "Introduction", kind: "heading", pageNumber: 1 },
-      { text: "First paragraph.", kind: "body", pageNumber: 1 },
-      { text: "Second paragraph.", kind: "body", pageNumber: 2 },
-      { text: "Methods", kind: "heading", pageNumber: 2 },
-      { text: "Method paragraph.", kind: "body", pageNumber: 2 },
+      { text: "Introduction", kind: "heading", pageNumber: 1, slideNumber: null },
+      { text: "First paragraph.", kind: "body", pageNumber: 1, slideNumber: null },
+      { text: "Second paragraph.", kind: "body", pageNumber: 2, slideNumber: null },
+      { text: "Methods", kind: "heading", pageNumber: 2, slideNumber: null },
+      { text: "Method paragraph.", kind: "body", pageNumber: 2, slideNumber: null },
     ];
     const chunks = chunkBlocks(blocks);
 
@@ -75,11 +98,27 @@ describe("chunkBlocks", () => {
     expect(chunks[1]!.content).toBe("Method paragraph.");
   });
 
+  test("a slide boundary flushes the chunk even without a heading", () => {
+    const blocks: ParsedBlock[] = [
+      { text: "First slide bullet.", kind: "body", pageNumber: 1, slideNumber: 1 },
+      { text: "Second slide bullet.", kind: "body", pageNumber: 2, slideNumber: 2 },
+      { text: "Second slide note.", kind: "body", pageNumber: 2, slideNumber: 2 },
+    ];
+    const chunks = chunkBlocks(blocks);
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]).toMatchObject({ pageNumber: 1, content: "First slide bullet." });
+    expect(chunks[1]).toMatchObject({
+      pageNumber: 2,
+      content: "Second slide bullet.\nSecond slide note.",
+    });
+  });
+
   test("no chunk exceeds the character budget and indexes stay sequential", () => {
     const blocks: ParsedBlock[] = [
-      { text: "a".repeat(600), kind: "body", pageNumber: 1 },
-      { text: "b".repeat(600), kind: "body", pageNumber: 1 },
-      { text: "c".repeat(600), kind: "body", pageNumber: 1 },
+      { text: "a".repeat(600), kind: "body", pageNumber: 1, slideNumber: null },
+      { text: "b".repeat(600), kind: "body", pageNumber: 1, slideNumber: null },
+      { text: "c".repeat(600), kind: "body", pageNumber: 1, slideNumber: null },
     ];
     const chunks = chunkBlocks(blocks);
 
@@ -92,7 +131,9 @@ describe("chunkBlocks", () => {
 
   test("a single block longer than the budget is split without losing text", () => {
     const longText = `Sentence one. Sentence two. ${"Word ".repeat(2000)}`;
-    const chunks = chunkBlocks([{ text: longText, kind: "body", pageNumber: 1 }]);
+    const chunks = chunkBlocks([
+      { text: longText, kind: "body", pageNumber: 1, slideNumber: null },
+    ]);
 
     expect(chunks.length).toBeGreaterThan(1);
     for (const chunk of chunks) {
@@ -102,7 +143,9 @@ describe("chunkBlocks", () => {
   });
 
   test("a heading with no following body creates no chunk", () => {
-    expect(chunkBlocks([{ text: "Orphan heading", kind: "heading", pageNumber: 1 }])).toEqual([]);
+    expect(
+      chunkBlocks([{ text: "Orphan heading", kind: "heading", pageNumber: 1, slideNumber: null }]),
+    ).toEqual([]);
   });
 });
 

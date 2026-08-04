@@ -1,7 +1,8 @@
 /**
- * The fixture corpus for the AI-ingestion parsers: 20 documents covering valid PDFs, valid DOCX
- * files, corrupt files, and an unsupported legacy format. `generate.ts` materialises the files
- * (committed under `files/`); this manifest is the test-side truth for what each file must yield.
+ * The fixture corpus for the AI-ingestion parsers: 26 documents covering valid PDFs, valid DOCX
+ * files, valid PPTX decks, corrupt files, and unsupported legacy formats. `generate.ts` materialises
+ * the files (committed under `files/`); this manifest is the test-side truth for what each file must
+ * yield.
  *
  * - `anchors`: phrases of body text that must survive extraction verbatim.
  * - `headings`: section headings the parser must recognise, in document order.
@@ -11,9 +12,11 @@ export interface FixtureSpec {
   file: string;
   mimeType: string;
   description: string;
-  kind: "pdf" | "docx" | "corrupt" | "unsupported";
+  kind: "pdf" | "docx" | "pptx" | "corrupt" | "unsupported";
   /** Expected page count for valid PDFs. */
   pages?: number;
+  /** Expected slide count for valid PPTX decks. */
+  slides?: number;
   /** Body-text phrases that must appear in the extracted chunks. */
   anchors?: string[];
   /** Section headings the parser must detect, in document order. */
@@ -154,6 +157,33 @@ export const FIXTURES: readonly FixtureSpec[] = [
     anchors: ["The mitochondria are often described as the powerhouse of the cell"],
   },
   {
+    file: "photosynthesis-deck.pptx",
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    description: "3-slide biology deck with titled slides and speaker notes.",
+    kind: "pptx",
+    slides: 3,
+    anchors: [
+      "Photosynthesis converts light energy into chemical energy stored in glucose",
+      "Chlorophyll absorbs mostly red and blue light",
+      "Emphasize that the cycle repeats three times",
+    ],
+    headings: ["Photosynthesis", "Light Reactions", "The Calvin Cycle"],
+  },
+  {
+    file: "solar-system-deck.pptx",
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    description:
+      "2-slide deck whose second slide has no title, so chunks must fence on slide number.",
+    kind: "pptx",
+    slides: 2,
+    anchors: [
+      "The Sun contains most of the mass of the solar system",
+      "Jupiter is the largest planet by mass",
+      "Cover the gas giants and how each was found",
+    ],
+    headings: ["The Solar System"],
+  },
+  {
     file: "corrupt-not-a-pdf.pdf",
     mimeType: "application/pdf",
     description: "Plain text with a .pdf extension.",
@@ -194,6 +224,34 @@ export const FIXTURES: readonly FixtureSpec[] = [
     description: "A zero-byte file claiming to be a DOCX.",
     kind: "corrupt",
     ingestError: "file is not a valid DOCX",
+  },
+  {
+    file: "corrupt-not-a-pptx.pptx",
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    description: "Plain text with a .pptx extension.",
+    kind: "corrupt",
+    ingestError: "file is not a valid PPTX",
+  },
+  {
+    file: "corrupt-empty.pptx",
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    description: "A zero-byte file claiming to be a PPTX.",
+    kind: "corrupt",
+    ingestError: "file is not a valid PPTX",
+  },
+  {
+    file: "corrupt-pptx-missing-presentation.pptx",
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    description: "A valid zip that is not a PPTX (no ppt/presentation.xml).",
+    kind: "corrupt",
+    ingestError: "file is not a valid PPTX",
+  },
+  {
+    file: "unsupported-legacy-ppt.ppt",
+    mimeType: "application/vnd.ms-powerpoint",
+    description: "A legacy binary .ppt: a format the pipeline does not parse.",
+    kind: "unsupported",
+    ingestError: "unsupported mime type: application/vnd.ms-powerpoint",
   },
   {
     file: "unsupported-legacy-doc.doc",

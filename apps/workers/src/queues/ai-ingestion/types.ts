@@ -14,14 +14,21 @@ export interface ParsedBlock {
   kind: "heading" | "body";
   /**
    * The 1-based page the block was extracted from. DOCX has no intrinsic page numbers (Word
-   * paginates at render time), so DOCX blocks carry `null`; PDF blocks always carry a page.
+   * paginates at render time), so DOCX blocks carry `null`; PDF blocks always carry a page; PPTX
+   * blocks carry the slide number, which is the only pagination a deck has.
    */
   pageNumber: number | null;
+  /**
+   * PPTX only: the 1-based slide the block came from. Unlike a PDF page, a slide is an authoring
+   * boundary — a chunk must never straddle one — so the chunker flushes when it changes. `null` for
+   * every other format.
+   */
+  slideNumber: number | null;
 }
 
 export interface ParsedDocument {
-  format: "pdf" | "docx";
-  /** Number of pages, when the format exposes it. `null` for DOCX. */
+  format: "pdf" | "docx" | "pptx";
+  /** Number of pages, when the format exposes it. `null` for DOCX, the slide count for PPTX. */
   pages: number | null;
   blocks: ParsedBlock[];
 }
