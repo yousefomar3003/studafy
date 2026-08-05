@@ -137,6 +137,7 @@ describe("createAiTokenMeter (requires Redis)", () => {
         periodEnd: PERIOD_END,
         reservationId: reservation.reservationId,
         consumedTokens: 6,
+        budget: 100,
       });
       expect(committed).toEqual({ settled: true, remaining: 94 });
 
@@ -176,6 +177,7 @@ describe("createAiTokenMeter (requires Redis)", () => {
         periodStart: PERIOD_START,
         periodEnd: PERIOD_END,
         reservationId: reservation.reservationId,
+        budget: 100,
       });
       expect(released).toEqual({ settled: true, remaining: 100 });
 
@@ -278,6 +280,7 @@ describe("createAiTokenMeter (requires Redis)", () => {
         periodStart: PERIOD_START,
         periodEnd: PERIOD_END,
         reservationId: reservation.reservationId,
+        budget: 100,
       };
 
       const first = await meter.commit({ ...base, consumedTokens: 4 });
@@ -309,16 +312,22 @@ describe("createAiTokenMeter (requires Redis)", () => {
       expect(reservation.ok).toBe(true);
       if (!reservation.ok) return;
 
-      await expect(
-        meter.commit({
+      let error: unknown;
+      try {
+        await meter.commit({
           schoolId: SCHOOL_ID,
           studentId: STUDENT_ID,
           periodStart: PERIOD_START,
           periodEnd: PERIOD_END,
           reservationId: reservation.reservationId,
           consumedTokens: 11,
-        }),
-      ).rejects.toThrow(/exceeds reservation/);
+          budget: 100,
+        });
+      } catch (err) {
+        error = err;
+      }
+      expect(error).toBeDefined();
+      expect(error).toMatchObject({ message: expect.stringMatching(/exceeds reservation/) });
     } finally {
       await client.quit();
     }

@@ -57,7 +57,7 @@ export interface AiQuotaRefusal {
   ok: false;
   /** "exhausted": nothing is left. "insufficient": what is left cannot cover the reservation. */
   reason: "exhausted" | "insufficient";
-  /** Tokens the period has already consumed. */
+  /** Tokens the period has already committed (used plus held by in-flight reservations). */
   currentUsage: number;
   budget: number;
   /** Seconds until the billing period ends; clients can send this as Retry-After. */
@@ -72,6 +72,8 @@ interface AiSettleBase {
   periodStart: string;
   periodEnd: string;
   reservationId: string;
+  /** Monthly token budget for this subscription's window; used to report the budget left after settling. */
+  budget: number;
 }
 
 export interface AiCommitInput extends AiSettleBase {
@@ -185,6 +187,7 @@ if redis.call('HGET', KEYS[1], 'reserved') ~= ARGV[2] then
 end
 
 local consumed = tonumber(ARGV[1])
+local budget = tonumber(ARGV[3])
 local reservedAmount = tonumber(redis.call('HGET', KEYS[1], 'reserved_amount') or '0')
 if consumed < 0 or consumed > reservedAmount then
   return {-1, 0}
@@ -199,7 +202,7 @@ local held = math.max(0, tonumber(redis.call('HGET', KEYS[1], 'held') or '0') - 
 redis.call('HSET', KEYS[1], 'used', used)
 redis.call('HSET', KEYS[1], 'held', held)
 
-return {1, used + held}
+return {1, budget - used - held}
 `;
 
 /**
@@ -208,11 +211,12 @@ return {1, used + held}
  * Same shape and idempotency contract as COMMIT_SCRIPT.
  */
 const RELEASE_SCRIPT = `
-if redis.call('HGET', KEYS[1], 'reserved') ~= ARGV[2] then
+if redis.call('HGET', KEYS[1], 'reserved') ~= ARGV[1] then
   return {0, 0}
 end
 
 local reservedAmount = tonumber(redis.call('HGET', KEYS[1], 'reserved_amount') or '0')
+local budget = tonumber(ARGV[2])
 redis.call('HDEL', KEYS[1], 'reserved')
 redis.call('HDEL', KEYS[1], 'reserved_amount')
 
@@ -221,7 +225,7 @@ local held = math.max(0, tonumber(redis.call('HGET', KEYS[1], 'held') or '0') - 
 
 redis.call('HSET', KEYS[1], 'held', held)
 
-return {1, used + held}
+return {1, budget - used - held}
 `;
 
 /**
@@ -301,7 +305,7 @@ export function createAiTokenMeter({ redis }: { redis: RedisClient }): AiTokenMe
     const key = aiQuotaKey(schoolId, studentId, aiQuotaPeriodKey(periodStart));
     const reservationId = crypto.randomUUID();
 
-    const [allowed, reason, remaining, used] = (await evalScript<
+    const [allowed, reason, remaining, used, held] = (await evalScript<
       [number, number, number, number, number]
     >(RESERVE_SCRIPT, [key, amount, budget, reservationId, periodTtlSeconds(periodEnd)])) as [
       number,
@@ -318,20 +322,21 @@ export function createAiTokenMeter({ redis }: { redis: RedisClient }): AiTokenMe
     return {
       ok: false,
       reason: reason === 1 ? "insufficient" : "exhausted",
-      currentUsage: used,
+      currentUsage: used + held,
       budget,
       retryAfterSeconds: retryAfterSeconds(periodEnd),
     };
   }
 
   async function commit(input: AiCommitInput): Promise<AiSettleResult> {
-    const { schoolId, studentId, periodStart, reservationId, consumedTokens } = input;
+    const { schoolId, studentId, periodStart, reservationId, consumedTokens, budget } = input;
     const key = aiQuotaKey(schoolId, studentId, aiQuotaPeriodKey(periodStart));
 
     const [settled, remaining] = (await evalScript<[number, number]>(COMMIT_SCRIPT, [
       key,
       consumedTokens,
       reservationId,
+      budget,
     ])) as [number, number];
 
     if (settled === -1) {
@@ -344,12 +349,13 @@ export function createAiTokenMeter({ redis }: { redis: RedisClient }): AiTokenMe
   }
 
   async function release(input: AiReleaseInput): Promise<AiSettleResult> {
-    const { schoolId, studentId, periodStart, reservationId } = input;
+    const { schoolId, studentId, periodStart, reservationId, budget } = input;
     const key = aiQuotaKey(schoolId, studentId, aiQuotaPeriodKey(periodStart));
 
     const [settled, remaining] = (await evalScript<[number, number]>(RELEASE_SCRIPT, [
       key,
       reservationId,
+      budget,
     ])) as [number, number];
 
     return { settled: settled === 1, remaining };

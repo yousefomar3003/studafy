@@ -172,6 +172,7 @@ function createHandle(
     periodStart: ctx.ai.currentPeriodStart,
     periodEnd: ctx.ai.currentPeriodEnd,
     reservationId: reservation.reservationId,
+    budget: ctx.budget,
   };
 
   const handle: AiQuotaHandle = {
