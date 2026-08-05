@@ -8,22 +8,6 @@ import type { MaterialIngestStatus } from "./schemas";
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
-// Storage client interface
-// ---------------------------------------------------------------------------
-
-export interface StorageClient {
-  createPresignedUpload(
-    storageKey: string,
-    contentType: string,
-  ): Promise<{
-    uploadUrl: string;
-    expiresAt: Date;
-  }>;
-  confirmUpload(storageKey: string): Promise<boolean>;
-  deleteObject(storageKey: string): Promise<void>;
-}
-
-// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -144,7 +128,7 @@ export async function initiateUpload(
     SELECT id FROM app.materials
     WHERE school_id = ${schoolId} AND class_id = ${params.class_id}
       AND original_file_name = ${params.original_file_name}
-      AND ingest_status IN ('uploaded', 'processing')
+      AND ingest_status IN ('uploaded', 'processing', 'scanning')
   `;
   if (existingMaterial) {
     throw new CodedHttpException(
@@ -232,7 +216,7 @@ export async function confirmUpload(
 
   const [row] = await tx<MaterialRow[]>`
     UPDATE app.materials
-    SET ingest_status = 'processing'::app.material_ingest_status,
+    SET ingest_status = 'scanning'::app.material_ingest_status,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${materialId} AND school_id = ${schoolId}
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
@@ -246,7 +230,7 @@ export async function confirmUpload(
     targetTable: "materials",
     targetId: materialId,
     oldValues: { ingest_status: existing.ingest_status },
-    newValues: { ingest_status: "processing" },
+    newValues: { ingest_status: "scanning" },
   });
 
   return row!;

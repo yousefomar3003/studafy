@@ -62,3 +62,23 @@ export function runnerEnv(url: string, directory: string): Record<string, string
     MIGRATIONS_DIR: directory,
   };
 }
+
+// Env for a spawned CLI process. DATABASE_URL cannot be combined with discrete DATABASE_* values
+// (see loadMigrationConfig), so the inherited environment is scrubbed of them. Spawners should also
+// pass --no-env-file so the child's own bun startup cannot load the repo's ambient .env (whose
+// discrete values would otherwise collide with the DATABASE_URL provided here).
+export function cliEnv(url: string, extra: Record<string, string> = {}): Record<string, string> {
+  const discreteDbKeys = new Set([
+    "DATABASE_HOST",
+    "DATABASE_PORT",
+    "DATABASE_NAME",
+    "DATABASE_USER",
+    "DATABASE_PASSWORD",
+  ]);
+  return {
+    ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !discreteDbKeys.has(key))),
+    DATABASE_URL: url,
+    DATABASE_SSL_MODE: "disable",
+    ...extra,
+  };
+}

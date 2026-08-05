@@ -5,7 +5,7 @@ import { expect, test } from "bun:test";
 import { auditRlsCoverage, formatRlsCoverageReport } from "../../../db/policies/rls-coverage";
 import { runMigrationCommand } from "../src/runner";
 
-import { integrationEnabled, runnerEnv, testDatabase } from "./helpers";
+import { integrationEnabled, cliEnv, runnerEnv, testDatabase } from "./helpers";
 
 import type { CatalogClient, RlsCoverageReport } from "../../../db/policies/rls-coverage";
 
@@ -206,16 +206,17 @@ integrationTest(
   async () => {
     const database = await migratedDatabase();
     const runCli = async (args: string[]) => {
-      const processHandle = Bun.spawn([process.execPath, "packages/db/src/cli.ts", ...args], {
-        cwd: repositoryRoot,
-        env: {
-          ...process.env,
-          DATABASE_URL: database.url,
-          DATABASE_SSL_MODE: "disable",
+      const processHandle = Bun.spawn(
+        // --no-env-file plus a scrubbed env: the CLI must see exactly the database the test creates,
+        // never the repo's ambient .env or inherited discrete DATABASE_* values (see loadMigrationConfig).
+        [process.execPath, "--no-env-file", "packages/db/src/cli.ts", ...args],
+        {
+          cwd: repositoryRoot,
+          env: cliEnv(database.url),
+          stdout: "pipe",
+          stderr: "pipe",
         },
-        stdout: "pipe",
-        stderr: "pipe",
-      });
+      );
       const [exitCode, stdout, stderr] = await Promise.all([
         processHandle.exited,
         new Response(processHandle.stdout).text(),

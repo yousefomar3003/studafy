@@ -46,9 +46,17 @@ async function asRole(
 }
 
 async function expectDenied(database: Database, role: Role, statement: string): Promise<void> {
-  await expect(
-    asRole(database, role, (tx) => tx.unsafe(statement).then(() => undefined)),
-  ).rejects.toThrow();
+  // Deliberately a try/catch: `await expect(...).rejects.toThrow()` can hang on postgres.js
+  // thenable queries in bun:test when a pooled query ran first (oven-sh/bun#31462, #19130).
+  let denied = false;
+  try {
+    await asRole(database, role, (tx) => tx.unsafe(statement).then(() => undefined));
+  } catch {
+    denied = true;
+  }
+  if (!denied) {
+    throw new Error(`expected statement to be denied for ${role}: ${statement}`);
+  }
 }
 
 async function referenceIds(

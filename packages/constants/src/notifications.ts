@@ -21,6 +21,13 @@ export const NOTIFICATION_TYPES = {
   // added ahead of its producer, the same order app.notifications itself was built in (see
   // docs/architecture/SAD_21_notification_dispatch_flow.md).
   ADMIN_ANNOUNCEMENT: "ADMIN_ANNOUNCEMENT",
+  // Raised by the file-scan worker when ClamAV flags a confirmed material. Tells the uploader the
+  // file was blocked and will never be served. Mirrored in app.notification_type by 000088.
+  MATERIAL_SCAN_QUARANTINED: "MATERIAL_SCAN_QUARANTINED",
+  // Raised by the file-scan worker when a material's scan could not be completed (ClamAV
+  // unreachable, timeout, scan error) and its retries were exhausted. Fail-closed alert: the
+  // material is marked failed, never available. Mirrored in app.notification_type by 000088.
+  MATERIAL_SCAN_FAILED: "MATERIAL_SCAN_FAILED",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

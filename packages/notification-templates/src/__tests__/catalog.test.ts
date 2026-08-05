@@ -72,6 +72,8 @@ describe("templates — completeness", () => {
                       "date",
                       "title",
                       "summary",
+                      "fileName",
+                      "virus",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -123,6 +125,13 @@ describe("renderNotification — snapshot tests", () => {
     [NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT]: {
       title: "Campus closed Friday",
       summary: "The campus will be closed for maintenance on Friday. Classes resume Monday.",
+    },
+    [NOTIFICATION_TYPES.MATERIAL_SCAN_QUARANTINED]: {
+      fileName: "eicar-test.txt",
+      virus: "Win.Test.EICAR_HDB-1",
+    },
+    [NOTIFICATION_TYPES.MATERIAL_SCAN_FAILED]: {
+      fileName: "notes.pdf",
     },
   } as const;
 
