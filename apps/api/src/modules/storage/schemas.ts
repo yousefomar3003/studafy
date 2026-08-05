@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
-import { CONTENT_CLASS_KEYS } from "./content-classes";
+import { CONTENT_CLASS_KEYS, DOWNLOAD_CLASS_KEYS } from "./content-classes";
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
@@ -85,5 +85,35 @@ export const confirmedUploadSchema = z.object({
     description:
       "The server-computed SHA-256 when a checksum was supplied and verified, otherwise null.",
     example: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  }),
+});
+
+/**
+ * Download path params. objectId is validated as a uuid so a malformed id answers 400 at the
+ * boundary rather than surfacing as a PostgreSQL cast error (22P02) on the resolve query.
+ */
+export const downloadParamsSchema = z.object({
+  contentClass: z.enum(DOWNLOAD_CLASS_KEYS).openapi({
+    description:
+      "Which download class governs this request (required permission and audit policy).",
+    example: "material",
+  }),
+  objectId: z.string().uuid().openapi({
+    description: "The id of the object to download, scoped by the caller's row visibility.",
+    example: "11111111-1111-4111-8111-111111111111",
+  }),
+});
+
+export const downloadUrlResponseSchema = z.object({
+  download_url: z.string().url().openapi({
+    description:
+      "Short-lived pre-signed GET URL. Bound to the storage key and its expiry — it cannot be replayed to another key or tenant.",
+  }),
+  expires_at: z.string().datetime().openapi({
+    description: "When the pre-signed URL stops being valid (ISO 8601).",
+  }),
+  original_file_name: z.string().openapi({
+    description: "The file name segment of the stored object.",
+    example: "notes.pdf",
   }),
 });

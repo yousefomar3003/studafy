@@ -702,11 +702,14 @@ export function createApp({
   }
 
   // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm,
-  // reusing the temp/ -> permanent/ scheme the assignments/submissions/materials flows use.
-  // Database-free, so it mounts regardless of the database guard above; `storage` is nullable and
-  // the endpoints answer 503 when it is absent. Authorization is per content class, asserted in
-  // the handler via requirePermissionIn().
-  app.route("/", storageRoutes(storage));
+  // reusing the temp/ -> permanent/ scheme the assignments/submissions/materials flows use, plus a
+  // pre-signed download leg (5-minute URLs) whose row-scope check is a tenant-scoped query under
+  // RLS. The upload endpoints are database-free, so they mount regardless of the database guard;
+  // `storage` is nullable and the endpoints answer 503 when it is absent. The download route is
+  // registered only when a database is present, since it cannot verify row scope without one.
+  // Authorization is per content class, asserted in the handler via requirePermissionIn() (or
+  // hasPermission() where a class's permission is any-of).
+  app.route("/", storageRoutes(storage, database));
 
   // Tenant provisioning status & manual trigger (ST-089). Authenticated and admin-scoped.
   // Provides read access to provisioning status and manual provisioning trigger.
