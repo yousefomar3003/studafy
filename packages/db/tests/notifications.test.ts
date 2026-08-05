@@ -30,6 +30,11 @@ const NOTIFICATION_TYPES = [
   // the trigger always seeds enabled = true, which is also the only value
   // ck_notification_preferences_mandatory_enabled (000083) permits for it.
   "ADMIN_ANNOUNCEMENT",
+  // ST-151. Appended by 000088, same mechanism. Raised by the file-scan worker when a confirmed
+  // material is quarantined (ClamAV verdict) or when its scan cannot complete; the trigger seeds
+  // the full matrix for them like every other type, so they sort after ADMIN_ANNOUNCEMENT.
+  "MATERIAL_SCAN_QUARANTINED",
+  "MATERIAL_SCAN_FAILED",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;

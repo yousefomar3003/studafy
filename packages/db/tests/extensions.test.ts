@@ -41,9 +41,17 @@ async function asRole(
 
 // Asserts a single statement is rejected for the given role (each in its own aborted transaction).
 async function expectDenied(database: Database, role: Role, statement: string): Promise<void> {
-  await expect(
-    asRole(database, role, (tx) => tx.unsafe(statement).then(() => undefined)),
-  ).rejects.toThrow();
+  // Deliberately a try/catch: `await expect(...).rejects.toThrow()` can hang on postgres.js
+  // thenable queries in bun:test when a pooled query ran first (oven-sh/bun#31462, #19130).
+  let denied = false;
+  try {
+    await asRole(database, role, (tx) => tx.unsafe(statement).then(() => undefined));
+  } catch {
+    denied = true;
+  }
+  if (!denied) {
+    throw new Error(`expected statement to be denied for ${role}: ${statement}`);
+  }
 }
 
 // True when pg_stat_statements is actually loaded, so its views collect and return rows.
@@ -223,7 +231,17 @@ integrationTest("pg_stat_statements collects statistics when preloaded", async (
       // Honest fail-open: without shared_preload_libraries the view raises on read. Prove that,
       // rather than claiming the extension is operational. Preload it (see db/compose.yml) to run
       // the operational assertions below.
-      await expect(database.sql`SELECT count(*) FROM public.pg_stat_statements`).rejects.toThrow();
+      let raised = false;
+      try {
+        await database.sql`SELECT count(*) FROM public.pg_stat_statements`;
+      } catch {
+        raised = true;
+      }
+      if (!raised) {
+        throw new Error(
+          "expected pg_stat_statements view to raise when the module is not preloaded",
+        );
+      }
       return;
     }
 

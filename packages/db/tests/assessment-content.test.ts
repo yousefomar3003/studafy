@@ -267,7 +267,14 @@ integrationTest(
         ],
         exam_result_status: ["pending", "graded", "published", "withheld", "voided"],
         exam_status: ["draft", "scheduled", "open", "closed", "cancelled", "archived"],
-        material_ingest_status: ["uploaded", "processing", "ready", "failed"],
+        material_ingest_status: [
+          "uploaded",
+          "processing",
+          "ready",
+          "failed",
+          "scanning",
+          "quarantined",
+        ],
       });
 
       const tables = await database.sql<

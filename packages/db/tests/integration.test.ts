@@ -8,7 +8,7 @@ import { discoverMigrations } from "../src/discovery";
 import { MigrationExecutionError, MigrationValidationError } from "../src/errors";
 import { ADVISORY_LOCK_KEY, runMigrationCommand } from "../src/runner";
 
-import { integrationEnabled, migrationFixture, runnerEnv, testDatabase } from "./helpers";
+import { cliEnv, integrationEnabled, migrationFixture, runnerEnv, testDatabase } from "./helpers";
 
 const integrationTest = test.skipIf(!integrationEnabled);
 const repositoryMigrations = resolve(import.meta.dir, "../../../db/migrations");
@@ -151,9 +151,9 @@ integrationTest(
     const fixture = await migrationFixture({
       "000001_slow.sql": "SELECT pg_sleep(2);\n",
     });
-    const env = { ...process.env, ...runnerEnv(database.url, fixture.directory) };
+    const env = cliEnv(database.url, { MIGRATIONS_DIR: fixture.directory });
     try {
-      const first = Bun.spawn([process.execPath, cli, "migrate"], {
+      const first = Bun.spawn([process.execPath, "--no-env-file", cli, "migrate"], {
         cwd: process.cwd(),
         env,
         stdout: "pipe",
@@ -171,7 +171,7 @@ integrationTest(
         await Bun.sleep(50);
       }
 
-      const second = Bun.spawn([process.execPath, cli, "migrate"], {
+      const second = Bun.spawn([process.execPath, "--no-env-file", cli, "migrate"], {
         cwd: process.cwd(),
         env,
         stdout: "pipe",
