@@ -267,6 +267,17 @@ export const ERROR_CODES = {
   SUBSCRIPTION_NOT_FOUND: "SUBSCRIPTION_NOT_FOUND",
   SUBSCRIPTION_CHECKOUT_FAILED: "SUBSCRIPTION_CHECKOUT_FAILED",
   AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE: "AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE",
+
+  // AI quota gate (ST-155). The gate answers with one distinct code per stage of the decision flow
+  // -- school active, AI add-on active, quota available -- so a client can branch on exactly why a
+  // request was refused: reactivate to fix 403, renew the add-on to fix 402, wait for the budget
+  // reset to fix 429. AI_QUOTA_UNAVAILABLE is the fail-closed arm: quota could not be verified (for
+  // example the entitlement cache predates the period fields), and the safe answer is to retry.
+  AI_SCHOOL_INACTIVE: "AI_SCHOOL_INACTIVE",
+  AI_SUBSCRIPTION_INACTIVE: "AI_SUBSCRIPTION_INACTIVE",
+  AI_QUOTA_EXCEEDED: "AI_QUOTA_EXCEEDED",
+  AI_QUOTA_UNAVAILABLE: "AI_QUOTA_UNAVAILABLE",
+
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",
