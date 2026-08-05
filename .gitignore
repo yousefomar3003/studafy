@@ -15,7 +15,7 @@ crash.*.log
 override.tf
 override.tf.json
 *_override.tf
-*_override.tf.json
+*_override.tf.jzson
 .terraformrc
 terraform.rc
 # Variable files may carry secrets, so they are ignored by default. The committed
