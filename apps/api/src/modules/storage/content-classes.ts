@@ -1,11 +1,12 @@
 /**
- * Content classes: the single source of truth for "what may be uploaded, and by whom".
+ * Content classes: the single source of truth for "what may be uploaded and downloaded, and by
+ * whom".
  *
- * Each class pairs a policy (allowed MIME types + maximum size, both checked against the object
- * that actually lands in the bucket, not the request body) with the permission a caller must hold
- * to use it. The permission is what makes the storage gateway RBAC-aware without a static
- * mount-time guard: the required permission depends on the body, so it is asserted per request via
- * requirePermissionIn() rather than requirePermission() middleware.
+ * Each upload class pairs a policy (allowed MIME types + maximum size, both checked against the
+ * object that actually lands in the bucket, not the request body) with the permission a caller
+ * must hold to use it. The permission is what makes the storage gateway RBAC-aware without a
+ * static mount-time guard: the required permission depends on the body, so it is asserted per
+ * request via requirePermissionIn() rather than requirePermission() middleware.
  *
  * Enforcement model (docs/runbooks/storage-conventions.md):
  *   - request-upload rejects a class-invalid type or oversize claim before signing anything, and
@@ -15,6 +16,10 @@
  *     from temp/ to permanent/, closing the "claim small, upload big" gap.
  *   - a caller can only confirm under classes their roles permit, and only into their own school's
  *     prefix (assertSchoolOwnedKey), which is the tenant boundary on the return leg.
+ *
+ * The download classes below are the read leg of the same gateway. They pair a read permission
+ * with an audit flag; the row-scope check that keeps a student out of another class's material is
+ * the tenant-scoped resolver in download-service.ts running under RLS, not a static list here.
  */
 
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
@@ -130,4 +135,71 @@ export function getContentClass(key: string): ContentClass {
     );
   }
   return contentClass;
+}
+
+// ---------------------------------------------------------------------------
+// Download classes
+// ---------------------------------------------------------------------------
+
+/**
+ * A download class: what a caller needs to be able to hold before the gateway will mint a GET URL
+ * for an object of this class.
+ *
+ * Row scope is deliberately not a field here. Each class resolves its object through a
+ * tenant-scoped query that runs under RLS (download-service.ts), so a caller can only ever resolve
+ * rows their roles can read; the resolver is the row-scope check, and this registry is only the
+ * RBAC + audit policy layered on top of it.
+ */
+export interface DownloadClass {
+  /**
+   * Any one of these grants access. Most classes need exactly one; export is the union of the two
+   * export-job tables (attendance and finance), so it lists both and either suffices.
+   */
+  readonly requiredPermissions: readonly Permission[];
+  /**
+   * Whether issuing a URL is written to app.audit_logs. Materials and submissions are ordinary
+   * coursework and stay off the log like their uploads do; receipts and exports are finance-
+   * adjacent, so their issuance is audited with the "export" action.
+   */
+  readonly audit: boolean;
+}
+
+/**
+ * The download classes the gateway serves. Exactly the four the upload flow feeds: coursework
+ * files (materials, submissions), finance evidence (receipts), and generated report files
+ * (exports). Keys are single words on purpose: a download class is a read of an existing object,
+ * not a sibling of the dotted upload classes, and reusing a dotted key would blur which leg a
+ * caller meant.
+ */
+const DOWNLOAD_CLASSES: ReadonlyMap<string, DownloadClass> = new Map([
+  ["material", { requiredPermissions: [PERMISSIONS.MATERIAL_READ], audit: false }],
+  ["submission", { requiredPermissions: [PERMISSIONS.SUBMISSION_READ], audit: false }],
+  ["receipt", { requiredPermissions: [PERMISSIONS.BILLING_READ], audit: true }],
+  [
+    "export",
+    {
+      requiredPermissions: [PERMISSIONS.ATTENDANCE_REPORT_EXPORT, PERMISSIONS.REPORT_EXPORT],
+      audit: true,
+    },
+  ],
+]);
+
+export const DOWNLOAD_CLASS_KEYS = [...DOWNLOAD_CLASSES.keys()] as const;
+export type DownloadClassKey = (typeof DOWNLOAD_CLASS_KEYS)[number];
+
+/**
+ * Resolve a download class from a client-supplied key, or reject the request. Unknown classes are
+ * a client error (typo, or a feature not enabled on this deployment), not a security condition, so
+ * they answer 400 VALIDATION_FAILED rather than 403 — the same call the upload leg makes.
+ */
+export function getDownloadClass(key: string): DownloadClass {
+  const downloadClass = DOWNLOAD_CLASSES.get(key);
+  if (!downloadClass) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      `Unknown download class: ${key}`,
+    );
+  }
+  return downloadClass;
 }

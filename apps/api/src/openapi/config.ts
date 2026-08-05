@@ -226,9 +226,10 @@ export const OPENAPI_DOCUMENT_CONFIG = {
     {
       name: "Storage",
       description:
-        "Generic object-storage gateway. Content-class-gated pre-signed upload and confirm, " +
-        "reusing the temp/ -> permanent/ lifecycle scheme. Answers 503 when object storage is not " +
-        "configured, and is authorized per content class.",
+        "Generic object-storage gateway. Content-class-gated pre-signed upload and confirm " +
+        "reusing the temp/ -> permanent/ lifecycle scheme, and short-lived pre-signed download " +
+        "URLs whose row scope is enforced by tenant-scoped RLS-backed resolution. Answers 503 " +
+        "when object storage is not configured, and is authorized per content class.",
     },
   ],
 };
