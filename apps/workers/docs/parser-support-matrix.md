@@ -70,15 +70,22 @@ work (no shell-outs), so a hostile file can neither spawn processes nor reach th
 
 ## Chunking
 
-`chunker.ts` folds blocks into retrieval chunks of at most `DEFAULT_MAX_CHUNK_CHARS` (1 000)
-characters:
+`chunker.ts` folds blocks into retrieval chunks that target ~800 tokens (`CHUNK_TOKENS`) each. The
+repository has no tokenizer — embeddings are mock — so tokens use the standard approximation of four
+characters per token (`CHARS_PER_TOKEN`), which makes the enforced budget `DEFAULT_MAX_CHUNK_CHARS`
+(3 200) characters. The chunker stays a pure character machine: deterministic for identical input,
+with no dependency.
 
 - Heading blocks never produce content. They flush the current chunk — so no chunk straddles a
   section boundary — and become the `section_title` of everything that follows.
 - A chunk records the **page of its first contributing block**, so a chunk spanning a page break is
   cited from where its content begins.
-- A single block longer than the budget is split on sentence boundaries (`. ` / `.\n`), falling back
-  to the last space, then a hard cut.
+- Adjacent chunks share up to `DEFAULT_OVERLAP_CHARS` (15% of the budget) so a retrieval boundary
+  never drops a sentence. Overlap carries only across size-induced flushes — it never crosses a
+  section heading, a slide, or a page — so every chunk's text stays citable to the page and section
+  it is anchored on.
+- A single block longer than the budget is split near sentence boundaries (`. ` / `.\n`), falling
+  back to a line break, the last space, then a hard cut.
 
 ## Embeddings
 
