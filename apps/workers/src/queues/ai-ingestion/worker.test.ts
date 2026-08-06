@@ -4,7 +4,13 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { FIXTURES } from "./__fixtures__/specs";
-import { DEFAULT_MAX_CHUNK_CHARS, chunkBlocks } from "./chunker";
+import {
+  CHUNK_TOKENS,
+  DEFAULT_MAX_CHUNK_CHARS,
+  OVERLAP_RATIO,
+  chunkBlocks,
+  estimateTokens,
+} from "./chunker";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, mockEmbedding } from "./embedding";
 import { buildIngestChunks } from "./ingest";
 import { TesseractOcrEngine } from "./ocr";
@@ -103,6 +109,31 @@ describe("ai-ingestion fixture corpus", () => {
       });
     }
   });
+
+  test("chunks stay within the token budget, keep their anchors, and are deterministic across the corpus", async () => {
+    for (const spec of FIXTURES) {
+      // OCR fixtures are excluded: the chunker is deterministic by construction, and re-running the
+      // engine doubles the tesseract load for a property the unit tests already pin.
+      if (!["pdf", "docx", "pptx"].includes(spec.kind)) continue;
+      if (spec.file === "scanned-photosynthesis-guide.pdf") continue;
+
+      const first = await buildIngestChunks(await readFixture(spec.file), spec.mimeType);
+      const second = await buildIngestChunks(await readFixture(spec.file), spec.mimeType);
+
+      expect(second.chunks, `${spec.file} chunking is not deterministic`).toEqual(first.chunks);
+      first.chunks.forEach((chunk, index) => {
+        expect(chunk.chunkIndex, `${spec.file} chunk ${index} index`).toBe(index);
+        expect(
+          estimateTokens(chunk.content),
+          `${spec.file} chunk ${index} exceeds the token budget`,
+        ).toBeLessThanOrEqual(CHUNK_TOKENS);
+        expect(
+          chunk.content.length,
+          `${spec.file} chunk ${index} exceeds the character budget`,
+        ).toBeLessThanOrEqual(DEFAULT_MAX_CHUNK_CHARS);
+      });
+    }
+  });
 });
 
 describe("chunkBlocks", () => {
@@ -145,24 +176,25 @@ describe("chunkBlocks", () => {
       { text: "b".repeat(600), kind: "body", pageNumber: 1, slideNumber: null },
       { text: "c".repeat(600), kind: "body", pageNumber: 1, slideNumber: null },
     ];
-    const chunks = chunkBlocks(blocks);
+    const chunks = chunkBlocks(blocks, { maxChunkChars: 1_000, overlapChars: 150 });
 
     expect(chunks.length).toBeGreaterThan(1);
     for (const chunk of chunks) {
-      expect(chunk.content.length).toBeLessThanOrEqual(DEFAULT_MAX_CHUNK_CHARS);
+      expect(chunk.content.length).toBeLessThanOrEqual(1_000);
     }
     expect(chunks.map((chunk) => chunk.chunkIndex)).toEqual(chunks.map((_, index) => index));
   });
 
   test("a single block longer than the budget is split without losing text", () => {
     const longText = `Sentence one. Sentence two. ${"Word ".repeat(2000)}`;
-    const chunks = chunkBlocks([
-      { text: longText, kind: "body", pageNumber: 1, slideNumber: null },
-    ]);
+    const chunks = chunkBlocks(
+      [{ text: longText, kind: "body", pageNumber: 1, slideNumber: null }],
+      { maxChunkChars: 1_000, overlapChars: 150 },
+    );
 
     expect(chunks.length).toBeGreaterThan(1);
     for (const chunk of chunks) {
-      expect(chunk.content.length).toBeLessThanOrEqual(DEFAULT_MAX_CHUNK_CHARS);
+      expect(chunk.content.length).toBeLessThanOrEqual(1_000);
     }
     expect(chunks.map((chunk) => chunk.content).join(" ")).toContain("Sentence one. Sentence two.");
   });
@@ -171,6 +203,119 @@ describe("chunkBlocks", () => {
     expect(
       chunkBlocks([{ text: "Orphan heading", kind: "heading", pageNumber: 1, slideNumber: null }]),
     ).toEqual([]);
+  });
+
+  test("adjacent chunks share the configured overlap within a section", () => {
+    const sentence =
+      "The chloroplast is the organelle where photosynthesis stores chemical energy. ";
+    const blocks: ParsedBlock[] = [
+      { text: sentence.repeat(60), kind: "body", pageNumber: 1, slideNumber: null },
+    ];
+    const chunks = chunkBlocks(blocks, { maxChunkChars: 1_000, overlapChars: 150 });
+
+    expect(chunks.length).toBeGreaterThan(2);
+    for (let index = 1; index < chunks.length; index += 1) {
+      // The next chunk opens inside the previous chunk's tail — the overlap.
+      const overlapProbe = chunks[index]!.content.slice(0, 60);
+      expect(
+        chunks[index - 1]!.content.slice(-200),
+        `chunks ${index - 1} and ${index} share no overlap`,
+      ).toContain(overlapProbe);
+    }
+  });
+
+  test("overlap never crosses a section heading", () => {
+    const firstSection = "The Calvin cycle fixes carbon dioxide into organic molecules. ";
+    const secondSection = "Chlorophyll absorbs mostly red and blue light. ";
+    const blocks: ParsedBlock[] = [
+      { text: firstSection.repeat(40), kind: "body", pageNumber: 1, slideNumber: null },
+      { text: "Light Reactions", kind: "heading", pageNumber: 2, slideNumber: null },
+      { text: secondSection.repeat(40), kind: "body", pageNumber: 2, slideNumber: null },
+    ];
+    const chunks = chunkBlocks(blocks, { maxChunkChars: 1_000, overlapChars: 150 });
+
+    const sectionStart = chunks.findIndex((chunk) => chunk.sectionTitle === "Light Reactions");
+    expect(sectionStart).toBeGreaterThan(0);
+    // A fresh section opens with its own text: the previous chunk's overlap tail never carries over,
+    // which would otherwise prefix this chunk with "The Calvin cycle" and break the start.
+    expect(chunks[sectionStart]!.content.startsWith("Chlorophyll absorbs")).toBe(true);
+  });
+
+  test("overlap never crosses a slide boundary", () => {
+    const firstSlide = "The Sun contains most of the mass of the solar system. ";
+    const secondSlide = "Jupiter is the largest planet by mass. ";
+    const blocks: ParsedBlock[] = [
+      { text: firstSlide.repeat(40), kind: "body", pageNumber: 1, slideNumber: 1 },
+      { text: secondSlide.repeat(40), kind: "body", pageNumber: 2, slideNumber: 2 },
+    ];
+    const chunks = chunkBlocks(blocks, { maxChunkChars: 1_000, overlapChars: 150 });
+
+    const last = chunks[chunks.length - 1]!;
+    expect(last.pageNumber).toBe(2);
+    // A leaked slide-1 tail would prefix this chunk with "The Sun contains" and break the start.
+    expect(last.content.startsWith("Jupiter is the largest planet")).toBe(true);
+  });
+
+  test("overlap never crosses a page boundary", () => {
+    const sentence = "The nucleus stores genetic material in chromosomes. ";
+    const blocks: ParsedBlock[] = [
+      { text: sentence.repeat(40), kind: "body", pageNumber: 1, slideNumber: null },
+      {
+        text: "The nuclear envelope has pores that control what enters and leaves.",
+        kind: "body",
+        pageNumber: 2,
+        slideNumber: null,
+      },
+    ];
+    const chunks = chunkBlocks(blocks, { maxChunkChars: 1_000, overlapChars: 150 });
+
+    const pageTwoStart = chunks.findIndex((chunk) => chunk.pageNumber === 2);
+    expect(pageTwoStart).toBeGreaterThan(0);
+    // A leaked page-1 tail would prefix this chunk with "The nucleus" and break the start.
+    expect(chunks[pageTwoStart]!.content.startsWith("The nuclear envelope")).toBe(true);
+  });
+
+  test("every chunk carries its material ordinal and page/section anchors", () => {
+    const blocks: ParsedBlock[] = [
+      { text: "Introduction", kind: "heading", pageNumber: 1, slideNumber: null },
+      { text: "First paragraph.", kind: "body", pageNumber: 1, slideNumber: null },
+      { text: "Second paragraph.", kind: "body", pageNumber: 2, slideNumber: null },
+      { text: "Methods", kind: "heading", pageNumber: 2, slideNumber: null },
+      { text: "Method paragraph.", kind: "body", pageNumber: 2, slideNumber: null },
+    ];
+    const chunks = chunkBlocks(blocks);
+
+    expect(chunks.map((chunk) => chunk.chunkIndex)).toEqual(chunks.map((_, index) => index));
+    for (const chunk of chunks) {
+      expect(chunk.pageNumber).not.toBeNull();
+      expect(chunk.sectionTitle).not.toBeNull();
+    }
+  });
+
+  test("output is deterministic for identical input", () => {
+    const sentence = "The mitochondria generate ATP for cellular work. ";
+    const blocks: ParsedBlock[] = [
+      { text: "Biology", kind: "heading", pageNumber: 1, slideNumber: null },
+      { text: sentence.repeat(60), kind: "body", pageNumber: 1, slideNumber: null },
+      { text: sentence.repeat(30), kind: "body", pageNumber: 2, slideNumber: null },
+    ];
+    const options = { maxChunkChars: 1_000, overlapChars: 150 };
+
+    expect(chunkBlocks(blocks, options)).toEqual(chunkBlocks(blocks, options));
+  });
+
+  test("continuous text is split at the ~800 token target and never over it", () => {
+    const sentence =
+      "Photosynthesis converts light energy into chemical energy stored in glucose. ";
+    const chunks = chunkBlocks([
+      { text: sentence.repeat(400), kind: "body", pageNumber: 1, slideNumber: null },
+    ]);
+
+    const tokens = chunks.map((chunk) => estimateTokens(chunk.content));
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(Math.max(...tokens)).toBeLessThanOrEqual(CHUNK_TOKENS);
+    // The splitter actually fills chunks toward the budget rather than carving thin slivers.
+    expect(Math.max(...tokens)).toBeGreaterThan(Math.round(CHUNK_TOKENS * (1 - OVERLAP_RATIO)));
   });
 });
 
