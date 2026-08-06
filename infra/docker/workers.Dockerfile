@@ -6,8 +6,9 @@
 #
 # apps/workers depends on workspace packages such as @studafy/constants and
 # @studafy/notification-templates (see apps/workers/package.json), but `bun build --target bun`
-# bundles them (and every other dependency) directly into apps/workers/dist/index.js — the runtime
-# stage copies only that file, never node_modules.
+# bundles them (and every other dependency) directly into apps/workers/dist — the runtime stage
+# copies only that directory, never node_modules. The OCR stage's assets (the tesseract worker-script
+# bundle, its WASM cores, and the traineddata) are produced into dist/ by `bun run build:ocr`.
 
 ARG BUN_VERSION=1.3.14
 
@@ -43,6 +44,11 @@ RUN bun run --cwd packages/constants build \
  && bun run --cwd packages/finance-reporting build \
  && bun run --cwd packages/notification-templates build
 RUN bunx turbo run build --filter=@studafy/workers
+# The OCR stage bundles tesseract's worker-script (spawned as a worker thread) and copies its WASM
+# cores and traineddata next to dist/. The runtime stage ships only apps/workers/dist — no
+# node_modules — so without this step every asset tesseract.js would normally resolve from packages
+# would be missing at runtime. See apps/workers/scripts/copy-ocr-assets.ts for the layout.
+RUN bun run --cwd apps/workers build:ocr
 
 FROM oven/bun:${BUN_VERSION}-alpine AS runtime
 WORKDIR /app
@@ -60,6 +66,11 @@ COPY --chown=app:app infra/docker/workers/healthcheck.ts ./healthcheck.ts
 USER app
 
 ENV NODE_ENV=production
+
+# tesseract's worker-script runs as a child worker thread; with no node_modules in the image, point
+# it (and only it) at the bundled copy. The engine's traineddata default already resolves to
+# dist/traineddata/ next to the bundled main module, so no OCR_LANG_PATH is needed.
+ENV OCR_WORKER_PATH=/app/dist/ocr/index.js
 
 # apps/workers exposes no HTTP or IPC surface (by design — it is a queue consumer, not a
 # service), so there is no endpoint of its own to probe. This instead independently re-checks the

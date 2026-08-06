@@ -73,6 +73,15 @@ export const envSchema = z
     // propagation SLA, and the poll interval is the dominant term in that budget.
     ENTITLEMENT_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(500),
     ENTITLEMENT_BATCH_SIZE: z.coerce.number().int().positive().default(100),
+    // OCR (ai-ingestion). OCR_LOW_CONFIDENCE_THRESHOLD is the mean per-word confidence below which an
+    // OCR'd page is flagged for the teacher; default matches the engine's own. OCR_WORKER_PATH and
+    // OCR_LANG_PATH point at the bundled tesseract worker-script, its WASM cores, and the
+    // `<language>.traineddata` files in the production image (which has no node_modules); unset in
+    // dev/test, where the engine defaults resolve tesseract.js's own worker and the checked-in
+    // traineddata next to this source file.
+    OCR_LOW_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(60),
+    OCR_WORKER_PATH: z.string().min(1).optional(),
+    OCR_LANG_PATH: z.string().min(1).optional(),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;

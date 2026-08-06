@@ -10,11 +10,12 @@ The format is chosen by the material's **MIME type** as stored on `app.materials
 by file extension or magic bytes — the extension is untrusted. Parsing is pure in-process library
 work (no shell-outs), so a hostile file can neither spawn processes nor reach the filesystem.
 
-| MIME type(s)                                                              | Parser            | Behaviour                                                         |
-| ------------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------- |
-| `application/pdf`, `application/x-pdf`, `text/pdf`                        | `parsers/pdf.ts`  | Extracts text with page anchors and heading detection (below).    |
-| `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | `parsers/docx.ts` | Extracts text with real heading styles (below).                   |
-| anything else                                                             | —                 | `UnsupportedFormatError`, reason `unsupported mime type: <type>`. |
+| MIME type(s)                                                              | Parser             | Behaviour                                                                                          |
+| ------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
+| `application/pdf`, `application/x-pdf`, `text/pdf`                        | `parsers/pdf.ts`   | Extracts text with page anchors and heading detection; textless (scanned) pages are OCR'd (below). |
+| `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | `parsers/docx.ts`  | Extracts text with real heading styles (below).                                                    |
+| `image/png`, `image/jpeg`, `image/bmp`, `image/tiff`                      | `parsers/image.ts` | OCR's the raster; a raster is a single page of body text (below).                                  |
+| anything else                                                             | —                  | `UnsupportedFormatError`, reason `unsupported mime type: <type>`.                                  |
 
 ## Supported formats
 
@@ -28,10 +29,31 @@ work (no shell-outs), so a hostile file can neither spawn processes nor reach th
   against the document as a whole. Heuristic by construction: a text-only PDF has no style
   semantics.
 - Lines are grouped by vertical position (tolerance ±2 units), ordered top-to-bottom, left-to-right.
-- **Not supported**: scanned/image-only PDFs (no extractable text → `EmptyDocumentError`,
-  reason `no extractable text`), password-protected PDFs (`EncryptedDocumentError`, reason
+- **Scanned pages**: a page with no extractable text is rendered to a raster at scale 2
+  (`renderPageAsImage`) and OCR'd; its recognized text becomes one body block at the page's own
+  position, so mixed text/scanned documents keep reading order. The OCR report (engine, flagging
+  threshold, per-page confidence/latency) rides on `ParsedDocument.ocrReport` — `null` when no page
+  was OCR'd.
+- **Not supported**: password-protected PDFs (`EncryptedDocumentError`, reason
   `file is password-protected`), truncated or otherwise malformed files (`CorruptDocumentError`,
-  reason `file is not a valid PDF`).
+  reason `file is not a valid PDF`), and a PDF whose pages yield no text at all — after the OCR
+  fallback — (`EmptyDocumentError`, reason `no extractable text`).
+
+### Images (`parsers/image.ts`, tesseract.js 7)
+
+- A raster is a single "page" of body text: recognized once and emitted as one body block (the
+  chunker owns splitting long text). No heading detection — a raster has no styles to detect.
+- The engine recognizes clean printed text at **≥ 95 mean per-word confidence** (fixture-verified).
+  When a page's confidence falls below the flagging threshold (default 60), it is re-run across the
+  candidate languages (`spa`, `ara`) and the most confident pass wins — this is how non-Latin
+  materials are detected. Every OCR'd page carries its confidence, language, word count, and
+  latency on the report; low-confidence pages are flagged to the uploader via a
+  `MATERIAL_OCR_LOW_CONFIDENCE` notification.
+- **Not supported**: WebP/GIF rasters (formats leptonica is not verified against) are
+  `unsupported mime type`. A raster with an empty OCR result produces no blocks (and no chunk), and
+  a raster supplied without an OCR engine is rejected as loudly as an unsupported format.
+- OCR internals and deployment (no `node_modules` in the image) are recorded in
+  `docs/adr/0007-ocr-engine.md`.
 
 ### DOCX (`mammoth`)
 
@@ -80,7 +102,9 @@ Every parse failure writes a short, stable reason (the `reason` of a `MaterialPa
 
 ## Test coverage
 
-`worker.test.ts` runs the full 20-file corpus: anchors and headings survive extraction, PDF page
-numbers match the source documents, corrupt/unsupported files reject with the exact reason above,
-plus chunker boundary and embedding-determinism unit tests. Regenerate fixtures deterministically
-with `bun run generate:fixtures`.
+`worker.test.ts` runs the 30-file corpus: anchors and headings survive extraction, PDF page numbers
+match the source documents, corrupt/unsupported files reject with the exact reason above, plus
+chunker boundary and embedding-determinism unit tests. `ocr/tesseract.test.ts` asserts the OCR
+accuracy bar against the real engine: clean print at ≥ 95 confidence, non-Latin detection via the
+candidate-language re-runs, and low-confidence flagging on report and metrics. Regenerate fixtures
+deterministically with `bun run generate:fixtures`.

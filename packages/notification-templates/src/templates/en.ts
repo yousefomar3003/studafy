@@ -72,4 +72,10 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       'Your file "{fileName}" could not be scanned and was not made available. Please upload it again.',
   },
+  [NOTIFICATION_TYPES.MATERIAL_OCR_LOW_CONFIDENCE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{fileName} needs a quick review",
+    [NOTIFICATION_CHANNELS.PUSH]: "Review needed: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      'Your file "{fileName}" was transcribed automatically, but these pages were hard to read: {pages}. Please check them.',
+  },
 } as const satisfies LocaleTemplateSet;

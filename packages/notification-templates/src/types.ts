@@ -63,4 +63,8 @@ export interface NotificationTypeVars {
   MATERIAL_SCAN_FAILED: {
     fileName: string;
   };
+  MATERIAL_OCR_LOW_CONFIDENCE: {
+    fileName: string;
+    pages: string;
+  };
 }

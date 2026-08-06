@@ -1,10 +1,11 @@
 /**
- * The fixture corpus for the AI-ingestion parsers: 26 documents covering valid PDFs, valid DOCX
- * files, valid PPTX decks, corrupt files, and unsupported legacy formats. `generate.ts` materialises
- * the files (committed under `files/`); this manifest is the test-side truth for what each file must
- * yield.
+ * The fixture corpus for the AI-ingestion parsers: documents covering valid PDFs, valid DOCX
+ * files, valid PPTX decks, rasters (PNG), a scanned (textless) PDF, corrupt files, and unsupported
+ * legacy formats. `generate.ts` materialises the files (committed under `files/`); this manifest is
+ * the test-side truth for what each file must yield.
  *
- * - `anchors`: phrases of body text that must survive extraction verbatim.
+ * - `anchors`: phrases of body text that must survive extraction verbatim. For raster/OCR fixtures
+ *   these are the exact printed lines, so the anchors assert real OCR accuracy, not just plumbing.
  * - `headings`: section headings the parser must recognise, in document order.
  * - `ingestError`: the reason a corrupt/unsupported file must be recorded with.
  */
@@ -12,7 +13,7 @@ export interface FixtureSpec {
   file: string;
   mimeType: string;
   description: string;
-  kind: "pdf" | "docx" | "pptx" | "corrupt" | "unsupported";
+  kind: "pdf" | "docx" | "pptx" | "image" | "corrupt" | "unsupported";
   /** Expected page count for valid PDFs. */
   pages?: number;
   /** Expected slide count for valid PPTX decks. */
@@ -182,6 +183,41 @@ export const FIXTURES: readonly FixtureSpec[] = [
       "Cover the gas giants and how each was found",
     ],
     headings: ["The Solar System"],
+  },
+  {
+    file: "photosynthesis-notes.png",
+    mimeType: "image/png",
+    description: "Clean black-on-white raster of two lines of photosynthesis notes.",
+    kind: "image",
+    anchors: [
+      "Plants use photosynthesis to make food",
+      "Chlorophyll gives leaves their green color",
+    ],
+  },
+  {
+    file: "arabic-photosynthesis-notes.png",
+    mimeType: "image/png",
+    description: "Arabic raster; exercises the candidate-language re-run path in the engine.",
+    kind: "image",
+  },
+  {
+    file: "scanned-rotated-notes.png",
+    mimeType: "image/png",
+    description:
+      "A page raster rotated 90 degrees, so OCR is low-confidence and the page must be flagged.",
+    kind: "image",
+  },
+  {
+    file: "scanned-photosynthesis-guide.pdf",
+    mimeType: "application/pdf",
+    description:
+      "Textless PDF whose only content is an embedded raster — the scanned-page OCR fallback path.",
+    kind: "pdf",
+    pages: 1,
+    anchors: [
+      "Plants use photosynthesis to make food",
+      "Chlorophyll gives leaves their green color",
+    ],
   },
   {
     file: "corrupt-not-a-pdf.pdf",

@@ -35,6 +35,9 @@ const NOTIFICATION_TYPES = [
   // the full matrix for them like every other type, so they sort after ADMIN_ANNOUNCEMENT.
   "MATERIAL_SCAN_QUARANTINED",
   "MATERIAL_SCAN_FAILED",
+  // ST-152. Appended by 000090, same mechanism. Raised by the ai-ingestion worker when an OCR'd
+  // material has pages below the confidence threshold; sorts last, after the file-scan pair.
+  "MATERIAL_OCR_LOW_CONFIDENCE",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;
