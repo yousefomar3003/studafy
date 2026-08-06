@@ -68,4 +68,10 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "لم يتم فحص التحميل: {fileName}",
     [NOTIFICATION_CHANNELS.EMAIL]: 'تعذر فحص ملف "{fileName}" ولم يتم نشره. يرجى إعادة تحميله.',
   },
+  [NOTIFICATION_TYPES.MATERIAL_OCR_LOW_CONFIDENCE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "يتطلب {fileName} مراجعة سريعة",
+    [NOTIFICATION_CHANNELS.PUSH]: "مراجعة مطلوبة: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      'تم تحويل ملف "{fileName}" تلقائيًا، لكن الصفحات التالية كانت صعبة القراءة: {pages}. يرجى مراجعتها.',
+  },
 } as const satisfies LocaleTemplateSet;

@@ -128,6 +128,9 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         s3Region: workerEnv.S3_REGION,
         s3Endpoint: workerEnv.S3_ENDPOINT,
         bucket: workerEnv.S3_APP_FILES_BUCKET,
+        ocrLowConfidenceThreshold: workerEnv.OCR_LOW_CONFIDENCE_THRESHOLD,
+        ocrWorkerPath: workerEnv.OCR_WORKER_PATH,
+        ocrLangPath: workerEnv.OCR_LANG_PATH,
       });
     },
   },

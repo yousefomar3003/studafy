@@ -7,6 +7,7 @@ import { FIXTURES } from "./__fixtures__/specs";
 import { DEFAULT_MAX_CHUNK_CHARS, chunkBlocks } from "./chunker";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, mockEmbedding } from "./embedding";
 import { buildIngestChunks } from "./ingest";
+import { TesseractOcrEngine } from "./ocr";
 
 import type { ParsedBlock } from "./types";
 
@@ -15,40 +16,64 @@ const readFixture = async (file: string): Promise<Uint8Array> =>
 
 describe("ai-ingestion fixture corpus", () => {
   test("valid documents yield chunks containing their anchors and section headings", async () => {
-    for (const spec of FIXTURES) {
-      if (spec.kind !== "pdf" && spec.kind !== "docx" && spec.kind !== "pptx") continue;
-      const chunks = await buildIngestChunks(await readFixture(spec.file), spec.mimeType);
-
-      expect(chunks.length, `${spec.file} produced no chunks`).toBeGreaterThan(0);
-      const content = chunks.map((chunk) => chunk.content).join("\n");
-      for (const anchor of spec.anchors ?? []) {
-        expect(content, `${spec.file} lost anchor "${anchor}"`).toContain(anchor);
-      }
-      const sectionTitles = new Set(chunks.map((chunk) => chunk.sectionTitle).filter(Boolean));
-      for (const heading of spec.headings ?? []) {
-        expect(sectionTitles.has(heading), `${spec.file} did not detect heading "${heading}"`).toBe(
-          true,
+    // One engine for the whole run: it spawns its tesseract worker lazily on the first raster and
+    // reuses it, and close() at the end (idempotent, cheap for the text-only formats that never
+    // spawned it) guarantees no worker thread leaks out of the test.
+    const ocr = new TesseractOcrEngine();
+    try {
+      for (const spec of FIXTURES) {
+        if (!["pdf", "docx", "pptx", "image"].includes(spec.kind)) continue;
+        const needsOcr = spec.kind === "image" || spec.file === "scanned-photosynthesis-guide.pdf";
+        const { chunks } = await buildIngestChunks(
+          await readFixture(spec.file),
+          spec.mimeType,
+          needsOcr ? { ocr } : {},
         );
+
+        expect(chunks.length, `${spec.file} produced no chunks`).toBeGreaterThan(0);
+        const content = chunks.map((chunk) => chunk.content).join("\n");
+        for (const anchor of spec.anchors ?? []) {
+          expect(content, `${spec.file} lost anchor "${anchor}"`).toContain(anchor);
+        }
+        const sectionTitles = new Set(chunks.map((chunk) => chunk.sectionTitle).filter(Boolean));
+        for (const heading of spec.headings ?? []) {
+          expect(
+            sectionTitles.has(heading),
+            `${spec.file} did not detect heading "${heading}"`,
+          ).toBe(true);
+        }
       }
+    } finally {
+      await ocr.close();
     }
-  }, 30_000);
+  }, 60_000);
 
   test("pdf chunks carry page numbers up to the document page count", async () => {
-    for (const spec of FIXTURES) {
-      if (spec.kind !== "pdf") continue;
-      const chunks = await buildIngestChunks(await readFixture(spec.file), spec.mimeType);
-      const pages = chunks
-        .map((chunk) => chunk.pageNumber)
-        .filter((page): page is number => page !== null);
-      expect(pages.length, `${spec.file} lost all page numbers`).toBe(chunks.length);
-      expect(Math.max(...pages)).toBe(spec.pages!);
+    const ocr = new TesseractOcrEngine();
+    try {
+      for (const spec of FIXTURES) {
+        if (spec.kind !== "pdf") continue;
+        const needsOcr = spec.file === "scanned-photosynthesis-guide.pdf";
+        const { chunks } = await buildIngestChunks(
+          await readFixture(spec.file),
+          spec.mimeType,
+          needsOcr ? { ocr } : {},
+        );
+        const pages = chunks
+          .map((chunk) => chunk.pageNumber)
+          .filter((page): page is number => page !== null);
+        expect(pages.length, `${spec.file} lost all page numbers`).toBe(chunks.length);
+        expect(Math.max(...pages)).toBe(spec.pages!);
+      }
+    } finally {
+      await ocr.close();
     }
   });
 
   test("pptx decks chunk one per slide with slide-number anchors and captured notes", async () => {
     for (const spec of FIXTURES) {
       if (spec.kind !== "pptx") continue;
-      const chunks = await buildIngestChunks(await readFixture(spec.file), spec.mimeType);
+      const { chunks } = await buildIngestChunks(await readFixture(spec.file), spec.mimeType);
 
       expect(chunks, `${spec.file} did not chunk one-per-slide`).toHaveLength(spec.slides!);
       expect(chunks.map((chunk) => chunk.pageNumber)).toEqual(
@@ -161,7 +186,7 @@ describe("mockEmbedding", () => {
   });
 
   test("every chunk carries the embedding model and a vector literal", async () => {
-    const chunks = await buildIngestChunks(
+    const { chunks } = await buildIngestChunks(
       await readFixture("algebra-functions.pdf"),
       "application/pdf",
     );

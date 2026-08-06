@@ -57,7 +57,7 @@ export async function parsePptx(bytes: Uint8Array): Promise<ParsedDocument> {
   if (blocks.length === 0) {
     throw new EmptyDocumentError("no extractable text");
   }
-  return { format: "pptx", pages: slides.length, blocks };
+  return { format: "pptx", pages: slides.length, blocks, ocrReport: null };
 }
 
 /**

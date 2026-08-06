@@ -128,4 +128,17 @@ export const NOTIFICATION_CATALOG = {
       route: "",
     },
   },
+  // OCR quality (000090). Raised by the ai-ingestion worker directly into app.notifications when an
+  // OCR'd material has low-confidence pages — no dispatch event today, so the entry exists to keep
+  // NotificationCatalog total and the route is empty; nothing links to a flagged page yet.
+  [NOTIFICATION_TYPES.MATERIAL_OCR_LOW_CONFIDENCE]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "",
+    },
+  },
 } as const satisfies NotificationCatalog;

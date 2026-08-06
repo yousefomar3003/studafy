@@ -10,12 +10,16 @@
  */
 /* eslint-disable security/detect-non-literal-fs-filename -- a dev-only generator; every path is derived from the manifest, never user input */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 
+import { createCanvas, GlobalFonts } from "@napi-rs/canvas";
 import JSZip from "jszip";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 import { FIXTURES } from "./specs";
+
+const require = createRequire(import.meta.url);
 
 const FILES_DIR = join(import.meta.dir, "files");
 
@@ -94,6 +98,102 @@ async function buildPdf(
       `PDF builder made ${reloaded.getPageCount()} pages, expected ${pageSpecs.length}`,
     );
   }
+  return bytes;
+}
+
+// ---- Rasters (OCR fixtures) -------------------------------------------------------------------
+
+// The clean English page. Rendered 800x220 at 48px, two short lines — the exact geometry verified
+// (ADR 0007) to OCR back at mean per-word confidence >= 95 with the committed eng.traineddata.
+const RASTER_ENG_LINES = [
+  "Plants use photosynthesis to make food",
+  "Chlorophyll gives leaves their green color",
+];
+
+// Arabic line rendered with the checked-in Noto Sans Arabic face; recognized at confidence >= 85 by
+// the candidate-language pass in eng -> spa -> ara order.
+const RASTER_ARA_LINE = "التمثيل الضوئي يحول الضوء إلى طاقة";
+
+const ARABIC_FONT = "NotoArabic";
+
+// Register the Arabic face from the checked-in @fontsource package. Raster generation is
+// deterministic — no random content, and the exact face is committed — so regeneration reproduces
+// byte-for-byte what tests OCR against.
+if (
+  !GlobalFonts.registerFromPath(
+    require.resolve("@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-400-normal.woff"),
+    ARABIC_FONT,
+  )
+) {
+  throw new Error("could not register the Noto Sans Arabic font for raster fixtures");
+}
+
+function renderRaster(
+  lines: string[],
+  options: { font?: string; height?: number; rotate?: boolean } = {},
+): Buffer {
+  const width = 800;
+  const height = options.height ?? 220;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "black";
+  ctx.font = options.font ?? "48px sans-serif";
+  lines.forEach((line, index) => ctx.fillText(line, 20, 90 + index * 70));
+
+  if (options.rotate) {
+    // Rotate the whole canvas 90 degrees clockwise so tesseract reads the text as non-text; this
+    // is the low-confidence fixture, its confidence stays well under the flagging threshold.
+    const rotated = createCanvas(height, width);
+    const rctx = rotated.getContext("2d");
+    rctx.translate(height, 0);
+    rctx.rotate(Math.PI / 2);
+    rctx.drawImage(canvas, 0, 0);
+    return rotated.toBuffer("image/png");
+  }
+  return canvas.toBuffer("image/png");
+}
+
+/** The committed raster content, keyed by fixture file name. */
+const RASTER_CONTENT: Record<string, Buffer> = {
+  "photosynthesis-notes.png": renderRaster(RASTER_ENG_LINES),
+  "arabic-photosynthesis-notes.png": renderRaster([RASTER_ARA_LINE], {
+    font: `52px ${ARABIC_FONT}`,
+  }),
+  "scanned-rotated-notes.png": renderRaster(
+    [...RASTER_ENG_LINES, "Oxygen is released during the process"],
+    {
+      height: 280,
+      rotate: true,
+    },
+  ),
+};
+
+// ---- Scanned PDF -------------------------------------------------------------------------------
+
+/**
+ * A PDF with no text layer: one page whose only content is an embedded raster. `extractTextItems`
+ * finds nothing, so parsing exercises the OCR fallback in parsers/pdf.ts.
+ *
+ * The page is sized to the raster (800x220pt) and the raster drawn 1:1, so rendering it back at
+ * scale 2 produces the same glyphs at twice the resolution as the source PNG — which is what keeps
+ * the OCR confidence on this fixture in the same >= 95 range as the raster itself. Stretching the
+ * image to a letterbox page (as a real scan would) distorts letters and OCR conf drops.
+ */
+async function buildScannedPdf(pngBytes: Uint8Array): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([800, 220]);
+  const image = await pdf.embedPng(pngBytes);
+  page.drawImage(image, {
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 220,
+  });
+  const bytes = await pdf.save();
+  const reloaded = await PDFDocument.load(bytes);
+  if (reloaded.getPageCount() !== 1) throw new Error("scanned PDF must have exactly one page");
   return bytes;
 }
 
@@ -851,12 +951,24 @@ async function main(): Promise<void> {
 
   for (const spec of FIXTURES) {
     if (spec.kind === "pdf") {
-      const pageSpecs = PDF_PAGES[spec.file];
-      if (!pageSpecs) throw new Error(`Missing PDF content for ${spec.file}`);
-      const bytes = await buildPdf(pageSpecs);
-      if (spec.pages !== pageSpecs.length) {
-        throw new Error(`Manifest page count for ${spec.file} does not match its content`);
+      if (spec.file === "scanned-photosynthesis-guide.pdf") {
+        const bytes = await buildScannedPdf(RASTER_CONTENT["photosynthesis-notes.png"]!);
+        if (spec.pages !== 1) {
+          throw new Error(`Manifest page count for ${spec.file} does not match its content`);
+        }
+        writeFileSync(join(FILES_DIR, spec.file), bytes);
+      } else {
+        const pageSpecs = PDF_PAGES[spec.file];
+        if (!pageSpecs) throw new Error(`Missing PDF content for ${spec.file}`);
+        const bytes = await buildPdf(pageSpecs);
+        if (spec.pages !== pageSpecs.length) {
+          throw new Error(`Manifest page count for ${spec.file} does not match its content`);
+        }
+        writeFileSync(join(FILES_DIR, spec.file), bytes);
       }
+    } else if (spec.kind === "image") {
+      const bytes = RASTER_CONTENT[spec.file];
+      if (!bytes) throw new Error(`Missing raster content for ${spec.file}`);
       writeFileSync(join(FILES_DIR, spec.file), bytes);
     } else if (spec.kind === "docx") {
       const content = DOCX_CONTENT[spec.file];

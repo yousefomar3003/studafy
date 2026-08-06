@@ -151,3 +151,15 @@ exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_FAILED / in_app 
 exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_FAILED / push renders correctly 1`] = `"لم يتم فحص التحميل: notes.pdf"`;
 
 exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_FAILED / email renders correctly 1`] = `"تعذر فحص ملف "notes.pdf" ولم يتم نشره. يرجى إعادة تحميله."`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_OCR_LOW_CONFIDENCE / in_app renders correctly 1`] = `"scanned-guide.pdf needs a quick review"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_OCR_LOW_CONFIDENCE / push renders correctly 1`] = `"Review needed: scanned-guide.pdf"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_OCR_LOW_CONFIDENCE / email renders correctly 1`] = `"Your file "scanned-guide.pdf" was transcribed automatically, but these pages were hard to read: 2, 4. Please check them."`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_OCR_LOW_CONFIDENCE / in_app renders correctly 1`] = `"يتطلب scanned-guide.pdf مراجعة سريعة"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_OCR_LOW_CONFIDENCE / push renders correctly 1`] = `"مراجعة مطلوبة: scanned-guide.pdf"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_OCR_LOW_CONFIDENCE / email renders correctly 1`] = `"تم تحويل ملف "scanned-guide.pdf" تلقائيًا، لكن الصفحات التالية كانت صعبة القراءة: 2, 4. يرجى مراجعتها."`;

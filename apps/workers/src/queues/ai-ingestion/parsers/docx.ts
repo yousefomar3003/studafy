@@ -55,7 +55,7 @@ export async function parseDocx(bytes: Uint8Array): Promise<ParsedDocument> {
   if (blocks.length === 0) {
     throw new EmptyDocumentError("no extractable text");
   }
-  return { format: "docx", pages: null, blocks };
+  return { format: "docx", pages: null, blocks, ocrReport: null };
 }
 
 function collectParagraphs(document: MammothElement): Paragraph[] {

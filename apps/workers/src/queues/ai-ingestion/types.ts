@@ -1,3 +1,5 @@
+import type { OcrReport } from "./ocr";
+
 /**
  * A single extractable unit of a document, in reading order.
  *
@@ -15,7 +17,8 @@ export interface ParsedBlock {
   /**
    * The 1-based page the block was extracted from. DOCX has no intrinsic page numbers (Word
    * paginates at render time), so DOCX blocks carry `null`; PDF blocks always carry a page; PPTX
-   * blocks carry the slide number, which is the only pagination a deck has.
+   * blocks carry the slide number, which is the only pagination a deck has. Image blocks carry 1 —
+   * a raster is a single page.
    */
   pageNumber: number | null;
   /**
@@ -27,10 +30,16 @@ export interface ParsedBlock {
 }
 
 export interface ParsedDocument {
-  format: "pdf" | "docx" | "pptx";
-  /** Number of pages, when the format exposes it. `null` for DOCX, the slide count for PPTX. */
+  format: "pdf" | "docx" | "pptx" | "image";
+  /** Number of pages, when the format exposes it. `null` for DOCX, the slide count for PPTX, 1 for an image. */
   pages: number | null;
   blocks: ParsedBlock[];
+  /**
+   * Non-null iff OCR produced the document's text — every image, and (later) the scanned pages of a
+   * textless PDF. Text-extractable documents carry `null`, so a consumer can tell "no OCR ran" from
+   * "OCR ran cleanly" without guessing from the format.
+   */
+  ocrReport: OcrReport | null;
 }
 
 /**

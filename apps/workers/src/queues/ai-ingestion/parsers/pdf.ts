@@ -1,7 +1,8 @@
-import { extractTextItems, getDocumentProxy } from "unpdf";
+import { extractTextItems, getDocumentProxy, renderPageAsImage } from "unpdf";
 
 import { CorruptDocumentError, EmptyDocumentError, EncryptedDocumentError } from "../errors";
 
+import type { OcrEngine, OcrPageResult, OcrReport } from "../ocr";
 import type { ParsedBlock, ParsedDocument } from "../types";
 import type { StructuredTextItem } from "unpdf";
 
@@ -31,7 +32,26 @@ const HEADING_FONT_RATIO = 1.4;
 const MAX_HEADING_CHARS = 120;
 const LINE_Y_TOLERANCE = 2;
 
-export async function parsePdf(bytes: Uint8Array): Promise<ParsedDocument> {
+export interface ParsePdfOptions {
+  /**
+   * The OCR engine used for pages with no extractable text (scanned pages). Optional because a text
+   * PDF never needs it; a scanned PDF without an engine is a configuration gap and fails with
+   * `EmptyDocumentError` just as it would have before OCR existed.
+   */
+  ocr?: OcrEngine;
+}
+
+/**
+ * Parse a PDF into blocks. Text pages are extracted and heuristically headed exactly as before;
+ * pages with no extractable text (scans, embedded rasters) are handed to the OCR engine, one
+ * rendered raster per page, and their recognized text becomes one body block at the page's
+ * position. The {@link OcrReport} records every OCR'd page so low-confidence pages can be flagged.
+ * Rendering pages is the slow path, and only pages that need it pay for it.
+ */
+export async function parsePdf(
+  bytes: Uint8Array,
+  options: ParsePdfOptions = {},
+): Promise<ParsedDocument> {
   let proxy: Awaited<ReturnType<typeof getDocumentProxy>>;
   try {
     proxy = await getDocumentProxy(bytes);
@@ -49,14 +69,50 @@ export async function parsePdf(bytes: Uint8Array): Promise<ParsedDocument> {
     const bodySize = dominantFontSize(lines);
     const outline = await readOutline(proxy);
 
-    const blocks = buildBlocks(lines, bodySize, outline);
+    const ocrByPage = new Map<number, OcrPageResult>();
+    if (options.ocr) {
+      for (const [pageIndex, pageLines] of lines.entries()) {
+        if (pageLines.length > 0) continue;
+        const pageNumber = pageIndex + 1;
+        const result = await ocrPage(options.ocr, proxy, pageNumber);
+        ocrByPage.set(pageIndex, result);
+      }
+    }
+
+    const blocks = buildBlocks(lines, bodySize, outline, ocrByPage);
     if (blocks.length === 0) {
       throw new EmptyDocumentError("no extractable text");
     }
-    return { format: "pdf", pages, blocks };
+    const ocrReport: OcrReport | null =
+      ocrByPage.size > 0 && options.ocr
+        ? {
+            engine: options.ocr.name,
+            lowConfidenceThreshold: options.ocr.lowConfidenceThreshold,
+            pages: [...ocrByPage.values()].sort((a, b) => a.page - b.page),
+          }
+        : null;
+    return { format: "pdf", pages, blocks, ocrReport };
   } finally {
     await proxy.loadingTask.destroy();
   }
+}
+
+/**
+ * Render one page of the PDF to a raster and recognize it. `renderPageAsImage` returns an
+ * `ArrayBuffer`; `new Uint8Array` copies it so the engine owns the bytes. Scale 2 doubles the
+ * resolution of a typical 72pt scan to roughly what a phone camera produces, which is where
+ * tesseract's accuracy plateaus for clean print (verified against the fixtures, ADR 0007).
+ */
+async function ocrPage(
+  ocr: OcrEngine,
+  proxy: Awaited<ReturnType<typeof getDocumentProxy>>,
+  page: number,
+): Promise<OcrPageResult> {
+  const rendered = await renderPageAsImage(proxy, page, {
+    canvasImport: () => import("@napi-rs/canvas"),
+    scale: 2,
+  });
+  return ocr.recognize(new Uint8Array(rendered), page);
 }
 
 /** Group a page's text items into lines by vertical position, top of page first. */
@@ -156,7 +212,12 @@ async function pageIndexOf(
   }
 }
 
-function buildBlocks(lines: Line[][], bodySize: number, outline: OutlineSection[]): ParsedBlock[] {
+function buildBlocks(
+  lines: Line[][],
+  bodySize: number,
+  outline: OutlineSection[],
+  ocrByPage: Map<number, OcrPageResult> = new Map<number, OcrPageResult>(),
+): ParsedBlock[] {
   const outlineByPage = new Map<number, string>();
   for (const section of outline) outlineByPage.set(section.pageIndex, section.title);
 
@@ -183,6 +244,17 @@ function buildBlocks(lines: Line[][], bodySize: number, outline: OutlineSection[
       blocks.push({
         text: line.text,
         kind: heading ? "heading" : "body",
+        pageNumber: pageIndex + 1,
+        slideNumber: null,
+      });
+    }
+    // An OCR'd page has no text lines, so its recognized text lands at the page's own position,
+    // keeping reading order intact for mixed documents.
+    const ocr = ocrByPage.get(pageIndex);
+    if (ocr !== undefined && ocr.text !== "") {
+      blocks.push({
+        text: ocr.text,
+        kind: "body",
         pageNumber: pageIndex + 1,
         slideNumber: null,
       });

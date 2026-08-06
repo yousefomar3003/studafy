@@ -21,6 +21,7 @@ describe("loadEnv", () => {
       EMAIL_BATCH_SIZE: 25,
       ENTITLEMENT_POLL_INTERVAL_MS: 500,
       ENTITLEMENT_BATCH_SIZE: 100,
+      OCR_LOW_CONFIDENCE_THRESHOLD: 60,
     });
   });
 
@@ -47,6 +48,7 @@ describe("loadEnv", () => {
       EMAIL_BATCH_SIZE: 25,
       ENTITLEMENT_POLL_INTERVAL_MS: 500,
       ENTITLEMENT_BATCH_SIZE: 100,
+      OCR_LOW_CONFIDENCE_THRESHOLD: 60,
     });
   });
 
@@ -62,6 +64,12 @@ describe("loadEnv", () => {
 
   test("throws for an unknown NODE_ENV", () => {
     expect(() => loadEnv({ NODE_ENV: "staging" })).toThrow(EnvValidationError);
+  });
+
+  test("coerces the OCR low-confidence threshold override", () => {
+    expect(loadEnv({ OCR_LOW_CONFIDENCE_THRESHOLD: "75" })).toMatchObject({
+      OCR_LOW_CONFIDENCE_THRESHOLD: 75,
+    });
   });
 
   test("requires a distinct read pool in production", () => {

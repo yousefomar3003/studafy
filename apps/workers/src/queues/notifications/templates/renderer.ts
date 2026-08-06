@@ -6,7 +6,7 @@
  * body a dispatch writes.
  *
  * The templates themselves are not duplicated here. They moved out of apps/api into a shared
- * package precisely so this file could be thin — nine notification types across three channels and
+ * package precisely so this file could be thin — every notification type across three channels and
  * two locales, kept in one place, is the only version of this that stays correct.
  */
 

@@ -28,6 +28,10 @@ export const NOTIFICATION_TYPES = {
   // unreachable, timeout, scan error) and its retries were exhausted. Fail-closed alert: the
   // material is marked failed, never available. Mirrored in app.notification_type by 000088.
   MATERIAL_SCAN_FAILED: "MATERIAL_SCAN_FAILED",
+  // Raised by the ai-ingestion worker when an OCR'd material has pages whose mean per-word
+  // confidence fell below the flagging threshold. Tells the uploader (usually the teacher) which
+  // pages to review before trusting the transcription. Mirrored in app.notification_type by 000090.
+  MATERIAL_OCR_LOW_CONFIDENCE: "MATERIAL_OCR_LOW_CONFIDENCE",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

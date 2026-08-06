@@ -74,6 +74,7 @@ describe("templates — completeness", () => {
                       "summary",
                       "fileName",
                       "virus",
+                      "pages",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -132,6 +133,10 @@ describe("renderNotification — snapshot tests", () => {
     },
     [NOTIFICATION_TYPES.MATERIAL_SCAN_FAILED]: {
       fileName: "notes.pdf",
+    },
+    [NOTIFICATION_TYPES.MATERIAL_OCR_LOW_CONFIDENCE]: {
+      fileName: "scanned-guide.pdf",
+      pages: "2, 4",
     },
   } as const;
 
