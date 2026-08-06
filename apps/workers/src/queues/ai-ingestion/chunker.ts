@@ -80,7 +80,17 @@ export function chunkBlocks(
   let carrySlide: number | null = null;
 
   const flush = (carryEligible: boolean): void => {
-    if (buffer.length === 0) return;
+    if (buffer.length === 0) {
+      // A heading or slide boundary must never let the previous chunk's overlap tail ride across
+      // it. With nothing buffered there is nothing to carry from, so drop any pending carry — a
+      // size-flush never reaches this point because it always leaves a seeded chunk behind.
+      if (!carryEligible) {
+        carry = null;
+        carryPage = null;
+        carrySlide = null;
+      }
+      return;
+    }
     const content = buffer.join("\n").trim();
     buffer = [];
     if (content === "") {

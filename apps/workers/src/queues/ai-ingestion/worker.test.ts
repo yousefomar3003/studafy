@@ -241,6 +241,22 @@ describe("chunkBlocks", () => {
     expect(chunks[sectionStart]!.content.startsWith("Chlorophyll absorbs")).toBe(true);
   });
 
+  test("overlap does not carry across a heading that follows a size flush", () => {
+    // Section one ends exactly on a size-induced flush (a split piece left behind an overlap tail),
+    // and the next heading sits on the same page — the case that used to leak the tail across.
+    const blocks: ParsedBlock[] = [
+      { text: "A".repeat(90), kind: "body", pageNumber: 1, slideNumber: null },
+      { text: "B".repeat(90), kind: "body", pageNumber: 1, slideNumber: null },
+      { text: "Section Two", kind: "heading", pageNumber: 1, slideNumber: null },
+      { text: "C".repeat(90), kind: "body", pageNumber: 1, slideNumber: null },
+    ];
+    const chunks = chunkBlocks(blocks, { maxChunkChars: 100, overlapChars: 15 });
+
+    const sectionTwoStart = chunks.findIndex((chunk) => chunk.sectionTitle === "Section Two");
+    expect(sectionTwoStart).toBeGreaterThan(0);
+    expect(chunks[sectionTwoStart]!.content.startsWith("C")).toBe(true);
+  });
+
   test("overlap never crosses a slide boundary", () => {
     const firstSlide = "The Sun contains most of the mass of the solar system. ";
     const secondSlide = "Jupiter is the largest planet by mass. ";
