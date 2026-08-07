@@ -7,7 +7,9 @@ import { deterministicEmbedding, seedDate, uuid } from "../support";
 
 import type { FullCtx, MaterialsCtx, Sql } from "../support";
 
-const EMBEDDING_MODEL = "mock-embedding-3-small";
+// Must match apps/workers/src/queues/ai-ingestion/embedding.ts (EMBEDDING_MODEL): the seed corpus
+// and the ingestion worker share one table, and the design note forbids mixing models in it.
+const EMBEDDING_MODEL = "mock-embedding-3-small@1";
 
 const CHUNKS: readonly { content: string; page: number; section: string }[] = [
   {
@@ -42,6 +44,13 @@ const CHUNKS: readonly { content: string; page: number; section: string }[] = [
   },
 ];
 
+// The embedding token cost the worker would have recorded for the ingested corpus: the chunker's
+// four-chars-per-token rule over each chunk. Kept consistent with app.materials.embedding_token_cost.
+const INGESTED_EMBEDDING_TOKENS = CHUNKS.reduce(
+  (total, chunk) => total + Math.ceil(chunk.content.length / 4),
+  0,
+);
+
 export async function seedMaterials(sql: Sql, ctx: FullCtx): Promise<MaterialsCtx> {
   const { schoolId, classes, teachers } = ctx;
   const scienceClass = classes[0]!;
@@ -69,6 +78,7 @@ export async function seedMaterials(sql: Sql, ctx: FullCtx): Promise<MaterialsCt
           ingest_status: "ready",
           ingest_error: null,
           ingested_at: seedDate(-4),
+          embedding_token_cost: INGESTED_EMBEDDING_TOKENS,
         },
         {
           id: pendingMaterialId,
@@ -87,6 +97,7 @@ export async function seedMaterials(sql: Sql, ctx: FullCtx): Promise<MaterialsCt
           ingest_status: "uploaded",
           ingest_error: null,
           ingested_at: null,
+          embedding_token_cost: 0,
         },
       ],
       "id",
@@ -105,6 +116,7 @@ export async function seedMaterials(sql: Sql, ctx: FullCtx): Promise<MaterialsCt
       "ingest_status",
       "ingest_error",
       "ingested_at",
+      "embedding_token_cost",
     )}
   `;
 

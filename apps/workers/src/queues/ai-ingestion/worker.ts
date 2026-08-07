@@ -4,6 +4,7 @@ import postgres from "postgres";
 
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
+import { createEmbeddingStage, createMockEmbeddingProvider } from "./embedding";
 import { MaterialParseError } from "./errors";
 import { buildIngestChunks } from "./ingest";
 import { aiIngestionJobDataSchema } from "./job";
@@ -120,8 +121,17 @@ export async function processIngestJob(
       : undefined;
     let chunks: IngestChunk[];
     let ocrReport: OcrReport | null = null;
+    let embeddingTokens = 0;
     try {
-      ({ chunks, ocrReport } = await buildIngestChunks(bytes, material.mime_type, { ocr }));
+      // The stage over the repository's mock provider is the single swap point for a real
+      // embedding client: batching, rate limiting, 429 retries and per-tenant metering are all
+      // inside the stage, so the worker never changes when the provider does.
+      const embedder = createEmbeddingStage(createMockEmbeddingProvider());
+      ({ chunks, ocrReport, embeddingTokens } = await buildIngestChunks(bytes, material.mime_type, {
+        ocr,
+        schoolId: data.schoolId,
+        embedder,
+      }));
     } finally {
       // The engine lazily spawns a worker thread on first recognize; close it either way so a job
       // never leaks one. `catch` guards close() itself: terminating a broken worker must not mask
@@ -154,6 +164,7 @@ export async function processIngestJob(
         SET ingest_status = 'ready'::app.material_ingest_status,
             ingest_error = NULL,
             ingested_at = clock_timestamp(),
+            embedding_token_cost = ${embeddingTokens},
             updated_at = clock_timestamp()
         WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
       `;

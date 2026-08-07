@@ -1,7 +1,8 @@
 import { chunkBlocks } from "./chunker";
-import { EMBEDDING_MODEL, mockEmbedding } from "./embedding";
+import { createEmbeddingStage, createMockEmbeddingProvider, nullCostMeter } from "./embedding";
 import { parseDocument, type ParseDocumentOptions } from "./parsers";
 
+import type { CostMeter, EmbeddingStage } from "./embedding";
 import type { OcrReport } from "./ocr";
 import type { MaterialChunk } from "./types";
 
@@ -16,10 +17,24 @@ export interface IngestChunk extends MaterialChunk {
   embeddingModel: string;
 }
 
+export interface IngestOptions extends ParseDocumentOptions {
+  /**
+   * The embedding stage that turns chunks into vectors. Defaults to a stage over the repository's
+   * mock provider, so the pure pipeline (and its tests) need no wiring.
+   */
+  embedder?: EmbeddingStage;
+  /** Tenant the embedding cost is charged to; passed through to the stage's meter. */
+  schoolId?: string;
+  /** Receives the token count of every completed batch. Defaults to a no-op meter. */
+  meter?: CostMeter;
+}
+
 export interface BuildIngestChunksResult {
   chunks: IngestChunk[];
   /** Non-null iff OCR produced the document's text (see `ParsedDocument.ocrReport`). */
   ocrReport: OcrReport | null;
+  /** Total input tokens the embedding stage billed for this document (sum of the batches). */
+  embeddingTokens: number;
 }
 
 /**
@@ -33,15 +48,19 @@ export interface BuildIngestChunksResult {
 export async function buildIngestChunks(
   bytes: Uint8Array,
   mimeType: string,
-  options: ParseDocumentOptions = {},
+  options: IngestOptions = {},
 ): Promise<BuildIngestChunksResult> {
   const parsed = await parseDocument(bytes, mimeType, options);
+  const embedder = options.embedder ?? defaultEmbedder;
+  const embedded = await embedder.embed(chunkBlocks(parsed.blocks), {
+    schoolId: options.schoolId,
+    meter: options.meter ?? nullCostMeter,
+  });
   return {
-    chunks: chunkBlocks(parsed.blocks).map((chunk) => ({
-      ...chunk,
-      embedding: mockEmbedding(chunk.content),
-      embeddingModel: EMBEDDING_MODEL,
-    })),
+    chunks: embedded.chunks,
     ocrReport: parsed.ocrReport,
+    embeddingTokens: embedded.tokens,
   };
 }
+
+const defaultEmbedder = createEmbeddingStage(createMockEmbeddingProvider());

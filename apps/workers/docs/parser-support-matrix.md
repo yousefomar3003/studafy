@@ -89,11 +89,29 @@ with no dependency.
 
 ## Embeddings
 
-`embedding.ts` stores a deterministic, content-derived 1536-dimension vector under
-`EMBEDDING_MODEL = "mock-embedding-3-small"` (the seed corpus' model). This is a placeholder: the
-repository declares no embedding client, and `app.material_chunks.embedding` is `vector(1536) NOT
-NULL`, so a row cannot exist without a vector. This module is the single swap point for a real
-provider; content is retained verbatim on each chunk so embeddings can be regenerated in place.
+`embedding.ts` is the embedding stage of ingestion. The repository declares no embedding client —
+no OpenAI/Voyage/Cohere dependency, no API key in `apps/workers/src/env.ts` — so the provider
+wired in by the worker is a deterministic mock under `EMBEDDING_MODEL = "mock-embedding-3-small@1"`
+(the seed corpus' model, versioned so a model change is a new value rather than an overwrite). This
+is the single swap point for a real provider: `createEmbeddingStage(provider)` in `worker.ts`
+accepts any provider implementing `EmbeddingProvider`, and the stage around it is provider-agnostic:
+
+- **Batching.** Chunks are folded into provider calls bounded by both chunk count and input tokens
+  (the chunker's 4-char-per-token rule), so a call stays within a real provider's request and token
+  limits at once.
+- **Rate limiting.** When a rate is configured the stage paces calls through the same token bucket
+  the SES sender uses, so a provider's per-second ceiling is respected across a whole material.
+- **Retries.** Provider rate limits (`EmbeddingRateLimitError`, HTTP 429) are retried with
+  exponential backoff and full jitter; every other failure propagates immediately, because retrying
+  a mistake that will never resolve only burns a job's attempt budget.
+- **Cost metering.** Every completed batch's token count is metered per tenant and written by the
+  worker to `app.materials.embedding_token_cost` in the same transaction that marks the material
+  `ready`.
+
+Because the vectors are content-derived and deterministic, ingestion stays reproducible, and
+content is retained verbatim on each chunk so embeddings can be regenerated in place when a real
+model arrives (see the regeneration procedure in `docs/rag/hybrid-search-and-rag-storage.md`).
+Operator notes on tuning the stage are in [`embedding-ops.md`](embedding-ops.md).
 
 ## Error taxonomy → `app.materials.ingest_error`
 

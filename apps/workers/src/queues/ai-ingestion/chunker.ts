@@ -2,7 +2,7 @@ import type { MaterialChunk, ParsedBlock } from "./types";
 
 /**
  * The retrieval chunk budget, expressed in tokens. The repository has no tokenizer — the embedding
- * pipeline is mock (`EMBEDDING_MODEL = "mock-embedding-3-small"`, no client declared) — so tokens
+ * pipeline is mock (`EMBEDDING_MODEL = "mock-embedding-3-small@1"`, no client declared) — so tokens
  * are an approximation: English runs at roughly four characters per token, the canonical rule of
  * thumb. The chunker stays a character machine (deterministic, no dependency); the character budget
  * it enforces is `CHUNK_TOKENS * CHARS_PER_TOKEN`.
