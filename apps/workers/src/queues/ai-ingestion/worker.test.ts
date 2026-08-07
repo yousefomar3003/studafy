@@ -347,10 +347,11 @@ describe("mockEmbedding", () => {
   });
 
   test("every chunk carries the embedding model and a vector literal", async () => {
-    const { chunks } = await buildIngestChunks(
+    const { chunks, embeddingTokens } = await buildIngestChunks(
       await readFixture("algebra-functions.pdf"),
       "application/pdf",
     );
+    expect(embeddingTokens).toBeGreaterThan(0);
     for (const chunk of chunks) {
       expect(chunk.embeddingModel).toBe(EMBEDDING_MODEL);
       expect(chunk.embedding.startsWith("[")).toBe(true);
