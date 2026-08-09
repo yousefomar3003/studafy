@@ -32,6 +32,12 @@ const BillingOverviewResponseSchema = z
       used: z.number(),
       cap: z.number(),
     }),
+    storage: z.object({
+      usedBytes: z.number().nonnegative(),
+      capBytes: z.number().positive(),
+      /** 0..1; NaN when no cap is configured. */
+      fractionUsed: z.number(),
+    }),
   })
   .openapi("BillingOverview");
 
@@ -84,6 +90,7 @@ export function billingOverviewRoutes(database: Database): OpenAPIHono<AppEnv> {
         },
         plan: overview.plan,
         seats: overview.seats,
+        storage: overview.storage,
       },
       200,
     );

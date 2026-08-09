@@ -76,6 +76,11 @@ function fakeStorage(
       calls.push(`remove:${key}`);
       objects.delete(key);
     },
+    async *list(prefix) {
+      for (const [key, object] of objects) {
+        if (key.startsWith(prefix)) yield { key, sizeBytes: object.sizeBytes };
+      }
+    },
   };
 
   return Object.assign(base, { calls, objects }) as FakeStorage;

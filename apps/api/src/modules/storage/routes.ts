@@ -12,6 +12,12 @@ import { standardResponses } from "../../openapi/responses";
 import { getContentClass, getDownloadClass } from "./content-classes";
 import { requestDownload } from "./download-service";
 import {
+  DEFAULT_STORAGE_CAP_BYTES,
+  STORAGE_QUOTA_WARNING_THRESHOLD,
+  assertStorageUploadQuota,
+  recordStorageUpload,
+} from "./quota-service";
+import {
   confirmedUploadSchema,
   confirmUploadBodySchema,
   downloadParamsSchema,
@@ -21,6 +27,7 @@ import {
 } from "./schemas";
 import { confirmUpload, requestUpload } from "./service";
 
+import type { StorageUsage } from "./quota-service";
 import type { Database, DatabasePools } from "../../db/client";
 import type { StorageService } from "../../lib/storage";
 import type { AppEnv } from "../../middleware/requestId";
@@ -54,7 +61,7 @@ const requestUploadRoute = createRoute({
         schema: uploadUrlResponseSchema,
       },
     },
-    [400, 401, 403, 500, 503],
+    [400, 401, 402, 403, 500, 503],
   ),
 });
 
@@ -82,7 +89,7 @@ const confirmUploadRoute = createRoute({
         schema: confirmedUploadSchema,
       },
     },
-    [400, 401, 403, 404, 500, 503],
+    [400, 401, 402, 403, 404, 500, 503],
   ),
 });
 
@@ -122,6 +129,20 @@ function tenantFrom(c: Context<AppEnv>) {
 }
 
 /**
+ * Surface the school's storage posture on upload responses so clients can warn their own UI early.
+ * The hard stop is the 402; these are advisory -- used bytes, cap, and a flag once the school is
+ * at or past the 80% soft-warning threshold.
+ */
+function attachQuotaHeaders(c: Context<AppEnv>, usage: StorageUsage | null): void {
+  if (!usage) return;
+  c.header("x-storage-used-bytes", String(usage.bytesUsed));
+  c.header("x-storage-cap-bytes", String(usage.capBytes));
+  if (usage.fractionUsed >= STORAGE_QUOTA_WARNING_THRESHOLD) {
+    c.header("x-storage-quota-warning", "1");
+  }
+}
+
+/**
  * The generic object-storage gateway.
  *
  * Authorization is per content class: the required permission lives in the body (or path), so it
@@ -155,6 +176,17 @@ export function storageRoutes(
     const contentClass = getContentClass(body.content_class);
     requirePermissionIn(c, contentClass.requiredPermission);
 
+    // Storage-quota hard stop, checked before anything is signed so a request that cannot be
+    // honored costs nothing. Claim-based (the body's size_bytes); confirm re-checks the stored
+    // size. When no database is present the upload routes stay ungated, matching the download
+    // route's if(database) posture -- production always has one.
+    let quota: StorageUsage | null = null;
+    if (database) {
+      quota = await withTenantTx(database, tenantFrom(c), (tx) =>
+        assertStorageUploadQuota(tx, body.size_bytes),
+      );
+    }
+
     const { storageKey, presigned } = await requestUpload(
       storageService,
       auth.schoolId,
@@ -165,6 +197,8 @@ export function storageRoutes(
         sizeBytes: body.size_bytes,
       },
     );
+
+    attachQuotaHeaders(c, quota);
 
     return c.json(
       {
@@ -183,10 +217,44 @@ export function storageRoutes(
     const contentClass = getContentClass(body.content_class);
     requirePermissionIn(c, contentClass.requiredPermission);
 
-    const confirmed = await confirmUpload(storageService, auth.schoolId, contentClass, {
-      storageKey: body.storage_key,
-      checksumSha256: body.checksum_sha256,
-    });
+    let confirmed;
+    let quota: StorageUsage | null = null;
+
+    if (database) {
+      let capBytes = DEFAULT_STORAGE_CAP_BYTES;
+      confirmed = await withTenantTx(database, tenantFrom(c), async (tx) => {
+        const result = await confirmUpload(
+          storageService,
+          auth.schoolId,
+          contentClass,
+          {
+            storageKey: body.storage_key,
+            checksumSha256: body.checksum_sha256,
+          },
+          {
+            // Re-check the quota against the *stored* size before the object leaves temp/ --
+            // closing the "claim small, upload big" gap at the quota boundary.
+            assertCanPromote: async (sizeBytes) => {
+              capBytes = (await assertStorageUploadQuota(tx, sizeBytes)).capBytes;
+            },
+          },
+        );
+        const bytesUsed = await recordStorageUpload(tx, result.sizeBytes);
+        quota = {
+          bytesUsed,
+          capBytes,
+          fractionUsed: capBytes > 0 ? bytesUsed / capBytes : NaN,
+        };
+        return result;
+      });
+    } else {
+      confirmed = await confirmUpload(storageService, auth.schoolId, contentClass, {
+        storageKey: body.storage_key,
+        checksumSha256: body.checksum_sha256,
+      });
+    }
+
+    attachQuotaHeaders(c, quota);
 
     return c.json(
       {

@@ -12,6 +12,8 @@ import {
   processBillingEventSchema,
 } from "./schemas";
 import { runSeatReconciliation } from "./seat-reconciliation";
+import { runStorageQuotaReconciliation } from "./storage-quota-reconciliation";
+import { createStorageQuotaS3 } from "./storage-quota-s3";
 import { StripeSeatSubscriptionProvider } from "./stripe-seat-provider";
 
 import type {
@@ -23,9 +25,17 @@ import type { Job } from "bullmq";
 
 export const BILLING_QUEUE = JOB_NAMES.GENERATE_INVOICE;
 
+/** S3 connectivity the storage-quota reconciliation sweep needs, supplied by the registry. */
+export interface StorageReconciliationOptions {
+  s3Region?: string;
+  s3Endpoint?: string;
+  bucket?: string;
+}
+
 export async function processBillingJob(
   job: Job<BillingJobData>,
   databaseUrl: string,
+  storageOptions?: StorageReconciliationOptions,
 ): Promise<unknown> {
   if (job.name === JOB_NAMES.GENERATE_INVOICE) {
     const parsed = generateInvoiceSchema.safeParse(job.data);
@@ -70,6 +80,15 @@ export async function processBillingJob(
     return processSeatReconciliation(databaseUrl);
   }
 
+  // Daily storage-quota reconciliation (ST-16x). Same shape as the dunning and seat sweeps: no
+  // payload, its own postgres connection, one system tenant transaction per school. Unlike them it
+  // talks to S3 (the bucket that holds the school's objects), so it needs the storage options — and
+  // a missing S3 region/bucket is a thrown error (the registry re-queues it) rather than a silent
+  // skip, because a meter that never reconciles drifts without limit.
+  if (job.name === JOB_NAMES.RUN_STORAGE_QUOTA_RECONCILIATION) {
+    return processStorageQuotaReconciliation(databaseUrl, storageOptions);
+  }
+
   return { processed: false, reason: "unknown billing job" };
 }
 
@@ -86,6 +105,33 @@ async function processSeatReconciliation(databaseUrl: string): Promise<unknown> 
       sql,
       new StripeSeatSubscriptionProvider(secretKey),
       new Date(),
+      workerLogger,
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function processStorageQuotaReconciliation(
+  databaseUrl: string,
+  options?: StorageReconciliationOptions,
+): Promise<unknown> {
+  if (!options?.s3Region || !options.bucket) {
+    throw new Error(
+      "S3_REGION and S3_APP_FILES_BUCKET are required to run storage quota reconciliation",
+    );
+  }
+
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    return runStorageQuotaReconciliation(
+      sql,
+      createStorageQuotaS3({
+        region: options.s3Region,
+        endpoint: options.s3Endpoint,
+        bucket: options.bucket,
+      }),
       workerLogger,
     );
   } finally {

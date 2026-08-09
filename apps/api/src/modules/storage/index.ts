@@ -11,7 +11,22 @@ export type {
   DownloadClassKey,
 } from "./content-classes";
 export { confirmUpload, requestUpload } from "./service";
-export type { ConfirmedUpload, ConfirmUploadParams, RequestUploadParams } from "./service";
+export type {
+  ConfirmUploadOptions,
+  ConfirmedUpload,
+  ConfirmUploadParams,
+  RequestUploadParams,
+} from "./service";
+export {
+  DEFAULT_STORAGE_CAP_BYTES,
+  STORAGE_QUOTA_WARNING_THRESHOLD,
+  assertStorageUploadQuota,
+  getStorageUsage,
+  reconcileStorageUsage,
+  recordStorageUpload,
+  releaseStorageUsage,
+} from "./quota-service";
+export type { StorageReconcileResult, StorageUsage } from "./quota-service";
 export {
   requestDownload,
   resolveDownloadObject,
