@@ -4,7 +4,8 @@
  * Consumes one job per confirmed material. The confirm route flips the material to `scanning` and
  * enqueues this job; the worker streams the object from S3 into clamd and applies the verdict:
  *
- *   clean        — material -> `ready` (the "available" state). Nothing else changes.
+ *   clean        — material -> `ready` (the "available" state) and the derivations job is enqueued
+ *                  so the thumbnail/preview worker runs on the now-clean object.
  *   infected     — the object is copied to `quarantine/<schoolId>/materials/`, the material is
  *                  flipped to `quarantined`, the uploader is notified, and the `permanent/` copy
  *                  is deleted. The material is never served.
@@ -66,6 +67,12 @@ export interface ScanMaterialConfig {
   s3: ScanS3Client | null;
   bucket?: string;
   clamd: ClamdConfig;
+  /**
+   * Enqueue the `derive-material-previews` job once a material is clean. Injected by the registry so
+   * this worker stays free of BullMQ/Redis imports. Required: the scan worker is the derivations
+   * queue's only producer, so an absent producer is a configuration error, not a mode.
+   */
+  enqueueDerivation: (data: { schoolId: string; materialId: string }) => Promise<void>;
 }
 
 export type ScanMaterialResult =
@@ -217,8 +224,13 @@ export async function processMaterialScan(
     });
 
     // Not found, or already past 'scanning' by an earlier (successful) run. Nothing to do — the
-    // claim was lost, and that is the dedup working, not a fault.
+    // claim was lost, and that is the dedup working, not a fault. A material already `ready` means
+    // a prior attempt committed the clean flip but died before (or while) enqueueing the derivation
+    // job, so re-enqueue best-effort here and let the derivation worker's status guard dedup it.
     if (!material || material.ingest_status !== "scanning") {
+      if (material && material.ingest_status === "ready") {
+        await config.enqueueDerivation({ schoolId, materialId }).catch(() => undefined);
+      }
       return { processed: true, outcome: "skipped" };
     }
 
@@ -265,6 +277,13 @@ export async function processMaterialScan(
             AND ingest_status = 'scanning'::app.material_ingest_status
         `;
       });
+
+      // The material is clean, so now the thumbnail/preview can be derived from the same bytes.
+      // An enqueue failure propagates: the job retries and self-heals via the already-'ready' path
+      // above (status guard) or the derivation worker's keys guard. The derivation job must not be
+      // enqueued before the ready flip commits — see the status/keys guards in derivation.worker.ts.
+      await config.enqueueDerivation({ schoolId, materialId });
+
       return { processed: true, outcome: "clean" };
     }
 

@@ -6,6 +6,7 @@ import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
 import { workerLogger } from "./log";
 import { processIngestJob } from "./queues/ai-ingestion/worker";
 import { billingDeadLetterListener, processBillingJob } from "./queues/billing";
+import { createDerivationS3, processMaterialDerivation } from "./queues/derivations";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
@@ -88,6 +89,21 @@ function enqueueDelivery(data: DeliverNotificationJobData): Promise<void> {
   return deliveryQueue
     .add(JOB_NAMES.DELIVER_NOTIFICATION, data, DELIVERY_JOB_OPTIONS)
     .then(() => undefined);
+}
+
+/**
+ * The derivations queue, produced by the scan worker on every clean verdict. Lazily created for
+ * the same reason `deliveryQueue` is — registry.test.ts imports this module, and constructing a
+ * BullMQ `Queue` opens a Redis connection that a pure unit test has no need for.
+ */
+let derivationQueue: Queue | null = null;
+
+function enqueueDerivation(data: { schoolId: string; materialId: string }): Promise<void> {
+  derivationQueue ??= new Queue(QUEUE_NAMES.DERIVATIONS, {
+    connection: createRedisConnection(workerEnv) as never,
+  });
+
+  return derivationQueue.add(JOB_NAMES.DERIVE_MATERIAL_PREVIEWS, data).then(() => undefined);
 }
 
 /**
@@ -260,10 +276,29 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           timeoutMs: workerEnv.CLAMAV_TIMEOUT_MS,
           maxFileBytes: workerEnv.CLAMAV_MAX_FILE_BYTES,
         },
+        enqueueDerivation,
       }),
     // Terminal failures fail closed: the material is marked failed (never available) and the
     // uploader is alerted. See scan-material.worker.ts.
     onFailed: materialScanFailedListener(databaseUrl, workerLogger),
+  },
+  {
+    name: QUEUE_NAMES.DERIVATIONS,
+    concurrency: 2,
+    // One job per clean material, enqueued by the scan worker. Rasterizes the object into a
+    // thumbnail (and first-page preview for PDFs) without ever modifying the original; unsupported
+    // or unreadable content degrades to a NULL-key skip, never a failed material. Concurrency 2
+    // mirrors the scan queue: each job holds the whole source in memory while rasterizing, so two
+    // in flight keeps peak memory modest without making thumbnails trail availability.
+    processor: (job: Job) =>
+      processMaterialDerivation(job, {
+        databaseUrl,
+        databaseCaCert: workerEnv.DATABASE_CA_CERT,
+        s3: workerEnv.S3_REGION
+          ? createDerivationS3({ region: workerEnv.S3_REGION, endpoint: workerEnv.S3_ENDPOINT })
+          : null,
+        bucket: workerEnv.S3_APP_FILES_BUCKET,
+      }),
   },
   {
     name: QUEUE_NAMES.BILLING,

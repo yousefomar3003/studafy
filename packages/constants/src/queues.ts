@@ -14,6 +14,11 @@ export const QUEUE_NAMES = {
   // Malware scanning of uploaded objects (ClamAV). Consumes one job per confirmed material; the
   // verdict decides whether the material becomes available (ready) or is quarantined.
   SCAN: "file-scan",
+  // Material thumbnail/preview derivation. Consumes one job per clean material, enqueued by the
+  // file-scan worker after it flips the material to `ready`. Derived images are cosmetic — their
+  // failures never affect material availability, so this queue must stay independent of the scan
+  // verdict the moment it is made.
+  DERIVATIONS: "derivations",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -88,6 +93,11 @@ export const JOB_NAMES = {
   // key, and the user to notify if the verdict is not clean. One job per confirm, at most once:
   // the worker claims the material by its 'scanning' status and flips it to a terminal state.
   SCAN_MATERIAL: "scan-material",
+  // Thumbnail + first-page preview derivation of a clean material. Carried by the derivations
+  // queue; enqueued by the file-scan worker right after a clean verdict. Carries only the material
+  // id: the worker reads storage_key/mime_type from the row, so a retry never acts on stale payload
+  // data. A duplicate job is a no-op (the worker only derives while thumbnail_key is NULL).
+  DERIVE_MATERIAL_PREVIEWS: "derive-material-previews",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];
