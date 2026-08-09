@@ -470,6 +470,8 @@ export async function confirmAttachment(
   const { assertSchoolOwnedKey } = await import("../../../lib/storage/keys");
   const { buildPermanentKey } = await import("../../../lib/storage/keys");
   const { promoteTempObject } = await import("../../../lib/storage/promote");
+  const { assertStorageUploadQuota, recordStorageUpload } =
+    await import("../../storage/quota-service");
 
   assertSchoolOwnedKey(tempKey, schoolId, "temp");
 
@@ -488,7 +490,12 @@ export async function confirmAttachment(
   const objectId = crypto.randomUUID();
   const filename = tempKey.split("/").at(-1) ?? "attachment";
   const permanentKey = buildPermanentKey(schoolId, objectId, filename);
-  await promoteTempObject(storage, tempKey, permanentKey);
+  const promoted = await promoteTempObject(storage, tempKey, permanentKey, {
+    onSize: async (sizeBytes) => {
+      await assertStorageUploadQuota(tx, sizeBytes);
+    },
+  });
+  await recordStorageUpload(tx, promoted.sizeBytes);
 
   const erpnextName = before.erpnext_name as string;
   await tx`

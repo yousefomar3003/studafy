@@ -102,6 +102,7 @@
   "STORAGE_OBJECT_NOT_FOUND": "The uploaded file could not be found. Please upload it again.",
   "STORAGE_NOT_CONFIGURED": "File storage is unavailable. Please try again later.",
   "STORAGE_CHECKSUM_MISMATCH": "The uploaded file does not match the checksum you provided. Please upload it again.",
+  "STORAGE_QUOTA_EXCEEDED": "Storage quota exceeded. Free space by deleting files, or upgrade your plan.",
   "EXAM_NOT_FOUND": "Exam not found",
   "EXAM_INVALID_STATE": "Exam is not in a valid state for this operation",
   "MATERIAL_NOT_FOUND": "Material not found",

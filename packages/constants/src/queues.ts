@@ -79,6 +79,11 @@ export const JOB_NAMES = {
   // next-cycle downgrade on drift down, and a drift report to the school's ORG_ADMINs. Carries no
   // payload: the sweep reads every school's seats and Stripe state straight from the database.
   RUN_SEAT_RECONCILIATION: "run-seat-reconciliation",
+  // Daily storage-quota reconciliation (ST-16x). Scheduled job: recomputes each school's
+  // app.storage_usage_meters row from the bucket inventory, converging the drift (quarantine
+  // deletions, lifecycle expirations, orphaned objects) that event-driven increments cannot see.
+  // Carries no payload: the sweep reads every school's usage and the S3 bucket directly.
+  RUN_STORAGE_QUOTA_RECONCILIATION: "run-storage-quota-reconciliation",
   // Malware scan of a confirmed material. Carries the material id, its permanent storage
   // key, and the user to notify if the verdict is not clean. One job per confirm, at most once:
   // the worker claims the material by its 'scanning' status and flips it to a terminal state.

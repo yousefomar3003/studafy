@@ -81,6 +81,11 @@ function fakeStorage(): StorageService & { presignCalls: { key: string; ttl?: nu
     async remove(key) {
       objects.delete(key);
     },
+    async *list(prefix) {
+      for (const [key, sizeBytes] of objects) {
+        if (key.startsWith(prefix)) yield { key, sizeBytes };
+      }
+    },
   };
 }
 

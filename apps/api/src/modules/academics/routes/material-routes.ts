@@ -8,6 +8,7 @@ import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
+import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quota-service";
 import {
   confirmUpload,
   deleteMaterial,
@@ -103,7 +104,7 @@ const initiateMaterialUploadRoute = createRoute({
         schema: presignedUploadResponseSchema,
       },
     },
-    [400, 401, 403, 404, 409, 500],
+    [400, 401, 402, 403, 404, 409, 500],
   ),
 });
 
@@ -132,7 +133,7 @@ const confirmMaterialUploadRoute = createRoute({
         schema: materialSchema,
       },
     },
-    [400, 401, 403, 404, 409, 500],
+    [400, 401, 402, 403, 404, 409, 500],
   ),
 });
 
@@ -279,9 +280,13 @@ export function materialRoutes(
       throw new HTTPException(503, { message: "Storage not configured" });
     }
 
-    const result = await withTenantTx(database, tenantFrom(c), (tx) =>
-      initiateUpload(tx, auth.schoolId, auth.userId, body),
-    );
+    // Claim-based quota check before the material row is created or a PUT is signed. Materials
+    // upload straight into permanent/, so there is no temp/ stage to refuse at -- this gate plus
+    // the daily reconciliation is the enforcement boundary for this flow.
+    const result = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      await assertStorageUploadQuota(tx, body.size_bytes);
+      return initiateUpload(tx, auth.schoolId, auth.userId, body);
+    });
 
     const presigned = await storage.presign(result.storage_key, "PUT", body.mime_type);
 
@@ -300,9 +305,20 @@ export function materialRoutes(
     const { materialId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      confirmUpload(tx, auth.schoolId, materialId, body.storage_key, body.checksum_sha256),
-    );
+    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const confirmed = await confirmUpload(
+        tx,
+        auth.schoolId,
+        materialId,
+        body.storage_key,
+        body.checksum_sha256,
+      );
+      // The material's size is the client's claim from initiate; the object is already in
+      // permanent/ by now. The meter is credited so enforcement stays fresh, and reconciliation
+      // corrects any gap between the claim and the stored bytes.
+      await recordStorageUpload(tx, confirmed.size_bytes);
+      return confirmed;
+    });
 
     // Hand the confirmed material to the file-scan worker. The status flip above is the claim: the
     // worker only touches materials still in 'scanning', so a retry (or a duplicate enqueue) can

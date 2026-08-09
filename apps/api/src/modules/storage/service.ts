@@ -73,6 +73,16 @@ export interface ConfirmUploadParams {
   checksumSha256?: string;
 }
 
+export interface ConfirmUploadOptions {
+  /**
+   * Called with the *stored* size once it has been re-read from the bucket, before the object is
+   * promoted out of temp/. Injected by the confirm route so the storage-quota hard stop can be
+   * enforced against reality -- a caller who claimed a small size at request-upload cannot slip a
+   * large object past the cap. This module stays database-free by design; the hook is the seam.
+   */
+  assertCanPromote?: (sizeBytes: number) => Promise<void>;
+}
+
 export interface ConfirmedUpload {
   /** The permanent key the object now lives at. Persist this, not the temp key. */
   storageKey: string;
@@ -88,6 +98,7 @@ export async function confirmUpload(
   schoolId: string,
   contentClass: ContentClass,
   params: ConfirmUploadParams,
+  options: ConfirmUploadOptions = {},
 ): Promise<ConfirmedUpload> {
   // The key arrives from the client (it was echoed back in the upload-url response), so it is
   // untrusted: it must parse as the four-segment scheme, live under temp/, and belong to this
@@ -134,6 +145,12 @@ export async function confirmUpload(
         "Uploaded file checksum does not match the checksum you provided",
       );
     }
+  }
+
+  // Quota is checked against the stored size, not the request's claim, before the object leaves
+  // temp/ -- the same "the bucket is the truth" ordering as the content-class re-checks above.
+  if (options.assertCanPromote) {
+    await options.assertCanPromote(metadata.sizeBytes);
   }
 
   const permanentKey = buildPermanentKey(schoolId, parsed.objectId, parsed.filename);

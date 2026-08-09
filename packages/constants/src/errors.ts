@@ -220,6 +220,8 @@ export const ERROR_CODES = {
   STORAGE_NOT_CONFIGURED: "STORAGE_NOT_CONFIGURED",
   // The object's server-computed SHA-256 did not match the checksum the client supplied at confirm.
   STORAGE_CHECKSUM_MISMATCH: "STORAGE_CHECKSUM_MISMATCH",
+  // The tenant's storage usage is at its plan's cap; new uploads are blocked.
+  STORAGE_QUOTA_EXCEEDED: "STORAGE_QUOTA_EXCEEDED",
 
   // Materials — upload, ingestion, and AI visibility.
   MATERIAL_NOT_FOUND: "MATERIAL_NOT_FOUND",

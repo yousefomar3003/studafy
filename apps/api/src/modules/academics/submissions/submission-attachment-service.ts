@@ -10,6 +10,7 @@ import {
   promoteTempObject,
 } from "../../../lib/storage";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
+import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quota-service";
 
 import { resolveCallerStudentId, resolveSubmissionForAttachment } from "./submission-service";
 
@@ -143,7 +144,12 @@ export async function confirmSubmissionAttachment(
   const staged = assertSchoolOwnedKey(params.storage_key, schoolId, "temp");
   const permanentKey = buildPermanentKey(schoolId, staged.objectId, staged.filename);
 
-  const promoted = await promoteTempObject(storage, params.storage_key, permanentKey);
+  const promoted = await promoteTempObject(storage, params.storage_key, permanentKey, {
+    onSize: async (sizeBytes) => {
+      await assertStorageUploadQuota(tx, sizeBytes);
+    },
+  });
+  await recordStorageUpload(tx, promoted.sizeBytes);
 
   const [row] = await tx<SubmissionAttachmentRow[]>`
     INSERT INTO app.submission_attachments (

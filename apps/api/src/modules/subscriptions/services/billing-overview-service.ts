@@ -1,4 +1,5 @@
 import { withTenantTx } from "../../../db/tenant-tx";
+import { getStorageUsage } from "../../storage/quota-service";
 import { checkStudentCap } from "../../students/services/student-cap";
 
 import { requireSchoolSubscription } from "./subscription-service";
@@ -26,6 +27,12 @@ export interface BillingOverview {
     used: number;
     cap: number;
   };
+  storage: {
+    usedBytes: number;
+    capBytes: number;
+    /** 0..1; NaN when no cap is configured. */
+    fractionUsed: number;
+  };
 }
 
 /**
@@ -49,6 +56,7 @@ export async function getBillingOverview(
     `;
 
     const seats = await checkStudentCap(tx, 0);
+    const storage = await getStorageUsage(tx);
 
     return {
       subscription: {
@@ -69,6 +77,11 @@ export async function getBillingOverview(
       seats: {
         used: seats.currentCount,
         cap: seats.cap,
+      },
+      storage: {
+        usedBytes: storage.bytesUsed,
+        capBytes: storage.capBytes,
+        fractionUsed: storage.fractionUsed,
       },
     };
   });

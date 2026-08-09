@@ -23,6 +23,17 @@ export interface PromotedObject {
   sizeBytes: number;
 }
 
+export interface PromoteOptions {
+  /**
+   * Called with the staged object's size once it has been read, before the copy to the permanent
+   * key. Injected by confirm flows so the storage-quota hard stop can run against the stored size
+   * before any mutation -- and its errors propagate before the temp object is touched, so a
+   * refused promotion leaves nothing behind. Exists as a hook rather than a database dependency
+   * because this module is storage infra and must stay database-free.
+   */
+  onSize?: (sizeBytes: number) => Promise<void>;
+}
+
 /**
  * Verify a staged upload exists, copy it to its permanent key, and drop the staged copy.
  *
@@ -37,6 +48,7 @@ export async function promoteTempObject(
   storage: StorageService,
   tempKey: string,
   permanentKey: string,
+  options: PromoteOptions = {},
 ): Promise<PromotedObject> {
   if (!(await storage.exists(tempKey))) {
     throw new CodedHttpException(
@@ -54,6 +66,8 @@ export async function promoteTempObject(
   if (sizeBytes <= 0) {
     throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Staged upload is empty");
   }
+
+  await options.onSize?.(sizeBytes);
 
   await storage.copy(tempKey, permanentKey);
 

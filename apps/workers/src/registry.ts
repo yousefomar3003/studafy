@@ -268,7 +268,12 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.BILLING,
     concurrency: 1,
-    processor: async (job) => processBillingJob(job, databaseUrl),
+    processor: async (job) =>
+      processBillingJob(job, databaseUrl, {
+        s3Region: workerEnv.S3_REGION,
+        s3Endpoint: workerEnv.S3_ENDPOINT,
+        bucket: workerEnv.S3_APP_FILES_BUCKET,
+      }),
     // Terminal failures of `process-billing-event` park the app.billing_events row itself (ST-132).
     // The row already holds the verbatim provider payload, the reason and the attempt count, so it
     // is the dead-letter record — a separate table would be a second copy of data this one has in

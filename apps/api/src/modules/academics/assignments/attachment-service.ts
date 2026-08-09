@@ -10,6 +10,7 @@ import {
   promoteTempObject,
 } from "../../../lib/storage";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
+import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quota-service";
 
 import { assertCanManageClass } from "./assignment-service";
 
@@ -139,7 +140,14 @@ export async function confirmAttachment(
   const staged = assertSchoolOwnedKey(params.storage_key, schoolId, "temp");
   const permanentKey = buildPermanentKey(schoolId, staged.objectId, staged.filename);
 
-  const promoted = await promoteTempObject(storage, params.storage_key, permanentKey);
+  // The quota hard stop runs on the stored size before the copy, so a refused promotion leaves
+  // the staged object untouched in temp/; the meter is credited once the promotion actually lands.
+  const promoted = await promoteTempObject(storage, params.storage_key, permanentKey, {
+    onSize: async (sizeBytes) => {
+      await assertStorageUploadQuota(tx, sizeBytes);
+    },
+  });
+  await recordStorageUpload(tx, promoted.sizeBytes);
 
   const [row] = await tx<AttachmentRow[]>`
     INSERT INTO app.assignment_attachments (

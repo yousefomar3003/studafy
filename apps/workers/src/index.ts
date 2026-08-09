@@ -3,7 +3,11 @@ import postgres from "postgres";
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
-import { scheduleDunningJob, scheduleSeatReconciliationJob } from "./queues/billing";
+import {
+  scheduleDunningJob,
+  scheduleSeatReconciliationJob,
+  scheduleStorageQuotaReconciliationJob,
+} from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
 import {
   createSesSender,
@@ -115,6 +119,14 @@ void scheduleDunningJob(dunningRedis).then(() => dunningRedis.disconnect());
 const seatReconciliationRedis = createRedisConnection(env);
 void scheduleSeatReconciliationJob(seatReconciliationRedis).then(() =>
   seatReconciliationRedis.disconnect(),
+);
+
+// Storage-quota reconciliation scheduler (ST-16x): idempotently register the daily 06:00 storage
+// sweep on the billing queue, after the dunning and seat sweeps so it sees the post-suspension
+// bucket state.
+const storageQuotaReconciliationRedis = createRedisConnection(env);
+void scheduleStorageQuotaReconciliationJob(storageQuotaReconciliationRedis).then(() =>
+  storageQuotaReconciliationRedis.disconnect(),
 );
 
 console.log(

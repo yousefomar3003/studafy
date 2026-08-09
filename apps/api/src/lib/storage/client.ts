@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -25,6 +26,12 @@ export interface PresignedUrl {
 /** What S3 actually stored for an object -- read back from the bucket, never from the caller. */
 export interface ObjectMetadata {
   contentType: string;
+  sizeBytes: number;
+}
+
+/** One object surfaced by {@link StorageService.list}. */
+export interface ListedObject {
+  key: string;
   sizeBytes: number;
 }
 
@@ -49,6 +56,13 @@ export interface StorageService {
   checksumSha256(key: string): Promise<string>;
   copy(sourceKey: string, destinationKey: string): Promise<void>;
   remove(key: string): Promise<void>;
+  /**
+   * Iterate every object under a key prefix, streaming pagination internally.
+   *
+   * Used by storage-quota reconciliation to recompute a school's meter from bucket inventory; the
+   * trailing slash on the prefix is what pins it to one tenant (permanent/<schoolId>/ and friends).
+   */
+  list(prefix: string): AsyncIterable<ListedObject>;
 }
 
 export function createStorageService(env: Env): StorageService | null {
@@ -147,6 +161,26 @@ export function createStorageService(env: Env): StorageService | null {
 
     async remove(key) {
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    },
+
+    async *list(prefix) {
+      let continuationToken: string | undefined;
+      do {
+        const page = await client.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: prefix,
+            ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+          }),
+        );
+        for (const item of page.Contents ?? []) {
+          yield {
+            key: item.Key ?? "",
+            sizeBytes: Number(item.Size ?? 0),
+          };
+        }
+        continuationToken = page.NextContinuationToken;
+      } while (continuationToken);
     },
   };
 }
