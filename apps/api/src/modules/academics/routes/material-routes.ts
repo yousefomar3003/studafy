@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
+import { INGESTION_JOB_OPTIONS, JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 import { Queue } from "bullmq";
 import { HTTPException } from "hono/http-exception";
 
@@ -116,8 +116,9 @@ const confirmMaterialUploadRoute = createRoute({
   summary: "Confirm a material upload",
   description:
     "Confirms that the file was uploaded to storage. Transitions the material to " +
-    "scanning state and enqueues a malware scan. The scan worker flips it to ready (clean) " +
-    "or quarantined (infected).",
+    "scanning state and enqueues a malware scan. The scan worker flips a clean, AI-visible " +
+    "material to queued and enqueues AI ingestion (which flips it to ready), a clean non-AI " +
+    "material straight to ready, and an infected material to quarantined.",
   security: [{ bearerAuth: [] }],
   request: {
     params: materialIdParamSchema,
@@ -236,6 +237,13 @@ export function materialRoutes(
   // endpoint still flips the material to 'scanning' and answers 200, and the scan simply never
   // runs — the same degraded mode the import and report producers use.
   const scanQueue = redis ? new Queue(QUEUE_NAMES.SCAN, { connection: redis as never }) : null;
+
+  // The ai-ingestion producer for AI re-enable: a 'ready' material whose ai_visible is turned back
+  // on is re-staged to 'queued' (ST-161) and an ingest job is enqueued so it is re-chunked without
+  // a fresh upload. Same degraded mode as scanQueue when Redis is unavailable.
+  const ingestionQueue = redis
+    ? new Queue(QUEUE_NAMES.AI_INGESTION, { connection: redis as never })
+    : null;
 
   // Audit declarations
   routes.use("/api/academics/materials/upload", auditAction("insert", "materials"));
@@ -375,6 +383,17 @@ export function materialRoutes(
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
       toggleAiVisible(tx, auth.schoolId, materialId, body.ai_visible),
     );
+
+    // Enabling re-stages a previously ingested material to 'queued' (the service flips it there).
+    // Hand it to the ai-ingestion worker: the claim on 'queued' makes a duplicate enqueue a no-op,
+    // so re-enabling a material with an ingest already in flight cannot double-ingest it.
+    if (body.ai_visible && row.ingest_status === "queued" && ingestionQueue) {
+      await ingestionQueue.add(
+        JOB_NAMES.INGEST_MATERIAL,
+        { version: 1, schoolId: auth.schoolId, materialId: row.id },
+        INGESTION_JOB_OPTIONS,
+      );
+    }
 
     return c.json(row, 200);
   });

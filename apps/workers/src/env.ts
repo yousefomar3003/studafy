@@ -82,6 +82,11 @@ export const envSchema = z
     OCR_LOW_CONFIDENCE_THRESHOLD: z.coerce.number().int().min(0).max(100).default(60),
     OCR_WORKER_PATH: z.string().min(1).optional(),
     OCR_LANG_PATH: z.string().min(1).optional(),
+    // Per-tenant ingestion concurrency cap (ST-161). BullMQ's queue `concurrency` bounds jobs per
+    // worker process; this bounds jobs per school across the whole fleet, via the Redis semaphore
+    // in queues/ai-ingestion/semaphore.ts. A school is a cluster-wide resource (embedding spend is
+    // metered per material), so one over-subscribed school must not swamp the shared queue.
+    INGESTION_MAX_CONCURRENCY_PER_SCHOOL: z.coerce.number().int().min(1).default(2),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;

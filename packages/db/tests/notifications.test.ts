@@ -38,6 +38,11 @@ const NOTIFICATION_TYPES = [
   // ST-152. Appended by 000090, same mechanism. Raised by the ai-ingestion worker when an OCR'd
   // material has pages below the confidence threshold; sorts last, after the file-scan pair.
   "MATERIAL_OCR_LOW_CONFIDENCE",
+  // ST-161. Appended by 000096, same mechanism. Raised by the ai-ingestion worker when a material
+  // finishes ingestion (MATERIAL_INGESTED) or its retries were exhausted (MATERIAL_INGEST_FAILED);
+  // sorts last, after the OCR-quality type.
+  "MATERIAL_INGESTED",
+  "MATERIAL_INGEST_FAILED",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;

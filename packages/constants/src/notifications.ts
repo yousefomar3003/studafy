@@ -32,6 +32,15 @@ export const NOTIFICATION_TYPES = {
   // confidence fell below the flagging threshold. Tells the uploader (usually the teacher) which
   // pages to review before trusting the transcription. Mirrored in app.notification_type by 000090.
   MATERIAL_OCR_LOW_CONFIDENCE: "MATERIAL_OCR_LOW_CONFIDENCE",
+  // Raised by the ai-ingestion worker when a material finished ingestion and is ready for AI
+  // search. Tells the uploader (usually the teacher) their material is live. Mirrored in
+  // app.notification_type by 000096.
+  MATERIAL_INGESTED: "MATERIAL_INGESTED",
+  // Raised by the ai-ingestion worker when a material's ingestion could not be completed (parse,
+  // OCR, chunk or embed failure) and its retries were exhausted. The material is marked failed
+  // and never available; the uploader is told it is not searchable and can re-ingest. Mirrored
+  // in app.notification_type by 000096.
+  MATERIAL_INGEST_FAILED: "MATERIAL_INGEST_FAILED",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

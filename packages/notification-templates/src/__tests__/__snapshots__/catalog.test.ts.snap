@@ -163,3 +163,27 @@ exports[`renderNotification — snapshot tests ar MATERIAL_OCR_LOW_CONFIDENCE / 
 exports[`renderNotification — snapshot tests ar MATERIAL_OCR_LOW_CONFIDENCE / push renders correctly 1`] = `"مراجعة مطلوبة: scanned-guide.pdf"`;
 
 exports[`renderNotification — snapshot tests ar MATERIAL_OCR_LOW_CONFIDENCE / email renders correctly 1`] = `"تم تحويل ملف "scanned-guide.pdf" تلقائيًا، لكن الصفحات التالية كانت صعبة القراءة: 2, 4. يرجى مراجعتها."`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGESTED / in_app renders correctly 1`] = `"lecture-notes.pdf is ready for AI search"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGESTED / push renders correctly 1`] = `"Ready for search: lecture-notes.pdf"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGESTED / email renders correctly 1`] = `"Your file "lecture-notes.pdf" has finished processing and is now searchable."`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / in_app renders correctly 1`] = `"lab-manual.pdf could not be made searchable"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / push renders correctly 1`] = `"Processing failed: lab-manual.pdf"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / email renders correctly 1`] = `"Your file "lab-manual.pdf" could not be processed and is not searchable. You can try again from the material page."`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_INGESTED / in_app renders correctly 1`] = `"lecture-notes.pdf جاهز للبحث الذكي"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_INGESTED / push renders correctly 1`] = `"جاهز للبحث: lecture-notes.pdf"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_INGESTED / email renders correctly 1`] = `"انتهت معالجة ملف "lecture-notes.pdf" وأصبح قابلاً للبحث الآن."`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_INGEST_FAILED / in_app renders correctly 1`] = `"تعذر جعل lab-manual.pdf قابلاً للبحث"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_INGEST_FAILED / push renders correctly 1`] = `"فشلت المعالجة: lab-manual.pdf"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_INGEST_FAILED / email renders correctly 1`] = `"تعذرت معالجة ملف "lab-manual.pdf" وهو غير قابل للبحث. يمكنك المحاولة مرة أخرى من صفحة الملف."`;

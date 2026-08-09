@@ -102,6 +102,28 @@ export const JOB_NAMES = {
   // sweep reads completed report rows older than the retention window from both report job tables
   // and deletes their stored objects. Registered on the reports queue via Job Scheduler.
   PURGE_EXPIRED_REPORTS: "purge-expired-reports",
+  // Ingestion of a confirmed, clean-scanned material (ST-161). Carries only the school and
+  // material ids (aiIngestionJobDataSchema); the worker claims the material by its 'queued'
+  // status and drives it parse -> (ocr) -> chunk -> embed -> ready. Enqueued by the scan worker
+  // on a clean verdict and by the API on re-ingest / re-enable, with attempts + exponential
+  // backoff so a saturated per-tenant concurrency slot retries instead of failing the job.
+  INGEST_MATERIAL: "ingest-material",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];
+
+/**
+ * BullMQ job options for one material ingestion (ST-161). Shared by both producers — the file-scan
+ * worker after a clean verdict and the API's AI re-enable route — so retry policy and retention
+ * can't drift between them. `attempts` includes the first run: 5 tries with exponential backoff,
+ * because parse/OCR/embed are long-running but transiently contended — an embedding 429 or a
+ * saturated per-tenant concurrency slot should retry, not fail the file. Flattened as a plain
+ * object rather than a `JobsOptions`-typed constant because @studafy/constants has no BullMQ
+ * dependency; BullMQ accepts the shape structurally.
+ */
+export const INGESTION_JOB_OPTIONS = {
+  attempts: 5,
+  backoff: { type: "exponential", delay: 5_000 },
+  removeOnComplete: { age: 7 * 24 * 60 * 60 },
+  removeOnFail: { age: 30 * 24 * 60 * 60 },
+} as const;

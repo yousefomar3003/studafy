@@ -10,10 +10,13 @@ import { buildIngestChunks } from "./ingest";
 import { aiIngestionJobDataSchema } from "./job";
 import { lowConfidencePages, TesseractOcrEngine } from "./ocr";
 import { isOcrCandidate } from "./parsers";
+import { nullSemaphore, TenantConcurrencyExceededError } from "./semaphore";
 
 import type { IngestChunk } from "./ingest";
 import type { OcrReport } from "./ocr";
+import type { TenantSemaphore, TenantSemaphoreLease } from "./semaphore";
 import type { Job } from "bullmq";
+import type { TransactionSql } from "postgres";
 
 export interface AiIngestionWorkerConfig {
   databaseUrl: string;
@@ -27,6 +30,24 @@ export interface AiIngestionWorkerConfig {
   ocrWorkerPath?: string;
   /** Directory (path or file:// URL) holding the `<language>.traineddata` files. */
   ocrLangPath?: string;
+  /**
+   * The per-tenant concurrency gate (ST-161). Omitted in dev/test, where ingestion runs uncapped;
+   * the workers registry wires the Redis semaphore with its per-school cap.
+   */
+  semaphore?: TenantSemaphore;
+  /**
+   * Fetches the material's bytes, injected by integration tests. Defaults to an S3 GET via
+   * `s3Region`/`s3Endpoint`/`bucket` — the same client construction the scan worker's `config.s3`
+   * pattern replaces on its side.
+   */
+  fetchBytes?: (storageKey: string) => Promise<Uint8Array>;
+  /**
+   * Enqueue the `derive-material-previews` job once ingestion flips the material `ready`. Injected
+   * by the workers registry; omitted in tests. Best-effort: called after the ready flip commits, and
+   * a lost enqueue degrades to a NULL-key thumbnail icon — the derivation worker's status/key guards
+   * make the equivalent scan-worker enqueue (for non-AI materials) a no-op here.
+   */
+  enqueueDerivation?: (data: { schoolId: string; materialId: string }) => Promise<void>;
 }
 
 /** The material columns the claim reads, snake_case — postgres.js maps results as-is without a transform option. */
@@ -36,6 +57,13 @@ interface MaterialClaim {
   ingest_status: string;
   original_file_name: string;
   uploaded_by_user_id: string;
+  ai_visible: boolean;
+}
+
+/** The columns a re-claim re-reads under FOR UPDATE, to decide whether the work still commits. */
+interface MaterialState {
+  ingest_status: string;
+  ai_visible: boolean;
 }
 
 type IngestResult =
@@ -46,14 +74,20 @@ type IngestResult =
  * Process one `ai-ingestion` job: claim the material, extract and chunk its text, and store the
  * chunks on `app.material_chunks`.
  *
- * Lifecycle (driven by `app.material_ingest_status`, migration 000011):
- *  - claim the `app.materials` row FOR UPDATE inside a tenant transaction; a material already
- *    `ready` is an idempotent no-op (the producer may enqueue a job more than once);
- *  - otherwise set `processing`, fetch the bytes from S3, parse + chunk + embed, and in one final
- *    transaction replace the material's chunks and mark it `ready` with `ingested_at`;
- *  - a terminal failure (the last attempt) records `failed` + a reason in `ingest_error`. The
- *    transaction boundary is what makes this safe: a crash mid-insert rolls back and the retry
- *    re-claims from `processing`; a committed insert and a committed `ready` never diverge.
+ * Lifecycle (ST-161, driven by `app.material_ingest_status`):
+ *  - take a per-tenant concurrency slot, then claim the `app.materials` row FOR UPDATE inside a
+ *    tenant transaction. Only materials in `queued` or `processing` with `ai_visible` may be
+ *    claimed; anything else (already `ready`, toggled off, unknown state) is an idempotent no-op —
+ *    the producer may enqueue a job more than once;
+ *  - set `processing`, fetch the bytes (S3 or injected), parse + chunk + embed, and in one final
+ *    transaction re-claim FOR UPDATE, replace the material's chunks, notify the uploader, and mark
+ *    it `ready` with `ingested_at`. The re-claim is what makes a toggle race safe: if the teacher
+ *    disabled AI visibility (or a duplicate job already finished) while this job parsed, the final
+ *    transaction skips without writing chunks or notifying;
+ *  - a terminal failure (the last attempt) records `failed` + a reason in `ingest_error` and
+ *    notifies the uploader. The transaction boundary is what makes this safe: a crash mid-insert
+ *    rolls back and the retry re-claims from `processing`; a committed insert and a committed
+ *    `ready` never diverge.
  */
 export async function processIngestJob(
   job: Job,
@@ -62,7 +96,9 @@ export async function processIngestJob(
   const parsed = aiIngestionJobDataSchema.safeParse(job.data);
   if (!parsed.success) return { processed: false, reason: "invalid job data" };
   const data = parsed.data;
-  if (!config.bucket || !config.s3Region) throw new Error("ai ingestion storage is not configured");
+  if (!config.fetchBytes && (!config.bucket || !config.s3Region)) {
+    throw new Error("ai ingestion storage is not configured");
+  }
 
   const database = postgres(config.databaseUrl, {
     max: 2,
@@ -72,45 +108,60 @@ export async function processIngestJob(
       ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
       : {}),
   });
-  const s3 = new S3Client({
-    region: config.s3Region,
-    ...(config.s3Endpoint ? { endpoint: config.s3Endpoint, forcePathStyle: true } : {}),
-  });
+  const semaphore = config.semaphore ?? nullSemaphore;
 
+  let lease: TenantSemaphoreLease | null = null;
+  let material: MaterialClaim | undefined;
   try {
-    const material = await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
+    // The cap is checked before the claim so a rejected job never flips the material. The throw
+    // makes BullMQ retry with the job's backoff; on the terminal attempt the failure path records
+    // it as a scheduling failure (see failureReason).
+    lease = await semaphore.acquire(data.schoolId);
+    if (!lease) throw new TenantConcurrencyExceededError(data.schoolId);
+
+    const claim = await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
       const [locked] = await tx<MaterialClaim[]>`
         SELECT storage_key, mime_type, ingest_status::text AS ingest_status,
-               original_file_name, uploaded_by_user_id
+               original_file_name, uploaded_by_user_id, ai_visible
         FROM app.materials
         WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
         FOR UPDATE
       `;
       if (!locked) throw new Error("material does not exist");
-      if (locked.ingest_status !== "ready") {
-        await tx`
-          UPDATE app.materials
-          SET ingest_status = 'processing'::app.material_ingest_status,
-              ingest_error = NULL,
-              updated_at = clock_timestamp()
-          WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
-        `;
+      if (
+        locked.ingest_status === "ready" ||
+        !locked.ai_visible ||
+        (locked.ingest_status !== "queued" && locked.ingest_status !== "processing")
+      ) {
+        return null;
       }
+      await tx`
+        UPDATE app.materials
+        SET ingest_status = 'processing'::app.material_ingest_status,
+            ingest_error = NULL,
+            updated_at = clock_timestamp()
+        WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
+          AND ingest_status IN ('queued', 'processing')
+          AND ai_visible = true
+      `;
       return locked;
     });
 
-    if (material.ingest_status === "ready") {
+    if (!claim) {
       return { processed: true, materialId: data.materialId, ingested: false, chunks: 0 };
     }
+    material = claim;
+    // A const snapshot: `material` must stay `MaterialClaim | undefined` for the catch block, but
+    // a `let` captured by a closure would widen inside it, so the rest of the success path reads
+    // the claim through this non-optional name.
+    const claimedMaterial = material;
 
-    const object = await s3.send(
-      new GetObjectCommand({ Bucket: config.bucket, Key: material.storage_key }),
-    );
-    if (!object.Body) throw new Error("S3 object body is empty");
-    const bytes = new Uint8Array(await object.Body.transformToByteArray());
+    const bytes = config.fetchBytes
+      ? await config.fetchBytes(claimedMaterial.storage_key)
+      : await fetchFromS3(config, claimedMaterial.storage_key);
     // Rasters always OCR; PDFs may need it for scanned pages. The engine is a cheap wrapper and
     // spawns its tesseract worker lazily, so a text PDF never pays for the thread.
-    const ocr = isOcrCandidate(material.mime_type)
+    const ocr = isOcrCandidate(claimedMaterial.mime_type)
       ? new TesseractOcrEngine({
           ...(config.ocrLowConfidenceThreshold !== undefined
             ? { lowConfidenceThreshold: config.ocrLowConfidenceThreshold }
@@ -127,11 +178,15 @@ export async function processIngestJob(
       // embedding client: batching, rate limiting, 429 retries and per-tenant metering are all
       // inside the stage, so the worker never changes when the provider does.
       const embedder = createEmbeddingStage(createMockEmbeddingProvider());
-      ({ chunks, ocrReport, embeddingTokens } = await buildIngestChunks(bytes, material.mime_type, {
-        ocr,
-        schoolId: data.schoolId,
-        embedder,
-      }));
+      ({ chunks, ocrReport, embeddingTokens } = await buildIngestChunks(
+        bytes,
+        claimedMaterial.mime_type,
+        {
+          ocr,
+          schoolId: data.schoolId,
+          embedder,
+        },
+      ));
     } finally {
       // The engine lazily spawns a worker thread on first recognize; close it either way so a job
       // never leaks one. `catch` guards close() itself: terminating a broken worker must not mask
@@ -142,24 +197,39 @@ export async function processIngestJob(
     }
     const lowConfidencePagesList = ocrReport === null ? [] : lowConfidencePages(ocrReport);
 
-    await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
-      await tx`
+    const committed = await withSystemTenantTx(
+      database,
+      { schoolId: data.schoolId },
+      async (tx) => {
+        const [state] = await tx<MaterialState[]>`
+        SELECT ingest_status::text AS ingest_status, ai_visible
+        FROM app.materials
+        WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
+        FOR UPDATE
+      `;
+        // The teacher may have toggled AI visibility off (or a duplicate job already finished) while
+        // this job parsed. Skip — never write chunks for a hidden material or notify for a stale one.
+        if (!state || state.ingest_status !== "processing" || !state.ai_visible) {
+          return false;
+        }
+        await tx`
         DELETE FROM app.material_chunks
         WHERE school_id = ${data.schoolId}::uuid AND material_id = ${data.materialId}::uuid
       `;
-      if (chunks.length > 0) {
-        await insertChunks(tx, data.schoolId, data.materialId, chunks);
-      }
-      if (lowConfidencePagesList.length > 0) {
-        await notifyLowConfidencePages(
-          tx,
-          material,
-          data.materialId,
-          data.schoolId,
-          lowConfidencePagesList,
-        );
-      }
-      await tx`
+        if (chunks.length > 0) {
+          await insertChunks(tx, data.schoolId, data.materialId, chunks);
+        }
+        if (lowConfidencePagesList.length > 0) {
+          await notifyLowConfidencePages(
+            tx,
+            claimedMaterial,
+            data.materialId,
+            data.schoolId,
+            lowConfidencePagesList,
+          );
+        }
+        await notifyIngested(tx, claimedMaterial, data.materialId, data.schoolId);
+        await tx`
         UPDATE app.materials
         SET ingest_status = 'ready'::app.material_ingest_status,
             ingest_error = NULL,
@@ -168,30 +238,76 @@ export async function processIngestJob(
             updated_at = clock_timestamp()
         WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
       `;
-    });
+        return true;
+      },
+    );
 
-    return { processed: true, materialId: data.materialId, ingested: true, chunks: chunks.length };
+    // The material is `ready` now, so the thumbnail/preview can be derived from the same bytes.
+    // Best-effort by design: an enqueue failure must not fail an already-committed ingestion, and a
+    // missing thumbnail degrades to the list's type icon rather than a failed material.
+    if (committed) {
+      await config
+        .enqueueDerivation?.({ schoolId: data.schoolId, materialId: data.materialId })
+        .catch(() => undefined);
+    }
+
+    return {
+      processed: true,
+      materialId: data.materialId,
+      ingested: committed,
+      chunks: committed ? chunks.length : 0,
+    };
   } catch (error) {
     if (job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
+      const reason = failureReason(error);
       await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
+        const [state] = await tx<MaterialState[]>`
+          SELECT ingest_status::text AS ingest_status, ai_visible
+          FROM app.materials
+          WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
+          FOR UPDATE
+        `;
+        // A duplicate job may have succeeded and flipped the material ready while this one died;
+        // never downgrade a committed ingestion to failed.
+        if (!state || state.ingest_status === "ready") return;
         await tx`
           UPDATE app.materials
           SET ingest_status = 'failed'::app.material_ingest_status,
-              ingest_error = ${failureReason(error)},
+              ingest_error = ${reason},
               updated_at = clock_timestamp()
           WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
-            AND ingest_status <> 'ready'
         `;
+        if (material) {
+          await notifyIngestFailed(tx, material, data.materialId, data.schoolId, reason);
+        }
       });
     }
     throw error;
   } finally {
+    await lease?.release().catch(() => undefined);
     await database.end({ timeout: 5 });
   }
 }
 
+async function fetchFromS3(
+  config: AiIngestionWorkerConfig,
+  storageKey: string,
+): Promise<Uint8Array> {
+  const s3 = new S3Client({
+    region: config.s3Region,
+    ...(config.s3Endpoint ? { endpoint: config.s3Endpoint, forcePathStyle: true } : {}),
+  });
+  try {
+    const object = await s3.send(new GetObjectCommand({ Bucket: config.bucket, Key: storageKey }));
+    if (!object.Body) throw new Error("S3 object body is empty");
+    return new Uint8Array(await object.Body.transformToByteArray());
+  } finally {
+    s3.destroy();
+  }
+}
+
 function insertChunks(
-  tx: postgres.TransactionSql,
+  tx: TransactionSql,
   schoolId: string,
   materialId: string,
   chunks: readonly IngestChunk[],
@@ -227,11 +343,11 @@ function insertChunks(
  * it wholesale — the page numbers whose mean per-word confidence fell below the flagging threshold.
  * Written inside the same transaction that flips the material `ready`, so a notification can never
  * be observed for a material that did not actually ingest, and the at-least-once job semantics stay
- * safe: a retried job re-claims from `processing`, and the `ready` guard above makes the whole
+ * safe: a retried job re-claims from `processing`, and the re-claim guard above makes the whole
  * second run a no-op (no duplicate chunks, no duplicate notification).
  */
 function notifyLowConfidencePages(
-  tx: postgres.TransactionSql,
+  tx: TransactionSql,
   material: MaterialClaim,
   materialId: string,
   schoolId: string,
@@ -251,7 +367,56 @@ function notifyLowConfidencePages(
   `;
 }
 
+/**
+ * Tell the uploader the material is ready for AI search. Written inside the same transaction that
+ * flips the material `ready` — a notification can never be observed for a material that did not
+ * actually ingest, and the re-claim guard keeps a duplicate job from notifying twice.
+ */
+function notifyIngested(
+  tx: TransactionSql,
+  material: MaterialClaim,
+  materialId: string,
+  schoolId: string,
+): Promise<unknown> {
+  return tx`
+    INSERT INTO app.notifications (school_id, user_id, notification_type, title, body, metadata)
+    VALUES (
+      ${schoolId}::uuid,
+      ${material.uploaded_by_user_id}::uuid,
+      ${NOTIFICATION_TYPES.MATERIAL_INGESTED}::app.notification_type,
+      'Material is ready',
+      ${`The file "${material.original_file_name}" has finished processing and is now searchable.`},
+      ${tx.json({ material_id: materialId })}
+    )
+  `;
+}
+
+/**
+ * Tell the uploader ingestion could not complete. Written inside the same transaction that flips
+ * the material `failed`, so the two can never diverge.
+ */
+function notifyIngestFailed(
+  tx: TransactionSql,
+  material: MaterialClaim,
+  materialId: string,
+  schoolId: string,
+  reason: string,
+): Promise<unknown> {
+  return tx`
+    INSERT INTO app.notifications (school_id, user_id, notification_type, title, body, metadata)
+    VALUES (
+      ${schoolId}::uuid,
+      ${material.uploaded_by_user_id}::uuid,
+      ${NOTIFICATION_TYPES.MATERIAL_INGEST_FAILED}::app.notification_type,
+      'Material could not be processed',
+      ${`The file "${material.original_file_name}" could not be processed and is not searchable. You can try again from the material page.`},
+      ${tx.json({ material_id: materialId, reason })}
+    )
+  `;
+}
+
 /** The stable reason written to `ingest_error`; parse failures carry their own, everything else a generic one. */
 function failureReason(error: unknown): string {
+  if (error instanceof TenantConcurrencyExceededError) return "concurrency limit reached";
   return error instanceof MaterialParseError ? error.reason : "ingestion failed";
 }

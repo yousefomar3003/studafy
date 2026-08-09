@@ -67,4 +67,12 @@ export interface NotificationTypeVars {
     fileName: string;
     pages: string;
   };
+  // Ingestion outcomes (000096). Raised by the ai-ingestion worker directly into
+  // app.notifications when a material finishes ingestion or its retries were exhausted.
+  MATERIAL_INGESTED: {
+    fileName: string;
+  };
+  MATERIAL_INGEST_FAILED: {
+    fileName: string;
+  };
 }
