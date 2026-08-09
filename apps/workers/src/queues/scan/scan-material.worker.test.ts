@@ -259,6 +259,7 @@ describeDb("processMaterialScan", () => {
         s3: s3.client,
         bucket: "test-bucket",
         clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+        enqueueDerivation: async () => undefined,
       });
 
       expect(result).toEqual({ processed: true, outcome: "clean" });
@@ -269,6 +270,59 @@ describeDb("processMaterialScan", () => {
       expect(s3.objects.has(f.storageKey)).toBe(true);
       expect(await scanNotifications(f)).toHaveLength(0);
       expect(await scanOutboxEvents(f)).toHaveLength(0);
+    } finally {
+      await clamd.close();
+    }
+  });
+
+  test("enqueues a derivation job once the clean verdict commits", async () => {
+    const f = await seedFixture();
+    const s3 = createFakeS3();
+    s3.objects.set(f.storageKey, Buffer.from("harmless notes for the class"));
+    const enqueued: { schoolId: string; materialId: string }[] = [];
+
+    const clamd = await startFakeClamd(() => "stream: OK");
+    try {
+      const result = await processMaterialScan(jobFor(f), {
+        databaseUrl: databaseUrl!,
+        s3: s3.client,
+        bucket: "test-bucket",
+        clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+        enqueueDerivation: async (data) => {
+          enqueued.push(data);
+        },
+      });
+
+      expect(result).toEqual({ processed: true, outcome: "clean" });
+      expect(enqueued).toEqual([{ schoolId: f.schoolId, materialId: f.materialId }]);
+    } finally {
+      await clamd.close();
+    }
+  });
+
+  test("an enqueue failure after the ready flip propagates so the job retries", async () => {
+    const f = await seedFixture();
+    const s3 = createFakeS3();
+    s3.objects.set(f.storageKey, Buffer.from("harmless notes for the class"));
+
+    const clamd = await startFakeClamd(() => "stream: OK");
+    try {
+      await expect(
+        processMaterialScan(jobFor(f), {
+          databaseUrl: databaseUrl!,
+          s3: s3.client,
+          bucket: "test-bucket",
+          clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+          enqueueDerivation: async () => {
+            throw new Error("redis is down");
+          },
+        }),
+      ).rejects.toThrow(/redis is down/);
+
+      // The ready flip already committed, so a retry will take the already-'ready' skip path and
+      // re-enqueue best-effort — that is the self-heal contract for a lost enqueue.
+      const row = await materialRow(f);
+      expect(row!.ingest_status).toBe("ready");
     } finally {
       await clamd.close();
     }
@@ -289,6 +343,7 @@ describeDb("processMaterialScan", () => {
         s3: s3.client,
         bucket: "test-bucket",
         clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+        enqueueDerivation: async () => undefined,
       });
 
       expect(result).toEqual({ processed: true, outcome: "quarantined" });
@@ -338,6 +393,7 @@ describeDb("processMaterialScan", () => {
         s3: s3.client,
         bucket: "test-bucket",
         clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+        enqueueDerivation: async () => undefined,
       });
 
       expect(result).toEqual({ processed: true, outcome: "quarantined" });
@@ -368,6 +424,7 @@ describeDb("processMaterialScan", () => {
         s3: s3.client,
         bucket: "test-bucket",
         clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+        enqueueDerivation: async () => undefined,
       });
 
       expect(result).toEqual({ processed: true, outcome: "skipped" });
@@ -392,6 +449,7 @@ describeDb("processMaterialScan", () => {
           s3: s3.client,
           bucket: "test-bucket",
           clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+          enqueueDerivation: async () => undefined,
         }),
       ).rejects.toThrow(/no quarantine copy/);
     } finally {
@@ -412,6 +470,7 @@ describeDb("processMaterialScan", () => {
           s3: s3.client,
           bucket: "test-bucket",
           clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+          enqueueDerivation: async () => undefined,
         }),
       ).rejects.toThrow(/clamd scan failed/);
     } finally {
@@ -432,6 +491,7 @@ describeDb("processMaterialScan", () => {
           s3: s3.client,
           bucket: "test-bucket",
           clamd: { host: "127.0.0.1", port: silent.port, timeoutMs: 200, maxFileBytes: 1 << 20 },
+          enqueueDerivation: async () => undefined,
         }),
       ).rejects.toThrow(/clamd timed out/);
     } finally {
