@@ -1,9 +1,17 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+/**
+ * Finance export report type (ST-175).
+ *
+ * After the async report framework landed, this file is the finance half of a registry entry: the
+ * deterministic object key (tenant/`<schoolId>`/`reports`/`<year>`/`<jobId>.<format>`), the
+ * renderer (ERPNext query reports or JoInvoice generation, both under a `withSystemTenantTx`), the
+ * content headers, and the shared PDF renderer. The lifecycle SQL that used to live here moved to
+ * `finance-report-store.ts`, and `processFinanceExport` was replaced by the generic runner in
+ * `report-runner.ts`.
+ */
+
 import notoSansArabic from "@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-400-normal.woff" with { type: "file" };
 import * as fontkit from "@pdf-lib/fontkit";
 import {
-  financeExportJobDataSchema,
   generateJoInvoice,
   normalizeErpNextReport,
   reportToCsv,
@@ -15,34 +23,14 @@ import {
 } from "@studafy/finance-reporting";
 import bidiFactory from "bidi-js";
 import { PDFDocument, rgb } from "pdf-lib";
-import postgres from "postgres";
 
 import { withSystemTenantTx } from "../../db/tenant-tx";
 import { resolveSchoolCredentials } from "../billing/credential-resolver";
 import { ErpNextClient } from "../billing/erpnext-client";
 
-import type { Job } from "bullmq";
+import type { FinanceReportJobRow } from "./finance-report-store";
+import type { ReportRenderDeps } from "./report-types";
 import type { TransactionSql } from "postgres";
-
-const SIGNED_URL_TTL_SECONDS = 24 * 60 * 60;
-
-export interface FinanceExportWorkerConfig {
-  primaryDatabaseUrl: string;
-  databaseCaCert?: string;
-  s3Region?: string;
-  s3Endpoint?: string;
-  bucket?: string;
-  erpnextBaseUrl?: string;
-  erpnextApiKey?: string;
-}
-
-interface FinanceJobRow {
-  report_type: FinanceReportType;
-  file_format: FinanceFileFormat;
-  parameters: Record<string, unknown>;
-  status: string;
-  created_at: Date;
-}
 
 export function financeReportStorageKey(
   data: FinanceExportJobData,
@@ -66,7 +54,7 @@ function reportName(reportType: FinanceReportType): string {
   }
 }
 
-function contentType(format: FinanceFileFormat): string {
+export function financeContentType(format: FinanceFileFormat): string {
   switch (format) {
     case "csv":
       return "text/csv; charset=utf-8";
@@ -77,6 +65,13 @@ function contentType(format: FinanceFileFormat): string {
     case "json":
       return "application/json; charset=utf-8";
   }
+}
+
+export function financeContentDisposition(
+  data: FinanceExportJobData,
+  format: FinanceFileFormat,
+): string {
+  return `attachment; filename="${data.jobId}.${format}"`;
 }
 
 function stringValue(value: unknown): string {
@@ -229,7 +224,7 @@ async function fetchReport(
 
 async function generateReportArtifact(
   client: ErpNextClient,
-  row: FinanceJobRow,
+  row: FinanceReportJobRow,
   company: string,
 ): Promise<Uint8Array> {
   if (row.report_type === "family_statement") {
@@ -272,7 +267,7 @@ async function generateInvoiceExport(
   tx: TransactionSql,
   client: ErpNextClient,
   schoolId: string,
-  row: FinanceJobRow,
+  row: FinanceReportJobRow,
 ): Promise<Uint8Array> {
   const invoiceId = stringValue(row.parameters.invoice_id);
   if (!invoiceId) throw new Error("invoice_id is required");
@@ -303,112 +298,27 @@ async function generateInvoiceExport(
   return new TextEncoder().encode(value);
 }
 
-export async function processFinanceExport(
-  job: Job,
-  config: FinanceExportWorkerConfig,
-): Promise<
-  { processed: true; storageKey: string; bytes: number } | { processed: false; reason: string }
-> {
-  const parsed = financeExportJobDataSchema.safeParse(job.data);
-  if (!parsed.success) return { processed: false, reason: "invalid job data" };
-  const data = parsed.data;
-  if (!config.bucket || !config.s3Region)
-    throw new Error("finance export storage is not configured");
-
-  const database = postgres(config.primaryDatabaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
-  });
-  const s3 = new S3Client({
-    region: config.s3Region,
-    ...(config.s3Endpoint ? { endpoint: config.s3Endpoint, forcePathStyle: true } : {}),
-  });
-
-  try {
-    const row = await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
-      const [locked] = await tx<FinanceJobRow[]>`
-        SELECT report_type::text AS report_type, file_format, parameters, status::text AS status,
-               created_at
-        FROM app.finance_report_jobs
-        WHERE school_id = ${data.schoolId}::uuid AND id = ${data.jobId}::uuid
-        FOR UPDATE
-      `;
-      if (!locked) throw new Error("finance report job does not exist");
-      if (locked.status !== "completed") {
-        await tx`
-          UPDATE app.finance_report_jobs
-          SET status = 'processing', started_at = COALESCE(started_at, clock_timestamp()),
-              failure_message = NULL, updated_at = clock_timestamp()
-          WHERE school_id = ${data.schoolId}::uuid AND id = ${data.jobId}::uuid
-        `;
-      }
-      return locked;
-    });
-    const key = financeReportStorageKey(data, row.file_format, row.created_at);
-    if (row.status === "completed") return { processed: true, storageKey: key, bytes: 0 };
-
-    const artifact = await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
-      const credentials = await resolveSchoolCredentials(
-        tx,
-        data.schoolId,
-        config.erpnextBaseUrl,
-        config.erpnextApiKey,
-      );
-      const [site] = await tx<{ erpnext_company_id: string | null }[]>`
-        SELECT erpnext_company_id
-        FROM app.erpnext_site_configs
-        WHERE school_id = ${data.schoolId}::uuid
-      `;
-      if (!site?.erpnext_company_id) throw new Error("ERPNext company is not configured");
-      const client = new ErpNextClient(credentials);
-      return row.report_type === "joinvoice_export"
-        ? generateInvoiceExport(tx, client, data.schoolId, row)
-        : generateReportArtifact(client, row, site.erpnext_company_id);
-    });
-
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: config.bucket,
-        Key: key,
-        Body: artifact,
-        ContentType: contentType(row.file_format),
-        ContentDisposition: `attachment; filename="${data.jobId}.${row.file_format}"`,
-      }),
+export async function renderFinanceExport(
+  deps: ReportRenderDeps<FinanceExportJobData, FinanceReportJobRow>,
+): Promise<Uint8Array> {
+  const row = deps.record;
+  if (!row) throw new Error("finance report job record is missing");
+  return withSystemTenantTx(deps.primary, { schoolId: deps.context.schoolId }, async (tx) => {
+    const credentials = await resolveSchoolCredentials(
+      tx,
+      deps.context.schoolId,
+      deps.config.erpnextBaseUrl,
+      deps.config.erpnextApiKey,
     );
-    const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000);
-    const signedUrl = await getSignedUrl(
-      s3,
-      new GetObjectCommand({ Bucket: config.bucket, Key: key }),
-      { expiresIn: SIGNED_URL_TTL_SECONDS },
-    );
-    await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
-      await tx`
-        UPDATE app.finance_report_jobs
-        SET status = 'completed', object_key = ${key}, signed_url = ${signedUrl},
-            signed_url_expires_at = ${expiresAt}, failure_message = NULL,
-            completed_at = clock_timestamp(), updated_at = clock_timestamp()
-        WHERE school_id = ${data.schoolId}::uuid AND id = ${data.jobId}::uuid
-      `;
-    });
-    return { processed: true, storageKey: key, bytes: artifact.byteLength };
-  } catch (error) {
-    if (job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
-      await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
-        await tx`
-          UPDATE app.finance_report_jobs
-          SET status = 'failed', failure_message = 'Export generation failed',
-              completed_at = clock_timestamp(), updated_at = clock_timestamp()
-          WHERE school_id = ${data.schoolId}::uuid AND id = ${data.jobId}::uuid
-            AND status <> 'completed'
-        `;
-      });
-    }
-    throw error;
-  } finally {
-    await database.end({ timeout: 5 });
-  }
+    const [site] = await tx<{ erpnext_company_id: string | null }[]>`
+      SELECT erpnext_company_id
+      FROM app.erpnext_site_configs
+      WHERE school_id = ${deps.context.schoolId}::uuid
+    `;
+    if (!site?.erpnext_company_id) throw new Error("ERPNext company is not configured");
+    const client = new ErpNextClient(credentials);
+    return row.report_type === "joinvoice_export"
+      ? generateInvoiceExport(tx, client, deps.context.schoolId, row)
+      : generateReportArtifact(client, row, site.erpnext_company_id);
+  });
 }
