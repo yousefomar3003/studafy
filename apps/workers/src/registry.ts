@@ -18,7 +18,7 @@ import {
 } from "./queues/notifications/dispatcher.worker";
 import { processDigest, processNotificationDigest } from "./queues/notifications/email";
 import { createFcmSender } from "./queues/notifications/push";
-import { processAttendanceExport, processFinanceExport } from "./queues/reports";
+import { processReportJob } from "./queues/reports";
 import { createScanS3, materialScanFailedListener, processMaterialScan } from "./queues/scan";
 
 import type { AiIngestionJobData } from "./queues/ai-ingestion/job";
@@ -220,30 +220,21 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.REPORTS,
     concurrency: 3,
-    processor: async (job: Job) => {
-      if (job.name === JOB_NAMES.GENERATE_FINANCE_REPORT) {
-        return processFinanceExport(job, {
-          primaryDatabaseUrl: databaseUrl,
-          s3Region: workerEnv.S3_REGION,
-          s3Endpoint: workerEnv.S3_ENDPOINT,
-          bucket: workerEnv.S3_APP_FILES_BUCKET,
-          databaseCaCert: workerEnv.DATABASE_CA_CERT,
-          erpnextBaseUrl: workerEnv.ERPNEXT_API_URL,
-          erpnextApiKey: workerEnv.ERPNEXT_API_KEY,
-        });
-      }
-      if (job.name !== JOB_NAMES.GENERATE_ATTENDANCE_EXPORT) {
-        return { processed: false, reason: "unknown report job" };
-      }
-      return processAttendanceExport(job, {
+    // The report type registry dispatches every job this queue carries: the scheduled purge sweep
+    // (PURGE_EXPIRED_REPORTS) plus each registered report type. Unknown job names resolve without
+    // touching the database or S3, which is what keeps the registry unit test (and any stray
+    // producer) side-effect-free.
+    processor: (job: Job) =>
+      processReportJob(job, {
         primaryDatabaseUrl: databaseUrl,
         readDatabaseUrl,
         s3Region: workerEnv.S3_REGION,
         s3Endpoint: workerEnv.S3_ENDPOINT,
         bucket: workerEnv.S3_APP_FILES_BUCKET,
         databaseCaCert: workerEnv.DATABASE_CA_CERT,
-      });
-    },
+        erpnextBaseUrl: workerEnv.ERPNEXT_API_URL,
+        erpnextApiKey: workerEnv.ERPNEXT_API_KEY,
+      }),
   },
   {
     name: QUEUE_NAMES.IMPORTS,

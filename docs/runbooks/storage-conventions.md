@@ -98,3 +98,7 @@ module has no visibility into which `schoolId` a given request is for.
 - The `temp/` → `permanent/` move step is application logic that doesn't exist yet either. Until
   it does, verify the module's lifecycle rules with the manual test-object procedure in
   [`modules/storage/README.md`](../../infra/terraform/modules/storage/README.md#verifying-lifecycle-rules-with-test-objects).
+- The app-files lifecycle rule matches only the `reports/` prefix. Legacy finance exports live
+  under `tenant-<schoolId>/reports/` (see [`docs/modules/report-framework.md`](../modules/report-framework.md))
+  and are invisible to that rule; the workers' daily `purge-expired-reports` sweep (ST-175) is the
+  DB-driven closure for both prefixes.

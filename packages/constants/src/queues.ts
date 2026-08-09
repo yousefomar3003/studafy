@@ -98,6 +98,10 @@ export const JOB_NAMES = {
   // id: the worker reads storage_key/mime_type from the row, so a retry never acts on stale payload
   // data. A duplicate job is a no-op (the worker only derives while thumbnail_key is NULL).
   DERIVE_MATERIAL_PREVIEWS: "derive-material-previews",
+  // Scheduled purge of report artifacts whose 7-day window has elapsed. Carries no payload: the
+  // sweep reads completed report rows older than the retention window from both report job tables
+  // and deletes their stored objects. Registered on the reports queue via Job Scheduler.
+  PURGE_EXPIRED_REPORTS: "purge-expired-reports",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

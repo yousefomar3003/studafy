@@ -17,6 +17,7 @@ import {
   TokenBucket,
 } from "./queues/notifications/email";
 import { startRelay } from "./queues/outbox-relay";
+import { scheduleReportExpiryJob } from "./queues/reports";
 import { QUEUE_REGISTRY } from "./registry";
 import { shutdownWorkers, startWorkers } from "./worker";
 
@@ -128,6 +129,12 @@ const storageQuotaReconciliationRedis = createRedisConnection(env);
 void scheduleStorageQuotaReconciliationJob(storageQuotaReconciliationRedis).then(() =>
   storageQuotaReconciliationRedis.disconnect(),
 );
+
+// Report-expiry scheduler (ST-175): idempotently register the daily 07:00 purge of expired report
+// artifacts on the reports queue. Attendance objects are already covered by the `reports/` bucket
+// lifecycle rule; this closes the gap for the legacy `tenant-<schoolId>/reports/` finance keys.
+const reportExpiryRedis = createRedisConnection(env);
+void scheduleReportExpiryJob(reportExpiryRedis).then(() => reportExpiryRedis.disconnect());
 
 console.log(
   `Workers started for queues: ${QUEUE_REGISTRY.map((definition) => definition.name).join(", ")} (${env.NODE_ENV})`,
