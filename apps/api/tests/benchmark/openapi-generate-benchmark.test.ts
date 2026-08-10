@@ -62,6 +62,8 @@ const EXPECTED_PATHS = [
   "/api/notifications/read-all",
   "/api/notifications/{notificationId}/read",
   "/api/notifications/unread-count",
+  "/api/reports/children/comparison",
+  "/api/reports/children/{studentId}/breakdown",
   "/api/notification-preferences",
   "/api/auth/refresh",
   "/api/auth/logout",
