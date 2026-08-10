@@ -1,0 +1,1 @@
+export { childComparisonRoutes } from "./routes";
