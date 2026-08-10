@@ -243,6 +243,9 @@ describe("structure", () => {
         // Notification preferences (ST-143). Per-user channel toggles, digest mode, and personal
         // attendance-alert threshold, all RLS-fenced to the authenticated user.
         "/api/notification-preferences",
+        // Parent child comparison reports (ST-177). PARENT-role-gated metrics over linked children.
+        "/api/reports/children/comparison",
+        "/api/reports/children/{studentId}/breakdown",
         "/api/schools/current/settings",
         "/api/schools/register",
         "/api/schools/resend-verification",
@@ -532,6 +535,9 @@ describe("security", () => {
         "GET /api/notifications/unread-count",
         // Notification preferences (ST-143). Self-service on the caller's own rows.
         "GET /api/notification-preferences",
+        // Parent child comparison reports (ST-177). Bearer-authenticated, then PARENT-role-gated.
+        "GET /api/reports/children/comparison",
+        "GET /api/reports/children/{studentId}/breakdown",
         "PATCH /api/notification-preferences",
         "GET /api/schools/current/settings",
         "PATCH /api/schools/current/settings",

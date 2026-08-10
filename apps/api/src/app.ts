@@ -83,6 +83,7 @@ import {
 } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
+import { childComparisonRoutes } from "./modules/reports";
 import { storageRoutes } from "./modules/storage";
 import {
   checkoutRoutes,
@@ -683,6 +684,7 @@ export function createApp({
       "/",
       attendanceReportRoutes(database, readDatabase ?? database, redis ?? null, storage),
     );
+    app.route("/", childComparisonRoutes(database, readDatabase ?? database));
   }
 
   // Discipline incidents and actions: teacher reporting, principal management (actions,

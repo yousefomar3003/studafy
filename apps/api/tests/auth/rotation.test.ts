@@ -114,6 +114,25 @@ async function familyRows(
   `;
 }
 
+/**
+ * Drain a DB-backed rejection through plain `await` and return its error code.
+ *
+ * bun#19130: under `bun:test`, `await expect(pendingPostgresPromise).rejects...` extracts the
+ * internal JSC promise and bypasses the JS-level `.then()` that postgres.js relies on to dispatch
+ * a lazy query, leaving the query unsent and the test hung. Draining through plain `await` keeps
+ * resolution on the JS side, where postgres.js's lazy thenables actually dispatch.
+ */
+async function rejectionCode(promise: Promise<unknown>): Promise<string | undefined> {
+  try {
+    await promise;
+    return undefined;
+  } catch (error) {
+    return typeof error === "object" && error !== null && "code" in error
+      ? (error as { code: string }).code
+      : undefined;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Normal rotation
 // ---------------------------------------------------------------------------
@@ -208,9 +227,15 @@ describe("normal rotation", () => {
         } as unknown as typeof config.keyStore,
       };
 
-      await expect(
-        rotateRefreshToken(sql, failingConfig, { presentedToken: seed.token }),
-      ).rejects.toThrow("synthetic signing failure");
+      // bun#19130: `await expect(pendingPostgresPromise).rejects...` hangs the query resolution,
+      // so drain the promise through a plain try/catch and assert on the outcome instead.
+      let signingFailed = false;
+      try {
+        await rotateRefreshToken(sql, failingConfig, { presentedToken: seed.token });
+      } catch (error) {
+        signingFailed = error instanceof Error && error.message === "synthetic signing failure";
+      }
+      expect(signingFailed).toBe(true);
 
       const parent = await readToken(seed.sessionId);
       expect(parent.rotated_at).toBeNull();
@@ -246,18 +271,20 @@ describe("reuse detection", () => {
       expect(before.every((row) => row.revoked_at === null)).toBe(true);
 
       // Replay the original — the token an attacker would have captured first.
-      await expect(
-        rotateRefreshToken(sql, config, { presentedToken: seed.token }),
-      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+      expect(
+        await rejectionCode(rotateRefreshToken(sql, config, { presentedToken: seed.token })),
+      ).toBe("AUTH_TOKEN_INVALID");
 
       const after = await familyRows(seed.familyId);
       expect(after).toHaveLength(3);
       expect(after.every((row) => row.revoked_at !== null)).toBe(true);
 
       // Including the live tip: the legitimate holder is logged out too, which is the point.
-      await expect(
-        rotateRefreshToken(sql, config, { presentedToken: second.refreshToken }),
-      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+      expect(
+        await rejectionCode(
+          rotateRefreshToken(sql, config, { presentedToken: second.refreshToken }),
+        ),
+      ).toBe("AUTH_TOKEN_INVALID");
     } finally {
       destroy();
     }
@@ -273,9 +300,11 @@ describe("reuse detection", () => {
       await rotateRefreshToken(sql, config, { presentedToken: seed.token });
 
       const requestId = crypto.randomUUID();
-      await expect(
-        rotateRefreshToken(sql, config, { presentedToken: seed.token, requestId }),
-      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+      expect(
+        await rejectionCode(
+          rotateRefreshToken(sql, config, { presentedToken: seed.token, requestId }),
+        ),
+      ).toBe("AUTH_TOKEN_INVALID");
 
       const [audit] = await sql<
         {
@@ -316,9 +345,9 @@ describe("reuse detection", () => {
       });
 
       await rotateRefreshToken(sql, config, { presentedToken: seed.token });
-      await expect(
-        rotateRefreshToken(sql, config, { presentedToken: seed.token }),
-      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+      expect(
+        await rejectionCode(rotateRefreshToken(sql, config, { presentedToken: seed.token })),
+      ).toBe("AUTH_TOKEN_INVALID");
 
       const [row] = await sql<{ revoked_at: Date | null }[]>`
         SELECT revoked_at FROM app.user_devices WHERE id = ${device.id}
@@ -340,9 +369,9 @@ describe("reuse detection", () => {
         revokedAt: new Date(),
       });
 
-      await expect(
-        rotateRefreshToken(sql, config, { presentedToken: seed.token }),
-      ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+      expect(
+        await rejectionCode(rotateRefreshToken(sql, config, { presentedToken: seed.token })),
+      ).toBe("AUTH_TOKEN_INVALID");
     } finally {
       destroy();
     }
@@ -362,9 +391,9 @@ describe("reuse detection", () => {
           expiresAt: new Date(Date.now() - 30 * 60 * 1000),
         });
 
-        await expect(
-          rotateRefreshToken(sql, config, { presentedToken: seed.token }),
-        ).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+        expect(
+          await rejectionCode(rotateRefreshToken(sql, config, { presentedToken: seed.token })),
+        ).toBe("AUTH_TOKEN_INVALID");
 
         // Reporting this as merely expired would let the replay pass unnoticed.
         const rows = await familyRows(seed.familyId);
@@ -393,9 +422,9 @@ describe("rejections", () => {
 
       // The distinct code matters: a client seeing AUTH_TOKEN_EXPIRED re-authenticates, while one
       // seeing AUTH_TOKEN_INVALID on the same condition would retry into a loop.
-      await expect(
-        rotateRefreshToken(sql, config, { presentedToken: seed.token }),
-      ).rejects.toMatchObject({ code: "AUTH_TOKEN_EXPIRED" });
+      expect(
+        await rejectionCode(rotateRefreshToken(sql, config, { presentedToken: seed.token })),
+      ).toBe("AUTH_TOKEN_EXPIRED");
     } finally {
       destroy();
     }
@@ -414,9 +443,9 @@ describe("rejections", () => {
       // Keep the locator and base64url shape valid while changing the digest that proves possession.
       const forged = `${tenant.schoolId}.${user.id}.${unknownSecret}`;
 
-      await expect(
-        rotateRefreshToken(sql, config, { presentedToken: forged }),
-      ).rejects.toMatchObject({ code: "AUTH_SESSION_NOT_FOUND" });
+      expect(await rejectionCode(rotateRefreshToken(sql, config, { presentedToken: forged }))).toBe(
+        "AUTH_SESSION_NOT_FOUND",
+      );
 
       // And the real token still works: a failed guess must not consume the session.
       const rotated = await rotateRefreshToken(sql, config, { presentedToken: seed.token });
@@ -438,9 +467,13 @@ describe("rejections", () => {
         "",
         `${tenant.schoolId}.${tenant.users.STUDENT.id}.Xk7pQ2abc`,
       ]) {
-        await expect(
-          rotateRefreshToken(sql, config, { presentedToken: presented }),
-        ).rejects.toThrow();
+        let threw = false;
+        try {
+          await rotateRefreshToken(sql, config, { presentedToken: presented });
+        } catch {
+          threw = true;
+        }
+        expect(threw).toBe(true);
       }
     } finally {
       destroy();

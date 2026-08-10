@@ -197,6 +197,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "including term and cumulative summaries.",
     },
     {
+      name: "Child Comparison Reports",
+      description:
+        "Parent report endpoints. Authenticated, PARENT-role-gated, and scoped to children linked " +
+        "through app.parent_child_links. Compare grade, attendance, and assignment metrics across " +
+        "linked children for a term, or drill into one child's breakdown.",
+    },
+    {
       name: "Evaluations",
       description:
         "Teacher evaluation management. Authenticated and tenant-scoped. " +
