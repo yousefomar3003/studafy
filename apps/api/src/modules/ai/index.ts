@@ -16,6 +16,29 @@ export {
   type AiQuotaHandle,
 } from "./gate/entitlement-gate";
 export { aiUsageRoutes } from "./routes/usage-routes";
+export { aiRetrievalRoutes } from "./routes/retrieval-routes";
+export {
+  createDeterministicQueryEmbedder,
+  deterministicQueryEmbedding,
+  estimateQueryTokens,
+  RETRIEVAL_EMBEDDING_DIMENSIONS,
+  RETRIEVAL_EMBEDDING_MODEL,
+  type QueryEmbedder,
+} from "./retrieval/embeddings";
+export {
+  clampLimit,
+  hybridSearch,
+  HYBRID_DEFAULT_LIMIT,
+  HYBRID_EF_SEARCH,
+  HYBRID_EF_SEARCH_RETRY,
+  HYBRID_ITERATIVE_SCAN,
+  HYBRID_LEG_LIMIT,
+  HYBRID_MAX_LIMIT,
+  HYBRID_RRF_K,
+  type HybridSearchHit,
+  type HybridSearchInput,
+  type HybridSearchResult,
+} from "./retrieval/search";
 export {
   createAiTokenMeter,
   aiQuotaKey,
