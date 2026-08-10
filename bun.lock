@@ -29,6 +29,7 @@
         "@studafy/billing": "workspace:*",
         "@studafy/constants": "workspace:*",
         "@studafy/finance-reporting": "workspace:*",
+        "@studafy/grades-reporting": "workspace:*",
         "@studafy/notification-templates": "workspace:*",
         "@studafy/shared-schemas": "workspace:*",
         "bullmq": "5.79.3",
@@ -108,7 +109,9 @@
         "@studafy/billing": "workspace:*",
         "@studafy/constants": "workspace:*",
         "@studafy/finance-reporting": "workspace:*",
+        "@studafy/grades-reporting": "workspace:*",
         "@studafy/notification-templates": "workspace:*",
+        "@studafy/progress-reporting": "workspace:*",
         "@xmldom/xmldom": "0.8.13",
         "bidi-js": "1.0.3",
         "bullmq": "5.79.3",
@@ -232,11 +235,38 @@
         "xmllint-wasm": "5.2.0",
       },
     },
+    "packages/grades-reporting": {
+      "name": "@studafy/grades-reporting",
+      "version": "0.0.0",
+      "dependencies": {
+        "postgres": "3.4.9",
+      },
+      "devDependencies": {
+        "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
+        "@types/bun": "1.3.14",
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/notification-templates": {
       "name": "@studafy/notification-templates",
       "version": "0.0.0",
       "dependencies": {
         "@studafy/constants": "workspace:*",
+      },
+      "devDependencies": {
+        "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
+        "@types/bun": "1.3.14",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/progress-reporting": {
+      "name": "@studafy/progress-reporting",
+      "version": "0.0.0",
+      "dependencies": {
+        "postgres": "3.4.9",
+        "zod": "4.1.12",
       },
       "devDependencies": {
         "@studafy/config": "workspace:*",
@@ -737,9 +767,13 @@
 
     "@studafy/finance-reporting": ["@studafy/finance-reporting@workspace:packages/finance-reporting"],
 
+    "@studafy/grades-reporting": ["@studafy/grades-reporting@workspace:packages/grades-reporting"],
+
     "@studafy/mobile": ["@studafy/mobile@workspace:apps/mobile"],
 
     "@studafy/notification-templates": ["@studafy/notification-templates@workspace:packages/notification-templates"],
+
+    "@studafy/progress-reporting": ["@studafy/progress-reporting@workspace:packages/progress-reporting"],
 
     "@studafy/realtime": ["@studafy/realtime@workspace:apps/realtime"],
 

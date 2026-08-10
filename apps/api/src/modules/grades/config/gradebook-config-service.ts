@@ -1,4 +1,5 @@
 import { ERROR_CODES } from "@studafy/constants";
+import { getInheritedSchemeBoundaries } from "@studafy/grades-reporting";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
@@ -78,14 +79,9 @@ export interface GradingSchemeRow {
   updated_at: Date;
 }
 
-export interface SchoolSettingsRow {
-  grading_scheme: string;
-}
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
 const WEIGHT_TOLERANCE = 0.001;
 
 // ---------------------------------------------------------------------------
@@ -372,67 +368,6 @@ export async function deleteCategory(
 // ---------------------------------------------------------------------------
 // Grading schemes — versioned, append-only
 // ---------------------------------------------------------------------------
-
-/**
- * Default grade boundaries per scheme type, derived from school_settings.grading_scheme.
- */
-export function getDefaultBoundaries(schemeType: GradingSchemeType): GradeBoundary[] {
-  switch (schemeType) {
-    case "letter":
-      return [
-        { label: "A", min: 90, max: 100, gpa_points: 4.0 },
-        { label: "B", min: 80, max: 89, gpa_points: 3.0 },
-        { label: "C", min: 70, max: 79, gpa_points: 2.0 },
-        { label: "D", min: 60, max: 69, gpa_points: 1.0 },
-        { label: "F", min: 0, max: 59, gpa_points: 0.0 },
-      ];
-    case "gpa":
-      return [
-        { label: "A", min: 90, max: 100, gpa_points: 4.0 },
-        { label: "B", min: 80, max: 89, gpa_points: 3.0 },
-        { label: "C", min: 70, max: 79, gpa_points: 2.0 },
-        { label: "D", min: 60, max: 69, gpa_points: 1.0 },
-        { label: "F", min: 0, max: 59, gpa_points: 0.0 },
-      ];
-    case "percentage":
-      return [
-        { label: "Excellent", min: 90, max: 100 },
-        { label: "Good", min: 80, max: 89 },
-        { label: "Average", min: 70, max: 79 },
-        { label: "Below Average", min: 60, max: 69 },
-        { label: "Failing", min: 0, max: 59 },
-      ];
-    case "numeric":
-      return [
-        { label: "5", min: 90, max: 100 },
-        { label: "4", min: 80, max: 89 },
-        { label: "3", min: 70, max: 79 },
-        { label: "2", min: 60, max: 69 },
-        { label: "1", min: 0, max: 59 },
-      ];
-    case "pass_fail":
-      return [
-        { label: "Pass", min: 60, max: 100 },
-        { label: "Fail", min: 0, max: 59 },
-      ];
-  }
-}
-
-/**
- * Read the school's grading_scheme type from school_settings and return default boundaries.
- * Creates the settings row if it does not exist (lazy init, same as tenancy/settings/service).
- */
-export async function getInheritedSchemeBoundaries(
-  tx: TransactionSql,
-  schoolId: string,
-): Promise<{ schemeType: GradingSchemeType; boundaries: GradeBoundary[] }> {
-  const [settings] = await tx<SchoolSettingsRow[]>`
-    SELECT grading_scheme FROM app.school_settings WHERE school_id = ${schoolId}::uuid
-  `;
-
-  const schemeType = (settings?.grading_scheme ?? "letter") as GradingSchemeType;
-  return { schemeType, boundaries: getDefaultBoundaries(schemeType) };
-}
 
 /**
  * List all versions of grading schemes for a term.
