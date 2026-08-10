@@ -91,6 +91,7 @@ const app = createApp({
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",
+  aiRerankEnabled: env.AI_RERANK_ENABLED,
 });
 
 const server = Bun.serve({

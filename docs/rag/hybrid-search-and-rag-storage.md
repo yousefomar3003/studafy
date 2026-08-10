@@ -234,6 +234,39 @@ COMMIT;
 `k = 60` is the constant from the original RRF paper. Both legs are RLS-filtered independently, so the
 fused result cannot contain another school's chunk — asserted in `packages/db/tests/material-chunks.test.ts`.
 
+## Cross-encoder re-ranking (ST-163)
+
+RRF fuses _ranks_; it never re-scores. ST-163 adds the second stage that closes that gap: the fused
+top-20 is scored jointly against the query and cut to a re-scored top-6. It is **feature-flagged** — the
+`AI_RERANK_ENABLED` kill switch in the API's environment schema, off by default so an unset environment
+deploys the previous RRF-only behavior, and read at bootstrap the same way every other knob in the
+repository is read.
+
+The repository declares no ML runtime, so the default re-ranker is the same honest deterministic mock
+the embeddings use (`mock-cross-encoder@1`): it scores a (query, chunk) pair by the fraction of the
+query's tokens the chunk contains — the lexical analogue of a cross-encoder's joint scoring pass. A real
+cross-encoder (e.g. `cross-encoder/ms-marco-MiniLM-L-12-v2` over ONNX or an HTTP endpoint) is a
+one-function swap behind the `CrossEncoderReranker` contract, mirroring the `QueryEmbedder` swap point.
+
+Decisions, stated the same way this document states the retrieval ones:
+
+- **The pool is the route's max fused limit** (`HYBRID_MAX_LIMIT` = 20), so when the stage is on the
+  route asks the fusion for a full 20 and the re-ranker cuts to `RERANK_K` = 6. The request `limit` can
+  only tighten further.
+- **RRF remains the tie-break, not the answer.** Candidates that tie on the joint score keep their
+  fusion order (`rrf_score` descending is the sort's second key), so the re-ranker cannot reorder
+  candidates it cannot separate.
+- **The exact-token limitation is deliberate and documented.** The mock is not stem-aware; a plural
+  chunk does not satisfy a singular query token. The golden-set eval (`rerank.eval.test.ts`) is written
+  to that contract, and the latency budget (`rerank.benchmark.test.ts`, p95 < 300 ms) is enforced against
+  the full 20-candidate pool the route actually produces.
+- **The re-ranker is scoped to the retrieval route** (`/api/ai/students/{studentId}/search`), which is
+  the retrieval half of both the Ask AI and exam-mode surfaces, so one switch governs both.
+
+The acceptance evidence lives in the test suite rather than in prose here: a golden set of judged
+queries where the fused order is diluted by the semantic leg's noise, asserted to lift nDCG@6 over the
+RRF baseline with no per-query regression; and a latency gate measured on the worst-case pool shape.
+
 ## Write amplification
 
 Ingestion pays for the ANN index on every row. Measured, 2,000-row batch:
@@ -282,5 +315,6 @@ MATERIAL_CHUNKS_BENCHMARK=1 TEST_DATABASE_URL=postgresql://… \
   at the 75k/100k corpus shape in `material-chunks-benchmark.test.ts`.
 - **The `ef_search = 400` result (recall 38/50, ~4 s) is not understood** and is recorded as an anomaly.
   Do not raise `ef_search` without measuring recall — higher is not monotonically better.
-- **No reranker.** RRF fuses ranks; it does not re-score. A cross-encoder rerank on the fused top-k is the
-  obvious next quality step.
+- **The re-ranker is the deterministic mock, not a learned model.** It is exact-token, not stem-aware,
+  and it cannot read paraphrase. Swapping in a real cross-encoder is the expected next step and the
+  `CrossEncoderReranker` contract, the eval, and the latency gate already exist to measure that swap.

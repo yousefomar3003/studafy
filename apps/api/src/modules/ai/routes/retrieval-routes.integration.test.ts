@@ -45,6 +45,11 @@ import {
   estimateQueryTokens,
   RETRIEVAL_EMBEDDING_MODEL,
 } from "../retrieval/embeddings";
+import {
+  createDeterministicCrossEncoderReranker,
+  RERANK_K,
+  RERANK_MODEL,
+} from "../retrieval/rerank";
 import { HYBRID_LEG_LIMIT } from "../retrieval/search";
 
 import { aiRetrievalRoutes } from "./retrieval-routes";
@@ -53,6 +58,7 @@ import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { AiQuotaHandle } from "../gate/entitlement-gate";
+import type { CrossEncoderReranker } from "../retrieval/rerank";
 import type { TransactionSql } from "postgres";
 
 const RETRIEVAL_DIMENSIONS = 1536;
@@ -106,7 +112,10 @@ function quotaHandle(): AiQuotaHandle {
   };
 }
 
-function buildRetrievalApp(handle: AiQuotaHandle): OpenAPIHono<AppEnv> {
+function buildRetrievalApp(
+  handle: AiQuotaHandle,
+  reranker?: CrossEncoderReranker | null,
+): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
   app.use("*", async (c, next) => {
     c.set("auth", auth);
@@ -116,7 +125,11 @@ function buildRetrievalApp(handle: AiQuotaHandle): OpenAPIHono<AppEnv> {
   });
   app.route(
     "/",
-    aiRetrievalRoutes({ database: tenantClient!, embedder: createDeterministicQueryEmbedder() }),
+    aiRetrievalRoutes({
+      database: tenantClient!,
+      embedder: createDeterministicQueryEmbedder(),
+      reranker,
+    }),
   );
   app.onError(errorHandlerMiddleware(silentLogger));
   return app;
@@ -261,12 +274,24 @@ describeDb("POST /api/ai/students/{studentId}/search", () => {
         rrf_score: number;
         semantic_rank: number | null;
         keyword_rank: number | null;
+        rerank_score: number | null;
       }[];
-      meta: { semantic_leg_count: number; retried: boolean; tokens_used: number };
+      meta: {
+        semantic_leg_count: number;
+        retried: boolean;
+        tokens_used: number;
+        reranked: boolean;
+        rerank_model: string | null;
+      };
     };
 
     expect(body.query).toBe(query);
     expect(body.results.length).toBeGreaterThan(0);
+
+    // The kill switch is off in this mount: no re-ranker, raw RRF ranking, no rerank score anywhere.
+    expect(body.meta.reranked).toBe(false);
+    expect(body.meta.rerank_model).toBeNull();
+    expect(body.results.every((hit) => hit.rerank_score === null)).toBe(true);
 
     // The semantic leg is asserted on its own terms: it returned exactly the tenant's two chunks,
     // because RLS filtered the foreign tenant's rows out of the ANN path before fusion could hide it.
@@ -352,6 +377,39 @@ describeDb("POST /api/ai/students/{studentId}/search", () => {
       body: JSON.stringify({ query: "   " }),
     });
     expect(blank.status).toBe(400);
+  });
+
+  test("re-ranks the fused hits when the cross-encoder stage is wired in", async () => {
+    const rerankedApp = buildRetrievalApp(quotaHandle(), createDeterministicCrossEncoderReranker());
+    const res = await rerankedApp.request(`/api/ai/students/${tenant.students[0]!.id}/search`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: "zirconium metallurgical corrosion resistance" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      results: {
+        chunk_id: string;
+        rrf_score: number;
+        rerank_score: number | null;
+      }[];
+      meta: { reranked: boolean; rerank_model: string | null };
+    };
+
+    expect(body.meta.reranked).toBe(true);
+    expect(body.meta.rerank_model).toBe(RERANK_MODEL);
+
+    // The full-coverage chunk is the only scored survivor that matters here: it must rank first with
+    // a joint score of 1, above the zero-coverage chunk, and the pool must be cut to RERANK_K.
+    expect(body.results.length).toBeLessThanOrEqual(RERANK_K);
+    expect(body.results[0]!.chunk_id).toBe(tenantChunkIds[0]);
+    expect(body.results[0]!.rerank_score).toBe(1);
+    expect(body.results.every((hit) => typeof hit.rerank_score === "number")).toBe(true);
+
+    // Rerank ordering is score-descending across the response, never an arbitrary shuffle.
+    const scores = body.results.map((hit) => hit.rerank_score as number);
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
   });
 
   test("fails loud when the route runs without an aiQuota handle", async () => {
