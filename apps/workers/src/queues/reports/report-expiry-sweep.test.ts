@@ -1,9 +1,10 @@
 /**
  * The expired-report purge sweep (ST-175), against a real database.
  *
- * Seeds schools with old completed report jobs in both lifecycle tables — attendance
- * (app.report_export_jobs, `reports/` keys) and finance (app.finance_report_jobs,
- * `tenant-<schoolId>/reports/` keys) — and drives the sweep with an in-memory fake S3 client, so
+ * Seeds schools with old completed report jobs in all three lifecycle tables — attendance
+ * (app.report_export_jobs, `reports/` keys), finance (app.finance_report_jobs,
+ * `tenant-<schoolId>/reports/` keys) and progress (app.progress_report_jobs, `reports/` keys) —
+ * and drives the sweep with an in-memory fake S3 client, so
  * no network is touched and every removed key is deterministic. The acceptance the tests prove:
  * only completed artifacts older than the 7-day retention are purged (recent rows, non-terminal
  * rows and rows without a key are decoys that survive), the DB row disappears so the API reports a
@@ -17,6 +18,7 @@ import postgres from "postgres";
 
 import { purgeExpiredReports } from "./report-expiry-sweep";
 
+import type { PurgeLogger } from "./report-expiry-sweep";
 import type { ReportS3Client } from "./report-types";
 import type { Sql } from "postgres";
 
@@ -26,7 +28,10 @@ const sweepTest = test.skipIf(!enabled);
 
 let db: Sql | undefined;
 
-const silentLogger = {
+/** Schools seeded by this file, so afterAll can remove them and the DB is left as found. */
+const seededSchools: string[] = [];
+
+const silentLogger: PurgeLogger = {
   warn: () => undefined,
 };
 
@@ -34,13 +39,20 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const old = new Date(Date.now() - 10 * DAY_MS);
 const recent = new Date(Date.now() - DAY_MS);
 
-beforeAll(() => {
+beforeAll(async () => {
   if (!enabled) return;
   db = postgres(databaseUrl!, { max: 4, ssl: false, prepare: false });
+  // The purge result counts rows across every school, so a completed artifact older than the
+  // retention window left behind by an interrupted run would break the exact assertions below.
+  // Flush those first: the only rows this can touch are, by definition, past retention.
+  await purgeExpiredReports(db, new FakeReportS3(), new Date(), silentLogger);
 });
 
 afterAll(async () => {
-  await db?.end({ timeout: 5 });
+  if (db) {
+    await removeSeededSchools();
+    await db.end({ timeout: 5 });
+  }
 });
 
 class FakeReportS3 implements ReportS3Client {
@@ -82,6 +94,7 @@ async function seedSchool(): Promise<{ schoolId: string; userId: string }> {
       RETURNING id
     `;
     const schoolId = school!.id;
+    seededSchools.push(schoolId);
 
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
 
@@ -92,6 +105,79 @@ async function seedSchool(): Promise<{ schoolId: string; userId: string }> {
     `;
 
     return { schoolId, userId: user!.id };
+  });
+}
+
+/**
+ * Remove every row the seeds created, in FK-safe order. app.schools is referenced with
+ * ON DELETE RESTRICT by most children, so the school itself is deleted last. Best-effort: a school
+ * left behind by a crashed run only feeds the beforeAll purge, which keeps the counters exact.
+ */
+async function removeSeededSchools(): Promise<void> {
+  for (const schoolId of seededSchools) {
+    try {
+      await db!.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+        await tx`DELETE FROM app.progress_report_jobs WHERE school_id = ${schoolId}::uuid`;
+        await tx`DELETE FROM app.finance_report_jobs WHERE school_id = ${schoolId}::uuid`;
+        await tx`DELETE FROM app.report_export_jobs WHERE school_id = ${schoolId}::uuid`;
+        await tx`DELETE FROM app.terms WHERE school_id = ${schoolId}::uuid`;
+        await tx`DELETE FROM app.academic_years WHERE school_id = ${schoolId}::uuid`;
+        const students = await tx<{ id: string }[]>`
+          SELECT id FROM app.students WHERE school_id = ${schoolId}::uuid
+        `;
+        for (const student of students) {
+          await tx`DELETE FROM app.students WHERE id = ${student.id}::uuid`;
+        }
+        await tx`DELETE FROM app.users WHERE school_id = ${schoolId}::uuid`;
+        await tx`DELETE FROM app.schools WHERE id = ${schoolId}::uuid`;
+      });
+    } catch (error) {
+      silentLogger.warn({ school_id: schoolId, error }, "failed to clean up seeded school");
+    }
+  }
+}
+
+/**
+ * Create the minimal academic structure a progress job requires: an active academic year, a term
+ * within it, and an enrolled student. Progress jobs are normalized on student/term/year, unlike the
+ * free-form report_export_jobs rows.
+ */
+async function ensureAcademicFixture(
+  schoolId: string,
+  userId: string,
+): Promise<{ studentId: string; termId: string; academicYearId: string }> {
+  return db!.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+
+    const suffix = crypto.randomUUID().slice(0, 6);
+    const [year] = await tx<{ id: string }[]>`
+      INSERT INTO app.academic_years (school_id, code, name, starts_on, ends_on, status)
+      VALUES (${schoolId}::uuid, ${`SW${suffix}`}, 'Sweep Year', '2026-01-01'::date,
+        '2026-12-31'::date, 'active')
+      RETURNING id
+    `;
+    const yearId = year!.id;
+
+    const [term] = await tx<{ id: string }[]>`
+      INSERT INTO app.terms
+        (school_id, academic_year_id, code, name, sequence_number, starts_on, ends_on, status)
+      VALUES (${schoolId}::uuid, ${yearId}::uuid, ${`SWT${suffix}`}, 'Sweep Term', 1,
+        '2026-03-01'::date, '2026-06-30'::date, 'active')
+      RETURNING id
+    `;
+
+    const [student] = await tx<{ id: string }[]>`
+      INSERT INTO app.students
+        (school_id, user_id, admission_number, first_name, last_name, status)
+      VALUES (${schoolId}::uuid, ${userId}::uuid, ${`SW-ADM-${suffix}`}, 'Sweep', 'Student',
+        'enrolled')
+      RETURNING id
+    `;
+
+    return { studentId: student!.id, termId: term!.id, academicYearId: yearId };
   });
 }
 
@@ -154,9 +240,51 @@ async function seedFinanceJob(
   });
 }
 
+/**
+ * Insert a progress job row shaped to pass ck_progress_report_jobs_terminal_state: completed rows
+ * carry a storage key and completed_at, failed rows an error message and completed_at, and
+ * pending/processing rows neither.
+ */
+async function seedProgressJob(
+  schoolId: string,
+  fixture: { studentId: string; termId: string; academicYearId: string },
+  userId: string,
+  createdAt: Date,
+  status: "pending" | "processing" | "completed" | "failed",
+  storageKey: string | null = null,
+): Promise<void> {
+  await db!.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    await tx`
+      INSERT INTO app.progress_report_jobs (
+        school_id, requested_by_user_id, student_id, academic_term_id, academic_year_id, status,
+        storage_key, error_message, created_at, completed_at
+      ) VALUES (
+        ${schoolId}::uuid, ${userId}::uuid, ${fixture.studentId}::uuid, ${fixture.termId}::uuid,
+        ${fixture.academicYearId}::uuid, ${status}, ${storageKey},
+        ${status === "failed" ? "purged" : null}, ${createdAt},
+        ${status === "completed" || status === "failed" ? createdAt : null}
+      )
+    `;
+  });
+}
+
+async function progressRowCount(schoolId: string): Promise<number> {
+  return db!.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    const [row] = await tx<{ n: string }[]>`
+      SELECT count(*)::text AS n FROM app.progress_report_jobs WHERE school_id = ${schoolId}::uuid
+    `;
+    return Number(row!.n);
+  });
+}
+
 async function attendanceRowCount(schoolId: string): Promise<number> {
   return db!.begin(async (tx) => {
     await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
     const [row] = await tx<{ n: string }[]>`
       SELECT count(*)::text AS n FROM app.report_export_jobs WHERE school_id = ${schoolId}::uuid
     `;
@@ -167,6 +295,7 @@ async function attendanceRowCount(schoolId: string): Promise<number> {
 async function financeRowCount(schoolId: string): Promise<number> {
   return db!.begin(async (tx) => {
     await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
     const [row] = await tx<{ n: string }[]>`
       SELECT count(*)::text AS n FROM app.finance_report_jobs WHERE school_id = ${schoolId}::uuid
     `;
@@ -177,11 +306,14 @@ async function financeRowCount(schoolId: string): Promise<number> {
 describe("expired report purge sweep", () => {
   sweepTest("purges completed artifacts older than retention and keeps every decoy", async () => {
     const { schoolId, userId } = await seedSchool();
+    const academic = await ensureAcademicFixture(schoolId, userId);
 
     const oldAttendanceKey = `reports/${schoolId}/attendance-old.xlsx`;
     const recentAttendanceKey = `reports/${schoolId}/attendance-recent.xlsx`;
     const oldFinanceKey = `tenant-${schoolId}/reports/2026/finance-old.csv`;
     const recentFinanceKey = `tenant-${schoolId}/reports/2026/finance-recent.csv`;
+    const oldProgressKey = `reports/${schoolId}/progress-old.pdf`;
+    const recentProgressKey = `reports/${schoolId}/progress-recent.pdf`;
 
     await seedAttendanceJob(schoolId, userId, old, "completed", oldAttendanceKey);
     await seedAttendanceJob(schoolId, userId, recent, "completed", recentAttendanceKey);
@@ -189,18 +321,23 @@ describe("expired report purge sweep", () => {
     await seedFinanceJob(schoolId, userId, old, "completed", oldFinanceKey);
     await seedFinanceJob(schoolId, userId, recent, "completed", recentFinanceKey);
     await seedFinanceJob(schoolId, userId, old, "failed");
+    await seedProgressJob(schoolId, academic, userId, old, "completed", oldProgressKey);
+    await seedProgressJob(schoolId, academic, userId, recent, "completed", recentProgressKey);
+    await seedProgressJob(schoolId, academic, userId, old, "processing");
 
     const s3 = new FakeReportS3();
     const result = await purgeExpiredReports(db!, s3, new Date(), silentLogger);
 
     expect(result.attendanceRemoved).toBe(1);
     expect(result.financeRemoved).toBe(1);
+    expect(result.progressRemoved).toBe(1);
     expect(result.failed).toBe(0);
-    expect(s3.removed.sort()).toEqual([oldAttendanceKey, oldFinanceKey].sort());
+    expect(s3.removed.sort()).toEqual([oldAttendanceKey, oldFinanceKey, oldProgressKey].sort());
 
-    // Both tables keep the decoys: recent completed, and old rows that are not completed.
+    // All tables keep the decoys: recent completed, and old rows that are not completed.
     expect(await attendanceRowCount(schoolId)).toBe(2);
     expect(await financeRowCount(schoolId)).toBe(2);
+    expect(await progressRowCount(schoolId)).toBe(2);
   });
 
   sweepTest(

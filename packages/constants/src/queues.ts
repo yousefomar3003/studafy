@@ -57,6 +57,9 @@ export const JOB_NAMES = {
   EVALUATE_ATTENDANCE_ALERTS: "evaluate-attendance-alerts",
   GENERATE_ATTENDANCE_EXPORT: "generate-attendance-export",
   GENERATE_FINANCE_REPORT: "generate-finance-report",
+  // Per-student term progress report (ST-176). One job per (student, term); the payload carries the
+  // student/term ids and the report renders published grades, attendance and teacher comments.
+  GENERATE_PROGRESS_REPORT: "generate-progress-report",
   GENERATE_INVOICE: "generate-invoice",
   GENERATE_BATCH_INVOICES: "generate-batch-invoices",
   SEND_DIGESTS: "send-digests",

@@ -30,6 +30,8 @@ export interface PurgeExpiredReportsResult {
   attendanceRemoved: number;
   /** Artifacts removed from app.finance_report_jobs (finance, `tenant-<schoolId>/reports/` prefix). */
   financeRemoved: number;
+  /** Artifacts removed from app.progress_report_jobs (progress, `reports/` prefix). */
+  progressRemoved: number;
   /** Schools whose purge aborted (S3 or database error) — ops telemetry, job continues. */
   failed: number;
 }
@@ -52,18 +54,20 @@ export async function purgeExpiredReports(
     schools: schoolIds.length,
     attendanceRemoved: 0,
     financeRemoved: 0,
+    progressRemoved: 0,
     failed: 0,
   };
 
   for (const schoolId of schoolIds) {
     try {
       const keys = await collectExpiredKeys(sql, schoolId, cutoff);
-      for (const key of [...keys.attendance, ...keys.finance]) {
+      for (const key of [...keys.attendance, ...keys.finance, ...keys.progress]) {
         await s3.remove(key);
       }
       await deleteExpiredRows(sql, schoolId, cutoff);
       result.attendanceRemoved += keys.attendance.length;
       result.financeRemoved += keys.finance.length;
+      result.progressRemoved += keys.progress.length;
     } catch (error) {
       result.failed += 1;
       log.warn(
@@ -80,7 +84,7 @@ async function collectExpiredKeys(
   sql: Sql,
   schoolId: string,
   cutoff: Date,
-): Promise<{ attendance: string[]; finance: string[] }> {
+): Promise<{ attendance: string[]; finance: string[]; progress: string[] }> {
   return withSystemTenantTx(sql, { schoolId }, (tx) => selectExpiredKeys(tx, cutoff));
 }
 
@@ -98,13 +102,19 @@ async function deleteExpiredRows(sql: Sql, schoolId: string, cutoff: Date): Prom
         AND status = 'completed' AND object_key IS NOT NULL
         AND created_at < ${cutoff}
     `;
+    await tx`
+      DELETE FROM app.progress_report_jobs
+      WHERE school_id = current_setting('app.school_id')::uuid
+        AND status = 'completed' AND storage_key IS NOT NULL
+        AND created_at < ${cutoff}
+    `;
   });
 }
 
 async function selectExpiredKeys(
   tx: TransactionSql,
   cutoff: Date,
-): Promise<{ attendance: string[]; finance: string[] }> {
+): Promise<{ attendance: string[]; finance: string[]; progress: string[] }> {
   const attendance = await tx<{ storage_key: string }[]>`
     SELECT storage_key
     FROM app.report_export_jobs
@@ -119,8 +129,16 @@ async function selectExpiredKeys(
       AND status = 'completed' AND object_key IS NOT NULL
       AND created_at < ${cutoff}
   `;
+  const progress = await tx<{ storage_key: string }[]>`
+    SELECT storage_key
+    FROM app.progress_report_jobs
+    WHERE school_id = current_setting('app.school_id')::uuid
+      AND status = 'completed' AND storage_key IS NOT NULL
+      AND created_at < ${cutoff}
+  `;
   return {
     attendance: attendance.map((row) => row.storage_key),
     finance: finance.map((row) => row.object_key),
+    progress: progress.map((row) => row.storage_key),
   };
 }

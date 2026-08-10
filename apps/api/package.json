@@ -25,6 +25,7 @@
     "@studafy/billing": "workspace:*",
     "@studafy/constants": "workspace:*",
     "@studafy/finance-reporting": "workspace:*",
+    "@studafy/grades-reporting": "workspace:*",
     "@studafy/notification-templates": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
     "bullmq": "5.79.3",

@@ -56,6 +56,7 @@ const SCOPED_TABLES = [
   "grades",
   "attendance_sessions",
   "attendance_records",
+  "teacher_term_comments",
 ] as const;
 
 interface Fixture {
@@ -83,6 +84,8 @@ interface Fixture {
   publishedExamResultId: string;
   withheldExamResultId: string;
   submissionAId: string;
+  commentAId: string;
+  commentBId: string;
 }
 
 interface Snapshot {
@@ -97,6 +100,7 @@ interface Snapshot {
   attendanceRecords: string[];
   subjects: string[];
   timetableSlots: string[];
+  teacherTermComments: string[];
 }
 
 let db: TestDatabase | undefined;
@@ -129,6 +133,7 @@ async function snapshotFor(userId: string): Promise<Snapshot> {
     attendanceRecords: await ids(tx, "SELECT student_id AS id FROM app.attendance_records"),
     subjects: await ids(tx, "SELECT id FROM app.subjects"),
     timetableSlots: await ids(tx, "SELECT id FROM app.timetable_slots"),
+    teacherTermComments: await ids(tx, "SELECT id FROM app.teacher_term_comments"),
   }));
 }
 
@@ -322,6 +327,30 @@ async function seed(): Promise<Fixture> {
 
   await sql.unsafe("ANALYZE");
 
+  // teacher_term_comments is SELECT-only for studafy_app (writes go through a future SECURITY
+  // DEFINER seam), so seed it as studafy_admin rather than inside the asAppUser block above.
+  const [commentAId, commentBId] = await sql.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    const [commentA] = await tx<{ id: string }[]>`
+      INSERT INTO app.teacher_term_comments
+        (school_id, student_id, class_id, academic_term_id, academic_year_id, author_user_id,
+         comment)
+      VALUES (${schoolId}, ${studentA.id}, ${classA.id}, ${term.id}, ${year.id},
+        ${teacherA.userId}, 'Excellent participation this term.')
+      RETURNING id
+    `;
+    const [commentB] = await tx<{ id: string }[]>`
+      INSERT INTO app.teacher_term_comments
+        (school_id, student_id, class_id, academic_term_id, academic_year_id, author_user_id,
+         comment)
+      VALUES (${schoolId}, ${studentB.id}, ${classB.id}, ${term.id}, ${year.id},
+        ${teacherB.userId}, 'Must turn in homework on time.')
+      RETURNING id
+    `;
+    return [commentA!.id, commentB!.id] as const;
+  });
+
   return {
     schoolId,
     adminUserId: admin.id,
@@ -341,6 +370,8 @@ async function seed(): Promise<Fixture> {
     subjectBId: subjectB.id,
     materialAId: materialA.id,
     materialBId: materialB.id,
+    commentAId,
+    commentBId,
     ...extra,
   };
 }
@@ -370,6 +401,7 @@ describe("ST-085 row-scope visibility", () => {
       [f.publishedExamResultId, f.withheldExamResultId].sort(),
     );
     expect(snap.subjects.sort()).toEqual([f.subjectAId, f.subjectBId].sort());
+    expect(snap.teacherTermComments.sort()).toEqual([f.commentAId, f.commentBId].sort());
   });
 
   integrationTest("teacher A sees only class A; teacher B only class B", async () => {
@@ -387,6 +419,7 @@ describe("ST-085 row-scope visibility", () => {
     // Teacher A holds the one timetable slot; both class-A attendance records are visible.
     expect(a.timetableSlots).toHaveLength(1);
     expect(a.attendanceRecords.sort()).toEqual([f.studentAId, f.studentA2Id].sort());
+    expect(a.teacherTermComments).toEqual([f.commentAId]);
 
     const b = await snapshotFor(f.teacherBUserId);
     expect(b.students).toEqual([f.studentBId]);
@@ -396,6 +429,7 @@ describe("ST-085 row-scope visibility", () => {
     expect(b.examResults).toEqual([]);
     expect(b.timetableSlots).toEqual([]);
     expect(b.attendanceRecords).toEqual([]);
+    expect(b.teacherTermComments).toEqual([f.commentBId]);
   });
 
   integrationTest("student A sees only self, released grades, and own enrollment", async () => {
@@ -414,6 +448,8 @@ describe("ST-085 row-scope visibility", () => {
     expect(snap.assignmentSubmissions).toEqual([f.submissionAId]);
     // Own attendance only.
     expect(snap.attendanceRecords).toEqual([f.studentAId]);
+    // Own teacher comment only.
+    expect(snap.teacherTermComments).toEqual([f.commentAId]);
   });
 
   integrationTest("draft grades stay hidden from the student who owns them", async () => {
@@ -425,6 +461,8 @@ describe("ST-085 row-scope visibility", () => {
     // A2's exam result is withheld, so also hidden from A2.
     expect(snap.examResults).toEqual([]);
     expect(snap.students).toEqual([f.studentA2Id]);
+    // No comment is seeded for A2, and the comment for classmate student A stays hidden.
+    expect(snap.teacherTermComments).toEqual([]);
   });
 
   integrationTest("parent sees only the linked child's released records", async () => {
@@ -436,6 +474,8 @@ describe("ST-085 row-scope visibility", () => {
     expect(snap.grades).toEqual([f.gradeId]);
     expect(snap.examResults).toEqual([f.publishedExamResultId]);
     expect(snap.attendanceRecords).toEqual([f.studentAId]);
+    // The parent sees their child's teacher comment through the linked-child branch.
+    expect(snap.teacherTermComments).toEqual([f.commentAId]);
   });
 
   integrationTest("a roleless / guest user sees no academic rows", async () => {
@@ -447,6 +487,7 @@ describe("ST-085 row-scope visibility", () => {
     expect(snap.gradeSubmissions).toEqual([]);
     expect(snap.examResults).toEqual([]);
     expect(snap.attendanceRecords).toEqual([]);
+    expect(snap.teacherTermComments).toEqual([]);
   });
 
   integrationTest(

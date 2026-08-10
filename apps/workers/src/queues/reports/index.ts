@@ -14,6 +14,14 @@ export {
 } from "./finance-export.worker";
 export { createFinanceReportStore } from "./finance-report-store";
 export type { FinanceReportJobRow } from "./finance-report-store";
+export {
+  progressContentDisposition,
+  progressContentType,
+  progressReportStorageKey,
+  renderProgressReport,
+  renderProgressReportPdf,
+} from "./progress-report.worker";
+export { createProgressReportStore } from "./progress-report-store";
 export { REPORT_TYPE_REGISTRY, lookupReportType, processReportJob } from "./report-registry";
 export { closeReportPorts, isFinalAttempt, openReportPorts, runReport } from "./report-runner";
 export { REPORT_EXPIRY_CRON_PATTERN, scheduleReportExpiryJob } from "./report-expiry-scheduler";

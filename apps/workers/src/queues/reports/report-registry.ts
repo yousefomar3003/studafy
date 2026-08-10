@@ -12,6 +12,7 @@
 import { attendanceExportJobDataSchema } from "@studafy/attendance-reporting";
 import { JOB_NAMES } from "@studafy/constants";
 import { financeExportJobDataSchema } from "@studafy/finance-reporting";
+import { progressReportJobDataSchema } from "@studafy/progress-reporting";
 
 import { workerLogger } from "../../log";
 
@@ -29,6 +30,13 @@ import {
   renderFinanceExport,
 } from "./finance-export.worker";
 import { createFinanceReportStore } from "./finance-report-store";
+import { createProgressReportStore } from "./progress-report-store";
+import {
+  progressContentDisposition,
+  progressContentType,
+  progressReportStorageKey,
+  renderProgressReport,
+} from "./progress-report.worker";
 import { purgeExpiredReports } from "./report-expiry-sweep";
 import {
   closeReportPorts,
@@ -42,6 +50,7 @@ import type { FinanceReportJobRow } from "./finance-report-store";
 import type { ReportRunResult, ReportRunnerConfig, ReportTypeDefinition } from "./report-types";
 import type { AttendanceExportJobData } from "@studafy/attendance-reporting";
 import type { FinanceExportJobData } from "@studafy/finance-reporting";
+import type { ProgressReportJobData } from "@studafy/progress-reporting";
 import type { Job } from "bullmq";
 
 const attendanceExportDefinition: ReportTypeDefinition<AttendanceExportJobData> = {
@@ -68,9 +77,20 @@ const financeExportDefinition: ReportTypeDefinition<FinanceExportJobData, Financ
     financeContentDisposition(data, record?.file_format ?? "pdf"),
 };
 
+const progressReportDefinition: ReportTypeDefinition<ProgressReportJobData> = {
+  jobName: JOB_NAMES.GENERATE_PROGRESS_REPORT,
+  schema: progressReportJobDataSchema,
+  store: createProgressReportStore(),
+  render: renderProgressReport,
+  storageKey: progressReportStorageKey,
+  contentType: progressContentType,
+  contentDisposition: progressContentDisposition,
+};
+
 export const REPORT_TYPE_REGISTRY: readonly ReportTypeDefinition[] = [
   attendanceExportDefinition,
   financeExportDefinition,
+  progressReportDefinition,
 ];
 
 export function lookupReportType(jobName: string): ReportTypeDefinition | undefined {
