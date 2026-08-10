@@ -4,7 +4,11 @@
  * Consumes one job per confirmed material. The confirm route flips the material to `scanning` and
  * enqueues this job; the worker streams the object from S3 into clamd and applies the verdict:
  *
- *   clean        — material -> `ready` (the "available" state) and the derivations job is enqueued
+ *   clean, AI visible — the material is flipped to `queued` (the ingestion handoff, ST-161) and an
+ *                  ai-ingestion job is enqueued; the ai-ingestion worker claims it, drives it
+ *                  parse -> (ocr) -> chunk -> embed -> `ready`, and enqueues the derivations job so
+ *                  the thumbnail/preview worker runs on the now-clean object.
+ *   clean, not AI  — material -> `ready` (the "available" state) and the derivations job is enqueued
  *                  so the thumbnail/preview worker runs on the now-clean object.
  *   infected     — the object is copied to `quarantine/<schoolId>/materials/`, the material is
  *                  flipped to `quarantined`, the uploader is notified, and the `permanent/` copy
@@ -68,15 +72,24 @@ export interface ScanMaterialConfig {
   bucket?: string;
   clamd: ClamdConfig;
   /**
-   * Enqueue the `derive-material-previews` job once a material is clean. Injected by the registry so
-   * this worker stays free of BullMQ/Redis imports. Required: the scan worker is the derivations
-   * queue's only producer, so an absent producer is a configuration error, not a mode.
+   * Enqueue the `derive-material-previews` job once a clean non-AI material flips to `ready`.
+   * Injected by the registry so this worker stays free of BullMQ/Redis imports. Required: without a
+   * producer a clean material would never get its thumbnails, so an absent producer is a
+   * configuration error, not a mode. AI-visible materials are derived by the ai-ingestion worker
+   * after ingestion flips them `ready`.
    */
   enqueueDerivation: (data: { schoolId: string; materialId: string }) => Promise<void>;
+  /**
+   * Enqueue the ai-ingestion job for an AI-visible material whose clean scan committed. Injected by
+   * the workers registry; omitted in tests that only assert the clean flip. Called AFTER the flip
+   * to `queued` commits — the flip is the claim, and a job enqueued for a material still in
+   * `scanning` would be a permanent no-op when the ai-ingestion worker (correctly) skips it.
+   */
+  enqueueIngestion?: (schoolId: string, materialId: string) => Promise<void>;
 }
 
 export type ScanMaterialResult =
-  | { processed: true; outcome: "clean" | "quarantined" | "skipped" }
+  | { processed: true; outcome: "clean" | "queued" | "quarantined" | "skipped" }
   | { processed: false; reason: string };
 
 interface MaterialScanRow {
@@ -86,6 +99,7 @@ interface MaterialScanRow {
   original_file_name: string;
   uploaded_by_user_id: string;
   ingest_status: string;
+  ai_visible: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,19 +230,33 @@ export async function processMaterialScan(
     const material = await withSystemTenantTx(sql, { schoolId }, async (tx) => {
       const [row] = await tx<MaterialScanRow[]>`
         SELECT id, school_id, storage_key, original_file_name, uploaded_by_user_id,
-               ingest_status::text AS ingest_status
+               ingest_status::text AS ingest_status, ai_visible
         FROM app.materials
         WHERE id = ${materialId}::uuid AND school_id = ${schoolId}::uuid
       `;
       return row;
     });
 
+    if (!material) {
+      return { processed: true, outcome: "skipped" };
+    }
+
+    // A prior run committed the clean verdict (flipping an AI-visible material to `queued`) but died
+    // before enqueueing the ingestion job. The flip already happened, so there is nothing left to
+    // scan — re-enqueue instead. The ai-ingestion worker's claim makes a duplicate enqueue a no-op.
+    if (material.ingest_status === "queued") {
+      if (config.enqueueIngestion) {
+        await config.enqueueIngestion(schoolId, materialId);
+      }
+      return { processed: true, outcome: "queued" };
+    }
+
     // Not found, or already past 'scanning' by an earlier (successful) run. Nothing to do — the
     // claim was lost, and that is the dedup working, not a fault. A material already `ready` means
     // a prior attempt committed the clean flip but died before (or while) enqueueing the derivation
     // job, so re-enqueue best-effort here and let the derivation worker's status guard dedup it.
-    if (!material || material.ingest_status !== "scanning") {
-      if (material && material.ingest_status === "ready") {
+    if (material.ingest_status !== "scanning") {
+      if (material.ingest_status === "ready") {
         await config.enqueueDerivation({ schoolId, materialId }).catch(() => undefined);
       }
       return { processed: true, outcome: "skipped" };
@@ -266,6 +294,28 @@ export async function processMaterialScan(
       if (recoveredFromQuarantine) {
         throw new Error("material object is missing but its quarantine copy scans clean");
       }
+
+      if (material.ai_visible) {
+        // Hand the material to the ai-ingestion queue. The flip to `queued` is the claim: it is
+        // guarded by the `scanning` status, so a retried or duplicated scan job can only ever flip
+        // once — whichever run wins, the others see `queued` and drop into the re-enqueue branch
+        // above, where the ingestion worker's claim absorbs the duplicate.
+        await withSystemTenantTx(sql, { schoolId }, async (tx) => {
+          await tx`
+            UPDATE app.materials
+            SET ingest_status = 'queued'::app.material_ingest_status,
+                ingest_error = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ${materialId}::uuid AND school_id = ${schoolId}::uuid
+              AND ingest_status = 'scanning'::app.material_ingest_status
+          `;
+        });
+        if (config.enqueueIngestion) {
+          await config.enqueueIngestion(schoolId, materialId);
+        }
+        return { processed: true, outcome: "queued" };
+      }
+
       await withSystemTenantTx(sql, { schoolId }, async (tx) => {
         await tx`
           UPDATE app.materials

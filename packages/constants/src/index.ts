@@ -10,7 +10,7 @@ export {
 export type { NotificationType } from "./notifications";
 export { PERMISSIONS, ROLE_PERMISSIONS } from "./permissions";
 export type { Permission } from "./permissions";
-export { DEAD_LETTER_QUEUE_NAMES, JOB_NAMES, QUEUE_NAMES } from "./queues";
+export { DEAD_LETTER_QUEUE_NAMES, INGESTION_JOB_OPTIONS, JOB_NAMES, QUEUE_NAMES } from "./queues";
 export type { DeadLetterQueueName, JobName, QueueName } from "./queues";
 export { ROLES } from "./roles";
 export type { Role } from "./roles";

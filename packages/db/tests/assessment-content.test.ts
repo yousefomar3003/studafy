@@ -274,6 +274,7 @@ integrationTest(
           "failed",
           "scanning",
           "quarantined",
+          "queued",
         ],
       });
 

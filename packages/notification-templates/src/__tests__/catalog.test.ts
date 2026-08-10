@@ -138,6 +138,12 @@ describe("renderNotification — snapshot tests", () => {
       fileName: "scanned-guide.pdf",
       pages: "2, 4",
     },
+    [NOTIFICATION_TYPES.MATERIAL_INGESTED]: {
+      fileName: "lecture-notes.pdf",
+    },
+    [NOTIFICATION_TYPES.MATERIAL_INGEST_FAILED]: {
+      fileName: "lab-manual.pdf",
+    },
   } as const;
 
   const locales = ["en", "ar"] as const;

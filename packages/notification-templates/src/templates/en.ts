@@ -78,4 +78,16 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       'Your file "{fileName}" was transcribed automatically, but these pages were hard to read: {pages}. Please check them.',
   },
+  [NOTIFICATION_TYPES.MATERIAL_INGESTED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{fileName} is ready for AI search",
+    [NOTIFICATION_CHANNELS.PUSH]: "Ready for search: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      'Your file "{fileName}" has finished processing and is now searchable.',
+  },
+  [NOTIFICATION_TYPES.MATERIAL_INGEST_FAILED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{fileName} could not be made searchable",
+    [NOTIFICATION_CHANNELS.PUSH]: "Processing failed: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      'Your file "{fileName}" could not be processed and is not searchable. You can try again from the material page.',
+  },
 } as const satisfies LocaleTemplateSet;

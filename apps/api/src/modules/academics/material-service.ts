@@ -300,10 +300,15 @@ export async function deleteMaterial(
 /**
  * Toggle ai_visible on a material.
  *
- * Disabling purges all material_chunks (ON DELETE CASCADE handles this at the schema level)
- * and resets ingest_status to 'uploaded' so a future enable triggers re-ingestion.
+ * Disabling purges all material_chunks (ON DELETE CASCADE handles this at the schema level) and
+ * resets ingest_status to 'uploaded' so a future enable triggers re-ingestion.
  *
- * Enabling resets ingest_status to 'uploaded' so the ingestion queue picks it up.
+ * Enabling stages a `ready` material for re-ingestion: it is flipped to 'queued' (the ST-161
+ * re-ingest / re-enable staging state) and the route enqueues an ai-ingestion job, which drives it
+ * through parse -> chunk -> embed to 'ready' again. For any other state the status is left alone —
+ * an in-flight pipeline ('uploaded' -> confirm, 'scanning' -> scan, 'processing' -> claim) still
+ * owns it, and a 'failed'/'quarantined' material must be re-uploaded rather than silently
+ * re-ingested (a failed scan must never be bypassed into ingestion).
  */
 export async function toggleAiVisible(
   tx: TransactionSql,
@@ -321,10 +326,24 @@ export async function toggleAiVisible(
   }
 
   if (aiVisible) {
+    // 'ready' -> 'queued' + clear the ingest stamp (the CHECK requires 'queued' with a null stamp);
+    // every other state keeps its status, so nothing mid-flight is derailed.
     const [row] = await tx<MaterialRow[]>`
       UPDATE app.materials
       SET ai_visible = true,
-          ingest_status = 'uploaded'::app.material_ingest_status,
+          ingest_status = CASE
+            WHEN ingest_status = 'ready'::app.material_ingest_status
+              THEN 'queued'::app.material_ingest_status
+            ELSE ingest_status
+          END,
+          ingest_error = CASE
+            WHEN ingest_status = 'ready'::app.material_ingest_status THEN NULL
+            ELSE ingest_error
+          END,
+          ingested_at = CASE
+            WHEN ingest_status = 'ready'::app.material_ingest_status THEN NULL
+            ELSE ingested_at
+          END,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ${materialId} AND school_id = ${schoolId}
       RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
@@ -339,7 +358,7 @@ export async function toggleAiVisible(
       targetTable: "materials",
       targetId: materialId,
       oldValues: { ai_visible: false },
-      newValues: { ai_visible: true, ingest_status: "uploaded" },
+      newValues: { ai_visible: true, ingest_status: row.ingest_status },
     });
 
     return row;

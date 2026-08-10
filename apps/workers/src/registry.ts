@@ -4,6 +4,8 @@ import { Queue } from "bullmq";
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
 import { workerLogger } from "./log";
+import { enqueueAiIngestion } from "./queues/ai-ingestion/enqueue";
+import { createTenantSemaphore } from "./queues/ai-ingestion/semaphore";
 import { processIngestJob } from "./queues/ai-ingestion/worker";
 import { billingDeadLetterListener, processBillingJob } from "./queues/billing";
 import { createDerivationS3, processMaterialDerivation } from "./queues/derivations";
@@ -22,6 +24,7 @@ import { processReportJob } from "./queues/reports";
 import { createScanS3, materialScanFailedListener, processMaterialScan } from "./queues/scan";
 
 import type { AiIngestionJobData } from "./queues/ai-ingestion/job";
+import type { TenantSemaphore } from "./queues/ai-ingestion/semaphore";
 import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
 import type { FailedHandler } from "./queues/notifications/dead-letter";
 import type {
@@ -107,6 +110,37 @@ function enqueueDerivation(data: { schoolId: string; materialId: string }): Prom
 }
 
 /**
+ * The ai-ingestion producer handle, used by the scan worker to hand a clean AI-visible material to
+ * the ingestion queue. Created lazily rather than at module scope for the same reason
+ * `deliveryQueue` is: registry.test.ts imports this module, and constructing a BullMQ `Queue`
+ * opens a Redis connection.
+ */
+let aiIngestionQueueInstance: Queue | null = null;
+
+function enqueueIngestion(schoolId: string, materialId: string): Promise<void> {
+  aiIngestionQueueInstance ??= new Queue(QUEUE_NAMES.AI_INGESTION, {
+    connection: createRedisConnection(workerEnv) as never,
+  });
+  return enqueueAiIngestion(aiIngestionQueueInstance, schoolId, materialId);
+}
+
+/**
+ * The per-tenant ingestion gate (ST-161): at most `INGESTION_MAX_CONCURRENCY_PER_SCHOOL` ingestion
+ * jobs in flight per school across the whole fleet. Built once on first use rather than at module
+ * scope — registry.test.ts imports this module, and constructing the semaphore would open a Redis
+ * connection (lazyConnect or not, the client object itself is per-connection).
+ */
+let ingestionSemaphoreInstance: TenantSemaphore | null = null;
+
+function ingestionSemaphore(): TenantSemaphore {
+  ingestionSemaphoreInstance ??= createTenantSemaphore({
+    redis: createRedisConnection(workerEnv),
+    maxConcurrencyPerSchool: workerEnv.INGESTION_MAX_CONCURRENCY_PER_SCHOOL,
+  });
+  return ingestionSemaphoreInstance;
+}
+
+/**
  * The push sender, built once on first use rather than at module scope.
  *
  * Lazy for the same reason `deliveryQueue` is: registry.test.ts imports this module, and in the
@@ -147,6 +181,8 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         ocrLowConfidenceThreshold: workerEnv.OCR_LOW_CONFIDENCE_THRESHOLD,
         ocrWorkerPath: workerEnv.OCR_WORKER_PATH,
         ocrLangPath: workerEnv.OCR_LANG_PATH,
+        semaphore: ingestionSemaphore(),
+        enqueueDerivation,
       });
     },
   },
@@ -268,6 +304,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           maxFileBytes: workerEnv.CLAMAV_MAX_FILE_BYTES,
         },
         enqueueDerivation,
+        enqueueIngestion,
       }),
     // Terminal failures fail closed: the material is marked failed (never available) and the
     // uploader is alerted. See scan-material.worker.ts.

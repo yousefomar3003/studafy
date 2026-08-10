@@ -1019,7 +1019,7 @@ export const examIdParamSchema = z
 // ---------------------------------------------------------------------------
 
 export const materialIngestStatusSchema = z
-  .enum(["uploaded", "processing", "scanning", "ready", "failed", "quarantined"])
+  .enum(["uploaded", "queued", "processing", "scanning", "ready", "failed", "quarantined"])
   .openapi({ description: "Ingestion lifecycle state of a material." });
 
 export type MaterialIngestStatus = z.infer<typeof materialIngestStatusSchema>;

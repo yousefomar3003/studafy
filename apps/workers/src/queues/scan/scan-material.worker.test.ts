@@ -2,12 +2,12 @@
  * Material malware scan (file-scan queue) tests.
  *
  * `quarantineKeyOf` is pure and always runs. Everything that proves the actual guarantee — clean
- * becomes `ready`, an infected object is copied to `quarantine/`, the served copy is deleted, the
- * uploader is notified exactly once, and a scan error fails closed — needs a real database, real
- * migrations and a TCP clamd, so those follow the packages/db tests convention: skip unless
- * TEST_DATABASE_URL is set, assert against real rows. The S3 side is an in-memory fake behind the
- * worker's `ScanS3Client` interface; the acceptance criteria (infected bytes never served) is
- * asserted on that fake's object map.
+ * becomes `ready` (or `queued` + an ingestion enqueue for an AI-visible material), an infected
+ * object is copied to `quarantine/`, the served copy is deleted, the uploader is notified exactly
+ * once, and a scan error fails closed — needs a real database, real migrations and a TCP clamd, so
+ * those follow the packages/db tests convention: skip unless TEST_DATABASE_URL is set, assert
+ * against real rows. The S3 side is an in-memory fake behind the worker's `ScanS3Client` interface;
+ * the acceptance criteria (infected bytes never served) is asserted on that fake's object map.
  */
 
 import { randomUUID } from "node:crypto";
@@ -112,11 +112,16 @@ interface MaterialFixture {
 
 let fixtureSeq = 0;
 
+interface SeedFixtureOptions {
+  /** Defaults to false — the materials column default — matching the majority of uploads. */
+  aiVisible?: boolean;
+}
+
 /**
  * A school with one class and one material already in `scanning`. Seeded as studafy_admin the way
  * apps/api/tests/harness/factories.ts does — role_scope_visibility gates INSERT ... RETURNING.
  */
-async function seedFixture(): Promise<MaterialFixture> {
+async function seedFixture(options: SeedFixtureOptions = {}): Promise<MaterialFixture> {
   fixtureSeq += 1;
   const tag = `scan${fixtureSeq}-${Date.now().toString(36)}`;
 
@@ -192,10 +197,10 @@ async function seedFixture(): Promise<MaterialFixture> {
     const [material] = await tx<{ id: string }[]>`
       INSERT INTO app.materials
         (school_id, class_id, uploaded_by_user_id, last_edited_by_user_id, title,
-         storage_key, original_file_name, mime_type, size_bytes, ingest_status)
+         storage_key, original_file_name, mime_type, size_bytes, ingest_status, ai_visible)
       VALUES (${schoolId}::uuid, ${classId}::uuid, ${uploaderUserId}::uuid, ${uploaderUserId}::uuid,
               ${`Material ${tag}`}, ${storageKey}, 'scan-test.txt', 'text/plain', 1024,
-              'scanning'::app.material_ingest_status)
+              'scanning'::app.material_ingest_status, ${options.aiVisible ?? false})
       RETURNING id
     `;
 
@@ -300,6 +305,42 @@ describeDb("processMaterialScan", () => {
     }
   });
 
+  test("a clean verdict on an AI-visible material flips it to queued and enqueues ingestion", async () => {
+    const f = await seedFixture({ aiVisible: true });
+    const s3 = createFakeS3();
+    s3.objects.set(f.storageKey, Buffer.from("harmless notes for the class"));
+
+    const enqueued: { schoolId: string; materialId: string }[] = [];
+    const enqueueIngestion = async (schoolId: string, materialId: string) => {
+      enqueued.push({ schoolId, materialId });
+    };
+
+    const clamd = await startFakeClamd(() => "stream: OK");
+    try {
+      const result = await processMaterialScan(jobFor(f), {
+        databaseUrl: databaseUrl!,
+        s3: s3.client,
+        bucket: "test-bucket",
+        clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+        enqueueDerivation: async () => undefined,
+        enqueueIngestion,
+      });
+
+      expect(result).toEqual({ processed: true, outcome: "queued" });
+      const row = await materialRow(f);
+      // The ingestion handoff: mid-flight 'queued', not terminal 'ready' — the ai-ingestion worker
+      // owns the rest of the lifecycle.
+      expect(row!.ingest_status).toBe("queued");
+      expect(row!.ingest_error).toBeNull();
+      expect(row!.ingested_at).toBeNull();
+      expect(s3.objects.has(f.storageKey)).toBe(true);
+      expect(enqueued).toEqual([{ schoolId: f.schoolId, materialId: f.materialId }]);
+      expect(await scanNotifications(f)).toHaveLength(0);
+    } finally {
+      await clamd.close();
+    }
+  });
+
   test("an enqueue failure after the ready flip propagates so the job retries", async () => {
     const f = await seedFixture();
     const s3 = createFakeS3();
@@ -323,6 +364,69 @@ describeDb("processMaterialScan", () => {
       // re-enqueue best-effort — that is the self-heal contract for a lost enqueue.
       const row = await materialRow(f);
       expect(row!.ingest_status).toBe("ready");
+    } finally {
+      await clamd.close();
+    }
+  });
+
+  test("re-enqueues ingestion when a prior run committed the queued flip but died before enqueueing", async () => {
+    // Crash window: the clean verdict flipped the AI-visible material to 'queued', then the process
+    // died before the enqueue. The retry must NOT re-scan (nothing left to scan) — it re-enqueues.
+    const f = await seedFixture({ aiVisible: true });
+    await sql`
+      UPDATE app.materials SET ingest_status = 'queued'::app.material_ingest_status
+      WHERE id = ${f.materialId}::uuid
+    `;
+
+    const enqueued: { schoolId: string; materialId: string }[] = [];
+    const enqueueIngestion = async (schoolId: string, materialId: string) => {
+      enqueued.push({ schoolId, materialId });
+    };
+
+    const s3 = createFakeS3();
+    const clamd = await startFakeClamd(() => "stream: OK");
+    try {
+      const result = await processMaterialScan(jobFor(f), {
+        databaseUrl: databaseUrl!,
+        s3: s3.client,
+        bucket: "test-bucket",
+        clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+        enqueueDerivation: async () => undefined,
+        enqueueIngestion,
+      });
+
+      expect(result).toEqual({ processed: true, outcome: "queued" });
+      expect(enqueued).toEqual([{ schoolId: f.schoolId, materialId: f.materialId }]);
+      // Still queued — the scan must not have re-flipped it.
+      const row = await materialRow(f);
+      expect(row!.ingest_status).toBe("queued");
+    } finally {
+      await clamd.close();
+    }
+  });
+
+  test("a failed enqueue after the queued flip throws so BullMQ retries the handoff", async () => {
+    const f = await seedFixture({ aiVisible: true });
+    const s3 = createFakeS3();
+    s3.objects.set(f.storageKey, Buffer.from("harmless notes for the class"));
+
+    const clamd = await startFakeClamd(() => "stream: OK");
+    try {
+      await expect(
+        processMaterialScan(jobFor(f), {
+          databaseUrl: databaseUrl!,
+          s3: s3.client,
+          bucket: "test-bucket",
+          clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+          enqueueDerivation: async () => undefined,
+          enqueueIngestion: async () => {
+            throw new Error("redis down");
+          },
+        }),
+      ).rejects.toThrow(/redis down/);
+      // The flip committed before the enqueue threw; the retry's queued branch re-enqueues.
+      const row = await materialRow(f);
+      expect(row!.ingest_status).toBe("queued");
     } finally {
       await clamd.close();
     }

@@ -74,4 +74,15 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       'تم تحويل ملف "{fileName}" تلقائيًا، لكن الصفحات التالية كانت صعبة القراءة: {pages}. يرجى مراجعتها.',
   },
+  [NOTIFICATION_TYPES.MATERIAL_INGESTED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{fileName} جاهز للبحث الذكي",
+    [NOTIFICATION_CHANNELS.PUSH]: "جاهز للبحث: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]: 'انتهت معالجة ملف "{fileName}" وأصبح قابلاً للبحث الآن.',
+  },
+  [NOTIFICATION_TYPES.MATERIAL_INGEST_FAILED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تعذر جعل {fileName} قابلاً للبحث",
+    [NOTIFICATION_CHANNELS.PUSH]: "فشلت المعالجة: {fileName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      'تعذرت معالجة ملف "{fileName}" وهو غير قابل للبحث. يمكنك المحاولة مرة أخرى من صفحة الملف.',
+  },
 } as const satisfies LocaleTemplateSet;

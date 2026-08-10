@@ -141,4 +141,27 @@ export const NOTIFICATION_CATALOG = {
       route: "",
     },
   },
+  // Ingestion outcomes (000096). Raised by the ai-ingestion worker directly into
+  // app.notifications — no dispatch event today, so the entries exist to keep NotificationCatalog
+  // total and the routes are empty; nothing deep-links to a material detail page yet.
+  [NOTIFICATION_TYPES.MATERIAL_INGESTED]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "",
+    },
+  },
+  [NOTIFICATION_TYPES.MATERIAL_INGEST_FAILED]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "",
+    },
+  },
 } as const satisfies NotificationCatalog;
