@@ -255,6 +255,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // cancellation-routes.ts.
   "POST /api/subscriptions/current/cancel",
   "POST /api/subscriptions/current/cancel/reverse",
+  // Hybrid retrieval (ST-162). Gated by the ST-155 AI entitlement gate (403/402/429), not the
+  // permission matrix; exempt below because the gate is the authorization surface for every
+  // /api/ai/* route and the search's one write is the metered student's own usage ledger.
+  "POST /api/ai/students/{studentId}/search",
 ];
 
 /**
@@ -378,6 +382,11 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // caller still cannot reach a class's upload without holding that class's permission.
   "POST /api/storage/uploads/request-upload",
   "POST /api/storage/uploads/confirm",
+  // Hybrid retrieval (ST-162) — the ST-155 AI entitlement gate (school active -> AI add-on active ->
+  // quota available; 403/402/429), not the permission matrix, is the authorization surface for every
+  // /api/ai/* route. The search reads only the school's own corpus under forced RLS, and its one
+  // write is the metered student's own ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/search",
 ]);
 
 // ---------------------------------------------------------------------------

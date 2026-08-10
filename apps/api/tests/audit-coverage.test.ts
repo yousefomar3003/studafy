@@ -297,6 +297,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // cancellation-service.ts, alongside the cancel_at_period_end / retention_state change.
   "POST /api/subscriptions/current/cancel",
   "POST /api/subscriptions/current/cancel/reverse",
+  // Hybrid retrieval (ST-162). POST carries the search query; the route's one write is the durable
+  // per-student usage meter. auditAction("update", "ai_usage_meters") declares that intent, and like
+  // the storage-upload precedent the declaration is metadata — no app.audit_logs row is written.
+  "POST /api/ai/students/{studentId}/search",
 ];
 
 function collectSourceFiles(dir: string): string[] {

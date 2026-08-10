@@ -33,7 +33,13 @@ import {
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
-import { aiEntitlementGate, aiUsageRoutes, createAiTokenMeter } from "./modules/ai";
+import {
+  aiEntitlementGate,
+  aiRetrievalRoutes,
+  aiUsageRoutes,
+  createAiTokenMeter,
+  createDeterministicQueryEmbedder,
+} from "./modules/ai";
 import {
   attendanceCorrectionRoutes,
   attendanceReportRoutes,
@@ -745,6 +751,10 @@ export function createApp({
     const aiMeter = createAiTokenMeter({ redis });
     app.use("/api/ai/*", aiEntitlementGate({ entitlements, meter: aiMeter }));
     app.route("/", aiUsageRoutes({ entitlements, meter: aiMeter }));
+    // Hybrid retrieval (ST-162). Mounted under the same gate so a search reserves and commits the
+    // caller's AI quota, and only when the gate's dependencies (a database for entitlements, Redis
+    // for the meter) exist — the retrieval surface must never run un-metered.
+    app.route("/", aiRetrievalRoutes({ database, embedder: createDeterministicQueryEmbedder() }));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:
