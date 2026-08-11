@@ -26,6 +26,7 @@
         "@hono/zod-openapi": "1.5.1",
         "@scalar/hono-api-reference": "0.11.11",
         "@studafy/attendance-reporting": "workspace:*",
+        "@studafy/audit-reporting": "workspace:*",
         "@studafy/billing": "workspace:*",
         "@studafy/constants": "workspace:*",
         "@studafy/finance-reporting": "workspace:*",
@@ -106,6 +107,7 @@
         "@napi-rs/canvas": "1.0.3",
         "@pdf-lib/fontkit": "1.1.1",
         "@studafy/attendance-reporting": "workspace:*",
+        "@studafy/audit-reporting": "workspace:*",
         "@studafy/billing": "workspace:*",
         "@studafy/constants": "workspace:*",
         "@studafy/finance-reporting": "workspace:*",
@@ -154,6 +156,20 @@
     },
     "packages/attendance-reporting": {
       "name": "@studafy/attendance-reporting",
+      "version": "0.0.0",
+      "dependencies": {
+        "postgres": "3.4.9",
+        "zod": "4.1.12",
+      },
+      "devDependencies": {
+        "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
+        "@types/bun": "1.3.14",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/audit-reporting": {
+      "name": "@studafy/audit-reporting",
       "version": "0.0.0",
       "dependencies": {
         "postgres": "3.4.9",
@@ -756,6 +772,8 @@
     "@studafy/api-client": ["@studafy/api-client@workspace:packages/api-client"],
 
     "@studafy/attendance-reporting": ["@studafy/attendance-reporting@workspace:packages/attendance-reporting"],
+
+    "@studafy/audit-reporting": ["@studafy/audit-reporting@workspace:packages/audit-reporting"],
 
     "@studafy/billing": ["@studafy/billing@workspace:packages/billing"],
 

@@ -97,6 +97,10 @@ approved_flexible_columns(table_name, column_name) AS (
     -- reproduce the exact request. The stable relational fields (tenant, requester, type, format,
     -- status and object metadata) remain normalized and constrained.
     ('finance_report_jobs', 'parameters'),
+    -- ST-046x mirrors ST-126: the audit export worker needs the validated filter snapshot a queued
+    -- job must reproduce. The stable relational fields (tenant, requester, format, status and object
+    -- metadata) remain normalized and constrained.
+    ('audit_export_jobs', 'parameters'),
     -- R-08: the raw, externally-defined SES SNS event payload is audited verbatim in email_events.
     ('email_events', 'payload'),
     ('student_imports', 'rows_data'),

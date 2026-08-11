@@ -57,6 +57,10 @@ export const JOB_NAMES = {
   EVALUATE_ATTENDANCE_ALERTS: "evaluate-attendance-alerts",
   GENERATE_ATTENDANCE_EXPORT: "generate-attendance-export",
   GENERATE_FINANCE_REPORT: "generate-finance-report",
+  // Async CSV export of a school's audit log (ST-046x). Carries the durable job identity
+  // (auditExportJobDataSchema); the resolved filter rides in app.audit_export_jobs.parameters,
+  // which the store reads at claim time.
+  GENERATE_AUDIT_EXPORT: "generate-audit-export",
   // Per-student term progress report (ST-176). One job per (student, term); the payload carries the
   // student/term ids and the report renders published grades, attendance and teacher comments.
   GENERATE_PROGRESS_REPORT: "generate-progress-report",

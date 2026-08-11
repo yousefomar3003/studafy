@@ -123,6 +123,8 @@
   "ATTENDANCE_REPORT_RESOURCE_NOT_FOUND": "The requested attendance report resource was not found",
   "ATTENDANCE_EXPORT_NOT_FOUND": "Attendance export not found",
   "ATTENDANCE_EXPORT_UNAVAILABLE": "Attendance export is temporarily unavailable. Please try again later.",
+  "AUDIT_LOG_EXPORT_NOT_FOUND": "Audit log export not found",
+  "AUDIT_LOG_EXPORT_UNAVAILABLE": "Audit log export is temporarily unavailable. Please try again later.",
   "INVALID_GRADEBOOK_WEIGHT_TOTAL": "Assessment category weights must sum to exactly 100%",
   "GRADEBOOK_NOT_FOUND": "Gradebook not found",
   "GRADING_SCHEME_NOT_FOUND": "Grading scheme not found",

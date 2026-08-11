@@ -148,6 +148,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Tenant-scoped attendance summary, trend, and asynchronous export endpoints for school administrators.",
     },
     {
+      name: "Audit Logs",
+      description:
+        "Audit log exploration and export. Authenticated and permission-gated: administrators page " +
+        "through the tenant's immutable audit trail and queue asynchronous CSV exports, whose " +
+        "download URLs expire after a short window.",
+    },
+    {
       name: "Assignments",
       description:
         "Class-scoped coursework. Authenticated and tenant-scoped, then scoped again within the " +

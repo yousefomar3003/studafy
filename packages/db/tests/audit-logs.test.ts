@@ -32,6 +32,7 @@ const AUDIT_ACTIONS = [
   "logout",
   "export",
   "permission_change",
+  "read",
 ] as const;
 
 // pk_audit_logs, uq_audit_logs_id_school_created, and the three deliberate composites. Declared once on

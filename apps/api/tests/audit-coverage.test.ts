@@ -242,6 +242,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/expenses/upload-url",
   "POST /api/finance/expenses/{expenseId}/attachments",
   "POST /api/finance/reports/export",
+  // Audit explorer (ST-046x). Queues the async CSV export; auditAction("insert",
+  // "audit_export_jobs") declares the intent, and like the finance/attendance export routes the
+  // enqueue itself emits no app.audit_logs row.
+  "POST /api/audit/logs/export",
   // Fee schedule generation (ST-122). Per-student installments derived from a fee structure.
   // Audit row written by auditAction middleware in installments/routes.ts.
   "POST /api/finance/fee-schedules/generate",
