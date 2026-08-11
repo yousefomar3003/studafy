@@ -9,6 +9,12 @@ import { standardResponses } from "../../../openapi/responses";
 import { getAiQuota } from "../gate/entitlement-gate";
 import { estimateQueryTokens } from "../retrieval/embeddings";
 import {
+  RERANK_CANDIDATE_POOL,
+  RERANK_K,
+  rerankHits,
+  type CrossEncoderReranker,
+} from "../retrieval/rerank";
+import {
   clampLimit,
   hybridSearch,
   HYBRID_MAX_LIMIT,
@@ -30,6 +36,11 @@ import type { TransactionSql } from "postgres";
  * another school's chunk. Each hit carries the citation anchors a chat answer renders from — the
  * material title, page number, and section heading — so this endpoint is the retrieval half of a
  * RAG answer, and nothing else.
+ *
+ * When a re-ranker is wired in (ST-163, gated on the `AI_RERANK_ENABLED` kill switch), the route asks
+ * the fusion for a full `RERANK_CANDIDATE_POOL` candidates and cuts the re-scored pool to `RERANK_K`.
+ * Both the retrieval surfaces — Ask AI and exam mode — resolve to this endpoint, so one switch flips
+ * the re-ranking stage for both.
  *
  * The route rides the ST-155 AI gate: the gate has already reserved a quota hold when the handler
  * runs, and the handler commits the query's embedding cost (the four-chars-per-token rule) and
@@ -56,6 +67,8 @@ const retrievalHitSchema = z.object({
   semantic_rank: z.number().int().nullable(),
   /** The chunk's rank in the keyword leg, or null when only the semantic leg found it. */
   keyword_rank: z.number().int().nullable(),
+  /** The cross-encoder's joint score, or null when the re-ranker is not wired in. */
+  rerank_score: z.number().nullable(),
 });
 
 const retrievalResponseSchema = z.object({
@@ -68,6 +81,10 @@ const retrievalResponseSchema = z.object({
     retried: z.boolean(),
     /** Tokens committed against this student's AI quota for this search. */
     tokens_used: z.number().int(),
+    /** True when the cross-encoder re-ranked the fused candidates before the top-k cut. */
+    reranked: z.boolean(),
+    /** The re-ranker's model id, or null when the stage was not wired in. */
+    rerank_model: z.string().nullable(),
   }),
 });
 
@@ -82,7 +99,11 @@ const retrievalSearchBodySchema = z.object({
     .min(1)
     .max(HYBRID_MAX_LIMIT)
     .optional()
-    .openapi({ description: "How many fused results to return. Defaults to 10, max 20." }),
+    .openapi({
+      description:
+        "How many fused results to return. Defaults to 10, max 20. When re-ranking is enabled the " +
+        `re-ranker cuts this to at most ${RERANK_K} (the cross-encoder output); a smaller limit still caps it.`,
+    }),
 });
 
 const retrievalSearchParamsSchema = z.object({
@@ -103,9 +124,10 @@ const retrievalSearchRoute = createRoute({
   summary: "Search the school's AI corpus",
   description:
     "Hybrid retrieval over the school's ingested materials: a pgvector ANN semantic leg fused " +
-    "with a full-text keyword leg via Reciprocal Rank Fusion, tenant-isolated by RLS. Returns the " +
-    "top-ranked chunks with the citation anchors (material, page, section) a chat answer renders " +
-    "from. Consumes this student's AI quota.",
+    "with a full-text keyword leg via Reciprocal Rank Fusion, tenant-isolated by RLS. When the " +
+    "cross-encoder re-ranker (ST-163) is enabled, the fused top-20 is re-scored and cut to the top 6. " +
+    "Returns the top-ranked chunks with the citation anchors (material, page, section) a chat answer " +
+    "renders from. Consumes this student's AI quota.",
   security: [{ bearerAuth: [] }],
   request: {
     params: retrievalSearchParamsSchema,
@@ -162,8 +184,13 @@ async function recordDurableUsage(
 export function aiRetrievalRoutes(deps: {
   database: Database;
   embedder: QueryEmbedder;
+  /**
+   * The cross-encoder re-ranker (ST-163). Null (or absent) when the `AI_RERANK_ENABLED` kill switch
+   * is off: the route then returns the fused ranking untouched. `app.ts` owns this decision.
+   */
+  reranker?: CrossEncoderReranker | null;
 }): OpenAPIHono<AppEnv> {
-  const { database, embedder } = deps;
+  const { database, embedder, reranker = null } = deps;
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to declare
@@ -185,11 +212,40 @@ export function aiRetrievalRoutes(deps: {
       const search = await hybridSearch(tx, {
         query: body.query,
         queryVector,
-        limit: clampLimit(body.limit),
+        // The re-ranker needs the full fused top-N to choose from; without it, respect the caller's
+        // limit as before.
+        limit: reranker ? RERANK_CANDIDATE_POOL : clampLimit(body.limit),
       });
       await recordDurableUsage(tx, auth.schoolId, studentId, tokensUsed);
       return search;
     });
+
+    const requestedLimit = clampLimit(body.limit);
+    const meta: {
+      semantic_leg_count: number;
+      retried: boolean;
+      tokens_used: number;
+      reranked: boolean;
+      rerank_model: string | null;
+    } = {
+      semantic_leg_count: result.semanticLegCount,
+      retried: result.retried,
+      tokens_used: tokensUsed,
+      reranked: false,
+      rerank_model: null,
+    };
+
+    let hits = result.hits;
+    let rerankScores: ReadonlyMap<string, number> = new Map();
+    if (reranker && result.hits.length > 0) {
+      const reranked = await rerankHits(body.query, result.hits, reranker);
+      hits = reranked.hits;
+      rerankScores = reranked.scores;
+      meta.reranked = true;
+      meta.rerank_model = reranked.model;
+    }
+    // Rerank cut to RERANK_K; a caller-supplied limit may still tighten the result further.
+    hits = hits.slice(0, requestedLimit);
 
     // The gate released the hold if the handler never settled; committing the real cost settles it.
     await quota.commit(tokensUsed);
@@ -197,7 +253,7 @@ export function aiRetrievalRoutes(deps: {
     return c.json(
       {
         query: body.query,
-        results: result.hits.map((hit) => ({
+        results: hits.map((hit) => ({
           chunk_id: hit.chunkId,
           material_id: hit.materialId,
           material_title: hit.materialTitle,
@@ -207,12 +263,9 @@ export function aiRetrievalRoutes(deps: {
           rrf_score: hit.rrfScore,
           semantic_rank: hit.semanticRank,
           keyword_rank: hit.keywordRank,
+          rerank_score: rerankScores.get(hit.chunkId) ?? null,
         })),
-        meta: {
-          semantic_leg_count: result.semanticLegCount,
-          retried: result.retried,
-          tokens_used: tokensUsed,
-        },
+        meta,
       },
       200,
     );

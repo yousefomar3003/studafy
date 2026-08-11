@@ -38,6 +38,7 @@ import {
   aiRetrievalRoutes,
   aiUsageRoutes,
   createAiTokenMeter,
+  createDeterministicCrossEncoderReranker,
   createDeterministicQueryEmbedder,
 } from "./modules/ai";
 import {
@@ -166,6 +167,13 @@ export interface AppOptions {
    */
   docsEnabled?: boolean;
   /**
+   * Cross-encoder re-ranking (ST-163) kill switch. When true, the hybrid-retrieval route mounts with
+   * a re-ranker that re-scores the fused top-20 and returns the top 6. Off by default so an unset
+   * environment deploys the previous RRF-only behavior. Injected rather than read from the
+   * environment in here, so a test can exercise both arms without mutating the environment.
+   */
+  aiRerankEnabled?: boolean;
+  /**
    * Seam for account activation's Microsoft OIDC verification (ST-078). Defaults to the real ST-077
    * ID-token validation; injected in tests so activation can run without a live Microsoft JWKS, the
    * same way `logger` and `securityEventSink` are injected.
@@ -215,6 +223,7 @@ export function createApp({
   jwtRefreshTtlSeconds = 30 * 24 * 60 * 60,
   securityEventSink,
   docsEnabled = false,
+  aiRerankEnabled = false,
   microsoftIdentityVerifier,
   storage = null,
   stripeProvider = null,
@@ -755,8 +764,18 @@ export function createApp({
     app.route("/", aiUsageRoutes({ entitlements, meter: aiMeter }));
     // Hybrid retrieval (ST-162). Mounted under the same gate so a search reserves and commits the
     // caller's AI quota, and only when the gate's dependencies (a database for entitlements, Redis
-    // for the meter) exist — the retrieval surface must never run un-metered.
-    app.route("/", aiRetrievalRoutes({ database, embedder: createDeterministicQueryEmbedder() }));
+    // for the meter) exist — the retrieval surface must never run un-metered. Cross-encoder
+    // re-ranking (ST-163) rides the AI_RERANK_ENABLED kill switch: off, the route returns the raw
+    // RRF ranking; on, the deterministic re-ranker is constructed here and swapped in at the one
+    // place the route depends on.
+    app.route(
+      "/",
+      aiRetrievalRoutes({
+        database,
+        embedder: createDeterministicQueryEmbedder(),
+        reranker: aiRerankEnabled ? createDeterministicCrossEncoderReranker() : null,
+      }),
+    );
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:

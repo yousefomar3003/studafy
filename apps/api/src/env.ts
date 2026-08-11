@@ -141,6 +141,13 @@ export const envSchema = z
     // Stripe billing integration. All optional — activates only when both are set.
     STRIPE_SECRET_KEY: z.string().min(1).optional(),
     STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    // Cross-encoder re-ranking (ST-163) kill switch. Off by default: an unset or "false" value leaves
+    // the retrieval route on the raw RRF ranking with zero re-ranking cost. Validated as an explicit
+    // two-value string so a typo ("yes") fails bootstrap instead of silently flipping the feature on.
+    AI_RERANK_ENABLED: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) => value === "true"),
   })
   .superRefine((env, context) => {
     // Checked before the NODE_ENV gate below: this constraint keys off the deployment tier, and a

@@ -21,6 +21,7 @@ describe("loadEnv", () => {
       JWT_REFRESH_TTL_SECONDS: 2592000,
       JWT_KEY_ROTATION_INTERVAL_MS: 7 * 24 * 60 * 60 * 1000,
       S3_PRESIGN_TTL_SECONDS: 900,
+      AI_RERANK_ENABLED: false,
     });
   });
 
@@ -53,6 +54,7 @@ describe("loadEnv", () => {
       JWT_REFRESH_TTL_SECONDS: 2592000,
       JWT_KEY_ROTATION_INTERVAL_MS: 7 * 24 * 60 * 60 * 1000,
       S3_PRESIGN_TTL_SECONDS: 900,
+      AI_RERANK_ENABLED: false,
     });
   });
 
@@ -147,5 +149,16 @@ describe("loadEnv", () => {
         READ_DATABASE_NAME: "api_read",
       }).RELEASE_VERSION,
     ).toBe("unknown");
+  });
+
+  test("parses the AI_RERANK_ENABLED kill switch as an explicit two-value string", () => {
+    expect(loadEnv({ AI_RERANK_ENABLED: "true" }).AI_RERANK_ENABLED).toBe(true);
+    expect(loadEnv({ AI_RERANK_ENABLED: "false" }).AI_RERANK_ENABLED).toBe(false);
+    // Off by default: the kill switch must never flip a feature on by omission.
+    expect(loadEnv({}).AI_RERANK_ENABLED).toBe(false);
+  });
+
+  test("rejects a non-boolean AI_RERANK_ENABLED value", () => {
+    expect(() => loadEnv({ AI_RERANK_ENABLED: "yes" })).toThrow(EnvValidationError);
   });
 });
