@@ -21,7 +21,7 @@ import type { JSONValue, TransactionSql } from "postgres";
 
 /** Audit action -- mirrors the app.audit_action PostgreSQL enum. */
 export type AuditAction =
-  "insert" | "update" | "delete" | "login" | "logout" | "export" | "permission_change";
+  "insert" | "update" | "delete" | "login" | "logout" | "export" | "permission_change" | "read";
 
 /** Fields whose values must never appear in audit payloads. Case-insensitive match. */
 export const SENSITIVE_KEYS: ReadonlySet<string> = new Set([

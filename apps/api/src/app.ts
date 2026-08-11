@@ -46,6 +46,7 @@ import {
   attendanceReportRoutes,
   attendanceSessionRoutes,
 } from "./modules/attendance";
+import { auditRoutes } from "./modules/audit";
 import {
   activationRoutes,
   adminDeviceRoutes,
@@ -694,6 +695,13 @@ export function createApp({
       attendanceReportRoutes(database, readDatabase ?? database, redis ?? null, storage),
     );
     app.route("/", childComparisonRoutes(database, readDatabase ?? database));
+  }
+
+  // Audit explorer (ST-046x). Paged, filterable reads of the school's audit log plus an async CSV
+  // export job, all gated on AUDIT_LOG_READ / AUDIT_LOG_EXPORT. Each paged read writes its own
+  // 'read' audit row (target_table 'audit_logs') inside the same transaction.
+  if (database) {
+    app.route("/", auditRoutes(database, redis ?? null, storage));
   }
 
   // Discipline incidents and actions: teacher reporting, principal management (actions,

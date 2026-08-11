@@ -2,14 +2,15 @@
  * The report type registry (ST-175).
  *
  * The registry is the single source of truth for what the reports queue knows how to do, so the
- * unit tests pin its shape: exactly the attendance, finance and progress entries, lookups that
- * resolve by job name (and nothing else), a full report-type surface per entry (schema, store,
+ * unit tests pin its shape: exactly the attendance, finance, progress and audit entries, lookups
+ * that resolve by job name (and nothing else), a full report-type surface per entry (schema, store,
  * renderer, storage key, content headers), and the two short-circuit paths of `processReportJob`
  * that need no database: an unknown job resolves unprocessed, and a known job with an unparseable
  * payload resolves unprocessed before any pool is queried.
  */
 
 import { attendanceExportJobDataSchema } from "@studafy/attendance-reporting";
+import { auditExportJobDataSchema } from "@studafy/audit-reporting";
 import { JOB_NAMES } from "@studafy/constants";
 import { financeExportJobDataSchema } from "@studafy/finance-reporting";
 import { progressReportJobDataSchema } from "@studafy/progress-reporting";
@@ -52,21 +53,30 @@ const progressPayload = progressReportJobDataSchema.parse({
   termId: "9d8c7b6a-5e4f-4321-9876-fedcba987654",
 });
 
+const auditPayload = auditExportJobDataSchema.parse({
+  version: 1,
+  jobId: "f1eb83c0-ae1f-4b3a-962d-6db28640d68a",
+  schoolId: "5f417184-d876-4e6a-88cb-9fd589141b54",
+  requestedByUserId: "c9dac2e9-8b48-416f-a0dd-e21f6d6c1dac",
+});
+
 describe("REPORT_TYPE_REGISTRY", () => {
-  test("registers exactly the attendance, finance and progress report types", () => {
+  test("registers exactly the attendance, finance, progress and audit report types", () => {
     expect(REPORT_TYPE_REGISTRY.map((entry) => entry.jobName).sort()).toEqual(
       [
         JOB_NAMES.GENERATE_ATTENDANCE_EXPORT,
         JOB_NAMES.GENERATE_FINANCE_REPORT,
         JOB_NAMES.GENERATE_PROGRESS_REPORT,
+        JOB_NAMES.GENERATE_AUDIT_EXPORT,
       ].sort(),
     );
   });
 
-  test("lookup resolves all three report types by job name and nothing else", () => {
+  test("lookup resolves all four report types by job name and nothing else", () => {
     expect(lookupReportType(JOB_NAMES.GENERATE_ATTENDANCE_EXPORT)).toBe(REPORT_TYPE_REGISTRY[0]);
     expect(lookupReportType(JOB_NAMES.GENERATE_FINANCE_REPORT)).toBe(REPORT_TYPE_REGISTRY[1]);
     expect(lookupReportType(JOB_NAMES.GENERATE_PROGRESS_REPORT)).toBe(REPORT_TYPE_REGISTRY[2]);
+    expect(lookupReportType(JOB_NAMES.GENERATE_AUDIT_EXPORT)).toBe(REPORT_TYPE_REGISTRY[3]);
     expect(lookupReportType("no-such-report")).toBeUndefined();
     // The purge sweep is a scheduled job, not a report type, so it is dispatched by name outside
     // the registry rather than living in it.
@@ -80,7 +90,9 @@ describe("REPORT_TYPE_REGISTRY", () => {
           ? attendancePayload
           : entry.jobName === JOB_NAMES.GENERATE_FINANCE_REPORT
             ? financePayload
-            : progressPayload;
+            : entry.jobName === JOB_NAMES.GENERATE_PROGRESS_REPORT
+              ? progressPayload
+              : auditPayload;
 
       expect(entry.schema.safeParse(payload).success).toBe(true);
       expect(typeof entry.render).toBe("function");

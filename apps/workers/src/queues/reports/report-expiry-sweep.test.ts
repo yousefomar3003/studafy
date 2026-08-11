@@ -1,11 +1,11 @@
 /**
  * The expired-report purge sweep (ST-175), against a real database.
  *
- * Seeds schools with old completed report jobs in all three lifecycle tables — attendance
+ * Seeds schools with old completed report jobs in all four lifecycle tables — attendance
  * (app.report_export_jobs, `reports/` keys), finance (app.finance_report_jobs,
- * `tenant-<schoolId>/reports/` keys) and progress (app.progress_report_jobs, `reports/` keys) —
- * and drives the sweep with an in-memory fake S3 client, so
- * no network is touched and every removed key is deterministic. The acceptance the tests prove:
+ * `tenant-<schoolId>/reports/` keys), progress (app.progress_report_jobs, `reports/` keys) and audit
+ * (app.audit_export_jobs, `reports/` keys) — and drives the sweep with an in-memory fake S3 client,
+ * so no network is touched and every removed key is deterministic. The acceptance the tests prove:
  * only completed artifacts older than the 7-day retention are purged (recent rows, non-terminal
  * rows and rows without a key are decoys that survive), the DB row disappears so the API reports a
  * clean 404, and a school whose S3 removal fails keeps its rows without stopping the schools after
@@ -119,6 +119,7 @@ async function removeSeededSchools(): Promise<void> {
       await db!.begin(async (tx) => {
         await tx.unsafe("SET LOCAL ROLE studafy_admin");
         await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+        await tx`DELETE FROM app.audit_export_jobs WHERE school_id = ${schoolId}::uuid`;
         await tx`DELETE FROM app.progress_report_jobs WHERE school_id = ${schoolId}::uuid`;
         await tx`DELETE FROM app.finance_report_jobs WHERE school_id = ${schoolId}::uuid`;
         await tx`DELETE FROM app.report_export_jobs WHERE school_id = ${schoolId}::uuid`;
@@ -270,6 +271,34 @@ async function seedProgressJob(
   });
 }
 
+/**
+ * Insert an audit export job row shaped to pass ck_audit_export_jobs_terminal_state: completed rows
+ * carry a storage key and completed_at, failed rows an error message and completed_at, and
+ * queued/processing rows neither.
+ */
+async function seedAuditJob(
+  schoolId: string,
+  userId: string,
+  createdAt: Date,
+  status: "queued" | "processing" | "completed" | "failed",
+  storageKey: string | null = null,
+): Promise<void> {
+  await db!.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    await tx`
+      INSERT INTO app.audit_export_jobs (
+        school_id, requested_by_user_id, file_format, status,
+        storage_key, failure_message, parameters, created_at, completed_at
+      ) VALUES (
+        ${schoolId}::uuid, ${userId}::uuid, 'csv', ${status},
+        ${storageKey}, ${status === "failed" ? "purged" : null}, '{}'::jsonb, ${createdAt},
+        ${status === "completed" || status === "failed" ? createdAt : null}
+      )
+    `;
+  });
+}
+
 async function progressRowCount(schoolId: string): Promise<number> {
   return db!.begin(async (tx) => {
     await tx.unsafe("SET LOCAL ROLE studafy_admin");
@@ -303,6 +332,17 @@ async function financeRowCount(schoolId: string): Promise<number> {
   });
 }
 
+async function auditRowCount(schoolId: string): Promise<number> {
+  return db!.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    const [row] = await tx<{ n: string }[]>`
+      SELECT count(*)::text AS n FROM app.audit_export_jobs WHERE school_id = ${schoolId}::uuid
+    `;
+    return Number(row!.n);
+  });
+}
+
 describe("expired report purge sweep", () => {
   sweepTest("purges completed artifacts older than retention and keeps every decoy", async () => {
     const { schoolId, userId } = await seedSchool();
@@ -314,6 +354,8 @@ describe("expired report purge sweep", () => {
     const recentFinanceKey = `tenant-${schoolId}/reports/2026/finance-recent.csv`;
     const oldProgressKey = `reports/${schoolId}/progress-old.pdf`;
     const recentProgressKey = `reports/${schoolId}/progress-recent.pdf`;
+    const oldAuditKey = `reports/${schoolId}/audit-old.csv`;
+    const recentAuditKey = `reports/${schoolId}/audit-recent.csv`;
 
     await seedAttendanceJob(schoolId, userId, old, "completed", oldAttendanceKey);
     await seedAttendanceJob(schoolId, userId, recent, "completed", recentAttendanceKey);
@@ -324,6 +366,9 @@ describe("expired report purge sweep", () => {
     await seedProgressJob(schoolId, academic, userId, old, "completed", oldProgressKey);
     await seedProgressJob(schoolId, academic, userId, recent, "completed", recentProgressKey);
     await seedProgressJob(schoolId, academic, userId, old, "processing");
+    await seedAuditJob(schoolId, userId, old, "completed", oldAuditKey);
+    await seedAuditJob(schoolId, userId, recent, "completed", recentAuditKey);
+    await seedAuditJob(schoolId, userId, old, "processing");
 
     const s3 = new FakeReportS3();
     const result = await purgeExpiredReports(db!, s3, new Date(), silentLogger);
@@ -331,13 +376,17 @@ describe("expired report purge sweep", () => {
     expect(result.attendanceRemoved).toBe(1);
     expect(result.financeRemoved).toBe(1);
     expect(result.progressRemoved).toBe(1);
+    expect(result.auditRemoved).toBe(1);
     expect(result.failed).toBe(0);
-    expect(s3.removed.sort()).toEqual([oldAttendanceKey, oldFinanceKey, oldProgressKey].sort());
+    expect(s3.removed.sort()).toEqual(
+      [oldAttendanceKey, oldFinanceKey, oldProgressKey, oldAuditKey].sort(),
+    );
 
     // All tables keep the decoys: recent completed, and old rows that are not completed.
     expect(await attendanceRowCount(schoolId)).toBe(2);
     expect(await financeRowCount(schoolId)).toBe(2);
     expect(await progressRowCount(schoolId)).toBe(2);
+    expect(await auditRowCount(schoolId)).toBe(2);
   });
 
   sweepTest(

@@ -3,13 +3,14 @@
  *
  * The registry is the single source of truth for what the `reports` queue knows how to do. Each
  * entry is a complete, self-describing report type — payload schema, state store, renderer, storage
- * key and content headers — so adding a third report type is one entry here plus a store/renderer,
- * with no lifecycle code. `processReportJob` is what the queue registry hands a REPORTS job to: it
+ * key and content headers — so adding a report type is one entry here plus a store/renderer, with
+ * no lifecycle code. `processReportJob` is what the queue registry hands a REPORTS job to: it
  * routes the scheduled purge sweep to `purgeExpiredReports` and every known report job to the
  * generic runner, resolving `{ processed: false }` for anything else.
  */
 
 import { attendanceExportJobDataSchema } from "@studafy/attendance-reporting";
+import { auditExportJobDataSchema } from "@studafy/audit-reporting";
 import { JOB_NAMES } from "@studafy/constants";
 import { financeExportJobDataSchema } from "@studafy/finance-reporting";
 import { progressReportJobDataSchema } from "@studafy/progress-reporting";
@@ -23,6 +24,13 @@ import {
   renderAttendanceExport,
 } from "./attendance-export.worker";
 import { createAttendanceReportStore } from "./attendance-report-store";
+import {
+  auditContentDisposition,
+  auditContentType,
+  auditReportStorageKey,
+  renderAuditExport,
+} from "./audit-export.worker";
+import { createAuditReportStore } from "./audit-report-store";
 import {
   financeContentDisposition,
   financeContentType,
@@ -49,6 +57,7 @@ import {
 import type { FinanceReportJobRow } from "./finance-report-store";
 import type { ReportRunResult, ReportRunnerConfig, ReportTypeDefinition } from "./report-types";
 import type { AttendanceExportJobData } from "@studafy/attendance-reporting";
+import type { AuditExportJobData } from "@studafy/audit-reporting";
 import type { FinanceExportJobData } from "@studafy/finance-reporting";
 import type { ProgressReportJobData } from "@studafy/progress-reporting";
 import type { Job } from "bullmq";
@@ -87,10 +96,21 @@ const progressReportDefinition: ReportTypeDefinition<ProgressReportJobData> = {
   contentDisposition: progressContentDisposition,
 };
 
+const auditExportDefinition: ReportTypeDefinition<AuditExportJobData> = {
+  jobName: JOB_NAMES.GENERATE_AUDIT_EXPORT,
+  schema: auditExportJobDataSchema,
+  store: createAuditReportStore(),
+  render: renderAuditExport,
+  storageKey: auditReportStorageKey,
+  contentType: auditContentType,
+  contentDisposition: auditContentDisposition,
+};
+
 export const REPORT_TYPE_REGISTRY: readonly ReportTypeDefinition[] = [
   attendanceExportDefinition,
   financeExportDefinition,
   progressReportDefinition,
+  auditExportDefinition,
 ];
 
 export function lookupReportType(jobName: string): ReportTypeDefinition | undefined {
