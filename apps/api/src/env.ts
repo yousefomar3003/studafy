@@ -148,6 +148,32 @@ export const envSchema = z
       .enum(["true", "false"])
       .optional()
       .transform((value) => value === "true"),
+    // LLM gateway (ST-164) kill switch. Off by default: the generate route registers but answers
+    // 503 AI_LLM_DISABLED until a deployment opts in with AI_LLM_ENABLED=true and an API key.
+    AI_LLM_ENABLED: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) => value === "true"),
+    // Anthropic API key for the LLM gateway. Required by the refinement below when AI_LLM_ENABLED.
+    // Treated as a credential: never logged, and error payloads are scrubbed for its literal value.
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    // Override the Anthropic API endpoint (gateway/proxy). Defaults to https://api.anthropic.com/v1.
+    ANTHROPIC_BASE_URL: z.string().url().optional(),
+    // Model ids for the small and large routing tiers. Defaults are the catalog ids current when
+    // ST-164 shipped (modules/ai/config.ts); see docs/runbooks/anthropic-provider-config.md.
+    AI_LLM_SMALL_MODEL: z.string().min(1).optional(),
+    AI_LLM_LARGE_MODEL: z.string().min(1).optional(),
+    // Server default for max_tokens when a request omits it. Bounded to the route's ceiling so the
+    // reservation math in config.ts (AI_LLM_MAX_RESERVE_TOKENS) stays valid.
+    AI_LLM_MAX_TOKENS: z.coerce.number().int().min(1).max(16_384).optional(),
+    // Whole-call timeout (connect + wait + read). Bounded so a hung provider cannot pin a worker.
+    AI_LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300_000).optional(),
+    // Zero-retention posture: never send the metadata.user_id field the provider retains for abuse
+    // monitoring. See docs/runbooks/anthropic-provider-config.md.
+    AI_LLM_ZERO_RETENTION: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) => value === "true"),
   })
   .superRefine((env, context) => {
     // Checked before the NODE_ENV gate below: this constraint keys off the deployment tier, and a
@@ -230,6 +256,24 @@ export const envSchema = z
         code: "custom",
         path: ["ERPNEXT_API_URL"],
         message: "ERPNEXT_API_URL is required when ERPNEXT_API_KEY is set",
+      });
+    }
+
+    // LLM gateway: the kill switch is opt-in, but it must never be armed without a credential to
+    // call — that would mount a route that only ever answers 503 AI_LLM_DISABLED while claiming to
+    // be enabled.
+    if (env.AI_LLM_ENABLED && env.ANTHROPIC_API_KEY === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["ANTHROPIC_API_KEY"],
+        message: "ANTHROPIC_API_KEY is required when AI_LLM_ENABLED is true",
+      });
+    }
+    if (!env.AI_LLM_ENABLED && env.ANTHROPIC_API_KEY !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["ANTHROPIC_API_KEY"],
+        message: "ANTHROPIC_API_KEY is set but AI_LLM_ENABLED is not true",
       });
     }
 

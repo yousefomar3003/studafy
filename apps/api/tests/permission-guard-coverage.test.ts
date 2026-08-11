@@ -259,6 +259,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // permission matrix; exempt below because the gate is the authorization surface for every
   // /api/ai/* route and the search's one write is the metered student's own usage ledger.
   "POST /api/ai/students/{studentId}/search",
+  // LLM gateway (ST-164). Same gate and same rationale as the retrieval route above: the gate is
+  // the authorization surface for every /api/ai/* route, and the generate route's one write is the
+  // metered student's own usage ledger.
+  "POST /api/ai/students/{studentId}/generate",
 ];
 
 /**
@@ -387,6 +391,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // /api/ai/* route. The search reads only the school's own corpus under forced RLS, and its one
   // write is the metered student's own ai_usage_meters row.
   "POST /api/ai/students/{studentId}/search",
+  // LLM gateway (ST-164) — same gate, same RLS, same single write to the metered student's own
+  // ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/generate",
 ]);
 
 // ---------------------------------------------------------------------------

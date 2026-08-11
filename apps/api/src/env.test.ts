@@ -22,6 +22,8 @@ describe("loadEnv", () => {
       JWT_KEY_ROTATION_INTERVAL_MS: 7 * 24 * 60 * 60 * 1000,
       S3_PRESIGN_TTL_SECONDS: 900,
       AI_RERANK_ENABLED: false,
+      AI_LLM_ENABLED: false,
+      AI_LLM_ZERO_RETENTION: false,
     });
   });
 
@@ -55,6 +57,8 @@ describe("loadEnv", () => {
       JWT_KEY_ROTATION_INTERVAL_MS: 7 * 24 * 60 * 60 * 1000,
       S3_PRESIGN_TTL_SECONDS: 900,
       AI_RERANK_ENABLED: false,
+      AI_LLM_ENABLED: false,
+      AI_LLM_ZERO_RETENTION: false,
     });
   });
 
@@ -160,5 +164,65 @@ describe("loadEnv", () => {
 
   test("rejects a non-boolean AI_RERANK_ENABLED value", () => {
     expect(() => loadEnv({ AI_RERANK_ENABLED: "yes" })).toThrow(EnvValidationError);
+  });
+
+  test("parses the LLM gateway kill switch and zero-retention posture as explicit two-value strings", () => {
+    expect(loadEnv({ AI_LLM_ENABLED: "true", ANTHROPIC_API_KEY: "sk-test" }).AI_LLM_ENABLED).toBe(
+      true,
+    );
+    expect(loadEnv({ AI_LLM_ENABLED: "false" }).AI_LLM_ENABLED).toBe(false);
+    // Off by default: the LLM plane must never arm by omission.
+    expect(loadEnv({}).AI_LLM_ENABLED).toBe(false);
+    expect(loadEnv({ AI_LLM_ZERO_RETENTION: "true" }).AI_LLM_ZERO_RETENTION).toBe(true);
+    expect(loadEnv({}).AI_LLM_ZERO_RETENTION).toBe(false);
+  });
+
+  test("rejects a non-boolean AI_LLM_ENABLED value", () => {
+    expect(() => loadEnv({ AI_LLM_ENABLED: "on" })).toThrow(EnvValidationError);
+  });
+
+  test("requires ANTHROPIC_API_KEY when the LLM gateway is enabled", () => {
+    expect(() => loadEnv({ AI_LLM_ENABLED: "true" })).toThrow(EnvValidationError);
+    expect(
+      loadEnv({ AI_LLM_ENABLED: "true", ANTHROPIC_API_KEY: "sk-test" }).ANTHROPIC_API_KEY,
+    ).toBe("sk-test");
+  });
+
+  test("rejects an ANTHROPIC_API_KEY that is set while the gateway is disabled", () => {
+    expect(() => loadEnv({ ANTHROPIC_API_KEY: "sk-test" })).toThrow(EnvValidationError);
+  });
+
+  test("parses LLM gateway tuning variables", () => {
+    const env = loadEnv({
+      AI_LLM_ENABLED: "true",
+      ANTHROPIC_API_KEY: "sk-test",
+      ANTHROPIC_BASE_URL: "https://proxy.example.com/v1",
+      AI_LLM_SMALL_MODEL: "claude-haiku-custom",
+      AI_LLM_LARGE_MODEL: "claude-sonnet-custom",
+      AI_LLM_MAX_TOKENS: "8192",
+      AI_LLM_TIMEOUT_MS: "45000",
+    });
+
+    expect(env.ANTHROPIC_BASE_URL).toBe("https://proxy.example.com/v1");
+    expect(env.AI_LLM_SMALL_MODEL).toBe("claude-haiku-custom");
+    expect(env.AI_LLM_LARGE_MODEL).toBe("claude-sonnet-custom");
+    expect(env.AI_LLM_MAX_TOKENS).toBe(8192);
+    expect(env.AI_LLM_TIMEOUT_MS).toBe(45_000);
+  });
+
+  test("rejects an out-of-range AI_LLM_MAX_TOKENS or AI_LLM_TIMEOUT_MS", () => {
+    expect(() =>
+      loadEnv({ AI_LLM_ENABLED: "true", ANTHROPIC_API_KEY: "sk-test", AI_LLM_MAX_TOKENS: "0" }),
+    ).toThrow(EnvValidationError);
+    expect(() =>
+      loadEnv({
+        AI_LLM_ENABLED: "true",
+        ANTHROPIC_API_KEY: "sk-test",
+        AI_LLM_MAX_TOKENS: "16385",
+      }),
+    ).toThrow(EnvValidationError);
+    expect(() =>
+      loadEnv({ AI_LLM_ENABLED: "true", ANTHROPIC_API_KEY: "sk-test", AI_LLM_TIMEOUT_MS: "500" }),
+    ).toThrow(EnvValidationError);
   });
 });

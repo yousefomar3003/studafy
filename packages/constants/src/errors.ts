@@ -280,6 +280,15 @@ export const ERROR_CODES = {
   AI_QUOTA_EXCEEDED: "AI_QUOTA_EXCEEDED",
   AI_QUOTA_UNAVAILABLE: "AI_QUOTA_UNAVAILABLE",
 
+  // LLM gateway (ST-164). The generate route answers with one of three provider-stage codes:
+  // AI_LLM_DISABLED when the kill switch is off (the feature is deliberately absent, not broken);
+  // AI_LLM_UNAVAILABLE when the provider or the network around it is failing (transient -- retry,
+  // honoring Retry-After); AI_LLM_REQUEST_REJECTED when the provider answered but refused the
+  // request itself (non-transient 4xx -- retrying would repeat the rejection).
+  AI_LLM_DISABLED: "AI_LLM_DISABLED",
+  AI_LLM_UNAVAILABLE: "AI_LLM_UNAVAILABLE",
+  AI_LLM_REQUEST_REJECTED: "AI_LLM_REQUEST_REJECTED",
+
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",

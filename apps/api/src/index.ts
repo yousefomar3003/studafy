@@ -1,10 +1,17 @@
 import { createApp } from "./app";
 import { checkDatabase, closeDatabasePools, createDatabase, createReadDatabase } from "./database";
 import { loadEnv } from "./env";
+import { RedisCircuitBreaker } from "./lib/circuit-breaker";
 import { createSecurityEventSink } from "./lib/security/securityEventSink";
 import { createStorageService } from "./lib/storage";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
+import {
+  createAnthropicProvider,
+  isTransientLlmFailure,
+  type AiModelTier,
+  type LlmProvider,
+} from "./modules/ai";
 import { KeyStore } from "./modules/auth";
 import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
 import { startEntitlementInvalidationSubscriber, StripeAdapter } from "./modules/subscriptions";
@@ -64,6 +71,35 @@ const stripeProvider =
       })
     : null;
 
+// LLM gateway (ST-164). The provider is built here — the only place with the environment, the
+// logger, and Redis together — and handed to createApp as an option, so the app itself stays
+// environment-free. It is null when the AI_LLM_ENABLED kill switch is off (or Redis is absent, in
+// which case the whole AI surface is already unmounted): the generate route still registers and
+// answers 503 AI_LLM_DISABLED. The per-school circuit breaker lives on `cb:ai` keys, is named for
+// its logs, and shares the provider's failure predicate so the breaker and the retry loop cannot
+// disagree on what "a failure" means.
+const aiLlmProvider: LlmProvider | null =
+  env.AI_LLM_ENABLED && redis && env.ANTHROPIC_API_KEY
+    ? createAnthropicProvider({
+        apiKey: env.ANTHROPIC_API_KEY,
+        baseUrl: env.ANTHROPIC_BASE_URL,
+        timeoutMs: env.AI_LLM_TIMEOUT_MS,
+        defaultMaxTokens: env.AI_LLM_MAX_TOKENS,
+        zeroRetention: env.AI_LLM_ZERO_RETENTION,
+        logger,
+        circuitBreaker: new RedisCircuitBreaker(redis, logger, {
+          keyPrefix: "cb:ai",
+          component: "ai-circuit-breaker",
+          isFailure: isTransientLlmFailure,
+        }),
+      })
+    : null;
+
+const aiLlmModelOverrides: Partial<Record<AiModelTier, string>> = {
+  ...(env.AI_LLM_SMALL_MODEL ? { small: env.AI_LLM_SMALL_MODEL } : {}),
+  ...(env.AI_LLM_LARGE_MODEL ? { large: env.AI_LLM_LARGE_MODEL } : {}),
+};
+
 const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
   logger.info({ kid }, "jwt key rotated");
 });
@@ -92,6 +128,8 @@ const app = createApp({
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",
   aiRerankEnabled: env.AI_RERANK_ENABLED,
+  aiLlmProvider,
+  aiLlmModelOverrides,
 });
 
 const server = Bun.serve({

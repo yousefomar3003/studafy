@@ -13,12 +13,12 @@
  *      another. They are separate Frappe sites that merely share a hostname.
  */
 
+import { ErpNextClient, isTransientErpNextFailure } from "../../../erpnext/client";
 import {
   InMemoryCircuitBreaker,
   RedisCircuitBreaker,
   type CircuitBreaker,
-} from "../../../erpnext/circuit-breaker";
-import { ErpNextClient, isTransientErpNextFailure } from "../../../erpnext/client";
+} from "../../../lib/circuit-breaker";
 
 import type { ErpNextCredentialResolver } from "./credential-resolver";
 import type { ErpNextRequestOptions, ErpNextResponse } from "../../../erpnext/client";
@@ -90,6 +90,10 @@ export class TenantErpNextFactory {
     this.timeout = options.timeout;
     this.breaker = options.redis
       ? new RedisCircuitBreaker(options.redis, options.logger, {
+          // Preserve the key shape and log component the ERPNext breaker used before the generic
+          // extraction, so an already-open circuit survives a deploy without resetting.
+          keyPrefix: "cb:erpnext",
+          component: "erpnext-circuit-breaker",
           isFailure: isTransientErpNextFailure,
         })
       : new InMemoryCircuitBreaker({ isFailure: isTransientErpNextFailure });

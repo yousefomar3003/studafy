@@ -5,12 +5,12 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test, beforeEach, afterAll } from "bun:test";
 
+import { ErpNextClient, ErpNextError, isTransientErpNextFailure } from "../../../erpnext/client";
 import {
   CircuitOpenError,
   InMemoryCircuitBreaker,
   DEFAULT_FAILURE_THRESHOLD,
-} from "../../../erpnext/circuit-breaker";
-import { ErpNextClient, ErpNextError, isTransientErpNextFailure } from "../../../erpnext/client";
+} from "../../../lib/circuit-breaker";
 import { formatMinorUnits, fromMinorUnits, toMinorUnits } from "../currency";
 
 import type { Logger } from "../../../logger";
