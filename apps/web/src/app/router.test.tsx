@@ -59,4 +59,18 @@ describe("app shell", () => {
     renderAt("/account");
     expect(await screen.findByRole("heading", { name: /account/i, level: 1 })).toBeTruthy();
   });
+
+  test("resolves the lazy /invite/:token route, publicly (no RequireAuth redirect)", async () => {
+    renderAt("/invite/tok-123");
+    expect(
+      await screen.findByRole("heading", { name: /invited/i, level: 1 }, { timeout: 5000 }),
+    ).toBeTruthy();
+  });
+
+  test("resolves the lazy /invite/:token/complete route and forwards an authenticated session home", async () => {
+    renderAt("/invite/tok-123/complete");
+    expect(
+      await screen.findByRole("heading", { name: /portal/i, level: 1 }, { timeout: 5000 }),
+    ).toBeTruthy();
+  });
 });

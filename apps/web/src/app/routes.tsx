@@ -14,6 +14,8 @@ import type { RouteObject } from "react-router-dom";
 // Secondary route groups are code-split so the initial (marketing) route stays small.
 const AuthLoginPage = lazy(() => import("../routes/auth/LoginPage"));
 const AuthCallbackPage = lazy(() => import("../routes/auth/CallbackPage"));
+const InvitePage = lazy(() => import("../routes/invite/InvitePage"));
+const InviteCompletePage = lazy(() => import("../routes/invite/InviteCompletePage"));
 const OnboardingPage = lazy(() => import("../routes/onboarding/OnboardingPage"));
 const PortalPage = lazy(() => import("../routes/portal/PortalPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
@@ -38,6 +40,15 @@ export const routes: RouteObject[] = [
         children: [
           { path: "login", element: <AuthLoginPage /> },
           { path: "callback", element: <AuthCallbackPage /> },
+        ],
+      },
+      {
+        // Public: the invitation token in the path is the credential (see
+        // apps/api/src/modules/auth/routes/activation-oauth-routes.ts). No RequireAuth wrapper.
+        path: "invite/:token",
+        children: [
+          { index: true, element: <InvitePage /> },
+          { path: "complete", element: <InviteCompletePage /> },
         ],
       },
       {

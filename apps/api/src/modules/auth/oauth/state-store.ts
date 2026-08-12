@@ -12,14 +12,19 @@
 const SWEEP_INTERVAL = 10;
 const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+export type OAuthFlowPurpose = "link" | "activation";
+
 export interface StateEntry {
   codeVerifier: string;
   nonce: string;
   createdAt: number;
-  /** When present, this state initiates a provider-link flow bound to this user. */
-  purpose?: "link";
+  /** Which flow this state belongs to. Absent = the legacy login OAuth flow. */
+  purpose?: OAuthFlowPurpose;
+  /** When `purpose` is `"link"`, the user this provider is being linked to. */
   userId?: string;
   schoolId?: string;
+  /** When `purpose` is `"activation"`, the invitation bearer token this flow activates. */
+  token?: string;
 }
 
 export interface StateStore {

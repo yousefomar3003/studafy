@@ -28,8 +28,8 @@ export const activationBodySchema = z
       .min(1)
       .openapi({
         description:
-          "The Microsoft OIDC ID token obtained by the client's authorization request. It is " +
-          "verified server-side against Microsoft's JWKS before activation proceeds.",
+          "The OIDC ID token obtained by the client's authorization request. It is " +
+          "verified server-side against the provider's JWKS before activation proceeds.",
         example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIs...",
       }),
     nonce: z
@@ -40,6 +40,15 @@ export const activationBodySchema = z
           "The nonce the client generated for its OIDC authorization request. The ID token is " +
           "rejected unless it was minted with this nonce.",
         example: "n-0S6_WzA2Mj",
+      }),
+    provider: z
+      .enum(["microsoft", "google"])
+      .default("microsoft")
+      .openapi({
+        description:
+          "The OAuth provider that issued the id_token. Determines which JWKS is used for " +
+          "validation.",
+        example: "microsoft",
       }),
   })
   .openapi("ActivateAccountRequest");
