@@ -319,4 +319,34 @@ describe("aiEntitlementGate reservation lifecycle", () => {
     expect(calls.reserve).toHaveLength(0);
     expect(calls.release).toHaveLength(0);
   });
+
+  test("resolveReserveTokens sets the hold size for the request, defaulting elsewhere", async () => {
+    const { meter, calls } = recordingMeter();
+    const app = new Hono<AppEnv>();
+
+    app.use("*", async (c, next) => {
+      c.set("auth", auth);
+      c.set("locale", "en");
+      await next();
+    });
+    app.use(
+      "/api/ai/*",
+      aiEntitlementGate({
+        entitlements: fakeEntitlements(schoolEntitlement(true), aiEntitlement(true)),
+        meter,
+        defaultReserveTokens: 1000,
+        resolveReserveTokens: (c) => (c.req.path.endsWith("/generate") ? 24_000 : undefined),
+      }),
+    );
+    app.onError(errorHandlerMiddleware(silentLogger));
+    app.post("/api/ai/students/:studentId/generate", (c) => c.json({ ok: true }));
+    app.post("/api/ai/students/:studentId/chat", (c) => c.json({ ok: true }));
+
+    await app.request(`/api/ai/students/${STUDENT_ID}/generate`, { method: "POST" });
+    await app.request(`/api/ai/students/${STUDENT_ID}/chat`, { method: "POST" });
+
+    expect(calls.reserve).toHaveLength(2);
+    expect(calls.reserve[0]).toMatchObject({ amount: 24_000 });
+    expect(calls.reserve[1]).toMatchObject({ amount: 1000 });
+  });
 });

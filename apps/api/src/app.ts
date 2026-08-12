@@ -34,7 +34,9 @@ import {
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
 import {
+  AI_LLM_MAX_RESERVE_TOKENS,
   aiEntitlementGate,
+  aiGatewayRoutes,
   aiRetrievalRoutes,
   aiUsageRoutes,
   createAiTokenMeter,
@@ -114,6 +116,7 @@ import type { StorageService } from "./lib/storage";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
+import type { AiModelTier, LlmProvider } from "./modules/ai";
 import type { KeyStore } from "./modules/auth";
 import type { PaymentProviderPort } from "./modules/subscriptions";
 import type { RedisClient } from "./redis";
@@ -175,6 +178,21 @@ export interface AppOptions {
    */
   aiRerankEnabled?: boolean;
   /**
+   * LLM provider for the gateway (ST-164). Null (or absent) when the AI_LLM_ENABLED kill switch is
+   * off: the generate route still registers — so the published contract does not depend on a
+   * deployment's environment, the storage-upload precedent — and answers 503 AI_LLM_DISABLED at
+   * request time. Injected rather than constructed in here because building the provider needs the
+   * environment and the per-school circuit breaker, both owned by src/index.ts, and so a test can
+   * inject a fake.
+   */
+  aiLlmProvider?: LlmProvider | null;
+  /**
+   * Model-id overrides for the gateway's routing table (`AI_LLM_SMALL_MODEL` / `AI_LLM_LARGE_MODEL`).
+   * Threaded from the environment by src/index.ts so flipping a model is an env change, not a code
+   * change.
+   */
+  aiLlmModelOverrides?: Partial<Record<AiModelTier, string>>;
+  /**
    * Seam for account activation's Microsoft OIDC verification (ST-078). Defaults to the real ST-077
    * ID-token validation; injected in tests so activation can run without a live Microsoft JWKS, the
    * same way `logger` and `securityEventSink` are injected.
@@ -225,6 +243,8 @@ export function createApp({
   securityEventSink,
   docsEnabled = false,
   aiRerankEnabled = false,
+  aiLlmProvider = null,
+  aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
   storage = null,
   stripeProvider = null,
@@ -768,7 +788,18 @@ export function createApp({
   // that predate this gate are likewise absent until both dependencies exist.
   if (database && redis && entitlements) {
     const aiMeter = createAiTokenMeter({ redis });
-    app.use("/api/ai/*", aiEntitlementGate({ entitlements, meter: aiMeter }));
+    app.use(
+      "/api/ai/*",
+      aiEntitlementGate({
+        entitlements,
+        meter: aiMeter,
+        // The LLM gateway (ST-164) can generate up to 16,384 output tokens, which no default-size
+        // hold can cover, so the generate path resolves the worst-case hold (AI_LLM_MAX_RESERVE_TOKENS)
+        // and every other AI surface keeps the default.
+        resolveReserveTokens: (c) =>
+          c.req.path.endsWith("/generate") ? AI_LLM_MAX_RESERVE_TOKENS : undefined,
+      }),
+    );
     app.route("/", aiUsageRoutes({ entitlements, meter: aiMeter }));
     // Hybrid retrieval (ST-162). Mounted under the same gate so a search reserves and commits the
     // caller's AI quota, and only when the gate's dependencies (a database for entitlements, Redis
@@ -782,6 +813,18 @@ export function createApp({
         database,
         embedder: createDeterministicQueryEmbedder(),
         reranker: aiRerankEnabled ? createDeterministicCrossEncoderReranker() : null,
+      }),
+    );
+    // LLM gateway (ST-164). Mounted under the same gate so a generation reserves and commits the
+    // caller's AI quota, and only when the gate's dependencies exist — the generate surface must
+    // never run un-metered. The provider may be null (AI_LLM_ENABLED off): the route still
+    // registers and answers 503 AI_LLM_DISABLED at request time.
+    app.route(
+      "/",
+      aiGatewayRoutes({
+        database,
+        provider: aiLlmProvider,
+        modelOverrides: aiLlmModelOverrides,
       }),
     );
   }

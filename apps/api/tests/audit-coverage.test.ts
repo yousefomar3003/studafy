@@ -305,6 +305,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // per-student usage meter. auditAction("update", "ai_usage_meters") declares that intent, and like
   // the storage-upload precedent the declaration is metadata — no app.audit_logs row is written.
   "POST /api/ai/students/{studentId}/search",
+  // LLM gateway (ST-164). POST carries the generation request; the route's one write is the durable
+  // per-student usage meter, recorded with the same declaration as the retrieval route above.
+  "POST /api/ai/students/{studentId}/generate",
 ];
 
 function collectSourceFiles(dir: string): string[] {

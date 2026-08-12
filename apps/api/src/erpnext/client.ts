@@ -30,11 +30,11 @@
  * bodies. Nothing in this module logs `apiKey`.
  */
 
+import { CircuitOpenError } from "../lib/circuit-breaker";
+import { scrubSecret } from "../lib/scrub-secret";
 import { redactPayload } from "../middleware/auditEmitter";
 
-import { CircuitOpenError } from "./circuit-breaker";
-
-import type { CircuitBreaker } from "./circuit-breaker";
+import type { CircuitBreaker } from "../lib/circuit-breaker";
 import type { Logger } from "../logger";
 import type { SupportedLocale } from "../middleware/locale";
 
@@ -107,23 +107,6 @@ function backoffDelayMs(attempt: number): number {
 
 const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Replace every literal occurrence of a secret, at any depth, with a marker. */
-function scrubSecret(value: unknown, secret: string): unknown {
-  if (secret.length === 0) return value;
-  if (typeof value === "string") {
-    return value.includes(secret) ? value.split(secret).join("[REDACTED]") : value;
-  }
-  if (Array.isArray(value)) return value.map((item) => scrubSecret(item, secret));
-  if (value !== null && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      out[key] = scrubSecret(nested, secret);
-    }
-    return out;
-  }
-  return value;
-}
 
 export class ErpNextClient {
   private readonly baseUrl: string;

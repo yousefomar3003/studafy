@@ -84,6 +84,14 @@ export interface AiQuotaGateOptions {
   /** Tokens reserved up front per request. */
   defaultReserveTokens?: number;
   /**
+   * Resolve the hold size for one request, when the hold is not the default.
+   *
+   * The LLM gateway (ST-164) generates up to 16,384 output tokens, which no default-size hold can
+   * cover, so the generate route resolves `AI_LLM_MAX_RESERVE_TOKENS` by path; every other AI
+   * surface keeps `defaultReserveTokens`. `undefined` falls back to the default.
+   */
+  resolveReserveTokens?: (c: Context<AppEnv>) => number | undefined;
+  /**
    * Which student's quota the request draws on. Defaults to the `:studentId` path parameter (or, when
    * the gate is mounted via app.use where Hono exposes no route params, the /api/ai/students/{id}
    * path segment), the shape the AI chat routes will use.
@@ -214,6 +222,7 @@ export function aiEntitlementGate(options: AiQuotaGateOptions): MiddlewareHandle
     defaultReserveTokens = AI_DEFAULT_RESERVE_TOKENS,
     resolveStudentId = defaultResolveStudentId,
     reserveQuota = defaultReserveQuota,
+    resolveReserveTokens,
   } = options;
 
   return async (c, next) => {
@@ -255,7 +264,7 @@ export function aiEntitlementGate(options: AiQuotaGateOptions): MiddlewareHandle
         periodStart: ctx.ai.currentPeriodStart,
         periodEnd: ctx.ai.currentPeriodEnd,
         budget: ctx.budget,
-        amount: defaultReserveTokens,
+        amount: resolveReserveTokens?.(c) ?? defaultReserveTokens,
       });
     } catch (err) {
       log?.warn({ err, school_id: ctx.schoolId, student_id: studentId }, "ai quota reserve failed");

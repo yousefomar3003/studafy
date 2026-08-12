@@ -20,12 +20,12 @@ import {
   HYBRID_MAX_LIMIT,
   type HybridSearchResult,
 } from "../retrieval/search";
+import { recordDurableUsage } from "../usage/durable";
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { QueryEmbedder } from "../retrieval/embeddings";
 import type { Context } from "hono";
-import type { TransactionSql } from "postgres";
 
 /**
  * Hybrid retrieval endpoint (ST-162): search the school's AI corpus.
@@ -154,31 +154,6 @@ function tenantFrom(c: Context<AppEnv>): {
 } {
   const auth = requireAuth(c);
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
-}
-
-/**
- * Record this search's token cost in the durable per-student ledger. The Redis meter the gate
- * commits to is the quota decision surface; `app.ai_usage_meters` is the durable record the design
- * note reserves for the routes that produce usage. The gate has already proven the student holds an
- * AI subscription, so a missing row is treated as an unchargeable no-op rather than an error.
- */
-async function recordDurableUsage(
-  tx: TransactionSql,
-  schoolId: string,
-  studentId: string,
-  tokens: number,
-): Promise<void> {
-  const [subscription] = await tx<{ id: string }[]>`
-    SELECT id
-    FROM app.ai_subscriptions
-    WHERE school_id = ${schoolId}::uuid AND student_id = ${studentId}::uuid
-    ORDER BY created_at DESC
-    LIMIT 1
-  `;
-  if (!subscription) return;
-  await tx`
-    SELECT app.upsert_ai_usage_tokens(${studentId}::uuid, ${subscription.id}::uuid, ${tokens})
-  `;
 }
 
 export function aiRetrievalRoutes(deps: {

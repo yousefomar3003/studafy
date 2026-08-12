@@ -1,5 +1,5 @@
 /**
- * Circuit breaker for the ERPNext plane (ST-119).
+ * Circuit breaker for outbound HTTP planes (ERPNext ST-119, Anthropic LLM ST-164).
  *
  * A retry policy protects a caller from a blip. It makes a sustained outage worse: every request
  * pays the full timeout budget three times over before failing, and the pile-up of in-flight
@@ -15,8 +15,9 @@
  *   - {@link InMemoryCircuitBreaker} — per-process. Used when Redis is absent, which is the local
  *     and test configuration; `app.ts` already guards every Redis use with `if (redis)`.
  *
- * State is keyed per school, because one tenant's ERPNext site being down says nothing about
- * another's — they are separate Frappe sites behind the same host.
+ * State is keyed per resource (the ERPNext client keys per school site, the LLM provider per
+ * school), because one tenant's upstream being down says nothing about another's. The Redis key
+ * prefix and log component are configurable so each caller keeps its own breaker namespace.
  */
 
 import type { Logger } from "../logger";
@@ -32,7 +33,7 @@ export class CircuitOpenError extends Error {
   readonly key: string;
 
   constructor(key: string) {
-    super("Circuit is open for this ERPNext site");
+    super("Circuit is open for this resource");
     this.name = "CircuitOpenError";
     this.key = key;
   }
@@ -45,10 +46,18 @@ export interface CircuitBreakerOptions {
   cooldownMs?: number;
   /**
    * Which errors count toward opening. Defaults to counting everything, but the ERPNext client
-   * passes a predicate that excludes 4xx: a validation rejection means ERPNext is *working*, and
-   * counting it would let a user typing bad input open the circuit for their whole school.
+   * and the LLM provider pass a predicate that excludes 4xx: a validation rejection means the
+   * upstream is *working*, and counting it would let a user typing bad input open the circuit for
+   * their whole school.
    */
   isFailure?: (error: unknown) => boolean;
+  /**
+   * Redis key prefix, carrying its own separator. Each caller passes a distinct namespace
+   * (`"cb:erpnext"`, `"cb:ai"`), so one plane's breaker never shares state with another's.
+   */
+  keyPrefix?: string;
+  /** Name used for this breaker's child logger component. */
+  component?: string;
 }
 
 export interface CircuitBreaker {
@@ -209,20 +218,26 @@ export class RedisCircuitBreaker implements CircuitBreaker {
   private readonly threshold: number;
   private readonly cooldownMs: number;
   private readonly isFailure: (error: unknown) => boolean;
+  private readonly keyPrefix: string;
   /** Used when Redis itself is unreachable, so the breaker degrades rather than disappearing. */
   private readonly fallback: InMemoryCircuitBreaker;
 
   constructor(redis: RedisClient, logger: Logger, options: CircuitBreakerOptions = {}) {
     this.redis = redis;
-    this.logger = logger.child({ component: "erpnext-circuit-breaker" });
+    this.logger = logger.child({ component: options.component ?? "circuit-breaker" });
     this.threshold = options.failureThreshold ?? DEFAULT_FAILURE_THRESHOLD;
     this.cooldownMs = options.cooldownMs ?? DEFAULT_COOLDOWN_MS;
     this.isFailure = options.isFailure ?? (() => true);
+    this.keyPrefix = options.keyPrefix ?? "cb";
     this.fallback = new InMemoryCircuitBreaker(options);
   }
 
   private keys(key: string): [string, string, string] {
-    return [`cb:erpnext:${key}:f`, `cb:erpnext:${key}:o`, `cb:erpnext:${key}:p`];
+    return [
+      `${this.keyPrefix}:${key}:f`,
+      `${this.keyPrefix}:${key}:o`,
+      `${this.keyPrefix}:${key}:p`,
+    ];
   }
 
   /**
