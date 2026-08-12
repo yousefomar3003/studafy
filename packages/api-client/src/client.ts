@@ -19,6 +19,13 @@ export interface ApiClientOptions {
   readonly sanitize?: boolean | SanitizeOptions;
   /** Override the fetch implementation (tests inject a mock; production uses the platform default). */
   readonly fetch?: typeof globalThis.fetch;
+  /**
+   * Cookie policy for requests. `"include"` is required when the client runs on a different origin
+   * than the API yet still relies on a cookie credential (the web session's HttpOnly refresh
+   * cookie). Omitted for same-origin or bearer-only clients. The literal union mirrors
+   * `RequestCredentials` without pulling the DOM lib into this package's `ES2022` target.
+   */
+  readonly credentials?: "omit" | "same-origin" | "include";
 }
 
 /** A fully-typed client whose method surface is derived from the OpenAPI document. */
@@ -36,6 +43,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   const client = createClient<paths>({
     baseUrl: options.baseUrl,
     ...(options.fetch ? { fetch: options.fetch } : {}),
+    ...(options.credentials ? { credentials: options.credentials } : {}),
   });
 
   if (options.getToken) {
