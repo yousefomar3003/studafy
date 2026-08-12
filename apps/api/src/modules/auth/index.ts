@@ -79,11 +79,13 @@ export { sessionRoutes } from "./routes/session-routes";
 export {
   activationRoutes,
   type ActivationRouteDeps,
-  type VerifiedMicrosoftIdentity,
+  type VerifiedActivationIdentity,
 } from "./routes/activation-routes";
+export { activationOAuthRoutes } from "./routes/activation-oauth-routes";
 export {
   activateAccount,
   ACTIVATION_PROVIDER,
+  type ActivationProvider,
   type ActivateAccountParams,
   type ActivateAccountResult,
   type ActivationIdentity,

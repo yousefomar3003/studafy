@@ -50,6 +50,7 @@ import {
 } from "./modules/attendance";
 import { auditRoutes } from "./modules/audit";
 import {
+  activationOAuthRoutes,
   activationRoutes,
   adminDeviceRoutes,
   configureRefreshCookie,
@@ -499,26 +500,30 @@ export function createApp({
     );
   }
 
-  // Account activation (ST-078). Consumes an invitation, provisions the user, links the Microsoft
+  // Account activation (ST-078). Consumes an invitation, provisions the user, links the OAuth
   // identity, and issues the first session token pair in one transaction. Public like the OAuth
   // callbacks (the invitation token is the credential), and needs a database plus a key store to mint
   // that first token pair.
   if (database && keyStore) {
+    const sessionTokenConfig = {
+      keyStore,
+      issuer: jwtIssuer,
+      audience: jwtAudience,
+      accessTtlSeconds: jwtAccessTtlSeconds,
+      refreshTtlSeconds: jwtRefreshTtlSeconds,
+    };
     app.route(
       "/",
       activationRoutes(
         database,
-        {
-          keyStore,
-          issuer: jwtIssuer,
-          audience: jwtAudience,
-          accessTtlSeconds: jwtAccessTtlSeconds,
-          refreshTtlSeconds: jwtRefreshTtlSeconds,
-        },
+        sessionTokenConfig,
         logger,
         microsoftIdentityVerifier ? { verifyMicrosoftIdentity: microsoftIdentityVerifier } : {},
       ),
     );
+    // Browser-redirect arm of the same flow: /start + /invitation/callback give an invited user the
+    // full-page OAuth round trip and run activation server-side (see activation-oauth-routes.ts).
+    app.route("/", activationOAuthRoutes(database, sessionTokenConfig, logger));
   }
 
   // Returning-user OAuth login (ST-079). Authenticates an active user via a verified Microsoft

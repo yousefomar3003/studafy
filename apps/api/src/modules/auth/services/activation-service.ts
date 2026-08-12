@@ -2,7 +2,7 @@
  * Account activation — the atomic onboarding transaction (ST-078).
  *
  * An invited user completes onboarding by presenting their one-time invitation token together with a
- * verified Microsoft OIDC identity. This service turns that into an account in a single database
+ * verified Microsoft or Google OIDC identity. This service turns that into an account in a single database
  * transaction: it consumes the invitation, provisions (or activates) the user, grants the invited
  * role, links the `oauth_identity`, writes the audit trail, and issues the first session token pair —
  * all or nothing.
@@ -48,12 +48,15 @@ import type { AuthChannel } from "../channels";
 import type { InvitationVerificationState } from "../invitation/verification";
 import type { ErrorCode } from "@studafy/constants";
 
-/** The only OAuth provider this activation flow links. Matches app.oauth_identities.provider. */
-export const ACTIVATION_PROVIDER = "microsoft";
+/** The OAuth providers the activation flow can link. Matches app.oauth_identities.provider. */
+export type ActivationProvider = "microsoft" | "google";
 
-/** A Microsoft OIDC identity that has already been verified by the caller (ST-077). */
+/** Default provider, retained for backward compatibility with callers that omit it. */
+export const ACTIVATION_PROVIDER: ActivationProvider = "microsoft";
+
+/** An OIDC identity that has already been verified by the caller (ST-077). */
 export interface ActivationIdentity {
-  provider: typeof ACTIVATION_PROVIDER;
+  provider: ActivationProvider;
   /** The IdP subject (`sub`) claim — stored as app.oauth_identities.subject. */
   subject: string;
   /** The verified email from the ID token, matched against the invitation's bound email. */
@@ -301,7 +304,7 @@ export async function activateAccount(
         throw new CodedHttpException(
           409,
           ERROR_CODES.CONFLICT_DUPLICATE_ENTRY,
-          "This Microsoft account is already linked to another user.",
+          "This account is already linked to another user.",
         );
       }
       throw error;
