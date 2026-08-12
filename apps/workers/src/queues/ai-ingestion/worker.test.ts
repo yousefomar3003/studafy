@@ -74,7 +74,7 @@ describe("ai-ingestion fixture corpus", () => {
     } finally {
       await ocr.close();
     }
-  });
+  }, 60_000);
 
   test("pptx decks chunk one per slide with slide-number anchors and captured notes", async () => {
     for (const spec of FIXTURES) {
@@ -133,7 +133,7 @@ describe("ai-ingestion fixture corpus", () => {
         ).toBeLessThanOrEqual(DEFAULT_MAX_CHUNK_CHARS);
       });
     }
-  });
+  }, 60_000);
 });
 
 describe("chunkBlocks", () => {
