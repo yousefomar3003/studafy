@@ -12,8 +12,6 @@ export type { RealtimeClientOptions, RealtimeConnectionStatus, RealtimeSocket } 
 
 export { RealtimeProvider, useRealtime, useRealtimeConnection } from "./connection";
 
-export { getRealtimeToken } from "./token";
-
 export {
   EVENT_QUERY_INVALIDATIONS,
   allInvalidationKeys,

@@ -3,7 +3,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
-import { AppProviders } from "./providers";
+import { createSessionStore } from "../lib/auth";
+
+import { AppProviders, createInertRealtimeSocket } from "./providers";
 import { routes } from "./routes";
 
 // These tests assert routing, not data. Stub the API client so the /portal page's health query
@@ -14,13 +16,26 @@ mock.module("../lib/api", () => ({
 
 afterEach(cleanup);
 
+// /portal and /account are behind <RequireAuth>, so every render needs an authenticated session.
+// Build a store over an in-memory refresh client and resolve it before the page mounts.
+const sessionStore = createSessionStore({
+  refreshClient: {
+    refresh: async () => ({
+      accessToken: "test-token",
+      expiresAt: Date.now() + 3_600_000,
+      sessionId: "test-session",
+    }),
+    logout: async () => undefined,
+  },
+});
+await sessionStore.restore();
+
 const renderAt = (path: string) => {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   // Wrap in the real app providers: pages such as /portal now consume the API client via a query,
-  // which needs the QueryClientProvider. The health request fails harmlessly against no server here;
-  // these tests assert routing, not data.
+  // which needs the QueryClientProvider, and the route guards need the AuthProvider.
   return render(
-    <AppProviders>
+    <AppProviders sessionStore={sessionStore} realtimeSocketFactory={createInertRealtimeSocket}>
       <RouterProvider router={router} />
     </AppProviders>,
   );

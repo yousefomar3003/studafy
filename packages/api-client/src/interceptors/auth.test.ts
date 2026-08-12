@@ -51,4 +51,17 @@ describe("authMiddleware (via the client)", () => {
 
     expect(last()?.headers.get("authorization")).toBeNull();
   });
+
+  test("forwards a credentials policy for cross-origin cookie-authenticated clients", async () => {
+    const { fetch, last } = capturingFetch();
+    const client = createApiClient({
+      baseUrl: "http://api.test",
+      credentials: "include",
+      fetch,
+    });
+
+    await client.GET("/healthz");
+
+    expect(last()?.credentials).toBe("include");
+  });
 });
