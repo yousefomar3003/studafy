@@ -17,6 +17,7 @@
   "OAUTH_STATE_INVALID": "حالة OAuth غير صالحة أو منتهية الصلاحية",
   "OAUTH_EMAIL_NOT_VERIFIED": "لم يتم التحقق من بريد OAuth الإلكتروني",
   "OAUTH_PROVIDER_ERROR": "خطأ في مزود OAuth",
+  "OAUTH_CANCELLED": "ألغى المستخدم تسجيل الدخول",
   "REQUIRES_ADMIN_APPROVAL": "يتطلب هذا الحساب موافقة المسؤول قبل تفعيله",
   "AUTHZ_FORBIDDEN": "تم رفض الوصول",
   "ACCESS_DENIED": "تم رفض الوصول",

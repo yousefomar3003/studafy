@@ -14,6 +14,7 @@ import type { RouteObject } from "react-router-dom";
 // Secondary route groups are code-split so the initial (marketing) route stays small.
 const AuthLoginPage = lazy(() => import("../routes/auth/LoginPage"));
 const AuthCallbackPage = lazy(() => import("../routes/auth/CallbackPage"));
+const AuthErrorPage = lazy(() => import("../routes/auth/ErrorPage"));
 const InvitePage = lazy(() => import("../routes/invite/InvitePage"));
 const InviteCompletePage = lazy(() => import("../routes/invite/InviteCompletePage"));
 const OnboardingPage = lazy(() => import("../routes/onboarding/OnboardingPage"));
@@ -39,6 +40,9 @@ export const routes: RouteObject[] = [
         path: "auth",
         children: [
           { path: "login", element: <AuthLoginPage /> },
+          // The OAuth callbacks 302 here after a failed exchange, with the failure in `?code=`
+          // (see oauth/error-redirect.ts and routes/auth/ErrorPage.tsx).
+          { path: "error", element: <AuthErrorPage /> },
           { path: "callback", element: <AuthCallbackPage /> },
         ],
       },
