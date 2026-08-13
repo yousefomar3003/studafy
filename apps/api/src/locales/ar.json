@@ -165,6 +165,8 @@
   "AI_LLM_REQUEST_REJECTED": "رفض مزود الذكاء الاصطناعي هذا الطلب",
   "AI_CONVERSATION_NOT_FOUND": "لم يتم العثور على محادثة الذكاء الاصطناعي لهذا الطالب",
   "AI_ASK_INSUFFICIENT_GROUNDING": "لم أجد مادة كافية حول هذا الموضوع للإجابة بثقة. جرّب أحد المواضيع ذات الصلة أدناه، أو أعد صياغة سؤالك.",
+  "AI_QUIZ_GENERATION_FAILED": "تعذّر التحقق من مخرجات الاختبار من مزود الذكاء الاصطناعي، يرجى المحاولة مرة أخرى",
+  "AI_QUIZ_NOT_FOUND": "لم يتم العثور على هذا الاختبار لهذا الطالب",
   "SUBSCRIPTION_ALREADY_CANCELED": "تمت جدولة إلغاء هذا الاشتراك بالفعل",
   "SUBSCRIPTION_CANCELLATION_NOT_PENDING": "لا يوجد إلغاء معلق للتراجع عنه",
   "SUBSCRIPTION_NOT_LINKED_TO_PROVIDER": "لا يوجد سجل لدى مزود الدفع لهذا الاشتراك",

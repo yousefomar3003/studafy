@@ -1,14 +1,18 @@
 /**
  * AI module (ST-155): entitlement gate, Redis token meter, usage endpoint, hybrid retrieval (ST-162),
  * its cross-encoder re-ranker (ST-163), and the LLM gateway with model routing (ST-164) for
- * `/api/ai/*`, plus the grounded Ask AI stream (ST-165) and the cached study-material summarizer.
+ * `/api/ai/*`, plus the grounded Ask AI stream (ST-165), the cached study-material summarizer, and
+ * the quiz generator and grader (ST-167).
  *
  * The gate enforces school active -> AI add-on active -> quota available with distinct HTTP codes
  * (403 / 402 / 429); the meter is the atomic Redis ledger that backs the quota decision; the usage
  * route reports the remaining budget; the retrieval route fuses the ANN and keyword legs and, when
  * the re-ranker is wired in, cuts the fused top-20 to a re-scored top-6; the gateway routes a
  * feature to a small/large model tier, calls the Anthropic provider, and commits the provider-
- * reported tokens against the caller's quota.
+ * reported tokens against the caller's quota. The quiz generator validates every question against a
+ * schema before persisting it, so a malformed or hallucinated-citation response is rejected rather
+ * than stored; grading reads the persisted answer key back and scores deterministically, with no
+ * model call and no quota spend.
  */
 
 export {
@@ -30,6 +34,7 @@ export { aiRetrievalRoutes } from "./routes/retrieval-routes";
 export { aiGatewayRoutes } from "./routes/gateway-routes";
 export { aiAskRoutes } from "./routes/ask-routes";
 export { aiSummaryRoutes } from "./routes/summary-routes";
+export { aiQuizRoutes } from "./routes/quiz-routes";
 export {
   createSummaryCache,
   summaryCacheKey,
@@ -45,6 +50,30 @@ export {
   type LoadSummaryMaterialResult,
 } from "./summary/materials";
 export { assembleSummaryPrompt, type SummaryPrompt } from "./summary/prompt";
+export {
+  QUIZ_QUESTION_TYPES,
+  quizGenerationSchema,
+  quizGeneratedQuestionSchema,
+  quizOptionSchema,
+  type QuizGeneratedQuestion,
+  type QuizGeneration,
+  type QuizOption,
+  type QuizQuestionType,
+} from "./quiz/schema";
+export { assembleQuizPrompt, toQuizSources, type QuizPrompt } from "./quiz/prompt";
+export {
+  loadQuizMaterials,
+  type LoadedQuizChunk,
+  type LoadQuizMaterialsResult,
+} from "./quiz/materials";
+export { parseQuizGeneration, QuizGenerationInvalidError } from "./quiz/parser";
+export { gradeQuiz, type QuizAnswerInput, type QuizGradeResult } from "./quiz/grading";
+export {
+  persistQuiz,
+  loadQuizForGrading,
+  type PersistedQuiz,
+  type PersistedQuizQuestion,
+} from "./quiz/persistence";
 export {
   AI_FEATURES,
   AI_LLM_MODEL_CATALOG,

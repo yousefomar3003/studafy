@@ -303,6 +303,14 @@ export const ERROR_CODES = {
   // localization catalog as every coded error so the client-facing text stays translated.
   AI_ASK_INSUFFICIENT_GROUNDING: "AI_ASK_INSUFFICIENT_GROUNDING",
 
+  // Quiz generation and grading (ST-167). AI_QUIZ_GENERATION_FAILED is the model-output-stage
+  // counterpart to AI_LLM_UNAVAILABLE above: the provider answered, but its JSON did not validate
+  // against the quiz schema (malformed options, or a citation the model invented) -- a client can
+  // retry the same request. AI_QUIZ_NOT_FOUND covers the grading endpoint's quiz lookup, on the same
+  // terms AI_CONVERSATION_NOT_FOUND covers Ask AI's.
+  AI_QUIZ_GENERATION_FAILED: "AI_QUIZ_GENERATION_FAILED",
+  AI_QUIZ_NOT_FOUND: "AI_QUIZ_NOT_FOUND",
+
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",
