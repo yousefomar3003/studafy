@@ -8,6 +8,7 @@ import { AUTH_CHANNELS } from "../../auth/channels";
 
 import { aiEntitlementGate } from "./entitlement-gate";
 
+import type { AiQuotaHandle } from "./entitlement-gate";
 import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -301,6 +302,39 @@ describe("aiEntitlementGate reservation lifecycle", () => {
 
     expect(res.status).toBe(200);
     expect(calls.release).toHaveLength(1);
+  });
+
+  test("detach() stops the auto-release, and the handle keeps working after the handler returns", async () => {
+    const { meter, calls } = recordingMeter();
+    let handedOff: AiQuotaHandle | undefined;
+    const app = buildGateApp(
+      fakeEntitlements(schoolEntitlement(true), aiEntitlement(true)),
+      meter,
+      (a) => {
+        a.post("/api/ai/students/:studentId/chat", (c) => {
+          const quota = c.get("aiQuota")!;
+          // Mirrors streamSSE: the route hands the reservation off and returns before any
+          // commit/release, exactly the shape that would otherwise race the gate's finally block.
+          quota.detach();
+          handedOff = quota;
+          return c.json({ ok: true });
+        });
+      },
+    );
+
+    const res = await app.request(`/api/ai/students/${STUDENT_ID}/chat`, { method: "POST" });
+
+    expect(res.status).toBe(200);
+    // The finally block saw settled === true and skipped its release — detach(), not a real commit.
+    expect(calls.commit).toHaveLength(0);
+    expect(calls.release).toHaveLength(0);
+
+    // The reservation is still live: the caller that was handed the handle can settle it for real,
+    // after the request/response cycle (and this gate's middleware chain) has already finished.
+    await handedOff?.commit(12);
+    expect(calls.commit).toHaveLength(1);
+    expect(calls.commit[0]).toMatchObject({ reservationId: "res-1", consumedTokens: 12 });
+    expect(calls.release).toHaveLength(0);
   });
 
   test("the usage path passes through without reserving", async () => {

@@ -35,6 +35,7 @@ import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
 import {
   AI_LLM_MAX_RESERVE_TOKENS,
+  aiAskRoutes,
   aiEntitlementGate,
   aiGatewayRoutes,
   aiRetrievalRoutes,
@@ -799,10 +800,13 @@ export function createApp({
         entitlements,
         meter: aiMeter,
         // The LLM gateway (ST-164) can generate up to 16,384 output tokens, which no default-size
-        // hold can cover, so the generate path resolves the worst-case hold (AI_LLM_MAX_RESERVE_TOKENS)
-        // and every other AI surface keeps the default.
+        // hold can cover, so the generate path resolves the worst-case hold (AI_LLM_MAX_RESERVE_TOKENS).
+        // The ask path (ST-165) bounds its grounded prompt with AI_ASK_SOURCE_LIMIT × the chunk text
+        // cap plus the question, so it is held at the same worst case — see config.ts.
         resolveReserveTokens: (c) =>
-          c.req.path.endsWith("/generate") ? AI_LLM_MAX_RESERVE_TOKENS : undefined,
+          c.req.path.endsWith("/generate") || c.req.path.endsWith("/ask")
+            ? AI_LLM_MAX_RESERVE_TOKENS
+            : undefined,
       }),
     );
     app.route("/", aiUsageRoutes({ entitlements, meter: aiMeter }));
@@ -829,6 +833,19 @@ export function createApp({
       aiGatewayRoutes({
         database,
         provider: aiLlmProvider,
+        modelOverrides: aiLlmModelOverrides,
+      }),
+    );
+    // Ask AI streaming (ST-165). Mounted under the same gate so a grounded answer reserves and
+    // commits the caller's AI quota, and only when the gate's dependencies exist — the ask surface
+    // must never run un-metered. The provider may be null on the same kill-switch terms as the
+    // gateway: the route still registers and answers 503 AI_LLM_DISABLED at request time.
+    app.route(
+      "/",
+      aiAskRoutes({
+        database,
+        provider: aiLlmProvider,
+        embedder: createDeterministicQueryEmbedder(),
         modelOverrides: aiLlmModelOverrides,
       }),
     );

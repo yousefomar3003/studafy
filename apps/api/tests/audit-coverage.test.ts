@@ -308,6 +308,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // LLM gateway (ST-164). POST carries the generation request; the route's one write is the durable
   // per-student usage meter, recorded with the same declaration as the retrieval route above.
   "POST /api/ai/students/{studentId}/generate",
+  // Ask AI streaming (ST-165). POST carries the question; the route's writes are the conversation,
+  // message, and citation rows, recorded with the storage-upload precedent (the interaction's own
+  // rows are its audit record), plus the durable usage meter.
+  "POST /api/ai/students/{studentId}/ask",
 ];
 
 function collectSourceFiles(dir: string): string[] {

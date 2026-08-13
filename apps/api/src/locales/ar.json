@@ -162,6 +162,8 @@
   "AI_LLM_DISABLED": "توليد الذكاء الاصطناعي معطّل حالياً",
   "AI_LLM_UNAVAILABLE": "مزود الذكاء الاصطناعي غير متاح مؤقتاً",
   "AI_LLM_REQUEST_REJECTED": "رفض مزود الذكاء الاصطناعي هذا الطلب",
+  "AI_CONVERSATION_NOT_FOUND": "لم يتم العثور على محادثة الذكاء الاصطناعي لهذا الطالب",
+  "AI_ASK_INSUFFICIENT_GROUNDING": "لم أجد مادة كافية حول هذا الموضوع للإجابة بثقة. جرّب أحد المواضيع ذات الصلة أدناه، أو أعد صياغة سؤالك.",
   "SUBSCRIPTION_ALREADY_CANCELED": "تمت جدولة إلغاء هذا الاشتراك بالفعل",
   "SUBSCRIPTION_CANCELLATION_NOT_PENDING": "لا يوجد إلغاء معلق للتراجع عنه",
   "SUBSCRIPTION_NOT_LINKED_TO_PROVIDER": "لا يوجد سجل لدى مزود الدفع لهذا الاشتراك",

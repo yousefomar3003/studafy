@@ -265,6 +265,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // the authorization surface for every /api/ai/* route, and the generate route's one write is the
   // metered student's own usage ledger.
   "POST /api/ai/students/{studentId}/generate",
+  // Ask AI streaming (ST-165). Same gate and same rationale as the gateway route above; the ask
+  // route's writes are the grounded answer's messages, citations, and the student's usage ledger.
+  "POST /api/ai/students/{studentId}/ask",
 ];
 
 /**
@@ -396,6 +399,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // LLM gateway (ST-164) — same gate, same RLS, same single write to the metered student's own
   // ai_usage_meters row.
   "POST /api/ai/students/{studentId}/generate",
+  // Ask AI streaming (ST-165) — same gate, same RLS; its writes are the answer's messages,
+  // citations, and the student's ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/ask",
 ]);
 
 // ---------------------------------------------------------------------------

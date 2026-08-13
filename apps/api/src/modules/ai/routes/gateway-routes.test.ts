@@ -74,6 +74,9 @@ function quotaHandle(): AiQuotaHandle & { commits: number[] } {
     async release() {
       return { settled: true, remaining: 1000 };
     },
+    detach() {
+      handle.settled = true;
+    },
   };
   return Object.assign(handle, { commits });
 }

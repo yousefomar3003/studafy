@@ -293,6 +293,12 @@ export const ERROR_CODES = {
   AI_LLM_UNAVAILABLE: "AI_LLM_UNAVAILABLE",
   AI_LLM_REQUEST_REJECTED: "AI_LLM_REQUEST_REJECTED",
 
+  // Ask AI streaming endpoint (ST-165).
+  AI_CONVERSATION_NOT_FOUND: "AI_CONVERSATION_NOT_FOUND",
+  // Not an HTTP status -- this is the refusal path's SSE payload message, resolved through the same
+  // localization catalog as every coded error so the client-facing text stays translated.
+  AI_ASK_INSUFFICIENT_GROUNDING: "AI_ASK_INSUFFICIENT_GROUNDING",
+
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",
