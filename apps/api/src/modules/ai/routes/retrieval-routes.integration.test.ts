@@ -99,7 +99,7 @@ function chunkEmbedding(seed: number): string {
 }
 
 function quotaHandle(): AiQuotaHandle {
-  return {
+  const handle: AiQuotaHandle = {
     reservationId: "res-retrieval",
     reservedTokens: 5,
     settled: false,
@@ -109,7 +109,11 @@ function quotaHandle(): AiQuotaHandle {
     async release() {
       return { settled: true, remaining: 1000 };
     },
+    detach() {
+      handle.settled = true;
+    },
   };
+  return handle;
 }
 
 function buildRetrievalApp(

@@ -28,6 +28,7 @@ export {
 export { aiUsageRoutes } from "./routes/usage-routes";
 export { aiRetrievalRoutes } from "./routes/retrieval-routes";
 export { aiGatewayRoutes } from "./routes/gateway-routes";
+export { aiAskRoutes } from "./routes/ask-routes";
 export {
   AI_FEATURES,
   AI_LLM_MODEL_CATALOG,

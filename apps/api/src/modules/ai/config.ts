@@ -47,3 +47,28 @@ export const AI_LLM_MAX_RESERVE_TOKENS = 24_000;
  * lets a probe through.
  */
 export const AI_LLM_RETRY_AFTER_SECONDS = 30;
+
+/**
+ * Ask AI streaming endpoint (ST-165).
+ *
+ * The ask route reserves the same worst-case hold as /generate (AI_LLM_MAX_RESERVE_TOKENS): its
+ * output is the same open-ended, large-tier generation, just delivered as a stream instead of one
+ * response body.
+ */
+
+/** The student's question. Short — this is a chat turn, not the /generate route's raw prompt field. */
+export const AI_ASK_QUESTION_MAX_CHARS = 2000;
+
+/**
+ * Minimum fused RRF score a grounded answer requires from its best retrieval hit, AND-ed with that
+ * hit having matched the keyword leg (see `ask/refusal.ts` for why the AND is load-bearing: the
+ * semantic leg here is a deterministic mock, not a real embedding, so its score alone cannot carry
+ * a relevance verdict). Below this, the route refuses rather than answers from noise.
+ */
+export const AI_ASK_MIN_RELEVANCE_SCORE = 0.02;
+
+/** How many retrieval hits are handed to the model as numbered, citable sources. */
+export const AI_ASK_SOURCE_LIMIT = 6;
+
+/** Matches the 90-day retention `ai_messages.expires_at` documents (migration 000021). */
+export const AI_ASK_MESSAGE_RETENTION_DAYS = 90;

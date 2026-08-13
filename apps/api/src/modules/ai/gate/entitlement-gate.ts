@@ -46,12 +46,27 @@ export interface AiQuotaHandle {
   reservationId: string;
   /** Tokens this request is holding while it runs. */
   reservedTokens: number;
-  /** True once the reservation was settled by commit() or release(). */
+  /** True once the reservation was settled by commit() or release(), or handed off by detach(). */
   settled: boolean;
   /** Move this request's hold into used tokens. Idempotent. */
   commit(consumedTokens: number): Promise<AiSettleResult>;
   /** Return this request's hold to the budget without counting it as usage. Idempotent. */
   release(): Promise<AiSettleResult>;
+  /**
+   * Hand the live reservation off to code that outlives this handler's return.
+   *
+   * `streamSSE` (hono/streaming) fires its callback without awaiting it and returns the Response
+   * immediately, so a streaming route's own async function resolves before its SSE body has written
+   * a single byte. The gate's `finally` block runs right after that resolution -- before the stream
+   * has produced anything to commit -- and would release a hold the route fully intends to keep
+   * (see docs/rag/ask-ai-streaming-and-prompt-injection.md). `detach()` marks the handle settled
+   * from the gate's point of view, so its `finally` skips the auto-release, WITHOUT touching the
+   * reservation itself: it stays live in Redis under the same `reservationId` until the detached
+   * caller calls `commit()`/`release()` on this same handle once the stream actually ends. Call it
+   * only once success up to the point of opening the stream is certain -- anything that can still
+   * fail before that should throw normally and let the gate release as usual.
+   */
+  detach(): void;
 }
 
 /** What the gate resolved for the request: the entitlement verdicts and the budget in force. */
@@ -196,6 +211,9 @@ function createHandle(
       const result = await meter.release(base);
       if (result.settled) handle.settled = true;
       return result;
+    },
+    detach() {
+      handle.settled = true;
     },
   };
 
