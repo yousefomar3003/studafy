@@ -38,6 +38,7 @@ import {
   aiAskRoutes,
   aiEntitlementGate,
   aiGatewayRoutes,
+  aiQuizRoutes,
   aiRetrievalRoutes,
   aiSummaryRoutes,
   aiUsageRoutes,
@@ -808,11 +809,15 @@ export function createApp({
         // path (the material-summarizer) likewise feeds an open-ended generation and is held at the
         // same worst case — its input is bounded (AI_SUMMARY_CHUNK_LIMIT × chunk cap), but its output
         // ceiling still exceeds any default-size hold, and a summary that raced its reservation would
-        // trip the meter's out-of-range guard.
+        // trip the meter's out-of-range guard. Quiz generation (ST-167) is held at the same worst
+        // case for the same reason -- see config.ts's AI_QUIZ_* reservation math -- but only the
+        // generate path (POST .../quizzes); grading (POST .../quizzes/{quizId}/grade) makes no LLM
+        // call and stays on the default hold.
         resolveReserveTokens: (c) =>
           c.req.path.endsWith("/generate") ||
           c.req.path.endsWith("/ask") ||
-          c.req.path.endsWith("/summarize")
+          c.req.path.endsWith("/summarize") ||
+          c.req.path.endsWith("/quizzes")
             ? AI_LLM_MAX_RESERVE_TOKENS
             : undefined,
       }),
@@ -869,6 +874,18 @@ export function createApp({
         database,
         provider: aiLlmProvider,
         cache: createSummaryCache(redis),
+        modelOverrides: aiLlmModelOverrides,
+      }),
+    );
+    // Quiz generation and grading (ST-167). Mounted under the same gate so a generated quiz reserves
+    // and commits the caller's AI quota, and only when the gate's dependencies exist -- generation
+    // must never run un-metered. The provider may be null on the same kill-switch terms as the
+    // gateway; grading makes no provider call at all and is unaffected by the kill switch.
+    app.route(
+      "/",
+      aiQuizRoutes({
+        database,
+        provider: aiLlmProvider,
         modelOverrides: aiLlmModelOverrides,
       }),
     );

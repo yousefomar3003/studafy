@@ -98,3 +98,57 @@ export const AI_SUMMARY_CACHE_KEY_PREFIX = "aisum";
 
 /** How long a cached summary is served before a repeat request regenerates it. */
 export const AI_SUMMARY_CACHE_TTL_SECONDS = 24 * 60 * 60;
+
+/**
+ * Quiz generator and grader (ST-167).
+ *
+ * The generate route loads a bounded prefix of each selected material's ingested chunks (mirroring
+ * the summarizer's contiguous-prefix-until-budget approach, extended across up to
+ * `AI_QUIZ_MAX_MATERIALS` materials), asks the large tier for a strict-JSON question set, and
+ * validates every question against the quiz schema (`quiz/schema.ts`) before persisting it -- an
+ * output that fails validation is never stored or returned (see `quiz/parser.ts`). The answer key
+ * lives only in `app.quiz_questions`; the generation response carries each question's prompt,
+ * options (for MCQ), and citation, never the correct answer, so grading is the only way to learn it.
+ *
+ * There is deliberately no server-side "regenerate on invalid JSON" retry: a schema failure is
+ * treated the same as a transport failure (503, not committed to quota), which keeps the route on
+ * the same failure posture the rest of the gateway already uses instead of inventing a second one.
+ */
+
+/** Upper bound on how many materials one quiz can be generated from in a single request. */
+export const AI_QUIZ_MAX_MATERIALS = 5;
+
+/** Maximum number of text chunks fed to the quiz model per material, in chunk order. */
+export const AI_QUIZ_CHUNK_LIMIT_PER_MATERIAL = 20;
+
+/**
+ * Maximum characters of source text handed to the model across every selected material combined.
+ * Applied as a budget to a contiguous prefix of each material's chunks in order (same rule as
+ * `AI_SUMMARY_MAX_INPUT_CHARS`). ~4 characters per token ≈ 7,500 input tokens.
+ */
+export const AI_QUIZ_MAX_INPUT_CHARS = 30_000;
+
+export const AI_QUIZ_MIN_QUESTIONS = 1;
+
+/** Upper bound on `questionCount`; also the worst case the reservation math below is sized against. */
+export const AI_QUIZ_MAX_QUESTIONS = 15;
+
+export const AI_QUIZ_DEFAULT_QUESTIONS = 5;
+
+/**
+ * Output-token ceiling passed to the provider: `questionCount` scaled by an estimated cost per
+ * question (JSON for a prompt, up to a handful of options, a citation, and either a correct option
+ * id or a short-answer key -- roughly 220 tokens), plus a fixed buffer, capped so a request can never
+ * ask for more than the reservation covers.
+ *
+ * Worst case at `AI_QUIZ_MAX_QUESTIONS`: 15 * 220 + 300 = 3,600, comfortably under the 4,096 cap.
+ * Combined with the ~7,500-token input budget above, one generation call costs at most ~11,100
+ * tokens -- well inside `AI_LLM_MAX_RESERVE_TOKENS` (24,000), so the quiz route reuses that existing
+ * reservation rather than defining its own.
+ */
+export const AI_QUIZ_OUTPUT_TOKENS_PER_QUESTION = 220;
+export const AI_QUIZ_OUTPUT_TOKEN_BUFFER = 300;
+export const AI_QUIZ_OUTPUT_TOKENS_CEILING = 4096;
+
+/** Maximum length of one submitted answer on the grading endpoint. */
+export const AI_QUIZ_ANSWER_MAX_CHARS = 1000;

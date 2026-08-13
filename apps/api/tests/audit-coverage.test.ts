@@ -315,6 +315,12 @@ const EXPECTED_MUTATING_ROUTES = [
   // Study-material summarizer. POST carries the material id; the route's one write is the durable
   // per-student usage meter, recorded with the same declaration as the retrieval route above.
   "POST /api/ai/students/{studentId}/summarize",
+  // Quiz generation and grading (ST-167). Generation's writes are app.quizzes, app.quiz_questions,
+  // and the durable usage meter, declared "insert" on quiz_questions. Grading writes nothing --
+  // it reads the persisted answer key and scores in memory -- so it is declared "read" rather than
+  // borrowing a write verb that did not happen; see routes/quiz-routes.ts.
+  "POST /api/ai/students/{studentId}/quizzes",
+  "POST /api/ai/students/{studentId}/quizzes/{quizId}/grade",
 ];
 
 function collectSourceFiles(dir: string): string[] {
