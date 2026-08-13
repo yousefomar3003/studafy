@@ -48,6 +48,31 @@ describe("app shell", () => {
     expect(await screen.findByRole("heading", { name: /studafy/i, level: 1 })).toBeTruthy();
   });
 
+  test("resolves the lazy /features route", async () => {
+    renderAt("/features");
+    expect(
+      await screen.findByRole(
+        "heading",
+        { name: /whole school day/i, level: 1 },
+        { timeout: 5000 },
+      ),
+    ).toBeTruthy();
+  });
+
+  test("resolves the lazy /pricing route", async () => {
+    renderAt("/pricing");
+    expect(
+      await screen.findByRole("heading", { name: /pricing/i, level: 1 }, { timeout: 5000 }),
+    ).toBeTruthy();
+  });
+
+  test("resolves the lazy /about route", async () => {
+    renderAt("/about");
+    expect(
+      await screen.findByRole("heading", { name: /about studafy/i, level: 1 }, { timeout: 5000 }),
+    ).toBeTruthy();
+  });
+
   test("resolves the lazy /portal route group", async () => {
     renderAt("/portal");
     expect(

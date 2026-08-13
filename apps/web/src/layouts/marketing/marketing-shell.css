@@ -1,0 +1,206 @@
+/**
+ * Marketing site chrome: header + footer. Sticky header stays out of the CLS budget since it has a
+ * fixed 64px height regardless of nav state — only its dropdown panel (mobile) grows/shrinks.
+ */
+
+.marketing-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background-color: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.marketing-header__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  max-width: 1200px;
+  height: 64px;
+  margin: 0 auto;
+  padding: 0 var(--space-24);
+}
+
+.marketing-header__brand {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+  text-decoration: none;
+  letter-spacing: var(--tracking-tight);
+}
+
+.marketing-header__nav-toggle {
+  display: none;
+  margin-left: auto;
+}
+
+.marketing-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-foreground);
+  cursor: pointer;
+}
+
+.marketing-icon-button:hover {
+  background-color: var(--color-surface);
+}
+
+.marketing-icon-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.marketing-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-32);
+  margin-left: auto;
+}
+
+.marketing-nav__list {
+  display: flex;
+  align-items: center;
+  gap: var(--space-24);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.marketing-nav__link {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted-foreground);
+  text-decoration: none;
+  padding: var(--space-8) 0;
+}
+
+.marketing-nav__link:hover {
+  color: var(--color-foreground);
+}
+
+.marketing-nav__link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.marketing-nav__link--active {
+  color: var(--color-accent);
+}
+
+.marketing-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* Footer */
+
+.marketing-footer {
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  padding: var(--space-48) var(--space-24) var(--space-24);
+}
+
+.marketing-footer__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-32);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.marketing-footer__brand-name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+}
+
+.marketing-footer__tagline {
+  margin: var(--space-4) 0 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.marketing-footer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8) var(--space-24);
+}
+
+.marketing-footer__nav a {
+  color: var(--color-muted-foreground);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+}
+
+.marketing-footer__nav a:hover {
+  color: var(--color-foreground);
+}
+
+.marketing-footer__nav a:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.marketing-footer__copyright {
+  max-width: 1200px;
+  margin: var(--space-32) auto 0;
+  padding-top: var(--space-24);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+/* Narrow breakpoint: nav collapses into a toggled dropdown panel below the header row. */
+@media (max-width: 768px) {
+  .marketing-header__nav-toggle {
+    display: inline-flex;
+  }
+
+  .marketing-nav {
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-16);
+    margin-left: 0;
+    padding: var(--space-16) var(--space-24) var(--space-24);
+    background-color: var(--color-background);
+    border-bottom: 1px solid var(--color-border);
+    display: none;
+  }
+
+  .marketing-nav[data-open="true"] {
+    display: flex;
+  }
+
+  .marketing-nav__list {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+  }
+
+  .marketing-nav__link {
+    padding: var(--space-12) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .marketing-nav__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .marketing-footer__row {
+    flex-direction: column;
+    gap: var(--space-24);
+  }
+}

@@ -91,6 +91,9 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/schools/register",
   "/api/subscriptions/webhook/stripe",
+  // Plan/price listing is pre-signup content (the marketing pricing page reads it anonymously) and
+  // the query is not school-scoped — see getActivePlans in subscription-service.ts.
+  "/api/subscriptions/plans",
 ];
 
 function isInvitationSubPath(path: string, action: "verify" | "activate"): boolean {

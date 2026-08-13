@@ -8,7 +8,9 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 
 import "@studafy/ui/styles.css";
 
+import "./layouts/marketing/marketing-shell.css";
 import "./layouts/portal/portal-shell.css";
+import "./routes/marketing/marketing-pages.css";
 import "./styles/global.css";
 
 const rootElement = document.getElementById("root");

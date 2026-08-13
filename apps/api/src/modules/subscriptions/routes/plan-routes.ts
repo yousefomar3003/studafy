@@ -31,8 +31,10 @@ const listPlansRoute = createRoute({
   tags: ["Subscriptions"],
   operationId: "listSubscriptionPlans",
   summary: "List available subscription plans",
-  description: "Returns all active plans with their prices for the authenticated school.",
-  security: [{ bearerAuth: [] }],
+  description:
+    "Returns all active plans with their prices. Public: no authentication required — this backs " +
+    "the pricing page shown to prospects before they have a school or a session.",
+  security: [],
   responses: standardResponses(
     {
       200: {
@@ -40,7 +42,7 @@ const listPlansRoute = createRoute({
         schema: PlanListResponseSchema,
       },
     },
-    [401, 403, 500],
+    [500],
   ),
 });
 

@@ -13,6 +13,9 @@ import HomePage from "../routes/marketing/HomePage";
 import type { RouteObject } from "react-router-dom";
 
 // Secondary route groups are code-split so the initial (marketing) route stays small.
+const FeaturesPage = lazy(() => import("../routes/marketing/FeaturesPage"));
+const PricingPage = lazy(() => import("../routes/marketing/PricingPage"));
+const AboutPage = lazy(() => import("../routes/marketing/AboutPage"));
 const AuthLoginPage = lazy(() => import("../routes/auth/LoginPage"));
 const AuthCallbackPage = lazy(() => import("../routes/auth/CallbackPage"));
 const AuthErrorPage = lazy(() => import("../routes/auth/ErrorPage"));
@@ -36,7 +39,12 @@ export const routes: RouteObject[] = [
     children: [
       {
         element: <MarketingLayout />,
-        children: [{ index: true, element: <HomePage /> }],
+        children: [
+          { index: true, element: <HomePage /> },
+          { path: "features", element: <FeaturesPage /> },
+          { path: "pricing", element: <PricingPage /> },
+          { path: "about", element: <AboutPage /> },
+        ],
       },
       {
         path: "auth",

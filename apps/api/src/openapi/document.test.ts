@@ -551,7 +551,6 @@ describe("security", () => {
         "GET /api/students/{studentId}/guardians",
         "GET /api/subscriptions/current",
         "GET /api/subscriptions/current/invoices",
-        "GET /api/subscriptions/plans",
         "GET /api/teachers",
         "GET /api/teachers/me",
         "GET /api/teachers/{teacherId}",
