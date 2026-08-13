@@ -144,6 +144,13 @@ function createHarness(ttlMs = ACCESS_TTL_MS): Harness {
 
 const flushMicrotasks = () => Promise.resolve();
 
+/** Builds a JWT-shaped string (header.payload.signature), unsigned — matches access-token-claims.test.ts. */
+function fakeJwt(payload: unknown): string {
+  const segment = (value: unknown) =>
+    btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
+}
+
 describe("createSessionStore", () => {
   test("starts in the restoring state until the first token demand", () => {
     const { store } = createHarness();
@@ -312,6 +319,23 @@ describe("createSessionStore", () => {
 
     expect(store.getStatus()).toBe("unauthenticated");
     expect(await store.getToken()).toBeNull();
+  });
+
+  test("getRoles decodes the held token's roles claim and clears it on sign-out", async () => {
+    const { store, client, clock } = createHarness();
+    client.setRefresh(async () => ({
+      accessToken: fakeJwt({ roles: ["INSTRUCTOR", "ORG_ADMIN"] }),
+      expiresAt: clock.time + ACCESS_TTL_MS,
+      sessionId: "session-1",
+    }));
+
+    expect(store.getRoles()).toEqual([]);
+
+    await store.restore();
+    expect(store.getRoles()).toEqual(["INSTRUCTOR", "ORG_ADMIN"]);
+
+    await store.logout();
+    expect(store.getRoles()).toEqual([]);
   });
 
   test("subscribe notifies listeners on status transitions only", async () => {

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -72,5 +72,63 @@ describe("app shell", () => {
     expect(
       await screen.findByRole("heading", { name: /portal/i, level: 1 }, { timeout: 5000 }),
     ).toBeTruthy();
+  });
+
+  test("the portal shell renders the permission-gated sidebar for a roleless session", async () => {
+    renderAt("/portal");
+
+    const nav = await screen.findByRole("navigation", { name: "Portal" }, { timeout: 5000 });
+    // This suite's shared store carries no roles (a non-JWT "test-token"), so only the
+    // unconditional items render — Approvals (gated on approval:review) does not.
+    expect(within(nav).getByRole("link", { name: "Home" })).toBeTruthy();
+    expect(within(nav).getByRole("link", { name: "Account" })).toBeTruthy();
+    expect(within(nav).queryByRole("link", { name: "Approvals" })).toBeNull();
+  });
+
+  test("a session without approval:review is redirected off /portal/approvals with a notice", async () => {
+    renderAt("/portal/approvals");
+
+    expect(
+      await screen.findByRole("heading", { name: /portal/i, level: 1 }, { timeout: 5000 }),
+    ).toBeTruthy();
+    expect(await screen.findByRole("alert")).toBeTruthy();
+  });
+});
+
+/** Builds a JWT-shaped string (header.payload.signature), unsigned — matches access-token-claims.test.ts. */
+function fakeJwt(payload: unknown): string {
+  const segment = (value: unknown) =>
+    btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
+}
+
+describe("app shell for a session holding approval:review", () => {
+  test("reaches /portal/approvals directly, and the sidebar shows the gated item", async () => {
+    const orgAdminStore = createSessionStore({
+      refreshClient: {
+        refresh: async () => ({
+          accessToken: fakeJwt({ roles: ["ORG_ADMIN"] }),
+          expiresAt: Date.now() + 3_600_000,
+          sessionId: "org-admin-session",
+        }),
+        logout: async () => undefined,
+      },
+    });
+    await orgAdminStore.restore();
+
+    const router = createMemoryRouter(routes, { initialEntries: ["/portal/approvals"] });
+    render(
+      <AppProviders sessionStore={orgAdminStore} realtimeSocketFactory={createInertRealtimeSocket}>
+        <RouterProvider router={router} />
+      </AppProviders>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /approvals/i, level: 1 }, { timeout: 5000 }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    const nav = await screen.findByRole("navigation", { name: "Portal" });
+    expect(within(nav).getByRole("link", { name: "Approvals" })).toBeTruthy();
   });
 });

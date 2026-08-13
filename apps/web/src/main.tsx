@@ -6,8 +6,9 @@ import { AppProviders } from "./app/providers";
 import { routes } from "./app/routes";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-import "@studafy/ui/tokens.css";
+import "@studafy/ui/styles.css";
 
+import "./layouts/portal/portal-shell.css";
 import "./styles/global.css";
 
 const rootElement = document.getElementById("root");
