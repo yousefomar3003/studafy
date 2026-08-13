@@ -40,21 +40,23 @@ export default function ApprovalsPage() {
           loading={isPending}
           empty={isError ? "Unable to load the approval queue." : "Nothing is pending review."}
         >
-          {// `readonly ApprovalQueueItem[]` loses its array prototype through the generated
-          // response type here — a pre-existing `@studafy/api-client` typing gap, not a shape
-          // mismatch. The annotation restores it without widening to `any`.
-          ((data?.items ?? []) as readonly components["schemas"]["ApprovalQueueItem"][]).map(
-            (item) => (
-              <Table.Row key={item.id}>
-                <Table.Cell>{item.item_type}</Table.Cell>
-                <Table.Cell>{item.summary}</Table.Cell>
-                <Table.Cell>{item.requested_by_display_name ?? "—"}</Table.Cell>
-                <Table.Cell>
-                  {item.requested_at ? new Date(item.requested_at).toLocaleString() : "—"}
-                </Table.Cell>
-              </Table.Row>
-            ),
-          )}
+          {
+            // `readonly ApprovalQueueItem[]` loses its array prototype through the generated
+            // response type here — a pre-existing `@studafy/api-client` typing gap, not a shape
+            // mismatch. The annotation restores it without widening to `any`.
+            ((data?.items ?? []) as readonly components["schemas"]["ApprovalQueueItem"][]).map(
+              (item) => (
+                <Table.Row key={item.id}>
+                  <Table.Cell>{item.item_type}</Table.Cell>
+                  <Table.Cell>{item.summary}</Table.Cell>
+                  <Table.Cell>{item.requested_by_display_name ?? "—"}</Table.Cell>
+                  <Table.Cell>
+                    {item.requested_at ? new Date(item.requested_at).toLocaleString() : "—"}
+                  </Table.Cell>
+                </Table.Row>
+              ),
+            )
+          }
         </Table.Body>
       </Table>
     </>
