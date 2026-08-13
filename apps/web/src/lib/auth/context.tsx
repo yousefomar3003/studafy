@@ -8,7 +8,10 @@ import {
 
 import { API_BASE_URL } from "../config";
 
+import { permissionsForRoles } from "./permissions";
+
 import type { SessionStatus, SessionStore } from "./session-store";
+import type { Permission } from "@studafy/constants";
 
 const SessionContext = createContext<SessionStore | null>(null);
 
@@ -48,6 +51,8 @@ export interface AuthState {
   readonly isAuthenticated: boolean;
   readonly isRestoring: boolean;
   readonly sessionId: string | null;
+  /** The held token's `roles` claim. Routing/UX data only — see `decodeAccessTokenRoles`. */
+  readonly roles: readonly string[];
 }
 
 export function useAuth(): AuthState {
@@ -58,7 +63,19 @@ export function useAuth(): AuthState {
     isAuthenticated: status === "authenticated",
     isRestoring: status === "restoring",
     sessionId: store.getSessionId(),
+    roles: store.getRoles(),
   };
+}
+
+/**
+ * The permission set granted by the current session's roles — see `permissionsForRoles` for what
+ * this can and cannot be used for. Memoized on the roles array, which is only ever replaced (not
+ * mutated) by the session store, so identity comparison is enough to skip recomputation on renders
+ * that don't follow a rotation.
+ */
+export function usePermissions(): ReadonlySet<Permission> {
+  const { roles } = useAuth();
+  return useMemo(() => permissionsForRoles(roles), [roles]);
 }
 
 /** The OAuth providers the API exposes browser-redirect flows for. */

@@ -1,3 +1,4 @@
+import { PERMISSIONS } from "@studafy/constants";
 import { lazy } from "react";
 
 import { RouteError } from "../components/RouteError";
@@ -6,7 +7,7 @@ import { MarketingLayout } from "../layouts/MarketingLayout";
 import { OnboardingLayout } from "../layouts/OnboardingLayout";
 import { PortalLayout } from "../layouts/PortalLayout";
 import { RootLayout } from "../layouts/RootLayout";
-import { RequireAuth } from "../lib/auth";
+import { RequireAuth, RequirePermission } from "../lib/auth";
 import HomePage from "../routes/marketing/HomePage";
 
 import type { RouteObject } from "react-router-dom";
@@ -19,6 +20,7 @@ const InvitePage = lazy(() => import("../routes/invite/InvitePage"));
 const InviteCompletePage = lazy(() => import("../routes/invite/InviteCompletePage"));
 const OnboardingPage = lazy(() => import("../routes/onboarding/OnboardingPage"));
 const PortalPage = lazy(() => import("../routes/portal/PortalPage"));
+const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
 /**
@@ -67,7 +69,17 @@ export const routes: RouteObject[] = [
             <PortalLayout />
           </RequireAuth>
         ),
-        children: [{ index: true, element: <PortalPage /> }],
+        children: [
+          { index: true, element: <PortalPage /> },
+          {
+            path: "approvals",
+            element: (
+              <RequirePermission permission={PERMISSIONS.APPROVAL_REVIEW}>
+                <ApprovalsPage />
+              </RequirePermission>
+            ),
+          },
+        ],
       },
       {
         path: "account",

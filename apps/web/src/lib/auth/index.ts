@@ -32,11 +32,16 @@ export {
   useAuth,
   useAuthStatus,
   useOAuthLogin,
+  usePermissions,
   useSessionStore,
 } from "./context";
 export type { AuthState, OAuthProvider } from "./context";
 
+export { permissionsForRoles } from "./permissions";
+
 export { RequireAuth } from "./require-auth";
+export { RequirePermission } from "./require-permission";
+export type { RequirePermissionProps } from "./require-permission";
 
 export {
   clearReturnTo,

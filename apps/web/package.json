@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@studafy/api-client": "workspace:*",
+    "@studafy/constants": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
     "@studafy/ui": "workspace:*",
     "@tanstack/react-query": "5.101.2",

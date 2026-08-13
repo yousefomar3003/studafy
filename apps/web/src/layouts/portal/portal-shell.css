@@ -1,0 +1,301 @@
+/**
+ * Portal shell layout: header + sidebar + content in a CSS grid with fixed track sizes, so nothing
+ * downstream (nav items resolving, the notification/approval counts arriving) changes the shell's
+ * own box and shifts anything (CLS budget for this ticket is <0.1). Async counts are always overlaid
+ * with `position: absolute` on a fixed-size trigger rather than inserted into flow.
+ */
+
+.portal-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: 64px 1fr;
+  grid-template-areas: "header header" "sidebar content";
+  min-height: 100vh;
+}
+
+/* Header */
+
+.portal-header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  padding: 0 var(--space-24);
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-background);
+}
+
+.portal-header__brand {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+}
+
+.portal-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-left: auto;
+}
+
+.portal-header__nav-toggle {
+  display: none;
+}
+
+/* Sidebar */
+
+.portal-sidebar {
+  grid-area: sidebar;
+  border-right: 1px solid var(--color-border);
+  padding: var(--space-16) var(--space-8);
+  overflow-y: auto;
+}
+
+.portal-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.portal-nav__item {
+  position: relative;
+}
+
+.portal-nav__link {
+  display: block;
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  color: var(--color-foreground);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.portal-nav__link:hover {
+  background-color: var(--color-surface);
+}
+
+.portal-nav__link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.portal-nav__link--active {
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+}
+
+/* The pending-approvals count rides over the nav item rather than in flow, so it appearing or
+   changing width never reflows the item list. */
+.portal-nav__item .approval-queue-badge {
+  position: absolute;
+  top: 2px;
+  right: var(--space-8);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+}
+
+/* Content */
+
+.portal-content {
+  grid-area: content;
+  padding: var(--space-24);
+  min-width: 0;
+}
+
+/* Icon buttons (bell, user menu, nav toggle trigger) */
+
+.portal-icon-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-foreground);
+  cursor: pointer;
+}
+
+.portal-icon-button:hover {
+  background-color: var(--color-surface);
+}
+
+.portal-icon-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Popover panels (notification bell, user menu) */
+
+.portal-notification-bell,
+.portal-user-menu {
+  position: relative;
+}
+
+.portal-popover {
+  position: absolute;
+  top: calc(100% + var(--space-8));
+  right: 0;
+  z-index: var(--z-dropdown);
+  min-width: 280px;
+  max-width: 360px;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-3);
+  padding: var(--space-16);
+}
+
+/* Notification bell */
+
+.portal-notification-bell__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  background-color: var(--color-danger);
+  color: var(--color-danger-foreground);
+  font-size: var(--font-size-xs);
+  line-height: 16px;
+  text-align: center;
+}
+
+.portal-notification-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+
+.portal-notification-panel__header h2 {
+  font-size: var(--font-size-base);
+  margin: 0;
+}
+
+.portal-notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.portal-notification-list__item[data-unread] {
+  border-left: 2px solid var(--color-accent);
+  padding-left: var(--space-8);
+}
+
+.portal-notification-list__title {
+  font-weight: var(--font-weight-medium);
+  margin: 0 0 var(--space-4);
+}
+
+.portal-notification-list__body {
+  color: var(--color-muted-foreground);
+  margin: 0 0 var(--space-4);
+}
+
+/* User menu */
+
+.portal-user-menu__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-8);
+}
+
+.portal-user-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-8) var(--space-12);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-foreground);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.portal-user-menu__item:hover {
+  background-color: var(--color-surface);
+}
+
+.portal-user-menu__item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Device/session panel rows */
+
+.portal-device-session-list {
+  list-style: none;
+  margin: 0 0 var(--space-16);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.portal-device-session-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.portal-device-session-list__meta {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+  margin: 0;
+}
+
+.portal-device-session-list__current {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+}
+
+/* Narrow viewport: the sidebar becomes an off-canvas drawer, toggled from the header. */
+@media (max-width: 768px) {
+  .portal-shell {
+    grid-template-columns: 1fr;
+    grid-template-areas: "header" "content";
+  }
+
+  .portal-header__nav-toggle {
+    display: inline-flex;
+  }
+
+  .portal-sidebar {
+    position: fixed;
+    inset: 64px 0 0 0;
+    z-index: var(--z-dropdown);
+    background-color: var(--color-background);
+    transform: translateX(-100%);
+    transition: transform var(--duration-base) var(--easing-standard);
+  }
+
+  .portal-sidebar[data-open] {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-sidebar {
+    transition: none;
+  }
+}
