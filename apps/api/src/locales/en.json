@@ -12,6 +12,7 @@
   "OAUTH_STATE_INVALID": "Invalid or expired OAuth state",
   "OAUTH_EMAIL_NOT_VERIFIED": "OAuth email is not verified",
   "OAUTH_PROVIDER_ERROR": "OAuth provider error",
+  "OAUTH_CANCELLED": "Sign-in cancelled by the user",
   "REQUIRES_ADMIN_APPROVAL": "This account requires administrator approval before it can be activated",
   "AUTHZ_FORBIDDEN": "Access denied",
   "ACCESS_DENIED": "Access denied",

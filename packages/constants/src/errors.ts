@@ -27,6 +27,10 @@ export const ERROR_CODES = {
   OAUTH_PROVIDER_ERROR: "OAUTH_PROVIDER_ERROR",
   OAUTH_LAST_PROVIDER: "OAUTH_LAST_PROVIDER",
   OAUTH_IDENTITY_EXISTS: "OAUTH_IDENTITY_EXISTS",
+  // The user declined the provider's consent screen (the provider bounced `error=access_denied`
+  // instead of a code). Never emitted as a problem+json `code` — the OAuth callbacks redirect it to
+  // the frontend `/auth/error` page so the UI can say "you cancelled" rather than "something broke".
+  OAUTH_CANCELLED: "OAUTH_CANCELLED",
 
   // Returning-user login — no matching OAuth identity found for the incoming (provider, sub) pair.
   NO_ACCOUNT: "NO_ACCOUNT",

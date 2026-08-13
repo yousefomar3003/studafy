@@ -29,6 +29,7 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { deliverTokenPair } from "../delivery";
 import { issueTokenPair } from "../services/session-service";
 
+import { oauthErrorUrl } from "./error-redirect";
 import {
   MICROSOFT_AUTH_ENDPOINT,
   MICROSOFT_SCOPES,
@@ -95,64 +96,85 @@ export function microsoftOAuthRoutes(
     if (!oauthConfig) {
       throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
     }
-
-    const code = c.req.query("code");
-    const state = c.req.query("state");
-
-    if (!code || !state) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.OAUTH_STATE_INVALID,
-        "Missing code or state parameter",
-      );
-    }
-
-    // 1. Validate state
-    const entry = stateStore.get(state);
-    if (!entry) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.OAUTH_STATE_INVALID,
-        "Invalid or expired OAuth state",
-      );
-    }
-    stateStore.delete(state);
-
-    // 2. Exchange authorization code for tokens
-    const idToken = await exchangeCode(code, oauthConfig, entry.codeVerifier);
-
-    // 3. Validate id_token
-    const claims = await validateMicrosoftIdToken(idToken, oauthConfig.clientId, entry.nonce);
-
-    // 4. Find oauth identity
-    const identity = await findOAuthIdentity(db, "microsoft", claims.sub);
-    if (!identity) {
-      logger.warn({ sub: claims.sub, email: claims.email }, "OAuth identity not found");
-      throw new CodedHttpException(
-        403,
-        ERROR_CODES.AUTHZ_FORBIDDEN,
-        "Account not found. Contact your administrator.",
-      );
-    }
-
-    // 5. Issue token pair inside a tenant transaction
-    const issued = await withTenantTx(
-      db,
-      { schoolId: identity.schoolId, userId: identity.userId },
-      (tx) =>
-        issueTokenPair(tx, config, {
-          userId: identity.userId,
-          schoolId: identity.schoolId,
-          channel: "web",
-        }),
-    );
-
-    // 6. Set refresh cookie and redirect to frontend
-    deliverTokenPair(c, issued);
     const frontendUrl = oauthConfig.frontendUrl ?? "/";
-    const redirectUrl = new URL("/auth/callback", frontendUrl);
 
-    return c.redirect(redirectUrl.toString(), 302);
+    // The user declined Microsoft's consent screen: Microsoft bounces back with `error` and no
+    // `code`. Nothing is broken, so redirect to the frontend's friendly "cancelled" state rather
+    // than an error page.
+    if (c.req.query("error")) {
+      return c.redirect(oauthErrorUrl(frontendUrl, ERROR_CODES.OAUTH_CANCELLED), 302);
+    }
+
+    try {
+      const code = c.req.query("code");
+      const state = c.req.query("state");
+
+      if (!code || !state) {
+        throw new CodedHttpException(
+          400,
+          ERROR_CODES.OAUTH_STATE_INVALID,
+          "Missing code or state parameter",
+        );
+      }
+
+      // 1. Validate state
+      const entry = stateStore.get(state);
+      if (!entry) {
+        throw new CodedHttpException(
+          400,
+          ERROR_CODES.OAUTH_STATE_INVALID,
+          "Invalid or expired OAuth state",
+        );
+      }
+      stateStore.delete(state);
+
+      // 2. Exchange authorization code for tokens
+      const idToken = await exchangeCode(code, oauthConfig, entry.codeVerifier);
+
+      // 3. Validate id_token
+      const claims = await validateMicrosoftIdToken(idToken, oauthConfig.clientId, entry.nonce);
+
+      // 4. Find oauth identity
+      const identity = await findOAuthIdentity(db, "microsoft", claims.sub);
+      if (!identity) {
+        logger.warn({ sub: claims.sub, email: claims.email }, "OAuth identity not found");
+        throw new CodedHttpException(
+          403,
+          ERROR_CODES.AUTHZ_FORBIDDEN,
+          "Account not found. Contact your administrator.",
+        );
+      }
+
+      // 5. Issue token pair inside a tenant transaction
+      const issued = await withTenantTx(
+        db,
+        { schoolId: identity.schoolId, userId: identity.userId },
+        (tx) =>
+          issueTokenPair(tx, config, {
+            userId: identity.userId,
+            schoolId: identity.schoolId,
+            channel: "web",
+          }),
+      );
+
+      // 6. Set refresh cookie and redirect to frontend
+      deliverTokenPair(c, issued);
+      const redirectUrl = new URL("/auth/callback", frontendUrl);
+
+      return c.redirect(redirectUrl.toString(), 302);
+    } catch (error) {
+      // The browser is mid-round-trip on a real tab: an authored failure (bad state, unknown
+      // account, unverified email, …) and an exchange-level failure (unreachable provider) both
+      // redirect to the frontend error page so the user sees guidance, never raw JSON at the API
+      // origin. Anything unexpected still propagates to the global error handler.
+      if (error instanceof CodedHttpException) {
+        return c.redirect(oauthErrorUrl(frontendUrl, error.code), 302);
+      }
+      if (error instanceof HTTPException) {
+        return c.redirect(oauthErrorUrl(frontendUrl, ERROR_CODES.OAUTH_PROVIDER_ERROR), 302);
+      }
+      throw error;
+    }
   });
 
   return routes;

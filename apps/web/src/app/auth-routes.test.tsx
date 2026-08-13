@@ -56,11 +56,12 @@ function createStore(): {
 
 const renderAt = (path: string, store: SessionStore) => {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  return render(
+  const result = render(
     <AppProviders sessionStore={store} realtimeSocketFactory={createInertRealtimeSocket}>
       <RouterProvider router={router} />
     </AppProviders>,
   );
+  return { ...result, router };
 };
 
 afterEach(cleanup);
@@ -93,12 +94,18 @@ describe("web auth flow", () => {
     // The OAuth round trip completes and the API bounces the browser here with the cookie set.
     cleanup();
     setHasSession(true);
-    renderAt("/auth/callback", store);
+    const { router } = renderAt("/auth/callback", store);
 
     expect(
       await screen.findByRole("heading", { name: /account/i, level: 1 }, { timeout: 5000 }),
     ).toBeTruthy();
     expect(getReturnTo()).toBeNull();
+
+    // The callback is replaced, never pushed: the landing URL carries no query string or fragment,
+    // so no authorization code, state, or token ever sits in the address bar or survives in history.
+    expect(router.state.location.pathname).toBe("/account");
+    expect(router.state.location.search).toBe("");
+    expect(router.state.location.hash).toBe("");
   });
 
   test("the login page recovers a still-live session instead of showing provider buttons", async () => {
