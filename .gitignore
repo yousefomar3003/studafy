@@ -3,6 +3,8 @@ dist/
 storybook-static/
 .turbo/
 *.tsbuildinfo
+playwright-report/
+test-results/
 
 # Terraform — see infra/terraform/README.md
 **/.terraform/*

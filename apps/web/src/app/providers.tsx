@@ -1,3 +1,4 @@
+import { ToastProvider } from "@studafy/ui";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useState, type PropsWithChildren } from "react";
 
@@ -43,9 +44,11 @@ export function AppProviders({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider store={store}>
-        <RealtimeProvider client={realtimeClient}>{children}</RealtimeProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider store={store}>
+          <RealtimeProvider client={realtimeClient}>{children}</RealtimeProvider>
+        </AuthProvider>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

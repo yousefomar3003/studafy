@@ -11,6 +11,13 @@ interface ImportMetaEnv {
    * "not configured" notice instead of a fabricated mailto.
    */
   readonly VITE_MARKETING_CONTACT_EMAIL?: string;
+  /**
+   * Cloudflare Turnstile site key for the school registration form's bot-protection widget.
+   * Defaults to Cloudflare's publicly documented always-passing test key when unset, matching the
+   * API's own dev bypass (registration/captcha.ts skips verification when TURNSTILE_SECRET_KEY is
+   * unset) — see lib/config.ts.
+   */
+  readonly VITE_TURNSTILE_SITE_KEY?: string;
 }
 
 interface ImportMeta {

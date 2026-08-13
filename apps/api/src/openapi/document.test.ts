@@ -237,6 +237,10 @@ describe("structure", () => {
         "/api/invitations/bulk/{bulkInviteId}/retry",
         "/api/invitations/{id}/regenerate",
         "/api/invitations/{id}/revoke",
+        // Reference-data lookups (ST-184). Public, read-only; feeds the school
+        // self-registration form's country/currency selectors.
+        "/api/lookups/countries",
+        "/api/lookups/currencies",
         // In-app inbox (ST-142). Personal per-recipient notifications: list, unread count,
         // and read-state mutations, all RLS-fenced to the authenticated user.
         "/api/notifications",
