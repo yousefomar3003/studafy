@@ -41,6 +41,15 @@ export interface GroundedPrompt {
   user: string;
 }
 
+/** The structural fields `sourceBlock` interpolates; both ask and summary sources are supersets. */
+export interface SourceBlockSource {
+  order: number;
+  materialTitle: string | null;
+  pageNumber: number | null;
+  sectionTitle: string | null;
+  content: string;
+}
+
 /** Turn retrieval hits into numbered, citable sources, in the order the model should cite them. */
 export function toGroundedSources(hits: readonly HybridSearchHit[]): GroundedSource[] {
   return hits.map((hit, index) => ({
@@ -79,17 +88,26 @@ function systemPrompt(boundary: string): string {
 }
 
 /**
+ * A fresh boundary token: 12 hex characters derived from `crypto.randomUUID()`, regenerated per
+ * request so a chunk crafted in advance cannot guess this request's source tags. Both the ask and
+ * the summary prompt use it; a caller that needs determinism (tests) injects its own boundary.
+ */
+export function newBoundary(): string {
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+}
+
+/**
  * Neutralize a literal occurrence of the request's own boundary token inside untrusted content, so
  * it cannot forge a closing tag even though guessing the boundary in advance is already
  * astronomically unlikely (it is a fresh UUID per request). Splits the token with a zero-width
  * space, which is invisible when rendered but breaks an exact tag match.
  */
-function escapeBoundaryCollisions(content: string, boundary: string): string {
+export function escapeBoundaryCollisions(content: string, boundary: string): string {
   if (!content.includes(boundary)) return content;
   return content.split(boundary).join(`${boundary.slice(0, 4)}\u200B${boundary.slice(4)}`);
 }
 
-function sourceBlock(source: GroundedSource, boundary: string): string {
+export function sourceBlock(source: SourceBlockSource, boundary: string): string {
   const attrs = [
     `id="${source.order}"`,
     source.materialTitle ? `material="${source.materialTitle.replace(/"/g, "'")}"` : null,
@@ -111,7 +129,7 @@ function sourceBlock(source: GroundedSource, boundary: string): string {
 export function assembleGroundedPrompt(
   question: string,
   sources: readonly GroundedSource[],
-  boundary: string = crypto.randomUUID().replace(/-/g, "").slice(0, 12),
+  boundary: string = newBoundary(),
 ): GroundedPrompt {
   const blocks = sources.map((source) => sourceBlock(source, boundary)).join("\n\n");
   const user =

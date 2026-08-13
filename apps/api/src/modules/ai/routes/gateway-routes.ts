@@ -9,9 +9,8 @@ import { requireAuth } from "../../../middleware/authContext";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
-import { AI_LLM_MAX_RESERVE_TOKENS, AI_LLM_RETRY_AFTER_SECONDS } from "../config";
 import { getAiQuota } from "../gate/entitlement-gate";
-import { LlmProviderError } from "../llm/provider";
+import { throwLlmError } from "../llm/errors";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
 import { recordDurableUsage } from "../usage/durable";
 
@@ -160,37 +159,6 @@ function tenantFrom(c: Context<AppEnv>): {
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
 }
 
-/**
- * Map a provider failure onto the ST-164 error surface. Returns nothing: it throws the
- * {@link CodedHttpException} (or rethrows non-provider errors so a genuine bug still surfaces as
- * 500, exactly as the retrieval route lets its database errors bubble).
- */
-function throwGenerationError(c: Context<AppEnv>, error: unknown): never {
-  const locale = (c.get("locale") ?? "en") as SupportedLocale;
-
-  if (error instanceof LlmProviderError) {
-    // A non-transient 4xx is a verdict from a healthy provider — content policy, unknown model,
-    // malformed prompt. Retrying cannot fix it, so it is reported as a distinct code and is never
-    // Retry-After'd. (429 is retried by the provider and falls through to unavailable.)
-    if (error.kind === "http" && error.status < 500 && error.status !== 429) {
-      throw new CodedHttpException(
-        503,
-        ERROR_CODES.AI_LLM_REQUEST_REJECTED,
-        getLocalizedMessage(ERROR_CODES.AI_LLM_REQUEST_REJECTED, locale),
-      );
-    }
-
-    c.header("Retry-After", String(AI_LLM_RETRY_AFTER_SECONDS));
-    throw new CodedHttpException(
-      503,
-      ERROR_CODES.AI_LLM_UNAVAILABLE,
-      getLocalizedMessage(ERROR_CODES.AI_LLM_UNAVAILABLE, locale),
-    );
-  }
-
-  throw error;
-}
-
 export function aiGatewayRoutes(deps: {
   database: Database;
   /**
@@ -263,7 +231,7 @@ export function aiGatewayRoutes(deps: {
         200,
       );
     } catch (error) {
-      throwGenerationError(c, error);
+      throwLlmError(c, error);
     }
   });
 

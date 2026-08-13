@@ -72,3 +72,29 @@ export const AI_ASK_SOURCE_LIMIT = 6;
 
 /** Matches the 90-day retention `ai_messages.expires_at` documents (migration 000021). */
 export const AI_ASK_MESSAGE_RETENTION_DAYS = 90;
+
+/**
+ * Study-material summarizer.
+ *
+ * The summarize route loads the requested material's ingested text chunks and hands them to the
+ * small (fast, cheap) tier as numbered, section-anchored sources. The generation is bounded — a
+ * fixed chunk cap and an input-character budget — but the model's output is still open-ended up to
+ * the provider's output ceiling, so the route reserves the same worst-case hold as the other
+ * generation surfaces (see app.ts, resolveReserveTokens).
+ */
+
+/** Maximum number of text chunks fed to the summary model per material, in chunk order. */
+export const AI_SUMMARY_CHUNK_LIMIT = 50;
+
+/**
+ * Maximum characters of source text handed to the model per material. Applied as a budget to a
+ * contiguous prefix of the chunks in order, so the model always sees the material's opening rather
+ * than a sparse sample of it. ~4 characters per token ≈ 10,000 input tokens.
+ */
+export const AI_SUMMARY_MAX_INPUT_CHARS = 40_000;
+
+/** Redis key prefix for summary cache entries. Keys look like `aisum:{studentId}:{materialId}:{fingerprint}`. */
+export const AI_SUMMARY_CACHE_KEY_PREFIX = "aisum";
+
+/** How long a cached summary is served before a repeat request regenerates it. */
+export const AI_SUMMARY_CACHE_TTL_SECONDS = 24 * 60 * 60;
