@@ -146,6 +146,8 @@ const EXPECTED_PATHS = [
   "/api/schools/register",
   "/api/schools/resend-verification",
   "/api/schools/verify-email/{token}",
+  "/api/lookups/countries",
+  "/api/lookups/currencies",
   "/api/schools/current/settings",
   "/api/schools/{schoolId}/provision",
   "/api/schools/{schoolId}/provisioning-status",

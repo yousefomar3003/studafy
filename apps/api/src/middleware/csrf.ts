@@ -107,6 +107,16 @@ const EXEMPT_PATHS = [
   // Stripe delivery with 403 missing_token before the handler runs: Stripe sends no session cookie
   // and no Authorization header, so neither the exemption list nor the Bearer exemption covered it.
   "/api/subscriptions/webhook/stripe",
+  // School self-registration (ST-184), same posture as /api/auth/login above: no ambient authority
+  // (cookie or Bearer header) a cross-site page could forge — a forged POST here accomplishes
+  // nothing an attacker could not already do by calling the endpoint directly. Without this entry a
+  // browser's first-ever visit to /onboarding (no CSRF cookie bootstrapped yet, since nothing on
+  // the page has made a prior request) could 403 before the double-submit cookie even exists.
+  "/api/schools/register",
+  // Resend is additionally idempotent/enumeration-safe by construction (identical response whether
+  // the email is registered or not — see resend-verification's schema), so a forged call can cause
+  // an extra email at most, never a state change or a disclosure.
+  "/api/schools/resend-verification",
 ];
 
 type CsrfFailureReason = "missing_token" | "token_mismatch";

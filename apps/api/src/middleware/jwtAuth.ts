@@ -90,6 +90,16 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/auth/oauth",
   "/api/auth/login",
   "/api/schools/register",
+  // The rest of the self-registration flow (ST-184): verifying the emailed link and resending it
+  // are, like registration itself, unauthenticated by design — there is no session to bear a token
+  // yet. Previously missing here, which meant only /api/schools/register itself was reachable
+  // anonymously; verify-email 401'd and resend-verification never got this far (see csrf.ts).
+  "/api/schools/verify-email",
+  "/api/schools/resend-verification",
+  // Reference-data lookups (ST-184): public, read-only, feed the registration form's country/
+  // currency selectors before a school (and therefore a token) exists.
+  "/api/lookups/countries",
+  "/api/lookups/currencies",
   "/api/subscriptions/webhook/stripe",
   // Plan/price listing is pre-signup content (the marketing pricing page reads it anonymously) and
   // the query is not school-scoped — see getActivePlans in subscription-service.ts.

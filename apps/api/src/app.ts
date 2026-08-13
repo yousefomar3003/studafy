@@ -106,6 +106,7 @@ import {
   cancellationRoutes,
   createEntitlementService,
 } from "./modules/subscriptions";
+import { lookupsRoutes } from "./modules/tenancy/lookups/route";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { schoolSettingsRoutes } from "./modules/tenancy/settings/route";
@@ -386,6 +387,12 @@ export function createApp({
   // and activation invitation in a single transaction.
   if (database) {
     app.route("/", registerSchoolRoutes(database, logger));
+  }
+
+  // Reference-data lookups (countries, currencies) — public, no authentication, read-only.
+  // Feeds the country/currency selectors on the school self-registration form.
+  if (database) {
+    app.route("/", lookupsRoutes(database));
   }
 
   // School email verification — public, no authentication. Rate-limited (auth-strict class).

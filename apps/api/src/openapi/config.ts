@@ -95,6 +95,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "first administrator; authenticated endpoints manage existing schools.",
     },
     {
+      name: "Lookups",
+      description:
+        "Public, read-only reference data (countries, currencies) used to populate form " +
+        "selectors — most notably school self-registration.",
+    },
+    {
       name: "Academics",
       description:
         "Academic year and term lifecycle management. Authenticated and tenant-scoped. " +
