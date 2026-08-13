@@ -49,19 +49,30 @@ import type { SessionTokenConfig } from "../services/session-service";
 // Route group factory
 // ---------------------------------------------------------------------------
 
+export interface MicrosoftOAuthDependencies {
+  /** Config loader. Tests inject a stub so no process-wide module mock is needed. */
+  getOAuthConfig?: typeof getMicrosoftOAuthConfig;
+  /** id_token validator. Tests inject a stub to skip the JWKS round trip. */
+  validateIdToken?: typeof validateMicrosoftIdToken;
+}
+
 export function microsoftOAuthRoutes(
   db: Database,
   config: SessionTokenConfig,
   logger: Logger,
+  deps: MicrosoftOAuthDependencies = {},
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   const stateStore = createStateStore();
 
+  const getOAuthConfig = deps.getOAuthConfig ?? getMicrosoftOAuthConfig;
+  const validateIdToken = deps.validateIdToken ?? validateMicrosoftIdToken;
+
   // GET /api/auth/oauth/microsoft/start
   // Generates PKCE + state + nonce, stores them, and redirects to Microsoft.
   routes.get("/api/auth/oauth/microsoft/start", async (c) => {
-    const oauthConfig = getMicrosoftOAuthConfig();
+    const oauthConfig = getOAuthConfig();
     if (!oauthConfig) {
       throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
     }
@@ -92,7 +103,7 @@ export function microsoftOAuthRoutes(
   // Microsoft redirects here with code + state. We exchange the code, validate the id_token,
   // find the user, issue tokens, and redirect to the frontend.
   routes.get("/api/auth/oauth/microsoft/callback", async (c) => {
-    const oauthConfig = getMicrosoftOAuthConfig();
+    const oauthConfig = getOAuthConfig();
     if (!oauthConfig) {
       throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
     }
@@ -132,7 +143,7 @@ export function microsoftOAuthRoutes(
       const idToken = await exchangeCode(code, oauthConfig, entry.codeVerifier);
 
       // 3. Validate id_token
-      const claims = await validateMicrosoftIdToken(idToken, oauthConfig.clientId, entry.nonce);
+      const claims = await validateIdToken(idToken, oauthConfig.clientId, entry.nonce);
 
       // 4. Find oauth identity
       const identity = await findOAuthIdentity(db, "microsoft", claims.sub);
