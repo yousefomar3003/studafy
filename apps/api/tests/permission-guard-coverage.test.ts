@@ -268,6 +268,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // Ask AI streaming (ST-165). Same gate and same rationale as the gateway route above; the ask
   // route's writes are the grounded answer's messages, citations, and the student's usage ledger.
   "POST /api/ai/students/{studentId}/ask",
+  // Study-material summarizer. Same gate and same rationale as the retrieval route above; the
+  // summarize route's one write is the metered student's own usage ledger.
+  "POST /api/ai/students/{studentId}/summarize",
 ];
 
 /**
@@ -402,6 +405,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Ask AI streaming (ST-165) — same gate, same RLS; its writes are the answer's messages,
   // citations, and the student's ai_usage_meters row.
   "POST /api/ai/students/{studentId}/ask",
+  // Study-material summarizer — same gate, same RLS, same single write to the metered student's
+  // own ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/summarize",
 ]);
 
 // ---------------------------------------------------------------------------

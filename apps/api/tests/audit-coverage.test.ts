@@ -312,6 +312,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // message, and citation rows, recorded with the storage-upload precedent (the interaction's own
   // rows are its audit record), plus the durable usage meter.
   "POST /api/ai/students/{studentId}/ask",
+  // Study-material summarizer. POST carries the material id; the route's one write is the durable
+  // per-student usage meter, recorded with the same declaration as the retrieval route above.
+  "POST /api/ai/students/{studentId}/summarize",
 ];
 
 function collectSourceFiles(dir: string): string[] {

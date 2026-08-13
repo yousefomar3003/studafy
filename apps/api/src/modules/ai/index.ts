@@ -1,7 +1,7 @@
 /**
  * AI module (ST-155): entitlement gate, Redis token meter, usage endpoint, hybrid retrieval (ST-162),
  * its cross-encoder re-ranker (ST-163), and the LLM gateway with model routing (ST-164) for
- * `/api/ai/*`.
+ * `/api/ai/*`, plus the grounded Ask AI stream (ST-165) and the cached study-material summarizer.
  *
  * The gate enforces school active -> AI add-on active -> quota available with distinct HTTP codes
  * (403 / 402 / 429); the meter is the atomic Redis ledger that backs the quota decision; the usage
@@ -29,6 +29,22 @@ export { aiUsageRoutes } from "./routes/usage-routes";
 export { aiRetrievalRoutes } from "./routes/retrieval-routes";
 export { aiGatewayRoutes } from "./routes/gateway-routes";
 export { aiAskRoutes } from "./routes/ask-routes";
+export { aiSummaryRoutes } from "./routes/summary-routes";
+export {
+  createSummaryCache,
+  summaryCacheKey,
+  summaryFingerprint,
+  type SummaryCache,
+  type SummaryCacheEntry,
+  type SummaryCacheSource,
+} from "./summary/cache";
+export {
+  loadSummaryMaterial,
+  type LoadedSummaryChunk,
+  type LoadedSummaryMaterial,
+  type LoadSummaryMaterialResult,
+} from "./summary/materials";
+export { assembleSummaryPrompt, type SummaryPrompt } from "./summary/prompt";
 export {
   AI_FEATURES,
   AI_LLM_MODEL_CATALOG,

@@ -39,10 +39,12 @@ import {
   aiEntitlementGate,
   aiGatewayRoutes,
   aiRetrievalRoutes,
+  aiSummaryRoutes,
   aiUsageRoutes,
   createAiTokenMeter,
   createDeterministicCrossEncoderReranker,
   createDeterministicQueryEmbedder,
+  createSummaryCache,
 } from "./modules/ai";
 import {
   attendanceCorrectionRoutes,
@@ -802,9 +804,15 @@ export function createApp({
         // The LLM gateway (ST-164) can generate up to 16,384 output tokens, which no default-size
         // hold can cover, so the generate path resolves the worst-case hold (AI_LLM_MAX_RESERVE_TOKENS).
         // The ask path (ST-165) bounds its grounded prompt with AI_ASK_SOURCE_LIMIT × the chunk text
-        // cap plus the question, so it is held at the same worst case — see config.ts.
+        // cap plus the question, so it is held at the same worst case — see config.ts. The summarize
+        // path (the material-summarizer) likewise feeds an open-ended generation and is held at the
+        // same worst case — its input is bounded (AI_SUMMARY_CHUNK_LIMIT × chunk cap), but its output
+        // ceiling still exceeds any default-size hold, and a summary that raced its reservation would
+        // trip the meter's out-of-range guard.
         resolveReserveTokens: (c) =>
-          c.req.path.endsWith("/generate") || c.req.path.endsWith("/ask")
+          c.req.path.endsWith("/generate") ||
+          c.req.path.endsWith("/ask") ||
+          c.req.path.endsWith("/summarize")
             ? AI_LLM_MAX_RESERVE_TOKENS
             : undefined,
       }),
@@ -846,6 +854,21 @@ export function createApp({
         database,
         provider: aiLlmProvider,
         embedder: createDeterministicQueryEmbedder(),
+        modelOverrides: aiLlmModelOverrides,
+      }),
+    );
+    // Study-material summarizer. Mounted under the same gate so a generated summary reserves and
+    // commits the caller's AI quota, and only when the gate's dependencies exist — the summarize
+    // surface must never run un-metered. The provider may be null on the same kill-switch terms as
+    // the gateway. A Redis-backed cache (createSummaryCache, sharing the gate's redis client)
+    // serves repeat summaries of the same material to the same student with a zero-token commit;
+    // it is an accelerator — a miss or a Redis error regenerates.
+    app.route(
+      "/",
+      aiSummaryRoutes({
+        database,
+        provider: aiLlmProvider,
+        cache: createSummaryCache(redis),
         modelOverrides: aiLlmModelOverrides,
       }),
     );
