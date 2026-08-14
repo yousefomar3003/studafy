@@ -209,7 +209,7 @@ export interface AuditLogEntry {
 
 const AUDIT_LOG_SELECT = `
   l.id, l.created_at, l.action::text AS action, l.actor_id,
-  concat_ws(' ', u.first_name, u.middle_name, u.last_name) AS actor_name,
+  u.display_name AS actor_name,
   u.email AS actor_email,
   l.target_table, l.target_id, l.client_ip, l.user_agent, l.request_id,
   l.old_values, l.new_values
@@ -245,8 +245,8 @@ export async function queryAuditLogPage(
       AND (${position?.createdAt ?? null}::timestamptz IS NULL
         OR (l.created_at, l.id) < (${position?.createdAt ?? null}::timestamptz, ${position?.id ?? null}::uuid))
       AND (${filter.actorId ?? null}::uuid IS NULL OR l.actor_id = ${filter.actorId ?? null}::uuid)
-      AND (${filter.action ?? null} IS NULL OR l.action::text = ${filter.action ?? null})
-      AND (${filter.targetTable ?? null} IS NULL OR l.target_table = ${filter.targetTable ?? null})
+      AND (${filter.action ?? null}::text IS NULL OR l.action::text = ${filter.action ?? null}::text)
+      AND (${filter.targetTable ?? null}::text IS NULL OR l.target_table = ${filter.targetTable ?? null}::text)
       AND (${filter.targetId ?? null}::uuid IS NULL OR l.target_id = ${filter.targetId ?? null}::uuid)
     ORDER BY l.created_at DESC, l.id DESC
     LIMIT ${options.limit + 1}
@@ -287,8 +287,8 @@ export async function* queryAuditLogExportRows(
         AND (${afterCreated}::timestamptz IS NULL
           OR (l.created_at, l.id) > (${afterCreated}::timestamptz, ${afterId}::uuid))
         AND (${filter.actorId ?? null}::uuid IS NULL OR l.actor_id = ${filter.actorId ?? null}::uuid)
-        AND (${filter.action ?? null} IS NULL OR l.action::text = ${filter.action ?? null})
-        AND (${filter.targetTable ?? null} IS NULL OR l.target_table = ${filter.targetTable ?? null})
+        AND (${filter.action ?? null}::text IS NULL OR l.action::text = ${filter.action ?? null}::text)
+        AND (${filter.targetTable ?? null}::text IS NULL OR l.target_table = ${filter.targetTable ?? null}::text)
         AND (${filter.targetId ?? null}::uuid IS NULL OR l.target_id = ${filter.targetId ?? null}::uuid)
       ORDER BY l.created_at ASC, l.id ASC
       LIMIT ${batchSize}

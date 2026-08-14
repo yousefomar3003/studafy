@@ -1,0 +1,156 @@
+/**
+ * Invitation management screens. `@studafy/ui`'s Tabs, DataGrid, FilterBar, and Modal supply their
+ * own chrome; everything here is feature-specific layout, styled with the same design tokens the
+ * rest of the portal shell uses (see `features/admin/users/users.css`, which this mirrors).
+ */
+
+.invitations-board__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin: var(--space-16) 0;
+}
+
+.invitations-board__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.invitations-board__actions {
+  display: flex;
+  gap: var(--space-8);
+  white-space: nowrap;
+}
+
+.invitations-board__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+.invitations-status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.invitations-status-pill[data-status="pending"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.invitations-status-pill[data-status="consumed"],
+.invitations-status-pill[data-status="sent"],
+.invitations-status-pill[data-status="completed"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.invitations-status-pill[data-status="expired"],
+.invitations-status-pill[data-status="revoked"],
+.invitations-status-pill[data-status="failed"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.invitations-status-pill[data-status="processing"] {
+  background-color: var(--color-accent-subtle-bg, var(--color-surface));
+  color: var(--color-accent-subtle-foreground, var(--color-foreground));
+}
+
+/* Copy-link dialog */
+
+.invitations-link-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-8);
+}
+
+.invitations-link-row .sf-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Bulk invite recipients textarea — reuses Input's `.sf-input`/`.sf-input__control` chrome (see
+ * packages/ui/src/components/input/input.css) since there is no Textarea primitive in the design
+ * system; `align-items: stretch` overrides Input's single-line `center` so a multi-row textarea
+ * doesn't get squeezed against the wrapper's vertical center. */
+.invitations-recipients-input {
+  align-items: stretch;
+  padding-block: var(--space-8);
+}
+
+.invitations-recipients-input .sf-input__control {
+  resize: vertical;
+  min-height: 6lh;
+  padding-block: 0;
+}
+
+/* Bulk invite progress panel */
+
+.invitations-bulk-progress__stats {
+  display: flex;
+  gap: var(--space-24);
+  margin: 0 0 var(--space-12);
+}
+
+.invitations-bulk-progress__stats div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.invitations-bulk-progress__stats dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.invitations-bulk-progress__stats dd {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
+.invitations-bulk-progress__meter {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  overflow: hidden;
+  margin-bottom: var(--space-16);
+}
+
+.invitations-bulk-progress__meter-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+  transition: width var(--duration-base) var(--easing-standard);
+}
+
+.invitations-bulk-progress__toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.invitations-bulk-progress__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invitations-bulk-progress__meter-fill {
+    transition: none;
+  }
+}
