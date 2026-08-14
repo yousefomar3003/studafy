@@ -23,6 +23,9 @@ export default function AdminDashboardPage() {
       <p className="admin-dashboard-link">
         <Link to="/portal/admin/users">Manage users →</Link>
       </p>
+      <p className="admin-dashboard-link">
+        <Link to="/portal/admin/invitations">Manage invitations →</Link>
+      </p>
 
       <div className="admin-dashboard-banner">
         <SubscriptionStatusBanner />

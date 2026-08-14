@@ -540,6 +540,7 @@ describe("security", () => {
         "GET /api/imports/students",
         "GET /api/imports/students/template",
         "GET /api/imports/students/{importId}",
+        "GET /api/invitations",
         "GET /api/invitations/bulk",
         "GET /api/invitations/bulk/{bulkInviteId}",
         "GET /api/invitations/bulk/{bulkInviteId}/recipients",

@@ -11,17 +11,20 @@ import {
   createInvitationBodySchema,
   createInvitationResponseSchema,
   invitationIdPathParams,
+  invitationListQuerySchema,
+  invitationListResponseSchema,
   invitationVerificationPathParams,
   invitationVerificationResponseSchema,
   revokeInvitationResponseSchema,
   regenerateInvitationResponseSchema,
 } from "./schemas";
-import { createInvitationService } from "./service";
+import { createInvitationService, listInvitations } from "./service";
 import { throwInvitationVerificationFailure, verifyInvitationToken } from "./verification";
 
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { Role } from "@studafy/constants";
 
 // ---------------------------------------------------------------------------
 // Route definition
@@ -108,6 +111,30 @@ const regenerateInvitationRoute = createRoute({
   ),
 });
 
+const listInvitationsRoute = createRoute({
+  method: "get",
+  path: "/api/invitations",
+  tags: ["Invitations"],
+  operationId: "listInvitations",
+  summary: "List invitations",
+  description:
+    "Paginated, cursor-based list of invitations for the authenticated school. Each row carries a " +
+    "lifecycle status (pending, expired, consumed, revoked) derived from " +
+    "expires_at/consumed_at/revoked_at — not a stored column. Supports filtering by status, role, " +
+    "and a partial email match.",
+  security: [{ bearerAuth: [] }],
+  request: { query: invitationListQuerySchema },
+  responses: standardResponses(
+    {
+      200: {
+        description: "Paginated list of invitations.",
+        schema: invitationListResponseSchema,
+      },
+    },
+    [400, 401, 403, 429, 500],
+  ),
+});
+
 const verifyInvitationRoute = createRoute({
   method: "get",
   path: "/api/auth/invitations/{token}/verify",
@@ -157,6 +184,49 @@ export function invitationRoutes(db: Database, _logger: Logger): OpenAPIHono<App
 
     return c.json(
       { state: "valid" as const, emailHint: result.emailHint, schoolName: result.schoolName },
+      200,
+    );
+  });
+
+  routes.openapi(listInvitationsRoute, async (c) => {
+    const auth = requireAuth(c);
+
+    if (!auth.roles.includes("SUPER_ADMIN") && !auth.roles.includes("ORG_ADMIN")) {
+      throw new HTTPException(403, {
+        message: "You do not have permission to list invitations",
+      });
+    }
+
+    const query = c.req.valid("query");
+
+    const { rows, next_cursor } = await withTenantTx(
+      db,
+      { schoolId: auth.schoolId, userId: auth.userId },
+      (tx) =>
+        listInvitations(tx, auth.schoolId, {
+          limit: query.limit,
+          cursor: query.cursor,
+          status: query.status,
+          role: query.role as Role | undefined,
+          search: query.search,
+        }),
+    );
+
+    return c.json(
+      {
+        invitations: rows.map((row) => ({
+          id: row.id,
+          email: row.email,
+          role: row.role,
+          status: row.status,
+          expires_at: row.expiresAt.toISOString(),
+          revoked_at: row.revokedAt?.toISOString() ?? null,
+          consumed_at: row.consumedAt?.toISOString() ?? null,
+          invited_by_user_id: row.invitedByUserId,
+          created_at: row.createdAt.toISOString(),
+        })),
+        next_cursor,
+      },
       200,
     );
   });

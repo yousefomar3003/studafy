@@ -4,8 +4,10 @@ import { DOMAIN_EVENTS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { emit } from "../../../lib/events/emitter";
+import { decodeKeysetCursor, encodeKeysetCursor } from "../../../lib/keyset-cursor";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
+import type { InvitationStatus } from "./schemas";
 import type { Logger } from "../../../logger";
 import type { Role } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -52,6 +54,26 @@ export interface RegenerateInvitationResult {
   /** The old invitation's ID that was revoked. */
   revokedInvitationId: string;
   revokedAt: Date;
+}
+
+export interface ListInvitationsParams {
+  limit: number;
+  cursor?: string;
+  status?: InvitationStatus;
+  role?: Role;
+  search?: string;
+}
+
+export interface InvitationWithStatusRow {
+  id: string;
+  email: string;
+  role: Role;
+  status: InvitationStatus;
+  expiresAt: Date;
+  revokedAt: Date | null;
+  consumedAt: Date | null;
+  invitedByUserId: string | null;
+  createdAt: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -361,5 +383,96 @@ export function createInvitationService(options: InvitationServiceOptions = {}) 
         revokedAt: new Date(old.revoked_at),
       };
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// List
+// ---------------------------------------------------------------------------
+
+/**
+ * List invitations for the school, keyset-paginated by (created_at, id) DESC — same shape as
+ * `listUsers` in the users module.
+ *
+ * `status` is not a stored column (see the `app.invitations` migration comment: expiry-at-use is
+ * evaluated in the application transaction, never by a mutable-time check constraint). It is derived
+ * per row from revoked_at/consumed_at/expires_at with a CASE expression, wrapped in a subquery so the
+ * `status` filter can compare against the derived value rather than repeating the CASE in a WHERE
+ * clause.
+ */
+export async function listInvitations(
+  tx: TransactionSql,
+  schoolId: string,
+  params: ListInvitationsParams,
+): Promise<{ rows: InvitationWithStatusRow[]; next_cursor: string | null }> {
+  const statusFilter = params.status ? tx` AND status = ${params.status}` : tx``;
+
+  const roleFilter = params.role ? tx` AND role = ${params.role}::app.user_role` : tx``;
+
+  const searchFilter = params.search ? tx` AND email ILIKE ${`%${params.search}%`}` : tx``;
+
+  const cursorFilter = params.cursor
+    ? (() => {
+        const { created_at, id } = decodeKeysetCursor(params.cursor!);
+        return tx` AND (created_at, id) < (${created_at}::timestamptz, ${id}::uuid)`;
+      })()
+    : tx``;
+
+  const limit = params.limit + 1; // fetch one extra to detect next page
+
+  const rows = await tx<
+    {
+      id: string;
+      email: string;
+      role: Role;
+      status: InvitationStatus;
+      expires_at: Date;
+      revoked_at: Date | null;
+      consumed_at: Date | null;
+      invited_by_user_id: string | null;
+      created_at: Date;
+    }[]
+  >`
+    SELECT id, email, role, status, expires_at, revoked_at, consumed_at, invited_by_user_id, created_at
+    FROM (
+      SELECT id, email, role, expires_at, revoked_at, consumed_at, invited_by_user_id, created_at,
+             CASE
+               WHEN revoked_at IS NOT NULL THEN 'revoked'
+               WHEN consumed_at IS NOT NULL THEN 'consumed'
+               WHEN expires_at <= CURRENT_TIMESTAMP THEN 'expired'
+               ELSE 'pending'
+             END AS status
+      FROM app.invitations
+      WHERE school_id = ${schoolId}
+    ) invitations_with_status
+    WHERE TRUE
+      ${statusFilter}
+      ${roleFilter}
+      ${searchFilter}
+      ${cursorFilter}
+    ORDER BY created_at DESC, id DESC
+    LIMIT ${limit}
+  `;
+
+  const hasMore = rows.length > params.limit;
+  const sliced = hasMore ? rows.slice(0, params.limit) : rows;
+  const next_cursor =
+    hasMore && sliced.length > 0
+      ? encodeKeysetCursor(sliced[sliced.length - 1]!.created_at, sliced[sliced.length - 1]!.id)
+      : null;
+
+  return {
+    rows: sliced.map((row) => ({
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      status: row.status,
+      expiresAt: row.expires_at,
+      revokedAt: row.revoked_at,
+      consumedAt: row.consumed_at,
+      invitedByUserId: row.invited_by_user_id,
+      createdAt: row.created_at,
+    })),
+    next_cursor,
   };
 }

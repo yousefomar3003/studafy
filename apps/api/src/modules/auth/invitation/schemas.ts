@@ -135,6 +135,77 @@ export const regenerateInvitationResponseSchema = z
   .openapi("RegenerateInvitationResponse");
 
 // ---------------------------------------------------------------------------
+// List
+// ---------------------------------------------------------------------------
+
+export const invitationStatusValues = ["pending", "expired", "consumed", "revoked"] as const;
+
+export const invitationStatusSchema = z.enum(invitationStatusValues).openapi({
+  description:
+    "Lifecycle state derived from expires_at/consumed_at/revoked_at — not a stored column.",
+});
+
+export type InvitationStatus = z.infer<typeof invitationStatusSchema>;
+
+export const invitationWithStatusSchema = z
+  .object({
+    id: z.string().uuid().openapi({ description: "Unique invitation identifier." }),
+    email: z.string().email().openapi({ description: "Invited email address." }),
+    role: z.string().openapi({ description: "Role to be assigned on acceptance." }),
+    status: invitationStatusSchema,
+    expires_at: z.string().datetime().openapi({ description: "Expiry timestamp (ISO 8601)." }),
+    revoked_at: z
+      .string()
+      .datetime()
+      .nullable()
+      .openapi({ description: "Revocation timestamp, null unless revoked." }),
+    consumed_at: z
+      .string()
+      .datetime()
+      .nullable()
+      .openapi({ description: "Acceptance timestamp, null unless consumed." }),
+    invited_by_user_id: z
+      .string()
+      .uuid()
+      .nullable()
+      .openapi({ description: "User who issued the invitation, if known." }),
+    created_at: z.string().datetime().openapi({ description: "Issuance timestamp (ISO 8601)." }),
+  })
+  .openapi("InvitationWithStatus");
+
+export const invitationListQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().min(1).optional(),
+    status: invitationStatusSchema.optional(),
+    role: z
+      .enum([
+        ROLES.ORG_ADMIN,
+        ROLES.INSTRUCTOR,
+        ROLES.TEACHING_ASSISTANT,
+        ROLES.STUDENT,
+        ROLES.GUEST,
+      ])
+      .optional(),
+    search: z
+      .string()
+      .min(1)
+      .max(320)
+      .optional()
+      .openapi({ description: "Partial, case-insensitive match over email." }),
+  })
+  .openapi("InvitationListQuery");
+
+export const invitationListResponseSchema = z
+  .object({
+    invitations: z.array(invitationWithStatusSchema),
+    next_cursor: z.string().nullable().openapi({
+      description: "Opaque cursor for the next page. Null when no more results.",
+    }),
+  })
+  .openapi("InvitationList");
+
+// ---------------------------------------------------------------------------
 // Bulk invite
 // ---------------------------------------------------------------------------
 
