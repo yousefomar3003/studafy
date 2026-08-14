@@ -613,6 +613,109 @@ export async function listUserDevices(tx: TransactionSql, userId: string): Promi
 }
 
 /**
+ * Another user's live sessions, for an administrator (ST-187).
+ *
+ * `refresh_tokens_owner` (000029) restricts a plain `studafy_app` query to the caller's own rows, so
+ * this cannot be `listActiveSessions` with a different id — it has to go through
+ * `app.admin_list_user_sessions`, the SECURITY DEFINER seam 000100 adds specifically for this read,
+ * mirroring how `adminRevokeUserSessions` already goes through a SECURITY DEFINER seam to write.
+ * Cross-tenant targets and nonexistent ids both come back as an empty list rather than an error —
+ * the same non-enumerable convention the revoke routes use.
+ */
+export async function adminListUserSessions(
+  tx: TransactionSql,
+  targetUserId: string,
+): Promise<ActiveSession[]> {
+  const rows = await tx<
+    {
+      id: string;
+      device_id: string | null;
+      device_name: string | null;
+      channel: AuthChannel;
+      user_agent: string | null;
+      ip_address: string | null;
+      issued_at: Date;
+      expires_at: Date;
+    }[]
+  >`SELECT * FROM app.admin_list_user_sessions(${targetUserId})`;
+
+  return rows.map((row) => ({
+    id: row.id,
+    deviceId: row.device_id,
+    deviceName: row.device_name,
+    channel: row.channel,
+    userAgent: row.user_agent,
+    ipAddress: row.ip_address,
+    issuedAt: row.issued_at,
+    expiresAt: row.expires_at,
+  }));
+}
+
+/** Another user's registered, unrevoked devices, for an administrator. See adminListUserSessions. */
+export async function adminListUserDevices(
+  tx: TransactionSql,
+  targetUserId: string,
+): Promise<UserDevice[]> {
+  const rows = await tx<
+    {
+      id: string;
+      platform: string;
+      last_seen: Date;
+      created_at: Date;
+      active_session_count: string;
+    }[]
+  >`SELECT * FROM app.admin_list_user_devices(${targetUserId})`;
+
+  return rows.map((row) => ({
+    id: row.id,
+    platform: row.platform,
+    lastSeen: row.last_seen,
+    createdAt: row.created_at,
+    activeSessionCount: Number(row.active_session_count),
+  }));
+}
+
+/** Wire-shape projection of a session, shared by the self-service and admin session-list routes. */
+export function sessionToResponse(session: ActiveSession): {
+  id: string;
+  device_id: string | null;
+  device_name: string | null;
+  channel: AuthChannel;
+  user_agent: string | null;
+  ip_address: string | null;
+  issued_at: string;
+  expires_at: string;
+} {
+  return {
+    id: session.id,
+    device_id: session.deviceId,
+    device_name: session.deviceName,
+    channel: session.channel,
+    user_agent: session.userAgent,
+    ip_address: session.ipAddress,
+    issued_at: session.issuedAt.toISOString(),
+    expires_at: session.expiresAt.toISOString(),
+  };
+}
+
+/** Wire-shape projection of a device, shared by the self-service and admin device-list routes. */
+export function deviceToResponse(device: UserDevice): {
+  id: string;
+  platform: string;
+  last_seen: string;
+  created_at: string;
+  active_session_count: number;
+} {
+  return {
+    id: device.id,
+    platform: device.platform,
+    last_seen: device.lastSeen.toISOString(),
+    created_at: device.createdAt.toISOString(),
+    active_session_count: device.activeSessionCount,
+  };
+}
+
+/**
  * Soft-revoke a device registration.
  *
  * Sets revoked_at rather than deleting, matching how app.user_devices is treated everywhere else in

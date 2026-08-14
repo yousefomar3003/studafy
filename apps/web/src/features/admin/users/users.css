@@ -1,0 +1,90 @@
+/**
+ * User management screens. `@studafy/ui`'s DataGrid, FilterBar, and Modal supply their own chrome;
+ * everything here is feature-specific layout, styled with the same design tokens the rest of the
+ * portal shell uses.
+ */
+
+.users-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.users-list__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.users-list__actions {
+  display: flex;
+  gap: var(--space-8);
+  white-space: nowrap;
+}
+
+.users-list__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+.users-list__status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.users-list__status-pill[data-status="active"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.users-list__status-pill[data-status="invited"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.users-list__status-pill[data-status="suspended"],
+.users-list__status-pill[data-status="archived"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.users-sessions-list {
+  list-style: none;
+  margin: 0 0 var(--space-16);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.users-sessions-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.users-sessions-list__meta {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+  margin: 0;
+}
+
+.users-sessions-list__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}

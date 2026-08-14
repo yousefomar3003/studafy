@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { PERMISSIONS } from "@studafy/constants";
 
+import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
@@ -9,6 +10,14 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
 import { adminRevokeUserSessions, REVOCATION_REASONS } from "../services/revocation-service";
+import {
+  adminListUserDevices,
+  adminListUserSessions,
+  deviceToResponse,
+  sessionToResponse,
+} from "../services/session-service";
+
+import { deviceListSchema, sessionListSchema } from "./session-routes";
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -94,6 +103,43 @@ const revokeOneDeviceRoute = createRoute({
   ),
 });
 
+const listUserSessionsRoute = createRoute({
+  method: "get",
+  path: "/api/admin/users/{userId}/sessions",
+  tags: ["Admin"],
+  operationId: "adminListUserSessions",
+  summary: "List a user's active sessions",
+  description:
+    "Every live session for the named user — the same view revokeAllDevicesRoute and " +
+    "revokeOneDeviceRoute act on, so an administrator can see what a revocation will affect before " +
+    "calling it. Answers 200 with an empty list when the user has no live sessions, does not " +
+    "exist, or belongs to another tenant — the same non-enumerable convention the revoke routes use.",
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ userId: z.uuid() }) },
+  responses: standardResponses(
+    { 200: { description: "The named user's active sessions.", schema: sessionListSchema } },
+    [400, 401, 403, 429, 500],
+  ),
+});
+
+const listUserDevicesRoute = createRoute({
+  method: "get",
+  path: "/api/admin/users/{userId}/devices",
+  tags: ["Admin"],
+  operationId: "adminListUserDevices",
+  summary: "List a user's registered devices",
+  description:
+    "Every registered, unrevoked device for the named user, with the number of live sessions on " +
+    "each. Answers 200 with an empty list when the user has no devices, does not exist, or belongs " +
+    "to another tenant.",
+  security: [{ bearerAuth: [] }],
+  request: { params: z.object({ userId: z.uuid() }) },
+  responses: standardResponses(
+    { 200: { description: "The named user's registered devices.", schema: deviceListSchema } },
+    [400, 401, 403, 429, 500],
+  ),
+});
+
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
@@ -104,21 +150,25 @@ export function adminDeviceRoutes(
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  // Channel guard: administrative mutations are restricted to web sessions. Mobile and API
-  // tokens are rejected regardless of role — the threat model is the token surface, not the role.
-  // Runs before the permission guard for early rejection.
+  // Channel guard: administrative routes are restricted to web sessions. Mobile and API tokens are
+  // rejected regardless of role — the threat model is the token surface, not the role. Runs before
+  // the permission guard for early rejection. Applies to the read routes too: there is no reason an
+  // API token should be listing another user's sessions any more than revoking them.
   const channelGuard = requireChannel(AUTH_CHANNELS.WEB);
   routes.use("/api/admin/users/:userId/devices", channelGuard);
   routes.use("/api/admin/users/:userId/devices/:deviceId", channelGuard);
+  routes.use("/api/admin/users/:userId/sessions", channelGuard);
 
-  // USER_SUSPEND rather than a new permission constant. Terminating every credential a user holds is
-  // operationally indistinguishable from suspending them — both end the account's ability to act —
-  // and the matrix in @studafy/constants grants it to exactly the roles that should have this reach.
-  // Minting a SESSION_REVOKE permission would widen a shared package for a distinction no role
-  // definition currently draws.
+  // USER_SUSPEND, not USER_READ, gates the list routes too — deliberately, not by omission. Seeing
+  // another user's live IP addresses and devices is the same sensitivity class as being able to
+  // revoke them, and USER_READ is also held by FINANCE and SUPPORT_AGENT, neither of which should
+  // see this. Keeping the whole per-user session/device surface — read and write — behind one
+  // permission is what admin-dashboard's deactivation dialog and device-sessions panel both rely on:
+  // whoever can see what a deactivation will revoke is exactly whoever can perform it.
   const guard = requirePermission(PERMISSIONS.USER_SUSPEND);
   routes.use("/api/admin/users/:userId/devices", guard);
   routes.use("/api/admin/users/:userId/devices/:deviceId", guard);
+  routes.use("/api/admin/users/:userId/sessions", guard);
 
   routes.use("/api/admin/users/:userId/devices", revokeAllAudit);
   routes.use("/api/admin/users/:userId/devices/:deviceId", revokeOneAudit);
@@ -131,6 +181,32 @@ export function adminDeviceRoutes(
   routes.openapi(revokeOneDeviceRoute, async (c) => {
     const { userId, deviceId } = c.req.valid("param");
     return c.json(await revokeFor(c, userId, deviceId), 200);
+  });
+
+  routes.openapi(listUserSessionsRoute, async (c) => {
+    const { userId } = c.req.valid("param");
+    const auth = requireAuth(c);
+
+    const sessions = await withTenantTx(
+      database,
+      { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+      (tx) => adminListUserSessions(tx, userId),
+    );
+
+    return c.json({ sessions: sessions.map(sessionToResponse) }, 200);
+  });
+
+  routes.openapi(listUserDevicesRoute, async (c) => {
+    const { userId } = c.req.valid("param");
+    const auth = requireAuth(c);
+
+    const devices = await withTenantTx(
+      database,
+      { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+      (tx) => adminListUserDevices(tx, userId),
+    );
+
+    return c.json({ devices: devices.map(deviceToResponse) }, 200);
   });
 
   /**

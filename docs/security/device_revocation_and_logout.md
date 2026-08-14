@@ -129,6 +129,19 @@ tuple and rethrows the first error rather than reporting a success that did not 
 | `DELETE` | `/api/auth/sessions/{sessionId}`               | Bearer                  | One session's family                       |
 | `DELETE` | `/api/admin/users/{userId}/devices`            | Bearer + `user:suspend` | Every family the user holds                |
 | `DELETE` | `/api/admin/users/{userId}/devices/{deviceId}` | Bearer + `user:suspend` | One device of another user                 |
+| `GET`    | `/api/admin/users/{userId}/sessions`           | Bearer + `user:suspend` | Another user's active sessions             |
+| `GET`    | `/api/admin/users/{userId}/devices`            | Bearer + `user:suspend` | Another user's registered devices          |
+
+The two `GET` rows are ST-187, added for the user-management screens' deactivation dialog and
+per-user device-sessions panel — an administrator could already revoke another user's sessions blind
+(the rows above), but had no way to see what a revocation would affect first. `GET
+/api/auth/sessions` and `/devices` cannot answer for another user for the same reason the admin
+`DELETE` routes could not use `revokeAndDenylist`: `refresh_tokens_owner` (000029) is RESTRICTIVE and
+scoped `TO studafy_app`, so a plain query only ever sees the caller's own rows. Migration `000100`
+adds `app.admin_list_user_sessions` and `app.admin_list_user_devices`, read-only SECURITY DEFINER
+functions owned by `studafy_admin` — the same seam `app.admin_revoke_user_sessions` uses, applied to
+a read instead of a write, with the same cross-tenant behavior: a target in another school answers
+200 with an empty list, not 404 or 403.
 
 `/api/auth/logout` is exempt from the authentication boundary via `DEFAULT_PUBLIC_PATHS` in
 [`jwtAuth.ts`](../../apps/api/src/middleware/jwtAuth.ts) — it is reached precisely when the access

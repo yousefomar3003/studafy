@@ -26,6 +26,7 @@ const OnboardingPage = lazy(() => import("../routes/onboarding/OnboardingPage"))
 const SetupWizardPage = lazy(() => import("../routes/onboarding-setup/SetupWizardPage"));
 const PortalPage = lazy(() => import("../routes/portal/PortalPage"));
 const AdminDashboardPage = lazy(() => import("../features/admin/AdminDashboardPage"));
+const UsersListPage = lazy(() => import("../features/admin/users/UsersListPage"));
 const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
@@ -106,6 +107,14 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <AdminDashboardPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "admin/users",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <UsersListPage />
               </RequirePermission>
             ),
           },

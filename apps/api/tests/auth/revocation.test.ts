@@ -7,6 +7,7 @@ import { resetSecurityConfig } from "../../src/config/security";
 import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { jtiDenylistKey, KeyStore } from "../../src/modules/auth";
+import { AUTH_CHANNELS } from "../../src/modules/auth/channels";
 import { createRedisClient } from "../../src/redis";
 import {
   createFullTenant,
@@ -117,8 +118,18 @@ afterAll(async () => {
  * Authorization is decided by the roles claim, not by which user id the token names, so a test about
  * permissions has to say which permissions it is testing with.
  */
-async function bearer(userId: string, schoolId: string, roles: Role[]): Promise<string> {
-  return `Bearer ${await mintTestToken(keyStore, { userId, schoolId, roles })}`;
+async function bearer(
+  userId: string,
+  schoolId: string,
+  roles: Role[],
+  channel: "web" | "mobile" | "api" = AUTH_CHANNELS.API,
+): Promise<string> {
+  return `Bearer ${await mintTestToken(keyStore, { userId, schoolId, roles, channel })}`;
+}
+
+/** The admin routes gate on `requireChannel(WEB)` — every call against them needs a web-channel token. */
+async function adminBearer(userId: string, schoolId: string, roles: Role[]): Promise<string> {
+  return bearer(userId, schoolId, roles, AUTH_CHANNELS.WEB);
 }
 
 /** Hit a route that exists and requires authentication, to observe whether a token is still accepted. */
@@ -414,7 +425,9 @@ describe("admin device revocation", () => {
     const res = await app.request(`/api/admin/users/${target.id}/devices`, {
       method: "DELETE",
       headers: {
-        authorization: await bearer(tenant.users.ORG_ADMIN.id, tenant.schoolId, [ROLES.ORG_ADMIN]),
+        authorization: await adminBearer(tenant.users.ORG_ADMIN.id, tenant.schoolId, [
+          ROLES.ORG_ADMIN,
+        ]),
       },
     });
 
@@ -440,7 +453,7 @@ describe("admin device revocation", () => {
 
     await app.request(`/api/admin/users/${target.id}/devices`, {
       method: "DELETE",
-      headers: { authorization: await bearer(admin.id, tenant.schoolId, [ROLES.ORG_ADMIN]) },
+      headers: { authorization: await adminBearer(admin.id, tenant.schoolId, [ROLES.ORG_ADMIN]) },
     });
 
     const [entry] = await sql<{ actor_id: string; new_values: Record<string, unknown> }[]>`
@@ -463,7 +476,7 @@ describe("admin device revocation", () => {
     const res = await app.request(`/api/admin/users/${tenant.users.INSTRUCTOR.id}/devices`, {
       method: "DELETE",
       headers: {
-        authorization: await bearer(tenant.users.STUDENT.id, tenant.schoolId, [ROLES.STUDENT]),
+        authorization: await adminBearer(tenant.users.STUDENT.id, tenant.schoolId, [ROLES.STUDENT]),
       },
     });
 
@@ -483,7 +496,9 @@ describe("admin device revocation", () => {
     const res = await app.request(`/api/admin/users/${foreignUser.id}/devices`, {
       method: "DELETE",
       headers: {
-        authorization: await bearer(tenant.users.ORG_ADMIN.id, tenant.schoolId, [ROLES.ORG_ADMIN]),
+        authorization: await adminBearer(tenant.users.ORG_ADMIN.id, tenant.schoolId, [
+          ROLES.ORG_ADMIN,
+        ]),
       },
     });
 
@@ -514,7 +529,9 @@ describe("admin device revocation", () => {
     const res = await app.request(`/api/admin/users/${target.id}/devices/${device.id}`, {
       method: "DELETE",
       headers: {
-        authorization: await bearer(tenant.users.ORG_ADMIN.id, tenant.schoolId, [ROLES.ORG_ADMIN]),
+        authorization: await adminBearer(tenant.users.ORG_ADMIN.id, tenant.schoolId, [
+          ROLES.ORG_ADMIN,
+        ]),
       },
     });
 
@@ -529,5 +546,99 @@ describe("admin device revocation", () => {
 
     expect(killed!.revoked_at).not.toBeNull();
     expect(survivor!.revoked_at).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Administrative session/device listing (ST-187)
+// ---------------------------------------------------------------------------
+
+describe("admin session/device listing", () => {
+  integrationTest("GET .../sessions lists another user's live sessions", async () => {
+    const target = tenant.users.STUDENT;
+    const admin = tenant.users.ORG_ADMIN;
+    const seed = await createRefreshSession(sql, tenant.schoolId, target.id, { channel: "mobile" });
+
+    const res = await app.request(`/api/admin/users/${target.id}/sessions`, {
+      headers: { authorization: await adminBearer(admin.id, tenant.schoolId, [ROLES.ORG_ADMIN]) },
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sessions: { id: string; channel: string }[] };
+    const listed = body.sessions.find((entry) => entry.id === seed.sessionId);
+    expect(listed).toBeDefined();
+    expect(listed!.channel).toBe("mobile");
+    // token_hash is a credential and must never reach a client.
+    expect(JSON.stringify(body)).not.toContain("token_hash");
+  });
+
+  integrationTest("GET .../devices lists another user's devices with session counts", async () => {
+    const target = tenant.users.INSTRUCTOR;
+    const admin = tenant.users.ORG_ADMIN;
+    const device = await createUserDevice(sql, tenant.schoolId, target.id, {
+      fcmToken: `tok-${crypto.randomUUID()}`,
+    });
+    await createRefreshSession(sql, tenant.schoolId, target.id, { deviceId: device.id });
+
+    const res = await app.request(`/api/admin/users/${target.id}/devices`, {
+      headers: { authorization: await adminBearer(admin.id, tenant.schoolId, [ROLES.ORG_ADMIN]) },
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      devices: { id: string; active_session_count: number }[];
+    };
+    const listed = body.devices.find((entry) => entry.id === device.id);
+    expect(listed).toBeDefined();
+    expect(listed!.active_session_count).toBe(1);
+    // The push credential must never reach a client.
+    expect(JSON.stringify(body)).not.toContain("tok-");
+  });
+
+  integrationTest("refuses a caller without USER_SUSPEND", async () => {
+    const res = await app.request(`/api/admin/users/${tenant.users.INSTRUCTOR.id}/sessions`, {
+      headers: {
+        authorization: await adminBearer(tenant.users.STUDENT.id, tenant.schoolId, [ROLES.STUDENT]),
+      },
+    });
+
+    expect(res.status).toBe(403);
+    const problem = (await res.json()) as { code: string };
+    expect(problem.code).toBe("AUTHZ_FORBIDDEN");
+  });
+
+  integrationTest("cannot list sessions for a user in another tenant", async () => {
+    const foreignUser = otherTenant.users.STUDENT;
+    await createRefreshSession(sql, otherTenant.schoolId, foreignUser.id);
+
+    const res = await app.request(`/api/admin/users/${foreignUser.id}/sessions`, {
+      headers: {
+        authorization: await adminBearer(tenant.users.ORG_ADMIN.id, tenant.schoolId, [
+          ROLES.ORG_ADMIN,
+        ]),
+      },
+    });
+
+    // Indistinguishable from a nonexistent user, matching the revoke routes' own convention.
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ sessions: [] });
+  });
+
+  integrationTest("cannot list devices for a user in another tenant", async () => {
+    const foreignUser = otherTenant.users.INSTRUCTOR;
+    await createUserDevice(sql, otherTenant.schoolId, foreignUser.id, {
+      fcmToken: `tok-${crypto.randomUUID()}`,
+    });
+
+    const res = await app.request(`/api/admin/users/${foreignUser.id}/devices`, {
+      headers: {
+        authorization: await adminBearer(tenant.users.ORG_ADMIN.id, tenant.schoolId, [
+          ROLES.ORG_ADMIN,
+        ]),
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ devices: [] });
   });
 });

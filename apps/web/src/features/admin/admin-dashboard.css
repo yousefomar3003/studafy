@@ -4,6 +4,10 @@
  * it, styled with the same design tokens the rest of the portal shell uses.
  */
 
+.admin-dashboard-link {
+  margin: 0 0 var(--space-16);
+}
+
 .admin-dashboard-banner {
   margin-bottom: var(--space-16);
 }
