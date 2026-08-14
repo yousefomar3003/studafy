@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import { ActivationFunnelTile } from "./tiles/ActivationFunnelTile";
 import { AttendanceTodayTile } from "./tiles/AttendanceTodayTile";
 import { PendingApprovalsTile } from "./tiles/PendingApprovalsTile";
@@ -17,6 +19,10 @@ export default function AdminDashboardPage() {
     <>
       <h1>Admin</h1>
       <p>A live snapshot of activation, attendance, approvals, and account health.</p>
+
+      <p className="admin-dashboard-link">
+        <Link to="/portal/admin/users">Manage users →</Link>
+      </p>
 
       <div className="admin-dashboard-banner">
         <SubscriptionStatusBanner />

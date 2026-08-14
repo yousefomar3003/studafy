@@ -80,6 +80,7 @@ const EXPECTED_PATHS = [
   "/api/auth/providers/{provider}",
   "/api/admin/users/{userId}/devices",
   "/api/admin/users/{userId}/devices/{deviceId}",
+  "/api/admin/users/{userId}/sessions",
   "/api/admin/users/{userId}/providers/{provider}",
   "/api/admin/subscriptions/sync-prices",
   "/api/approvals/bulk-decision",

@@ -10,10 +10,12 @@ import { clearRefreshCookie, deliverTokenPair, readPresentedToken } from "../del
 import { REVOCATION_REASONS, revokeAndDenylist } from "../services/revocation-service";
 import {
   deregisterDevice,
+  deviceToResponse,
   listActiveSessions,
   listUserDevices,
   resolveFamilyByToken,
   rotateRefreshToken,
+  sessionToResponse,
 } from "../services/session-service";
 
 import type { Database } from "../../../db/client";
@@ -83,7 +85,9 @@ const sessionSchema = z
   })
   .openapi("Session");
 
-const sessionListSchema = z.object({ sessions: z.array(sessionSchema) }).openapi("SessionList");
+export const sessionListSchema = z
+  .object({ sessions: z.array(sessionSchema) })
+  .openapi("SessionList");
 
 const logoutResponseSchema = z.object({ ended: z.literal(true) }).openapi("LogoutResult");
 
@@ -114,7 +118,7 @@ const deviceSchema = z
   })
   .openapi("Device");
 
-const deviceListSchema = z.object({ devices: z.array(deviceSchema) }).openapi("DeviceList");
+export const deviceListSchema = z.object({ devices: z.array(deviceSchema) }).openapi("DeviceList");
 
 // ---------------------------------------------------------------------------
 // Route definitions
@@ -392,21 +396,7 @@ export function sessionRoutes(
       listActiveSessions(tx, auth.userId),
     );
 
-    return c.json(
-      {
-        sessions: sessions.map((session) => ({
-          id: session.id,
-          device_id: session.deviceId,
-          device_name: session.deviceName,
-          channel: session.channel,
-          user_agent: session.userAgent,
-          ip_address: session.ipAddress,
-          issued_at: session.issuedAt.toISOString(),
-          expires_at: session.expiresAt.toISOString(),
-        })),
-      },
-      200,
-    );
+    return c.json({ sessions: sessions.map(sessionToResponse) }, 200);
   });
 
   routes.openapi(listDevicesRoute, async (c) => {
@@ -416,18 +406,7 @@ export function sessionRoutes(
       listUserDevices(tx, auth.userId),
     );
 
-    return c.json(
-      {
-        devices: devices.map((device) => ({
-          id: device.id,
-          platform: device.platform,
-          last_seen: device.lastSeen.toISOString(),
-          created_at: device.createdAt.toISOString(),
-          active_session_count: device.activeSessionCount,
-        })),
-      },
-      200,
-    );
+    return c.json({ devices: devices.map(deviceToResponse) }, 200);
   });
 
   routes.openapi(revokeSessionRoute, async (c) => {
