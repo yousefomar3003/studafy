@@ -25,6 +25,7 @@ const InviteCompletePage = lazy(() => import("../routes/invite/InviteCompletePag
 const OnboardingPage = lazy(() => import("../routes/onboarding/OnboardingPage"));
 const SetupWizardPage = lazy(() => import("../routes/onboarding-setup/SetupWizardPage"));
 const PortalPage = lazy(() => import("../routes/portal/PortalPage"));
+const AdminDashboardPage = lazy(() => import("../features/admin/AdminDashboardPage"));
 const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
@@ -100,6 +101,14 @@ export const routes: RouteObject[] = [
         ),
         children: [
           { index: true, element: <PortalPage /> },
+          {
+            path: "admin",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <AdminDashboardPage />
+              </RequirePermission>
+            ),
+          },
           {
             path: "approvals",
             element: (
