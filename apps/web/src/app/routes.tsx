@@ -7,6 +7,7 @@ import { MarketingLayout } from "../layouts/MarketingLayout";
 import { OnboardingLayout } from "../layouts/OnboardingLayout";
 import { PortalLayout } from "../layouts/PortalLayout";
 import { RootLayout } from "../layouts/RootLayout";
+import { SetupWizardLayout } from "../layouts/SetupWizardLayout";
 import { RequireAuth, RequirePermission } from "../lib/auth";
 import HomePage from "../routes/marketing/HomePage";
 
@@ -22,6 +23,7 @@ const AuthErrorPage = lazy(() => import("../routes/auth/ErrorPage"));
 const InvitePage = lazy(() => import("../routes/invite/InvitePage"));
 const InviteCompletePage = lazy(() => import("../routes/invite/InviteCompletePage"));
 const OnboardingPage = lazy(() => import("../routes/onboarding/OnboardingPage"));
+const SetupWizardPage = lazy(() => import("../routes/onboarding-setup/SetupWizardPage"));
 const PortalPage = lazy(() => import("../routes/portal/PortalPage"));
 const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
@@ -69,6 +71,25 @@ export const routes: RouteObject[] = [
         path: "onboarding",
         element: <OnboardingLayout />,
         children: [{ index: true, element: <OnboardingPage /> }],
+      },
+      {
+        // Post-activation: the admin is already signed in, unlike the public registration flow above.
+        path: "onboarding/setup",
+        element: (
+          <RequireAuth>
+            <SetupWizardLayout />
+          </RequireAuth>
+        ),
+        children: [
+          {
+            index: true,
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <SetupWizardPage />
+              </RequirePermission>
+            ),
+          },
+        ],
       },
       {
         path: "portal",
