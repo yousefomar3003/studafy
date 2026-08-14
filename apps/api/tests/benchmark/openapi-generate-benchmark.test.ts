@@ -229,6 +229,7 @@ const EXPECTED_PATHS = [
   "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
   "/api/grades/published/students/{studentId}/terms/{termId}",
   "/api/users",
+  "/api/users/status-counts",
   "/api/users/{userId}",
   "/api/users/{userId}/role",
   "/api/users/{userId}/deactivate",

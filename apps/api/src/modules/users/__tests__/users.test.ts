@@ -25,6 +25,7 @@ import {
 import {
   listUsers,
   getUser,
+  getUserStatusCounts,
   createUser,
   updateUser,
   updateUserRole,
@@ -179,6 +180,39 @@ describeDb("listUsers", () => {
     const page1Ids = page1.rows.map((r) => r.id);
     const page2Ids = page2.rows.map((r) => r.id);
     expect(page1Ids.some((id) => page2Ids.includes(id))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getUserStatusCounts
+// ---------------------------------------------------------------------------
+
+describeDb("getUserStatusCounts", () => {
+  test("counts users per status, scoped to the school", async () => {
+    const school = await createSchool(db.sql);
+    const otherSchool = await createSchool(db.sql);
+
+    await createUserFactory(db.sql, school.id, { email: "a1@test.local", status: "active" });
+    await createUserFactory(db.sql, school.id, { email: "a2@test.local", status: "active" });
+    await createUserFactory(db.sql, school.id, { email: "i1@test.local", status: "invited" });
+    await createUserFactory(db.sql, school.id, { email: "s1@test.local", status: "suspended" });
+    // Belongs to a different school — must not be counted.
+    await createUserFactory(db.sql, otherSchool.id, {
+      email: "other@test.local",
+      status: "active",
+    });
+
+    const counts = await withTx((tx) => getUserStatusCounts(tx, school.id));
+
+    expect(counts).toEqual({ invited: 1, active: 2, suspended: 1, archived: 0 });
+  });
+
+  test("returns all-zero counts for a school with no users", async () => {
+    const school = await createSchool(db.sql);
+
+    const counts = await withTx((tx) => getUserStatusCounts(tx, school.id));
+
+    expect(counts).toEqual({ invited: 0, active: 0, suspended: 0, archived: 0 });
   });
 });
 

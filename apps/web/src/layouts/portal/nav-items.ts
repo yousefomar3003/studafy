@@ -19,6 +19,12 @@ export interface PortalNavItem {
 export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
   { id: "home", label: "Home", to: "/portal" },
   {
+    id: "admin",
+    label: "Admin",
+    to: "/portal/admin",
+    requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS,
+  },
+  {
     id: "approvals",
     label: "Approvals",
     to: "/portal/approvals",

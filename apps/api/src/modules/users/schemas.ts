@@ -106,6 +106,19 @@ export const userListSchema = z
   .openapi("UserList");
 
 // ---------------------------------------------------------------------------
+// Status counts
+// ---------------------------------------------------------------------------
+
+export const userStatusCountsSchema = z
+  .object({
+    invited: z.number().int().nonnegative(),
+    active: z.number().int().nonnegative(),
+    suspended: z.number().int().nonnegative(),
+    archived: z.number().int().nonnegative(),
+  })
+  .openapi("UserStatusCounts");
+
+// ---------------------------------------------------------------------------
 // Deactivate response
 // ---------------------------------------------------------------------------
 

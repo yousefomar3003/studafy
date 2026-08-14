@@ -154,6 +154,35 @@ export async function listUsers(
   };
 }
 
+const ZERO_STATUS_COUNTS: Record<UserStatus, number> = {
+  invited: 0,
+  active: 0,
+  suspended: 0,
+  archived: 0,
+};
+
+/**
+ * Counts users per lifecycle status for the school, e.g. to power an activation funnel tile
+ * without paging through the full user list to total a status client-side.
+ */
+export async function getUserStatusCounts(
+  tx: TransactionSql,
+  schoolId: string,
+): Promise<Record<UserStatus, number>> {
+  const rows = await tx<{ status: UserStatus; count: string }[]>`
+    SELECT status, COUNT(*) AS count
+    FROM app.users
+    WHERE school_id = ${schoolId}
+    GROUP BY status
+  `;
+
+  const counts = { ...ZERO_STATUS_COUNTS };
+  for (const row of rows) {
+    counts[row.status] = Number(row.count);
+  }
+  return counts;
+}
+
 export async function getUser(
   tx: TransactionSql,
   schoolId: string,

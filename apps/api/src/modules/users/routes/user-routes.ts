@@ -18,12 +18,14 @@ import {
   updateUserBodySchema,
   updateUserRoleBodySchema,
   userDeactivateResponseSchema,
+  userStatusCountsSchema,
   userWithRolesSchema,
 } from "../schemas";
 import {
   createUser as createUserService,
   deactivateUser,
   getUser,
+  getUserStatusCounts,
   listUsers,
   updateUser as updateUserService,
   updateUserRole as updateUserRoleService,
@@ -78,6 +80,28 @@ const listUsersRoute = createRoute({
       },
     },
     [400, 401, 403, 429, 500],
+  ),
+});
+
+const getUserStatusCountsRoute = createRoute({
+  method: "get",
+  path: "/api/users/status-counts",
+  tags: ["Users"],
+  operationId: "getUserStatusCounts",
+  summary: "Get user counts by status",
+  description:
+    "Aggregate counts of users in the school grouped by lifecycle status (invited, active, " +
+    "suspended, archived). Powers admin activation-funnel reporting without paging through the " +
+    "full user list to total a status.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    {
+      200: {
+        description: "Counts of users per status.",
+        schema: userStatusCountsSchema,
+      },
+    },
+    [401, 403, 429, 500],
   ),
 });
 
@@ -216,6 +240,7 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
   // --- Channel guard: mutations restricted to web sessions ---
   const channelGuard = requireChannel(AUTH_CHANNELS.WEB);
   routes.use("/api/users", channelGuard);
+  routes.use("/api/users/status-counts", channelGuard);
   routes.use("/api/users/{userId}", channelGuard);
   routes.use("/api/users/{userId}/role", channelGuard);
   routes.use("/api/users/{userId}/deactivate", channelGuard);
@@ -223,6 +248,7 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
   // --- Permission guards ---
   routes.use("/api/users", requirePermission(PERMISSIONS.USER_READ));
   routes.use("/api/users", requirePermission(PERMISSIONS.USER_CREATE));
+  routes.use("/api/users/status-counts", requirePermission(PERMISSIONS.USER_READ));
   routes.use("/api/users/{userId}", requirePermission(PERMISSIONS.USER_READ));
   routes.use("/api/users/{userId}", requirePermission(PERMISSIONS.USER_UPDATE));
   routes.use("/api/users/{userId}/role", requirePermission(PERMISSIONS.ROLE_ASSIGN));
@@ -248,6 +274,16 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
     );
 
     return c.json({ users: rows, next_cursor }, 200);
+  });
+
+  routes.openapi(getUserStatusCountsRoute, async (c) => {
+    const auth = requireAuth(c);
+
+    const counts = await withTenantTx(database, tenantFrom(c), (tx) =>
+      getUserStatusCounts(tx, auth.schoolId),
+    );
+
+    return c.json(counts, 200);
   });
 
   routes.openapi(getUserRoute, async (c) => {
