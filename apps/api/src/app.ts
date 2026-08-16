@@ -36,6 +36,7 @@ import { submissionRoutes } from "./modules/academics/submissions";
 import {
   AI_LLM_MAX_RESERVE_TOKENS,
   aiAskRoutes,
+  aiConceptsRoutes,
   aiEntitlementGate,
   aiFlashcardRoutes,
   aiGatewayRoutes,
@@ -44,6 +45,7 @@ import {
   aiSummaryRoutes,
   aiUsageRoutes,
   createAiTokenMeter,
+  createConceptsCache,
   createDeterministicCrossEncoderReranker,
   createDeterministicQueryEmbedder,
   createSummaryCache,
@@ -817,17 +819,20 @@ export function createApp({
         // path (the material-summarizer) likewise feeds an open-ended generation and is held at the
         // same worst case — its input is bounded (AI_SUMMARY_CHUNK_LIMIT × chunk cap), but its output
         // ceiling still exceeds any default-size hold, and a summary that raced its reservation would
-        // trip the meter's out-of-range guard. Quiz generation (ST-167) is held at the same worst
-        // case for the same reason -- see config.ts's AI_QUIZ_* reservation math -- but only the
-        // generate path (POST .../quizzes); grading (POST .../quizzes/{quizId}/grade) makes no LLM
-        // call and stays on the default hold. Flashcard deck generation (ST-168) is held at the
-        // same worst case for the same reason -- see config.ts's AI_FLASHCARD_* reservation math --
-        // but only the generate path (POST .../decks); the review paths (GET/POST
+        // trip the meter's out-of-range guard. Key-concept extraction (ST-169) is held at the same
+        // worst case for the same reason -- see config.ts's AI_CONCEPTS_* reservation math -- it
+        // reuses the summary loader's input budget and caps its JSON output. Quiz generation (ST-167)
+        // is held at the same worst case for the same reason -- see config.ts's AI_QUIZ_* reservation
+        // math -- but only the generate path (POST .../quizzes); grading (POST .../quizzes/{quizId}/grade)
+        // makes no LLM call and stays on the default hold. Flashcard deck generation (ST-168) is held
+        // at the same worst case for the same reason -- see config.ts's AI_FLASHCARD_* reservation
+        // math -- but only the generate path (POST .../decks); the review paths (GET/POST
         // .../decks/{deckId}/review) make no LLM call and stay on the default hold.
         resolveReserveTokens: (c) =>
           c.req.path.endsWith("/generate") ||
           c.req.path.endsWith("/ask") ||
           c.req.path.endsWith("/summarize") ||
+          c.req.path.endsWith("/concepts") ||
           c.req.path.endsWith("/quizzes") ||
           c.req.path.endsWith("/decks")
             ? AI_LLM_MAX_RESERVE_TOKENS
@@ -886,6 +891,21 @@ export function createApp({
         database,
         provider: aiLlmProvider,
         cache: createSummaryCache(redis),
+        modelOverrides: aiLlmModelOverrides,
+      }),
+    );
+    // Key-concept extraction (ST-169). Mounted under the same gate so a generated concept list
+    // reserves and commits the caller's AI quota, and only when the gate's dependencies exist --
+    // the concepts surface must never run un-metered. The provider may be null on the same
+    // kill-switch terms as the gateway. A Redis-backed cache (createConceptsCache, sharing the
+    // gate's redis client) serves repeat concept lists of the same material to the same student
+    // with a zero-token commit; it is an accelerator -- a miss or a Redis error regenerates.
+    app.route(
+      "/",
+      aiConceptsRoutes({
+        database,
+        provider: aiLlmProvider,
+        cache: createConceptsCache(redis),
         modelOverrides: aiLlmModelOverrides,
       }),
     );

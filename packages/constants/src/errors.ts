@@ -319,6 +319,12 @@ export const ERROR_CODES = {
   AI_FLASHCARD_GENERATION_FAILED: "AI_FLASHCARD_GENERATION_FAILED",
   AI_FLASHCARD_DECK_NOT_FOUND: "AI_FLASHCARD_DECK_NOT_FOUND",
 
+  // Key-concept extraction (ST-169). AI_CONCEPTS_GENERATION_FAILED is the model-output-stage
+  // counterpart to the quiz/flashcard generation failures: the provider answered, but its JSON did
+  // not validate against the concepts schema, cited a source it was never given, or named a concept
+  // that the grounding validator could not tie to the corpus -- a client can retry the same request.
+  AI_CONCEPTS_GENERATION_FAILED: "AI_CONCEPTS_GENERATION_FAILED",
+
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",

@@ -271,6 +271,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // Study-material summarizer. Same gate and same rationale as the retrieval route above; the
   // summarize route's one write is the metered student's own usage ledger.
   "POST /api/ai/students/{studentId}/summarize",
+  // Key-concept extraction (ST-169). Same gate and same rationale as the summarizer route above;
+  // the concepts route's one write is the metered student's own usage ledger.
+  "POST /api/ai/students/{studentId}/concepts",
   // Quiz generation and grading (ST-167). Same gate and same rationale as the retrieval route
   // above; generation's writes are the quiz, its questions, and the student's usage ledger, and
   // grading acts only on the requesting student's own quiz (scoped by student_id, see
@@ -420,6 +423,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Study-material summarizer — same gate, same RLS, same single write to the metered student's
   // own ai_usage_meters row.
   "POST /api/ai/students/{studentId}/summarize",
+  // Key-concept extraction (ST-169) — same gate, same RLS, same single write to the metered
+  // student's own ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/concepts",
   // Quiz generation and grading (ST-167) — same gate, same RLS. Generation writes the quiz, its
   // questions, and the student's own ai_usage_meters row; grading is explicitly scoped to the
   // requesting student's own quiz (student_id filter in quiz/persistence.ts) and writes nothing.

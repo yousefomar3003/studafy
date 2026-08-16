@@ -169,6 +169,7 @@
   "AI_QUIZ_NOT_FOUND": "No such quiz found for this student",
   "AI_FLASHCARD_GENERATION_FAILED": "The AI provider's flashcard output could not be validated; please try again",
   "AI_FLASHCARD_DECK_NOT_FOUND": "No such flashcard deck found for this student",
+  "AI_CONCEPTS_GENERATION_FAILED": "The AI provider's concept output could not be validated; please try again",
   "SUBSCRIPTION_ALREADY_CANCELED": "A cancellation is already scheduled for this subscription",
   "SUBSCRIPTION_CANCELLATION_NOT_PENDING": "No pending cancellation to reverse",
   "SUBSCRIPTION_NOT_LINKED_TO_PROVIDER": "Subscription has no payment-provider record",

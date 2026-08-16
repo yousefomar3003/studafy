@@ -16,7 +16,7 @@ import { AI_LLM_DEFAULT_LARGE_MODEL, AI_LLM_DEFAULT_SMALL_MODEL } from "../confi
  */
 
 /** The AI surfaces the gateway serves, and the request body's `feature` values. */
-export const AI_FEATURES = ["ask", "exam", "summary", "flashcards", "quiz"] as const;
+export const AI_FEATURES = ["ask", "exam", "summary", "concepts", "flashcards", "quiz"] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 
 export const AI_MODEL_TIERS = ["small", "large"] as const;
@@ -26,6 +26,9 @@ export const AI_ROUTING_TABLE: Readonly<Record<AiFeature, AiModelTier>> = {
   ask: "large",
   exam: "large",
   summary: "small",
+  // Key-concept extraction (ST-169) is the same short, repetitive shape as summary/flashcards --
+  // a bounded JSON list over a bounded source prefix -- so it gets the fast cheap tier.
+  concepts: "small",
   flashcards: "small",
   // Quiz generation (ST-167) mixes question types across multiple materials and must keep every
   // question's citation and answer key internally consistent -- the same reasoning load as exam
@@ -43,7 +46,8 @@ export interface AiModelTierConfig {
 export const AI_LLM_MODEL_CATALOG: Readonly<Record<AiModelTier, AiModelTierConfig>> = {
   small: {
     defaultModel: AI_LLM_DEFAULT_SMALL_MODEL,
-    description: "Fast, cheap workhorse for short-form generation: summaries and flashcard lists.",
+    description:
+      "Fast, cheap workhorse for short-form generation: summaries, concept lists, and flashcard decks.",
   },
   large: {
     defaultModel: AI_LLM_DEFAULT_LARGE_MODEL,
