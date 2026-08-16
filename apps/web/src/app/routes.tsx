@@ -30,6 +30,7 @@ const UsersListPage = lazy(() => import("../features/admin/users/UsersListPage")
 const InvitationsListPage = lazy(() => import("../features/admin/invitations/InvitationsListPage"));
 const StudentsListPage = lazy(() => import("../features/admin/students/StudentsListPage"));
 const StudentProfilePage = lazy(() => import("../features/admin/students/StudentProfilePage"));
+const ImportStudentsPage = lazy(() => import("../features/admin/students/ImportStudentsPage"));
 const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
@@ -134,6 +135,14 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <StudentsListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "admin/students/import",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <ImportStudentsPage />
               </RequirePermission>
             ),
           },

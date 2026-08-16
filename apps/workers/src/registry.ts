@@ -1,5 +1,6 @@
 import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 import { Queue } from "bullmq";
+import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
@@ -9,6 +10,7 @@ import { createTenantSemaphore } from "./queues/ai-ingestion/semaphore";
 import { processIngestJob } from "./queues/ai-ingestion/worker";
 import { billingDeadLetterListener, processBillingJob } from "./queues/billing";
 import { createDerivationS3, processMaterialDerivation } from "./queues/derivations";
+import { purgeAbandonedStudentImports } from "./queues/imports/abandoned-import-sweep";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
@@ -276,6 +278,16 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     name: QUEUE_NAMES.IMPORTS,
     concurrency: 2,
     processor: async (job: Job) => {
+      if (job.name === JOB_NAMES.PURGE_ABANDONED_IMPORTS) {
+        const sql = postgres(databaseUrl, { max: 2, idle_timeout: 20, prepare: false });
+        try {
+          const result = await purgeAbandonedStudentImports(sql, new Date(), workerLogger);
+          return { processed: true, ...result };
+        } finally {
+          await sql.end({ timeout: 5 });
+        }
+      }
+
       const data = job.data as { importId?: string; schoolId?: string };
       if (!data.importId || !data.schoolId) {
         return { processed: false, reason: "missing job data" };

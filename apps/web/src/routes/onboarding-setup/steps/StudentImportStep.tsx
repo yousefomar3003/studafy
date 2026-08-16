@@ -14,7 +14,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api } from "../../../lib/api";
-import { buildImportErrorReportCsv, downloadTextFile } from "../csvErrorReport";
+import { buildImportErrorReportCsv, downloadTextFile } from "../../../lib/csv";
 
 import type { StudentImportProgress } from "../progress";
 import type { components } from "@studafy/api-client";

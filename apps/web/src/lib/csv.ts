@@ -5,7 +5,8 @@ type ImportRowError = components["schemas"]["ImportRowError"];
 /**
  * There is no server-side "download the error report" endpoint (the dry-run response only carries
  * `errors` as JSON — see apps/api/src/modules/imports/schemas.ts's `ImportRecord`), so the
- * downloadable report is built client-side from that same array.
+ * downloadable report is built client-side from that same array. Shared by the onboarding wizard's
+ * student-import step and the admin students CSV import flow.
  */
 
 /** A field value needs quoting only when it could otherwise be misread as a delimiter or newline. */
