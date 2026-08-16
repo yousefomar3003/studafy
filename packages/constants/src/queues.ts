@@ -109,6 +109,11 @@ export const JOB_NAMES = {
   // sweep reads completed report rows older than the retention window from both report job tables
   // and deletes their stored objects. Registered on the reports queue via Job Scheduler.
   PURGE_EXPIRED_REPORTS: "purge-expired-reports",
+  // Scheduled purge of abandoned student-CSV imports (ST-190 follow-up). Carries no payload: the
+  // sweep reads app.student_imports rows still in 'uploaded'/'validated' status (i.e. never
+  // confirmed) whose retention window has elapsed and deletes them, per school. Registered on the
+  // imports queue via Job Scheduler.
+  PURGE_ABANDONED_IMPORTS: "purge-abandoned-imports",
   // Ingestion of a confirmed, clean-scanned material (ST-161). Carries only the school and
   // material ids (aiIngestionJobDataSchema); the worker claims the material by its 'queued'
   // status and drives it parse -> (ocr) -> chunk -> embed -> ready. Enqueued by the scan worker

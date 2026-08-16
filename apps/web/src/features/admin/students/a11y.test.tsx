@@ -55,6 +55,8 @@ mock.module("../../../lib/api", () => ({
 
 const loadStudentsListPage = async (): Promise<ComponentType> =>
   (await import("./StudentsListPage")).default;
+const loadImportStudentsPage = async (): Promise<ComponentType> =>
+  (await import("./ImportStudentsPage")).default;
 
 /** Builds a JWT-shaped string (header.payload.signature), unsigned — matches
  * `require-permission.test.tsx` and `access-token-claims.test.ts`. */
@@ -115,6 +117,28 @@ describe("students feature accessibility", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "New student" }));
     await screen.findByRole("dialog", { name: "New student" });
+
+    await expectNoA11yViolations(container);
+  });
+
+  // The import flow's own steps beyond upload (progress, summary) turn on a real XHR-based upload
+  // (see ImportStudentsPage.test.tsx), which needs mocking this file's shared `AuthProvider` setup
+  // doesn't provide — the upload step alone, gated by nothing but the route, is what's covered here.
+  test("import students page — upload step", async () => {
+    const Page = await loadImportStudentsPage();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <MemoryRouter>
+            <main>
+              <Page />
+            </main>
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+    await screen.findByRole("button", { name: "Download CSV template" });
 
     await expectNoA11yViolations(container);
   });
