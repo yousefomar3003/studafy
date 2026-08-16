@@ -37,6 +37,7 @@ import {
   AI_LLM_MAX_RESERVE_TOKENS,
   aiAskRoutes,
   aiEntitlementGate,
+  aiFlashcardRoutes,
   aiGatewayRoutes,
   aiQuizRoutes,
   aiRetrievalRoutes,
@@ -819,12 +820,16 @@ export function createApp({
         // trip the meter's out-of-range guard. Quiz generation (ST-167) is held at the same worst
         // case for the same reason -- see config.ts's AI_QUIZ_* reservation math -- but only the
         // generate path (POST .../quizzes); grading (POST .../quizzes/{quizId}/grade) makes no LLM
-        // call and stays on the default hold.
+        // call and stays on the default hold. Flashcard deck generation (ST-168) is held at the
+        // same worst case for the same reason -- see config.ts's AI_FLASHCARD_* reservation math --
+        // but only the generate path (POST .../decks); the review paths (GET/POST
+        // .../decks/{deckId}/review) make no LLM call and stay on the default hold.
         resolveReserveTokens: (c) =>
           c.req.path.endsWith("/generate") ||
           c.req.path.endsWith("/ask") ||
           c.req.path.endsWith("/summarize") ||
-          c.req.path.endsWith("/quizzes")
+          c.req.path.endsWith("/quizzes") ||
+          c.req.path.endsWith("/decks")
             ? AI_LLM_MAX_RESERVE_TOKENS
             : undefined,
       }),
@@ -891,6 +896,19 @@ export function createApp({
     app.route(
       "/",
       aiQuizRoutes({
+        database,
+        provider: aiLlmProvider,
+        modelOverrides: aiLlmModelOverrides,
+      }),
+    );
+    // Flashcard deck generation and spaced-repetition reviews (ST-168). Mounted under the same gate
+    // so a generated deck reserves and commits the caller's AI quota, and only when the gate's
+    // dependencies exist -- generation must never run un-metered. The provider may be null on the
+    // same kill-switch terms as the gateway; the review paths make no provider call at all and are
+    // unaffected by the kill switch.
+    app.route(
+      "/",
+      aiFlashcardRoutes({
         database,
         provider: aiLlmProvider,
         modelOverrides: aiLlmModelOverrides,

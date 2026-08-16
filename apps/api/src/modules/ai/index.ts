@@ -12,7 +12,10 @@
  * reported tokens against the caller's quota. The quiz generator validates every question against a
  * schema before persisting it, so a malformed or hallucinated-citation response is rejected rather
  * than stored; grading reads the persisted answer key back and scores deterministically, with no
- * model call and no quota spend.
+ * model call and no quota spend. The flashcard deck generator (ST-168) validates every card against
+ * a schema the same way and returns each card's faces and citation; its review endpoints advance
+ * per-student spaced-repetition progress with a pure SM-2 scheduler, with no model call and no
+ * quota spend.
  */
 
 export {
@@ -35,6 +38,7 @@ export { aiGatewayRoutes } from "./routes/gateway-routes";
 export { aiAskRoutes } from "./routes/ask-routes";
 export { aiSummaryRoutes } from "./routes/summary-routes";
 export { aiQuizRoutes } from "./routes/quiz-routes";
+export { aiFlashcardRoutes } from "./routes/flashcard-routes";
 export {
   createSummaryCache,
   summaryCacheKey,
@@ -74,6 +78,40 @@ export {
   type PersistedQuiz,
   type PersistedQuizQuestion,
 } from "./quiz/persistence";
+export {
+  FLASHCARD_TYPES,
+  flashcardGenerationSchema,
+  flashcardGeneratedCardSchema,
+  type FlashcardGeneration,
+  type FlashcardType,
+} from "./flashcards/schema";
+export {
+  FLASHCARD_DEFAULT_EASE_FACTOR,
+  FLASHCARD_RATINGS,
+  scheduleCard,
+  type FlashcardProgress,
+  type FlashcardRating,
+  type ScheduledReview,
+} from "./flashcards/scheduling";
+export {
+  assembleFlashcardPrompt,
+  toFlashcardSources,
+  type FlashcardPrompt,
+} from "./flashcards/prompt";
+export { parseFlashcardGeneration, FlashcardGenerationInvalidError } from "./flashcards/parser";
+export {
+  persistDeck,
+  loadDeckCards,
+  loadDueCards,
+  loadReviewProgress,
+  applyCardReviews,
+  type DeckReview,
+  type DueCard,
+  type PersistedCard,
+  type PersistedDeck,
+  type ReviewProgress,
+  type ReviewUpdate,
+} from "./flashcards/persistence";
 export {
   AI_FEATURES,
   AI_LLM_MODEL_CATALOG,

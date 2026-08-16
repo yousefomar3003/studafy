@@ -321,6 +321,12 @@ const EXPECTED_MUTATING_ROUTES = [
   // borrowing a write verb that did not happen; see routes/quiz-routes.ts.
   "POST /api/ai/students/{studentId}/quizzes",
   "POST /api/ai/students/{studentId}/quizzes/{quizId}/grade",
+  // Flashcard deck generation and spaced-repetition reviews (ST-168). Generation's writes are
+  // app.flashcard_decks, app.flashcards, and the durable usage meter, declared "insert" on
+  // flashcards. Review submission's one write is the student's per-card SM-2 progress row,
+  // declared "update" on flashcard_reviews; the due-cards GET makes no write and is not listed.
+  "POST /api/ai/students/{studentId}/decks",
+  "POST /api/ai/students/{studentId}/decks/{deckId}/review",
 ];
 
 function collectSourceFiles(dir: string): string[] {

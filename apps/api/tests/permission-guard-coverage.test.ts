@@ -277,6 +277,12 @@ const EXPECTED_MUTATING_ROUTES = [
   // quiz/persistence.ts's loadQuizForGrading).
   "POST /api/ai/students/{studentId}/quizzes",
   "POST /api/ai/students/{studentId}/quizzes/{quizId}/grade",
+  // Flashcard deck generation and spaced-repetition reviews (ST-168). Same gate and same rationale
+  // as the quiz routes above; generation's writes are the deck, its cards, and the student's usage
+  // ledger, and the review endpoints act only on the requesting student's own deck (scoped by
+  // student_id, see flashcards/persistence.ts's loadDeckCards / loadDueCards).
+  "POST /api/ai/students/{studentId}/decks",
+  "POST /api/ai/students/{studentId}/decks/{deckId}/review",
 ];
 
 /**
@@ -419,6 +425,12 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // requesting student's own quiz (student_id filter in quiz/persistence.ts) and writes nothing.
   "POST /api/ai/students/{studentId}/quizzes",
   "POST /api/ai/students/{studentId}/quizzes/{quizId}/grade",
+  // Flashcard deck generation and spaced-repetition reviews (ST-168) — same gate, same RLS.
+  // Generation writes the deck, its cards, and the student's own ai_usage_meters row; the review
+  // endpoints are explicitly scoped to the requesting student's own deck (student_id filter in
+  // flashcards/persistence.ts) and update only that student's per-card progress rows.
+  "POST /api/ai/students/{studentId}/decks",
+  "POST /api/ai/students/{studentId}/decks/{deckId}/review",
 ]);
 
 // ---------------------------------------------------------------------------
