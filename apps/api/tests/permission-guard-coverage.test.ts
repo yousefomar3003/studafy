@@ -290,6 +290,13 @@ const EXPECTED_MUTATING_ROUTES = [
   // student_id, see flashcards/persistence.ts's loadDeckCards / loadDueCards).
   "POST /api/ai/students/{studentId}/decks",
   "POST /api/ai/students/{studentId}/decks/{deckId}/review",
+  // Exam mode (ST-171). Same gate and same rationale as the quiz/flashcard routes above; create's
+  // writes are the exam session and the student's usage ledger, and start/submit act only on the
+  // requesting student's own session (scoped by student_id, see exam/persistence.ts's
+  // loadExamSession).
+  "POST /api/ai/students/{studentId}/exams",
+  "POST /api/ai/students/{studentId}/exams/{examId}/start",
+  "POST /api/ai/students/{studentId}/exams/{examId}/submit",
 ];
 
 /**
@@ -444,6 +451,12 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // flashcards/persistence.ts) and update only that student's per-card progress rows.
   "POST /api/ai/students/{studentId}/decks",
   "POST /api/ai/students/{studentId}/decks/{deckId}/review",
+  // Exam mode (ST-171) — same gate, same RLS. Create writes the exam session and the student's own
+  // ai_usage_meters row; start/submit are explicitly scoped to the requesting student's own session
+  // (student_id filter in exam/persistence.ts) and act only on that session's own child rows.
+  "POST /api/ai/students/{studentId}/exams",
+  "POST /api/ai/students/{studentId}/exams/{examId}/start",
+  "POST /api/ai/students/{studentId}/exams/{examId}/submit",
 ]);
 
 // ---------------------------------------------------------------------------

@@ -331,6 +331,22 @@ export const ERROR_CODES = {
   // a client can retry the same request.
   AI_EXPLAIN_GENERATION_FAILED: "AI_EXPLAIN_GENERATION_FAILED",
 
+  // Exam mode (ST-171). Generation runs in a worker, not the request path, so
+  // AI_EXAM_GENERATION_FAILED is never thrown from an HTTP handler -- it is the reason string the
+  // GET status endpoint reports once a session's status has settled to `failed` (the same
+  // model-output-stage meaning AI_QUIZ_GENERATION_FAILED has for quiz's synchronous path).
+  // AI_EXAM_NOT_FOUND covers a session lookup, scoped to school AND student on the same terms
+  // AI_QUIZ_NOT_FOUND is. AI_EXAM_INVALID_STATE is start/submit called from a session status that
+  // does not allow it (e.g. submit before start, start twice). AI_EXAM_EXPIRED is the
+  // acceptance-criterion timer enforcement: submit refused because `now() > expires_at`.
+  // AI_EXAM_GENERATION_UNAVAILABLE is create refused because the generation queue or its Redis
+  // connection is not configured, on the same terms FINANCE_REPORT_EXPORT_UNAVAILABLE is.
+  AI_EXAM_GENERATION_FAILED: "AI_EXAM_GENERATION_FAILED",
+  AI_EXAM_NOT_FOUND: "AI_EXAM_NOT_FOUND",
+  AI_EXAM_INVALID_STATE: "AI_EXAM_INVALID_STATE",
+  AI_EXAM_EXPIRED: "AI_EXAM_EXPIRED",
+  AI_EXAM_GENERATION_UNAVAILABLE: "AI_EXAM_GENERATION_UNAVAILABLE",
+
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",

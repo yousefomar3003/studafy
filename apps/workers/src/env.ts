@@ -87,6 +87,14 @@ export const envSchema = z
     // in queues/ai-ingestion/semaphore.ts. A school is a cluster-wide resource (embedding spend is
     // metered per material), so one over-subscribed school must not swamp the shared queue.
     INGESTION_MAX_CONCURRENCY_PER_SCHOOL: z.coerce.number().int().min(1).default(2),
+    // Exam-mode item-bank generation (ST-171). Same names as apps/api/src/env.ts's ANTHROPIC_*
+    // vars -- both processes call the same provider with the same credential. Optional: unlike
+    // malware scanning, an unconfigured key does not risk silent data corruption, it fails the
+    // specific generation job closed (app.exam_sessions marked 'failed' with a clear reason) the
+    // same way a missing CLAMAV_HOST fails a scan job closed, just without CLAMAV_HOST's
+    // production-required check -- there is no safety property at stake in leaving this feature off.
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    ANTHROPIC_BASE_URL: z.string().url().optional(),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;

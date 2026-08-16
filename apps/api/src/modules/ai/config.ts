@@ -253,3 +253,44 @@ export const AI_EXPLAIN_LEVELS = ["elementary", "middle", "high"] as const;
  * its own reservation.
  */
 export const AI_EXPLAIN_MAX_INPUT_CHARS = 4_000;
+
+/**
+ * Exam mode (ST-171).
+ *
+ * The create route validates the requested scope (material count, question count, duration) against
+ * `AI_EXAM_*` bounds shared with the generation worker (`@studafy/constants`'s `ai-exam.ts` --
+ * producer and consumer must agree on the same numbers, the same reason `QUEUE_NAMES`/`JOB_NAMES`
+ * are shared rather than duplicated), creates the `app.exam_sessions` row, and enqueues generation
+ * onto `QUEUE_NAMES.AI_EXAM_GENERATION` -- it never calls the model itself. Only the reservation math
+ * below (which the worker needs as its `max_tokens` ceiling, and the create route needs to size the
+ * quota hold) lives here rather than in the shared package, because it is API-request-shaped
+ * (per-request, not a bound both sides validate against).
+ */
+
+/** Output-token cost estimate per item, the same class of estimate `AI_QUIZ_OUTPUT_TOKENS_PER_QUESTION` is. */
+export const AI_EXAM_OUTPUT_TOKENS_PER_ITEM = 220;
+export const AI_EXAM_OUTPUT_TOKEN_BUFFER = 500;
+export const AI_EXAM_OUTPUT_TOKENS_CEILING = 8192;
+
+/**
+ * Worst-case reservation for one exam generation: `AI_EXAM_MAX_INPUT_CHARS` (60,000 chars ≈ 15,000
+ * tokens) plus the output ceiling above. At `AI_EXAM_MAX_QUESTIONS` (40): 40 * 220 + 500 = 9,300,
+ * capped at 8,192. Total ≈ 23,200 tokens -- bigger than every synchronous surface's
+ * `AI_LLM_MAX_RESERVE_TOKENS` (24,000) leaves headroom for, so exam mode reserves its own larger
+ * ceiling rather than reusing that constant and risking the meter's commit-out-of-range guard on a
+ * genuinely large exam.
+ */
+export const AI_EXAM_MAX_RESERVE_TOKENS = 25_000;
+
+/**
+ * `AI_EXAM_MAX_RESERVE_TOKENS` is charged at create time in full, rather than metered from the
+ * worker's actual token usage after the fact.
+ *
+ * The Redis-scripted quota meter (`usage/meter.ts`) reserves and commits within one request/response
+ * cycle; an async worker job in a different process cannot settle that same reservation without
+ * carrying the meter (and its Lua scripts, and its Redis connection) across the process boundary --
+ * the same class of cross-app sharing `docs/rag/exam-mode.md` explains was deliberately not built for
+ * this ticket. So the create route commits the full ceiling synchronously, before returning 202: a
+ * failed generation is not refunded, and a cheap generation is not charged less than its worst case.
+ * This is a disclosed trade-off, not an oversight -- see docs/rag/exam-mode.md's "Quota" section.
+ */

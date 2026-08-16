@@ -9,6 +9,8 @@ import { createTenantSemaphore } from "./queues/ai-ingestion/semaphore";
 import { processIngestJob } from "./queues/ai-ingestion/worker";
 import { billingDeadLetterListener, processBillingJob } from "./queues/billing";
 import { createDerivationS3, processMaterialDerivation } from "./queues/derivations";
+import { createAnthropicClient } from "./queues/exam-generation/anthropic-client";
+import { processExamGeneration } from "./queues/exam-generation/worker";
 import { processStudentImport } from "./queues/imports/worker";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
@@ -25,6 +27,8 @@ import { createScanS3, materialScanFailedListener, processMaterialScan } from ".
 
 import type { AiIngestionJobData } from "./queues/ai-ingestion/job";
 import type { TenantSemaphore } from "./queues/ai-ingestion/semaphore";
+import type { AnthropicClient } from "./queues/exam-generation/anthropic-client";
+import type { ExamGenerationJobData } from "./queues/exam-generation/job";
 import type { AttendanceAlertJobData } from "./queues/notifications/attendance-alert.worker";
 import type { FailedHandler } from "./queues/notifications/dead-letter";
 import type {
@@ -156,6 +160,26 @@ function pushSender(): PushSender {
 }
 
 /**
+ * The exam-generation queue's Anthropic client (ST-171), built once on first use for the same
+ * reason `pushSender()` is: registry.test.ts imports this module and must not pay for constructing
+ * a real client (or, when `ANTHROPIC_API_KEY` is unset, must not throw) on import. `null` when
+ * unconfigured -- the queue still boots and jobs fail closed at claim time (worker.ts).
+ */
+let anthropicClientInstance: AnthropicClient | null | undefined;
+
+function examAnthropicClient(): AnthropicClient | null {
+  if (anthropicClientInstance === undefined) {
+    anthropicClientInstance = workerEnv.ANTHROPIC_API_KEY
+      ? createAnthropicClient({
+          apiKey: workerEnv.ANTHROPIC_API_KEY,
+          baseUrl: workerEnv.ANTHROPIC_BASE_URL,
+        })
+      : null;
+  }
+  return anthropicClientInstance;
+}
+
+/**
  * One entry per queue in `QUEUE_NAMES` — see `docs/queue-catalog.md` for what each queue is for
  * and why it has the concurrency it does. The workers bootstrap (`src/worker.ts`) starts exactly
  * one BullMQ `Worker` per entry.
@@ -183,6 +207,25 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         ocrLangPath: workerEnv.OCR_LANG_PATH,
         semaphore: ingestionSemaphore(),
         enqueueDerivation,
+      });
+    },
+  },
+  {
+    name: QUEUE_NAMES.AI_EXAM_GENERATION,
+    concurrency: 2,
+    // Generates one exam session's item bank: load the requested materials' chunks, call the LLM,
+    // validate the response, and persist it. The `missing job data` guard mirrors the AI_INGESTION
+    // entry above, so registry.test.ts's "every processor returns a defined result for `{data:{}}`"
+    // check passes without this queue opening a database connection.
+    processor: async (job: Job) => {
+      const data = job.data as Partial<ExamGenerationJobData>;
+      if (!data.examSessionId || !data.schoolId) {
+        return { processed: false, reason: "missing job data" };
+      }
+      return processExamGeneration(job, {
+        databaseUrl,
+        databaseCaCert: workerEnv.DATABASE_CA_CERT,
+        anthropic: examAnthropicClient(),
       });
     },
   },
