@@ -10,8 +10,58 @@ const getMock = mock((_path: string, _init?: RequestInit) =>
 );
 
 mock.module("../../../lib/api", () => ({ api: { GET: getMock } }));
+mock.module("../../../lib/auth", () => ({
+  sessionStore: { getToken: async () => "test-token" },
+}));
 
-const { fetchStudentEnrollmentHistory, fetchStudentsInClass } = await import("./queries");
+/** Minimal fake standing in for the real `XMLHttpRequest`, used only by `uploadStudentImportCsv`
+ * (raw XHR, not the typed `api` client — see that function's doc for why). */
+class FakeXhr {
+  static nextStatus = 201;
+  static nextResponseBody: unknown = { id: "import-1" };
+  static requests: { url: string; headers: Record<string, string> }[] = [];
+
+  status = 0;
+  response = "";
+  private headers: Record<string, string> = {};
+  private url = "";
+  upload: {
+    onprogress:
+      ((event: { lengthComputable: boolean; loaded: number; total: number }) => void) | null;
+  } = { onprogress: null };
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+
+  open(_method: string, url: string) {
+    this.url = url;
+  }
+  setRequestHeader(key: string, value: string) {
+    // eslint-disable-next-line security/detect-object-injection -- test double; `key` is a header name this same test file passes in, not untrusted input
+    this.headers[key] = value;
+  }
+  getAllResponseHeaders() {
+    return "content-type: application/json\r\n";
+  }
+  send(_body: unknown) {
+    FakeXhr.requests.push({ url: this.url, headers: this.headers });
+    setTimeout(() => {
+      this.upload.onprogress?.({ lengthComputable: true, loaded: 1, total: 2 });
+      this.upload.onprogress?.({ lengthComputable: true, loaded: 2, total: 2 });
+      this.status = FakeXhr.nextStatus;
+      this.response = JSON.stringify(FakeXhr.nextResponseBody);
+      this.onload?.();
+    }, 0);
+  }
+}
+// @ts-expect-error -- test double, not a full XMLHttpRequest implementation
+globalThis.XMLHttpRequest = FakeXhr;
+
+const {
+  fetchStudentEnrollmentHistory,
+  fetchStudentImportTemplate,
+  fetchStudentsInClass,
+  uploadStudentImportCsv,
+} = await import("./queries");
 
 function student(id: string, overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -172,5 +222,72 @@ describe("fetchStudentEnrollmentHistory", () => {
     expect(history.map((entry) => entry.class_id)).toEqual(["class-1", "class-2"]);
     expect(history[0]?.class?.code).toBe("MATH-101");
     expect(history[1]?.class?.code).toBe("SCI-101");
+  });
+});
+
+describe("fetchStudentImportTemplate", () => {
+  test("returns the CSV body from the typed client", async () => {
+    getMock.mockImplementation((path: string) => {
+      if (path === "/api/imports/students/template") {
+        return Promise.resolve<unknown>({ data: "admission_number,email\n" });
+      }
+      return Promise.resolve<unknown>({ data: {} });
+    });
+
+    expect(await fetchStudentImportTemplate()).toBe("admission_number,email\n");
+  });
+});
+
+describe("uploadStudentImportCsv", () => {
+  afterEach(() => {
+    FakeXhr.nextStatus = 201;
+    FakeXhr.nextResponseBody = { id: "import-1" };
+    FakeXhr.requests = [];
+  });
+
+  test("sends the file as raw text/csv, with the auth token and filename attached", async () => {
+    const file = new File(["a,b\n1,2"], "roster.csv", { type: "text/csv" });
+
+    await uploadStudentImportCsv(file);
+
+    expect(FakeXhr.requests).toHaveLength(1);
+    const [request] = FakeXhr.requests;
+    expect(request?.url).toContain("/api/imports/students/upload");
+    expect(request?.headers["Content-Type"]).toBe("text/csv");
+    expect(request?.headers["X-File-Name"]).toBe("roster.csv");
+    expect(request?.headers.Authorization).toBe("Bearer test-token");
+  });
+
+  test("reports upload progress as it streams", async () => {
+    const file = new File(["a,b\n1,2"], "roster.csv", { type: "text/csv" });
+    const events: number[] = [];
+
+    await uploadStudentImportCsv(file, (progress) => events.push(progress.percent));
+
+    expect(events).toEqual([50, 100]);
+  });
+
+  test("resolves with the parsed import record on a 2xx response", async () => {
+    FakeXhr.nextResponseBody = { id: "import-42", status: "validated" };
+    const file = new File(["a,b\n1,2"], "roster.csv", { type: "text/csv" });
+
+    const record = await uploadStudentImportCsv(file);
+
+    expect(record.id).toBe("import-42");
+  });
+
+  test("rejects with an ApiError built from the failed response", async () => {
+    FakeXhr.nextStatus = 400;
+    FakeXhr.nextResponseBody = {
+      title: "Bad request",
+      status: 400,
+      code: "IMPORT_ROWS_EXCEED_LIMIT",
+    };
+    const file = new File(["a,b\n1,2"], "roster.csv", { type: "text/csv" });
+
+    await expect(uploadStudentImportCsv(file)).rejects.toMatchObject({
+      status: 400,
+      code: "IMPORT_ROWS_EXCEED_LIMIT",
+    });
   });
 });

@@ -9,6 +9,7 @@ import {
   scheduleStorageQuotaReconciliationJob,
 } from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
+import { scheduleAbandonedImportSweepJob } from "./queues/imports";
 import {
   createSesSender,
   scheduleDigestJob,
@@ -135,6 +136,13 @@ void scheduleStorageQuotaReconciliationJob(storageQuotaReconciliationRedis).then
 // lifecycle rule; this closes the gap for the legacy `tenant-<schoolId>/reports/` finance keys.
 const reportExpiryRedis = createRedisConnection(env);
 void scheduleReportExpiryJob(reportExpiryRedis).then(() => reportExpiryRedis.disconnect());
+
+// Abandoned-import sweep scheduler (ST-190 follow-up): idempotently register the daily 08:00 purge
+// of student-CSV imports that were uploaded but never confirmed, on the imports queue.
+const abandonedImportSweepRedis = createRedisConnection(env);
+void scheduleAbandonedImportSweepJob(abandonedImportSweepRedis).then(() =>
+  abandonedImportSweepRedis.disconnect(),
+);
 
 console.log(
   `Workers started for queues: ${QUEUE_REGISTRY.map((definition) => definition.name).join(", ")} (${env.NODE_ENV})`,

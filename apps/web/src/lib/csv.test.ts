@@ -1,7 +1,7 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import { buildImportErrorReportCsv } from "./csvErrorReport";
+import { buildImportErrorReportCsv } from "./csv";
 
 describe("buildImportErrorReportCsv", () => {
   test("renders a header row followed by one row per error", () => {

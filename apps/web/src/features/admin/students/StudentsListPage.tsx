@@ -50,6 +50,7 @@ export default function StudentsListPage() {
   const permissions = usePermissions();
   const canViewAdmissionData = permissions.has(PERMISSIONS.BILLING_READ);
   const canCreate = permissions.has(PERMISSIONS.STUDENT_CREATE);
+  const canImport = permissions.has(PERMISSIONS.STUDENT_IMPORT);
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -159,7 +160,14 @@ export default function StudentsListPage() {
           <h1>Students</h1>
           <p>Search the student directory, review profiles, and manage guardian links.</p>
         </div>
-        {canCreate ? <Button onClick={() => setCreateOpen(true)}>New student</Button> : null}
+        <div className="students-list__header-actions">
+          {canImport ? (
+            <Button variant="secondary" onClick={() => navigate("/portal/admin/students/import")}>
+              Import CSV
+            </Button>
+          ) : null}
+          {canCreate ? <Button onClick={() => setCreateOpen(true)}>New student</Button> : null}
+        </div>
       </div>
 
       <div className="students-list__toolbar">

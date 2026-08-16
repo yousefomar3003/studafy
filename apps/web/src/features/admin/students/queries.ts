@@ -1,4 +1,8 @@
+import { ApiError } from "@studafy/api-client";
+
 import { api } from "../../../lib/api";
+import { sessionStore } from "../../../lib/auth";
+import { API_BASE_URL } from "../../../lib/config";
 
 import type { components } from "@studafy/api-client";
 import type { DateRangeValue } from "@studafy/ui";
@@ -8,6 +12,7 @@ export type Guardian = components["schemas"]["Guardian"];
 export type Enrollment = components["schemas"]["Enrollment"];
 export type Class = components["schemas"]["Class"];
 export type UserWithRoles = components["schemas"]["UserWithRoles"];
+export type StudentImport = components["schemas"]["ImportRecord"];
 
 export interface StudentsFilters {
   search: string;
@@ -291,4 +296,96 @@ export async function fetchStudentEnrollmentHistory(
     .filter((enrollment) => enrollment.student_id === studentId)
     .map((enrollment) => ({ ...enrollment, class: classById.get(enrollment.class_id) ?? null }))
     .sort((a, b) => new Date(b.enrolled_at).getTime() - new Date(a.enrolled_at).getTime());
+}
+
+// ---------------------------------------------------------------------------
+// CSV import
+// ---------------------------------------------------------------------------
+
+export function studentImportQueryKey(importId: string) {
+  return ["students", "import", importId] as const;
+}
+
+/** `GET /api/imports/students/template` — a CSV with the expected headers and an example row. */
+export async function fetchStudentImportTemplate(): Promise<string> {
+  const { data } = await api.GET("/api/imports/students/template");
+  return typeof data === "string" ? data : "";
+}
+
+/** `GET /api/imports/students/{importId}` — polled while the confirmed import is processing. */
+export async function fetchStudentImport(importId: string): Promise<StudentImport> {
+  const { data } = await api.GET("/api/imports/students/{importId}", {
+    params: { path: { importId } },
+  });
+  if (!data) throw new Error("Import not found.");
+  return data as StudentImport;
+}
+
+export interface UploadProgress {
+  loaded: number;
+  total: number;
+  percent: number;
+}
+
+/** Turns an XHR's raw header text into a `Headers` object, so a failed response can be handed to
+ * `ApiError.fromResponse` the same way the typed client's problem+json middleware does. */
+function headersFromXhr(xhr: XMLHttpRequest): Headers {
+  const headers = new Headers();
+  for (const line of xhr.getAllResponseHeaders().trim().split(/\r?\n/)) {
+    const separator = line.indexOf(":");
+    if (separator === -1) continue;
+    headers.append(line.slice(0, separator).trim(), line.slice(separator + 1).trim());
+  }
+  return headers;
+}
+
+/**
+ * `POST /api/imports/students/upload` — the dry-run validation call. Uploaded as raw `text/csv`,
+ * not JSON, matching the API's contract (see `apps/api/src/modules/imports/routes/import-routes.ts`).
+ *
+ * Sent via `XMLHttpRequest` rather than the typed `api` client: `openapi-fetch` (and `fetch` request
+ * bodies generally, in the browsers this app supports) has no upload-progress event, and the import
+ * flow's UX requirement is a real progress bar for files up to the API's 10,000-row cap, not a fake
+ * one. Errors are normalized back into the same `ApiError` the typed client throws, so callers don't
+ * need a second error-handling path — see `headersFromXhr`.
+ */
+export function uploadStudentImportCsv(
+  file: File,
+  onProgress?: (progress: UploadProgress) => void,
+): Promise<StudentImport> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE_URL}/api/imports/students/upload`);
+    xhr.setRequestHeader("Content-Type", "text/csv");
+    xhr.setRequestHeader("X-File-Name", file.name);
+
+    xhr.upload.onprogress = (event) => {
+      if (!onProgress || !event.lengthComputable) return;
+      onProgress({
+        loaded: event.loaded,
+        total: event.total,
+        percent: Math.round((event.loaded / event.total) * 100),
+      });
+    };
+
+    xhr.onload = () => {
+      void (async () => {
+        const response = new Response(xhr.response as string, {
+          status: xhr.status,
+          headers: headersFromXhr(xhr),
+        });
+        if (!response.ok) {
+          reject(await ApiError.fromResponse(response));
+          return;
+        }
+        resolve((await response.json()) as StudentImport);
+      })();
+    };
+    xhr.onerror = () => reject(new Error("Network error while uploading the CSV."));
+
+    void sessionStore.getToken().then((token) => {
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.send(file);
+    });
+  });
 }

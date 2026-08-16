@@ -14,6 +14,12 @@
   margin-bottom: var(--space-16);
 }
 
+.students-list__header-actions {
+  display: flex;
+  gap: var(--space-8);
+  flex-shrink: 0;
+}
+
 .students-list__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -172,4 +178,57 @@
   color: var(--color-muted-foreground);
   font-size: var(--font-size-xs);
   margin: 0;
+}
+
+.students-import__banner {
+  color: var(--color-danger-subtle-foreground);
+  background-color: var(--color-danger-subtle-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-8) var(--space-12);
+  margin: var(--space-16) 0;
+}
+
+.students-import__upload {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-16) 0;
+}
+
+.students-import__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  margin: var(--space-16) 0;
+}
+
+.students-import__progress progress {
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+}
+
+.students-import__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-16);
+  margin: 0 0 var(--space-16);
+}
+
+.students-import__stats dt {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+  margin-bottom: var(--space-4);
+}
+
+.students-import__stats dd {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+}
+
+.students-import__actions {
+  display: flex;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
 }

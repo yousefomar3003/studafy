@@ -2,9 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
 
-import { STUDENTS_LIST_KEY, studentGuardiansQueryKey, studentQueryKey } from "./queries";
+import {
+  STUDENTS_LIST_KEY,
+  studentGuardiansQueryKey,
+  studentQueryKey,
+  uploadStudentImportCsv,
+} from "./queries";
 
-import type { GuardianContact, StudentProfile } from "./queries";
+import type { GuardianContact, StudentImport, StudentProfile, UploadProgress } from "./queries";
 import type { CreateStudentValues, LinkGuardianValues } from "./schema";
 import type { components } from "@studafy/api-client";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
@@ -217,6 +222,39 @@ export function useUnlinkGuardian() {
     },
     onSettled: (_data, _error, { studentId }) => {
       void queryClient.invalidateQueries({ queryKey: studentGuardiansQueryKey(studentId) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// CSV import
+// ---------------------------------------------------------------------------
+
+export interface UploadStudentImportVariables {
+  file: File;
+  onProgress?: (progress: UploadProgress) => void;
+}
+
+/** The dry-run upload — nothing is committed until `useConfirmStudentImport` runs. */
+export function useUploadStudentImport() {
+  return useMutation({
+    mutationFn: ({ file, onProgress }: UploadStudentImportVariables) =>
+      uploadStudentImportCsv(file, onProgress),
+  });
+}
+
+/** Confirms a validated import, handing it to the async worker. The students it creates land in the
+ * directory once the worker finishes — the caller invalidates `STUDENTS_LIST_KEY` when polling
+ * observes the `completed` status, not here, since this call only reaches `confirmed`. */
+export function useConfirmStudentImport() {
+  return useMutation({
+    mutationFn: async (importId: string) => {
+      const { data } = await api.POST("/api/imports/students/{importId}/confirm", {
+        params: { path: { importId } },
+        body: {},
+      });
+      if (!data) throw new Error("Import confirmation returned no data.");
+      return data as StudentImport;
     },
   });
 }
