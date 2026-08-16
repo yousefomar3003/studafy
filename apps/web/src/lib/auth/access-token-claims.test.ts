@@ -1,7 +1,7 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import { decodeAccessTokenRoles } from "./access-token-claims";
+import { decodeAccessTokenRoles, decodeAccessTokenUserId } from "./access-token-claims";
 
 /** Builds a JWT-shaped string (header.payload.signature) from a plain payload object, unsigned — this
  * module never checks the signature, so tests don't need a real key. */
@@ -42,5 +42,29 @@ describe("decodeAccessTokenRoles", () => {
   test("returns an empty array when the payload segment is not JSON", () => {
     const notJson = btoa("plainly not json");
     expect(decodeAccessTokenRoles(`header.${notJson}.sig`)).toEqual([]);
+  });
+});
+
+describe("decodeAccessTokenUserId", () => {
+  test("reads the sub claim out of a well-formed token", () => {
+    const token = fakeJwt({ sub: "user-1", roles: ["ORG_ADMIN"] });
+    expect(decodeAccessTokenUserId(token)).toBe("user-1");
+  });
+
+  test("returns null when the claim is missing", () => {
+    const token = fakeJwt({ roles: ["ORG_ADMIN"] });
+    expect(decodeAccessTokenUserId(token)).toBeNull();
+  });
+
+  test("returns null when the claim is not a non-empty string", () => {
+    expect(decodeAccessTokenUserId(fakeJwt({ sub: 42 }))).toBeNull();
+    expect(decodeAccessTokenUserId(fakeJwt({ sub: "" }))).toBeNull();
+    expect(decodeAccessTokenUserId(fakeJwt({ sub: null }))).toBeNull();
+  });
+
+  test("returns null for a malformed token instead of throwing", () => {
+    expect(decodeAccessTokenUserId("not-a-jwt")).toBeNull();
+    expect(decodeAccessTokenUserId("")).toBeNull();
+    expect(decodeAccessTokenUserId("only.two")).toBeNull();
   });
 });

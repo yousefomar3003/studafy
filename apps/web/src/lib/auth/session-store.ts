@@ -21,7 +21,7 @@
  * medium — the code audit test (`token-storage.test.ts`) locks that in.
  */
 
-import { decodeAccessTokenRoles } from "./access-token-claims";
+import { decodeAccessTokenRoles, decodeAccessTokenUserId } from "./access-token-claims";
 
 /**
  * Session lifecycle state.
@@ -86,6 +86,12 @@ export interface SessionStore {
    * Empty when signed out.
    */
   getRoles(): readonly string[];
+  /**
+   * The `sub` claim of the held access token (the caller's own `app.users.id`), decoded once per
+   * rotation and cached alongside `roles` — see `decodeAccessTokenUserId` for the same
+   * "UX data, not an authorization decision" caveat. `null` when signed out.
+   */
+  getUserId(): string | null;
   /** Resolve the current access token, rotating first if it is stale. Never rejects. */
   getToken(): Promise<string | null>;
   /** Ensure a rotation attempt has happened (idempotent; concurrent callers share one request). */
@@ -117,6 +123,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   let status: SessionStatus = "restoring";
   let tokens: SessionTokens | null = null;
   let roles: readonly string[] = [];
+  let userId: string | null = null;
   let rotationTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   let rotationInFlight: Promise<SessionStatus> | null = null;
   const listeners = new Set<() => void>();
@@ -188,6 +195,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
         const next = await refreshClient.refresh();
         tokens = next;
         roles = decodeAccessTokenRoles(next.accessToken);
+        userId = decodeAccessTokenUserId(next.accessToken);
         setStatus("authenticated");
         armRotationTimer();
       } catch (error) {
@@ -197,10 +205,12 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
         if (statusCode === REFRESH_NO_CREDENTIAL_STATUS) {
           tokens = null;
           roles = [];
+          userId = null;
           setStatus("unauthenticated");
         } else if (statusCode === REFRESH_REJECTED_STATUS) {
           tokens = null;
           roles = [];
+          userId = null;
           setStatus("expired");
         } else if (tokens !== null && tokens.expiresAt > now()) {
           // Transient failure while a still-valid token was held: keep serving it.
@@ -208,6 +218,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
         } else {
           tokens = null;
           roles = [];
+          userId = null;
           setStatus("unauthenticated");
         }
       } finally {
@@ -245,6 +256,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     } finally {
       tokens = null;
       roles = [];
+      userId = null;
       cancelRotationTimer();
       setStatus("unauthenticated");
     }
@@ -261,6 +273,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
     getStatus: () => status,
     getSessionId: () => tokens?.sessionId ?? null,
     getRoles: () => roles,
+    getUserId: () => userId,
     getToken,
     restore,
     logout,
