@@ -19,6 +19,12 @@ export const QUEUE_NAMES = {
   // failures never affect material availability, so this queue must stay independent of the scan
   // verdict the moment it is made.
   DERIVATIONS: "derivations",
+  // Exam-mode item-bank generation (ST-171). Consumes one job per app.exam_sessions row: loads the
+  // requested materials' chunks, asks the LLM for a mixed mcq/short-answer item set grounded on
+  // them, validates it the same three-layer way quiz generation does, and persists the result. Split
+  // from ai-ingestion because this queue calls the LLM plane (a different failure mode and latency
+  // budget than parse/OCR/embed) rather than only transforming already-ingested text.
+  AI_EXAM_GENERATION: "ai-exam-generation",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -120,6 +126,11 @@ export const JOB_NAMES = {
   // on a clean verdict and by the API on re-ingest / re-enable, with attempts + exponential
   // backoff so a saturated per-tenant concurrency slot retries instead of failing the job.
   INGEST_MATERIAL: "ingest-material",
+  // Exam-mode item-bank generation (ST-171). Carries the resolved model/tier plus the generation
+  // scope (materialIds, questionCount, questionTypes); the worker claims the app.exam_sessions row
+  // by its `generating` status, so a retried job re-attempts the same generation rather than
+  // creating a duplicate session.
+  GENERATE_EXAM: "generate-exam",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];
@@ -138,4 +149,18 @@ export const INGESTION_JOB_OPTIONS = {
   backoff: { type: "exponential", delay: 5_000 },
   removeOnComplete: { age: 7 * 24 * 60 * 60 },
   removeOnFail: { age: 30 * 24 * 60 * 60 },
+} as const;
+
+/**
+ * BullMQ job options for one exam item-bank generation (ST-171). 3 attempts, not ingestion's 5: a
+ * single LLM call is either transiently unavailable (worth a couple of retries) or its output fails
+ * grounding validation (retrying rarely helps, same posture quiz generation's doc documents for its
+ * own synchronous path) — there is no multi-stage pipeline here to make more retries pay for
+ * themselves. Mirrors the finance report queue's `attempts: 3` for the same reason.
+ */
+export const EXAM_GENERATION_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: "exponential", delay: 5_000 },
+  removeOnComplete: { age: 7 * 24 * 60 * 60 },
+  removeOnFail: { age: 7 * 24 * 60 * 60 },
 } as const;

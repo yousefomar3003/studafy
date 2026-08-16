@@ -34,10 +34,12 @@ import {
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
 import {
+  AI_EXAM_MAX_RESERVE_TOKENS,
   AI_LLM_MAX_RESERVE_TOKENS,
   aiAskRoutes,
   aiConceptsRoutes,
   aiEntitlementGate,
+  aiExamRoutes,
   aiExplainRoutes,
   aiFlashcardRoutes,
   aiGatewayRoutes,
@@ -831,17 +833,26 @@ export function createApp({
         // .../decks/{deckId}/review) make no LLM call and stay on the default hold. Simplified
         // explanations (ST-170) are held at the same worst case for the same reason -- their single
         // passage is bounded (AI_EXPLAIN_MAX_INPUT_CHARS), but the open-ended rewrite's output
-        // ceiling still exceeds any default-size hold.
-        resolveReserveTokens: (c) =>
-          c.req.path.endsWith("/generate") ||
-          c.req.path.endsWith("/ask") ||
-          c.req.path.endsWith("/summarize") ||
-          c.req.path.endsWith("/concepts") ||
-          c.req.path.endsWith("/explain") ||
-          c.req.path.endsWith("/quizzes") ||
-          c.req.path.endsWith("/decks")
+        // ceiling still exceeds any default-size hold. Exam mode (ST-171) is different in kind, not
+        // degree: create (POST .../exams) does not call the model itself -- generation runs in a
+        // worker -- so there is no post-hoc usage to meter. It commits AI_EXAM_MAX_RESERVE_TOKENS in
+        // full at create time instead (see config.ts and docs/rag/exam-mode.md), a larger ceiling
+        // than every synchronous surface's shared AI_LLM_MAX_RESERVE_TOKENS because its scope (up to
+        // AI_EXAM_MAX_MATERIALS materials, AI_EXAM_MAX_QUESTIONS items) is deliberately bigger than a
+        // single quiz's. get/start/submit (.../exams/{examId}[/start|/submit]) make no LLM call and
+        // stay on the default hold, the same posture quiz grading takes.
+        resolveReserveTokens: (c) => {
+          if (c.req.path.endsWith("/exams")) return AI_EXAM_MAX_RESERVE_TOKENS;
+          return c.req.path.endsWith("/generate") ||
+            c.req.path.endsWith("/ask") ||
+            c.req.path.endsWith("/summarize") ||
+            c.req.path.endsWith("/concepts") ||
+            c.req.path.endsWith("/explain") ||
+            c.req.path.endsWith("/quizzes") ||
+            c.req.path.endsWith("/decks")
             ? AI_LLM_MAX_RESERVE_TOKENS
-            : undefined,
+            : undefined;
+        },
       }),
     );
     app.route("/", aiUsageRoutes({ entitlements, meter: aiMeter }));
@@ -949,6 +960,21 @@ export function createApp({
       aiFlashcardRoutes({
         database,
         provider: aiLlmProvider,
+        modelOverrides: aiLlmModelOverrides,
+      }),
+    );
+    // Exam mode (ST-171). Mounted under the same gate so create reserves and commits the caller's
+    // AI quota, and only when the gate's dependencies exist -- generation must never run
+    // un-metered. Unlike every other AI surface here, this route does not take `provider`: it never
+    // calls the model itself, only enqueues onto QUEUE_NAMES.AI_EXAM_GENERATION for
+    // apps/workers/src/queues/exam-generation to consume -- `redis` backs that queue's producer, on
+    // the same terms every other BullMQ producer in this app is constructed inside its own route
+    // factory (see finance/reports/routes.ts).
+    app.route(
+      "/",
+      aiExamRoutes({
+        database,
+        redis,
         modelOverrides: aiLlmModelOverrides,
       }),
     );

@@ -43,6 +43,7 @@ export { aiConceptsRoutes } from "./routes/concepts-routes";
 export { aiExplainRoutes } from "./routes/explain-routes";
 export { aiQuizRoutes } from "./routes/quiz-routes";
 export { aiFlashcardRoutes } from "./routes/flashcard-routes";
+export { aiExamRoutes } from "./routes/exam-routes";
 export {
   createSummaryCache,
   summaryCacheKey,
@@ -127,6 +128,30 @@ export {
   type PersistedQuiz,
   type PersistedQuizQuestion,
 } from "./quiz/persistence";
+export {
+  AI_EXAM_MAX_RESERVE_TOKENS,
+  AI_EXAM_OUTPUT_TOKEN_BUFFER,
+  AI_EXAM_OUTPUT_TOKENS_CEILING,
+  AI_EXAM_OUTPUT_TOKENS_PER_ITEM,
+} from "./config";
+export {
+  EXAM_ITEM_TYPES,
+  gradeExam,
+  type ExamGradeResult,
+  type ExamItemType,
+} from "./exam/grading";
+export { validateExamMaterials, type ValidateExamMaterialsResult } from "./exam/materials";
+export {
+  createExamSession,
+  loadExamItems,
+  loadExamItemsForGrading,
+  loadExamSession,
+  startExamSession,
+  submitExamAnswers,
+  type ExamItemView,
+  type ExamSessionRow,
+} from "./exam/persistence";
+export { loadExamReport, type ExamReport, type ExamTopicReport } from "./exam/report";
 export {
   FLASHCARD_TYPES,
   flashcardGenerationSchema,

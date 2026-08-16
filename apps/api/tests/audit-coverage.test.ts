@@ -333,6 +333,14 @@ const EXPECTED_MUTATING_ROUTES = [
   // declared "update" on flashcard_reviews; the due-cards GET makes no write and is not listed.
   "POST /api/ai/students/{studentId}/decks",
   "POST /api/ai/students/{studentId}/decks/{deckId}/review",
+  // Exam mode (ST-171). Create's write is the exam session (generation itself runs in a worker, off
+  // the request path), declared "insert" on exam_sessions. Start's write is the session's
+  // status/timer columns, declared "update" on exam_sessions. Submit's substantive write is one
+  // exam_item_answers row per item, declared "insert" on exam_item_answers; the GET status poll
+  // makes no write and is declared "read", not listed here.
+  "POST /api/ai/students/{studentId}/exams",
+  "POST /api/ai/students/{studentId}/exams/{examId}/start",
+  "POST /api/ai/students/{studentId}/exams/{examId}/submit",
 ];
 
 function collectSourceFiles(dir: string): string[] {
