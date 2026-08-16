@@ -545,6 +545,63 @@ export const classIdParamSchema = z
   .openapi("ClassIdParam");
 
 // ---------------------------------------------------------------------------
+// Rooms
+// ---------------------------------------------------------------------------
+
+export const roomTypeSchema = z
+  .enum(["physical", "virtual"])
+  .openapi({ description: "Whether the room is a physical space or a virtual meeting link." });
+
+export type RoomType = z.infer<typeof roomTypeSchema>;
+
+export const roomSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    code: z
+      .string()
+      .openapi({ description: "Short unique code within the school.", example: "RM-101" }),
+    name: z.string().openapi({ description: "Human-readable name.", example: "Room 101" }),
+    room_type: roomTypeSchema,
+    capacity: z
+      .number()
+      .int()
+      .nullable()
+      .openapi({ description: "Maximum occupancy, or null if not tracked." }),
+    building: z
+      .string()
+      .nullable()
+      .openapi({ description: "Building name, set only for physical rooms." }),
+    floor: z.string().nullable().openapi({ description: "Floor, set only for physical rooms." }),
+    virtual_url: z
+      .string()
+      .nullable()
+      .openapi({ description: "Meeting URL, set only for virtual rooms." }),
+    is_active: z.boolean().openapi({ description: "Whether the room can still be scheduled." }),
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("Room");
+
+export type Room = z.infer<typeof roomSchema>;
+
+export const roomListSchema = z
+  .object({
+    rooms: z.array(roomSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("RoomList");
+
+export const roomQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    is_active: z.coerce.boolean().optional(),
+    room_type: roomTypeSchema.optional(),
+  })
+  .openapi("RoomQuery");
+
+// ---------------------------------------------------------------------------
 // Enrollments
 // ---------------------------------------------------------------------------
 

@@ -31,6 +31,7 @@ const InvitationsListPage = lazy(() => import("../features/admin/invitations/Inv
 const StudentsListPage = lazy(() => import("../features/admin/students/StudentsListPage"));
 const StudentProfilePage = lazy(() => import("../features/admin/students/StudentProfilePage"));
 const ImportStudentsPage = lazy(() => import("../features/admin/students/ImportStudentsPage"));
+const TimetableBuilderPage = lazy(() => import("../features/admin/timetable/TimetableBuilderPage"));
 const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
@@ -151,6 +152,14 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <StudentProfilePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "admin/timetable",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <TimetableBuilderPage />
               </RequirePermission>
             ),
           },
