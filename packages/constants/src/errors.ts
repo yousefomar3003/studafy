@@ -311,6 +311,14 @@ export const ERROR_CODES = {
   AI_QUIZ_GENERATION_FAILED: "AI_QUIZ_GENERATION_FAILED",
   AI_QUIZ_NOT_FOUND: "AI_QUIZ_NOT_FOUND",
 
+  // Flashcard deck generation and spaced-repetition reviews (ST-168). AI_FLASHCARD_GENERATION_FAILED
+  // is the model-output-stage counterpart to AI_QUIZ_GENERATION_FAILED: the provider answered, but
+  // its JSON did not validate against the flashcard schema -- a client can retry the same request.
+  // AI_FLASHCARD_DECK_NOT_FOUND covers the review endpoints' deck lookup, on the same terms
+  // AI_QUIZ_NOT_FOUND covers quiz grading's.
+  AI_FLASHCARD_GENERATION_FAILED: "AI_FLASHCARD_GENERATION_FAILED",
+  AI_FLASHCARD_DECK_NOT_FOUND: "AI_FLASHCARD_DECK_NOT_FOUND",
+
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",

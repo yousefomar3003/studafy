@@ -152,3 +152,43 @@ export const AI_QUIZ_OUTPUT_TOKENS_CEILING = 4096;
 
 /** Maximum length of one submitted answer on the grading endpoint. */
 export const AI_QUIZ_ANSWER_MAX_CHARS = 1000;
+
+/**
+ * Flashcard deck generator and spaced-repetition reviews (ST-168).
+ *
+ * The generate route loads a bounded prefix of each selected material's ingested chunks -- reusing
+ * the quiz loader (`quiz/materials.ts`'s `loadQuizMaterials`) and therefore the quiz input budgets
+ * (`AI_QUIZ_MAX_MATERIALS` / `AI_QUIZ_CHUNK_LIMIT_PER_MATERIAL` / `AI_QUIZ_MAX_INPUT_CHARS`) rather
+ * than defining a second, identical loader -- asks the small tier for a strict-JSON card list
+ * (term/definition and Q/A), and validates every card against the flashcard schema
+ * (`flashcards/schema.ts`) before persisting it. Review scheduling and progress are pure SM-2
+ * arithmetic (`flashcards/scheduling.ts`), advanced by the review endpoints with no model call and
+ * no quota spend.
+ */
+
+export const AI_FLASHCARD_MIN_CARDS = 1;
+
+/** Upper bound on `cardCount`; also the worst case the reservation math below is sized against. */
+export const AI_FLASHCARD_MAX_CARDS = 20;
+
+export const AI_FLASHCARD_DEFAULT_CARDS = 10;
+
+/**
+ * Output-token ceiling passed to the provider: `cardCount` scaled by an estimated cost per card
+ * (JSON for a front and a back, a type, and a citation -- roughly 180 tokens), plus a fixed buffer,
+ * capped so a request can never ask for more than the reservation covers.
+ *
+ * Worst case at `AI_FLASHCARD_MAX_CARDS`: 20 * 180 + 300 = 3,900, under the 4,096 cap. Combined
+ * with the ~7,500-token input budget the shared quiz loader enforces, one generation call costs at
+ * most ~11,400 tokens -- well inside `AI_LLM_MAX_RESERVE_TOKENS` (24,000), so the deck route reuses
+ * that existing reservation rather than defining its own.
+ */
+export const AI_FLASHCARD_OUTPUT_TOKENS_PER_CARD = 180;
+export const AI_FLASHCARD_OUTPUT_TOKEN_BUFFER = 300;
+export const AI_FLASHCARD_OUTPUT_TOKENS_CEILING = 4096;
+
+/**
+ * Maximum number of due cards one review request returns (GET) or accepts (POST). Bounds the
+ * payload a study session can ask for in one call.
+ */
+export const AI_FLASHCARD_REVIEW_LIMIT = 30;
