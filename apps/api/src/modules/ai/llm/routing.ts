@@ -16,7 +16,15 @@ import { AI_LLM_DEFAULT_LARGE_MODEL, AI_LLM_DEFAULT_SMALL_MODEL } from "../confi
  */
 
 /** The AI surfaces the gateway serves, and the request body's `feature` values. */
-export const AI_FEATURES = ["ask", "exam", "summary", "concepts", "flashcards", "quiz"] as const;
+export const AI_FEATURES = [
+  "ask",
+  "exam",
+  "summary",
+  "concepts",
+  "flashcards",
+  "quiz",
+  "explain",
+] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 
 export const AI_MODEL_TIERS = ["small", "large"] as const;
@@ -34,6 +42,11 @@ export const AI_ROUTING_TABLE: Readonly<Record<AiFeature, AiModelTier>> = {
   // question's citation and answer key internally consistent -- the same reasoning load as exam
   // explanations, not the short, repetitive shape summary/flashcards get.
   quiz: "large",
+  // Simplified explanations (ST-170) rewrite a retrieved passage at a chosen register: a faithful
+  // paraphrase that keeps every claim and rephrases for the reader's age. That is the same
+  // reasoning load as Ask AI and exam explanations -- not the list-shaped small-tier features --
+  // so it gets the large tier.
+  explain: "large",
 };
 
 export interface AiModelTierConfig {

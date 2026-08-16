@@ -318,6 +318,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // Key-concept extraction (ST-169). POST carries the material id; the route's one write is the
   // durable per-student usage meter, recorded with the same declaration as the retrieval route above.
   "POST /api/ai/students/{studentId}/concepts",
+  // Simplified explanations (ST-170). POST carries the chunk id; the route's one write is the
+  // durable per-student usage meter, recorded with the same declaration as the retrieval route above.
+  "POST /api/ai/students/{studentId}/explain",
   // Quiz generation and grading (ST-167). Generation's writes are app.quizzes, app.quiz_questions,
   // and the durable usage meter, declared "insert" on quiz_questions. Grading writes nothing --
   // it reads the persisted answer key and scores in memory -- so it is declared "read" rather than

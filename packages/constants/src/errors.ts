@@ -325,6 +325,12 @@ export const ERROR_CODES = {
   // that the grounding validator could not tie to the corpus -- a client can retry the same request.
   AI_CONCEPTS_GENERATION_FAILED: "AI_CONCEPTS_GENERATION_FAILED",
 
+  // Simplified explanations (ST-170). AI_EXPLAIN_GENERATION_FAILED is the model-output-stage
+  // counterpart to the concepts failure above: the provider answered, but the rewrite came back
+  // empty or the grounding validator could not tie every sentence back to the retrieved passage --
+  // a client can retry the same request.
+  AI_EXPLAIN_GENERATION_FAILED: "AI_EXPLAIN_GENERATION_FAILED",
+
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",

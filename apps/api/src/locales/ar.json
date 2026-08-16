@@ -170,6 +170,7 @@
   "AI_FLASHCARD_GENERATION_FAILED": "تعذّر التحقق من مخرجات البطاقات التعليمية من مزود الذكاء الاصطناعي، يرجى المحاولة مرة أخرى",
   "AI_FLASHCARD_DECK_NOT_FOUND": "لم يتم العثور على مجموعة البطاقات التعليمية لهذا الطالب",
   "AI_CONCEPTS_GENERATION_FAILED": "تعذّر التحقق من مخرجات المفاهيم من مزود الذكاء الاصطناعي، يرجى المحاولة مرة أخرى",
+  "AI_EXPLAIN_GENERATION_FAILED": "تعذّر التحقق من مخرجات الشرح من مزود الذكاء الاصطناعي، يرجى المحاولة مرة أخرى",
   "SUBSCRIPTION_ALREADY_CANCELED": "تمت جدولة إلغاء هذا الاشتراك بالفعل",
   "SUBSCRIPTION_CANCELLATION_NOT_PENDING": "لا يوجد إلغاء معلق للتراجع عنه",
   "SUBSCRIPTION_NOT_LINKED_TO_PROVIDER": "لا يوجد سجل لدى مزود الدفع لهذا الاشتراك",
