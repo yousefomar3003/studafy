@@ -338,6 +338,23 @@ describe("createSessionStore", () => {
     expect(store.getRoles()).toEqual([]);
   });
 
+  test("getUserId decodes the held token's sub claim and clears it on sign-out", async () => {
+    const { store, client, clock } = createHarness();
+    client.setRefresh(async () => ({
+      accessToken: fakeJwt({ sub: "user-42", roles: ["ORG_ADMIN"] }),
+      expiresAt: clock.time + ACCESS_TTL_MS,
+      sessionId: "session-1",
+    }));
+
+    expect(store.getUserId()).toBeNull();
+
+    await store.restore();
+    expect(store.getUserId()).toBe("user-42");
+
+    await store.logout();
+    expect(store.getUserId()).toBeNull();
+  });
+
   test("subscribe notifies listeners on status transitions only", async () => {
     const { store } = createHarness();
     const seen: SessionStatus[] = [];

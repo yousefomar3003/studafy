@@ -53,6 +53,8 @@ export interface AuthState {
   readonly sessionId: string | null;
   /** The held token's `roles` claim. Routing/UX data only — see `decodeAccessTokenRoles`. */
   readonly roles: readonly string[];
+  /** The held token's `sub` claim (the caller's own user id). UX data only — see `decodeAccessTokenUserId`. */
+  readonly userId: string | null;
 }
 
 export function useAuth(): AuthState {
@@ -64,6 +66,7 @@ export function useAuth(): AuthState {
     isRestoring: status === "restoring",
     sessionId: store.getSessionId(),
     roles: store.getRoles(),
+    userId: store.getUserId(),
   };
 }
 
