@@ -26,6 +26,7 @@ import {
   subjectRoutes,
   courseRoutes,
   classRoutes,
+  roomRoutes,
   enrollmentRoutes,
   timetableRoutes,
   examRoutes,
@@ -662,6 +663,12 @@ export function createApp({
   if (database) {
     app.route("/", classRoutes(database));
     app.route("/", enrollmentRoutes(database));
+  }
+
+  // Room directory (read-only). Rooms are provisioned during school setup; this only exposes the
+  // list so the timetable builder can resolve names and offer a picker (ST-191).
+  if (database) {
+    app.route("/", roomRoutes(database));
   }
 
   // Timetable builder: draft version management, slot CRUD with teacher/room conflict

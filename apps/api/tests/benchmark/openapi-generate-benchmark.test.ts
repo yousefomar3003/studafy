@@ -200,6 +200,7 @@ const EXPECTED_PATHS = [
   "/api/academics/submissions/{submissionId}/attachments/upload-url",
   "/api/academics/submissions/{submissionId}/attachments/{attachmentId}",
   "/api/academics/classes/{classId}/enrollments",
+  "/api/academics/rooms",
   "/api/academics/classes/{classId}/enrollments/transfer",
   "/api/academics/classes/{classId}/enrollments/{studentId}",
   "/api/academics/slots/{slotId}",

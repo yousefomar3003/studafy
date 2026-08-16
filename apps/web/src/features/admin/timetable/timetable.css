@@ -1,0 +1,234 @@
+/**
+ * Timetable builder screens. Loaded only when `/portal/admin/timetable` is, matching the rest of the
+ * admin feature set (see `admin/students/students.css`'s doc comment for why each feature owns its
+ * own stylesheet rather than a shared one).
+ */
+
+.timetable-builder__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.timetable-builder__selectors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.timetable-builder__version-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  margin-bottom: var(--space-16);
+}
+
+.timetable-builder__readonly-note {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.timetable-builder__rejected-note {
+  color: var(--color-danger-subtle-foreground);
+  background-color: var(--color-danger-subtle-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-12);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+/* Status pill — draft/submitted/approved must read as visually distinct states at a glance. */
+.timetable-builder__status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.timetable-builder__status-pill[data-status="draft"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.timetable-builder__status-pill[data-status="pending"] {
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+}
+
+.timetable-builder__status-pill[data-status="approved"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+/* --- Grid editor --- */
+
+.timetable-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.timetable-grid__conflict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.timetable-grid__palette h2 {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.timetable-grid__palette-status {
+  margin: 0 0 var(--space-8);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.timetable-grid__palette-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+}
+
+.timetable-grid__palette-empty {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.timetable-grid__chip {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  padding: var(--space-4) var(--space-12);
+  font-size: var(--font-size-sm);
+  cursor: grab;
+}
+
+.timetable-grid__chip[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+}
+
+.timetable-grid__chip:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.timetable-grid__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.timetable-grid__table th,
+.timetable-grid__table td {
+  border: 1px solid var(--color-border);
+  padding: var(--space-4);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.timetable-grid__table thead th {
+  background-color: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+.timetable-grid__table tbody th {
+  background-color: var(--color-surface);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Wraps zero or more slot chips plus (when editable) a trailing drop target — a cell is a school-wide
+ * time slot, not a single class's seat, so it can hold several concurrent classes at once. */
+.timetable-grid__cell {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.timetable-grid__drop-target {
+  width: 100%;
+  min-height: 24px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+}
+
+.timetable-grid__drop-target:hover,
+.timetable-grid__drop-target:focus-visible {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-subtle-bg);
+}
+
+.timetable-grid__drop-target:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.timetable-grid__slot {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+  padding: var(--space-4);
+  cursor: pointer;
+}
+
+.timetable-grid__slot:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.timetable-grid__slot:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.timetable-grid__slot[data-conflict="true"] {
+  outline: var(--focus-ring-width) solid var(--color-danger);
+  outline-offset: -2px;
+}
+
+.timetable-grid__slot-class {
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+}
+
+.timetable-grid__slot-meta {
+  font-size: var(--font-size-xs);
+}
+
+.timetable-grid__period-controls {
+  display: flex;
+  gap: var(--space-8);
+}
