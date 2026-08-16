@@ -192,3 +192,40 @@ export const AI_FLASHCARD_OUTPUT_TOKENS_CEILING = 4096;
  * payload a study session can ask for in one call.
  */
 export const AI_FLASHCARD_REVIEW_LIMIT = 30;
+
+/**
+ * Key-concept extraction (ST-169).
+ *
+ * The concepts route loads a single material's ingested chunks -- reusing the summarizer's loader
+ * (`summary/materials.ts`) and therefore the summary input budgets (`AI_SUMMARY_CHUNK_LIMIT` /
+ * `AI_SUMMARY_MAX_INPUT_CHARS`) rather than defining a second, identical loader -- asks the small
+ * tier for a strict-JSON concept list, validates every concept against the concepts schema
+ * (`concepts/schema.ts`), deterministically merges name-equivalent duplicates
+ * (`concepts/merge.ts`), and rejects any concept the grounding validator cannot tie to the corpus
+ * (`concepts/grounding.ts`). The extraction is deterministic per material, so it is cached in Redis
+ * the same way summaries are, keyed by the same chunk-set fingerprint.
+ */
+
+/** Redis key prefix for concept cache entries. Keys look like `aiconc:{studentId}:{materialId}:{fingerprint}`. */
+export const AI_CONCEPTS_CACHE_KEY_PREFIX = "aiconc";
+
+/** How long a cached concept list is served before a repeat request regenerates it. */
+export const AI_CONCEPTS_CACHE_TTL_SECONDS = 24 * 60 * 60;
+
+/** Upper bound on how many concepts the prompt asks the model to return, and the reservation math's worst case. */
+export const AI_CONCEPTS_MAX_CONCEPTS = 30;
+
+/**
+ * Output-token ceiling passed to the provider: `AI_CONCEPTS_MAX_CONCEPTS` scaled by an estimated
+ * cost per concept (JSON for a name, a one-line explanation, and its source_ids -- roughly 150
+ * tokens), plus a fixed buffer, capped so a request can never ask for more than the reservation
+ * covers.
+ *
+ * Worst case: 30 * 150 + 300 = 4,800, capped at 4,096. Combined with the ~10,000-token input budget
+ * the summary loader enforces, one generation call costs at most ~14,100 tokens -- inside
+ * `AI_LLM_MAX_RESERVE_TOKENS` (24,000), so the concepts route reuses that existing reservation
+ * rather than defining its own.
+ */
+export const AI_CONCEPTS_OUTPUT_TOKENS_PER_CONCEPT = 150;
+export const AI_CONCEPTS_OUTPUT_TOKEN_BUFFER = 300;
+export const AI_CONCEPTS_OUTPUT_TOKENS_CEILING = 4096;

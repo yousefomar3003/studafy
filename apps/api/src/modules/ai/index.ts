@@ -37,6 +37,7 @@ export { aiRetrievalRoutes } from "./routes/retrieval-routes";
 export { aiGatewayRoutes } from "./routes/gateway-routes";
 export { aiAskRoutes } from "./routes/ask-routes";
 export { aiSummaryRoutes } from "./routes/summary-routes";
+export { aiConceptsRoutes } from "./routes/concepts-routes";
 export { aiQuizRoutes } from "./routes/quiz-routes";
 export { aiFlashcardRoutes } from "./routes/flashcard-routes";
 export {
@@ -54,6 +55,33 @@ export {
   type LoadSummaryMaterialResult,
 } from "./summary/materials";
 export { assembleSummaryPrompt, type SummaryPrompt } from "./summary/prompt";
+export {
+  AI_CONCEPTS_MAX_CONCEPTS,
+  AI_CONCEPTS_CACHE_KEY_PREFIX,
+  AI_CONCEPTS_CACHE_TTL_SECONDS,
+} from "./config";
+export {
+  createConceptsCache,
+  conceptsCacheKey,
+  conceptsFingerprint,
+  type ConceptCacheEntry,
+  type ConceptCacheItem,
+  type ConceptCacheSource,
+  type ConceptsCache,
+} from "./concepts/cache";
+export { assembleConceptsPrompt, type ConceptsPrompt } from "./concepts/prompt";
+export { mergeConcepts, type ConceptInput } from "./concepts/merge";
+export {
+  isConceptGrounded,
+  ungroundedConcepts,
+  type UngroundedConcept,
+} from "./concepts/grounding";
+export { ConceptGenerationInvalidError, parseConceptGeneration } from "./concepts/parser";
+export {
+  conceptGeneratedItemSchema,
+  conceptGenerationSchema,
+  type ConceptGeneration,
+} from "./concepts/schema";
 export {
   QUIZ_QUESTION_TYPES,
   quizGenerationSchema,

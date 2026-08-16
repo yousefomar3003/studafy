@@ -24,11 +24,12 @@ describe("AI model routing table", () => {
     expect(Object.keys(AI_ROUTING_TABLE).sort()).toEqual([...AI_FEATURES].sort());
   });
 
-  test("ask, exam, and quiz route to the large tier; summary and flashcards to the small tier", () => {
+  test("ask, exam, and quiz route to the large tier; summary, concepts, and flashcards to the small tier", () => {
     expect(AI_ROUTING_TABLE.ask).toBe("large");
     expect(AI_ROUTING_TABLE.exam).toBe("large");
     expect(AI_ROUTING_TABLE.quiz).toBe("large");
     expect(AI_ROUTING_TABLE.summary).toBe("small");
+    expect(AI_ROUTING_TABLE.concepts).toBe("small");
     expect(AI_ROUTING_TABLE.flashcards).toBe("small");
   });
 
