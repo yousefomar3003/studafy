@@ -38,6 +38,7 @@ import {
   aiAskRoutes,
   aiConceptsRoutes,
   aiEntitlementGate,
+  aiExplainRoutes,
   aiFlashcardRoutes,
   aiGatewayRoutes,
   aiQuizRoutes,
@@ -827,12 +828,16 @@ export function createApp({
         // makes no LLM call and stays on the default hold. Flashcard deck generation (ST-168) is held
         // at the same worst case for the same reason -- see config.ts's AI_FLASHCARD_* reservation
         // math -- but only the generate path (POST .../decks); the review paths (GET/POST
-        // .../decks/{deckId}/review) make no LLM call and stay on the default hold.
+        // .../decks/{deckId}/review) make no LLM call and stay on the default hold. Simplified
+        // explanations (ST-170) are held at the same worst case for the same reason -- their single
+        // passage is bounded (AI_EXPLAIN_MAX_INPUT_CHARS), but the open-ended rewrite's output
+        // ceiling still exceeds any default-size hold.
         resolveReserveTokens: (c) =>
           c.req.path.endsWith("/generate") ||
           c.req.path.endsWith("/ask") ||
           c.req.path.endsWith("/summarize") ||
           c.req.path.endsWith("/concepts") ||
+          c.req.path.endsWith("/explain") ||
           c.req.path.endsWith("/quizzes") ||
           c.req.path.endsWith("/decks")
             ? AI_LLM_MAX_RESERVE_TOKENS
@@ -906,6 +911,19 @@ export function createApp({
         database,
         provider: aiLlmProvider,
         cache: createConceptsCache(redis),
+        modelOverrides: aiLlmModelOverrides,
+      }),
+    );
+    // Simplified explanations (ST-170). Mounted under the same gate so a generated explanation
+    // reserves and commits the caller's AI quota, and only when the gate's dependencies exist --
+    // the explain surface must never run un-metered. The provider may be null on the same
+    // kill-switch terms as the gateway. Explanations are deliberately not cached: a paraphrase is
+    // only as useful as it is freshly faithful to one student's retrieval.
+    app.route(
+      "/",
+      aiExplainRoutes({
+        database,
+        provider: aiLlmProvider,
         modelOverrides: aiLlmModelOverrides,
       }),
     );

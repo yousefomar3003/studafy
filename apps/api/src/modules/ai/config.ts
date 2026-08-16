@@ -229,3 +229,27 @@ export const AI_CONCEPTS_MAX_CONCEPTS = 30;
 export const AI_CONCEPTS_OUTPUT_TOKENS_PER_CONCEPT = 150;
 export const AI_CONCEPTS_OUTPUT_TOKEN_BUFFER = 300;
 export const AI_CONCEPTS_OUTPUT_TOKENS_CEILING = 4096;
+
+/**
+ * Simplified-explanations endpoint (ST-170).
+ *
+ * The explain route loads ONE retrieved passage (`app.material_chunks` row) by chunk id and asks
+ * the routed large tier to rewrite it in plain language at a selectable age-appropriate level
+ * (`AI_EXPLAIN_LEVELS`). The input is a single chunk -- bounded here to
+ * `AI_EXPLAIN_MAX_INPUT_CHARS` -- and the output is open-ended prose up to the provider's output
+ * ceiling, so the route reserves the same worst-case hold as the other generation surfaces (see
+ * app.ts, resolveReserveTokens).
+ */
+
+/** The selectable age-appropriate levels the model's tone follows. */
+export const AI_EXPLAIN_LEVELS = ["elementary", "middle", "high"] as const;
+
+/**
+ * Maximum characters of passage text handed to the model. One retrieval chunk is already capped at
+ * the ingest chunker's 800-token budget (~3,200 chars), so this cap only guards against an
+ * oversized row. ~4 characters per token ≈ 1,000 input tokens; the open-ended rewrite adds the
+ * provider's output ceiling (~4,096 tokens), so one generation is ~5,100 tokens worst case --
+ * inside `AI_LLM_MAX_RESERVE_TOKENS` (24,000), which the explain route reuses rather than defining
+ * its own reservation.
+ */
+export const AI_EXPLAIN_MAX_INPUT_CHARS = 4_000;

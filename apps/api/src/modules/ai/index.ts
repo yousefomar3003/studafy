@@ -15,7 +15,9 @@
  * model call and no quota spend. The flashcard deck generator (ST-168) validates every card against
  * a schema the same way and returns each card's faces and citation; its review endpoints advance
  * per-student spaced-repetition progress with a pure SM-2 scheduler, with no model call and no
- * quota spend.
+ * quota spend. The simplified-explanations endpoint (ST-170) rewrites one retrieved passage at a
+ * selectable age-appropriate level and refuses any output whose sentences are not grounded in the
+ * passage's vocabulary.
  */
 
 export {
@@ -38,6 +40,7 @@ export { aiGatewayRoutes } from "./routes/gateway-routes";
 export { aiAskRoutes } from "./routes/ask-routes";
 export { aiSummaryRoutes } from "./routes/summary-routes";
 export { aiConceptsRoutes } from "./routes/concepts-routes";
+export { aiExplainRoutes } from "./routes/explain-routes";
 export { aiQuizRoutes } from "./routes/quiz-routes";
 export { aiFlashcardRoutes } from "./routes/flashcard-routes";
 export {
@@ -60,6 +63,24 @@ export {
   AI_CONCEPTS_CACHE_KEY_PREFIX,
   AI_CONCEPTS_CACHE_TTL_SECONDS,
 } from "./config";
+export { AI_EXPLAIN_LEVELS, AI_EXPLAIN_MAX_INPUT_CHARS } from "./config";
+export {
+  loadExplainPassage,
+  type LoadedExplainChunk,
+  type LoadExplainPassageResult,
+} from "./explain/materials";
+export {
+  assembleExplainPrompt,
+  EXPLAIN_LEVEL_INSTRUCTIONS,
+  type ExplainLevel,
+  type ExplainPrompt,
+} from "./explain/prompt";
+export {
+  ExplainGenerationInvalidError,
+  firstUngroundedSentence,
+  isExplanationGrounded,
+  wordsOverlap,
+} from "./explain/grounding";
 export {
   createConceptsCache,
   conceptsCacheKey,
