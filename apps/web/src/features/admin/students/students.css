@@ -1,0 +1,175 @@
+/**
+ * Student directory and profile screens. `@studafy/ui`'s DataGrid, FilterBar, Card, Modal, and Tabs
+ * supply their own chrome; everything here is feature-specific layout, styled with the same design
+ * tokens the rest of the portal shell uses. `.students-detail-list` intentionally mirrors
+ * `../users/users.css`'s `.users-sessions-list` rather than importing it — each admin feature owns
+ * its own stylesheet, loaded only when that feature's route is.
+ */
+
+.students-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.students-list__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.students-list__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+.students-list__status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.students-list__status-pill[data-status="enrolled"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.students-list__status-pill[data-status="applicant"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.students-list__status-pill[data-status="suspended"],
+.students-list__status-pill[data-status="withdrawn"],
+.students-list__status-pill[data-status="archived"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.students-profile__back {
+  margin-bottom: var(--space-8);
+}
+
+.students-profile__sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  margin-top: var(--space-16);
+}
+
+.students-profile__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.students-profile__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-16);
+  margin: 0;
+}
+
+.students-profile__fields dt {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+  margin-bottom: var(--space-4);
+}
+
+.students-profile__fields dd {
+  margin: 0;
+}
+
+.students-guardian-picker__selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.students-guardian-picker__selected p {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.students-guardian-picker__results {
+  list-style: none;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.students-guardian-picker__result {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+}
+
+.students-guardian-picker__result:hover,
+.students-guardian-picker__result:focus-visible {
+  border-color: var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.students-guardian-picker__result span {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.students-guardian-picker__empty {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  padding: var(--space-8) var(--space-12);
+}
+
+.students-detail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.students-detail-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.students-detail-list__item p {
+  margin: 0;
+}
+
+.students-detail-list__meta {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+  margin: 0;
+}
