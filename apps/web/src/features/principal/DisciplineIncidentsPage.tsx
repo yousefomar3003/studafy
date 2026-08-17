@@ -55,8 +55,8 @@ function formatDate(iso: string): string {
 
 /**
  * Discipline incident list (`/portal/principal/discipline`), drill-through target for the
- * principal dashboard's "Open discipline incidents" tile. Read-only, like `ApprovalsPage` — acting
- * on an incident (resolve, add an action) is the existing admin/teacher discipline workflow
+ * principal dashboard's "Open discipline incidents" tile. Read-only — acting on an incident
+ * (resolve, add an action) is the existing admin/teacher discipline workflow
  * (`apps/api/src/modules/discipline/routes/discipline-routes.ts`), not part of this dashboard.
  */
 export default function DisciplineIncidentsPage() {

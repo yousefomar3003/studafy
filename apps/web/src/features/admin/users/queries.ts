@@ -51,7 +51,7 @@ export async function fetchUsersPage(filters: UsersFilters, cursor: string | und
     },
   });
   // `readonly UserWithRoles[]` loses its array prototype through the generated response type here —
-  // a pre-existing `@studafy/api-client` typing gap (see ApprovalsPage/DeviceSessionsPanel), not a
+  // a pre-existing `@studafy/api-client` typing gap (see ApprovalQueuePage/DeviceSessionsPanel), not a
   // shape mismatch. The annotation restores it without widening to `any`.
   return {
     users: (data?.users ?? []) as UserWithRoles[],

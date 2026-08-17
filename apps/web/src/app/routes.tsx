@@ -38,7 +38,7 @@ const AnnouncementsPage = lazy(() => import("../features/admin/announcements/Ann
 const PrincipalDashboardPage = lazy(() => import("../features/principal/PrincipalDashboardPage"));
 const DisciplineIncidentsPage = lazy(() => import("../features/principal/DisciplineIncidentsPage"));
 const AttendanceByClassPage = lazy(() => import("../features/principal/AttendanceByClassPage"));
-const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
+const ApprovalQueuePage = lazy(() => import("../features/principal/approvals/ApprovalQueuePage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
 /**
@@ -229,7 +229,7 @@ export const routes: RouteObject[] = [
             path: "approvals",
             element: (
               <RequirePermission permission={PERMISSIONS.APPROVAL_REVIEW}>
-                <ApprovalsPage />
+                <ApprovalQueuePage />
               </RequirePermission>
             ),
           },

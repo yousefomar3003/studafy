@@ -69,7 +69,7 @@ export default function PricingPage() {
 
   // A bare top-level array response (unlike every other route, which wraps results in an object)
   // loses its `Array` prototype through the generated response type — the same pre-existing
-  // `@studafy/api-client` typing gap ApprovalsPage.tsx works around, not a shape mismatch. The
+  // `@studafy/api-client` typing gap ApprovalQueuePage.tsx works around, not a shape mismatch. The
   // annotation restores it without widening to `any`.
   const plans = (data ?? []) as readonly Plan[];
 
