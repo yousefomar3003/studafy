@@ -341,6 +341,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/ai/students/{studentId}/exams",
   "POST /api/ai/students/{studentId}/exams/{examId}/start",
   "POST /api/ai/students/{studentId}/exams/{examId}/submit",
+  // Answer report (ST-172). Student flags their own AI answer for teacher review; self-service on
+  // the caller's own message. Audit row written by auditAction middleware on the route.
+  "POST /api/ai/students/{studentId}/messages/{messageId}/report",
 ];
 
 function collectSourceFiles(dir: string): string[] {

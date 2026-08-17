@@ -267,3 +267,24 @@ export {
   type AiTokenMeter,
   type AiUsageSnapshot,
 } from "./usage/meter";
+
+export {
+  type AgeLevel,
+  type ModerationResult,
+  type ModerationProvider,
+  PatternModerationProvider,
+  moderateInput,
+  moderateOutput,
+  textHash,
+} from "./moderation/moderate";
+
+export { MODERATION_CATEGORIES, type ModerationCategory } from "./moderation/policy";
+
+export {
+  persistModerationDecision,
+  persistAnswerReport,
+  type PersistModerationDecisionInput,
+  type PersistAnswerReportInput,
+} from "./moderation/persistence";
+
+export { aiReportRoutes } from "./routes/report-routes";
