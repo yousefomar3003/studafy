@@ -35,6 +35,9 @@ export default function AdminDashboardPage() {
       <p className="admin-dashboard-link">
         <Link to="/portal/admin/settings">School settings →</Link>
       </p>
+      <p className="admin-dashboard-link">
+        <Link to="/portal/admin/audit">Audit log →</Link>
+      </p>
 
       <div className="admin-dashboard-banner">
         <SubscriptionStatusBanner />

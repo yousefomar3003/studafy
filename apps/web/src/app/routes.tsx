@@ -33,6 +33,7 @@ const StudentProfilePage = lazy(() => import("../features/admin/students/Student
 const ImportStudentsPage = lazy(() => import("../features/admin/students/ImportStudentsPage"));
 const TimetableBuilderPage = lazy(() => import("../features/admin/timetable/TimetableBuilderPage"));
 const SchoolSettingsPage = lazy(() => import("../features/admin/settings/SchoolSettingsPage"));
+const AuditLogExplorerPage = lazy(() => import("../features/admin/audit/AuditLogExplorerPage"));
 const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
@@ -169,6 +170,17 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <SchoolSettingsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on the specific `auditLog:read` permission, not `organization:manageSettings` —
+            // FINANCE and SUPPORT_AGENT hold the former without the latter (see
+            // `packages/constants/src/permissions.ts`) and are meant to reach this page directly.
+            path: "admin/audit",
+            element: (
+              <RequirePermission permission={PERMISSIONS.AUDIT_LOG_READ}>
+                <AuditLogExplorerPage />
               </RequirePermission>
             ),
           },
