@@ -4,6 +4,7 @@
   "ATTENDANCE_EXPORT_UNAVAILABLE": "تصدير الحضور غير متاح مؤقتاً. يرجى المحاولة لاحقاً.",
   "AUDIT_LOG_EXPORT_NOT_FOUND": "لم يتم العثور على تصدير سجل التدقيق",
   "AUDIT_LOG_EXPORT_UNAVAILABLE": "تصدير سجل التدقيق غير متاح مؤقتاً. يرجى المحاولة لاحقاً.",
+  "ANNOUNCEMENT_CLASS_NOT_FOUND": "لم يتم العثور على الفصل",
   "AUTH_INVALID_CREDENTIALS": "بيانات الاعتماد غير صالحة",
   "AUTH_TOKEN_EXPIRED": "انتهت صلاحية رمز المصادقة",
   "AUTH_TOKEN_INVALID": "رمز المصادقة غير صالح",

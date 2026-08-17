@@ -1,6 +1,7 @@
 import { publishAnnouncement } from "@studafy/announcements";
-import { HTTPException } from "hono/http-exception";
+import { ERROR_CODES } from "@studafy/constants";
 
+import { CodedHttpException } from "../../coded-http-exception";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../lib/keyset-cursor";
 
 import type { CreateAnnouncementBody } from "./schemas";
@@ -109,7 +110,13 @@ export async function createAnnouncement(
       SELECT id FROM app.classes
       WHERE id = ${input.audience_class_id}::uuid AND school_id = ${schoolId}::uuid
     `;
-    if (!klass) throw new HTTPException(404, { message: "Class not found" });
+    if (!klass) {
+      throw new CodedHttpException(
+        404,
+        ERROR_CODES.ANNOUNCEMENT_CLASS_NOT_FOUND,
+        "Class not found",
+      );
+    }
   }
 
   const scheduledAt =
