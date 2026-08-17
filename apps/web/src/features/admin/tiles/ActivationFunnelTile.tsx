@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { DashboardTile } from "../../../components/DashboardTile";
 import { api } from "../../../lib/api";
-import { AdminTile } from "../AdminTile";
 
 /** No realtime event is routed for user status changes yet, so this polls instead. */
 const ACTIVATION_FUNNEL_POLL_MS = 60_000;
@@ -21,25 +21,25 @@ export function ActivationFunnelTile() {
   const active = data?.active ?? 0;
 
   return (
-    <AdminTile
+    <DashboardTile
       title="Activation funnel"
       status={isPending ? "pending" : isError ? "error" : "ready"}
       errorMessage="Unable to load user activation counts."
     >
       {invited === 0 && active === 0 ? (
-        <p className="admin-tile__caption">No invited or active users yet.</p>
+        <p className="dashboard-tile__caption">No invited or active users yet.</p>
       ) : (
-        <dl className="admin-tile__stat-list">
-          <div className="admin-tile__stat">
+        <dl className="dashboard-tile__stat-list">
+          <div className="dashboard-tile__stat">
             <dt>Invited</dt>
             <dd>{invited}</dd>
           </div>
-          <div className="admin-tile__stat">
+          <div className="dashboard-tile__stat">
             <dt>Active</dt>
             <dd>{active}</dd>
           </div>
         </dl>
       )}
-    </AdminTile>
+    </DashboardTile>
   );
 }

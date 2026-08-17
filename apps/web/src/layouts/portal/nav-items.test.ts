@@ -11,8 +11,8 @@ const idsFor = (roles: readonly string[]) =>
 
 describe("visiblePortalNavItems", () => {
   test.each<[string, string[]]>([
-    ["SUPER_ADMIN", ["home", "admin", "approvals", "account"]],
-    ["ORG_ADMIN", ["home", "admin", "approvals", "account"]],
+    ["SUPER_ADMIN", ["home", "admin", "principal", "approvals", "account"]],
+    ["ORG_ADMIN", ["home", "admin", "principal", "approvals", "account"]],
     ["FINANCE", ["home", "account"]],
     ["INSTRUCTOR", ["home", "account"]],
     ["TEACHING_ASSISTANT", ["home", "account"]],
@@ -29,6 +29,12 @@ describe("visiblePortalNavItems", () => {
   });
 
   test("a multi-role session sees the union", () => {
-    expect(idsFor(["STUDENT", "ORG_ADMIN"])).toEqual(["home", "admin", "approvals", "account"]);
+    expect(idsFor(["STUDENT", "ORG_ADMIN"])).toEqual([
+      "home",
+      "admin",
+      "principal",
+      "approvals",
+      "account",
+    ]);
   });
 });

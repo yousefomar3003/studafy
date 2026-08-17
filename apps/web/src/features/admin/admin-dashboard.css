@@ -1,7 +1,7 @@
 /**
- * Admin dashboard tiles. `@studafy/ui`'s Card supplies the border/radius/elevation chrome
- * (packages/ui/src/components/card/card.css); everything here is the tile-specific content inside
- * it, styled with the same design tokens the rest of the portal shell uses.
+ * Admin dashboard page layout. Tile chrome itself (`dashboard-tile__*`) lives in the shared
+ * `apps/web/src/components/dashboard-tile.css`, imported by `AdminDashboardPage.tsx` alongside
+ * this file — this stylesheet only holds the layout classes specific to this page.
  */
 
 .admin-dashboard-link {
@@ -16,112 +16,4 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-16);
-}
-
-.admin-tile__title {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  margin: 0;
-}
-
-.admin-tile__status {
-  color: var(--color-muted-foreground);
-  margin: 0;
-}
-
-.admin-tile__status--error {
-  color: var(--color-danger);
-}
-
-.admin-tile__value {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
-  margin: 0;
-}
-
-.admin-tile__caption {
-  color: var(--color-muted-foreground);
-  font-size: var(--font-size-sm);
-  margin: var(--space-4) 0 0;
-}
-
-.admin-tile__stat-list {
-  display: flex;
-  gap: var(--space-24);
-  margin: 0;
-}
-
-.admin-tile__stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.admin-tile__stat dt {
-  font-size: var(--font-size-sm);
-  color: var(--color-muted-foreground);
-}
-
-.admin-tile__stat dd {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
-  margin: 0;
-}
-
-.admin-tile__status-pill {
-  display: inline-block;
-  padding: var(--space-4) var(--space-12);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  margin: 0;
-}
-
-.admin-tile__status-pill[data-tone="success"] {
-  background-color: var(--color-success-subtle-bg);
-  color: var(--color-success-subtle-foreground);
-}
-
-.admin-tile__status-pill[data-tone="warning"] {
-  background-color: var(--color-warning-subtle-bg);
-  color: var(--color-warning-subtle-foreground);
-}
-
-.admin-tile__status-pill[data-tone="danger"] {
-  background-color: var(--color-danger-subtle-bg);
-  color: var(--color-danger-subtle-foreground);
-}
-
-.admin-tile__meter {
-  height: 8px;
-  border-radius: var(--radius-full);
-  background-color: var(--color-surface);
-  overflow: hidden;
-}
-
-.admin-tile__meter-fill {
-  height: 100%;
-  border-radius: var(--radius-full);
-  transition: width var(--duration-base) var(--easing-standard);
-}
-
-.admin-tile__meter-fill[data-tone="success"] {
-  background-color: var(--color-success);
-}
-
-.admin-tile__meter-fill[data-tone="warning"] {
-  background-color: var(--color-warning);
-}
-
-.admin-tile__meter-fill[data-tone="danger"] {
-  background-color: var(--color-danger);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .admin-tile__meter-fill {
-    transition: none;
-  }
 }

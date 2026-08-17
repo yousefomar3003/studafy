@@ -56,8 +56,8 @@ afterEach(() => {
 
 /** The exact, per-role visible menu — the "snapshot per role" this ticket's AC calls for. */
 describe.each<[string, string[]]>([
-  ["SUPER_ADMIN", ["Home", "Admin", "Approvals", "Account"]],
-  ["ORG_ADMIN", ["Home", "Admin", "Approvals", "Account"]],
+  ["SUPER_ADMIN", ["Home", "Admin", "Principal", "Approvals", "Account"]],
+  ["ORG_ADMIN", ["Home", "Admin", "Principal", "Approvals", "Account"]],
   ["INSTRUCTOR", ["Home", "Account"]],
   ["TEACHING_ASSISTANT", ["Home", "Account"]],
   ["STUDENT", ["Home", "Account"]],
