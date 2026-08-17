@@ -35,6 +35,9 @@ const TimetableBuilderPage = lazy(() => import("../features/admin/timetable/Time
 const SchoolSettingsPage = lazy(() => import("../features/admin/settings/SchoolSettingsPage"));
 const AuditLogExplorerPage = lazy(() => import("../features/admin/audit/AuditLogExplorerPage"));
 const AnnouncementsPage = lazy(() => import("../features/admin/announcements/AnnouncementsPage"));
+const PrincipalDashboardPage = lazy(() => import("../features/principal/PrincipalDashboardPage"));
+const DisciplineIncidentsPage = lazy(() => import("../features/principal/DisciplineIncidentsPage"));
+const AttendanceByClassPage = lazy(() => import("../features/principal/AttendanceByClassPage"));
 const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
@@ -192,6 +195,33 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.NOTIFICATION_MANAGE}>
                 <AnnouncementsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Same gate as "Admin" — there is no distinct PRINCIPAL role/permission (see
+            // nav-items.ts). A leadership-facing view (approvals, attendance, discipline,
+            // announcements) alongside the ops-facing admin console, not a replacement for it.
+            path: "principal",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <PrincipalDashboardPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/discipline",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <DisciplineIncidentsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/attendance",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <AttendanceByClassPage />
               </RequirePermission>
             ),
           },

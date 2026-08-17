@@ -6,6 +6,7 @@ import { PendingApprovalsTile } from "./tiles/PendingApprovalsTile";
 import { StorageUsageTile } from "./tiles/StorageUsageTile";
 import { SubscriptionStatusBanner } from "./tiles/SubscriptionStatusBanner";
 
+import "../../components/dashboard-tile.css";
 import "./admin-dashboard.css";
 
 /**

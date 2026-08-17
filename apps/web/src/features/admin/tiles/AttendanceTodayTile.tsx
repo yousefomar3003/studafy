@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { DashboardTile } from "../../../components/DashboardTile";
 import { api } from "../../../lib/api";
-import { AdminTile } from "../AdminTile";
 
 /** No realtime event is routed for attendance marks yet, so this polls instead. */
 const ATTENDANCE_TODAY_POLL_MS = 60_000;
@@ -37,22 +37,22 @@ export function AttendanceTodayTile() {
   const totalRecords = totals?.total_records ?? 0;
 
   return (
-    <AdminTile
+    <DashboardTile
       title="Attendance today"
       status={isPending ? "pending" : isError ? "error" : "ready"}
       errorMessage="Unable to load today's attendance."
     >
       {totalRecords === 0 || !totals ? (
-        <p className="admin-tile__caption">No attendance recorded yet today.</p>
+        <p className="dashboard-tile__caption">No attendance recorded yet today.</p>
       ) : (
         <>
-          <p className="admin-tile__value">{Math.round(totals.present_percent)}%</p>
-          <p className="admin-tile__caption">
+          <p className="dashboard-tile__value">{Math.round(totals.present_percent)}%</p>
+          <p className="dashboard-tile__caption">
             {totals.present_count} present of {totalRecords} record
             {totalRecords === 1 ? "" : "s"}
           </p>
         </>
       )}
-    </AdminTile>
+    </DashboardTile>
   );
 }

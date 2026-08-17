@@ -1,4 +1,4 @@
-import { AdminTile } from "../AdminTile";
+import { DashboardTile } from "../../../components/DashboardTile";
 import { useBillingOverviewQuery } from "../billing-overview-query";
 
 /** Matches STORAGE_QUOTA_WARNING_THRESHOLD in apps/api's storage/quota-service.ts. */
@@ -29,33 +29,33 @@ export function StorageUsageTile() {
         : "success";
 
   return (
-    <AdminTile
+    <DashboardTile
       title="Storage usage"
       status={isPending ? "pending" : isError ? "error" : "ready"}
       errorMessage="Unable to load storage usage."
     >
       {!storage ? (
-        <p className="admin-tile__caption">No storage data available.</p>
+        <p className="dashboard-tile__caption">No storage data available.</p>
       ) : (
         <>
           <div
-            className="admin-tile__meter"
+            className="dashboard-tile__meter"
             role="img"
             aria-label={hasCap ? `${percent}% of storage used` : "Storage cap not configured"}
           >
             <div
-              className="admin-tile__meter-fill"
+              className="dashboard-tile__meter-fill"
               data-tone={tone}
               style={{ width: `${hasCap ? Math.min(percent, 100) : 0}%` }}
             />
           </div>
-          <p className="admin-tile__caption">
+          <p className="dashboard-tile__caption">
             {hasCap
               ? `${formatBytes(storage.usedBytes)} of ${formatBytes(storage.capBytes)} used`
               : `${formatBytes(storage.usedBytes)} used · no cap configured`}
           </p>
         </>
       )}
-    </AdminTile>
+    </DashboardTile>
   );
 }

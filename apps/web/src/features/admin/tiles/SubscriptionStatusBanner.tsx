@@ -1,4 +1,4 @@
-import { AdminTile } from "../AdminTile";
+import { DashboardTile } from "../../../components/DashboardTile";
 import { useBillingOverviewQuery } from "../billing-overview-query";
 
 // Maps (not plain objects) so a subscription status string can never resolve a prototype member —
@@ -34,20 +34,20 @@ export function SubscriptionStatusBanner() {
   const label = (status && STATUS_LABEL.get(status)) || status || "Unknown";
 
   return (
-    <AdminTile
+    <DashboardTile
       title="Subscription"
       status={isPending ? "pending" : isError ? "error" : "ready"}
       errorMessage="Unable to load subscription status."
     >
-      <p className="admin-tile__status-pill" data-tone={tone}>
+      <p className="dashboard-tile__status-pill" data-tone={tone}>
         {label}
       </p>
       {data ? (
-        <p className="admin-tile__caption">
+        <p className="dashboard-tile__caption">
           {data.plan.displayName} · {data.seats.used}/{data.seats.cap} seats
           {data.subscription.cancelAtPeriodEnd ? " · cancels at period end" : ""}
         </p>
       ) : null}
-    </AdminTile>
+    </DashboardTile>
   );
 }

@@ -18,7 +18,7 @@ export interface SettingsCardProps {
  * Shared chrome for every settings section: a labelled `Card` with its own form and save action, so
  * each setting persists independently rather than through one page-wide submit — matching how
  * `StudentProfilePage`'s per-section cards each own their save. The one local abstraction this
- * feature shares, same rationale as `AdminTile` for the dashboard tiles.
+ * feature shares, same rationale as `DashboardTile` for the dashboard tiles.
  */
 export function SettingsCard({
   title,

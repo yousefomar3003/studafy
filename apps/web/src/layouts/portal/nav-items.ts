@@ -25,6 +25,17 @@ export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
     requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS,
   },
   {
+    // Same audience as "Admin" (there is no distinct PRINCIPAL role — see
+    // ATTENDANCE_CORRECTION_OVERRIDE's doc comment in packages/constants/src/permissions.ts, which
+    // already calls ORG_ADMIN "a principal's administrative override"). A separate leadership-facing
+    // view — approvals, attendance, discipline, announcements — rather than the ops-facing admin
+    // console (users/invitations/timetable/settings).
+    id: "principal",
+    label: "Principal",
+    to: "/portal/principal",
+    requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS,
+  },
+  {
     id: "approvals",
     label: "Approvals",
     to: "/portal/approvals",
