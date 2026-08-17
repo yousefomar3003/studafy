@@ -56,6 +56,10 @@ export interface NotificationTypeVars {
     title: string;
     summary: string;
   };
+  ANNOUNCEMENT: {
+    title: string;
+    summary: string;
+  };
   MATERIAL_SCAN_QUARANTINED: {
     fileName: string;
     virus: string;

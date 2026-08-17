@@ -1,0 +1,42 @@
+/**
+ * Announcement management. `@studafy/ui`'s Card, Tabs, DataGrid, and form controls supply their
+ * own chrome; everything here is feature-specific layout, styled with the same design tokens the
+ * rest of the portal shell uses — see `../audit/audit.css` for the sibling pattern this mirrors.
+ */
+
+.announcements-compose__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  max-width: 560px;
+}
+
+.announcements-compose__body-input {
+  align-items: stretch;
+}
+
+.announcements-compose__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-16);
+}
+
+.announcements-history__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin: var(--space-16) 0;
+}
+
+.announcements-history__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+.announcements-history__mandatory-chip {
+  margin-inline-start: var(--space-8);
+  display: inline-block;
+}

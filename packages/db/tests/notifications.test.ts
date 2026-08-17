@@ -43,6 +43,9 @@ const NOTIFICATION_TYPES = [
   // sorts last, after the OCR-quality type.
   "MATERIAL_INGESTED",
   "MATERIAL_INGEST_FAILED",
+  // ST-194. Appended by 000104, same mechanism. ADMIN_ANNOUNCEMENT's non-mandatory sibling; sorts
+  // last, after the ingestion pair.
+  "ANNOUNCEMENT",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;

@@ -105,6 +105,16 @@ export const NOTIFICATION_CATALOG = {
       route: "/announcements",
     },
   },
+  [NOTIFICATION_TYPES.ANNOUNCEMENT]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/announcements",
+    },
+  },
   // File-scan outcomes (000088). Raised by the workers' file-scan queue directly into
   // app.notifications — no dispatch event today — so the catalog entries exist to keep
   // NotificationCatalog total and the route is empty; nothing routes to a quarantined file.

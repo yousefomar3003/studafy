@@ -213,6 +213,10 @@ export const ERROR_CODES = {
   AUDIT_LOG_EXPORT_NOT_FOUND: "AUDIT_LOG_EXPORT_NOT_FOUND",
   AUDIT_LOG_EXPORT_UNAVAILABLE: "AUDIT_LOG_EXPORT_UNAVAILABLE",
 
+  // Announcement management (ST-194). The audience class named at compose time doesn't exist in
+  // this school.
+  ANNOUNCEMENT_CLASS_NOT_FOUND: "ANNOUNCEMENT_CLASS_NOT_FOUND",
+
   // Submissions — hand-in window, enrollment scope, and grading state (ST-104).
   SUBMISSION_NOT_FOUND: "SUBMISSION_NOT_FOUND",
   SUBMISSION_FORBIDDEN: "SUBMISSION_FORBIDDEN",

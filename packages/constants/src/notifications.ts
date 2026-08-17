@@ -21,6 +21,13 @@ export const NOTIFICATION_TYPES = {
   // added ahead of its producer, the same order app.notifications itself was built in (see
   // docs/architecture/SAD_21_notification_dispatch_flow.md).
   ADMIN_ANNOUNCEMENT: "ADMIN_ANNOUNCEMENT",
+  // ST-194. The non-mandatory sibling of ADMIN_ANNOUNCEMENT: a school/role/class-targeted notice a
+  // recipient *can* disable via notification preferences, unlike ADMIN_ANNOUNCEMENT. Exists because
+  // ADMIN_ANNOUNCEMENT is the platform's only MANDATORY_NOTIFICATION_TYPES entry — routing every
+  // announcement through it would make the compose UI's "mandatory" toggle a no-op. Mirrored in
+  // app.notification_type by migration 000104. Sent by apps/api/src/modules/announcements (the first
+  // real producer of either announcement type).
+  ANNOUNCEMENT: "ANNOUNCEMENT",
   // Raised by the file-scan worker when ClamAV flags a confirmed material. Tells the uploader the
   // file was blocked and will never be served. Mirrored in app.notification_type by 000088.
   MATERIAL_SCAN_QUARANTINED: "MATERIAL_SCAN_QUARANTINED",
@@ -57,6 +64,11 @@ export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICA
  * Empty until ADMIN_ANNOUNCEMENT existed to put in it — see URGENT_NOTIFICATION_TYPES in
  * apps/workers/src/queues/notifications/quiet-hours.ts for the same "empty is a deliberate answer"
  * shape applied to a different question.
+ *
+ * ANNOUNCEMENT is deliberately absent: it is ADMIN_ANNOUNCEMENT's non-mandatory sibling (ST-194),
+ * the database constraint ck_notification_preferences_mandatory_enabled (migration 000083) only
+ * names ADMIN_ANNOUNCEMENT — so ANNOUNCEMENT staying out of this set matches the database exactly,
+ * not by oversight.
  */
 export const MANDATORY_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
   NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT,
@@ -72,7 +84,10 @@ export const MANDATORY_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new S
  * CERTIFICATE_ISSUED/SUPPORT_MESSAGE are individually significant results a recipient is actively
  * waiting on, and ADMIN_ANNOUNCEMENT is mandatory and therefore always immediate. ATTENDANCE_ALERT is
  * included because a parent digest already exists for it (apps/workers/.../email/digest-producer.ts);
- * the other three are lower-stakes social/catalog updates.
+ * the other three are lower-stakes social/catalog updates. ANNOUNCEMENT is excluded too, on purpose:
+ * even a non-mandatory school notice loses the point of being timely if it can sit in a batch until
+ * the next digest window, so it stays immediate-only like its mandatory sibling — a recipient's only
+ * lever is the enabled/disabled toggle, not delay.
  *
  * Mirrored in ck_notification_preferences_digest_eligible (migration 000083) for the same
  * lockstep reason MANDATORY_NOTIFICATION_TYPES is.

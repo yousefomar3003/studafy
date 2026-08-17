@@ -34,6 +34,7 @@ const ImportStudentsPage = lazy(() => import("../features/admin/students/ImportS
 const TimetableBuilderPage = lazy(() => import("../features/admin/timetable/TimetableBuilderPage"));
 const SchoolSettingsPage = lazy(() => import("../features/admin/settings/SchoolSettingsPage"));
 const AuditLogExplorerPage = lazy(() => import("../features/admin/audit/AuditLogExplorerPage"));
+const AnnouncementsPage = lazy(() => import("../features/admin/announcements/AnnouncementsPage"));
 const ApprovalsPage = lazy(() => import("../routes/portal/ApprovalsPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
@@ -181,6 +182,16 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.AUDIT_LOG_READ}>
                 <AuditLogExplorerPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `notification:manage`, matching the API's own route
+            // (apps/api/src/modules/announcements/routes.ts) rather than `organization:manageSettings`.
+            path: "admin/announcements",
+            element: (
+              <RequirePermission permission={PERMISSIONS.NOTIFICATION_MANAGE}>
+                <AnnouncementsPage />
               </RequirePermission>
             ),
           },

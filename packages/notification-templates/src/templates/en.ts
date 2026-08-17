@@ -60,6 +60,11 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "Announcement: {title}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{title}\n\n{summary}",
   },
+  [NOTIFICATION_TYPES.ANNOUNCEMENT]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{title}",
+    [NOTIFICATION_CHANNELS.PUSH]: "Announcement: {title}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "{title}\n\n{summary}",
+  },
   [NOTIFICATION_TYPES.MATERIAL_SCAN_QUARANTINED]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "{fileName} was blocked by a malware scan",
     [NOTIFICATION_CHANNELS.PUSH]: "Upload blocked: {fileName}",

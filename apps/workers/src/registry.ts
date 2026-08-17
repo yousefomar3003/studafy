@@ -8,6 +8,7 @@ import { workerLogger } from "./log";
 import { enqueueAiIngestion } from "./queues/ai-ingestion/enqueue";
 import { createTenantSemaphore } from "./queues/ai-ingestion/semaphore";
 import { processIngestJob } from "./queues/ai-ingestion/worker";
+import { publishDueAnnouncements } from "./queues/announcements";
 import { billingDeadLetterListener, processBillingJob } from "./queues/billing";
 import { createDerivationS3, processMaterialDerivation } from "./queues/derivations";
 import { createAnthropicClient } from "./queues/exam-generation/anthropic-client";
@@ -275,6 +276,15 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           });
         }
         return { processed: false, reason: "missing job data" };
+      }
+
+      if (job.name === JOB_NAMES.PUBLISH_DUE_ANNOUNCEMENTS) {
+        const sql = postgres(databaseUrl, { max: 4, idle_timeout: 20, prepare: false });
+        try {
+          return await publishDueAnnouncements(sql, new Date(), workerLogger);
+        } finally {
+          await sql.end({ timeout: 5 });
+        }
       }
 
       if (job.name === JOB_NAMES.SEND_DIGESTS) {

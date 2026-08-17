@@ -23,6 +23,7 @@
     "@aws-sdk/s3-request-presigner": "3.1097.0",
     "@hono/zod-openapi": "1.5.1",
     "@scalar/hono-api-reference": "0.11.11",
+    "@studafy/announcements": "workspace:*",
     "@studafy/attendance-reporting": "workspace:*",
     "@studafy/audit-reporting": "workspace:*",
     "@studafy/billing": "workspace:*",

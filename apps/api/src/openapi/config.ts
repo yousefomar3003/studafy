@@ -161,6 +161,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "download URLs expire after a short window.",
     },
     {
+      name: "Announcements",
+      description:
+        "Compose and publish school/role/class-targeted announcements, with an optional mandatory " +
+        "flag, optional scheduled publishing, and a paginated history carrying reach stats. " +
+        "Authenticated and permission-gated.",
+    },
+    {
       name: "Assignments",
       description:
         "Class-scoped coursework. Authenticated and tenant-scoped, then scoped again within the " +

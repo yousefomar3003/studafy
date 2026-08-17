@@ -58,6 +58,11 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "إعلان: {title}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{title}\n\n{summary}",
   },
+  [NOTIFICATION_TYPES.ANNOUNCEMENT]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{title}",
+    [NOTIFICATION_CHANNELS.PUSH]: "إعلان: {title}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "{title}\n\n{summary}",
+  },
   [NOTIFICATION_TYPES.MATERIAL_SCAN_QUARANTINED]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "تم حظر {fileName} بسبب فحص مكافحة الفيروسات",
     [NOTIFICATION_CHANNELS.PUSH]: "تم حظر التحميل: {fileName}",

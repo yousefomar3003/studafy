@@ -55,6 +55,7 @@ import {
   createDeterministicQueryEmbedder,
   createSummaryCache,
 } from "./modules/ai";
+import { announcementRoutes } from "./modules/announcements";
 import {
   attendanceCorrectionRoutes,
   attendanceReportRoutes,
@@ -752,6 +753,13 @@ export function createApp({
   // 'read' audit row (target_table 'audit_logs') inside the same transaction.
   if (database) {
     app.route("/", auditRoutes(database, redis ?? null, storage));
+  }
+
+  // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with
+  // scheduled publishing (apps/workers/src/queues/announcements' sweep claims due rows) and history
+  // reach stats off app.announcement_recipients. Gated on NOTIFICATION_MANAGE.
+  if (database) {
+    app.route("/", announcementRoutes(database));
   }
 
   // Discipline incidents and actions: teacher reporting, principal management (actions,
