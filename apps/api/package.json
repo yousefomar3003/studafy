@@ -14,6 +14,7 @@
     "test:security": "bun test ./tests/security --timeout 90000",
     "test:reports": "bun test ./tests/reports --timeout 90000",
     "test:cross-tenant": "bun test ./tests/security/cross-tenant.test.ts ./tests/security/probe-support.test.ts --timeout 90000",
+    "test:ai-eval": "bun test ./tests/ai-eval --timeout 30000",
     "generate": "bun run openapi:generate",
     "openapi:generate": "bun run scripts/generate-openapi.ts && prettier --write openapi.json"
   },
