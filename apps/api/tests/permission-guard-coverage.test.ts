@@ -191,6 +191,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/reports/export",
   // ST-046x. Audit explorer export queue, gated on AUDIT_LOG_EXPORT via requirePermission.
   "POST /api/audit/logs/export",
+  // ST-194. Announcement composition, gated on NOTIFICATION_MANAGE via requirePermission.
+  "POST /api/announcements",
   // ST-122. Fee schedule generation gated on BILLING_UPDATE via requirePermission middleware.
   "POST /api/finance/fee-schedules/generate",
   // ST-122. Internal API-key-authenticated reconciliation job; listed here for inventory accuracy

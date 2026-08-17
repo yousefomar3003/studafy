@@ -246,6 +246,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // "audit_export_jobs") declares the intent, and like the finance/attendance export routes the
   // enqueue itself emits no app.audit_logs row.
   "POST /api/audit/logs/export",
+  // Announcement management (ST-194). Composing an announcement is audited via
+  // auditAction("insert", "announcements") in modules/announcements/routes.ts.
+  "POST /api/announcements",
   // Fee schedule generation (ST-122). Per-student installments derived from a fee structure.
   // Audit row written by auditAction middleware in installments/routes.ts.
   "POST /api/finance/fee-schedules/generate",

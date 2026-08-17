@@ -54,6 +54,56 @@ exports[`renderNotification — snapshot tests en ATTENDANCE_ALERT / push render
 
 exports[`renderNotification — snapshot tests en ATTENDANCE_ALERT / email renders correctly 1`] = `"This is an attendance alert for Physics. Absences were recorded on 2026-07-28."`;
 
+exports[`renderNotification — snapshot tests en ADMIN_ANNOUNCEMENT / in_app renders correctly 1`] = `"Campus closed Friday"`;
+
+exports[`renderNotification — snapshot tests en ADMIN_ANNOUNCEMENT / push renders correctly 1`] = `"Announcement: Campus closed Friday"`;
+
+exports[`renderNotification — snapshot tests en ADMIN_ANNOUNCEMENT / email renders correctly 1`] = `
+"Campus closed Friday
+
+The campus will be closed for maintenance on Friday. Classes resume Monday."
+`;
+
+exports[`renderNotification — snapshot tests en ANNOUNCEMENT / in_app renders correctly 1`] = `"New library hours starting Monday"`;
+
+exports[`renderNotification — snapshot tests en ANNOUNCEMENT / push renders correctly 1`] = `"Announcement: New library hours starting Monday"`;
+
+exports[`renderNotification — snapshot tests en ANNOUNCEMENT / email renders correctly 1`] = `
+"New library hours starting Monday
+
+The library will now open at 7am on weekdays through the end of term."
+`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_QUARANTINED / in_app renders correctly 1`] = `"eicar-test.txt was blocked by a malware scan"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_QUARANTINED / push renders correctly 1`] = `"Upload blocked: eicar-test.txt"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_QUARANTINED / email renders correctly 1`] = `"Your file "eicar-test.txt" was blocked because it is infected with Win.Test.EICAR_HDB-1. It will not be served."`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_FAILED / in_app renders correctly 1`] = `"notes.pdf could not be scanned"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_FAILED / push renders correctly 1`] = `"Upload not scanned: notes.pdf"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_SCAN_FAILED / email renders correctly 1`] = `"Your file "notes.pdf" could not be scanned and was not made available. Please upload it again."`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_OCR_LOW_CONFIDENCE / in_app renders correctly 1`] = `"scanned-guide.pdf needs a quick review"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_OCR_LOW_CONFIDENCE / push renders correctly 1`] = `"Review needed: scanned-guide.pdf"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_OCR_LOW_CONFIDENCE / email renders correctly 1`] = `"Your file "scanned-guide.pdf" was transcribed automatically, but these pages were hard to read: 2, 4. Please check them."`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGESTED / in_app renders correctly 1`] = `"lecture-notes.pdf is ready for AI search"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGESTED / push renders correctly 1`] = `"Ready for search: lecture-notes.pdf"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGESTED / email renders correctly 1`] = `"Your file "lecture-notes.pdf" has finished processing and is now searchable."`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / in_app renders correctly 1`] = `"lab-manual.pdf could not be made searchable"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / push renders correctly 1`] = `"Processing failed: lab-manual.pdf"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / email renders correctly 1`] = `"Your file "lab-manual.pdf" could not be processed and is not searchable. You can try again from the material page."`;
+
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / in_app renders correctly 1`] = `"موعد تسليم Homework 5 هو 2026-08-15"`;
 
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / push renders correctly 1`] = `"Algebra II — Homework 5 مستحق في 2026-08-15"`;
@@ -108,16 +158,6 @@ exports[`renderNotification — snapshot tests ar ATTENDANCE_ALERT / push render
 
 exports[`renderNotification — snapshot tests ar ATTENDANCE_ALERT / email renders correctly 1`] = `"هذا تنبيه حضور لمادة Physics. تم تسجيل غيابات في 2026-07-28."`;
 
-exports[`renderNotification — snapshot tests en ADMIN_ANNOUNCEMENT / in_app renders correctly 1`] = `"Campus closed Friday"`;
-
-exports[`renderNotification — snapshot tests en ADMIN_ANNOUNCEMENT / push renders correctly 1`] = `"Announcement: Campus closed Friday"`;
-
-exports[`renderNotification — snapshot tests en ADMIN_ANNOUNCEMENT / email renders correctly 1`] = `
-"Campus closed Friday
-
-The campus will be closed for maintenance on Friday. Classes resume Monday."
-`;
-
 exports[`renderNotification — snapshot tests ar ADMIN_ANNOUNCEMENT / in_app renders correctly 1`] = `"Campus closed Friday"`;
 
 exports[`renderNotification — snapshot tests ar ADMIN_ANNOUNCEMENT / push renders correctly 1`] = `"إعلان: Campus closed Friday"`;
@@ -128,17 +168,15 @@ exports[`renderNotification — snapshot tests ar ADMIN_ANNOUNCEMENT / email ren
 The campus will be closed for maintenance on Friday. Classes resume Monday."
 `;
 
-exports[`renderNotification — snapshot tests en MATERIAL_SCAN_QUARANTINED / in_app renders correctly 1`] = `"eicar-test.txt was blocked by a malware scan"`;
+exports[`renderNotification — snapshot tests ar ANNOUNCEMENT / in_app renders correctly 1`] = `"New library hours starting Monday"`;
 
-exports[`renderNotification — snapshot tests en MATERIAL_SCAN_QUARANTINED / push renders correctly 1`] = `"Upload blocked: eicar-test.txt"`;
+exports[`renderNotification — snapshot tests ar ANNOUNCEMENT / push renders correctly 1`] = `"إعلان: New library hours starting Monday"`;
 
-exports[`renderNotification — snapshot tests en MATERIAL_SCAN_QUARANTINED / email renders correctly 1`] = `"Your file "eicar-test.txt" was blocked because it is infected with Win.Test.EICAR_HDB-1. It will not be served."`;
+exports[`renderNotification — snapshot tests ar ANNOUNCEMENT / email renders correctly 1`] = `
+"New library hours starting Monday
 
-exports[`renderNotification — snapshot tests en MATERIAL_SCAN_FAILED / in_app renders correctly 1`] = `"notes.pdf could not be scanned"`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_SCAN_FAILED / push renders correctly 1`] = `"Upload not scanned: notes.pdf"`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_SCAN_FAILED / email renders correctly 1`] = `"Your file "notes.pdf" could not be scanned and was not made available. Please upload it again."`;
+The library will now open at 7am on weekdays through the end of term."
+`;
 
 exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_QUARANTINED / in_app renders correctly 1`] = `"تم حظر eicar-test.txt بسبب فحص مكافحة الفيروسات"`;
 
@@ -152,29 +190,11 @@ exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_FAILED / push re
 
 exports[`renderNotification — snapshot tests ar MATERIAL_SCAN_FAILED / email renders correctly 1`] = `"تعذر فحص ملف "notes.pdf" ولم يتم نشره. يرجى إعادة تحميله."`;
 
-exports[`renderNotification — snapshot tests en MATERIAL_OCR_LOW_CONFIDENCE / in_app renders correctly 1`] = `"scanned-guide.pdf needs a quick review"`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_OCR_LOW_CONFIDENCE / push renders correctly 1`] = `"Review needed: scanned-guide.pdf"`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_OCR_LOW_CONFIDENCE / email renders correctly 1`] = `"Your file "scanned-guide.pdf" was transcribed automatically, but these pages were hard to read: 2, 4. Please check them."`;
-
 exports[`renderNotification — snapshot tests ar MATERIAL_OCR_LOW_CONFIDENCE / in_app renders correctly 1`] = `"يتطلب scanned-guide.pdf مراجعة سريعة"`;
 
 exports[`renderNotification — snapshot tests ar MATERIAL_OCR_LOW_CONFIDENCE / push renders correctly 1`] = `"مراجعة مطلوبة: scanned-guide.pdf"`;
 
 exports[`renderNotification — snapshot tests ar MATERIAL_OCR_LOW_CONFIDENCE / email renders correctly 1`] = `"تم تحويل ملف "scanned-guide.pdf" تلقائيًا، لكن الصفحات التالية كانت صعبة القراءة: 2, 4. يرجى مراجعتها."`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_INGESTED / in_app renders correctly 1`] = `"lecture-notes.pdf is ready for AI search"`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_INGESTED / push renders correctly 1`] = `"Ready for search: lecture-notes.pdf"`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_INGESTED / email renders correctly 1`] = `"Your file "lecture-notes.pdf" has finished processing and is now searchable."`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / in_app renders correctly 1`] = `"lab-manual.pdf could not be made searchable"`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / push renders correctly 1`] = `"Processing failed: lab-manual.pdf"`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / email renders correctly 1`] = `"Your file "lab-manual.pdf" could not be processed and is not searchable. You can try again from the material page."`;
 
 exports[`renderNotification — snapshot tests ar MATERIAL_INGESTED / in_app renders correctly 1`] = `"lecture-notes.pdf جاهز للبحث الذكي"`;
 

@@ -127,6 +127,10 @@ describe("renderNotification — snapshot tests", () => {
       title: "Campus closed Friday",
       summary: "The campus will be closed for maintenance on Friday. Classes resume Monday.",
     },
+    [NOTIFICATION_TYPES.ANNOUNCEMENT]: {
+      title: "New library hours starting Monday",
+      summary: "The library will now open at 7am on weekdays through the end of term.",
+    },
     [NOTIFICATION_TYPES.MATERIAL_SCAN_QUARANTINED]: {
       fileName: "eicar-test.txt",
       virus: "Win.Test.EICAR_HDB-1",

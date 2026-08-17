@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
+import { scheduleAnnouncementPublishJob } from "./queues/announcements";
 import {
   scheduleDunningJob,
   scheduleSeatReconciliationJob,
@@ -142,6 +143,14 @@ void scheduleReportExpiryJob(reportExpiryRedis).then(() => reportExpiryRedis.dis
 const abandonedImportSweepRedis = createRedisConnection(env);
 void scheduleAbandonedImportSweepJob(abandonedImportSweepRedis).then(() =>
   abandonedImportSweepRedis.disconnect(),
+);
+
+// Announcement publish-sweep scheduler (ST-194): idempotently register the every-5-minutes claim of
+// due `scheduled` announcements on the notifications queue, so a scheduled announcement publishes
+// close to its chosen instant without a school having to depend on someone opening the admin UI.
+const announcementPublishRedis = createRedisConnection(env);
+void scheduleAnnouncementPublishJob(announcementPublishRedis).then(() =>
+  announcementPublishRedis.disconnect(),
 );
 
 console.log(

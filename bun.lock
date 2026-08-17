@@ -25,6 +25,7 @@
         "@aws-sdk/s3-request-presigner": "3.1097.0",
         "@hono/zod-openapi": "1.5.1",
         "@scalar/hono-api-reference": "0.11.11",
+        "@studafy/announcements": "workspace:*",
         "@studafy/attendance-reporting": "workspace:*",
         "@studafy/audit-reporting": "workspace:*",
         "@studafy/billing": "workspace:*",
@@ -109,6 +110,7 @@
         "@fontsource/noto-sans-arabic": "5.3.0",
         "@napi-rs/canvas": "1.0.3",
         "@pdf-lib/fontkit": "1.1.1",
+        "@studafy/announcements": "workspace:*",
         "@studafy/attendance-reporting": "workspace:*",
         "@studafy/audit-reporting": "workspace:*",
         "@studafy/billing": "workspace:*",
@@ -132,6 +134,19 @@
         "unpdf": "1.8.0",
         "uuid": "11.1.0",
         "zod": "4.1.12",
+      },
+      "devDependencies": {
+        "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
+        "@types/bun": "1.3.14",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/announcements": {
+      "name": "@studafy/announcements",
+      "version": "0.0.0",
+      "dependencies": {
+        "postgres": "3.4.9",
       },
       "devDependencies": {
         "@studafy/config": "workspace:*",
@@ -771,6 +786,8 @@
     "@storybook/react-dom-shim": ["@storybook/react-dom-shim@9.1.13", "", { "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0-beta", "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0-beta", "storybook": "^9.1.13" } }, "sha512-/tMr9TmV3+98GEQO0S03k4gtKHGCpv9+k9Dmnv+TJK3TBz7QsaFEzMwe3gCgoTaebLACyVveDiZkWnCYAWB6NA=="],
 
     "@storybook/react-vite": ["@storybook/react-vite@9.1.13", "", { "dependencies": { "@joshwooding/vite-plugin-react-docgen-typescript": "0.6.1", "@rollup/pluginutils": "^5.0.2", "@storybook/builder-vite": "9.1.13", "@storybook/react": "9.1.13", "find-up": "^7.0.0", "magic-string": "^0.30.0", "react-docgen": "^8.0.0", "resolve": "^1.22.8", "tsconfig-paths": "^4.2.0" }, "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0-beta", "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0-beta", "storybook": "^9.1.13", "vite": "^5.0.0 || ^6.0.0 || ^7.0.0" } }, "sha512-mV1bZ1bpkNQygnuDo1xMGAS5ZXuoXFF0WGmr/BzNDGmRhZ1K1HQh42kC0w3PklckFBUwCFxmP58ZwTFzf+/dJA=="],
+
+    "@studafy/announcements": ["@studafy/announcements@workspace:packages/announcements"],
 
     "@studafy/api": ["@studafy/api@workspace:apps/api"],
 

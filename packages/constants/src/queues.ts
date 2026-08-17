@@ -131,6 +131,12 @@ export const JOB_NAMES = {
   // by its `generating` status, so a retried job re-attempts the same generation rather than
   // creating a duplicate session.
   GENERATE_EXAM: "generate-exam",
+  // Scheduled publish sweep for announcements (ST-194). Carries no payload: the sweep reads
+  // app.announcements rows still `scheduled` whose scheduled_at is due, per school, and publishes
+  // each via @studafy/announcements' publishAnnouncement — the same function the API calls
+  // synchronously for an immediate send. Registered on the notifications queue via Job Scheduler,
+  // since it is a notifications-shaped concern, not a report or import one.
+  PUBLISH_DUE_ANNOUNCEMENTS: "publish-due-announcements",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];
