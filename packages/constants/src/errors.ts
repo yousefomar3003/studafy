@@ -347,6 +347,18 @@ export const ERROR_CODES = {
   AI_EXAM_EXPIRED: "AI_EXAM_EXPIRED",
   AI_EXAM_GENERATION_UNAVAILABLE: "AI_EXAM_GENERATION_UNAVAILABLE",
 
+  // AI content moderation. AI_MODERATION_INPUT_BLOCKED is the question-side guard: the student's
+  // text violated the age-appropriate content policy before the LLM was called.
+  // AI_MODERATION_OUTPUT_BLOCKED is the generation-side guard: the model's answer violated the
+  // same policy and was withheld from the student. Both carry a category key (profanity,
+  // hate_speech, self_harm, sexual_content, violence, pii_sharing) so the client can show
+  // the matching guidance. AI_ANSWER_REPORTED is the confirmation a student's report landed;
+  // AI_REPORT_NOT_FOUND covers a lookup on the teacher review surface.
+  AI_MODERATION_INPUT_BLOCKED: "AI_MODERATION_INPUT_BLOCKED",
+  AI_MODERATION_OUTPUT_BLOCKED: "AI_MODERATION_OUTPUT_BLOCKED",
+  AI_ANSWER_REPORTED: "AI_ANSWER_REPORTED",
+  AI_REPORT_NOT_FOUND: "AI_REPORT_NOT_FOUND",
+
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",

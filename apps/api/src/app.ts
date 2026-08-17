@@ -45,6 +45,7 @@ import {
   aiFlashcardRoutes,
   aiGatewayRoutes,
   aiQuizRoutes,
+  aiReportRoutes,
   aiRetrievalRoutes,
   aiSummaryRoutes,
   aiUsageRoutes,
@@ -985,6 +986,9 @@ export function createApp({
         modelOverrides: aiLlmModelOverrides,
       }),
     );
+    // Answer report route. Students flag AI answers for teacher review. No LLM call, no quota
+    // spend — the route only writes to app.ai_answer_reports.
+    app.route("/", aiReportRoutes({ database }));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:

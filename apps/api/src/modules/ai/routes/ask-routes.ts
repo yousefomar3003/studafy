@@ -14,10 +14,12 @@ import { resolveCitations, type Citation } from "../ask/citations";
 import { persistAskMessage, resolveConversation } from "../ask/persistence";
 import { assembleGroundedPrompt, toGroundedSources } from "../ask/prompt";
 import { assessGrounding, type NearestTopic } from "../ask/refusal";
-import { AI_ASK_QUESTION_MAX_CHARS, AI_ASK_SOURCE_LIMIT } from "../config";
+import { AI_ASK_QUESTION_MAX_CHARS, AI_ASK_SOURCE_LIMIT, AI_EXPLAIN_LEVELS } from "../config";
 import { getAiQuota } from "../gate/entitlement-gate";
 import { LlmProviderError } from "../llm/provider";
 import { AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
+import { moderateInput, moderateOutput, textHash, type AgeLevel } from "../moderation/moderate";
+import { persistModerationDecision } from "../moderation/persistence";
 import { hybridSearch } from "../retrieval/search";
 import { recordDurableUsage } from "../usage/durable";
 
@@ -134,6 +136,13 @@ const askErrorEventSchema = z.object({
   message: z.string(),
 });
 
+const askModerationBlockedEventSchema = z.object({
+  code: z.string(),
+  category: z.string(),
+  guidance: z.string(),
+  phase: z.enum(["input", "output"]),
+});
+
 const askBodySchema = z.object({
   question: z
     .string()
@@ -153,6 +162,16 @@ const askBodySchema = z.object({
         "Continue an existing conversation. When omitted, a new conversation is created and its " +
         "id is returned in the sources and done events.",
       example: "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12",
+    }),
+  level: z
+    .enum(AI_EXPLAIN_LEVELS)
+    .optional()
+    .default("high")
+    .openapi({
+      description:
+        "The student's age-appropriate level for content moderation. Determines how strict the " +
+        "content filter is: 'elementary' is strictest, 'high' is most permissive. Defaults to 'high'.",
+      example: "middle",
     }),
 });
 
@@ -207,6 +226,10 @@ const askRoute = createRoute({
             z.object({ event: z.literal("delta"), data: askDeltaEventSchema }),
             z.object({ event: z.literal("done"), data: askDoneEventSchema }),
             z.object({ event: z.literal("refusal"), data: askRefusalEventSchema }),
+            z.object({
+              event: z.literal("moderation_blocked"),
+              data: askModerationBlockedEventSchema,
+            }),
             z.object({ event: z.literal("error"), data: askErrorEventSchema }),
           ]),
         },
@@ -325,6 +348,30 @@ export function aiAskRoutes(deps: {
 
     const routed = resolveAiModel("ask", modelOverrides);
 
+    // Input moderation: check the student's question against the age-appropriate content policy
+    // before any expensive work (retrieval, conversation resolution). Blocks with a problem+json
+    // response — no LLM call, no message persisted.
+    const inputModeration = moderateInput(body.question, body.level as AgeLevel);
+    if (inputModeration.blocked) {
+      await withTenantTx(database, tenantFrom(c), async (tx) => {
+        await persistModerationDecision(tx, {
+          schoolId: auth.schoolId,
+          studentId,
+          messageId: null,
+          phase: "input",
+          textHash: textHash(body.question),
+          blocked: true,
+          category: inputModeration.category ?? null,
+        });
+      });
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.AI_MODERATION_INPUT_BLOCKED,
+        inputModeration.guidance ??
+          getLocalizedMessage(ERROR_CODES.AI_MODERATION_INPUT_BLOCKED, locale),
+      );
+    }
+
     // Pre-flight: every remaining thing that can fail before the stream opens — retrieval and
     // conversation resolution — runs here, so its failures are ordinary problem+json responses.
     // It is one short tenant transaction; the provider call (tens of seconds) never holds a
@@ -408,6 +455,38 @@ export function aiAskRoutes(deps: {
           }
 
           const citations: Citation[] = resolveCitations(text, sources);
+
+          // Output moderation: check the model's generation against the age-appropriate content
+          // policy. If blocked, the message is not persisted, the quota is released, and a
+          // moderation_blocked event is sent. The student may have seen partial deltas — the client
+          // should clear any rendered content upon receiving this event.
+          const outputModeration = moderateOutput(text, body.level as AgeLevel);
+          if (outputModeration.blocked) {
+            await withTenantTx(database, tenantFrom(c), async (tx) => {
+              await persistModerationDecision(tx, {
+                schoolId: auth.schoolId,
+                studentId,
+                messageId: null,
+                phase: "output",
+                textHash: textHash(text),
+                blocked: true,
+                category: outputModeration.category ?? null,
+              });
+            });
+            await stream.writeSSE({
+              event: "moderation_blocked",
+              data: JSON.stringify({
+                code: ERROR_CODES.AI_MODERATION_OUTPUT_BLOCKED,
+                category: outputModeration.category ?? "unknown",
+                guidance:
+                  outputModeration.guidance ??
+                  getLocalizedMessage(ERROR_CODES.AI_MODERATION_OUTPUT_BLOCKED, locale),
+                phase: "output",
+              }),
+            });
+            await quota.release();
+            return;
+          }
 
           const messageId = await withTenantTx(database, tenantFrom(c), async (tx) => {
             await recordDurableUsage(tx, auth.schoolId, studentId, usage.totalTokens);
