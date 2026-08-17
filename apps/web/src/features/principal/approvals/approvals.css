@@ -1,0 +1,66 @@
+/**
+ * Approval queue screens. `@studafy/ui`'s Table and Modal supply their own chrome; everything here
+ * is feature-specific layout, styled with the same design tokens the rest of the portal shell uses
+ * (see `features/admin/invitations/invitations.css`, which this mirrors).
+ */
+
+.approvals-queue__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-16);
+}
+
+.approvals-queue__select-checkbox {
+  width: var(--space-16);
+  height: var(--space-16);
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.approvals-queue__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.approvals-queue__row-error {
+  margin: var(--space-4) 0 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+/* Reject-reason textarea — reuses Input's `.sf-input`/`.sf-input__control` chrome (see
+ * packages/ui/src/components/input/input.css) since there is no Textarea primitive in the design
+ * system; `align-items: stretch` overrides Input's single-line `center` so a multi-row textarea
+ * doesn't get squeezed against the wrapper's vertical center (same fix
+ * `invitations-recipients-input` applies for the bulk-invite textarea). */
+.approvals-reason-input {
+  align-items: stretch;
+  padding-block: var(--space-8);
+}
+
+.approvals-reason-input .sf-input__control {
+  resize: vertical;
+  min-height: 4lh;
+  padding-block: 0;
+}
+
+/* Diff modal */
+
+.approvals-diff__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  margin: 0 0 var(--space-16);
+}
+
+.approvals-diff__meta dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.approvals-diff__meta dd {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
