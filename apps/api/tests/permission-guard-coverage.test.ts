@@ -297,6 +297,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/ai/students/{studentId}/exams",
   "POST /api/ai/students/{studentId}/exams/{examId}/start",
   "POST /api/ai/students/{studentId}/exams/{examId}/submit",
+  // Answer report (ST-172). Self-service: student reports their own AI answer; caller's identity
+  // is sufficient authorization — no cross-user row-level permission.
+  "POST /api/ai/students/{studentId}/messages/{messageId}/report",
 ];
 
 /**
@@ -457,6 +460,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/ai/students/{studentId}/exams",
   "POST /api/ai/students/{studentId}/exams/{examId}/start",
   "POST /api/ai/students/{studentId}/exams/{examId}/submit",
+  // Answer report (ST-172) — same gate, same RLS. Writes the student's own report row;
+  // self-service: the reporter must be the authenticated student (auth.userId === studentId check).
+  "POST /api/ai/students/{studentId}/messages/{messageId}/report",
 ]);
 
 // ---------------------------------------------------------------------------
