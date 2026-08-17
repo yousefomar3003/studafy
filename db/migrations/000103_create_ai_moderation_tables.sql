@@ -52,12 +52,15 @@ CREATE TABLE app.ai_answer_reports (
   reporter_id    uuid        NOT NULL REFERENCES app.students(id, school_id),
   reason         text        NOT NULL CHECK (length(trim(reason)) > 0),
   status         text        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'dismissed')),
-  reviewed_by    uuid        REFERENCES app.users(id),
+  reviewed_by    uuid,
   reviewed_at    timestamptz,
   created_at     timestamptz NOT NULL DEFAULT now(),
 
   UNIQUE (school_id, message_id, reporter_id),
-  UNIQUE (id, school_id)
+  UNIQUE (id, school_id),
+  CONSTRAINT fk_ai_answer_reports_reviewed_by
+    FOREIGN KEY (reviewed_by, school_id) REFERENCES app.users(id, school_id)
+    ON UPDATE RESTRICT ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_ai_answer_reports_school_status_created
@@ -67,24 +70,17 @@ CREATE INDEX idx_ai_answer_reports_school_message
   ON app.ai_answer_reports (school_id, message_id);
 
 -- ---------------------------------------------------------------------------------------------------
--- 2. RLS policies
+-- 2. Grants and RLS
 -- ---------------------------------------------------------------------------------------------------
 
-ALTER TABLE app.ai_moderation_decisions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE
+  app.ai_moderation_decisions, app.ai_answer_reports
+FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  app.ai_moderation_decisions, app.ai_answer_reports
+TO studafy_app;
 
-CREATE POLICY ai_moderation_decisions_isolation ON app.ai_moderation_decisions
-  USING (school_id = current_setting('app.school_id', true)::uuid);
-
-ALTER TABLE app.ai_answer_reports ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY ai_answer_reports_isolation ON app.ai_answer_reports
-  USING (school_id = current_setting('app.school_id', true)::uuid);
-
--- ---------------------------------------------------------------------------------------------------
--- 3. Grants
--- ---------------------------------------------------------------------------------------------------
-
-GRANT SELECT, INSERT, UPDATE ON app.ai_moderation_decisions TO studafy_app;
-GRANT SELECT, INSERT, UPDATE ON app.ai_answer_reports TO studafy_app;
+SELECT app.apply_tenant_isolation('app', 'ai_moderation_decisions');
+SELECT app.apply_tenant_isolation('app', 'ai_answer_reports');
 
 RESET ROLE;
