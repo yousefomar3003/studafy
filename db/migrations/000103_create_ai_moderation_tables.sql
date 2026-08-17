@@ -23,9 +23,9 @@ SET ROLE studafy_admin;
 
 CREATE TABLE app.ai_moderation_decisions (
   id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  school_id      uuid        NOT NULL REFERENCES app.schools(id),
-  student_id     uuid        NOT NULL REFERENCES app.students(id, school_id),
-  message_id     uuid        REFERENCES app.ai_messages(id, school_id),
+  school_id      uuid        NOT NULL,
+  student_id     uuid        NOT NULL,
+  message_id     uuid,
   phase          text        NOT NULL CHECK (phase IN ('input', 'output')),
   text_hash      text        NOT NULL,
   blocked        boolean     NOT NULL,
@@ -34,7 +34,17 @@ CREATE TABLE app.ai_moderation_decisions (
   )),
   created_at     timestamptz NOT NULL DEFAULT now(),
 
-  UNIQUE (id, school_id)
+  UNIQUE (id, school_id),
+
+  CONSTRAINT fk_ai_moderation_decisions_school
+    FOREIGN KEY (school_id) REFERENCES app.schools(id)
+    ON UPDATE RESTRICT ON DELETE RESTRICT,
+  CONSTRAINT fk_ai_moderation_decisions_student
+    FOREIGN KEY (student_id, school_id) REFERENCES app.students(id, school_id)
+    ON UPDATE RESTRICT ON DELETE RESTRICT,
+  CONSTRAINT fk_ai_moderation_decisions_message
+    FOREIGN KEY (message_id, school_id) REFERENCES app.ai_messages(id, school_id)
+    ON UPDATE RESTRICT ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_ai_moderation_decisions_school_student_created
@@ -46,10 +56,10 @@ CREATE INDEX idx_ai_moderation_decisions_school_message
 
 CREATE TABLE app.ai_answer_reports (
   id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  school_id      uuid        NOT NULL REFERENCES app.schools(id),
-  student_id     uuid        NOT NULL REFERENCES app.students(id, school_id),
-  message_id     uuid        NOT NULL REFERENCES app.ai_messages(id, school_id),
-  reporter_id    uuid        NOT NULL REFERENCES app.students(id, school_id),
+  school_id      uuid        NOT NULL,
+  student_id     uuid        NOT NULL,
+  message_id     uuid        NOT NULL,
+  reporter_id    uuid        NOT NULL,
   reason         text        NOT NULL CHECK (length(trim(reason)) > 0),
   status         text        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'dismissed')),
   reviewed_by    uuid,
@@ -58,6 +68,19 @@ CREATE TABLE app.ai_answer_reports (
 
   UNIQUE (school_id, message_id, reporter_id),
   UNIQUE (id, school_id),
+
+  CONSTRAINT fk_ai_answer_reports_school
+    FOREIGN KEY (school_id) REFERENCES app.schools(id)
+    ON UPDATE RESTRICT ON DELETE RESTRICT,
+  CONSTRAINT fk_ai_answer_reports_student
+    FOREIGN KEY (student_id, school_id) REFERENCES app.students(id, school_id)
+    ON UPDATE RESTRICT ON DELETE RESTRICT,
+  CONSTRAINT fk_ai_answer_reports_message
+    FOREIGN KEY (message_id, school_id) REFERENCES app.ai_messages(id, school_id)
+    ON UPDATE RESTRICT ON DELETE RESTRICT,
+  CONSTRAINT fk_ai_answer_reports_reporter
+    FOREIGN KEY (reporter_id, school_id) REFERENCES app.students(id, school_id)
+    ON UPDATE RESTRICT ON DELETE RESTRICT,
   CONSTRAINT fk_ai_answer_reports_reviewed_by
     FOREIGN KEY (reviewed_by, school_id) REFERENCES app.users(id, school_id)
     ON UPDATE RESTRICT ON DELETE RESTRICT
