@@ -36,7 +36,10 @@ const SchoolSettingsPage = lazy(() => import("../features/admin/settings/SchoolS
 const AuditLogExplorerPage = lazy(() => import("../features/admin/audit/AuditLogExplorerPage"));
 const AnnouncementsPage = lazy(() => import("../features/admin/announcements/AnnouncementsPage"));
 const PrincipalDashboardPage = lazy(() => import("../features/principal/PrincipalDashboardPage"));
-const DisciplineIncidentsPage = lazy(() => import("../features/principal/DisciplineIncidentsPage"));
+const IncidentListPage = lazy(() => import("../features/principal/discipline/IncidentListPage"));
+const IncidentDetailPage = lazy(
+  () => import("../features/principal/discipline/IncidentDetailPage"),
+);
 const AttendanceDashboardView = lazy(
   () => import("../features/principal/attendance/views/AttendanceDashboardView"),
 );
@@ -215,7 +218,15 @@ export const routes: RouteObject[] = [
             path: "principal/discipline",
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
-                <DisciplineIncidentsPage />
+                <IncidentListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/discipline/:incidentId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <IncidentDetailPage />
               </RequirePermission>
             ),
           },

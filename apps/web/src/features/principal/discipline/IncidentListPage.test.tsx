@@ -29,10 +29,10 @@ function incident(overrides: Partial<Record<string, unknown>> = {}) {
 const getMock = mock((_path: string, _init?: { params?: { query?: unknown } }) =>
   Promise.resolve<unknown>({ data: { incidents: [], total: 0 } }),
 );
-mock.module("../../lib/api", () => ({ api: { GET: getMock } }));
+mock.module("../../../lib/api", () => ({ api: { GET: getMock } }));
 
-const loadDisciplineIncidentsPage = async (): Promise<ComponentType> =>
-  (await import("./DisciplineIncidentsPage")).default;
+const loadIncidentListPage = async (): Promise<ComponentType> =>
+  (await import("./IncidentListPage")).default;
 
 function renderPage(Page: ComponentType) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -50,12 +50,29 @@ afterEach(() => {
   getMock.mockReset();
 });
 
-describe("DisciplineIncidentsPage", () => {
-  test("defaults to the open filter and merges every open status", async () => {
+describe("IncidentListPage", () => {
+  test("the inbox tab defaults to open and shows only teacher-reported incidents", async () => {
     getMock.mockImplementation((_path: string, init?: { params?: { query?: unknown } }) => {
       const query = (init?.params?.query ?? {}) as { status?: string };
       if (query.status === "reported") {
         return Promise.resolve({ data: { incidents: [incident()], total: 1 } });
+      }
+      return Promise.resolve({ data: { incidents: [], total: 0 } });
+    });
+
+    renderPage(await loadIncidentListPage());
+
+    expect(
+      screen.getByRole("tab", { name: "Teacher-reported inbox" }).getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(await screen.findByText("Cafeteria altercation")).toBeTruthy();
+  });
+
+  test("switching to the all-incidents tab merges every open status by default", async () => {
+    getMock.mockImplementation((_path: string, init?: { params?: { query?: unknown } }) => {
+      const query = (init?.params?.query ?? {}) as { status?: string };
+      if (query.status === "reported") {
+        return Promise.resolve({ data: { incidents: [], total: 0 } });
       }
       if (query.status === "escalated") {
         return Promise.resolve({
@@ -66,7 +83,6 @@ describe("DisciplineIncidentsPage", () => {
                 title: "Repeated tardiness",
                 severity: "moderate",
                 status: "escalated",
-                incident_at: "2026-08-10T10:00:00.000Z",
               }),
             ],
             total: 1,
@@ -76,40 +92,33 @@ describe("DisciplineIncidentsPage", () => {
       return Promise.resolve({ data: { incidents: [], total: 0 } });
     });
 
-    renderPage(await loadDisciplineIncidentsPage());
+    renderPage(await loadIncidentListPage());
 
-    expect(await screen.findByText("Cafeteria altercation")).toBeTruthy();
-    expect(screen.getByText("Repeated tardiness")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "All incidents" }));
+
+    expect(await screen.findByText("Repeated tardiness")).toBeTruthy();
   });
 
   test("renders the empty state when nothing matches", async () => {
     getMock.mockImplementation(() => Promise.resolve({ data: { incidents: [], total: 0 } }));
 
-    renderPage(await loadDisciplineIncidentsPage());
+    renderPage(await loadIncidentListPage());
 
-    expect(await screen.findByText("No incidents match this filter.")).toBeTruthy();
+    expect(await screen.findByText("No incidents are waiting for triage.")).toBeTruthy();
   });
 
-  test("switching the status filter re-queries a single status", async () => {
+  test("a row's title links to the incident detail page", async () => {
     getMock.mockImplementation((_path: string, init?: { params?: { query?: unknown } }) => {
       const query = (init?.params?.query ?? {}) as { status?: string };
-      if (query.status === "resolved") {
-        return Promise.resolve({
-          data: {
-            incidents: [incident({ id: "incident-3", title: "Resolved case", status: "resolved" })],
-            total: 1,
-          },
-        });
+      if (query.status === "reported") {
+        return Promise.resolve({ data: { incidents: [incident()], total: 1 } });
       }
       return Promise.resolve({ data: { incidents: [], total: 0 } });
     });
 
-    renderPage(await loadDisciplineIncidentsPage());
-    await screen.findByText("No incidents match this filter.");
+    renderPage(await loadIncidentListPage());
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Status" }));
-    fireEvent.click(screen.getByRole("option", { name: "Resolved" }));
-
-    expect(await screen.findByText("Resolved case")).toBeTruthy();
+    const link = await screen.findByRole("link", { name: "Cafeteria altercation" });
+    expect(link.getAttribute("href")).toBe("/portal/principal/discipline/incident-1");
   });
 });
