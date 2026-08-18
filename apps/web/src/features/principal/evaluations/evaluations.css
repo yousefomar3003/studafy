@@ -1,0 +1,164 @@
+/**
+ * Teacher evaluation screens (list, detail with scoring/narrative/share, criteria template
+ * management). Mirrors `features/principal/discipline/discipline.css` — `@studafy/ui`'s Table,
+ * Modal, and Select supply their own chrome; everything here is feature-specific layout on the same
+ * design tokens the rest of the portal shell uses.
+ */
+
+.evaluations-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.evaluations-list__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+}
+
+.evaluations-list__templates-link {
+  white-space: nowrap;
+}
+
+.evaluations-list__filters {
+  display: flex;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+  max-width: 640px;
+}
+
+.evaluations-list__filters > * {
+  flex: 1;
+}
+
+.evaluations-detail__back {
+  display: inline-block;
+  margin-bottom: var(--space-16);
+}
+
+.evaluations-detail__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  margin: 0 0 var(--space-16);
+}
+
+.evaluations-detail__summary dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.evaluations-detail__summary dd {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.evaluations-detail__section {
+  margin-bottom: var(--space-24);
+}
+
+.evaluations-detail__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-8);
+}
+
+.evaluations-detail__workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-bottom: var(--space-8);
+}
+
+.evaluations-detail__hint {
+  margin: 0 0 var(--space-8);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.evaluations-rating-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.evaluations-rating-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.evaluations-rating-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.evaluations-rating-pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.evaluations-score__title {
+  font-weight: var(--font-weight-medium);
+}
+
+.evaluations-score__description {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.evaluations-autosave {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.evaluations-autosave[data-status="error"] {
+  color: var(--color-danger-subtle-foreground);
+}
+
+.evaluations-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* Narrative/strengths/comments textareas — reuse Input's `.sf-input`/`.sf-input__control` chrome
+ * since there is no Textarea primitive in the design system, the same approach
+ * `discipline-resolution-input` takes. */
+.evaluations-textarea {
+  align-items: stretch;
+  padding-block: var(--space-8);
+}
+
+.evaluations-textarea .sf-input__control {
+  resize: vertical;
+  min-height: 4lh;
+  padding-block: 0;
+}
+
+.evaluations-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.evaluations-history__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+}
+
+.evaluations-history__status {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}

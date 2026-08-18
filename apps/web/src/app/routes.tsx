@@ -43,6 +43,15 @@ const IncidentDetailPage = lazy(
 const AttendanceDashboardView = lazy(
   () => import("../features/principal/attendance/views/AttendanceDashboardView"),
 );
+const EvaluationListPage = lazy(
+  () => import("../features/principal/evaluations/EvaluationListPage"),
+);
+const EvaluationDetailPage = lazy(
+  () => import("../features/principal/evaluations/EvaluationDetailPage"),
+);
+const CriteriaTemplatesPage = lazy(
+  () => import("../features/principal/evaluations/CriteriaTemplatesPage"),
+);
 const ApprovalQueuePage = lazy(() => import("../features/principal/approvals/ApprovalQueuePage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
@@ -235,6 +244,30 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <AttendanceDashboardView />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/evaluations",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <EvaluationListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/evaluations/templates",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <CriteriaTemplatesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/evaluations/:evaluationId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <EvaluationDetailPage />
               </RequirePermission>
             ),
           },
