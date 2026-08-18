@@ -1,0 +1,128 @@
+/**
+ * Finance dashboard page layout and tile-specific content. Shared tile chrome (`dashboard-tile__*`)
+ * lives in `apps/web/src/components/dashboard-tile.css`, imported by `FinanceDashboardPage.tsx`
+ * alongside this file — matching how `principal-dashboard.css` is structured.
+ */
+
+.finance-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-16);
+}
+
+/* Aging buckets chart */
+
+.finance-aging-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  list-style: none;
+  margin: var(--space-8) 0;
+  padding: 0;
+}
+
+.finance-aging-chart__row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr auto;
+  align-items: center;
+  gap: var(--space-8);
+  text-decoration: none;
+  color: inherit;
+}
+
+.finance-aging-chart__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finance-aging-chart__track {
+  height: 10px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  overflow: hidden;
+}
+
+.finance-aging-chart__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--duration-base) var(--easing-standard);
+}
+
+.finance-aging-chart__fill[data-tone="accent"] {
+  background-color: var(--color-accent);
+}
+
+.finance-aging-chart__fill[data-tone="warning"] {
+  background-color: var(--color-warning);
+}
+
+.finance-aging-chart__fill[data-tone="danger"] {
+  background-color: var(--color-danger);
+}
+
+.finance-aging-chart__value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+/* Overdue installments */
+
+.finance-overdue-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  list-style: none;
+  margin: var(--space-8) 0;
+  padding: 0;
+}
+
+.finance-overdue-list__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.finance-overdue-list__party {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.finance-overdue-list__amount {
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+/* Recent payments feed */
+
+.finance-payments-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  list-style: none;
+  margin: var(--space-8) 0;
+  padding: 0;
+}
+
+.finance-payments-feed__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.finance-payments-feed__amount {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finance-aging-chart__fill {
+    transition: none;
+  }
+}

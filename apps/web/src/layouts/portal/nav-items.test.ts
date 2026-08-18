@@ -11,9 +11,9 @@ const idsFor = (roles: readonly string[]) =>
 
 describe("visiblePortalNavItems", () => {
   test.each<[string, string[]]>([
-    ["SUPER_ADMIN", ["home", "admin", "principal", "approvals", "account"]],
-    ["ORG_ADMIN", ["home", "admin", "principal", "approvals", "account"]],
-    ["FINANCE", ["home", "account"]],
+    ["SUPER_ADMIN", ["home", "admin", "principal", "finance", "approvals", "account"]],
+    ["ORG_ADMIN", ["home", "admin", "principal", "finance", "approvals", "account"]],
+    ["FINANCE", ["home", "finance", "account"]],
     ["INSTRUCTOR", ["home", "account"]],
     ["TEACHING_ASSISTANT", ["home", "account"]],
     ["STUDENT", ["home", "account"]],
@@ -33,6 +33,7 @@ describe("visiblePortalNavItems", () => {
       "home",
       "admin",
       "principal",
+      "finance",
       "approvals",
       "account",
     ]);

@@ -53,6 +53,10 @@ const CriteriaTemplatesPage = lazy(
   () => import("../features/principal/evaluations/CriteriaTemplatesPage"),
 );
 const ApprovalQueuePage = lazy(() => import("../features/principal/approvals/ApprovalQueuePage"));
+const FinanceDashboardPage = lazy(() => import("../features/finance/FinanceDashboardPage"));
+const FinanceOverdueInstallmentsPage = lazy(
+  () => import("../features/finance/FinanceOverdueInstallmentsPage"),
+);
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
 /**
@@ -276,6 +280,25 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.APPROVAL_REVIEW}>
                 <ApprovalQueuePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on the same permission the finance report endpoints themselves require
+            // (`REPORT_VIEW_FINANCIAL` — see apps/api/src/modules/finance/reports/routes.ts), which
+            // the FINANCE role and ORG_ADMIN both hold.
+            path: "finance",
+            element: (
+              <RequirePermission permission={PERMISSIONS.REPORT_VIEW_FINANCIAL}>
+                <FinanceDashboardPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "finance/overdue",
+            element: (
+              <RequirePermission permission={PERMISSIONS.REPORT_VIEW_FINANCIAL}>
+                <FinanceOverdueInstallmentsPage />
               </RequirePermission>
             ),
           },

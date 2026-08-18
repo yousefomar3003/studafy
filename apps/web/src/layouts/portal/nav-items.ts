@@ -36,6 +36,14 @@ export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
     requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS,
   },
   {
+    id: "finance",
+    label: "Finance",
+    to: "/portal/finance",
+    // The same permission the finance report endpoints themselves require (see
+    // apps/api/src/modules/finance/reports/routes.ts) — held by FINANCE and ORG_ADMIN.
+    requiredPermission: PERMISSIONS.REPORT_VIEW_FINANCIAL,
+  },
+  {
     id: "approvals",
     label: "Approvals",
     to: "/portal/approvals",
