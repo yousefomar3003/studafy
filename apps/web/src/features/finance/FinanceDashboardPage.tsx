@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import { AgingBucketsChartTile } from "./tiles/AgingBucketsChartTile";
 import { CollectionsVsDueTile } from "./tiles/CollectionsVsDueTile";
 import { OverdueInstallmentsListTile } from "./tiles/OverdueInstallmentsListTile";
@@ -21,6 +23,9 @@ export default function FinanceDashboardPage() {
       <h1>Finance</h1>
       <p>
         Collections vs due this term, receivables aging, overdue installments, and recent payments.
+      </p>
+      <p>
+        <Link to="/portal/finance/fees">Fee structure builder</Link>
       </p>
 
       <div className="finance-dashboard-grid">
