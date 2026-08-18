@@ -191,7 +191,11 @@ export function aiRetrievalRoutes(deps: {
         // limit as before.
         limit: reranker ? RERANK_CANDIDATE_POOL : clampLimit(body.limit),
       });
-      await recordDurableUsage(tx, auth.schoolId, studentId, tokensUsed);
+      await recordDurableUsage(tx, auth.schoolId, studentId, {
+        totalTokens: tokensUsed,
+        smallTokens: tokensUsed,
+        largeTokens: 0,
+      });
       return search;
     });
 

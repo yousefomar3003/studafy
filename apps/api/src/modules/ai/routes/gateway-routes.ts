@@ -12,7 +12,7 @@ import { standardResponses } from "../../../openapi/responses";
 import { getAiQuota } from "../gate/entitlement-gate";
 import { throwLlmError } from "../llm/errors";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
-import { recordDurableUsage } from "../usage/durable";
+import { recordDurableUsage, splitByTier } from "../usage/durable";
 
 import type { Database } from "../../../db/client";
 import type { SupportedLocale } from "../../../middleware/locale";
@@ -214,7 +214,12 @@ export function aiGatewayRoutes(deps: {
       // The provider call deliberately happened outside the transaction above; this short write is
       // all the transaction holds.
       await withTenantTx(database, tenantFrom(c), async (tx) => {
-        await recordDurableUsage(tx, auth.schoolId, studentId, generation.usage.totalTokens);
+        await recordDurableUsage(
+          tx,
+          auth.schoolId,
+          studentId,
+          splitByTier(generation.usage.totalTokens, routed.tier),
+        );
       });
 
       // The gate released the hold if the handler never settled; committing the real cost settles it.

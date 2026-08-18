@@ -46,6 +46,7 @@ import {
   aiGatewayRoutes,
   aiQuizRoutes,
   aiReportRoutes,
+  aiMetricsRoutes,
   aiRetrievalRoutes,
   aiSummaryRoutes,
   aiUsageRoutes,
@@ -997,6 +998,11 @@ export function createApp({
     // Answer report route. Students flag AI answers for teacher review. No LLM call, no quota
     // spend — the route only writes to app.ai_answer_reports.
     app.route("/", aiReportRoutes({ database }));
+    // AI metrics dashboard (ST-155). Cross-tenant per-tenant usage and cost metrics for the
+    // platform team. SUPER_ADMIN only, no quota consumption — the route reads the durable ledger
+    // via withSystemTx (same cross-tenant mechanism as the webhook processor). Mounted outside
+    // the gate's quota reservation via the reserveQuota skip in entitlement-gate.ts.
+    app.route("/", aiMetricsRoutes({ database }));
   }
 
   // The document and the reference site that reads it. Off by default and disabled in production:
