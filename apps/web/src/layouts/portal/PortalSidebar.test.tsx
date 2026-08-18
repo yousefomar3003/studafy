@@ -56,14 +56,14 @@ afterEach(() => {
 
 /** The exact, per-role visible menu — the "snapshot per role" this ticket's AC calls for. */
 describe.each<[string, string[]]>([
-  ["SUPER_ADMIN", ["Home", "Admin", "Principal", "Approvals", "Account"]],
-  ["ORG_ADMIN", ["Home", "Admin", "Principal", "Approvals", "Account"]],
+  ["SUPER_ADMIN", ["Home", "Admin", "Principal", "Finance", "Approvals", "Account"]],
+  ["ORG_ADMIN", ["Home", "Admin", "Principal", "Finance", "Approvals", "Account"]],
   ["INSTRUCTOR", ["Home", "Account"]],
   ["TEACHING_ASSISTANT", ["Home", "Account"]],
   ["STUDENT", ["Home", "Account"]],
   ["PARENT", ["Home", "Account"]],
   ["GUEST", ["Home", "Account"]],
-  ["FINANCE", ["Home", "Account"]],
+  ["FINANCE", ["Home", "Finance", "Account"]],
   ["SUPPORT_AGENT", ["Home", "Account"]],
 ])("PortalSidebar for %s", (role, expectedLabels) => {
   test(`renders exactly ${expectedLabels.join(", ")}`, async () => {
