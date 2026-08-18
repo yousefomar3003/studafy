@@ -1,0 +1,105 @@
+/**
+ * Discipline management screens (incident list/inbox, incident detail, actions, resolution
+ * workflow). `@studafy/ui`'s Table, Tabs, and Modal supply their own chrome; everything here is
+ * feature-specific layout, styled with the same design tokens the rest of the portal shell uses
+ * (see `features/principal/approvals/approvals.css`, which this mirrors).
+ */
+
+.discipline-list__tabs {
+  margin-bottom: var(--space-16);
+}
+
+.discipline-list__filter {
+  margin-bottom: var(--space-16);
+  max-width: 320px;
+}
+
+.discipline-detail__back {
+  display: inline-block;
+  margin-bottom: var(--space-16);
+}
+
+.discipline-detail__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  margin: 0 0 var(--space-16);
+}
+
+.discipline-detail__summary dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.discipline-detail__summary dd {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.discipline-severity-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.discipline-severity-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.discipline-severity-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.discipline-severity-pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.discipline-detail__section {
+  margin-bottom: var(--space-24);
+}
+
+.discipline-detail__actions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-8);
+}
+
+.discipline-detail__workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-bottom: var(--space-8);
+}
+
+.discipline-detail__hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.discipline-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* Resolution-notes textarea — reuses Input's `.sf-input`/`.sf-input__control` chrome (see
+ * packages/ui/src/components/input/input.css) since there is no Textarea primitive in the design
+ * system, the same approach `approvals-reason-input` takes. */
+.discipline-resolution-input {
+  align-items: stretch;
+  padding-block: var(--space-8);
+}
+
+.discipline-resolution-input .sf-input__control {
+  resize: vertical;
+  min-height: 4lh;
+  padding-block: 0;
+}

@@ -19,8 +19,6 @@ mock.module("../../lib/api", () => ({ api: { GET: getMock } }));
 
 const loadPrincipalDashboardPage = async (): Promise<ComponentType> =>
   (await import("./PrincipalDashboardPage")).default;
-const loadDisciplineIncidentsPage = async (): Promise<ComponentType> =>
-  (await import("./DisciplineIncidentsPage")).default;
 const loadAttendanceByClassPage = async (): Promise<ComponentType> =>
   (await import("./AttendanceByClassPage")).default;
 
@@ -59,16 +57,6 @@ describe("principal dashboard accessibility", () => {
 
     const { container } = renderInPortal(await loadPrincipalDashboardPage());
     await screen.findByRole("heading", { name: "Principal" });
-
-    await expectNoA11yViolations(container);
-  });
-
-  test("discipline incidents page", async () => {
-    getMock.mockImplementation(() => Promise.resolve({ data: { incidents: [], total: 0 } }));
-
-    const { container } = renderInPortal(await loadDisciplineIncidentsPage());
-    await screen.findByRole("heading", { name: "Discipline incidents" });
-    await screen.findByText("No incidents match this filter.");
 
     await expectNoA11yViolations(container);
   });
