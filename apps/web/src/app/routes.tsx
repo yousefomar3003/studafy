@@ -57,6 +57,9 @@ const FinanceDashboardPage = lazy(() => import("../features/finance/FinanceDashb
 const FinanceOverdueInstallmentsPage = lazy(
   () => import("../features/finance/FinanceOverdueInstallmentsPage"),
 );
+const FeeStructureBuilderPage = lazy(
+  () => import("../features/finance/fees/FeeStructureBuilderPage"),
+);
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
 /**
@@ -299,6 +302,17 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.REPORT_VIEW_FINANCIAL}>
                 <FinanceOverdueInstallmentsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:update`, matching the fee-structure gateway routes themselves
+            // (apps/api/src/modules/finance/fee-structures/routes.ts) rather than the dashboard's
+            // read-only `report:viewFinancial` — building/editing a structure is a write.
+            path: "finance/fees",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
+                <FeeStructureBuilderPage />
               </RequirePermission>
             ),
           },

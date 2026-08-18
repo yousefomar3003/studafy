@@ -1,0 +1,354 @@
+/**
+ * Fee structure builder screens. Loaded only when `/portal/finance/fees` is, matching the rest of
+ * the app (see `admin/students/students.css`'s doc comment for why each feature owns its own
+ * stylesheet rather than a shared one).
+ */
+
+.fee-builder__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.fee-builder__filter {
+  margin-bottom: var(--space-16);
+  max-width: 320px;
+}
+
+.fee-builder__layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(360px, 2fr);
+  gap: var(--space-24);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .fee-builder__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- List panel --- */
+
+.fee-builder__list-empty {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.fee-builder__list-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fee-builder__list-table th,
+.fee-builder__list-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-8);
+  text-align: start;
+  font-size: var(--font-size-sm);
+}
+
+.fee-builder__list-table thead th {
+  color: var(--color-muted-foreground);
+  font-weight: var(--font-weight-medium);
+}
+
+.fee-builder__list-row-button {
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  padding: 0;
+  text-align: start;
+}
+
+.fee-builder__list-row-button:hover,
+.fee-builder__list-row-button:focus-visible {
+  text-decoration: underline;
+}
+
+.fee-builder__list-row-button[aria-current="true"] {
+  color: var(--color-foreground);
+}
+
+.fee-builder__list-row-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* --- Status pill — shared by the list and the form header --- */
+
+.fee-builder__status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.fee-builder__status-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.fee-builder__status-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.fee-builder__status-pill[data-tone="neutral"] {
+  background-color: var(--color-muted-bg, var(--color-surface));
+  color: var(--color-muted-foreground);
+}
+
+/* --- Form panel --- */
+
+.fee-builder__form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.fee-builder__form-panel form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.fee-builder__form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.fee-builder__form-header h2 {
+  margin: 0;
+}
+
+.fee-builder__readonly-note {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.fee-builder__server-error {
+  color: var(--color-danger-subtle-foreground);
+  background-color: var(--color-danger-subtle-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-8) var(--space-12);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.fee-builder__form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* --- Components editor --- */
+
+.fee-builder__components {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-16);
+  margin: 0;
+}
+
+.fee-builder__components-legend {
+  font-weight: var(--font-weight-medium);
+  padding: 0 var(--space-4);
+}
+
+.fee-builder__components-empty {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.fee-builder__components-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-8);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-12);
+  margin: 0;
+}
+
+.fee-builder__components-note p {
+  margin: 0;
+}
+
+.fee-builder__component-rows {
+  list-style: none;
+  margin: 0 0 var(--space-12);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.fee-builder__component-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-12);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-12);
+}
+
+.fee-builder__component-row-fields {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr;
+  gap: var(--space-12);
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .fee-builder__component-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fee-builder__component-row-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fee-builder__components-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+.fee-builder__components-subtotal {
+  font-weight: var(--font-weight-medium);
+  margin: 0;
+}
+
+/* --- Preview panel --- */
+
+.fee-builder__preview {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.fee-builder__preview h2 {
+  margin: 0;
+  font-size: var(--font-size-base);
+}
+
+.fee-builder__preview-note {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.fee-builder__preview-empty {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.fee-builder__preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.fee-builder__preview-table th,
+.fee-builder__preview-table td {
+  padding: var(--space-4) var(--space-8);
+  text-align: start;
+}
+
+.fee-builder__preview-table td:last-child,
+.fee-builder__preview-table th:last-child {
+  text-align: end;
+}
+
+.fee-builder__preview-table tfoot th,
+.fee-builder__preview-table tfoot td {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-8);
+}
+
+.fee-builder__preview-total th,
+.fee-builder__preview-total td {
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
+}
+
+/* --- Student picker (mirrors admin/audit's actor picker) --- */
+
+.fee-builder__student-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.fee-builder__student-selected p {
+  margin: 0;
+}
+
+.fee-builder__student-picker {
+  position: relative;
+}
+
+.fee-builder__student-results {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 240px;
+  overflow-y: auto;
+  background-color: var(--color-background);
+}
+
+.fee-builder__student-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  border: none;
+  background: none;
+  padding: var(--space-8) var(--space-12);
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+}
+
+.fee-builder__student-result:hover,
+.fee-builder__student-result:focus-visible {
+  background-color: var(--color-surface);
+}
+
+.fee-builder__student-result span {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.fee-builder__student-empty {
+  padding: var(--space-8) var(--space-12);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
