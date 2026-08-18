@@ -37,7 +37,9 @@ const AuditLogExplorerPage = lazy(() => import("../features/admin/audit/AuditLog
 const AnnouncementsPage = lazy(() => import("../features/admin/announcements/AnnouncementsPage"));
 const PrincipalDashboardPage = lazy(() => import("../features/principal/PrincipalDashboardPage"));
 const DisciplineIncidentsPage = lazy(() => import("../features/principal/DisciplineIncidentsPage"));
-const AttendanceByClassPage = lazy(() => import("../features/principal/AttendanceByClassPage"));
+const AttendanceDashboardView = lazy(
+  () => import("../features/principal/attendance/views/AttendanceDashboardView"),
+);
 const ApprovalQueuePage = lazy(() => import("../features/principal/approvals/ApprovalQueuePage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
@@ -221,7 +223,7 @@ export const routes: RouteObject[] = [
             path: "principal/attendance",
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
-                <AttendanceByClassPage />
+                <AttendanceDashboardView />
               </RequirePermission>
             ),
           },
