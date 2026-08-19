@@ -129,7 +129,7 @@ function defaultResolveStudentId(c: Context<AppEnv>): string | undefined {
 }
 
 function defaultReserveQuota(c: Context<AppEnv>): boolean {
-  return !c.req.path.endsWith("/usage");
+  return !c.req.path.endsWith("/usage") && !c.req.path.endsWith("/admin/metrics");
 }
 
 /**

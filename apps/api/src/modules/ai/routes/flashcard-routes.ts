@@ -35,7 +35,7 @@ import { getAiQuota } from "../gate/entitlement-gate";
 import { throwLlmError } from "../llm/errors";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
 import { loadQuizMaterials } from "../quiz/materials";
-import { recordDurableUsage } from "../usage/durable";
+import { recordDurableUsage, splitByTier } from "../usage/durable";
 
 import type { Database } from "../../../db/client";
 import type { SupportedLocale } from "../../../middleware/locale";
@@ -457,7 +457,12 @@ export function aiFlashcardRoutes(deps: {
       // The provider call deliberately happened outside the transaction above; this short write is
       // all the transaction holds.
       const persisted = await withTenantTx(database, tenantFrom(c), async (tx) => {
-        await recordDurableUsage(tx, auth.schoolId, studentId, generation.usage.totalTokens);
+        await recordDurableUsage(
+          tx,
+          auth.schoolId,
+          studentId,
+          splitByTier(generation.usage.totalTokens, routed.tier),
+        );
         return persistDeck(tx, {
           schoolId: auth.schoolId,
           studentId,

@@ -288,3 +288,4 @@ export {
 } from "./moderation/persistence";
 
 export { aiReportRoutes } from "./routes/report-routes";
+export { aiMetricsRoutes } from "./routes/metrics-routes";

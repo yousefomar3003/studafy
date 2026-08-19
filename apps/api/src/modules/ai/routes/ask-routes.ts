@@ -21,7 +21,7 @@ import { AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
 import { moderateInput, moderateOutput, textHash, type AgeLevel } from "../moderation/moderate";
 import { persistModerationDecision } from "../moderation/persistence";
 import { hybridSearch } from "../retrieval/search";
-import { recordDurableUsage } from "../usage/durable";
+import { recordDurableUsage, splitByTier } from "../usage/durable";
 
 import type { Database } from "../../../db/client";
 import type { SupportedLocale } from "../../../middleware/locale";
@@ -489,7 +489,12 @@ export function aiAskRoutes(deps: {
           }
 
           const messageId = await withTenantTx(database, tenantFrom(c), async (tx) => {
-            await recordDurableUsage(tx, auth.schoolId, studentId, usage.totalTokens);
+            await recordDurableUsage(
+              tx,
+              auth.schoolId,
+              studentId,
+              splitByTier(usage.totalTokens, routed.tier),
+            );
             return persistAskMessage(tx, {
               schoolId: auth.schoolId,
               conversationId: preflight.conversationId,

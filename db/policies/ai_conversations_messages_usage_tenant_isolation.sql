@@ -13,8 +13,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   app.ai_conversations, app.ai_messages, app.ai_message_citations, app.ai_usage_meters
 TO studafy_app;
 
-REVOKE ALL ON FUNCTION app.upsert_ai_usage_tokens(uuid, uuid, bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION app.upsert_ai_usage_tokens(uuid, uuid, bigint) TO studafy_app;
+REVOKE ALL ON FUNCTION app.upsert_ai_usage_tokens(uuid, uuid, bigint, bigint, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app.upsert_ai_usage_tokens(uuid, uuid, bigint, bigint, bigint) TO studafy_app;
 
 REVOKE ALL ON FUNCTION app.delete_expired_ai_messages(integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION app.delete_expired_ai_messages(integer) TO studafy_app;

@@ -294,3 +294,33 @@ export const AI_EXAM_MAX_RESERVE_TOKENS = 25_000;
  * failed generation is not refunded, and a cheap generation is not charged less than its worst case.
  * This is a disclosed trade-off, not an oversight -- see docs/rag/exam-mode.md's "Quota" section.
  */
+
+// ---------------------------------------------------------------------------
+// Provider cost constants (ST-155 metrics dashboard)
+//
+// Per-token pricing by model tier, sourced from the provider's published rate card. The cost
+// estimation in usage/costs.ts blends input and output using an empirical ratio to produce a
+// single per-token rate. These constants are the single source of truth for dashboard cost
+// calculations; reconcile against the provider billing statement monthly.
+// ---------------------------------------------------------------------------
+
+/** Provider input cost per 1M tokens (USD) for the small tier (e.g. Claude 3.5 Haiku). */
+export const AI_COST_INPUT_PER_M_SMALL = 0.8;
+
+/** Provider output cost per 1M tokens (USD) for the small tier. */
+export const AI_COST_OUTPUT_PER_M_SMALL = 4.0;
+
+/** Provider input cost per 1M tokens (USD) for the large tier (e.g. Claude Sonnet 4). */
+export const AI_COST_INPUT_PER_M_LARGE = 3.0;
+
+/** Provider output cost per 1M tokens (USD) for the large tier. */
+export const AI_COST_OUTPUT_PER_M_LARGE = 15.0;
+
+/**
+ * AI add-on monthly price per student (USD).
+ *
+ * The per-student charge that appears on the school's Stripe invoice for the AI feature.
+ * Used by the metrics dashboard to compute margin (revenue - provider cost) per tenant.
+ * Reconcile against Stripe billing statements monthly.
+ */
+export const AI_ADDON_PRICE_PER_STUDENT_MONTHLY_USD = 12.0;
