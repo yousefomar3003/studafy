@@ -59,17 +59,7 @@ CREATE OR REPLACE FUNCTION app.upsert_ai_usage_tokens(
 $$;
 
 -- ---------------------------------------------------------------------------------------------------
--- 3. Backfill existing rows (60/40 large/small default for historical data)
--- ---------------------------------------------------------------------------------------------------
-
-UPDATE app.ai_usage_meters
-SET
-  small_tokens = FLOOR(total_tokens * 0.4),
-  large_tokens = total_tokens - FLOOR(total_tokens * 0.4)
-WHERE small_tokens = 0 AND large_tokens = 0 AND total_tokens > 0;
-
--- ---------------------------------------------------------------------------------------------------
--- 4. Grants
+-- 3. Grants
 -- ---------------------------------------------------------------------------------------------------
 
 GRANT EXECUTE ON FUNCTION app.upsert_ai_usage_tokens(uuid, uuid, bigint, bigint, bigint) TO studafy_app;
