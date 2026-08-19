@@ -1,11 +1,13 @@
 import { ERROR_CODES } from "@studafy/constants";
 import { v5 as uuidv5 } from "uuid";
 
+import { withSystemTenantTx } from "../../db/tenant-tx";
+
 import { resolveSchoolCredentials } from "./credential-resolver";
 import { ErpNextClient, ErpNextError } from "./erpnext-client";
 
 import type { GenerateBatchInvoicesJobData, GenerateInvoiceJobData } from "./schemas";
-import type { JSONValue, TransactionSql } from "postgres";
+import type { JSONValue, Sql, TransactionSql } from "postgres";
 
 const NAMESPACE_DETERMINISTIC = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
@@ -355,6 +357,7 @@ async function runConcurrent<T>(
   items: T[],
   fn: (item: T) => Promise<SingleInvoiceResult>,
   concurrency: number,
+  studentIdOf: (item: T) => string,
 ): Promise<SingleInvoiceResult[]> {
   const results: SingleInvoiceResult[] = [];
   let index = 0;
@@ -367,7 +370,7 @@ async function runConcurrent<T>(
       } catch (error) {
         results[current] = {
           idempotencyKey: "",
-          studentId: items[current] as unknown as string,
+          studentId: studentIdOf(items[current]),
           erpnextDocname: null,
           status: "failed",
           error: error instanceof Error ? error.message : "Unknown error",
@@ -382,84 +385,231 @@ async function runConcurrent<T>(
   return results;
 }
 
-export interface StudentRef {
+// ---------------------------------------------------------------------------
+// Batch generation (ST-202)
+//
+// Every step below runs its own `withSystemTenantTx(...)` rather than sharing one long-lived
+// transaction across the whole run: a batch can target thousands of students and each one makes a
+// real ERPNext HTTP call, so holding a single transaction open for the duration would risk
+// idle-in-transaction timeouts and long lock waits for no benefit -- nothing here needs cross-item
+// atomicity, only per-item atomicity (an item's own invoice_batch_items row and the batch's running
+// counters commit together, or not at all). `withSystemTenantTx` (apps/workers/src/db/tenant-tx.ts)
+// is the shared "set_config app.school_id + SET LOCAL ROLE studafy_admin, no acting user" helper —
+// the right one here since a batch job runs unattended, on the school's behalf.
+// ---------------------------------------------------------------------------
+
+interface InvoiceBatchItemTarget {
   id: string;
+  student_id: string;
 }
 
+/** Only flips `pending` -> `processing`, so a retried job that finds the batch already
+ * `processing` (a previous attempt got this far before failing) leaves it alone. */
+async function markBatchProcessing(sql: Sql, schoolId: string, batchId: string): Promise<void> {
+  await withSystemTenantTx(
+    sql,
+    { schoolId },
+    (tx) => tx`
+    UPDATE app.invoice_batches
+    SET status = 'processing'::app.invoice_batch_status, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${batchId}::uuid AND school_id = ${schoolId}::uuid AND status = 'pending'
+  `,
+  );
+}
+
+async function markBatchTerminal(
+  sql: Sql,
+  schoolId: string,
+  batchId: string,
+  status: "completed" | "failed",
+): Promise<void> {
+  await withSystemTenantTx(
+    sql,
+    { schoolId },
+    (tx) => tx`
+    UPDATE app.invoice_batches
+    SET status = ${status}::app.invoice_batch_status,
+        updated_at = CURRENT_TIMESTAMP,
+        completed_at = CURRENT_TIMESTAMP
+    WHERE id = ${batchId}::uuid AND school_id = ${schoolId}::uuid
+  `,
+  );
+}
+
+async function loadPendingItems(
+  sql: Sql,
+  schoolId: string,
+  batchId: string,
+): Promise<InvoiceBatchItemTarget[]> {
+  return withSystemTenantTx(
+    sql,
+    { schoolId },
+    (tx) => tx<InvoiceBatchItemTarget[]>`
+    SELECT id, student_id
+    FROM app.invoice_batch_items
+    WHERE batch_id = ${batchId}::uuid AND school_id = ${schoolId}::uuid AND status = 'pending'
+  `,
+  );
+}
+
+/** Writes one item's outcome and increments the matching counter on the batch header, atomically.
+ * `already_exists` maps to `already_existed` -- a prior attempt (or a concurrent duplicate request)
+ * already created this invoice, which is success, not failure. */
+async function recordItemResult(
+  sql: Sql,
+  schoolId: string,
+  batchId: string,
+  itemId: string,
+  result: SingleInvoiceResult,
+): Promise<void> {
+  const itemStatus =
+    result.status === "created"
+      ? "succeeded"
+      : result.status === "already_exists"
+        ? "already_existed"
+        : "failed";
+
+  await withSystemTenantTx(sql, { schoolId }, async (tx) => {
+    await tx`
+      UPDATE app.invoice_batch_items
+      SET status = ${itemStatus}::app.invoice_batch_item_status,
+          erpnext_docname = ${result.erpnextDocname},
+          error_message = ${result.error ?? null},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${itemId}::uuid AND batch_id = ${batchId}::uuid
+    `;
+
+    if (itemStatus === "succeeded") {
+      await tx`
+        UPDATE app.invoice_batches
+        SET succeeded_count = succeeded_count + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${batchId}::uuid
+      `;
+    } else if (itemStatus === "already_existed") {
+      await tx`
+        UPDATE app.invoice_batches
+        SET already_existed_count = already_existed_count + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${batchId}::uuid
+      `;
+    } else {
+      await tx`
+        UPDATE app.invoice_batches
+        SET failed_count = failed_count + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${batchId}::uuid
+      `;
+    }
+  });
+}
+
+/** Generates one student's invoice and records the outcome against its `invoice_batch_items` row,
+ * in that order. Never throws: a `generateInvoice` failure (ERPNext rejection, credential issue,
+ * network error) is captured as a `failed` result and recorded like any other outcome, so one bad
+ * student never aborts the run for the rest -- `runConcurrent`'s own catch is therefore a last-resort
+ * safety net for a failure in `recordItemResult` itself, in which case the item is deliberately left
+ * `pending` (not marked `failed`) so a retried job picks it back up rather than skipping it. */
+async function generateAndRecord(
+  sql: Sql,
+  schoolId: string,
+  batchId: string,
+  item: InvoiceBatchItemTarget,
+  params: GenerateBatchInvoicesJobData,
+  envBaseUrl: string | undefined,
+  envApiKey: string | undefined,
+): Promise<SingleInvoiceResult> {
+  const idempotencyKey = makeIdempotencyKey(
+    schoolId,
+    item.student_id,
+    params.feeStructureErpnextName,
+    params.periodTitle,
+  );
+
+  let result: SingleInvoiceResult;
+  try {
+    result = await withSystemTenantTx(sql, { schoolId }, (tx) =>
+      generateInvoice(
+        tx,
+        schoolId,
+        {
+          version: 1,
+          schoolId,
+          studentId: item.student_id,
+          feeStructureErpnextName: params.feeStructureErpnextName,
+          idempotencyKey,
+          periodTitle: params.periodTitle,
+          dueDate: params.dueDate,
+        },
+        envBaseUrl,
+        envApiKey,
+      ),
+    );
+  } catch (error) {
+    result = {
+      idempotencyKey,
+      studentId: item.student_id,
+      erpnextDocname: null,
+      status: "failed",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+
+  await recordItemResult(sql, schoolId, batchId, item.id, result);
+  return result;
+}
+
+/**
+ * Process a batch generation run (ST-202): every `app.invoice_batch_items` row still `pending` for
+ * `params.batchId`, seeded ahead of time by `createInvoiceBatch`
+ * (apps/api/.../finance/invoices/service.ts). Resumable by construction -- re-running this against
+ * the same batch only touches items still `pending`, so a BullMQ retry after a partial failure picks
+ * up where the last attempt left off instead of redoing (or re-billing) already-processed students.
+ *
+ * `isFinalAttempt` marks the batch `failed` if the whole run throws (credential resolution, a
+ * database outage) on what the caller believes is the last allowed attempt, so it never gets stuck
+ * `processing` forever. If BullMQ's own attempt accounting is off by one and a further retry does
+ * run and succeeds, `markBatchTerminal` unconditionally overwrites the status on completion, so an
+ * early `failed` self-corrects to `completed` rather than staying wrong.
+ */
 export async function generateBatchInvoices(
-  tx: TransactionSql,
-  sql: ReturnType<typeof import("postgres")>,
+  sql: Sql,
   schoolId: string,
   params: GenerateBatchInvoicesJobData,
   envBaseUrl: string | undefined,
   envApiKey: string | undefined,
+  isFinalAttempt: boolean,
 ): Promise<BatchInvoiceResult> {
-  const conditions: string[] = [`school_id = '${schoolId}'`];
-  if (params.classIds && params.classIds.length > 0) {
-    const ids = params.classIds.map((id) => `'${id}'`).join(",");
-    conditions.push(`class_id IN (${ids})`);
+  try {
+    await markBatchProcessing(sql, schoolId, params.batchId);
+    const items = await loadPendingItems(sql, schoolId, params.batchId);
+
+    if (items.length === 0) {
+      await markBatchTerminal(sql, schoolId, params.batchId, "completed");
+      return { total: 0, succeeded: 0, alreadyExisted: 0, failed: [] };
+    }
+
+    const concurrency = 10;
+    const results = await runConcurrent(
+      items,
+      (item) =>
+        generateAndRecord(sql, schoolId, params.batchId, item, params, envBaseUrl, envApiKey),
+      concurrency,
+      (item) => item.student_id,
+    );
+
+    await markBatchTerminal(sql, schoolId, params.batchId, "completed");
+
+    const succeeded = results.filter((r) => r.status === "created").length;
+    const alreadyExisted = results.filter((r) => r.status === "already_exists").length;
+    const failed = results
+      .filter((r) => r.status === "failed")
+      .map((r) => ({ studentId: r.studentId, error: r.error ?? "Unknown error" }));
+
+    return { total: items.length, succeeded, alreadyExisted, failed };
+  } catch (error) {
+    if (isFinalAttempt) {
+      // Best-effort: if this secondary write also fails, the batch is left `processing` rather
+      // than wrongly `failed` -- the original error (thrown below) is what BullMQ acts on either way.
+      await markBatchTerminal(sql, schoolId, params.batchId, "failed").catch(() => undefined);
+    }
+    throw error;
   }
-  if (params.gradeIds && params.gradeIds.length > 0) {
-    const ids = params.gradeIds.map((id) => `'${id}'`).join(",");
-    conditions.push(`grade_id IN (${ids})`);
-  }
-
-  const sqlCondition = conditions.join(" AND ");
-
-  const students = await sql.unsafe<StudentRef[]>(
-    `SELECT id FROM app.students WHERE ${sqlCondition}`,
-  );
-
-  if (students.length === 0) {
-    return { total: 0, succeeded: 0, alreadyExisted: 0, failed: [] };
-  }
-
-  const concurrency = 10;
-
-  const results = await runConcurrent(
-    students,
-    async (student) => {
-      const idempotencyKey = makeIdempotencyKey(
-        schoolId,
-        student.id,
-        params.feeStructureErpnextName,
-        params.periodTitle,
-      );
-
-      return sql.begin(async (subTx) => {
-        await subTx`SELECT set_config('app.school_id', ${schoolId}, true)`.execute();
-        await subTx.unsafe("SET LOCAL ROLE studafy_admin");
-
-        return generateInvoice(
-          subTx,
-          schoolId,
-          {
-            version: 1,
-            schoolId,
-            studentId: student.id,
-            feeStructureErpnextName: params.feeStructureErpnextName,
-            idempotencyKey,
-            periodTitle: params.periodTitle,
-            dueDate: params.dueDate,
-          },
-          envBaseUrl,
-          envApiKey,
-        );
-      });
-    },
-    concurrency,
-  );
-
-  const succeeded = results.filter((r) => r.status === "created").length;
-  const alreadyExisted = results.filter((r) => r.status === "already_exists").length;
-  const failed = results
-    .filter((r) => r.status === "failed")
-    .map((r) => ({ studentId: r.studentId, error: r.error ?? "Unknown error" }));
-
-  return {
-    total: students.length,
-    succeeded,
-    alreadyExisted,
-    failed,
-  };
 }

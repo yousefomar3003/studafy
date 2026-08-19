@@ -1,0 +1,301 @@
+/**
+ * Invoice management screens. Loaded only when `/portal/finance/invoices*` is, matching the rest
+ * of the app (see `admin/students/students.css`'s doc comment for why each feature owns its own
+ * stylesheet rather than a shared one).
+ */
+
+/* --- Status pill — shared by the list, detail header, and batch item rows --- */
+
+.invoices-status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.invoices-status-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.invoices-status-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.invoices-status-pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.invoices-status-pill[data-tone="neutral"] {
+  background-color: var(--color-muted-bg, var(--color-surface));
+  color: var(--color-muted-foreground);
+}
+
+/* --- List --- */
+
+.invoices-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.invoices-list__toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.invoices-list__search {
+  flex: 1;
+  max-width: 360px;
+  min-width: 200px;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+.invoices-list__search:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.invoices-list__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+/* --- Detail --- */
+
+.invoices-detail__back {
+  margin-bottom: var(--space-8);
+}
+
+.invoices-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.invoices-detail__header h1 {
+  margin: 0 0 var(--space-4);
+}
+
+.invoices-detail__header p {
+  margin: 0;
+  color: var(--color-muted-foreground);
+}
+
+.invoices-detail__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.invoices-detail__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-24);
+  margin: 0;
+}
+
+.invoices-detail__summary div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.invoices-detail__summary dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.invoices-detail__summary dd {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.invoices-detail__lines {
+  margin-top: var(--space-24);
+}
+
+.invoices-detail__lines-empty {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.invoices-detail__lines-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.invoices-detail__lines-table th,
+.invoices-detail__lines-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-8);
+  text-align: start;
+  font-size: var(--font-size-sm);
+}
+
+.invoices-detail__lines-table thead th {
+  color: var(--color-muted-foreground);
+  font-weight: var(--font-weight-medium);
+}
+
+.invoices-detail__lines-table tfoot th,
+.invoices-detail__lines-table tfoot td {
+  border-top: 2px solid var(--color-border);
+  border-bottom: none;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* --- Print view: the detail page's own markup, not a separate template. Everything not part of
+   the invoice itself (nav, buttons, status pill) is hidden; the rest prints as-is. --- */
+
+@media print {
+  .invoices-detail__no-print {
+    display: none !important;
+  }
+}
+
+/* --- Batch generation --- */
+
+.invoices-batch__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  max-width: 480px;
+}
+
+.invoices-batch__form input[type="text"],
+.invoices-batch__form input[type="date"] {
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+.invoices-batch__form input[type="text"]:focus-visible,
+.invoices-batch__form input[type="date"]:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.invoices-batch__target {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-16);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.invoices-batch__target legend {
+  font-weight: var(--font-weight-medium);
+  padding: 0 var(--space-4);
+}
+
+.invoices-batch__target-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.invoices-batch__classes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 200px;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-8);
+  margin-top: var(--space-4);
+}
+
+.invoices-batch__class-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.invoices-batch__form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.invoices-batch__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-24);
+  margin: var(--space-8) 0 var(--space-12);
+}
+
+.invoices-batch__stats div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.invoices-batch__stats dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.invoices-batch__stats dd {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
+.invoices-batch__meter {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  overflow: hidden;
+  margin-bottom: var(--space-16);
+}
+
+.invoices-batch__meter-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+  transition: width var(--duration-base) var(--easing-standard);
+}
+
+.invoices-batch__toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin: var(--space-16) 0;
+}
+
+.invoices-batch__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invoices-batch__meter-fill {
+    transition: none;
+  }
+}

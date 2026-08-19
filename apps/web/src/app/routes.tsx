@@ -60,6 +60,9 @@ const FinanceOverdueInstallmentsPage = lazy(
 const FeeStructureBuilderPage = lazy(
   () => import("../features/finance/fees/FeeStructureBuilderPage"),
 );
+const InvoiceListPage = lazy(() => import("../features/finance/invoices/InvoiceListPage"));
+const InvoiceDetailPage = lazy(() => import("../features/finance/invoices/InvoiceDetailPage"));
+const InvoiceBatchPage = lazy(() => import("../features/finance/invoices/InvoiceBatchPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
 /**
@@ -313,6 +316,36 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
                 <FeeStructureBuilderPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:read`, matching the invoice gateway's own read routes
+            // (apps/api/src/modules/finance/invoices/routes.ts).
+            path: "finance/invoices",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <InvoiceListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:update` — starting a batch calls ERPNext on the caller's behalf,
+            // the same write gate `POST /api/finance/invoices/batches` itself requires. React
+            // Router ranks this static path ahead of the `:invoiceId` route below regardless of
+            // registration order, so "batches" never matches as an invoice id.
+            path: "finance/invoices/batches/new",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
+                <InvoiceBatchPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "finance/invoices/:invoiceId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <InvoiceDetailPage />
               </RequirePermission>
             ),
           },

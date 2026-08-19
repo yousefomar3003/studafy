@@ -1,4 +1,5 @@
 export { feeStructureRoutes } from "./fee-structures/routes";
+export { financeInvoiceRoutes } from "./invoices/routes";
 export { expenseRoutes } from "./expenses/routes";
 export { paymentRoutes } from "./payments/routes";
 export { paymentWebhookRoutes } from "./webhooks/payment-confirmed";

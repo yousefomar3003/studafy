@@ -259,6 +259,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // ST-121. auditAction("insert", "payment_cache") declares the intent; emitAuditLog writes the row
   // inside the forwarder's own transaction so it commits with the payment or not at all.
   "POST /api/finance/payments",
+  // Batch invoice generation (ST-202). auditAction("insert", "invoice_batches") declares the
+  // intent; emitAuditLog writes the row inside the batch-creation transaction in
+  // finance/invoices/routes.ts.
+  "POST /api/finance/invoices/batches",
   "POST /api/discipline/incidents",
   "PATCH /api/discipline/incidents/{incidentId}",
   "POST /api/discipline/incidents/{incidentId}/resolve",
