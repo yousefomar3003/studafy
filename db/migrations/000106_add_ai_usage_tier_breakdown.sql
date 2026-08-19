@@ -25,8 +25,10 @@ ALTER TABLE app.ai_usage_meters
 -- 2. Replace upsert function with tier-aware version
 -- ---------------------------------------------------------------------------------------------------
 
--- Drop old grants first (function signature changes).
-REVOKE ALL ON FUNCTION app.upsert_ai_usage_tokens(uuid, uuid, bigint) FROM PUBLIC;
+-- Drop the old 3-arg overload entirely. CREATE OR REPLACE with a different argument list creates
+-- a new overload rather than replacing the existing one; without dropping the old function, 3-arg
+-- calls resolve to the revoked overload instead of falling through to the 5-arg version via defaults.
+DROP FUNCTION app.upsert_ai_usage_tokens(uuid, uuid, bigint);
 
 CREATE OR REPLACE FUNCTION app.upsert_ai_usage_tokens(
   p_student_id uuid,
