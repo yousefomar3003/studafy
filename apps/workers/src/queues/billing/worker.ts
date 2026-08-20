@@ -50,7 +50,7 @@ export async function processBillingJob(
     if (!parsed.success) {
       return { processed: false, reason: "invalid job data", errors: parsed.error.issues };
     }
-    return processBatchInvoices(parsed.data, databaseUrl);
+    return processBatchInvoices(parsed.data, databaseUrl, job);
   }
 
   // Stripe webhook retry (ST-132). Shares this queue because it is billing work and the queue is
@@ -176,23 +176,25 @@ async function processSingleInvoice(
 async function processBatchInvoices(
   data: GenerateBatchInvoicesJobData,
   databaseUrl: string,
+  job: Job<BillingJobData>,
 ): Promise<unknown> {
   const sql = postgres(databaseUrl, { max: 2 });
 
-  try {
-    return sql.begin(async (tx) => {
-      await tx`SELECT set_config('app.school_id', ${data.schoolId}, true)`.execute();
-      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+  // `generateBatchInvoices` opens its own per-step transactions (see its doc comment in
+  // invoice.service.ts) rather than running inside one held open for the whole batch, so there is
+  // no outer `sql.begin(...)` here the way the single-invoice path above has.
+  const attempts = job.opts.attempts ?? 1;
+  const isFinalAttempt = job.attemptsMade + 1 >= attempts;
 
-      return generateBatchInvoices(
-        tx,
-        sql,
-        data.schoolId,
-        data,
-        process.env.ERPNEXT_API_URL,
-        process.env.ERPNEXT_API_KEY,
-      );
-    });
+  try {
+    return await generateBatchInvoices(
+      sql,
+      data.schoolId,
+      data,
+      process.env.ERPNEXT_API_URL,
+      process.env.ERPNEXT_API_KEY,
+      isFinalAttempt,
+    );
   } finally {
     await sql.end({ timeout: 5 });
   }

@@ -12,14 +12,24 @@ export const generateInvoiceSchema = z.object({
 
 export type GenerateInvoiceJobData = z.infer<typeof generateInvoiceSchema>;
 
+/**
+ * `batchId` names an `app.invoice_batches` row (ST-202) whose `invoice_batch_items` were already
+ * seeded — one `pending` row per target student — by `createInvoiceBatch` (apps/api/.../finance/
+ * invoices/service.ts) before this job was enqueued. Target resolution (which students) happens
+ * once, there; this job only re-reads whichever items are still `pending`, which is what makes a
+ * BullMQ retry resumable instead of restarting the whole batch. There is deliberately no `classIds`/
+ * `gradeIds` here anymore — the old inline query built from them filtered `app.students` by
+ * `class_id`/`grade_id` columns that table has never had (class membership lives in
+ * `app.enrollments`), so it could never have run successfully; `createInvoiceBatch` resolves
+ * membership correctly instead.
+ */
 export const generateBatchInvoicesSchema = z.object({
   version: z.literal(1),
   schoolId: z.string().uuid(),
+  batchId: z.string().uuid(),
   feeStructureErpnextName: z.string().min(1),
   periodTitle: z.string().min(1),
   dueDate: z.string().optional(),
-  classIds: z.array(z.string().uuid()).optional(),
-  gradeIds: z.array(z.string().uuid()).optional(),
 });
 
 export type GenerateBatchInvoicesJobData = z.infer<typeof generateBatchInvoicesSchema>;
