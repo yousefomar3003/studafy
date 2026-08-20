@@ -59,18 +59,9 @@ export const invoiceQuerySchema = paginationQuerySchema
   .extend({
     status: invoiceStatusSchema.optional(),
     student_id: uuidSchema.optional().openapi({ description: "Filter to one student." }),
-    search: z
-      .string()
-      .trim()
-      .min(1)
-      .max(200)
-      .optional()
-      .openapi({
-        description:
-          "Matched against the invoice number first (exact, indexed — the fast path for " +
-          "'search by number'); only when that finds nothing does it fall back to a partial, " +
-          "case-insensitive match over the student's name or admission number.",
-      }),
+    search: z.string().trim().min(1).max(200).optional().openapi({
+      description: "Exact invoice-number match first; falls back to student name/admission #.",
+    }),
   })
   .openapi("InvoiceQuery");
 
@@ -141,16 +132,9 @@ export const createInvoiceBatchBodySchema = z
       .max(200)
       .openapi({ description: "Human-readable billing period, e.g. 'Spring 2026 Term 1'." }),
     due_date: dateSchema.optional(),
-    target_class_ids: z
-      .array(uuidSchema)
-      .min(1)
-      .max(500)
-      .optional()
-      .openapi({
-        description:
-          "Limit the batch to students actively enrolled in these classes. Omitted = every " +
-          "student in the school. The resulting student list is capped at 5,000.",
-      }),
+    target_class_ids: z.array(uuidSchema).min(1).max(500).optional().openapi({
+      description: "Limit to these classes; omitted = every student. Capped at 5,000 students.",
+    }),
   })
   .openapi("CreateInvoiceBatchBody");
 
