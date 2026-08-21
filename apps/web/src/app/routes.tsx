@@ -441,6 +441,10 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.REPORT_VIEW_FINANCIAL}>
                 <ReportsCenterPage />
+              </RequirePermission>
+            ),
+          },
+          {
             // Gated on `billing:read`, matching the expense gateway's own read routes
             // (apps/api/src/modules/finance/expenses/routes.ts).
             path: "finance/expenses",
