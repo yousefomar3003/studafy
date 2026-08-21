@@ -1,0 +1,168 @@
+/**
+ * Report center screens. Loaded only when `/portal/finance/reports*` is, matching the rest of the
+ * app (see `payments/payments.css`'s doc comment for why each feature owns its own stylesheet
+ * rather than importing a sibling's).
+ */
+
+/* --- Status pill — mirrors `payments/payments.css`'s `.payments-status-pill`, duplicated rather
+   than shared for the same lazy-loading reason documented there. --- */
+
+.reports-status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.reports-status-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.reports-status-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.reports-status-pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+/* --- Report run panel --- */
+
+.reports-panel > * + * {
+  margin-top: var(--space-16);
+}
+
+.reports-panel__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+}
+
+.reports-panel__idle {
+  color: var(--color-muted-foreground);
+}
+
+.reports-panel__error {
+  color: var(--color-danger-subtle-foreground);
+}
+
+.reports-panel__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.reports-panel__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-24);
+  margin: 0;
+}
+
+.reports-panel__summary div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reports-panel__summary dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.reports-panel__summary dd {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+/* --- Export --- */
+
+.reports-panel__export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+  padding-top: var(--space-16);
+  border-top: 1px solid var(--color-border);
+}
+
+.reports-panel__export-hint {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.reports-panel__export-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  margin: 0;
+  width: 100%;
+}
+
+/* --- Student/family picker (mirrors `adjustments/adjustments.css`'s own `.adjustments-form__student-*`) --- */
+
+.reports-filter__student-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.reports-filter__student-selected p {
+  margin: 0;
+}
+
+.reports-filter__student-picker {
+  position: relative;
+}
+
+.reports-filter__student-results {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 240px;
+  overflow-y: auto;
+  background-color: var(--color-background);
+  position: absolute;
+  z-index: 1;
+  min-width: 100%;
+}
+
+.reports-filter__student-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  border: none;
+  background: none;
+  padding: var(--space-8) var(--space-12);
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+}
+
+.reports-filter__student-result:hover,
+.reports-filter__student-result:focus-visible {
+  background-color: var(--color-surface);
+}
+
+.reports-filter__student-result span {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.reports-filter__student-empty {
+  padding: var(--space-8) var(--space-12);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
