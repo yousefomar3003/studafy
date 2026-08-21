@@ -36,6 +36,7 @@ export default function FinanceDashboardPage() {
         <Link to="/portal/finance/adjustments/refunds">Refunds</Link>
         {" · "}
         <Link to="/portal/finance/reports">Reports</Link>
+        <Link to="/portal/finance/expenses">Expenses</Link>
       </p>
 
       <div className="finance-dashboard-grid">
