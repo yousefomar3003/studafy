@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
 import { PAYMENT_MODE_LABELS, PAYMENT_STATUS_LABELS, paymentStatusTone } from "../labels";
@@ -13,9 +14,8 @@ function formatPaymentAmount(payment: Payment): string {
 /**
  * Recent payments feed (ST-200): the most recently recorded payments for the school, from the local
  * payment read-model (`GET /api/finance/payments`) rather than an ERPNext report — this is a plain
- * list of what was recorded, not a figure that needs to reconcile against anything. No "view all"
- * link: there is no payments listing page to send it to yet, and a link with nothing behind it is a
- * dead end (see `nav-items.ts`'s rule for the sidebar, applied the same way here).
+ * list of what was recorded, not a figure that needs to reconcile against anything. "View all" links
+ * to `payments/PaymentsListPage`, the same full history this feed previews.
  */
 export function RecentPaymentsFeedTile() {
   const { data, isPending, isError } = useQuery({
@@ -56,6 +56,10 @@ export function RecentPaymentsFeedTile() {
           ))}
         </ul>
       )}
+
+      <Link className="dashboard-tile__link" to="/portal/finance/payments">
+        View all payments &rarr;
+      </Link>
     </DashboardTile>
   );
 }

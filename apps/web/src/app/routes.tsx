@@ -63,6 +63,8 @@ const FeeStructureBuilderPage = lazy(
 const InvoiceListPage = lazy(() => import("../features/finance/invoices/InvoiceListPage"));
 const InvoiceDetailPage = lazy(() => import("../features/finance/invoices/InvoiceDetailPage"));
 const InvoiceBatchPage = lazy(() => import("../features/finance/invoices/InvoiceBatchPage"));
+const PaymentsListPage = lazy(() => import("../features/finance/payments/PaymentsListPage"));
+const RecordPaymentPage = lazy(() => import("../features/finance/payments/RecordPaymentPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
 /**
@@ -346,6 +348,29 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_READ}>
                 <InvoiceDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:read`, matching the payment gateway's own read routes
+            // (apps/api/src/modules/finance/payments/routes.ts).
+            path: "finance/payments",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <PaymentsListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:update` — recording a payment posts a Payment Entry to ERPNext on
+            // the caller's behalf, the same write gate `POST /api/finance/payments` itself
+            // requires. Static path, so React Router matches it ahead of any future dynamic
+            // `finance/payments/:paymentId` regardless of registration order, same as
+            // `finance/invoices/batches/new` above.
+            path: "finance/payments/new",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
+                <RecordPaymentPage />
               </RequirePermission>
             ),
           },
