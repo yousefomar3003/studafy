@@ -48,6 +48,11 @@ export default function InvoiceDetailPage() {
   }
 
   const invoice = query.data;
+  // Not permission-gated client-side, same as `InvoiceListPage`'s "Generate invoices" link — the
+  // route itself (`finance/payments/new`) is the actual `billing:update` boundary via
+  // `RequirePermission`; this just decides whether a payment is even possible to record.
+  const canRecordPayment =
+    invoice.erpnext_status === "submitted" && invoice.outstanding_amount_minor > 0;
 
   return (
     <div className="invoices-detail">
@@ -69,6 +74,11 @@ export default function InvoiceDetailPage() {
           >
             {invoiceStatusLabel(invoice.erpnext_status)}
           </span>
+          {canRecordPayment ? (
+            <Link to={`/portal/finance/payments/new?invoiceId=${invoice.id}`}>
+              <Button type="button">Record payment</Button>
+            </Link>
+          ) : null}
           <Button type="button" variant="secondary" onClick={handlePrint}>
             Print / Save as PDF
           </Button>

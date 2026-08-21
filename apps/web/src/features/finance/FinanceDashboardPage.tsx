@@ -28,6 +28,8 @@ export default function FinanceDashboardPage() {
         <Link to="/portal/finance/fees">Fee structure builder</Link>
         {" · "}
         <Link to="/portal/finance/invoices">Invoices</Link>
+        {" · "}
+        <Link to="/portal/finance/payments">Payments</Link>
       </p>
 
       <div className="finance-dashboard-grid">

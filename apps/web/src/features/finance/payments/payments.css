@@ -1,0 +1,185 @@
+/**
+ * Payment recording screens. Loaded only when `/portal/finance/payments*` is, matching the rest of
+ * the app (see `admin/students/students.css`'s doc comment for why each feature owns its own
+ * stylesheet rather than importing a sibling's).
+ */
+
+/* --- Status pill — mirrors `invoices/invoices.css`'s `.invoices-status-pill`, duplicated rather
+   than shared for the same lazy-loading reason documented there. --- */
+
+.payments-status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.payments-status-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.payments-status-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.payments-status-pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+/* --- List --- */
+
+.payments-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.payments-list__toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.payments-list__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+/* --- Form --- */
+
+.payments-form__back {
+  margin-bottom: var(--space-8);
+}
+
+.payments-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  max-width: 480px;
+}
+
+.payments-form__math {
+  margin: calc(-1 * var(--space-8)) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.payments-form__math[data-tone="warning"] {
+  color: var(--color-warning-subtle-foreground);
+}
+
+.payments-form__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* --- Invoice picker (mirrors fees/StudentPickerField's `.fee-builder__student-*`) --- */
+
+.payments-form__invoice-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.payments-form__invoice-selected p {
+  margin: 0;
+}
+
+.payments-form__invoice-outstanding {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.payments-form__invoice-picker {
+  position: relative;
+}
+
+.payments-form__invoice-results {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 240px;
+  overflow-y: auto;
+  background-color: var(--color-background);
+}
+
+.payments-form__invoice-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  border: none;
+  background: none;
+  padding: var(--space-8) var(--space-12);
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+}
+
+.payments-form__invoice-result:hover,
+.payments-form__invoice-result:focus-visible {
+  background-color: var(--color-surface);
+}
+
+.payments-form__invoice-result span {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.payments-form__invoice-empty {
+  padding: var(--space-8) var(--space-12);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+/* --- Success / receipt --- */
+
+.payments-success__headline {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 var(--space-12);
+}
+
+.payments-success__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-24);
+  margin: 0 0 var(--space-16);
+}
+
+.payments-success__summary div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.payments-success__summary dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.payments-success__summary dd {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.payments-success__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  margin-top: var(--space-16);
+}
