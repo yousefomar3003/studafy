@@ -1,0 +1,242 @@
+/**
+ * Expense screens. Loaded only when `/portal/finance/expenses*` is, matching the rest of the app
+ * (see `admin/students/students.css`'s doc comment for why each feature owns its own stylesheet
+ * rather than importing a sibling's).
+ */
+
+/* --- Status pill — mirrors `invoices/invoices.css`'s `.invoices-status-pill`, duplicated rather
+   than shared for the same lazy-loading reason documented there. --- */
+
+.expenses-status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.expenses-status-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.expenses-status-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.expenses-status-pill[data-tone="neutral"] {
+  background-color: var(--color-muted-bg, var(--color-surface));
+  color: var(--color-muted-foreground);
+}
+
+/* --- List --- */
+
+.expenses-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.expenses-list__toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.expenses-list__search {
+  flex: 1;
+  max-width: 320px;
+  min-width: 200px;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+.expenses-list__month {
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+.expenses-list__search:focus-visible,
+.expenses-list__month:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.expenses-list__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+/* --- Monthly summary (list page) --- */
+
+.expenses-summary {
+  margin-top: var(--space-24);
+}
+
+.expenses-summary h2 {
+  margin: 0 0 var(--space-12);
+  font-size: var(--font-size-lg);
+}
+
+.expenses-summary__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.expenses-summary__table th,
+.expenses-summary__table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-8);
+  text-align: start;
+  font-size: var(--font-size-sm);
+}
+
+.expenses-summary__table thead th {
+  color: var(--color-muted-foreground);
+  font-weight: var(--font-weight-medium);
+}
+
+.expenses-summary__table tfoot th,
+.expenses-summary__table tfoot td {
+  border-top: 2px solid var(--color-border);
+  border-bottom: none;
+  font-weight: var(--font-weight-semibold);
+}
+
+.expenses-summary__empty {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+/* --- Entry form --- */
+
+.expenses-form__back {
+  margin-bottom: var(--space-8);
+}
+
+.expenses-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  max-width: 480px;
+}
+
+.expenses-form__description textarea {
+  resize: vertical;
+}
+
+.expenses-form__attachment-name {
+  margin: calc(-1 * var(--space-8)) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.expenses-form__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* --- Success --- */
+
+.expenses-success__headline {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 var(--space-12);
+}
+
+.expenses-success__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-24);
+  margin: 0 0 var(--space-16);
+}
+
+.expenses-success__summary div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.expenses-success__summary dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.expenses-success__summary dd {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.expenses-success__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  margin-top: var(--space-16);
+}
+
+/* --- Detail --- */
+
+.expenses-detail__back {
+  margin-bottom: var(--space-8);
+}
+
+.expenses-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.expenses-detail__header h1 {
+  margin: 0 0 var(--space-4);
+}
+
+.expenses-detail__header p {
+  margin: 0;
+  color: var(--color-muted-foreground);
+}
+
+.expenses-detail__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-24);
+  margin: 0 0 var(--space-16);
+}
+
+.expenses-detail__summary div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.expenses-detail__summary dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.expenses-detail__summary dd {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.expenses-detail__no-attachment {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}

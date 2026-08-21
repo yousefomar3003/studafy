@@ -73,6 +73,9 @@ const NewScholarshipAwardPage = lazy(
 );
 const RefundsListPage = lazy(() => import("../features/finance/adjustments/RefundsListPage"));
 const NewRefundPage = lazy(() => import("../features/finance/adjustments/NewRefundPage"));
+const ExpenseListPage = lazy(() => import("../features/finance/expenses/ExpenseListPage"));
+const NewExpensePage = lazy(() => import("../features/finance/expenses/NewExpensePage"));
+const ExpenseDetailPage = lazy(() => import("../features/finance/expenses/ExpenseDetailPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
 /**
@@ -425,6 +428,36 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
                 <NewRefundPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:read`, matching the expense gateway's own read routes
+            // (apps/api/src/modules/finance/expenses/routes.ts).
+            path: "finance/expenses",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <ExpenseListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:update` — recording an expense posts to ERPNext on the caller's
+            // behalf, the same write gate `POST /api/finance/expenses` itself requires. Static path,
+            // so React Router matches it ahead of `finance/expenses/:expenseId` regardless of
+            // registration order, same as `finance/payments/new`'s own note above.
+            path: "finance/expenses/new",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
+                <NewExpensePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "finance/expenses/:expenseId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <ExpenseDetailPage />
               </RequirePermission>
             ),
           },
