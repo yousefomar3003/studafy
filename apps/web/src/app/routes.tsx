@@ -65,6 +65,14 @@ const InvoiceDetailPage = lazy(() => import("../features/finance/invoices/Invoic
 const InvoiceBatchPage = lazy(() => import("../features/finance/invoices/InvoiceBatchPage"));
 const PaymentsListPage = lazy(() => import("../features/finance/payments/PaymentsListPage"));
 const RecordPaymentPage = lazy(() => import("../features/finance/payments/RecordPaymentPage"));
+const ScholarshipAwardsListPage = lazy(
+  () => import("../features/finance/adjustments/ScholarshipAwardsListPage"),
+);
+const NewScholarshipAwardPage = lazy(
+  () => import("../features/finance/adjustments/NewScholarshipAwardPage"),
+);
+const RefundsListPage = lazy(() => import("../features/finance/adjustments/RefundsListPage"));
+const NewRefundPage = lazy(() => import("../features/finance/adjustments/NewRefundPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
 /**
@@ -371,6 +379,52 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
                 <RecordPaymentPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:read`, matching the scholarship/award gateway's own read routes
+            // (apps/api/src/modules/finance/scholarships/routes.ts). Confirming a pending award (the
+            // checker step) still requires `billing:update` — enforced both by the route the API
+            // itself requires and, client-side, by `ScholarshipAwardsListPage`'s own row actions.
+            path: "finance/adjustments/scholarships",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <ScholarshipAwardsListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:update` — awarding a scholarship/discount is the maker step, the
+            // same write gate `POST /api/finance/scholarship-discounts/awards` itself requires.
+            // Static path, matching `finance/payments/new`'s own note on why registration order
+            // doesn't matter here (no dynamic `:awardId` segment to collide with).
+            path: "finance/adjustments/scholarships/new",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
+                <NewScholarshipAwardPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:read`, matching the refund gateway's own read routes
+            // (apps/api/src/modules/finance/refunds/routes.ts). Approving or rejecting a pending
+            // refund (the checker step) requires the stricter `billing:refund` — enforced both by
+            // the API route itself and, client-side, by `RefundsListPage`'s own row actions.
+            path: "finance/adjustments/refunds",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <RefundsListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:update` — initiating a refund is the maker step, the same write gate
+            // `POST /api/finance/refunds/initiate` itself requires.
+            path: "finance/adjustments/refunds/new",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
+                <NewRefundPage />
               </RequirePermission>
             ),
           },

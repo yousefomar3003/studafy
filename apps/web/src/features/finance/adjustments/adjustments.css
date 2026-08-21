@@ -1,0 +1,291 @@
+/**
+ * Scholarship award and refund screens. Loaded only when `/portal/finance/adjustments*` is,
+ * matching the rest of the app (see `payments/payments.css`'s doc comment for why each feature owns
+ * its own stylesheet rather than importing a sibling's).
+ */
+
+/* --- Status pill — mirrors `payments/payments.css`'s `.payments-status-pill`, duplicated rather
+   than shared for the same lazy-loading reason documented there. --- */
+
+.adjustments-status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.adjustments-status-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.adjustments-status-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.adjustments-status-pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+/* --- List --- */
+
+.adjustments-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.adjustments-list__toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.adjustments-list__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+.adjustments-list__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+/* --- Form --- */
+
+.adjustments-form__back {
+  margin-bottom: var(--space-8);
+}
+
+.adjustments-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  max-width: 480px;
+}
+
+.adjustments-form__math {
+  margin: calc(-1 * var(--space-8)) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.adjustments-form__math[data-tone="danger"] {
+  color: var(--color-danger-subtle-foreground);
+}
+
+.adjustments-form__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.adjustments-reason-input textarea {
+  resize: vertical;
+}
+
+/* --- Student picker (mirrors `fees/StudentPickerField`'s `.fee-builder__student-*`) --- */
+
+.adjustments-form__student-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.adjustments-form__student-selected p {
+  margin: 0;
+}
+
+.adjustments-form__student-picker {
+  position: relative;
+}
+
+.adjustments-form__student-results {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 240px;
+  overflow-y: auto;
+  background-color: var(--color-background);
+}
+
+.adjustments-form__student-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  border: none;
+  background: none;
+  padding: var(--space-8) var(--space-12);
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+}
+
+.adjustments-form__student-result:hover,
+.adjustments-form__student-result:focus-visible {
+  background-color: var(--color-surface);
+}
+
+.adjustments-form__student-result span {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.adjustments-form__student-empty {
+  padding: var(--space-8) var(--space-12);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+/* --- Invoice picker (mirrors `payments/InvoicePickerField`'s `.payments-form__invoice-*`) --- */
+
+.adjustments-form__invoice-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.adjustments-form__invoice-selected p {
+  margin: 0;
+}
+
+.adjustments-form__invoice-paid {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.adjustments-form__invoice-picker {
+  position: relative;
+}
+
+.adjustments-form__invoice-results {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 240px;
+  overflow-y: auto;
+  background-color: var(--color-background);
+}
+
+.adjustments-form__invoice-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  border: none;
+  background: none;
+  padding: var(--space-8) var(--space-12);
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+}
+
+.adjustments-form__invoice-result:hover,
+.adjustments-form__invoice-result:focus-visible {
+  background-color: var(--color-surface);
+}
+
+.adjustments-form__invoice-result span {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.adjustments-form__invoice-empty {
+  padding: var(--space-8) var(--space-12);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+/* --- Success --- */
+
+.adjustments-success__headline {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 var(--space-12);
+}
+
+.adjustments-success__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  margin-top: var(--space-16);
+}
+
+/* --- Confirmation dialog's computed-effect summary (shared by the award and refund flows) --- */
+
+.adjustments-effect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin: 0 0 var(--space-16);
+}
+
+.adjustments-effect dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.adjustments-effect dd {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.adjustments-confirm__error {
+  margin: var(--space-16) 0 0;
+  color: var(--color-danger-subtle-foreground);
+}
+
+/* --- Audit trail --- */
+
+.adjustments-audit-trail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.adjustments-audit-trail__entry {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-12);
+}
+
+.adjustments-audit-trail__entry:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.adjustments-audit-trail__meta {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-sm);
+}
+
+.adjustments-audit-trail__fields {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
