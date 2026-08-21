@@ -73,6 +73,7 @@ const NewScholarshipAwardPage = lazy(
 );
 const RefundsListPage = lazy(() => import("../features/finance/adjustments/RefundsListPage"));
 const NewRefundPage = lazy(() => import("../features/finance/adjustments/NewRefundPage"));
+const ReportsCenterPage = lazy(() => import("../features/finance/reports/ReportsCenterPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 
 /**
@@ -425,6 +426,18 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
                 <NewRefundPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on the same `report:viewFinancial` the report endpoints themselves require —
+            // matching `finance`'s own gate above. Export additionally requires `report:export`,
+            // enforced both by the API route and, client-side, by `ExportPanel` hiding the download
+            // controls from a viewer who only has read access.
+            path: "finance/reports",
+            element: (
+              <RequirePermission permission={PERMISSIONS.REPORT_VIEW_FINANCIAL}>
+                <ReportsCenterPage />
               </RequirePermission>
             ),
           },
