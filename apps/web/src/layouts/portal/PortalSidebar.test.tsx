@@ -56,15 +56,21 @@ afterEach(() => {
 
 /** The exact, per-role visible menu — the "snapshot per role" this ticket's AC calls for. */
 describe.each<[string, string[]]>([
-  ["SUPER_ADMIN", ["Home", "Admin", "Principal", "Billing", "Finance", "Approvals", "Account"]],
-  ["ORG_ADMIN", ["Home", "Admin", "Principal", "Billing", "Finance", "Approvals", "Account"]],
-  ["INSTRUCTOR", ["Home", "Account"]],
-  ["TEACHING_ASSISTANT", ["Home", "Account"]],
-  ["STUDENT", ["Home", "Account"]],
-  ["PARENT", ["Home", "Account"]],
-  ["GUEST", ["Home", "Account"]],
-  ["FINANCE", ["Home", "Finance", "Account"]],
-  ["SUPPORT_AGENT", ["Home", "Account"]],
+  [
+    "SUPER_ADMIN",
+    ["Home", "Notifications", "Admin", "Principal", "Billing", "Finance", "Approvals", "Account"],
+  ],
+  [
+    "ORG_ADMIN",
+    ["Home", "Notifications", "Admin", "Principal", "Billing", "Finance", "Approvals", "Account"],
+  ],
+  ["INSTRUCTOR", ["Home", "Notifications", "Account"]],
+  ["TEACHING_ASSISTANT", ["Home", "Notifications", "Account"]],
+  ["STUDENT", ["Home", "Notifications", "Account"]],
+  ["PARENT", ["Home", "Notifications", "Account"]],
+  ["GUEST", ["Home", "Notifications", "Account"]],
+  ["FINANCE", ["Home", "Notifications", "Finance", "Account"]],
+  ["SUPPORT_AGENT", ["Home", "Notifications", "Account"]],
 ])("PortalSidebar for %s", (role, expectedLabels) => {
   test(`renders exactly ${expectedLabels.join(", ")}`, async () => {
     await renderSidebarAs([role]);
