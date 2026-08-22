@@ -76,6 +76,23 @@ const INVOICE = {
   invoicePdf: "https://invoice.example.com/in_1.pdf",
 };
 
+const AI_STUDENT = {
+  id: "student-1",
+  school_id: "school-1",
+  user_id: "user-1",
+  first_name: "Amina",
+  middle_name: null,
+  last_name: "Hassan",
+  preferred_name: null,
+  date_of_birth: null,
+  nationality_country_id: null,
+  status: "enrolled",
+  admission_number: "",
+  admission_date: null,
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+};
+
 const getMock = mock((path: string) => {
   if (path === "/api/subscriptions/current") {
     return Promise.resolve({ data: OVERVIEW });
@@ -85,6 +102,9 @@ const getMock = mock((path: string) => {
   }
   if (path === "/api/subscriptions/current/invoices") {
     return Promise.resolve({ data: { invoices: [INVOICE], hasMore: false } });
+  }
+  if (path === "/api/students/{studentId}") {
+    return Promise.resolve({ data: AI_STUDENT });
   }
   return Promise.resolve({ data: undefined });
 });
@@ -174,6 +194,30 @@ describe("billing screens accessibility", () => {
     );
     await screen.findByRole("heading", { name: "Invoices" });
     await screen.findByText("paid");
+
+    await expectNoA11yViolations(container);
+  });
+
+  test("AI subscription purchase, populated with the student's plan explainer", async () => {
+    const Page = (await import("./AiSubscriptionPurchasePage")).default;
+    const { container } = await renderInPortal(
+      Page,
+      "/account/ai?studentId=student-1&priceId=price-1",
+      "/account/ai",
+    );
+    await screen.findByText(/A personal AI tutor for Amina Hassan/);
+
+    await expectNoA11yViolations(container);
+  });
+
+  test("AI subscription purchase, success state", async () => {
+    const Page = (await import("./AiSubscriptionPurchasePage")).default;
+    const { container } = await renderInPortal(
+      Page,
+      "/account/ai?studentId=student-1&priceId=price-1&checkout=success",
+      "/account/ai",
+    );
+    await screen.findByRole("heading", { name: /all set/ });
 
     await expectNoA11yViolations(container);
   });

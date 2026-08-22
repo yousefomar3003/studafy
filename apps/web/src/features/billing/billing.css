@@ -174,3 +174,9 @@
   gap: var(--space-8);
   margin-top: var(--space-16);
 }
+
+/* --- AI subscription purchase (ST-208) --- */
+
+.ai-purchase__intro {
+  max-width: 60ch;
+}
