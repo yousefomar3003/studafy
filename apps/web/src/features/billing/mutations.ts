@@ -39,6 +39,27 @@ export function useStartSchoolCheckout() {
   });
 }
 
+export interface AiCheckoutInput {
+  studentId: string;
+  priceId: string;
+  successUrl: string;
+  cancelUrl: string;
+}
+
+/** Checkout entry for the per-student AI add-on (ST-208): creates a checkout session for one
+ * student's AI price and returns the provider's hosted checkout URL to redirect to. Web-channel
+ * only, same posture as `useStartSchoolCheckout` above — the mobile app that deep-links a parent
+ * here cannot call `/api/subscriptions/ai/checkout` itself. */
+export function useStartAiCheckout() {
+  return useMutation({
+    mutationFn: async (input: AiCheckoutInput) => {
+      const { data } = await api.POST("/api/subscriptions/ai/checkout", { body: input });
+      if (!data) throw new Error("Checkout session returned no data.");
+      return data;
+    },
+  });
+}
+
 export interface CancelSubscriptionInput {
   reason?: string;
 }

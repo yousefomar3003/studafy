@@ -80,6 +80,9 @@ const ExpenseListPage = lazy(() => import("../features/finance/expenses/ExpenseL
 const NewExpensePage = lazy(() => import("../features/finance/expenses/NewExpensePage"));
 const ExpenseDetailPage = lazy(() => import("../features/finance/expenses/ExpenseDetailPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
+const AiSubscriptionPurchasePage = lazy(
+  () => import("../features/billing/AiSubscriptionPurchasePage"),
+);
 
 /**
  * Application route tree, shared by the browser router (`main.tsx`) and the memory router used in
@@ -505,7 +508,19 @@ export const routes: RouteObject[] = [
             <AccountLayout />
           </RequireAuth>
         ),
-        children: [{ index: true, element: <AccountPage /> }],
+        children: [
+          { index: true, element: <AccountPage /> },
+          {
+            // Deep-link target from the mobile app (ST-208): a parent/student buying the
+            // per-student AI add-on. No `RequirePermission` — same as the rest of `/account`,
+            // since STUDENT and PARENT hold no distinct permission set of their own, and the API's
+            // own tenant scoping (`GET /api/students/{studentId}`, `POST
+            // /api/subscriptions/ai/checkout`) is what actually restricts a session to its own
+            // school and, for a parent, their own linked children.
+            path: "ai",
+            element: <AiSubscriptionPurchasePage />,
+          },
+        ],
       },
     ],
   },
