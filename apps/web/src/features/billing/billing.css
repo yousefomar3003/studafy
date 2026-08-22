@@ -1,0 +1,176 @@
+/**
+ * School billing screens. Loaded only when `/portal/billing*` is, matching the rest of the app (see
+ * `admin/students/students.css`'s doc comment for why each feature owns its own stylesheet rather
+ * than a shared one).
+ */
+
+/* --- Status pill — mirrors `finance/invoices/invoices.css`'s `.invoices-status-pill`, duplicated
+   rather than shared for the same lazy-loading reason documented there. --- */
+
+.billing-status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+}
+
+.billing-status-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.billing-status-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.billing-status-pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+/* --- Dunning / lifecycle banner --- */
+
+.billing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.billing-banner[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  border-color: var(--color-warning);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.billing-banner[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  border-color: var(--color-danger);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.billing-banner[data-tone="neutral"] {
+  background-color: var(--color-surface);
+}
+
+.billing-banner__title {
+  margin: 0 0 var(--space-4);
+  font-weight: var(--font-weight-semibold);
+}
+
+.billing-banner__body {
+  margin: 0;
+}
+
+/* --- Overview grid --- */
+
+.billing-overview__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-16);
+  align-items: start;
+}
+
+.billing-overview__stat-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-24);
+  margin: 0 0 var(--space-16);
+}
+
+.billing-overview__stat dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.billing-overview__stat dd {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.billing-meter {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  overflow: hidden;
+  margin-bottom: var(--space-8);
+}
+
+.billing-meter-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--duration-base) var(--easing-standard);
+}
+
+.billing-meter-fill[data-tone="success"] {
+  background-color: var(--color-success);
+}
+
+.billing-meter-fill[data-tone="warning"] {
+  background-color: var(--color-warning);
+}
+
+.billing-meter-fill[data-tone="danger"] {
+  background-color: var(--color-danger);
+}
+
+.billing-overview__caption {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.billing-overview__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  margin-top: var(--space-16);
+}
+
+.billing-overview__notice {
+  margin: var(--space-16) 0 0;
+  padding: var(--space-12);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .billing-meter-fill {
+    transition: none;
+  }
+}
+
+/* --- Cancellation dialog --- */
+
+.billing-cancel__notice {
+  margin: 0 0 var(--space-16);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+/* --- Invoice history --- */
+
+.billing-invoices__header {
+  margin-bottom: var(--space-16);
+}
+
+.billing-invoices__header h1 {
+  margin: 0 0 var(--space-4);
+}
+
+.billing-invoices__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}

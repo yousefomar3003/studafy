@@ -1,5 +1,5 @@
 import { DashboardTile } from "../../../components/DashboardTile";
-import { useBillingOverviewQuery } from "../billing-overview-query";
+import { useBillingOverviewQuery } from "../../billing/queries";
 
 /** Matches STORAGE_QUOTA_WARNING_THRESHOLD in apps/api's storage/quota-service.ts. */
 const STORAGE_WARNING_THRESHOLD = 0.8;

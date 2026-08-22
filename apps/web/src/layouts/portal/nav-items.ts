@@ -36,6 +36,17 @@ export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
     requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS,
   },
   {
+    // The school's own Studafy subscription (plan, seats, invoices, cancellation) — distinct from
+    // "Finance", which is the school's *own* tuition billing to families and runs on the unrelated
+    // `billing:*` permissions (see `packages/constants/src/permissions.ts`'s `FINANCE_PERMISSIONS`).
+    // Gated on `organization:manageBilling`, the same permission every subscriptions route itself
+    // requires (see `apps/api/src/modules/subscriptions/routes/billing-overview-routes.ts`).
+    id: "billing",
+    label: "Billing",
+    to: "/portal/billing",
+    requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_BILLING,
+  },
+  {
     id: "finance",
     label: "Finance",
     to: "/portal/finance",

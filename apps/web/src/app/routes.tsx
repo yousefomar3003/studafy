@@ -53,6 +53,8 @@ const CriteriaTemplatesPage = lazy(
   () => import("../features/principal/evaluations/CriteriaTemplatesPage"),
 );
 const ApprovalQueuePage = lazy(() => import("../features/principal/approvals/ApprovalQueuePage"));
+const BillingOverviewPage = lazy(() => import("../features/billing/BillingOverviewPage"));
+const BillingInvoicesPage = lazy(() => import("../features/billing/BillingInvoicesPage"));
 const FinanceDashboardPage = lazy(() => import("../features/finance/FinanceDashboardPage"));
 const FinanceOverdueInstallmentsPage = lazy(
   () => import("../features/finance/FinanceOverdueInstallmentsPage"),
@@ -300,6 +302,26 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.APPROVAL_REVIEW}>
                 <ApprovalQueuePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `organization:manageBilling`, the same permission every subscriptions route
+            // itself requires (apps/api/src/modules/subscriptions/routes/billing-overview-routes.ts
+            // and its siblings) — the school's own Studafy subscription, not its `finance/*` tuition
+            // billing to families (see nav-items.ts's own note on the distinction).
+            path: "billing",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_BILLING}>
+                <BillingOverviewPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "billing/invoices",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_BILLING}>
+                <BillingInvoicesPage />
               </RequirePermission>
             ),
           },
