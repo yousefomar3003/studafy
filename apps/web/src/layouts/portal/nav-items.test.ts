@@ -11,26 +11,33 @@ const idsFor = (roles: readonly string[]) =>
 
 describe("visiblePortalNavItems", () => {
   test.each<[string, string[]]>([
-    ["SUPER_ADMIN", ["home", "admin", "principal", "billing", "finance", "approvals", "account"]],
-    ["ORG_ADMIN", ["home", "admin", "principal", "billing", "finance", "approvals", "account"]],
-    ["FINANCE", ["home", "finance", "account"]],
-    ["INSTRUCTOR", ["home", "account"]],
-    ["TEACHING_ASSISTANT", ["home", "account"]],
-    ["STUDENT", ["home", "account"]],
-    ["PARENT", ["home", "account"]],
-    ["GUEST", ["home", "account"]],
-    ["SUPPORT_AGENT", ["home", "account"]],
+    [
+      "SUPER_ADMIN",
+      ["home", "notifications", "admin", "principal", "billing", "finance", "approvals", "account"],
+    ],
+    [
+      "ORG_ADMIN",
+      ["home", "notifications", "admin", "principal", "billing", "finance", "approvals", "account"],
+    ],
+    ["FINANCE", ["home", "notifications", "finance", "account"]],
+    ["INSTRUCTOR", ["home", "notifications", "account"]],
+    ["TEACHING_ASSISTANT", ["home", "notifications", "account"]],
+    ["STUDENT", ["home", "notifications", "account"]],
+    ["PARENT", ["home", "notifications", "account"]],
+    ["GUEST", ["home", "notifications", "account"]],
+    ["SUPPORT_AGENT", ["home", "notifications", "account"]],
   ])("renders exactly %s's menu", (role, expected) => {
     expect(idsFor([role])).toEqual(expected);
   });
 
   test("a session with no roles still sees the unconditional items", () => {
-    expect(idsFor([])).toEqual(["home", "account"]);
+    expect(idsFor([])).toEqual(["home", "notifications", "account"]);
   });
 
   test("a multi-role session sees the union", () => {
     expect(idsFor(["STUDENT", "ORG_ADMIN"])).toEqual([
       "home",
+      "notifications",
       "admin",
       "principal",
       "billing",

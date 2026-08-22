@@ -53,6 +53,10 @@ const CriteriaTemplatesPage = lazy(
   () => import("../features/principal/evaluations/CriteriaTemplatesPage"),
 );
 const ApprovalQueuePage = lazy(() => import("../features/principal/approvals/ApprovalQueuePage"));
+const NotificationInboxPage = lazy(() => import("../features/notifications/NotificationInboxPage"));
+const NotificationPreferencesPage = lazy(
+  () => import("../features/notifications/NotificationPreferencesPage"),
+);
 const BillingOverviewPage = lazy(() => import("../features/billing/BillingOverviewPage"));
 const BillingInvoicesPage = lazy(() => import("../features/billing/BillingInvoicesPage"));
 const FinanceDashboardPage = lazy(() => import("../features/finance/FinanceDashboardPage"));
@@ -307,6 +311,18 @@ export const routes: RouteObject[] = [
                 <ApprovalQueuePage />
               </RequirePermission>
             ),
+          },
+          {
+            // No `RequirePermission` — self-service on the caller's own rows, matching the API's
+            // own no-gate posture (see `notificationRoutes`'s doc comment). Every authenticated
+            // session sees its own inbox regardless of role.
+            path: "notifications",
+            element: <NotificationInboxPage />,
+          },
+          {
+            // Same no-gate posture as above (see `notificationPreferencesRoutes`'s doc comment).
+            path: "notifications/preferences",
+            element: <NotificationPreferencesPage />,
           },
           {
             // Gated on `organization:manageBilling`, the same permission every subscriptions route

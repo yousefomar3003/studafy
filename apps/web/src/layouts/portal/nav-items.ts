@@ -18,6 +18,10 @@ export interface PortalNavItem {
  */
 export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
   { id: "home", label: "Home", to: "/portal" },
+  // Same audience as "Home" (every authenticated session, regardless of role) — the inbox routes
+  // are deliberately open to everyone (see `notificationRoutes`'s doc comment in the API), so
+  // there is no `requiredPermission` to gate this on.
+  { id: "notifications", label: "Notifications", to: "/portal/notifications" },
   {
     id: "admin",
     label: "Admin",

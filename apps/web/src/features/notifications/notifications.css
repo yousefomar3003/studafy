@@ -1,0 +1,145 @@
+/**
+ * Notification inbox and preferences screens. Loaded only when `/portal/notifications*` is,
+ * matching the rest of the app (see `admin/students/students.css`'s doc comment for why each
+ * feature owns its own stylesheet rather than a shared one).
+ */
+
+.notifications-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-16);
+}
+
+.notifications-page__header h1 {
+  margin: 0 0 var(--space-4);
+}
+
+.notifications-page__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-16);
+}
+
+.notifications-page__filters {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.notifications-page__notice {
+  margin: 0 0 var(--space-16);
+  padding: var(--space-12);
+  border-radius: var(--radius-md);
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+  font-size: var(--font-size-sm);
+}
+
+/* --- Inbox list --- */
+
+.notifications-page__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.notifications-page__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.notifications-page__item[data-unread] {
+  border-left: 3px solid var(--color-accent);
+  background-color: var(--color-accent-subtle-bg);
+}
+
+.notifications-page__item-body {
+  min-width: 0;
+}
+
+.notifications-page__item-type {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-muted-foreground);
+}
+
+.notifications-page__item-title {
+  margin: 0 0 var(--space-4);
+  font-weight: var(--font-weight-medium);
+}
+
+.notifications-page__item-text {
+  margin: 0 0 var(--space-4);
+  color: var(--color-muted-foreground);
+}
+
+.notifications-page__item-date {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+}
+
+.notifications-page__pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+/* --- Preferences matrix --- */
+
+.notifications-prefs {
+  margin-bottom: var(--space-16);
+}
+
+.notifications-prefs .sf-table__header-cell:not(:first-child),
+.notifications-prefs .sf-table__cell:not(:first-child) {
+  text-align: center;
+}
+
+.notifications-prefs__type {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.notifications-prefs__checkbox {
+  width: var(--space-16);
+  height: var(--space-16);
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.notifications-prefs__checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.notifications-prefs__checkbox:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.notifications-page__card-description {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: var(--space-4) 0 0;
+}
