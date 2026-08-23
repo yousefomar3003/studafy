@@ -20,6 +20,22 @@
       "outputs": ["dist/**", "build/**"],
       "env": ["LOCALAPPDATA"]
     },
+    "@studafy/web#build": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": ["dist/**"],
+      // Baked into the bundle at build time (see infra/docker/web.Dockerfile) -- a cache hit on an
+      // unchanged source tree must still miss when any of these differ, since they change what
+      // vite.config.ts's sentryReleaseUploadEnabled produces and what release name a captured
+      // error is tagged with.
+      "env": [
+        "LOCALAPPDATA",
+        "VITE_RELEASE_VERSION",
+        "VITE_SENTRY_DSN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT",
+        "SENTRY_AUTH_TOKEN"
+      ]
+    },
     "check-types": {
       "dependsOn": ["^build", "generate"],
       "outputs": []

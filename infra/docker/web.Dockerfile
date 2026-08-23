@@ -10,6 +10,24 @@ ARG NGINX_VERSION=1.27-alpine
 FROM oven/bun:${BUN_VERSION}-alpine AS build
 WORKDIR /app
 
+# Baked into the bundle at build time (Vite inlines `import.meta.env.VITE_*` at build, not runtime —
+# unlike the ECS services, a static SPA has no server process left to read an env var from after
+# this point). VITE_RELEASE_VERSION is normally the same immutable image tag `release.yml` pushes to
+# ECR, so a captured error's Sentry release lines up with the deploy that shipped it (see
+# `apps/web/src/lib/monitoring/config.ts`); VITE_SENTRY_DSN, SENTRY_ORG, and SENTRY_PROJECT go
+# unset in the `containers.yml` validation build, which is fine — see that file's own doc comment on
+# degrading to "monitoring disabled" without one. SENTRY_AUTH_TOKEN is deliberately not an ARG (ARGs
+# land in the image's build history): it is mounted as a BuildKit secret, in scope only for the RUN
+# step that actually runs `vite build`.
+ARG VITE_RELEASE_VERSION=unknown
+ARG VITE_SENTRY_DSN
+ARG SENTRY_ORG
+ARG SENTRY_PROJECT
+ENV VITE_RELEASE_VERSION=${VITE_RELEASE_VERSION} \
+    VITE_SENTRY_DSN=${VITE_SENTRY_DSN} \
+    SENTRY_ORG=${SENTRY_ORG} \
+    SENTRY_PROJECT=${SENTRY_PROJECT}
+
 # See infra/docker/api.Dockerfile for why this is a single COPY rather than a manifest-first split.
 COPY . .
 
@@ -37,7 +55,17 @@ RUN bun run --cwd packages/constants build \
  && bun run --cwd packages/attendance-reporting build
 # turbo builds @studafy/ui first (turbo.json: dependsOn ["^build"]) because
 # apps/web/package.json declares it as a dependency, then apps/web's `vite build` itself.
-RUN bunx turbo run build --filter=@studafy/web
+#
+# The secret mount is optional (id not required): when the caller passes `--secret
+# id=sentry_auth_token,...` (release.yml's authenticated release build), the file exists and its
+# contents become SENTRY_AUTH_TOKEN for this RUN step only. When it doesn't (containers.yml's
+# validation build), the file is simply absent and the `[ -f ... ]` guard leaves the variable unset
+# — vite.config.ts's own sentryReleaseUploadEnabled check is what actually turns the upload off.
+RUN --mount=type=secret,id=sentry_auth_token \
+    if [ -f /run/secrets/sentry_auth_token ]; then \
+      export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token)"; \
+    fi; \
+    bunx turbo run build --filter=@studafy/web
 
 FROM nginx:${NGINX_VERSION} AS runtime
 

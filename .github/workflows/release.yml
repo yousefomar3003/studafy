@@ -40,14 +40,38 @@ jobs:
         working-directory: infra/terraform
       - name: Build, push, and attest
         shell: bash
+        env:
+          # Only consumed by web.Dockerfile's dedicated `--mount=type=secret` RUN step (ST-213);
+          # every other service's Dockerfile has no such mount, so the secret is simply unused for
+          # them. Environment-scoped, same as the AWS role ARNs above -- unset until a Sentry
+          # project is actually wired up for ${{ inputs.environment }}, in which case
+          # sentryReleaseUploadEnabled (vite.config.ts) stays false and the build behaves exactly
+          # like the unauthenticated containers.yml validation build.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           repo=$(terraform -chdir=infra/terraform output -json registry_repository_urls | jq -r '.${{ matrix.service }}')
           image="$repo:${{ inputs.tag }}"
+
+          # web's release build correlates every captured Sentry error to this same image tag and
+          # uploads its source maps (see apps/web/src/lib/monitoring and infra/docker/web.Dockerfile);
+          # no other service needs these build args.
+          extra_build_args=()
+          if [ "${{ matrix.service }}" = "web" ]; then
+            extra_build_args=(
+              --build-arg "VITE_RELEASE_VERSION=${{ inputs.tag }}"
+              --build-arg "VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}"
+              --build-arg "SENTRY_ORG=${{ vars.SENTRY_ORG }}"
+              --build-arg "SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}"
+              --secret "id=sentry_auth_token,env=SENTRY_AUTH_TOKEN"
+            )
+          fi
+
           docker buildx build \
             --file "infra/docker/${{ matrix.service }}.Dockerfile" \
             --tag "$image" \
             --sbom=true \
             --provenance=mode=max \
+            "${extra_build_args[@]}" \
             --push .
           digest=$(aws ecr describe-images \
             --repository-name "studafy-${{ inputs.environment }}/${{ matrix.service }}" \
