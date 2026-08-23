@@ -4,9 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { expectNoA11yViolations } from "../../lib/test/axe";
+
 import type { ComponentType } from "react";
 
-const getMock = mock((path: string) => {
+function defaultGetImplementation(path: string) {
   if (path === "/api/notifications/unread-count") {
     return Promise.resolve({ data: { unread_count: 2 } });
   }
@@ -41,7 +43,9 @@ const getMock = mock((path: string) => {
       ],
     },
   });
-});
+}
+
+const getMock = mock(defaultGetImplementation);
 
 const postMock = mock((_path: string) => Promise.resolve({ data: { unread_count: 1 } }));
 
@@ -126,5 +130,19 @@ describe("NotificationBell", () => {
       name: "Mark all as read",
     }) as HTMLButtonElement;
     expect(markAllButton.disabled).toBe(true);
+  });
+
+  test("has no accessibility violations with the panel open", async () => {
+    // A prior test in this file leaves `getMock` overridden to its own fixture (`mockClear` in
+    // `afterEach` clears call history, not the implementation) — restore the module's default here
+    // rather than depending on test order.
+    getMock.mockImplementation(defaultGetImplementation);
+
+    const { container } = renderBell(await loadBell());
+
+    fireEvent.click(await screen.findByRole("button", { name: /notifications/i }));
+    await screen.findByText("New assignment posted");
+
+    await expectNoA11yViolations(container);
   });
 });

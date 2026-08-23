@@ -13,7 +13,8 @@ export interface ModalProps {
   title: string;
   description?: string;
   children: ReactNode;
-  /** Focused on open. Defaults to the first focusable element in the dialog. */
+  /** Focused on open. Defaults to the first focusable element in the dialog's content (body or
+   * footer), falling back to the header's close button only when there is no other candidate. */
   initialFocusRef?: RefObject<HTMLElement | null>;
   closeOnOverlayClick?: boolean;
   closeOnEsc?: boolean;
@@ -36,9 +37,10 @@ const ModalRoot = forwardRef<HTMLDivElement, ModalProps>(function Modal(
   const titleId = `${baseId}-title`;
   const descriptionId = `${baseId}-description`;
   const dialogRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   const overlayMouseDown = useRef(false);
 
-  useFocusTrap(dialogRef, open, initialFocusRef);
+  useFocusTrap(dialogRef, open, initialFocusRef, headerRef);
 
   useEffect(() => {
     if (!open || !closeOnEsc) {
@@ -99,7 +101,7 @@ const ModalRoot = forwardRef<HTMLDivElement, ModalProps>(function Modal(
           tabIndex={-1}
           className="sf-modal"
         >
-          <div className="sf-modal__header">
+          <div className="sf-modal__header" ref={headerRef}>
             <h2 className="sf-modal__title" id={titleId}>
               {title}
             </h2>

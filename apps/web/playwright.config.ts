@@ -11,6 +11,10 @@ const BASE_URL = `http://localhost:${PORT}`;
  */
 export default defineConfig({
   testDir: "./e2e",
+  // These two run against a production build instead — see `playwright.a11y.config.ts`'s own doc
+  // comment for why (a Vite-dev/StrictMode-only focus quirk that this config's dev server would
+  // otherwise make them fail on, for a defect that does not exist in what ships).
+  testIgnore: ["keyboard-accessibility-walkthrough.spec.ts", "accessibility-audit.spec.ts"],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,

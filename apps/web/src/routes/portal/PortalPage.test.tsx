@@ -5,6 +5,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { expectNoA11yViolations } from "../../lib/test/axe";
+
 import type { ComponentType } from "react";
 
 // Mock the app client module before PortalPage is loaded, so the query hits this stub instead of the
@@ -20,7 +22,9 @@ function renderPage(Page: ComponentType, initialPath = "/portal") {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
-        <Page />
+        <main>
+          <Page />
+        </main>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -73,6 +77,15 @@ describe("PortalPage forbidden notice", () => {
 
     const notice = await screen.findByRole("alert");
     expect(notice.textContent).toMatch(/don.t have access/i);
+  });
+
+  test("has no accessibility violations with the forbidden notice showing", async () => {
+    getMock.mockImplementation(() => Promise.resolve({ data: { status: "ok" } }));
+
+    const { container } = renderPage(await loadPortalPage(), "/portal?notice=forbidden");
+    await screen.findByRole("alert");
+
+    await expectNoA11yViolations(container);
   });
 
   test("renders no notice on a plain visit", async () => {

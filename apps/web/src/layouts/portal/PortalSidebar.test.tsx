@@ -4,6 +4,8 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { expectNoA11yViolations } from "../../lib/test/axe";
+
 const getMock = mock((_path: string) => Promise.resolve<unknown>({ data: { total: 0 } }));
 mock.module("../../lib/api", () => ({ api: { GET: getMock } }));
 
@@ -113,5 +115,12 @@ describe("PortalSidebar", () => {
 
     const account = screen.getByRole("link", { name: "Account" });
     expect(account.getAttribute("aria-current")).toBeNull();
+  });
+
+  test("has no accessibility violations for the fullest nav (SUPER_ADMIN)", async () => {
+    const { container } = await renderSidebarAs(["SUPER_ADMIN"]);
+    await screen.findByRole("navigation", { name: "Portal" });
+
+    await expectNoA11yViolations(container);
   });
 });

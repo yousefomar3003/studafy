@@ -3,6 +3,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { expectNoA11yViolations } from "../../lib/test/axe";
+
 import ErrorPage from "./ErrorPage";
 
 function renderAt(path: string) {
@@ -77,5 +79,14 @@ describe("ErrorPage", () => {
   test("a direct visit with no code renders the generic failure state", () => {
     renderAt("/auth/error");
     expect(screen.getByRole("heading", { name: /couldn't complete your sign-in/i })).toBeTruthy();
+  });
+
+  test("has no accessibility violations, with and without a retry action", async () => {
+    const withAction = renderAt("/auth/error?code=OAUTH_STATE_INVALID");
+    await expectNoA11yViolations(withAction.container);
+    withAction.unmount();
+
+    const withoutAction = renderAt("/auth/error?code=SCHOOL_SUSPENDED");
+    await expectNoA11yViolations(withoutAction.container);
   });
 });

@@ -178,6 +178,36 @@ jobs:
         if: always()
         run: docker compose -f db/compose.yml down
 
+  # ST-211's axe budget (zero critical/serious violations) and its keyboard-only walkthrough of 5
+  # core journeys. Its own job, not folded into `quality`, because it needs a Chromium install and a
+  # production build+preview server that nothing else in this workflow requires. Runs against
+  # `vite build && vite preview` rather than `vite dev` — see `playwright.a11y.config.ts`'s own doc
+  # comment for why: React 18 `<StrictMode>` (dev-only) makes the focus-trap/color-contrast checks
+  # this job runs unreliable in a way that does not reflect what ships. No Postgres or `apps/api`
+  # process needed — every spec under `bun run e2e:a11y` stubs its own backend via `page.route()`.
+  web-accessibility:
+    name: web-accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Build the workspace packages the web app imports
+        run: bunx turbo run build --filter=@studafy/web^...
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Axe CI budget + keyboard-only walkthrough (ST-211)
+        run: bun run e2e:a11y
+        working-directory: apps/web
+      - name: Upload keyboard-walkthrough recordings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-walkthrough-videos
+          path: apps/web/test-results/**/*.webm
+          if-no-files-found: ignore
+          retention-days: 14
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:

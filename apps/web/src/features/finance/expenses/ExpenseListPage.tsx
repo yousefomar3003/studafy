@@ -172,6 +172,9 @@ export default function ExpenseListPage() {
               <p role="alert">Unable to load the monthly summary.</p>
             ) : summary && summary.categories.length > 0 ? (
               <table className="expenses-summary__table">
+                <caption className="sf-visually-hidden">
+                  Monthly summary — {monthLabel(month)}
+                </caption>
                 <thead>
                   <tr>
                     <th scope="col">Category</th>

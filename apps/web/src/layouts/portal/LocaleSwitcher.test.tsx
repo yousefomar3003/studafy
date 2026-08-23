@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, test } from "bun:test";
 
 import { localeStore } from "../../lib/i18n";
+import { expectNoA11yViolations } from "../../lib/test/axe";
 
 import { LocaleSwitcher } from "./LocaleSwitcher";
 
@@ -31,5 +32,10 @@ describe("LocaleSwitcher", () => {
     await waitFor(() => {
       expect(localeStore.getLocale()).toBe("ar");
     });
+  });
+
+  test("has no accessibility violations", async () => {
+    const { container } = render(<LocaleSwitcher />);
+    await expectNoA11yViolations(container);
   });
 });
