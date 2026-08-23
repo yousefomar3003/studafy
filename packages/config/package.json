@@ -12,6 +12,9 @@
     "./eslint": "./eslint.config.js",
     "./prettier": "./prettier.config.js"
   },
+  "scripts": {
+    "test": "bun test"
+  },
   "peerDependencies": {
     "eslint": "^10",
     "prettier": "^3",

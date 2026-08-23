@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { Loading } from "../../components/Loading";
+import { ACTIVATION_EVENTS, track } from "../../lib/analytics";
 import {
   decodeAccessTokenRoles,
   resolveRoleHome,
@@ -43,6 +44,14 @@ export default function InviteCompletePage() {
     }
   }, [requiresApproval, store]);
 
+  const approvalTracked = useRef(false);
+  useEffect(() => {
+    if (requiresApproval && !approvalTracked.current) {
+      approvalTracked.current = true;
+      track(ACTIVATION_EVENTS.ADMIN_APPROVAL_REQUIRED);
+    }
+  }, [requiresApproval]);
+
   const handled = useRef(false);
   useEffect(() => {
     if (requiresApproval || handled.current) {
@@ -50,6 +59,7 @@ export default function InviteCompletePage() {
     }
     if (status === "authenticated") {
       handled.current = true;
+      track(ACTIVATION_EVENTS.SUCCEEDED);
       void (async () => {
         const accessToken = await store.getToken();
         const roles = accessToken ? decodeAccessTokenRoles(accessToken) : [];

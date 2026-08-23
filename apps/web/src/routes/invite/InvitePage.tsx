@@ -1,8 +1,10 @@
 import { ApiError } from "@studafy/api-client";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 
 import { Loading } from "../../components/Loading";
+import { ACTIVATION_EVENTS, track } from "../../lib/analytics";
 import { api } from "../../lib/api";
 import { API_BASE_URL } from "../../lib/config";
 
@@ -109,6 +111,19 @@ export default function InvitePage() {
     retry: false,
   });
 
+  const code = error instanceof ApiError ? error.code : null;
+
+  // Fires once per settled outcome — `data`/`code` only change identity when the query transitions
+  // out of pending, not on every re-render.
+  useEffect(() => {
+    if (isPending) return;
+    if (data) {
+      track(ACTIVATION_EVENTS.INVITATION_VIEWED);
+    } else {
+      track(ACTIVATION_EVENTS.INVITATION_INVALID, { reason: code ?? "unknown" });
+    }
+  }, [isPending, data, code]);
+
   if (!token) {
     return <InvitationOutcome {...FAILURE_COPY.get("INVITATION_INVALID")!} />;
   }
@@ -118,7 +133,6 @@ export default function InvitePage() {
   }
 
   if (error || !data) {
-    const code = error instanceof ApiError ? error.code : null;
     const copy = (code && FAILURE_COPY.get(code)) || GENERIC_FAILURE;
     const requestId = error instanceof ApiError ? error.request_id : null;
     return <InvitationOutcome {...copy} requestId={requestId} />;
@@ -132,10 +146,20 @@ export default function InvitePage() {
         your account.
       </p>
       <p>
-        <a href={activationOAuthStartUrl(token, "google")}>{PROVIDER_LABELS.google}</a>
+        <a
+          href={activationOAuthStartUrl(token, "google")}
+          onClick={() => track(ACTIVATION_EVENTS.OAUTH_STARTED, { provider: "google" })}
+        >
+          {PROVIDER_LABELS.google}
+        </a>
       </p>
       <p>
-        <a href={activationOAuthStartUrl(token, "microsoft")}>{PROVIDER_LABELS.microsoft}</a>
+        <a
+          href={activationOAuthStartUrl(token, "microsoft")}
+          onClick={() => track(ACTIVATION_EVENTS.OAUTH_STARTED, { provider: "microsoft" })}
+        >
+          {PROVIDER_LABELS.microsoft}
+        </a>
       </p>
     </>
   );
