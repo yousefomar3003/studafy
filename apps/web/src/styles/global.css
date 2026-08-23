@@ -16,13 +16,14 @@ body {
   line-height: 1.5;
 }
 
-/* Accessible skip link: off-screen until focused. */
+/* Accessible skip link: off-screen until focused. Logical properties so it stays off the correct
+   (start) edge in both English (left) and Arabic (right) without a separate RTL rule. */
 .skip-link {
   position: absolute;
-  left: -9999px;
+  inset-inline-start: -9999px;
 }
 
 .skip-link:focus {
-  left: 1rem;
-  top: 1rem;
+  inset-inline-start: 1rem;
+  inset-block-start: 1rem;
 }

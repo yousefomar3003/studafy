@@ -34,18 +34,33 @@
   display: flex;
   align-items: center;
   gap: var(--space-8);
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .portal-header__nav-toggle {
   display: none;
 }
 
+.portal-locale-switcher__select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--color-foreground);
+  padding: var(--space-4) var(--space-8);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.portal-locale-switcher__select:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
 /* Sidebar */
 
 .portal-sidebar {
   grid-area: sidebar;
-  border-right: 1px solid var(--color-border);
+  border-inline-end: 1px solid var(--color-border);
   padding: var(--space-16) var(--space-8);
   overflow-y: auto;
 }
@@ -91,8 +106,8 @@
    changing width never reflows the item list. */
 .portal-nav__item .approval-queue-badge {
   position: absolute;
-  top: 2px;
-  right: var(--space-8);
+  inset-block-start: 2px;
+  inset-inline-end: var(--space-8);
   font-size: var(--font-size-xs);
   color: var(--color-muted-foreground);
 }
@@ -139,8 +154,8 @@
 
 .portal-popover {
   position: absolute;
-  top: calc(100% + var(--space-8));
-  right: 0;
+  inset-block-start: calc(100% + var(--space-8));
+  inset-inline-end: 0;
   z-index: var(--z-dropdown);
   min-width: 280px;
   max-width: 360px;
@@ -155,8 +170,8 @@
 
 .portal-notification-bell__badge {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
   min-width: 16px;
   height: 16px;
   padding: 0 var(--space-4);
@@ -193,8 +208,8 @@
 }
 
 .portal-notification-list__item[data-unread] {
-  border-left: 2px solid var(--color-accent);
-  padding-left: var(--space-8);
+  border-inline-start: 2px solid var(--color-accent);
+  padding-inline-start: var(--space-8);
 }
 
 .portal-notification-list__title {
@@ -229,7 +244,7 @@
 .portal-user-menu__item {
   display: block;
   width: 100%;
-  text-align: left;
+  text-align: start;
   padding: var(--space-8) var(--space-12);
   border: none;
   border-radius: var(--radius-md);
@@ -279,7 +294,11 @@
   color: var(--color-muted-foreground);
 }
 
-/* Narrow viewport: the sidebar becomes an off-canvas drawer, toggled from the header. */
+/* Narrow viewport: the sidebar becomes an off-canvas drawer, toggled from the header. Closed, it
+   sits one full width off its own start edge (`inset-inline-start: -100%`) — the start edge, and so
+   which physical side it slides off, is exactly what flips between `dir="ltr"` and `dir="rtl"`. This
+   animates `inset-inline-start` rather than `transform: translateX()` on purpose: a physical
+   transform doesn't know about `dir` and would need its own `[dir="rtl"]` override to flip sign. */
 @media (max-width: 768px) {
   .portal-shell {
     grid-template-columns: 1fr;
@@ -292,15 +311,16 @@
 
   .portal-sidebar {
     position: fixed;
-    inset: 64px 0 0 0;
+    inset-block: 64px 0;
+    inset-inline-start: -100%;
+    inline-size: 100%;
     z-index: var(--z-dropdown);
     background-color: var(--color-background);
-    transform: translateX(-100%);
-    transition: transform var(--duration-base) var(--easing-standard);
+    transition: inset-inline-start var(--duration-base) var(--easing-standard);
   }
 
   .portal-sidebar[data-open] {
-    transform: translateX(0);
+    inset-inline-start: 0;
   }
 }
 

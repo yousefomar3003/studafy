@@ -4,7 +4,8 @@ import type { Permission } from "@studafy/constants";
 
 export interface PortalNavItem {
   readonly id: string;
-  readonly label: string;
+  /** i18next key under `nav.*` (see `locales/en.json`) — `PortalSidebar` resolves it with `t()`. */
+  readonly labelKey: string;
   readonly to: string;
   /** Omitted for items every authenticated session sees, regardless of role. */
   readonly requiredPermission?: Permission;
@@ -17,14 +18,14 @@ export interface PortalNavItem {
  * dead link, not a preview of a future one.
  */
 export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
-  { id: "home", label: "Home", to: "/portal" },
+  { id: "home", labelKey: "nav.home", to: "/portal" },
   // Same audience as "Home" (every authenticated session, regardless of role) — the inbox routes
   // are deliberately open to everyone (see `notificationRoutes`'s doc comment in the API), so
   // there is no `requiredPermission` to gate this on.
-  { id: "notifications", label: "Notifications", to: "/portal/notifications" },
+  { id: "notifications", labelKey: "nav.notifications", to: "/portal/notifications" },
   {
     id: "admin",
-    label: "Admin",
+    labelKey: "nav.admin",
     to: "/portal/admin",
     requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS,
   },
@@ -35,7 +36,7 @@ export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
     // view — approvals, attendance, discipline, announcements — rather than the ops-facing admin
     // console (users/invitations/timetable/settings).
     id: "principal",
-    label: "Principal",
+    labelKey: "nav.principal",
     to: "/portal/principal",
     requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS,
   },
@@ -46,13 +47,13 @@ export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
     // Gated on `organization:manageBilling`, the same permission every subscriptions route itself
     // requires (see `apps/api/src/modules/subscriptions/routes/billing-overview-routes.ts`).
     id: "billing",
-    label: "Billing",
+    labelKey: "nav.billing",
     to: "/portal/billing",
     requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_BILLING,
   },
   {
     id: "finance",
-    label: "Finance",
+    labelKey: "nav.finance",
     to: "/portal/finance",
     // The same permission the finance report endpoints themselves require (see
     // apps/api/src/modules/finance/reports/routes.ts) — held by FINANCE and ORG_ADMIN.
@@ -60,11 +61,11 @@ export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
   },
   {
     id: "approvals",
-    label: "Approvals",
+    labelKey: "nav.approvals",
     to: "/portal/approvals",
     requiredPermission: PERMISSIONS.APPROVAL_REVIEW,
   },
-  { id: "account", label: "Account", to: "/account" },
+  { id: "account", labelKey: "nav.account", to: "/account" },
 ];
 
 /** Narrows `PORTAL_NAV_ITEMS` to the ones a session holding `permissions` is allowed to see. */

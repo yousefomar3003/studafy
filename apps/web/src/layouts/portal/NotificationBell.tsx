@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { useMarkAllRead, useMarkNotificationRead } from "../../features/notifications/mutations";
 import { useUnreadCountQuery } from "../../features/notifications/queries";
 import { api } from "../../lib/api";
+import { useTranslation } from "../../lib/i18n";
 
 import { useDisclosure } from "./use-disclosure";
 
@@ -29,6 +30,7 @@ const RECENT_LIST_LIMIT = 10;
  * count changing width or appearing/disappearing never reflows the header.
  */
 export function NotificationBell() {
+  const { t } = useTranslation();
   const { open, toggle, close, triggerRef, panelRef } = useDisclosure();
   const panelId = "portal-notifications-panel";
 
@@ -82,7 +84,7 @@ export function NotificationBell() {
           />
         </svg>
         <span className="sf-visually-hidden">
-          Notifications{unreadCount > 0 ? `, ${unreadCount} unread` : ""}
+          {t("notificationBell.ariaLabel", { count: unreadCount })}
         </span>
         {unreadCount > 0 ? (
           <span className="portal-notification-bell__badge" aria-hidden="true">
@@ -96,25 +98,25 @@ export function NotificationBell() {
           id={panelId}
           ref={panelRef}
           role="region"
-          aria-label="Notifications"
+          aria-label={t("notificationBell.heading")}
           className="portal-popover portal-notification-panel"
         >
           <div className="portal-notification-panel__header">
-            <h2>Notifications</h2>
+            <h2>{t("notificationBell.heading")}</h2>
             <Button
               variant="tertiary"
               disabled={unreadCount === 0}
               loading={markAllRead.isPending}
               onClick={() => markAllRead.mutate()}
             >
-              Mark all as read
+              {t("notificationBell.markAllRead")}
             </Button>
           </div>
 
           {recentQuery.isPending ? (
-            <p role="status">Loading…</p>
+            <p role="status">{t("notificationBell.loading")}</p>
           ) : notifications.length === 0 ? (
-            <p>You&rsquo;re all caught up.</p>
+            <p>{t("notificationBell.empty")}</p>
           ) : (
             <ul className="portal-notification-list">
               {notifications.map((notification) => (
@@ -131,7 +133,7 @@ export function NotificationBell() {
                       loading={markRead.isPending && markRead.variables === notification.id}
                       onClick={() => markRead.mutate(notification.id)}
                     >
-                      Mark as read
+                      {t("notificationBell.markAsRead")}
                     </Button>
                   ) : null}
                 </li>
@@ -141,10 +143,10 @@ export function NotificationBell() {
 
           <div className="portal-notification-panel__footer">
             <Link to="/portal/notifications" onClick={close}>
-              View all notifications
+              {t("notificationBell.viewAll")}
             </Link>
             <Link to="/portal/notifications/preferences" onClick={close}>
-              Notification settings
+              {t("notificationBell.settingsLink")}
             </Link>
           </div>
         </div>

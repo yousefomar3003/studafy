@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 
 import { ApprovalQueueBadge } from "../../components/ApprovalQueueBadge";
 import { usePermissions } from "../../lib/auth";
+import { useTranslation } from "../../lib/i18n";
 
 import { visiblePortalNavItems } from "./nav-items";
 
@@ -20,11 +21,17 @@ export interface PortalSidebarProps {
  * (otherwise 403) request.
  */
 export function PortalSidebar({ navId, open }: PortalSidebarProps) {
+  const { t } = useTranslation();
   const permissions = usePermissions();
   const items = visiblePortalNavItems(permissions);
 
   return (
-    <nav id={navId} aria-label="Portal" className="portal-sidebar" data-open={open || undefined}>
+    <nav
+      id={navId}
+      aria-label={t("nav.ariaLabel")}
+      className="portal-sidebar"
+      data-open={open || undefined}
+    >
       <ul className="portal-nav">
         {items.map((item) => (
           <li key={item.id} className="portal-nav__item">
@@ -35,7 +42,7 @@ export function PortalSidebar({ navId, open }: PortalSidebarProps) {
                 isActive ? "portal-nav__link portal-nav__link--active" : "portal-nav__link"
               }
             >
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
             {item.id === "approvals" ? <ApprovalQueueBadge /> : null}
           </li>
