@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
   go_router: ^17.3.0
   flutter_riverpod: ^3.3.2
+  google_fonts: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -20,3 +21,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/Inter-Regular.ttf
+    - assets/fonts/Inter-Medium.ttf
+    - assets/fonts/Inter-SemiBold.ttf
+    - assets/fonts/Inter-Bold.ttf
