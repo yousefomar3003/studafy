@@ -8,7 +8,7 @@ Studafy's Flutter mobile application shell. It contains the bootstrap needed for
 - Android SDK for Android builds
 - Xcode on macOS for iOS builds
 
-This workstation also has Flutter available at `C:\tmp\flutter`; the commands below use plain `flutter` so they work once Flutter is on `PATH`.
+The commands below use plain `flutter`; make sure the Flutter SDK is on `PATH`.
 
 ## Running Flavors
 
