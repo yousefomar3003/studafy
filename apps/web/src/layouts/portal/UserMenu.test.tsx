@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { expectNoA11yViolations } from "../../lib/test/axe";
+
 const getMock = mock((_path: string) => Promise.resolve({ data: { sessions: [], devices: [] } }));
 mock.module("../../lib/api", () => ({ api: { GET: getMock, DELETE: getMock } }));
 
@@ -79,5 +81,16 @@ describe("UserMenu", () => {
     fireEvent.click(screen.getByText("Sign out"));
 
     await waitFor(() => expect(called).toBe(true));
+  });
+
+  test("has no accessibility violations with the panel and the devices dialog open", async () => {
+    const { container } = await renderMenu(async () => undefined);
+
+    fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByText("Devices & sessions"));
+    await screen.findByRole("dialog", { name: "Devices & sessions" });
+    await expectNoA11yViolations(container);
   });
 });

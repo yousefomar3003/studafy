@@ -62,6 +62,52 @@ describe("Modal", () => {
     expect(dialog().contains(document.activeElement)).toBe(true);
   });
 
+  test("defaults focus to the first content control, not the header's close button", () => {
+    // The close button is first in DOM order in every `@studafy/ui` dialog, but a sighted mouse
+    // user's eye (and the ARIA APG's own guidance) goes to the dialog's content first — so that is
+    // what a keyboard/AT user should land on too, not the chrome around it.
+    render(
+      <Modal open onClose={() => undefined} title="New invitation">
+        <Modal.Body>
+          <input type="email" aria-label="Email" />
+        </Modal.Body>
+      </Modal>,
+    );
+
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Email" }));
+  });
+
+  test("falls back to the close button when the dialog has no other focusable content", () => {
+    render(
+      <Modal open onClose={() => undefined} title="Delete course">
+        <Modal.Body>This cannot be undone.</Modal.Body>
+      </Modal>,
+    );
+
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close dialog" }));
+  });
+
+  test("initialFocusRef still wins over the first-content-control default", () => {
+    function WithRef() {
+      const ref = useRef<HTMLButtonElement>(null);
+      return (
+        <Modal open onClose={() => undefined} title="New invitation" initialFocusRef={ref}>
+          <Modal.Body>
+            <input type="email" aria-label="Email" />
+          </Modal.Body>
+          <Modal.Footer>
+            <button type="button" ref={ref}>
+              Send
+            </button>
+          </Modal.Footer>
+        </Modal>
+      );
+    }
+    render(<WithRef />);
+
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Send" }));
+  });
+
   test("honours initialFocusRef", () => {
     function WithInitialFocus() {
       const ref = useRef<HTMLButtonElement>(null);

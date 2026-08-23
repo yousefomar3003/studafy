@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
+import { expectNoA11yViolations } from "../../lib/test/axe";
+
 const getMock = mock((path: string) => {
   if (path === "/api/auth/sessions") {
     return Promise.resolve({
@@ -138,5 +140,12 @@ describe("DeviceSessionsPanel", () => {
         expect.objectContaining({ params: { path: { deviceId: "device-2" } } }),
       );
     });
+  });
+
+  test("has no accessibility violations", async () => {
+    const { container } = await renderPanel();
+    await screen.findByText("Chrome on macOS");
+
+    await expectNoA11yViolations(container);
   });
 });

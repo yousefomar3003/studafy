@@ -4,6 +4,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { expectNoA11yViolations } from "../../lib/test/axe";
+
 import type { ComponentType } from "react";
 
 const EMPTY_ATTENDANCE_TOTALS = {
@@ -69,7 +71,9 @@ function renderPage(Page: ComponentType) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <Page />
+        <main>
+          <Page />
+        </main>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -148,5 +152,13 @@ describe("AdminDashboardPage", () => {
     expect(await screen.findByText("Nothing is waiting on your review.")).toBeTruthy();
     expect(screen.getByText("No invited or active users yet.")).toBeTruthy();
     expect(screen.getByText("No attendance recorded yet today.")).toBeTruthy();
+  });
+
+  test("has no accessibility violations, with data and with empty tiles", async () => {
+    getMock.mockImplementation(emptyResponsesFor);
+    const { container } = renderPage(await loadAdminDashboardPage());
+    await screen.findByText("No invited or active users yet.");
+
+    await expectNoA11yViolations(container);
   });
 });

@@ -66,6 +66,14 @@
   background-color: var(--color-accent-subtle-bg);
 }
 
+/* `--color-accent` (the tertiary button's resting text color) only reaches 4.23:1 against
+   `--color-accent-subtle-bg` — under the 4.5:1 AA text minimum. `--color-accent-subtle-foreground`
+   is this design system's own token for text on that background (7+:1 in both themes); the "Mark as
+   read" button just wasn't switched to it when this background was added. */
+.notifications-page__item[data-unread] .sf-button--tertiary {
+  color: var(--color-accent-subtle-foreground);
+}
+
 .notifications-page__item-body {
   min-width: 0;
 }
