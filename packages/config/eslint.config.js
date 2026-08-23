@@ -7,9 +7,12 @@ import securityPlugin from "eslint-plugin-security";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import noAnalyticsPii from "./rules/no-analytics-pii.js";
 import noSessionSet from "./rules/no-session-set.js";
 
-const studafyPlugin = { rules: { "no-session-set": noSessionSet } };
+const studafyPlugin = {
+  rules: { "no-session-set": noSessionSet, "no-analytics-pii": noAnalyticsPii },
+};
 
 export default defineConfig([
   {
@@ -45,6 +48,7 @@ export default defineConfig([
     },
     rules: {
       "studafy/no-session-set": "error",
+      "studafy/no-analytics-pii": "error",
       eqeqeq: ["error", "smart"],
       "no-var": "error",
       "prefer-const": "error",

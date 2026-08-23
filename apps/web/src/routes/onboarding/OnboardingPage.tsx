@@ -3,11 +3,10 @@ import { useToast } from "@studafy/ui";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { track } from "../../lib/analytics";
+import { REGISTRATION_EVENTS, track } from "../../lib/analytics";
 import { api } from "../../lib/api";
 
 import { AdminContactStep } from "./AdminContactStep";
-import { ONBOARDING_EVENTS } from "./analyticsEvents";
 import { RegistrationResult } from "./RegistrationResult";
 import { SchoolDetailsStep } from "./SchoolDetailsStep";
 
@@ -49,7 +48,7 @@ export default function OnboardingPage() {
   const [canResend, setCanResend] = useState(true);
 
   useEffect(() => {
-    track(ONBOARDING_EVENTS.REGISTRATION_STARTED);
+    track(REGISTRATION_EVENTS.STARTED);
   }, []);
 
   const registerMutation = useMutation({
@@ -69,11 +68,11 @@ export default function OnboardingPage() {
     onSuccess: () => {
       setBanner(null);
       setStep("result");
-      track(ONBOARDING_EVENTS.REGISTRATION_SUCCEEDED);
+      track(REGISTRATION_EVENTS.SUCCEEDED);
     },
     onError: (error: unknown) => {
       const apiError = error instanceof ApiError ? error : null;
-      track(ONBOARDING_EVENTS.REGISTRATION_FAILED, { reason: apiError?.code ?? "unknown" });
+      track(REGISTRATION_EVENTS.FAILED, { reason: apiError?.code ?? "unknown" });
       setResetCaptchaSignal((n) => n + 1);
 
       if (apiError?.code === "SCHOOL_SLUG_DUPLICATE") {
@@ -99,7 +98,7 @@ export default function OnboardingPage() {
       await api.POST("/api/schools/resend-verification", { body: { email } });
     },
     onSuccess: () => {
-      track(ONBOARDING_EVENTS.VERIFICATION_RESEND_SUCCEEDED);
+      track(REGISTRATION_EVENTS.VERIFICATION_RESEND_SUCCEEDED);
       toast.show({
         title: "Verification email sent",
         description: `Check ${schoolDetails.email}.`,
@@ -126,7 +125,7 @@ export default function OnboardingPage() {
             setSchoolDetails(values);
             setServerFieldErrors({});
             setStep("admin");
-            track(ONBOARDING_EVENTS.STEP_COMPLETED, { step: "school" });
+            track(REGISTRATION_EVENTS.STEP_COMPLETED, { step: "school" });
           }}
         />
       ) : null}
@@ -142,7 +141,7 @@ export default function OnboardingPage() {
           }}
           onSubmit={(values, captchaToken) => {
             setAdminContact(values);
-            track(ONBOARDING_EVENTS.REGISTRATION_SUBMITTED);
+            track(REGISTRATION_EVENTS.SUBMITTED);
             registerMutation.mutate({
               school_name: schoolDetails.school_name,
               slug: schoolDetails.slug,
@@ -165,7 +164,7 @@ export default function OnboardingPage() {
           resending={resendMutation.isPending}
           resendDisabled={!canResend || resendMutation.isPending}
           onResend={() => {
-            track(ONBOARDING_EVENTS.VERIFICATION_RESEND_REQUESTED);
+            track(REGISTRATION_EVENTS.VERIFICATION_RESEND_REQUESTED);
             resendMutation.mutate(schoolDetails.email);
           }}
         />

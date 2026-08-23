@@ -4,6 +4,12 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import {
+  ACTIVATION_EVENTS,
+  FEATURE_EVENTS,
+  SETUP_WIZARD_FEATURES,
+  track,
+} from "../../lib/analytics";
 import { api } from "../../lib/api";
 
 import { clearProgress, loadProgress, nextStepAfter, saveProgress } from "./progress";
@@ -55,20 +61,32 @@ export default function SetupWizardPage() {
 
   function completeStep(stepId: StepId, patch: Partial<WizardProgress>) {
     setBanner(null);
+    track(ACTIVATION_EVENTS.SETUP_STEP_COMPLETED, { step: stepId });
+    // eslint-disable-next-line security/detect-object-injection -- `stepId` is `StepId`, a fixed set of literal step names, not user-controlled
+    track(FEATURE_EVENTS.USED, { feature: SETUP_WIZARD_FEATURES[stepId] });
+    const currentStep = nextStepAfter(stepId);
+    if (currentStep === "complete") {
+      track(ACTIVATION_EVENTS.SETUP_COMPLETED);
+    }
     persist({
       ...progress,
       ...patch,
       stepState: { ...progress.stepState, [stepId]: "completed" },
-      currentStep: nextStepAfter(stepId),
+      currentStep,
     });
   }
 
   function skipStep(stepId: StepId) {
     setBanner(null);
+    track(ACTIVATION_EVENTS.SETUP_STEP_SKIPPED, { step: stepId });
+    const currentStep = nextStepAfter(stepId);
+    if (currentStep === "complete") {
+      track(ACTIVATION_EVENTS.SETUP_COMPLETED);
+    }
     persist({
       ...progress,
       stepState: { ...progress.stepState, [stepId]: "skipped" },
-      currentStep: nextStepAfter(stepId),
+      currentStep,
     });
   }
 
