@@ -4,6 +4,7 @@ import { useState, type PropsWithChildren } from "react";
 
 import { AuthProvider, sessionStore } from "../lib/auth";
 import { LocaleProvider } from "../lib/i18n";
+import { MonitoringUserSync } from "../lib/monitoring";
 import { RealtimeClient, RealtimeProvider } from "../lib/realtime";
 
 import { createQueryClient } from "./query-client";
@@ -26,6 +27,10 @@ import type { RealtimeClientOptions, RealtimeSocket } from "../lib/realtime";
  * `LocaleProvider` sits outermost: it sets `<html lang dir>` from the persisted locale, and every
  * provider below it (and the routed tree) may render translated text or logical-property layout that
  * depends on that attribute already being correct.
+ *
+ * `MonitoringUserSync` renders nothing; it sits inside `AuthProvider` purely so
+ * `useSyncMonitoringUser` (`lib/monitoring`) can read the session and keep Sentry's user context —
+ * the session's own id, nothing else — aligned with sign-in/sign-out.
  */
 export function AppProviders({
   children,
@@ -52,6 +57,7 @@ export function AppProviders({
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <AuthProvider store={store}>
+            <MonitoringUserSync />
             <RealtimeProvider client={realtimeClient}>{children}</RealtimeProvider>
           </AuthProvider>
         </ToastProvider>
