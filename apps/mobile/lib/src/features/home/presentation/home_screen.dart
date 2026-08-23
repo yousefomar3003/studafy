@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/app_providers.dart';
-import '../../../core/utils/string_formatters.dart';
 import '../../../design/widgets/app_info_tile.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -39,7 +38,7 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   AppInfoTile(
                     label: 'API base URL',
-                    value: formatUriForDisplay(networkConfig.apiBaseUrl),
+                    value: networkConfig.apiBaseUrl.toString(),
                   ),
                   const SizedBox(height: 12),
                   const AppInfoTile(label: 'Route', value: '/'),
