@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { useTranslation } from "../../lib/i18n";
 
 import type { components } from "@studafy/api-client";
 
@@ -25,6 +26,7 @@ export interface DeviceSessionsPanelProps {
  * open/close is what starts and stops the data fetch.
  */
 export function DeviceSessionsPanel({ open, onClose }: DeviceSessionsPanelProps) {
+  const { t } = useTranslation();
   const { sessionId: currentSessionId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -82,16 +84,16 @@ export function DeviceSessionsPanel({ open, onClose }: DeviceSessionsPanelProps)
     <Modal
       open={open}
       onClose={onClose}
-      title="Devices & sessions"
-      description="Everywhere you're currently signed in."
+      title={t("deviceSessions.title")}
+      description={t("deviceSessions.description")}
     >
       <Modal.Body>
         <section aria-labelledby="portal-sessions-heading">
-          <h3 id="portal-sessions-heading">Sessions</h3>
+          <h3 id="portal-sessions-heading">{t("deviceSessions.sessionsHeading")}</h3>
           {sessionsQuery.isPending ? (
-            <p role="status">Loading…</p>
+            <p role="status">{t("deviceSessions.loading")}</p>
           ) : sessions.length === 0 ? (
-            <p>No active sessions.</p>
+            <p>{t("deviceSessions.noSessions")}</p>
           ) : (
             <ul className="portal-device-session-list">
               {sessions.map((session) => {
@@ -101,19 +103,21 @@ export function DeviceSessionsPanel({ open, onClose }: DeviceSessionsPanelProps)
                     <div>
                       <p>{session.device_name ?? session.channel}</p>
                       <p className="portal-device-session-list__meta">
-                        {session.ip_address ?? "Unknown location"} &middot;{" "}
+                        {session.ip_address ?? t("deviceSessions.unknownLocation")} &middot;{" "}
                         {new Date(session.issued_at).toLocaleString()}
                       </p>
                     </div>
                     {isCurrent ? (
-                      <span className="portal-device-session-list__current">Current session</span>
+                      <span className="portal-device-session-list__current">
+                        {t("deviceSessions.currentSession")}
+                      </span>
                     ) : (
                       <Button
                         variant="tertiary"
                         loading={revokeSession.isPending && revokeSession.variables === session.id}
                         onClick={() => revokeSession.mutate(session.id)}
                       >
-                        Revoke
+                        {t("deviceSessions.revoke")}
                       </Button>
                     )}
                   </li>
@@ -124,11 +128,11 @@ export function DeviceSessionsPanel({ open, onClose }: DeviceSessionsPanelProps)
         </section>
 
         <section aria-labelledby="portal-devices-heading">
-          <h3 id="portal-devices-heading">Devices</h3>
+          <h3 id="portal-devices-heading">{t("deviceSessions.devicesHeading")}</h3>
           {devicesQuery.isPending ? (
-            <p role="status">Loading…</p>
+            <p role="status">{t("deviceSessions.loading")}</p>
           ) : devices.length === 0 ? (
-            <p>No registered devices.</p>
+            <p>{t("deviceSessions.noDevices")}</p>
           ) : (
             <ul className="portal-device-session-list">
               {devices.map((device) => (
@@ -136,8 +140,7 @@ export function DeviceSessionsPanel({ open, onClose }: DeviceSessionsPanelProps)
                   <div>
                     <p>{device.platform}</p>
                     <p className="portal-device-session-list__meta">
-                      {device.active_session_count} active session
-                      {device.active_session_count === 1 ? "" : "s"}
+                      {t("deviceSessions.activeSessions", { count: device.active_session_count })}
                     </p>
                   </div>
                   <Button
@@ -145,7 +148,7 @@ export function DeviceSessionsPanel({ open, onClose }: DeviceSessionsPanelProps)
                     loading={removeDevice.isPending && removeDevice.variables === device.id}
                     onClick={() => removeDevice.mutate(device.id)}
                   >
-                    Remove device
+                    {t("deviceSessions.removeDevice")}
                   </Button>
                 </li>
               ))}

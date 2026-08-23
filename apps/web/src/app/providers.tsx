@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useState, type PropsWithChildren } from "react";
 
 import { AuthProvider, sessionStore } from "../lib/auth";
+import { LocaleProvider } from "../lib/i18n";
 import { RealtimeClient, RealtimeProvider } from "../lib/realtime";
 
 import { createQueryClient } from "./query-client";
@@ -21,6 +22,10 @@ import type { RealtimeClientOptions, RealtimeSocket } from "../lib/realtime";
  * realtime handshake token — the socket authenticates as the active session and stays disconnected
  * (`unauthorized`) while signed out. `realtimeSocketFactory` is a test seam threaded through to the
  * `RealtimeClient`; production uses the browser `WebSocket`.
+ *
+ * `LocaleProvider` sits outermost: it sets `<html lang dir>` from the persisted locale, and every
+ * provider below it (and the routed tree) may render translated text or logical-property layout that
+ * depends on that attribute already being correct.
  */
 export function AppProviders({
   children,
@@ -43,13 +48,15 @@ export function AppProviders({
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <AuthProvider store={store}>
-          <RealtimeProvider client={realtimeClient}>{children}</RealtimeProvider>
-        </AuthProvider>
-      </ToastProvider>
-    </QueryClientProvider>
+    <LocaleProvider>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <AuthProvider store={store}>
+            <RealtimeProvider client={realtimeClient}>{children}</RealtimeProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </QueryClientProvider>
+    </LocaleProvider>
   );
 }
 

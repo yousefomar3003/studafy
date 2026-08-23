@@ -10,7 +10,8 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
     "test": "bun test src",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "i18n:pseudo": "bun src/lib/i18n/locales/generate-pseudo-locale.ts"
   },
   "dependencies": {
     "@studafy/api-client": "workspace:*",
@@ -19,8 +20,10 @@
     "@studafy/shared-schemas": "workspace:*",
     "@studafy/ui": "workspace:*",
     "@tanstack/react-query": "5.101.2",
+    "i18next": "23.16.8",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "react-i18next": "15.7.4",
     "react-router-dom": "6.30.4",
     "zod": "4.1.12"
   },

@@ -1,0 +1,66 @@
+{
+  "shell": {
+    "skipToContent": "تخطي إلى المحتوى",
+    "primaryNavAriaLabel": "التنقل الرئيسي",
+    "toggleNav": "تبديل التنقل"
+  },
+  "nav": {
+    "ariaLabel": "البوابة",
+    "home": "الرئيسية",
+    "notifications": "الإشعارات",
+    "admin": "الإدارة",
+    "principal": "المدير",
+    "billing": "الفوترة",
+    "finance": "المالية",
+    "approvals": "الموافقات",
+    "account": "الحساب"
+  },
+  "rootNav": {
+    "home": "الرئيسية",
+    "onboarding": "التهيئة",
+    "portal": "البوابة",
+    "account": "الحساب"
+  },
+  "localeSwitcher": {
+    "label": "اللغة"
+  },
+  "userMenu": {
+    "ariaLabel": "قائمة الحساب",
+    "devicesAndSessions": "الأجهزة والجلسات",
+    "signOut": "تسجيل الخروج"
+  },
+  "notificationBell": {
+    "ariaLabel_zero": "الإشعارات",
+    "ariaLabel_one": "الإشعارات، إشعار واحد غير مقروء",
+    "ariaLabel_two": "الإشعارات، إشعاران غير مقروءين",
+    "ariaLabel_few": "الإشعارات، {{count}} إشعارات غير مقروءة",
+    "ariaLabel_many": "الإشعارات، {{count}} إشعارًا غير مقروء",
+    "ariaLabel_other": "الإشعارات، {{count}} إشعار غير مقروء",
+    "heading": "الإشعارات",
+    "markAllRead": "تعليم الكل كمقروء",
+    "loading": "جارٍ التحميل…",
+    "empty": "لقد اطّلعت على كل شيء.",
+    "markAsRead": "تعليم كمقروء",
+    "viewAll": "عرض جميع الإشعارات",
+    "settingsLink": "إعدادات الإشعارات"
+  },
+  "deviceSessions": {
+    "title": "الأجهزة والجلسات",
+    "description": "كل الأماكن التي سجّلت الدخول منها حاليًا.",
+    "sessionsHeading": "الجلسات",
+    "devicesHeading": "الأجهزة",
+    "loading": "جارٍ التحميل…",
+    "noSessions": "لا توجد جلسات نشطة.",
+    "noDevices": "لا توجد أجهزة مسجّلة.",
+    "unknownLocation": "موقع غير معروف",
+    "currentSession": "الجلسة الحالية",
+    "revoke": "إبطال",
+    "removeDevice": "إزالة الجهاز",
+    "activeSessions_zero": "لا توجد جلسات نشطة",
+    "activeSessions_one": "جلسة نشطة واحدة",
+    "activeSessions_two": "جلستان نشطتان",
+    "activeSessions_few": "{{count}} جلسات نشطة",
+    "activeSessions_many": "{{count}} جلسة نشطة",
+    "activeSessions_other": "{{count}} جلسة نشطة"
+  }
+}

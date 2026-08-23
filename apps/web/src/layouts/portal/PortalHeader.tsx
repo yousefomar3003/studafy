@@ -1,3 +1,6 @@
+import { useTranslation } from "../../lib/i18n";
+
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import { NotificationBell } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
 
@@ -12,9 +15,11 @@ export interface PortalHeaderProps {
  * Single-tenant header: a static brand mark, no school switcher — Studafy is single-tenant per
  * deployment today, so there is nothing to switch between (see the ticket's own framing). The nav
  * toggle only does anything at the narrow breakpoint (`portal-shell.css` hides it above that width,
- * where the sidebar is always visible).
+ * where the sidebar is always visible). "Studafy" is a proper noun and is never run through `t()`.
  */
 export function PortalHeader({ navId, navOpen, onToggleNav }: PortalHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <header className="portal-header">
       <button
@@ -32,12 +37,13 @@ export function PortalHeader({ navId, navOpen, onToggleNav }: PortalHeaderProps)
             strokeLinecap="round"
           />
         </svg>
-        <span className="sf-visually-hidden">Toggle navigation</span>
+        <span className="sf-visually-hidden">{t("shell.toggleNav")}</span>
       </button>
 
       <span className="portal-header__brand">Studafy</span>
 
       <div className="portal-header__actions">
+        <LocaleSwitcher />
         <NotificationBell />
         <UserMenu />
       </div>

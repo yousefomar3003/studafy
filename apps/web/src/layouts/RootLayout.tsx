@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 
 import { Loading } from "../components/Loading";
+import { useTranslation } from "../lib/i18n";
 
 import { MARKETING_NAV_ITEMS } from "./marketing/nav-items";
 
@@ -18,21 +19,22 @@ const MARKETING_PATHS = new Set(MARKETING_NAV_ITEMS.map((item) => item.to));
  * broken rather than intentional.
  */
 export function RootLayout() {
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   const isMarketing = MARKETING_PATHS.has(pathname);
 
   return (
     <>
       <a className="skip-link" href="#main">
-        Skip to content
+        {t("shell.skipToContent")}
       </a>
       {!isMarketing && (
         <header>
-          <nav aria-label="Primary">
-            <Link to="/">Home</Link>
-            <Link to="/onboarding">Onboarding</Link>
-            <Link to="/portal">Portal</Link>
-            <Link to="/account">Account</Link>
+          <nav aria-label={t("shell.primaryNavAriaLabel")}>
+            <Link to="/">{t("rootNav.home")}</Link>
+            <Link to="/onboarding">{t("rootNav.onboarding")}</Link>
+            <Link to="/portal">{t("rootNav.portal")}</Link>
+            <Link to="/account">{t("rootNav.account")}</Link>
           </nav>
         </header>
       )}

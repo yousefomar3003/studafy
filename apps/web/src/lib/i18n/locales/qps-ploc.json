@@ -1,0 +1,60 @@
+{
+  "shell": {
+    "skipToContent": "[Šķíρ ţó çóñţéñţ ǝɥʇ ʞɔ]",
+    "primaryNavAriaLabel": "[Ρŕíɱáŕý ǝɥʇ]",
+    "toggleNav": "[Ţóğğĺé ñáṽíğáţíóñ ǝɥʇ ʞɔ]"
+  },
+  "nav": {
+    "ariaLabel": "[Ρóŕţáĺ ǝɥʇ]",
+    "home": "[Ĥóɱé ǝɥ]",
+    "notifications": "[Ñóţíƒíçáţíóñš ǝɥʇ ʞ]",
+    "admin": "[Áđɱíñ ǝɥ]",
+    "principal": "[Ρŕíñçíρáĺ ǝɥʇ ]",
+    "billing": "[Βíĺĺíñğ ǝɥʇ]",
+    "finance": "[F̃íñáñçé ǝɥʇ]",
+    "approvals": "[Áρρŕóṽáĺš ǝɥʇ ]",
+    "account": "[Áççóúñţ ǝɥʇ]"
+  },
+  "rootNav": {
+    "home": "[Ĥóɱé ǝɥ]",
+    "onboarding": "[Óñƀóáŕđíñğ ǝɥʇ ]",
+    "portal": "[Ρóŕţáĺ ǝɥʇ]",
+    "account": "[Áççóúñţ ǝɥʇ]"
+  },
+  "localeSwitcher": {
+    "label": "[Ĺáñğúáğé ǝɥʇ]"
+  },
+  "userMenu": {
+    "ariaLabel": "[Áççóúñţ ɱéñú ǝɥʇ ʞ]",
+    "devicesAndSessions": "[Đéṽíçéš & šéššíóñš ǝɥʇ ʞɔı]",
+    "signOut": "[Šíğñ óúţ ǝɥʇ]"
+  },
+  "notificationBell": {
+    "ariaLabel_zero": "[Ñóţíƒíçáţíóñš ǝɥʇ ʞ]",
+    "ariaLabel_one": "[Ñóţíƒíçáţíóñš, {{count}} úñŕéáđ ǝɥʇ ʞɔınb u]",
+    "ariaLabel_other": "[Ñóţíƒíçáţíóñš, {{count}} úñŕéáđ ǝɥʇ ʞɔınb u]",
+    "heading": "[Ñóţíƒíçáţíóñš ǝɥʇ ʞ]",
+    "markAllRead": "[M̃áŕķ áĺĺ áš ŕéáđ ǝɥʇ ʞɔ]",
+    "loading": "[Ĺóáđíñğ… ǝɥʇ]",
+    "empty": "[Ýóú’ŕé áĺĺ çáúğħţ úρ. ǝɥʇ ʞɔın]",
+    "markAsRead": "[M̃áŕķ áš ŕéáđ ǝɥʇ ʞ]",
+    "viewAll": "[Ṽíéŵ áĺĺ ñóţíƒíçáţíóñš ǝɥʇ ʞɔın]",
+    "settingsLink": "[Ñóţíƒíçáţíóñ šéţţíñğš ǝɥʇ ʞɔın]"
+  },
+  "deviceSessions": {
+    "title": "[Đéṽíçéš & šéššíóñš ǝɥʇ ʞɔı]",
+    "description": "[Éṽéŕýŵħéŕé ýóú'ŕé çúŕŕéñţĺý šíğñéđ íñ. ǝɥʇ ʞɔınb uʍoɹ]",
+    "sessionsHeading": "[Šéššíóñš ǝɥʇ]",
+    "devicesHeading": "[Đéṽíçéš ǝɥʇ]",
+    "loading": "[Ĺóáđíñğ… ǝɥʇ]",
+    "noSessions": "[Ñó áçţíṽé šéššíóñš. ǝɥʇ ʞɔı]",
+    "noDevices": "[Ñó ŕéğíšţéŕéđ đéṽíçéš. ǝɥʇ ʞɔın]",
+    "unknownLocation": "[Úñķñóŵñ ĺóçáţíóñ ǝɥʇ ʞɔ]",
+    "currentSession": "[Çúŕŕéñţ šéššíóñ ǝɥʇ ʞɔ]",
+    "revoke": "[Ŕéṽóķé ǝɥʇ]",
+    "removeDevice": "[Ŕéɱóṽé đéṽíçé ǝɥʇ ʞ]",
+    "activeSessions_zero": "[Ñó áçţíṽé šéššíóñš ǝɥʇ ʞɔı]",
+    "activeSessions_one": "[{{count}} áçţíṽé šéššíóñ ǝɥʇ ʞɔınb]",
+    "activeSessions_other": "[{{count}} áçţíṽé šéššíóñš ǝɥʇ ʞɔınb]"
+  }
+}

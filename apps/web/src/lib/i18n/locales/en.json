@@ -1,0 +1,60 @@
+{
+  "shell": {
+    "skipToContent": "Skip to content",
+    "primaryNavAriaLabel": "Primary",
+    "toggleNav": "Toggle navigation"
+  },
+  "nav": {
+    "ariaLabel": "Portal",
+    "home": "Home",
+    "notifications": "Notifications",
+    "admin": "Admin",
+    "principal": "Principal",
+    "billing": "Billing",
+    "finance": "Finance",
+    "approvals": "Approvals",
+    "account": "Account"
+  },
+  "rootNav": {
+    "home": "Home",
+    "onboarding": "Onboarding",
+    "portal": "Portal",
+    "account": "Account"
+  },
+  "localeSwitcher": {
+    "label": "Language"
+  },
+  "userMenu": {
+    "ariaLabel": "Account menu",
+    "devicesAndSessions": "Devices & sessions",
+    "signOut": "Sign out"
+  },
+  "notificationBell": {
+    "ariaLabel_zero": "Notifications",
+    "ariaLabel_one": "Notifications, {{count}} unread",
+    "ariaLabel_other": "Notifications, {{count}} unread",
+    "heading": "Notifications",
+    "markAllRead": "Mark all as read",
+    "loading": "Loading…",
+    "empty": "You’re all caught up.",
+    "markAsRead": "Mark as read",
+    "viewAll": "View all notifications",
+    "settingsLink": "Notification settings"
+  },
+  "deviceSessions": {
+    "title": "Devices & sessions",
+    "description": "Everywhere you're currently signed in.",
+    "sessionsHeading": "Sessions",
+    "devicesHeading": "Devices",
+    "loading": "Loading…",
+    "noSessions": "No active sessions.",
+    "noDevices": "No registered devices.",
+    "unknownLocation": "Unknown location",
+    "currentSession": "Current session",
+    "revoke": "Revoke",
+    "removeDevice": "Remove device",
+    "activeSessions_zero": "No active sessions",
+    "activeSessions_one": "{{count}} active session",
+    "activeSessions_other": "{{count}} active sessions"
+  }
+}
