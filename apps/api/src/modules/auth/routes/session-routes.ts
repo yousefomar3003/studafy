@@ -13,6 +13,7 @@ import {
   deviceToResponse,
   listActiveSessions,
   listUserDevices,
+  registerDeviceToken,
   resolveFamilyByToken,
   rotateRefreshToken,
   sessionToResponse,
@@ -119,6 +120,17 @@ const deviceSchema = z
   .openapi("Device");
 
 export const deviceListSchema = z.object({ devices: z.array(deviceSchema) }).openapi("DeviceList");
+
+const registerDeviceRequestSchema = z
+  .object({
+    fcm_token: z.string().min(1).openapi({ description: "FCM registration token." }),
+    platform: z.enum(["ios", "android", "web"]).openapi({ description: "Device platform." }),
+  })
+  .openapi("RegisterDeviceRequest");
+
+const registerDeviceResponseSchema = z
+  .object({ id: z.uuid().openapi({ description: "Device id." }) })
+  .openapi("RegisterDeviceResponse");
 
 // ---------------------------------------------------------------------------
 // Route definitions
@@ -261,6 +273,36 @@ const listDevicesRoute = createRoute({
   ),
 });
 
+const registerDeviceAudit = auditAction("insert", "user_devices");
+
+const registerDeviceRoute = createRoute({
+  method: "post",
+  path: "/api/auth/devices",
+  tags: ["Auth"],
+  operationId: "registerDevice",
+  summary: "Register a push-notification device",
+  description:
+    "Upserts an FCM registration token for the authenticated user. Calls `app.claim_device_token()` " +
+    "first to soft-revoke any other user in the same school who is still routing to this token, " +
+    "then inserts or reactivates the caller's own row. Re-registration after a token refresh is " +
+    "idempotent — the row's `last_seen` is bumped and `revoked_at` is cleared.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: { "application/json": { schema: registerDeviceRequestSchema } },
+    },
+  },
+  responses: standardResponses(
+    {
+      200: {
+        description: "Device registered or refreshed.",
+        schema: registerDeviceResponseSchema,
+      },
+    },
+    [400, 401, 429, 500],
+  ),
+});
+
 const revokeDeviceEntirelyAudit = auditAction("logout", "refresh_tokens");
 
 const revokeDeviceEntirelyRoute = createRoute({
@@ -329,6 +371,7 @@ export function sessionRoutes(
   routes.use("/api/auth/logout", logoutAudit);
   routes.use("/api/auth/sessions/:sessionId", revokeSessionAudit);
   routes.use("/api/auth/devices/:deviceId/sessions", revokeDeviceAudit);
+  routes.use("/api/auth/devices", registerDeviceAudit);
   routes.use("/api/auth/devices/:deviceId", revokeDeviceEntirelyAudit);
 
   routes.openapi(refreshRoute, async (c) => {
@@ -407,6 +450,17 @@ export function sessionRoutes(
     );
 
     return c.json({ devices: devices.map(deviceToResponse) }, 200);
+  });
+
+  routes.openapi(registerDeviceRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { fcm_token, platform } = c.req.valid("json");
+
+    const { id } = await withTenantTx(database, tenantFrom(c), (tx) =>
+      registerDeviceToken(tx, auth.userId, auth.schoolId, fcm_token, platform),
+    );
+
+    return c.json({ id }, 200);
   });
 
   routes.openapi(revokeSessionRoute, async (c) => {

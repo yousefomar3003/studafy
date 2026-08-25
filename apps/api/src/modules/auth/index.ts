@@ -50,6 +50,7 @@ export {
   rotateRefreshToken,
   listActiveSessions,
   listUserDevices,
+  registerDeviceToken,
   deregisterDevice,
   resolveFamilyByToken,
   type SessionTokenConfig,

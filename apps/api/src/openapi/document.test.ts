@@ -676,6 +676,7 @@ describe("security", () => {
         "POST /api/finance/scholarship-discounts/awards",
         "POST /api/finance/scholarship-discounts/awards/{awardId}/confirm",
         "POST /api/finance/reconciliation/run",
+        "POST /api/auth/devices",
         "POST /api/auth/providers/link/start",
         "POST /api/imports/students/upload",
         "POST /api/imports/students/{importId}/confirm",
