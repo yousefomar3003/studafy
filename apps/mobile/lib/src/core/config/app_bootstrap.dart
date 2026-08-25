@@ -3,22 +3,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app.dart';
+import '../auth/auth_notifier.dart';
+import '../auth/auth_session.dart';
+import '../auth/oauth_client.dart';
+import '../auth/secure_token_store.dart';
 import '../di/app_providers.dart';
+import '../realtime/realtime_providers.dart';
 import 'app_config.dart';
 import 'app_environment.dart';
 
-void bootstrapApp(AppEnvironment environment) {
+void bootstrapApp(AppEnvironment environment) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inter ships as a bundled asset (see pubspec.yaml + assets/fonts/), so the app never
-  // depends on a network fetch to render its own type scale.
   GoogleFonts.config.allowRuntimeFetching = false;
+
+  final appConfig = AppConfig.fromEnvironment(environment);
+
+  final authClient = MobileAuthClient(baseUrl: appConfig.apiBaseUrl.toString());
+  final secureStore = SecureTokenStore();
+  final session = AuthSession(authClient: authClient, secureStore: secureStore);
+  await session.restore();
 
   runApp(
     ProviderScope(
       overrides: [
-        appConfigProvider.overrideWithValue(
-          AppConfig.fromEnvironment(environment),
+        appConfigProvider.overrideWithValue(appConfig),
+        authSessionProvider.overrideWithValue(session),
+        realtimeTokenProvider.overrideWithValue(
+          () => session.tokenProvider,
         ),
       ],
       child: const StudafyApp(),

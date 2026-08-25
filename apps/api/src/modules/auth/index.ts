@@ -105,6 +105,7 @@ export {
 } from "./services/returning-user-login-service";
 export { googleOAuthRoutes } from "./oauth/google-route";
 export { microsoftOAuthRoutes } from "./oauth/microsoft-route";
+export { mobileOAuthRoutes } from "./oauth/mobile-oauth-routes";
 export { type DenylistEntry } from "./denylist";
 export type { AccessTokenClaims, JwtPayload, SignAccessTokenParams } from "./jwt/types";
 export {
