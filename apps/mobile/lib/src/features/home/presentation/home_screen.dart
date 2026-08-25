@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/app_providers.dart';
+import '../../../core/realtime/realtime_providers.dart';
 import '../../../design/widgets/app_info_tile.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -11,6 +12,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appConfig = ref.watch(appConfigProvider);
     final networkConfig = ref.watch(networkConfigProvider);
+    final realtimeStatus = ref.watch(realtimeConnectionStatusProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -39,6 +41,11 @@ class HomeScreen extends ConsumerWidget {
                   AppInfoTile(
                     label: 'API base URL',
                     value: networkConfig.apiBaseUrl.toString(),
+                  ),
+                  const SizedBox(height: 12),
+                  AppInfoTile(
+                    label: 'Realtime connection',
+                    value: realtimeStatus.name,
                   ),
                   const SizedBox(height: 12),
                   const AppInfoTile(label: 'Route', value: '/'),

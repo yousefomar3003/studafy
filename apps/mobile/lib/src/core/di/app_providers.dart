@@ -12,7 +12,10 @@ final appConfigProvider = Provider<AppConfig>((ref) {
 final networkConfigProvider = Provider<NetworkConfig>((ref) {
   final appConfig = ref.watch(appConfigProvider);
 
-  return NetworkConfig(apiBaseUrl: appConfig.apiBaseUrl);
+  return NetworkConfig(
+    apiBaseUrl: appConfig.apiBaseUrl,
+    realtimeBaseUrl: appConfig.realtimeBaseUrl,
+  );
 });
 
 final routerProvider = Provider<GoRouter>((ref) {
