@@ -11,19 +11,25 @@ were committed and changed on every branch that touched routes, schemas, or the 
 | `packages/api-client/src/generated-types.ts` | `openapi.json` changes (derived) | Incompatible line-level diffs             |
 
 Two branches independently regenerating these files made "can't auto merge" all but inevitable.
+`apps/mobile/lib/src/core/api/generated/` (ST-062, the Dart client) joined the same policy from
+the start — it's also wholly derived from `openapi.json` and would hit the identical problem, at
+larger scale (hundreds of files per regeneration instead of one).
 
 ## Current approach
 
-`apps/api/openapi.json` and `packages/api-client/src/generated-types.ts` are **no longer tracked
-in git** — both are listed in `.gitignore`. They are regenerated on demand:
+`apps/api/openapi.json`, `packages/api-client/src/generated-types.ts`, and
+`apps/mobile/lib/src/core/api/generated/` are **no longer tracked in git** — all three are listed
+in `.gitignore`. They are regenerated on demand:
 
 - Locally: `bun run openapi:generate` then `bun run client:generate` (also runs automatically as
-  a `generate` dependency of `check-types`, `test`, and `build` via `turbo.json`).
-- In CI: the same generation step runs before the pipeline; `scripts/check-drift.sh` /
-  `packages/api-client/scripts/check-drift.ts` now just verify generation succeeds and produces
-  internally consistent output — they no longer diff against a committed copy.
+  a `generate` dependency of `check-types`, `test`, and `build` via `turbo.json`) — and, for the
+  Dart client, `bun run mobile:client:generate` (see `apps/mobile/lib/src/core/api/README.md`).
+- In CI: the same generation steps run before their respective pipelines; `scripts/check-drift.sh`,
+  `packages/api-client/scripts/check-drift.ts`, and
+  `apps/mobile/scripts/check_api_client_drift.dart` now just verify generation succeeds and
+  produces internally consistent output — they no longer diff against a committed copy.
 
-Because neither file is committed, merging any branch into `dev` (or `dev` into a branch) no
+Because none of these are committed, merging any branch into `dev` (or `dev` into a branch) no
 longer produces conflicts on them — there's nothing to conflict. This applies to any branch cut
 **after** the change above landed.
 

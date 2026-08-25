@@ -9,6 +9,9 @@
     "build:prod": "flutter build apk --debug --flavor prod -t lib/main_prod.dart",
     "check-types": "echo \"Skipping Flutter analyze in turbo pipeline. Run 'flutter analyze' directly in apps/mobile instead.\"",
     "lint": "echo \"Skipping Flutter analyze in turbo pipeline. Run 'flutter analyze' directly in apps/mobile instead.\"",
-    "test": "flutter test"
+    "test": "flutter test",
+    "test:integration": "dart test test_integration",
+    "client:generate": "bash scripts/generate_api_client.sh",
+    "client:check-drift": "dart run scripts/check_api_client_drift.dart"
   }
 }

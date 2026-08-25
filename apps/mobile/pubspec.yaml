@@ -13,11 +13,19 @@ dependencies:
   go_router: ^17.3.0
   flutter_riverpod: ^3.3.2
   google_fonts: ^6.3.2
+  dio: ^5.11.0
+  retrofit: ^4.10.0
+  json_annotation: ^4.12.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  build_runner: ^2.15.1
+  retrofit_generator: ^10.2.9
+  json_serializable: ^6.14.1
+  swagger_parser: ^1.44.1
+  test: ^1.31.0
 
 flutter:
   uses-material-design: true
@@ -26,3 +34,19 @@ flutter:
     - assets/fonts/Inter-Medium.ttf
     - assets/fonts/Inter-SemiBold.ttf
     - assets/fonts/Inter-Bold.ttf
+
+# Drives `dart run scripts/generate_api_client.dart` (ST-062): generates a typed Dio/Retrofit
+# client from the OpenAPI 3.1 document that ST-060 emits at apps/api/openapi.json. Output is
+# gitignored — see lib/src/core/api/README.md and docs/runbooks/merge-conflicts-generated-files.md.
+swagger_parser:
+  schema_path: ../api/openapi.json
+  output_directory: lib/src/core/api/generated
+  name: studafy_api
+  root_client_name: StudafyApiClient
+  # "Finance" and "Approval Queue" hit unrelated swagger_parser 1.44.1 codegen bugs the API
+  # surface can't work around (a oneOf request body resolving to the wrong generated class, and
+  # an unstable name-collision rename between two schemas both called "Grades"). See
+  # lib/src/core/api/README.md#known-generation-gaps.
+  exclude_tags:
+    - Finance
+    - Approval Queue
