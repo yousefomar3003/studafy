@@ -66,5 +66,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>studafy</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>studafy</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

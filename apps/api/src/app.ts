@@ -72,6 +72,7 @@ import {
   googleOAuthRoutes,
   jwksRoutes,
   microsoftOAuthRoutes,
+  mobileOAuthRoutes,
   providerLinkRoutes,
   returningUserLoginRoutes,
   sessionRoutes,
@@ -510,6 +511,25 @@ export function createApp({
     app.route(
       "/",
       microsoftOAuthRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        logger,
+      ),
+    );
+  }
+
+  // Mobile OAuth (system-browser PKCE flow). Same database and key store requirements as the
+  // browser-redirect routes above. Returns JSON instead of HTTP redirects.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      mobileOAuthRoutes(
         database,
         {
           keyStore,
