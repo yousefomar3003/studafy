@@ -72,6 +72,7 @@ import {
   googleOAuthRoutes,
   jwksRoutes,
   microsoftOAuthRoutes,
+  mobileActivationOAuthRoutes,
   mobileOAuthRoutes,
   providerLinkRoutes,
   returningUserLoginRoutes,
@@ -567,6 +568,10 @@ export function createApp({
     // Browser-redirect arm of the same flow: /start + /invitation/callback give an invited user the
     // full-page OAuth round trip and run activation server-side (see activation-oauth-routes.ts).
     app.route("/", activationOAuthRoutes(database, sessionTokenConfig, logger));
+    // Mobile arm (ST-215): the native app drives the same PKCE exchange itself and gets the
+    // result as JSON with channel=mobile, instead of a redirect + HttpOnly cookie (see
+    // mobile-activation-oauth-routes.ts).
+    app.route("/", mobileActivationOAuthRoutes(database, sessionTokenConfig, logger));
   }
 
   // Returning-user OAuth login (ST-079). Authenticates an active user via a verified Microsoft

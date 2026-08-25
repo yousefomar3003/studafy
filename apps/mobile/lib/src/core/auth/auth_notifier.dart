@@ -78,7 +78,6 @@ class AuthNotifier extends Notifier<AuthStatus> {
         code: callback.code,
         state: callback.state,
         nonce: start.nonce,
-        codeVerifier: start.codeChallenge,
       );
 
       await _session.saveTokens(
