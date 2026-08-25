@@ -50,6 +50,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
   "DELETE /api/auth/devices/{deviceId}/sessions",
+  // Device token registration (ST-218). Self-service; RLS-scoped to the caller's own row.
+  "POST /api/auth/devices",
   "DELETE /api/auth/devices/{deviceId}",
   "DELETE /api/auth/providers/{provider}",
   "DELETE /api/admin/users/{userId}/devices",
@@ -326,6 +328,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
   "DELETE /api/auth/devices/{deviceId}/sessions",
+  // Device token registration (ST-218). Self-service upsert; caller's own user_devices row.
+  "POST /api/auth/devices",
   "DELETE /api/auth/devices/{deviceId}",
   // Webhook — HMAC-authenticated, not bearer.
   "POST /erpnext/webhooks",

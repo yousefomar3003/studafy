@@ -50,6 +50,7 @@ export {
   rotateRefreshToken,
   listActiveSessions,
   listUserDevices,
+  registerDeviceToken,
   deregisterDevice,
   resolveFamilyByToken,
   type SessionTokenConfig,
@@ -82,6 +83,7 @@ export {
   type VerifiedActivationIdentity,
 } from "./routes/activation-routes";
 export { activationOAuthRoutes } from "./routes/activation-oauth-routes";
+export { mobileActivationOAuthRoutes } from "./routes/mobile-activation-oauth-routes";
 export {
   activateAccount,
   ACTIVATION_PROVIDER,

@@ -27,6 +27,7 @@ import { GOOGLE_TOKEN_ENDPOINT, getGoogleOAuthConfig } from "./config";
 import { validateGoogleIdToken } from "./google-id-token";
 import { MICROSOFT_TOKEN_ENDPOINT, getMicrosoftOAuthConfig } from "./microsoft-config";
 import { validateMicrosoftIdToken } from "./microsoft-id-token";
+import { MOBILE_OAUTH_REDIRECT_URI } from "./mobile-redirect";
 import { generateCodeChallenge, generateCodeVerifier, generateNonce, generateState } from "./pkce";
 import { createStateStore } from "./state-store";
 
@@ -54,10 +55,6 @@ const mobileExchangeRequestSchema = z
     code: z.string().min(1).describe("Authorization code from the IdP callback."),
     state: z.string().min(1).describe("State parameter returned by the /mobile-start endpoint."),
     nonce: z.string().min(1).describe("Nonce returned by the /mobile-start endpoint."),
-    code_verifier: z
-      .string()
-      .min(43)
-      .describe("PKCE code_verifier. Must match the code_challenge stored against this state."),
   })
   .openapi("MobileOAuthExchangeRequest");
 
@@ -164,7 +161,7 @@ export function mobileOAuthRoutes(
   });
 
   routes.openapi(createMobileExchangeRoute("google"), async (c) => {
-    const { code, state, nonce, code_verifier } = c.req.valid("json");
+    const { code, state, nonce } = c.req.valid("json");
     const oauthConfig = getGoogleOAuthConfig();
     if (!oauthConfig) {
       throw new HTTPException(404, { message: "Google OAuth is not configured" });
@@ -180,20 +177,20 @@ export function mobileOAuthRoutes(
     }
     stateStore.delete(state);
 
-    if (entry.codeVerifier !== code_verifier) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.OAUTH_STATE_INVALID,
-        "PKCE code_verifier does not match",
-      );
-    }
-
     if (entry.nonce !== nonce) {
       throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
     }
 
     try {
-      const idToken = await exchangeCode(code, GOOGLE_TOKEN_ENDPOINT, oauthConfig, code_verifier);
+      // The verifier never left the server (the client only ever saw its S256 hash, sent to the
+      // IdP as code_challenge at /mobile-start), so the exchange uses the one this state entry was
+      // minted with rather than trusting anything the client could supply.
+      const idToken = await exchangeCode(
+        code,
+        GOOGLE_TOKEN_ENDPOINT,
+        { ...oauthConfig, redirectUri: MOBILE_OAUTH_REDIRECT_URI },
+        entry.codeVerifier,
+      );
       const claims = await validateGoogleIdToken(idToken, oauthConfig.clientId, nonce);
 
       const result = await loginReturningUser(db, config, {
@@ -259,7 +256,7 @@ export function mobileOAuthRoutes(
   });
 
   routes.openapi(createMobileExchangeRoute("microsoft"), async (c) => {
-    const { code, state, nonce, code_verifier } = c.req.valid("json");
+    const { code, state, nonce } = c.req.valid("json");
     const oauthConfig = getMicrosoftOAuthConfig();
     if (!oauthConfig) {
       throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
@@ -275,24 +272,19 @@ export function mobileOAuthRoutes(
     }
     stateStore.delete(state);
 
-    if (entry.codeVerifier !== code_verifier) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.OAUTH_STATE_INVALID,
-        "PKCE code_verifier does not match",
-      );
-    }
-
     if (entry.nonce !== nonce) {
       throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
     }
 
     try {
+      // The verifier never left the server (the client only ever saw its S256 hash, sent to the
+      // IdP as code_challenge at /mobile-start), so the exchange uses the one this state entry was
+      // minted with rather than trusting anything the client could supply.
       const idToken = await exchangeCode(
         code,
         MICROSOFT_TOKEN_ENDPOINT,
-        oauthConfig,
-        code_verifier,
+        { ...oauthConfig, redirectUri: MOBILE_OAUTH_REDIRECT_URI },
+        entry.codeVerifier,
       );
       const claims = await validateMicrosoftIdToken(idToken, oauthConfig.clientId, nonce);
 
