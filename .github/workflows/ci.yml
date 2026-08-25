@@ -208,6 +208,63 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # ST-062's acceptance gate: the generated Dart client builds deterministically from
+  # apps/api/openapi.json and a Flutter app can reach a live /healthz through it. The rest of
+  # apps/mobile stays excluded from `quality` (--filter=!@studafy/mobile) -- this job is scoped to
+  # exactly the API client, not a general mobile CI lane.
+  mobile-api-client:
+    name: mobile-api-client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bun-workspace
+      # Both the OpenAPI generator and the liveness probe this job starts below import the Hono
+      # app, which reaches @studafy/constants and @studafy/shared-schemas through their built
+      # dist/ -- see the identical step in cross-tenant-security for why.
+      - name: Build the workspace packages the API imports
+        run: bunx turbo run build --filter=@studafy/api^...
+      - name: Regenerate the OpenAPI document
+        run: bun run openapi:generate
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+      - name: Install Flutter dependencies
+        run: flutter pub get
+        working-directory: apps/mobile
+      - name: Generate the Dart API client (ST-062)
+        run: bun run client:generate
+        working-directory: apps/mobile
+      - name: Fail on generation drift
+        run: bun run client:check-drift
+        working-directory: apps/mobile
+      # No DATABASE_HOST/REDIS_URL: /healthz "never checks a dependency" (apps/api/src/health.ts),
+      # and every other env var the API reads has a development-safe default (apps/api/src/env.ts)
+      # -- so the liveness probe this job's integration test calls needs neither Postgres nor Redis.
+      - name: Start the API for the healthz integration test
+        working-directory: apps/api
+        run: |
+          PORT=38080 HOST=127.0.0.1 NODE_ENV=development nohup bun run src/index.ts \
+            > ../../api-server.log 2>&1 &
+          echo $! > ../../api-server.pid
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:38080/healthz > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API did not become ready within 30s"
+          cat ../../api-server.log
+          exit 1
+      - name: Run the healthz integration test (ST-062)
+        env:
+          API_BASE_URL: http://127.0.0.1:38080
+        run: bun run test:integration
+        working-directory: apps/mobile
+      - name: Stop the API
+        if: always()
+        run: kill "$(cat api-server.pid)" 2>/dev/null || true
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:

@@ -38,4 +38,5 @@ backups/
 # Generated — regenerated on demand or in CI; avoid merge conflicts
 apps/api/openapi.json
 packages/api-client/src/generated-types.ts
+apps/mobile/lib/src/core/api/generated/
 *.lnk

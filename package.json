@@ -32,6 +32,8 @@
     "openapi:generate": "bun run --cwd apps/api openapi:generate",
     "client:generate": "bun run --cwd packages/api-client generate",
     "client:check-drift": "bun run --cwd packages/api-client check-drift",
+    "mobile:client:generate": "bun run --cwd apps/mobile client:generate",
+    "mobile:client:check-drift": "bun run --cwd apps/mobile client:check-drift",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
