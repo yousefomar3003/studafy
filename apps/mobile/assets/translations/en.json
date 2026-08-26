@@ -1,0 +1,17 @@
+{
+  "app": {
+    "title": "Studafy"
+  },
+  "shell": {
+    "switchLanguage": "Switch language",
+    "viewOnlyBanner": "View only — this account can’t make changes on Studafy Mobile.",
+    "placeholderBody": "This section is coming soon.",
+    "tabs": {
+      "home": "Home",
+      "courses": "Courses",
+      "classes": "Classes",
+      "children": "Children",
+      "profile": "Profile"
+    }
+  }
+}

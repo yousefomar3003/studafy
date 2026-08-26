@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 
+import 'jwt_payload.dart';
 import 'oauth_client.dart';
 import 'secure_token_store.dart';
 
@@ -25,6 +25,7 @@ class AuthSession {
   String? _accessToken;
   String? _refreshToken;
   DateTime? _accessTokenExpiresAt;
+  List<String> _roles = const [];
 
   bool _refreshInProgress = false;
   final Completer<void> _restored = Completer<void>();
@@ -41,6 +42,11 @@ class AuthSession {
 
   /// Whether the session currently holds a bearer token.
   bool get isAuthenticated => _accessToken != null;
+
+  /// The `roles` claim of the current access token, for routing/UX only (e.g. which shell a
+  /// session lands in) — never an authorization decision, since this token is not re-verified
+  /// here. Empty when unauthenticated or the claim is missing/malformed.
+  List<String> get roles => _roles;
 
   /// Whether the session has been restored from secure storage.
   bool get isRestored => _restored.isCompleted;
@@ -63,8 +69,10 @@ class AuthSession {
       _accessToken = accessToken;
       _refreshToken = refreshToken;
 
-      // Decode expiry from the JWT payload.
-      _accessTokenExpiresAt = _decodeExpiry(accessToken);
+      // Decode expiry and roles from the JWT payload.
+      final payload = decodeJwtPayload(accessToken);
+      _accessTokenExpiresAt = _expiryFromPayload(payload);
+      _roles = _rolesFromPayload(payload);
     }
 
     _restored.complete();
@@ -80,6 +88,7 @@ class AuthSession {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
     _accessTokenExpiresAt = DateTime.now().add(Duration(seconds: expiresIn));
+    _roles = _rolesFromPayload(decodeJwtPayload(accessToken));
 
     await _secureStore.save(
       accessToken: accessToken,
@@ -93,6 +102,7 @@ class AuthSession {
     _accessToken = null;
     _refreshToken = null;
     _accessTokenExpiresAt = null;
+    _roles = const [];
     await _secureStore.clear();
   }
 
@@ -168,26 +178,19 @@ class AuthSession {
 
   // -- Helpers ---------------------------------------------------------------
 
-  /// Decode the `exp` claim from a JWT without verifying the signature.
-  /// The server is the source of truth for token validity; this is only used
-  /// for client-side "refresh soon" heuristic.
-  static DateTime? _decodeExpiry(String jwt) {
-    try {
-      final parts = jwt.split('.');
-      if (parts.length != 3) return null;
+  /// Reads the `exp` claim from an already-decoded JWT payload. `null` for a missing/malformed
+  /// claim or a payload that failed to decode.
+  static DateTime? _expiryFromPayload(Map<String, dynamic>? payload) {
+    final exp = payload?['exp'];
+    if (exp is! int) return null;
+    return DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true);
+  }
 
-      final payload = utf8.decode(base64Url.decode(parts[1]));
-      final claims = Map<String, dynamic>.from(
-        jsonDecode(payload) as Map<String, dynamic>,
-      );
-
-      final exp = claims['exp'];
-      if (exp is int) {
-        return DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true);
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
+  /// Reads the `roles` claim from an already-decoded JWT payload. Empty for a missing/malformed
+  /// claim or a payload that failed to decode.
+  static List<String> _rolesFromPayload(Map<String, dynamic>? payload) {
+    final roles = payload?['roles'];
+    if (roles is! List) return const [];
+    return roles.whereType<String>().toList(growable: false);
   }
 }
