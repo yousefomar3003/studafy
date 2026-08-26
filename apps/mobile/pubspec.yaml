@@ -21,6 +21,9 @@ dependencies:
   app_links: ^6.3.0
   url_launcher: ^6.3.1
   easy_localization: ^3.0.8
+  firebase_core: ^3.12.1
+  firebase_messaging: ^15.2.1
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:

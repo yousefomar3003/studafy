@@ -716,6 +716,40 @@ export function deviceToResponse(device: UserDevice): {
 }
 
 /**
+ * Register or refresh an FCM push-token device.
+ *
+ * Two-step: first calls `app.claim_device_token()` to soft-revoke any *other* user in the same
+ * school who is still routing pushes to this token (the SECURITY DEFINER seam that crosses the
+ * restrictive user policy), then upserts the caller's own row. The unique constraint on
+ * (user_id, fcm_token) means re-registration is a conflict-free UPDATE; a genuinely new token
+ * inserts. `revoked_at = NULL` on the UPDATE path reactivates a previously soft-revoked row if the
+ * same user re-registers the same token after a gap.
+ */
+export async function registerDeviceToken(
+  tx: TransactionSql,
+  userId: string,
+  schoolId: string,
+  fcmToken: string,
+  platform: "ios" | "android" | "web",
+): Promise<{ id: string }> {
+  await tx`SELECT app.claim_device_token(${fcmToken})`;
+
+  const [row] = await tx<{ id: string }[]>`
+    INSERT INTO app.user_devices (school_id, user_id, fcm_token, platform)
+    VALUES (${schoolId}::uuid, ${userId}::uuid, ${fcmToken}, ${platform}::app.device_platform)
+    ON CONFLICT (user_id, fcm_token)
+    DO UPDATE SET
+      last_seen  = CURRENT_TIMESTAMP,
+      platform   = EXCLUDED.platform,
+      updated_at = CURRENT_TIMESTAMP,
+      revoked_at = NULL
+    RETURNING id
+  `;
+
+  return { id: row!.id };
+}
+
+/**
  * Soft-revoke a device registration.
  *
  * Sets revoked_at rather than deleting, matching how app.user_devices is treated everywhere else in
