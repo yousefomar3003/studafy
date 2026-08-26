@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../auth/auth_session.dart';
 import '../auth/oauth_client.dart';
 import '../auth/secure_token_store.dart';
 import '../di/app_providers.dart';
+import '../localization/app_locales.dart';
 import '../push/push_providers.dart';
 import '../realtime/realtime_providers.dart';
 import 'app_config.dart';
@@ -16,6 +18,7 @@ import 'app_environment.dart';
 
 void bootstrapApp(AppEnvironment environment) async {
   WidgetsFlutterBinding.ensureInitialized();
+  await EasyLocalization.ensureInitialized();
 
   GoogleFonts.config.allowRuntimeFetching = false;
 
@@ -32,15 +35,20 @@ void bootstrapApp(AppEnvironment environment) async {
   await session.restore();
 
   runApp(
-    ProviderScope(
-      overrides: [
-        appConfigProvider.overrideWithValue(appConfig),
-        authSessionProvider.overrideWithValue(session),
-        realtimeTokenProvider.overrideWithValue(
-          () => session.tokenProvider,
-        ),
-      ],
-      child: const StudafyApp(),
+    EasyLocalization(
+      supportedLocales: AppLocales.supported,
+      path: AppLocales.translationsPath,
+      fallbackLocale: AppLocales.fallback,
+      child: ProviderScope(
+        overrides: [
+          appConfigProvider.overrideWithValue(appConfig),
+          authSessionProvider.overrideWithValue(session),
+          realtimeTokenProvider.overrideWithValue(
+            () => session.tokenProvider,
+          ),
+        ],
+        child: const StudafyApp(),
+      ),
     ),
   );
 }
