@@ -28,12 +28,39 @@ import 'app_config.dart';
 import 'app_environment.dart';
 
 void bootstrapApp(AppEnvironment environment) {
-  // Monitoring is set up inside this same guarded zone so both the zone's own error handler and
-  // the crash reporter it builds agree on what "an uncaught error" means. `crashReporter` is
-  // read by the zone's `onError` below, which — being a sibling of the zoned callback rather than
-  // nested inside it — can only see it via this shared, mutable outer variable.
   CrashReporter? crashReporter;
 
+  runZonedGuarded<Future<void>>(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await EasyLocalization.ensureInitialized();
+
+    for (final locale in AppLocales.supported) {
+      await initializeDateFormatting(locale.toString());
+    }
+
+    GoogleFonts.config.allowRuntimeFetching = false;
+
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+    final appConfig = AppConfig.fromEnvironment(environment);
+    final packageInfo = await PackageInfo.fromPlatform();
+    final monitoringConfig = MonitoringConfig.fromEnvironment(
+      environment,
+      release:
+          '${packageInfo.packageName}@${packageInfo.version}+${packageInfo.buildNumber}',
+    );
+    crashReporter = CompositeCrashReporter([
+      SentryCrashReporter(monitoringConfig),
+      FirebaseCrashlyticsReporter(),
+    ]);
+    await crashReporter!.initialize();
+
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      crashReporter?.recordFlutterError(details);
+    };
+    PlatformDispatcher.instance.onError = (error, stack) {
   runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
@@ -105,6 +132,36 @@ void bootstrapApp(AppEnvironment environment) {
       // `crashReporter` is null only if this fires during the setup above, before it's built —
       // there's nowhere to report those to, so they're limited to bootstrap itself.
       crashReporter?.recordError(error, stack, fatal: true);
-    },
-  );
+      return true;
+    };
+
+    final authClient = MobileAuthClient(
+      baseUrl: appConfig.apiBaseUrl.toString(),
+    );
+    final secureStore = SecureTokenStore();
+    final session = AuthSession(
+      authClient: authClient,
+      secureStore: secureStore,
+    );
+    await session.restore();
+
+    runApp(
+      EasyLocalization(
+        supportedLocales: AppLocales.supported,
+        path: AppLocales.translationsPath,
+        fallbackLocale: AppLocales.fallback,
+        child: ProviderScope(
+          overrides: [
+            appConfigProvider.overrideWithValue(appConfig),
+            authSessionProvider.overrideWithValue(session),
+            crashReporterProvider.overrideWithValue(crashReporter!),
+            realtimeTokenProvider.overrideWithValue(
+              () => session.tokenProvider,
+            ),
+          ],
+          child: const StudafyApp(),
+        ),
+      ),
+    );
+  }, (error, stack) => crashReporter?.recordError(error, stack, fatal: true));
 }

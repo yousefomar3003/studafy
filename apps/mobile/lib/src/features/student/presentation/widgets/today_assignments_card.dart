@@ -6,6 +6,8 @@ import '../../../../core/api/generated/models/assignment.dart';
 import '../../../../core/offline/staleness_banner.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/today_providers.dart';
+import '../assignment_detail_screen.dart';
+import '../assignments_screen.dart';
 import 'today_card_shell.dart';
 import 'today_skeleton.dart';
 import 'today_state_message.dart';
@@ -42,6 +44,15 @@ class TodayAssignmentsCard extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.space12),
               ],
               for (final assignment in cached.data) _AssignmentRow(assignment: assignment),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: TextButton(
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => const StudentAssignmentsScreen())),
+                  child: Text('today.assignments.viewAll'.tr()),
+                ),
+              ),
             ],
           );
         },
@@ -61,24 +72,28 @@ class _AssignmentRow extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final dueAt = DateFormat.MMMd(context.locale.toString()).add_jm().format(assignment.dueAt);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.space4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              assignment.title,
-              style: textTheme.bodyMedium,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => AssignmentDetailScreen(assignmentId: assignment.id),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.space4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                assignment.title,
+                style: textTheme.bodyMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.space8),
-          Text(
-            dueAt,
-            style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-          ),
-        ],
+            const SizedBox(width: AppSpacing.space8),
+            Text(dueAt, style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+          ],
+        ),
       ),
     );
   }
