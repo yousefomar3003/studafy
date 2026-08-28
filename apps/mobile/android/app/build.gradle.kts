@@ -3,6 +3,9 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
+    // Uploads the ProGuard/R8 mapping file on release builds so obfuscated Crashlytics stack
+    // traces get symbolicated — see docs/monitoring.md.
+    id("com.google.firebase.crashlytics")
 }
 
 android {

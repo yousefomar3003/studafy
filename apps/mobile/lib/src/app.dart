@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'core/auth/auth_notifier.dart';
 import 'core/auth/auth_state.dart';
 import 'core/di/app_providers.dart';
+import 'core/monitoring/monitoring_providers.dart';
 import 'core/push/push_providers.dart';
 import 'design/theme/app_theme.dart';
 
@@ -27,6 +28,10 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
     super.didChangeDependencies();
     _subscribeToPushTaps();
     _initPushOnAuth();
+    // Activates the auth-status listener that keeps the crash reporter's identified user in
+    // sync — see `crashReportingUserSyncProvider`. Reading it is idempotent, so no init flag is
+    // needed the way `_initPushOnAuth` needs `_pushInitialized`.
+    ref.read(crashReportingUserSyncProvider);
   }
 
   @override
