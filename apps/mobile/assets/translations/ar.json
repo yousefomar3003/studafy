@@ -13,5 +13,12 @@
       "children": "الأبناء",
       "profile": "الملف الشخصي"
     }
+  },
+  "offline": {
+    "stalenessBanner": "عرض بيانات محفوظة — آخر تحديث {time}.",
+    "justNow": "الآن",
+    "minutesAgo": "قبل {count} د",
+    "hoursAgo": "قبل {count} س",
+    "daysAgo": "قبل {count} يوم"
   }
 }
