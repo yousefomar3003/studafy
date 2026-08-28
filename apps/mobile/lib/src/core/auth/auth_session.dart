@@ -52,6 +52,10 @@ class AuthSession {
   /// The `sub` claim of the current access token — the user's id, and the only piece of user
   /// identity this app reads out of the token for purposes like crash-report attribution (never
   /// a name or email claim). Null when unauthenticated or the claim is missing/malformed.
+  /// The `sub` claim of the current access token — the signed-in user's stable UUID (see
+  /// `apps/api/src/modules/auth/jwt/types.ts`'s `AccessTokenClaims.sub`). Same trust posture as
+  /// [roles]: for client-side lookups only, never an authorization decision. Null when
+  /// unauthenticated or the claim is missing/malformed.
   String? get userId => _userId;
 
   /// Whether the session has been restored from secure storage.
@@ -76,6 +80,7 @@ class AuthSession {
       _refreshToken = refreshToken;
 
       // Decode expiry, roles, and user id from the JWT payload.
+      // Decode expiry, roles, and subject from the JWT payload.
       final payload = decodeJwtPayload(accessToken);
       _accessTokenExpiresAt = _expiryFromPayload(payload);
       _roles = _rolesFromPayload(payload);
