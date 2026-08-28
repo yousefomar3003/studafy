@@ -101,6 +101,35 @@
       }
     }
   },
+  "grades": {
+    "title": "Grades",
+    "error": "Couldn't load your grades.",
+    "unavailable": "Your grades aren't available yet.",
+    "emptyTerm": "No grades have been published for this term yet.",
+    "viewAll": "View all grades",
+    "termSummary": {
+      "title": "Term summary",
+      "average": "Term average",
+      "gpa": "Term GPA",
+      "credits": "Credits",
+      "cumulativeGpa": "Cumulative GPA"
+    },
+    "trend": {
+      "title": "Term average trend",
+      "empty": "Not enough published terms to show a trend yet."
+    },
+    "subject": {
+      "weightedAverage": "Weighted average",
+      "breakdown": "Category breakdown",
+      "entryWeight": "×{weight}",
+      "noScore": "Not scored"
+    },
+    "publishMoment": {
+      "title": "Your latest grades are in",
+      "body": "New results have just been published — here's where you stand this term.",
+      "dismiss": "Dismiss"
+    }
+  },
   "timetable": {
     "title": "Timetable",
     "error": "Couldn't load your timetable.",
