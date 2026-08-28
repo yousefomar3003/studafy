@@ -9,8 +9,10 @@ import 'package:studafy_mobile/src/core/config/app_config.dart';
 import 'package:studafy_mobile/src/core/config/app_environment.dart';
 import 'package:studafy_mobile/src/core/di/app_providers.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
+import 'package:studafy_mobile/src/core/monitoring/monitoring_providers.dart';
 
 import 'fake_access_token.dart';
+import 'fake_crash_reporter.dart';
 import 'fake_secure_token_store.dart';
 import 'wrap_with_localization.dart';
 
@@ -59,6 +61,7 @@ Future<void> pumpStudafyApp(
           overrides: [
             appConfigProvider.overrideWithValue(AppConfig.fromEnvironment(AppEnvironment.dev)),
             authSessionProvider.overrideWithValue(session ?? fakeAuthSession()),
+            crashReporterProvider.overrideWithValue(FakeCrashReporter()),
           ],
           child: const StudafyApp(),
         ),
