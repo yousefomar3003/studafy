@@ -32,7 +32,8 @@
     "assignments": {
       "title": "Due soon",
       "empty": "Nothing due soon.",
-      "error": "Couldn't load due-soon assignments."
+      "error": "Couldn't load due-soon assignments.",
+      "viewAll": "View all"
     },
     "grades": {
       "title": "New grades",
@@ -44,6 +45,59 @@
       "title": "Announcements",
       "empty": "No announcements yet.",
       "error": "Couldn't load announcements."
+    }
+  },
+  "assignments": {
+    "list": {
+      "title": "Assignments",
+      "tabs": {
+        "due": "Due",
+        "submitted": "Submitted",
+        "graded": "Graded"
+      },
+      "dueAt": "Due {date}",
+      "empty": {
+        "due": "Nothing due right now.",
+        "submitted": "You haven't submitted anything yet.",
+        "graded": "Nothing graded yet."
+      },
+      "error": "Couldn't load assignments."
+    },
+    "status": {
+      "late": "Late",
+      "submitted": "Submitted",
+      "graded": "Graded"
+    },
+    "detail": {
+      "title": "Assignment",
+      "error": "Couldn't load this assignment.",
+      "dueAt": "Due {date}",
+      "maxScore": "Worth {score} points",
+      "attachments": "Attachments",
+      "submissionSection": "Your submission",
+      "submissionError": "Couldn't load your submission.",
+      "notSubmitted": "You haven't submitted this yet.",
+      "submit": "Submit assignment",
+      "resubmit": "Resubmit",
+      "attempt": "Attempt {number}",
+      "submittedAt": "Submitted {date}",
+      "awaitingGrade": "Awaiting grade.",
+      "feedbackTitle": "Feedback"
+    },
+    "submission": {
+      "title": "Submit assignment",
+      "contentLabel": "Your answer",
+      "contentHint": "Type your answer here (optional if you're only attaching files).",
+      "addFiles": "Add files",
+      "retry": "Retry",
+      "remove": "Remove",
+      "submit": "Submit",
+      "errors": {
+        "closed": "This assignment is no longer accepting submissions.",
+        "attachmentsFailed": "Some files failed to upload. Retry them, then submit again.",
+        "network": "Couldn't reach the server. Check your connection and try again.",
+        "unknown": "Something went wrong. Please try again."
+      }
     }
   }
 }
