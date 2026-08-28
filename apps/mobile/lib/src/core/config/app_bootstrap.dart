@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import '../../app.dart';
 import '../auth/auth_notifier.dart';
@@ -19,6 +20,14 @@ import 'app_environment.dart';
 void bootstrapApp(AppEnvironment environment) async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
+
+  // `easy_localization` loads translation strings but never calls `intl`'s own
+  // `initializeDateFormatting` — any `DateFormat` built before this (e.g. the due date on
+  // `TodayAssignmentsCard`'s rows) throws `LocaleDataException` instead of formatting. One call
+  // per supported locale, done once here rather than per call site.
+  for (final locale in AppLocales.supported) {
+    await initializeDateFormatting(locale.toString());
+  }
 
   GoogleFonts.config.allowRuntimeFetching = false;
 

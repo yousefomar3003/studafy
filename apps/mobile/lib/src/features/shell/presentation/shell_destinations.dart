@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../student/presentation/today_screen.dart';
 import '../domain/shell_role.dart';
 import 'shell_tab_placeholder.dart';
 
@@ -33,7 +34,11 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
   switch (role) {
     case ShellRole.student:
       return const [
-        home,
+        ShellDestination(
+          labelKey: 'shell.tabs.home',
+          icon: Icons.home_outlined,
+          body: TodayScreen(),
+        ),
         ShellDestination(
           labelKey: 'shell.tabs.courses',
           icon: Icons.menu_book_outlined,

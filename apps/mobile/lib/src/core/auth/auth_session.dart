@@ -26,6 +26,7 @@ class AuthSession {
   String? _refreshToken;
   DateTime? _accessTokenExpiresAt;
   List<String> _roles = const [];
+  String? _userId;
 
   bool _refreshInProgress = false;
   final Completer<void> _restored = Completer<void>();
@@ -48,6 +49,12 @@ class AuthSession {
   /// here. Empty when unauthenticated or the claim is missing/malformed.
   List<String> get roles => _roles;
 
+  /// The `sub` claim of the current access token — the signed-in user's stable UUID (see
+  /// `apps/api/src/modules/auth/jwt/types.ts`'s `AccessTokenClaims.sub`). Same trust posture as
+  /// [roles]: for client-side lookups only, never an authorization decision. Null when
+  /// unauthenticated or the claim is missing/malformed.
+  String? get userId => _userId;
+
   /// Whether the session has been restored from secure storage.
   bool get isRestored => _restored.isCompleted;
 
@@ -69,10 +76,11 @@ class AuthSession {
       _accessToken = accessToken;
       _refreshToken = refreshToken;
 
-      // Decode expiry and roles from the JWT payload.
+      // Decode expiry, roles, and subject from the JWT payload.
       final payload = decodeJwtPayload(accessToken);
       _accessTokenExpiresAt = _expiryFromPayload(payload);
       _roles = _rolesFromPayload(payload);
+      _userId = _userIdFromPayload(payload);
     }
 
     _restored.complete();
@@ -88,7 +96,9 @@ class AuthSession {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
     _accessTokenExpiresAt = DateTime.now().add(Duration(seconds: expiresIn));
-    _roles = _rolesFromPayload(decodeJwtPayload(accessToken));
+    final payload = decodeJwtPayload(accessToken);
+    _roles = _rolesFromPayload(payload);
+    _userId = _userIdFromPayload(payload);
 
     await _secureStore.save(
       accessToken: accessToken,
@@ -103,6 +113,7 @@ class AuthSession {
     _refreshToken = null;
     _accessTokenExpiresAt = null;
     _roles = const [];
+    _userId = null;
     await _secureStore.clear();
   }
 
@@ -192,5 +203,12 @@ class AuthSession {
     final roles = payload?['roles'];
     if (roles is! List) return const [];
     return roles.whereType<String>().toList(growable: false);
+  }
+
+  /// Reads the `sub` claim from an already-decoded JWT payload. `null` for a missing/malformed
+  /// claim or a payload that failed to decode.
+  static String? _userIdFromPayload(Map<String, dynamic>? payload) {
+    final sub = payload?['sub'];
+    return sub is String ? sub : null;
   }
 }

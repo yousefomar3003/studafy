@@ -25,10 +25,13 @@ AuthSession fakeAuthSession() {
 
 /// A [fakeAuthSession] pre-seeded with an access token carrying [roles], as if a login or
 /// session restore had already happened.
-Future<AuthSession> fakeAuthenticatedSession({required List<String> roles}) async {
+Future<AuthSession> fakeAuthenticatedSession({
+  required List<String> roles,
+  String userId = 'test-user',
+}) async {
   final session = fakeAuthSession();
   await session.saveTokens(
-    accessToken: fakeAccessToken(roles: roles),
+    accessToken: fakeAccessToken(roles: roles, sub: userId),
     refreshToken: 'fake-refresh-token',
     sessionId: 'fake-session-id',
     expiresIn: 3600,

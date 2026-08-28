@@ -6,10 +6,14 @@ import 'dart:convert';
 /// verification (that's the server's job — see `jwt_payload.dart`), so the signature segment
 /// is left empty. Padding is stripped from both segments, matching how real tokens are
 /// encoded on the wire, to exercise the same `base64Url.normalize` path production tokens do.
-String fakeAccessToken({List<String> roles = const [], DateTime? expiresAt}) {
+String fakeAccessToken({
+  List<String> roles = const [],
+  DateTime? expiresAt,
+  String sub = 'test-user',
+}) {
   final header = _encodeSegment({'alg': 'none', 'typ': 'JWT'});
   final payload = _encodeSegment({
-    'sub': 'test-user',
+    'sub': sub,
     'roles': roles,
     'exp': (expiresAt ?? DateTime.now().add(const Duration(hours: 1)))
             .millisecondsSinceEpoch ~/
