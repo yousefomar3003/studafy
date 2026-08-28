@@ -6,13 +6,16 @@ import '../../support/pump_studafy_app.dart';
 
 void main() {
   group('lands each role in its own shell', () {
-    testWidgets('student gets Home, Courses, Profile — and a mutation FAB', (tester) async {
+    testWidgets('student gets Home, Timetable, Courses, Profile — and a mutation FAB', (
+      tester,
+    ) async {
       await pumpAppShell(
         tester,
         session: await fakeAuthenticatedSession(roles: const ['STUDENT']),
       );
 
       expect(find.text('Home'), findsWidgets);
+      expect(find.text('Timetable'), findsWidgets);
       expect(find.text('Courses'), findsWidgets);
       expect(find.text('Profile'), findsWidgets);
       expect(find.byType(FloatingActionButton), findsOneWidget);
@@ -59,6 +62,7 @@ void main() {
       expect(find.text('Home'), findsWidgets);
       expect(find.text('Profile'), findsWidgets);
       // No domain-specific tab, and zero mutation affordances.
+      expect(find.text('Timetable'), findsNothing);
       expect(find.text('Courses'), findsNothing);
       expect(find.text('Classes'), findsNothing);
       expect(find.text('Children'), findsNothing);
@@ -108,7 +112,7 @@ void main() {
     expect(stack().index, 0);
     expect(navBar().selectedIndex, 0);
 
-    await tester.tap(navLabel('Courses'));
+    await tester.tap(navLabel('Timetable'));
     await tester.pumpAndSettle();
 
     expect(stack().index, 1);

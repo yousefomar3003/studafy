@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../student/presentation/timetable_screen.dart';
 import '../../student/presentation/today_screen.dart';
 import '../domain/shell_role.dart';
 import 'shell_tab_placeholder.dart';
@@ -38,6 +39,11 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
           labelKey: 'shell.tabs.home',
           icon: Icons.home_outlined,
           body: TodayScreen(),
+        ),
+        ShellDestination(
+          labelKey: 'shell.tabs.timetable',
+          icon: Icons.calendar_month_outlined,
+          body: TimetableScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.courses',
