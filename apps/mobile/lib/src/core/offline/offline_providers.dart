@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../auth/auth_providers.dart';
 import '../auth/auth_state.dart';
 import 'announcements_offline_repository.dart';
+import 'assignments_offline_repository.dart';
 import 'materials_offline_repository.dart';
 import 'offline_database.dart';
 import 'published_grades_offline_repository.dart';
@@ -59,5 +60,12 @@ final announcementsOfflineRepositoryProvider = Provider<AnnouncementsOfflineRepo
   return AnnouncementsOfflineRepository(
     database: ref.watch(offlineDatabaseProvider),
     client: ref.watch(apiClientProvider).announcements,
+  );
+});
+
+final assignmentsOfflineRepositoryProvider = Provider<AssignmentsOfflineRepository>((ref) {
+  return AssignmentsOfflineRepository(
+    database: ref.watch(offlineDatabaseProvider),
+    client: ref.watch(apiClientProvider).assignments,
   );
 });

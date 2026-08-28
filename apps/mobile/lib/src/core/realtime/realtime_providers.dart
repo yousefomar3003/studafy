@@ -63,7 +63,7 @@ final realtimeConnectionStatusProvider =
 ///
 /// ```dart
 /// ref.listen(realtimeEventsProvider, (previous, next) {
-///   final envelope = next.valueOrNull;
+///   final envelope = next.value; // AsyncValue<T>.value is nullable in riverpod 3.x
 ///   if (envelope?.type == 'grades.published') {
 ///     ref.invalidateSelf();
 ///   }

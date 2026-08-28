@@ -20,5 +20,30 @@
     "minutesAgo": "{count}m ago",
     "hoursAgo": "{count}h ago",
     "daysAgo": "{count}d ago"
+  },
+  "today": {
+    "timetable": {
+      "title": "Today's timetable",
+      "empty": "No classes scheduled for today.",
+      "unavailable": "Today's timetable isn't available yet.",
+      "error": "Couldn't load today's timetable.",
+      "unknownClass": "Class"
+    },
+    "assignments": {
+      "title": "Due soon",
+      "empty": "Nothing due soon.",
+      "error": "Couldn't load due-soon assignments."
+    },
+    "grades": {
+      "title": "New grades",
+      "empty": "No grades published yet this term.",
+      "unavailable": "Grades aren't available yet.",
+      "error": "Couldn't load grades."
+    },
+    "announcements": {
+      "title": "Announcements",
+      "empty": "No announcements yet.",
+      "error": "Couldn't load announcements."
+    }
   }
 }
