@@ -117,8 +117,8 @@ final timetableWeekProvider = Provider.autoDispose<AsyncValue<TimetableWeekStatu
         return AsyncError<TimetableWeekStatus>(examsAsync.error!, examsAsync.stackTrace!);
       }
 
-      final slots = slotsAsync.valueOrNull;
-      final exams = examsAsync.valueOrNull;
+      final slots = slotsAsync.value;
+      final exams = examsAsync.value;
       if (slots == null || exams == null) {
         return const AsyncLoading<TimetableWeekStatus>();
       }

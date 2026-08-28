@@ -99,6 +99,8 @@
         "network": "Couldn't reach the server. Check your connection and try again.",
         "unknown": "Something went wrong. Please try again."
       }
+    }
+  },
   "timetable": {
     "title": "Timetable",
     "error": "Couldn't load your timetable.",
@@ -111,6 +113,24 @@
     "slot": {
       "unknownClass": "Class",
       "room": "Room {room}"
+    }
+  },
+  "attendance": {
+    "title": "Attendance",
+    "error": "Couldn't load your attendance.",
+    "unavailable": "Your attendance isn't available yet.",
+    "empty": "No attendance recorded yet.",
+    "rate": "{percent}% attendance",
+    "summary": "{present} present · {absent} absent · {late} late · {excused} excused",
+    "noAbsences": "Full attendance this month.",
+    "lateBy": "{minutes} min late",
+    "noReason": "No reason recorded",
+    "status": {
+      "present": "Present",
+      "absent": "Absent",
+      "late": "Late",
+      "excused": "Excused",
+      "remote": "Remote"
     }
   }
 }

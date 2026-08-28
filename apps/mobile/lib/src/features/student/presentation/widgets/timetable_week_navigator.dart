@@ -1,4 +1,7 @@
-import 'package:easy_localization/easy_localization.dart';
+// `TextDirection` is hidden: `easy_localization` re-exports `package:intl`, whose own
+// `TextDirection` enum collides with `dart:ui`'s (via `flutter/material`) and makes the name
+// ambiguous. This widget only needs the framework one, for the RTL chevron flip below.
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
