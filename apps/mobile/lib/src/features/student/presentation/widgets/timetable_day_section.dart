@@ -81,7 +81,7 @@ class _SlotRow extends ConsumerWidget {
     final roomCodes = ref.watch(_roomCodesProvider);
     final teacherName = ref.watch(timetableTeacherNameProvider(slot.teacherId));
 
-    final roomCode = roomCodes.valueOrNull?[slot.roomId];
+    final roomCode = roomCodes.value?[slot.roomId];
     final meta = [
       if (roomCode != null) 'timetable.slot.room'.tr(namedArgs: {'room': roomCode}),
       if (teacherName != null) teacherName,
@@ -145,7 +145,7 @@ class _ExamRow extends ConsumerWidget {
     final startsAt = exam.startsAt.toLocal();
     final endsAt = exam.endsAt.toLocal();
     final roomId = exam.roomId;
-    final roomCode = roomId == null ? null : roomCodes.valueOrNull?[roomId];
+    final roomCode = roomId == null ? null : roomCodes.value?[roomId];
     final meta = [
       '${DateFormat.jm(locale).format(startsAt)} – ${DateFormat.jm(locale).format(endsAt)}',
       if (roomCode != null) 'timetable.slot.room'.tr(namedArgs: {'room': roomCode}),
