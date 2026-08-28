@@ -2,6 +2,10 @@ abstract final class RoutePaths {
   static const home = '/';
   static const login = '/login';
 
+  /// The signed-in student's personal attendance history. Distinct from [attendance], which is
+  /// a course-scoped notification deep link.
+  static const studentAttendance = '/me/attendance';
+
   // Notification deep-link destinations.
   // Paths match the route templates in packages/notification-templates/src/registry.ts.
   static const grades = '/courses/:courseId/grades';
