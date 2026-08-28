@@ -24,6 +24,10 @@ dependencies:
   firebase_core: ^3.12.1
   firebase_messaging: ^15.2.1
   flutter_local_notifications: ^18.0.1
+  drift: ^2.34.3
+  sqlite3_flutter_libs: ^0.5.35
+  path_provider: ^2.1.6
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:
@@ -35,6 +39,7 @@ dev_dependencies:
   swagger_parser: ^1.44.1
   test: ^1.31.0
   shared_preferences: ^2.5.5
+  drift_dev: ^2.34.0
 
 flutter:
   uses-material-design: true

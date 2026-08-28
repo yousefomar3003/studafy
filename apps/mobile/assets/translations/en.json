@@ -13,5 +13,12 @@
       "children": "Children",
       "profile": "Profile"
     }
+  },
+  "offline": {
+    "stalenessBanner": "Showing saved data — updated {time}.",
+    "justNow": "just now",
+    "minutesAgo": "{count}m ago",
+    "hoursAgo": "{count}h ago",
+    "daysAgo": "{count}d ago"
   }
 }
