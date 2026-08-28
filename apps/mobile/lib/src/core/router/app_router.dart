@@ -5,6 +5,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
 import '../../features/notifications/presentation/notification_destination_screen.dart';
 import '../../features/student/presentation/assignment_detail_screen.dart';
+import '../../features/student/presentation/grades_screen.dart';
 import '../auth/auth_guard.dart';
 import '../config/app_config.dart';
 import '../config/app_environment.dart';
@@ -26,7 +27,8 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
       // the notification templates registry.
       GoRoute(
         path: '/courses/:courseId/grades',
-        builder: (context, state) => NotificationDestinationScreen(route: state.matchedLocation),
+        builder: (context, state) =>
+            GradesScreen(courseId: state.pathParameters['courseId']),
       ),
       GoRoute(
         path: '/courses/:courseId/attendance',

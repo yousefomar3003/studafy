@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +7,7 @@ import '../../../../core/offline/staleness_banner.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/today_providers.dart';
 import '../../domain/today_section.dart';
+import '../grades_screen.dart';
 import 'today_card_shell.dart';
 import 'today_skeleton.dart';
 import 'today_state_message.dart';
@@ -77,6 +79,15 @@ class _GradesContent extends StatelessWidget {
           const SizedBox(height: AppSpacing.space12),
         ],
         for (final grade in newest.take(maxItems)) _GradeRow(grade: grade),
+        Align(
+          alignment: AlignmentDirectional.centerEnd,
+          child: TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const GradesScreen()),
+            ),
+            child: Text('grades.viewAll'.tr()),
+          ),
+        ),
       ],
     );
   }
