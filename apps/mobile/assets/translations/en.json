@@ -8,6 +8,7 @@
     "placeholderBody": "This section is coming soon.",
     "tabs": {
       "home": "Home",
+      "timetable": "Timetable",
       "courses": "Courses",
       "classes": "Classes",
       "children": "Children",
@@ -98,6 +99,18 @@
         "network": "Couldn't reach the server. Check your connection and try again.",
         "unknown": "Something went wrong. Please try again."
       }
+  "timetable": {
+    "title": "Timetable",
+    "error": "Couldn't load your timetable.",
+    "unavailable": "Your timetable isn't available yet.",
+    "emptyWeek": "No classes this week.",
+    "thisWeek": "This week",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
+    "exam": "Exam · {title}",
+    "slot": {
+      "unknownClass": "Class",
+      "room": "Room {room}"
     }
   }
 }

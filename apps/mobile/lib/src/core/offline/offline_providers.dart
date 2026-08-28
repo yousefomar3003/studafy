@@ -5,6 +5,7 @@ import '../auth/auth_providers.dart';
 import '../auth/auth_state.dart';
 import 'announcements_offline_repository.dart';
 import 'assignments_offline_repository.dart';
+import 'exams_offline_repository.dart';
 import 'materials_offline_repository.dart';
 import 'offline_database.dart';
 import 'published_grades_offline_repository.dart';
@@ -67,5 +68,12 @@ final assignmentsOfflineRepositoryProvider = Provider<AssignmentsOfflineReposito
   return AssignmentsOfflineRepository(
     database: ref.watch(offlineDatabaseProvider),
     client: ref.watch(apiClientProvider).assignments,
+  );
+});
+
+final examsOfflineRepositoryProvider = Provider<ExamsOfflineRepository>((ref) {
+  return ExamsOfflineRepository(
+    database: ref.watch(offlineDatabaseProvider),
+    client: ref.watch(apiClientProvider).academics,
   );
 });
