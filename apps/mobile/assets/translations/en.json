@@ -144,6 +144,32 @@
       "room": "Room {room}"
     }
   },
+  "materials": {
+    "title": "Materials",
+    "unavailable": "Your materials aren't available yet.",
+    "unknownClass": "Class",
+    "error": "Couldn't load materials for this class.",
+    "empty": "No materials yet.",
+    "status": {
+      "pendingScan": "Pending scan",
+      "scanning": "Scanning",
+      "queued": "Queued",
+      "processing": "Processing",
+      "ready": "Ready",
+      "failed": "Processing failed",
+      "quarantined": "Blocked"
+    },
+    "viewer": {
+      "notReadyYet": "This file is still being processed. Check back soon.",
+      "failed": "Something went wrong preparing this file. Ask your teacher to re-upload it.",
+      "quarantined": "This file was blocked by a security scan and can't be opened.",
+      "aiVisible": "Included in the AI assistant's study materials.",
+      "downloadError": "Couldn't download this file. Check your connection and try again.",
+      "retry": "Retry",
+      "openExternally": "Open with another app",
+      "noPreview": "No in-app preview for this file type."
+    }
+  },
   "attendance": {
     "title": "Attendance",
     "error": "Couldn't load your attendance.",
