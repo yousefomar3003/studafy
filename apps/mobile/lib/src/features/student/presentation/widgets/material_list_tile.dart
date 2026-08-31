@@ -31,7 +31,7 @@ class MaterialListTile extends ConsumerWidget {
     final kind = materialFileKindFor(material.mimeType);
     final offlineCapable = kind == MaterialFileKind.pdf || kind == MaterialFileKind.image;
     final downloaded =
-        offlineCapable && (ref.watch(materialDownloadedProvider(material.id)).valueOrNull ?? false);
+        offlineCapable && (ref.watch(materialDownloadedProvider(material.id)).value ?? false);
 
     return ListTile(
       onTap: state.isOpenable ? onTap : null,
