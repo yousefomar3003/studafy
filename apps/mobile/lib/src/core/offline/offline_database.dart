@@ -51,6 +51,16 @@ class OfflineDatabase extends _$OfflineDatabase {
     );
   }
 
+  /// Deletes one cache entry, if present. For local-only state that isn't a cache of a server
+  /// resource (e.g. `QuizProgressStore`'s in-progress quiz session) — the read/write pair above
+  /// has no eviction path of its own since a re-fetch would just repopulate a normal cache entry,
+  /// which doesn't apply here.
+  Future<void> deleteEntry({required String resource, required String cacheKey}) {
+    return (delete(cacheEntries)
+          ..where((row) => row.resource.equals(resource) & row.cacheKey.equals(cacheKey)))
+        .go();
+  }
+
   /// Wipes every cached resource. Called on logout — cached school data must not survive into a
   /// different account signing in on the same device. See `offline_providers.dart`.
   Future<void> clearAll() => delete(cacheEntries).go();

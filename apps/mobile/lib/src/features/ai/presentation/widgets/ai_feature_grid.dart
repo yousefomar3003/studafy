@@ -1,6 +1,8 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/router/route_paths.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../domain/ai_feature.dart';
 import '../../../shell/presentation/shell_tab_placeholder.dart';
@@ -38,18 +40,20 @@ class _AiFeatureTile extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        // Each feature's own screen is a later ticket (ST-165 and siblings already implement the
-        // API side — see apps/api/src/modules/ai/routes/*). Opening the same "coming soon"
-        // placeholder the shell already uses for an unshipped tab keeps this honest rather than
-        // pretending the tile does something it doesn't.
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => Scaffold(
-              appBar: AppBar(title: Text(feature.labelKey.tr())),
-              body: ShellTabPlaceholder(titleKey: feature.labelKey),
-            ),
-          ),
-        ),
+        // Every feature but `quiz` (ST-230) is still a later ticket (ST-165 and siblings already
+        // implement the API side — see apps/api/src/modules/ai/routes/*). Opening the same
+        // "coming soon" placeholder the shell already uses for an unshipped tab keeps this honest
+        // rather than pretending the tile does something it doesn't.
+        onTap: () => feature == AiFeature.quiz
+            ? GoRouter.of(context).push(RoutePaths.quiz)
+            : Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: Text(feature.labelKey.tr())),
+                    body: ShellTabPlaceholder(titleKey: feature.labelKey),
+                  ),
+                ),
+              ),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.space16),
           child: Column(

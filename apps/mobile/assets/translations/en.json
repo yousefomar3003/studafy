@@ -223,6 +223,8 @@
     "schoolInactive": {
       "title": "AI features are paused",
       "body": "Your school's Studafy subscription isn't active right now, so AI features are paused for everyone at your school. Contact your school to have it reactivated."
+    }
+  },
   "exams": {
     "title": "Exams",
     "error": "Couldn't load your exams.",
@@ -291,6 +293,63 @@
       "dismiss": "Dismiss"
     }
   },
+  "quiz": {
+    "title": "Quiz",
+    "signedOut": "Sign in to take a quiz.",
+    "newQuiz": "New quiz",
+    "abandon": {
+      "title": "Start a new quiz?",
+      "body": "Your current quiz is saved — you can come back to it later instead.",
+      "cancel": "Keep going",
+      "confirm": "Start new"
+    },
+    "setup": {
+      "title": "Choose your materials",
+      "hint": "Pick up to 5 materials to generate a quiz from.",
+      "materialsUnavailable": "Your materials aren't available yet.",
+      "materialCount": "{count} of {max} selected",
+      "questionCount": "Number of questions",
+      "start": "Generate quiz",
+      "generateError": {
+        "quotaExceeded": "You've used up this month's AI questions.",
+        "subscriptionInactive": "Your school's AI assistant isn't active.",
+        "schoolInactive": "Your school's subscription is inactive.",
+        "llmDisabled": "The AI assistant is currently switched off.",
+        "materialNotFound": "One of the selected materials couldn't be found.",
+        "materialNotReady": "One of the selected materials is still being processed.",
+        "generationFailed": "Couldn't generate a quiz right now. Try again.",
+        "network": "No connection. Check your network and try again.",
+        "unknown": "Something went wrong generating your quiz."
+      }
+    },
+    "player": {
+      "progress": "Question {position} of {total}",
+      "progressRetry": "Retry · Question {position} of {total}",
+      "endNow": "End quiz",
+      "checkAnswer": "Check answer",
+      "correct": "Correct",
+      "incorrect": "Not quite",
+      "correctAnswer": "Correct answer: {answer}",
+      "yourAnswer": "Your answer: {answer}",
+      "shortAnswerHint": "Type your answer…",
+      "gradeFailed": "Couldn't check that answer. It's saved — try again when you're back online.",
+      "retry": "Retry",
+      "next": "Next",
+      "seeResults": "See results"
+    },
+    "results": {
+      "score": "{correct} of {total} correct",
+      "retryRound": "Retry round {round}",
+      "retryWrongOnly": "Retry {count} missed",
+      "newQuiz": "New quiz",
+      "yourAnswer": "Your answer: {answer}",
+      "correctAnswer": "Correct answer: {answer}",
+      "notAnswered": "Not answered"
+    },
+    "citation": {
+      "fallback": "Study material",
+      "withPage": "{title} · p.{page}",
+      "openError": "Couldn't open that material."
   "aiStudy": {
     "signedOut": "Sign in to use the AI study tools.",
     "retry": "Try again",
