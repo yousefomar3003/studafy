@@ -16,9 +16,14 @@ import 'widgets/material_type_icon.dart';
 /// downloaded and cached on-device via [ensureMaterialDownloadedProvider]) or an "open in
 /// another app" action for every other kind, via a freshly-minted pre-signed URL.
 class MaterialViewerScreen extends StatelessWidget {
-  const MaterialViewerScreen({required this.material, super.key});
+  const MaterialViewerScreen({required this.material, this.initialPage, super.key});
 
   final Material material;
+
+  /// 1-based page to open a PDF preview at — passed by an Ask AI citation chip so a cited
+  /// answer lands on the exact page it drew from. Null (and any non-PDF kind) opens at the
+  /// start. Ignored for file kinds with no in-app preview.
+  final int? initialPage;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +32,7 @@ class MaterialViewerScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(material.title)),
       body: state.isOpenable
-          ? _MaterialReadyBody(material: material)
+          ? _MaterialReadyBody(material: material, initialPage: initialPage)
           : _NotReadyMessage(state: state),
     );
   }
@@ -76,9 +81,10 @@ class _NotReadyMessage extends StatelessWidget {
 }
 
 class _MaterialReadyBody extends StatelessWidget {
-  const _MaterialReadyBody({required this.material});
+  const _MaterialReadyBody({required this.material, this.initialPage});
 
   final Material material;
+  final int? initialPage;
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +113,7 @@ class _MaterialReadyBody extends StatelessWidget {
         ],
         const SizedBox(height: AppSpacing.space16),
         if (kind == MaterialFileKind.pdf || kind == MaterialFileKind.image)
-          _InAppPreview(materialId: material.id, kind: kind)
+          _InAppPreview(materialId: material.id, kind: kind, initialPage: initialPage)
         else
           _ExternalOpenTile(material: material),
       ],
@@ -120,10 +126,11 @@ class _MaterialReadyBody extends StatelessWidget {
 /// [ensureMaterialDownloadedProvider] fills, so a material opened once is available with no
 /// connectivity on every later visit.
 class _InAppPreview extends ConsumerWidget {
-  const _InAppPreview({required this.materialId, required this.kind});
+  const _InAppPreview({required this.materialId, required this.kind, this.initialPage});
 
   final String materialId;
   final MaterialFileKind kind;
+  final int? initialPage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -158,7 +165,11 @@ class _InAppPreview extends ConsumerWidget {
       data: (file) => kind == MaterialFileKind.pdf
           ? SizedBox(
               height: MediaQuery.of(context).size.height * 0.7,
-              child: PDFView(filePath: file.path),
+              // PDFView pages are 0-based; citation anchors are 1-based.
+              child: PDFView(
+                filePath: file.path,
+                defaultPage: initialPage == null ? 0 : (initialPage! - 1).clamp(0, 1 << 30),
+              ),
             )
           : Image.file(file, fit: BoxFit.contain),
     );
