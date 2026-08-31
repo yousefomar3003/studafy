@@ -277,6 +277,7 @@ describe("POST /api/ai/students/{studentId}/summarize", () => {
     const res = await postSummary(app, { materialId: MATERIAL_ID });
     const body = (await res.json()) as {
       summary: string;
+      length: string;
       model: string;
       tier: string;
       feature: string;
@@ -293,6 +294,7 @@ describe("POST /api/ai/students/{studentId}/summarize", () => {
 
     expect(res.status).toBe(200);
     expect(body.summary).toBe("A condensed study summary of the material.");
+    expect(body.length).toBe("standard");
     expect(body.model).toBe(AI_LLM_DEFAULT_SMALL_MODEL);
     expect(body.tier).toBe("small");
     expect(body.feature).toBe("summary");
@@ -330,9 +332,10 @@ describe("POST /api/ai/students/{studentId}/summarize", () => {
     expect(queries.some((q) => q.includes("FROM app.ai_subscriptions"))).toBe(true);
     expect(queries.some((q) => q.includes("upsert_ai_usage_tokens"))).toBe(true);
 
-    // The cache was primed with the generated summary and its anchors.
+    // The cache was primed with the generated summary, its length preset, and its anchors.
     expect(cache.sets).toHaveLength(1);
     expect(cache.sets[0]!.summary).toBe("A condensed study summary of the material.");
+    expect(cache.sets[0]!.length).toBe("standard");
     expect(cache.sets[0]!.sources).toEqual(body.sources);
   });
 
@@ -359,6 +362,7 @@ describe("POST /api/ai/students/{studentId}/summarize", () => {
       summary: "Cached summary.",
       model: AI_LLM_DEFAULT_SMALL_MODEL,
       tier: "small",
+      length: "standard",
       sources: [
         {
           chunk_id: "10000000-0000-4000-8000-000000000001",
@@ -476,5 +480,60 @@ describe("POST /api/ai/students/{studentId}/summarize", () => {
     expect(noBody.status).toBe(400);
 
     expect(calls).toHaveLength(0);
+  });
+
+  test("an unknown length preset answers 400", async () => {
+    const calls: LlmGenerateInput[] = [];
+    const app = buildSummaryApp({
+      provider: fakeProvider({ calls }),
+      database: fakeDatabase({ material: readyMaterial, chunks: readyChunks() }).database,
+    });
+
+    const res = await postSummary(app, { materialId: MATERIAL_ID, length: "medium" });
+
+    expect(res.status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("each length preset generates once and is then served from its own cache entry", async () => {
+    const calls: LlmGenerateInput[] = [];
+    // A key-aware cache, unlike the shared fakeCache(): the route must key each preset separately
+    // for a preset switch to be a zero-token hit.
+    const store = new Map<string, SummaryCacheEntry>();
+    const keyed: SummaryCache = {
+      get: async (key) => store.get(key) ?? null,
+      set: async (key, entry) => void store.set(key, entry),
+    };
+    const handle = quotaHandle();
+    const app = buildSummaryApp({
+      provider: fakeProvider({ calls }),
+      database: fakeDatabase({ material: readyMaterial, chunks: readyChunks() }).database,
+      cache: keyed,
+      handle,
+    });
+
+    const brief = (await (
+      await postSummary(app, { materialId: MATERIAL_ID, length: "brief" })
+    ).json()) as {
+      length: string;
+      cached: boolean;
+    };
+    const detailed = (await (
+      await postSummary(app, { materialId: MATERIAL_ID, length: "detailed" })
+    ).json()) as { length: string; cached: boolean };
+
+    expect(brief).toMatchObject({ length: "brief", cached: false });
+    expect(detailed).toMatchObject({ length: "detailed", cached: false });
+    expect(calls).toHaveLength(2);
+    expect(store.size).toBe(2);
+
+    // Switching back to a preset already generated is a cache hit: no new provider call, zero tokens.
+    const briefAgain = (await (
+      await postSummary(app, { materialId: MATERIAL_ID, length: "brief" })
+    ).json()) as { length: string; cached: boolean };
+
+    expect(briefAgain).toMatchObject({ length: "brief", cached: true });
+    expect(calls).toHaveLength(2);
+    expect(handle.commits).toEqual([30, 30, 0]);
   });
 });
