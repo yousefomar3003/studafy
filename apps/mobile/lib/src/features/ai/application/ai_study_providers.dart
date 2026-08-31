@@ -11,8 +11,8 @@ import 'ask_ai_providers.dart';
 
 /// [AiStudyClient] on its own [Dio], wired identically to `askAiClientProvider` — same base URL,
 /// same bearer-token injection, same [ErrorMappingInterceptor]. Standing alone for the same
-/// reason: the generated client's `Dio` isn't reachable and the `AI` tag isn't in the OpenAPI
-/// snapshot.
+/// reason: the generated client's `Dio` isn't reachable and the `AI` tag is excluded from codegen
+/// (see `pubspec.yaml`).
 final aiStudyClientProvider = Provider<AiStudyClient>((ref) {
   final baseUrl = ref.watch(networkConfigProvider).apiBaseUrl;
   final session = ref.watch(authSessionProvider);

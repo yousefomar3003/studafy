@@ -5,9 +5,10 @@ import '../domain/ai_study.dart';
 /// Client for the per-material AI study surfaces — the length-preset summary, the key-concepts
 /// list, and the shared quota snapshot.
 ///
-/// Not generated, same reason as [AskAiClient]: the `AI` tag isn't in the mobile OpenAPI snapshot
-/// (`apps/api/openapi.json` has zero `/api/ai/` paths). Unlike the Ask AI stream these are plain
-/// buffered `application/json`, so a normal typed `Dio` call is enough — the shared
+/// Not generated, same reason as [AskAiClient]: the `AI` tag is excluded from the mobile OpenAPI
+/// codegen (see `pubspec.yaml`'s `swagger_parser.exclude_tags` — the Ask AI stream can't be
+/// typed). Unlike that stream these are plain buffered `application/json`, so a normal typed
+/// `Dio` call is enough — the shared
 /// `ErrorMappingInterceptor` turns a non-2xx problem+json body into an [ApiException] on the
 /// thrown [DioException]; callers classify it with [AiStudyError.classify].
 ///

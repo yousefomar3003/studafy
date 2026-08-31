@@ -19,10 +19,11 @@ enum AskAiReportOutcome {
 
 /// Client for the Ask AI surface — not generated, for the same reason as
 /// `StorageDownloadClient`: the streaming answer endpoint is `text/event-stream`, which a
-/// Retrofit-style typed client can't model (it only types a single decoded 2xx body), and the
-/// AI tag isn't in the mobile OpenAPI snapshot yet regardless. Hand-calls the two paths and
-/// hand-parses their responses, whose shapes are stable and documented in `ask-routes.ts` /
-/// `report-routes.ts`.
+/// Retrofit-style typed client can't model (it only types a single decoded 2xx body). That
+/// mismatch is why the whole `AI` tag is excluded from codegen (see `pubspec.yaml`'s
+/// `swagger_parser.exclude_tags` and `core/api/README.md`), so every `/api/ai/` surface is a
+/// hand-written client like this one. Hand-calls the two paths and hand-parses their responses,
+/// whose shapes are stable and documented in `ask-routes.ts` / `report-routes.ts`.
 ///
 /// Concrete rather than an interface so it matches `StorageDownloadClient`; tests substitute it
 /// by `implements AskAiClient` (its one field is private, so the interface is just the two
