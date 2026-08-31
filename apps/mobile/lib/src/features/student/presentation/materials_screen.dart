@@ -14,12 +14,21 @@ import 'widgets/materials_placeholders.dart';
 /// Empty when [currentEnrolledClassIdsProvider] is unresolved — the same honest "not available
 /// yet" state the timetable and attendance screens show for the same reason (there is no
 /// self-scoped enrollments endpoint yet); see that provider's doc comment.
+///
+/// [focusClassId] narrows the library to a single class — the entry point from an exam's "study
+/// materials" link, where the class is already known and doesn't depend on the enrolment seam.
+/// Null (the default) shows every enrolled class.
 class MaterialsScreen extends ConsumerWidget {
-  const MaterialsScreen({super.key});
+  const MaterialsScreen({this.focusClassId, super.key});
+
+  final String? focusClassId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final classIds = ref.watch(currentEnrolledClassIdsProvider);
+    final focusId = focusClassId;
+    final classIds = focusId != null
+        ? [focusId]
+        : ref.watch(currentEnrolledClassIdsProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text('materials.title'.tr())),

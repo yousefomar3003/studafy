@@ -19,7 +19,7 @@ class GradeTermSelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final terms = ref.watch(academicYearTermsProvider).valueOrNull;
+    final terms = ref.watch(academicYearTermsProvider).value;
     if (terms == null || terms.length < 2) return const SizedBox.shrink();
 
     final selectedId = _resolveSelectedId(terms, ref.watch(selectedGradeTermProvider));
