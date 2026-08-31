@@ -290,5 +290,46 @@
       "retry": "Retry",
       "dismiss": "Dismiss"
     }
+  },
+  "aiStudy": {
+    "signedOut": "Sign in to use the AI study tools.",
+    "retry": "Try again",
+    "openSummary": "AI summary",
+    "openConcepts": "Key concepts",
+    "summary": {
+      "subtitle": "AI summary",
+      "cached": "From cache"
+    },
+    "length": {
+      "brief": "Brief",
+      "standard": "Standard",
+      "detailed": "Detailed"
+    },
+    "concepts": {
+      "subtitle": "Key concepts",
+      "empty": "No key concepts were found in this material."
+    },
+    "sources": {
+      "heading": "Sources",
+      "page": "p.{page}",
+      "fallback": "Source {n}",
+      "openError": "Couldn't open that material."
+    },
+    "quota": {
+      "label": "{used} / {budget} AI tokens used this month"
+    },
+    "error": {
+      "quotaExceeded": "You've used up this month's AI allowance.",
+      "subscriptionInactive": "Your school's AI assistant isn't active.",
+      "schoolInactive": "Your school's subscription is inactive.",
+      "llmDisabled": "The AI assistant is currently switched off.",
+      "temporarilyUnavailable": "The AI assistant is briefly unavailable. Try again.",
+      "notReady": "This material is still being processed. Check back soon.",
+      "notFound": "This material isn't available to the AI assistant.",
+      "generationFailed": "The AI couldn't produce a reliable result. Try again.",
+      "notAllowed": "You're not allowed to use the AI tools here.",
+      "network": "No connection. Check your network and try again.",
+      "unknown": "Something went wrong. Try again."
+    }
   }
 }

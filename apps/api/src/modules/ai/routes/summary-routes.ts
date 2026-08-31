@@ -9,6 +9,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { AI_SUMMARY_DEFAULT_LENGTH, AI_SUMMARY_LENGTHS } from "../config";
 import { getAiQuota } from "../gate/entitlement-gate";
 import { throwLlmError } from "../llm/errors";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
@@ -78,6 +79,8 @@ const summarySourceSchema = z.object({
 const summaryResponseSchema = z.object({
   /** The model's condensation of the material's ingested text. */
   summary: z.string(),
+  /** The length preset this summary was generated for; echoes the request (or its default). */
+  length: z.enum(AI_SUMMARY_LENGTHS),
   /** The model id that actually answered (the routed tier's id). */
   model: z.string(),
   /** The routing-tier that served this feature: always "small" (summary is a small-tier feature). */
@@ -100,6 +103,15 @@ const summaryBodySchema = z.object({
     description: "The learning material to summarize.",
     example: "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12",
   }),
+  length: z
+    .enum(AI_SUMMARY_LENGTHS)
+    .default(AI_SUMMARY_DEFAULT_LENGTH)
+    .openapi({
+      description:
+        "How long the summary should be. Each preset is cached independently, so switching " +
+        "presets is a zero-token cache hit once every preset has been generated once.",
+      example: AI_SUMMARY_DEFAULT_LENGTH,
+    }),
 });
 
 const summaryParamsSchema = z.object({
@@ -121,8 +133,10 @@ const summaryRoute = createRoute({
   description:
     "Loads the material's ingested text chunks, routes the summarization through the small " +
     "(fast, cheap) model tier, and returns the condensation with its section/page anchors. " +
-    "Summaries are deterministic per student and material, so repeat requests are served from a " +
-    "Redis cache with zero token cost. Consumes the same gate as every other AI surface " +
+    "The `length` preset (brief | standard | detailed) changes only the length directive; the " +
+    "sources are identical across presets. Summaries are deterministic per student, material, and " +
+    "length preset, so repeat requests — including a switch to an already-generated preset — are " +
+    "served from a Redis cache with zero token cost. Consumes the same gate as every other AI surface " +
     "(403/402/429). Refuses with 404 RESOURCE_NOT_FOUND for a material the school cannot see or " +
     "with no ingested text, 422 VALIDATION_FAILED while the material is still mid-ingestion, 503 " +
     "AI_LLM_DISABLED when the LLM plane is turned off, and the shared provider failure taxonomy " +
@@ -193,7 +207,7 @@ export function aiSummaryRoutes(deps: {
   routes.openapi(summaryRoute, async (c) => {
     const auth = requireAuth(c);
     const { studentId } = c.req.valid("param");
-    const { materialId } = c.req.valid("json");
+    const { materialId, length } = c.req.valid("json");
     const quota = getAiQuota(c);
 
     if (!provider) {
@@ -236,7 +250,7 @@ export function aiSummaryRoutes(deps: {
     }
 
     const fingerprint = summaryFingerprint(materialId, loaded.material.chunks);
-    const cacheKey = summaryCacheKey(studentId, materialId, fingerprint);
+    const cacheKey = summaryCacheKey(studentId, materialId, length, fingerprint);
 
     // Cache is an accelerator, never a dependency: any get failure is a miss, and the set below is
     // fire-and-forget, so a Redis hiccup costs a regeneration, not an error.
@@ -252,6 +266,7 @@ export function aiSummaryRoutes(deps: {
       return c.json(
         {
           summary: cached.summary,
+          length,
           model: cached.model,
           tier: cached.tier,
           feature: SUMMARY_FEATURE,
@@ -264,7 +279,7 @@ export function aiSummaryRoutes(deps: {
     }
 
     try {
-      const prompt = assembleSummaryPrompt(loaded.material.chunks, loaded.material.title);
+      const prompt = assembleSummaryPrompt(loaded.material.chunks, loaded.material.title, length);
       const generation = await provider.generate({
         model: routed.model,
         prompt: prompt.user,
@@ -292,6 +307,7 @@ export function aiSummaryRoutes(deps: {
           summary: generation.content,
           model: generation.model,
           tier: routed.tier,
+          length,
           sources,
         })
         .catch((err: unknown) => {
@@ -304,6 +320,7 @@ export function aiSummaryRoutes(deps: {
       return c.json(
         {
           summary: generation.content,
+          length,
           model: generation.model,
           tier: routed.tier,
           feature: SUMMARY_FEATURE,
