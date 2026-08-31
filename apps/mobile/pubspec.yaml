@@ -72,6 +72,14 @@ swagger_parser:
   # surface can't work around (a oneOf request body resolving to the wrong generated class, and
   # an unstable name-collision rename between two schemas both called "Grades"). See
   # lib/src/core/api/README.md#known-generation-gaps.
+  #
+  # "AI" is excluded for a structural reason, not a codegen bug: the /api/ai/students/{studentId}/ask
+  # endpoint responds with a `text/event-stream` `oneOf` (an SSE event union) that a Retrofit-style
+  # typed client cannot model — swagger_parser emits an `askAiStreaming` method returning a sealed
+  # union whose file it never writes, breaking the whole client's compile. Every /api/ai/ surface
+  # the mobile app uses is served by a hand-written Dio client instead (features/ai/data/*), so
+  # dropping the tag from codegen matches how the feature is already built.
   exclude_tags:
     - Finance
     - Approval Queue
+    - AI

@@ -95,7 +95,8 @@ the spec — see the acceptance criteria on ST-062.
 ### Known generation gaps
 
 `swagger_parser` 1.44.1 (the OpenAPI → Dart generator) has three reproducible codegen bugs against
-this spec. Two are repaired automatically as part of `client:generate`; the third is scoped out:
+this spec. Two are repaired automatically as part of `client:generate`; the third is scoped out.
+A fourth tag (`AI`) is scoped out for a structural reason rather than a bug — see the last bullet:
 
 - **Missing sibling imports on `oneOf` sealed-union variants**
   ([`scripts/fix_sealed_union_imports.dart`](../../../../scripts/fix_sealed_union_imports.dart)).
@@ -120,6 +121,17 @@ this spec. Two are repaired automatically as part of `client:generate`; the thir
   spec generates and compiles cleanly. Re-running `client:generate` after a `swagger_parser` bump
   is the way to find out whether either bug has been fixed upstream — if so, drop it from
   `exclude_tags`.
+- **`AI` is excluded structurally, not for a bug** (see `pubspec.yaml`'s `swagger_parser.exclude_tags`).
+  `POST /api/ai/students/{studentId}/ask` responds with a `text/event-stream` `oneOf` (an SSE event
+  union) that a Retrofit-style typed client fundamentally cannot model — it types a single decoded
+  2xx body, not a stream. `swagger_parser` emits an `askAiStreaming()` method returning a sealed
+  union whose file it never writes, which breaks the whole client's compile; and the AI quiz
+  schema's inline `type` enum (`mcq | short_answer`) generates a model named `Type` that
+  `fix_sealed_union_imports.dart` then wrongly injects into unrelated sealed files, shadowing
+  `dart:core.Type`. Every `/api/ai/` surface the app uses is served by a hand-written Dio client
+  instead (`features/ai/data/{ask_ai,ai_study,ai_hub}_client.dart`), so dropping the tag from
+  codegen matches how the feature is already built. Unlike the two bug exclusions above, a
+  `swagger_parser` bump won't change this — the SSE-vs-typed-client mismatch is inherent.
 
 ## Testing
 

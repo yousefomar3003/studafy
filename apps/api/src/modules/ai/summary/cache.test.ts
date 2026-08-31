@@ -68,11 +68,19 @@ describe("summaryFingerprint", () => {
 });
 
 describe("summaryCacheKey", () => {
-  test("matches the documented prefix layout", () => {
+  test("matches the documented prefix layout, with the length preset as its own segment", () => {
     const fingerprint = "a".repeat(64);
 
-    expect(summaryCacheKey(STUDENT_ID, MATERIAL_ID, fingerprint)).toBe(
-      `${AI_SUMMARY_CACHE_KEY_PREFIX}:${STUDENT_ID}:${MATERIAL_ID}:${fingerprint}`,
+    expect(summaryCacheKey(STUDENT_ID, MATERIAL_ID, "standard", fingerprint)).toBe(
+      `${AI_SUMMARY_CACHE_KEY_PREFIX}:${STUDENT_ID}:${MATERIAL_ID}:standard:${fingerprint}`,
+    );
+  });
+
+  test("gives each length preset a distinct key for the same material and chunk set", () => {
+    const fingerprint = "b".repeat(64);
+
+    expect(summaryCacheKey(STUDENT_ID, MATERIAL_ID, "brief", fingerprint)).not.toBe(
+      summaryCacheKey(STUDENT_ID, MATERIAL_ID, "detailed", fingerprint),
     );
   });
 });
@@ -84,6 +92,7 @@ describe("createSummaryCache", () => {
       summary: "condensed text",
       model: "claude-3-5-haiku-20241022",
       tier: "small",
+      length: "standard",
       sources: [
         {
           chunk_id: "10000000-0000-4000-8000-000000000001",

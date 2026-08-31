@@ -87,13 +87,23 @@ export const AI_ASK_MESSAGE_RETENTION_DAYS = 90;
 export const AI_SUMMARY_CHUNK_LIMIT = 50;
 
 /**
+ * The length presets a client can ask a summary for. The source chunks fed to the model are the
+ * same for every preset — only the system prompt's length directive and the cache key differ — so
+ * a client can offer a preset switch that re-renders from cache after each preset is generated
+ * once. `standard` is the default when the body omits `length`.
+ */
+export const AI_SUMMARY_LENGTHS = ["brief", "standard", "detailed"] as const;
+export type AiSummaryLength = (typeof AI_SUMMARY_LENGTHS)[number];
+export const AI_SUMMARY_DEFAULT_LENGTH: AiSummaryLength = "standard";
+
+/**
  * Maximum characters of source text handed to the model per material. Applied as a budget to a
  * contiguous prefix of the chunks in order, so the model always sees the material's opening rather
  * than a sparse sample of it. ~4 characters per token ≈ 10,000 input tokens.
  */
 export const AI_SUMMARY_MAX_INPUT_CHARS = 40_000;
 
-/** Redis key prefix for summary cache entries. Keys look like `aisum:{studentId}:{materialId}:{fingerprint}`. */
+/** Redis key prefix for summary cache entries. Keys look like `aisum:{studentId}:{materialId}:{length}:{fingerprint}`. */
 export const AI_SUMMARY_CACHE_KEY_PREFIX = "aisum";
 
 /** How long a cached summary is served before a repeat request regenerates it. */

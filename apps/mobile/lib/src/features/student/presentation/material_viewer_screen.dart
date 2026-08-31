@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/generated/models/material.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../ai/presentation/key_concepts_screen.dart';
+import '../../ai/presentation/material_summary_screen.dart';
 import '../application/materials_providers.dart';
 import '../domain/material_ready_state.dart';
 import 'widgets/file_size.dart';
@@ -109,6 +111,31 @@ class _MaterialReadyBody extends StatelessWidget {
           Text(
             'materials.viewer.aiVisible'.tr(),
             style: textTheme.bodySmall?.copyWith(color: colorScheme.primary),
+          ),
+          const SizedBox(height: AppSpacing.space8),
+          Wrap(
+            spacing: AppSpacing.space8,
+            runSpacing: AppSpacing.space8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MaterialSummaryScreen(material: material),
+                  ),
+                ),
+                icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                label: Text('aiStudy.openSummary'.tr()),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => KeyConceptsScreen(material: material),
+                  ),
+                ),
+                icon: const Icon(Icons.lightbulb_outline, size: 18),
+                label: Text('aiStudy.openConcepts'.tr()),
+              ),
+            ],
           ),
         ],
         const SizedBox(height: AppSpacing.space16),

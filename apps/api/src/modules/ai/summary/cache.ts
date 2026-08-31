@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 
-import { AI_SUMMARY_CACHE_KEY_PREFIX, AI_SUMMARY_CACHE_TTL_SECONDS } from "../config";
+import {
+  AI_SUMMARY_CACHE_KEY_PREFIX,
+  AI_SUMMARY_CACHE_TTL_SECONDS,
+  type AiSummaryLength,
+} from "../config";
 
 import type { LoadedSummaryChunk } from "./materials";
 import type { RedisClient } from "../../../redis";
@@ -14,9 +18,11 @@ import type { AiModelTier } from "../llm/routing";
  * spending quota on a second generation. The cache is an accelerator, never a dependency: a
  * miss, an eviction, or a transient Redis error all degrade to regenerating.
  *
- * Cache keys live under the `aisum` prefix (`aisum:{studentId}:{materialId}:{fingerprint}`), the
- * family convention the `aiq` meter counters use. Entries expire after
- * `AI_SUMMARY_CACHE_TTL_SECONDS`.
+ * Cache keys live under the `aisum` prefix
+ * (`aisum:{studentId}:{materialId}:{length}:{fingerprint}`), the family convention the `aiq` meter
+ * counters use. The `length` segment keeps each summary-length preset a separate entry, so a
+ * client switching presets hits the cache once each preset has been generated once. Entries expire
+ * after `AI_SUMMARY_CACHE_TTL_SECONDS`.
  */
 
 export interface SummaryCacheSource {
@@ -31,6 +37,8 @@ export interface SummaryCacheEntry {
   summary: string;
   model: string;
   tier: AiModelTier;
+  /** The length preset this entry was generated for; echoed back on a cache hit. */
+  length: AiSummaryLength;
   /** The sources the summary was grounded on, enough to reproduce the response without the model. */
   sources: SummaryCacheSource[];
 }
@@ -61,9 +69,10 @@ export function summaryFingerprint(
 export function summaryCacheKey(
   studentId: string,
   materialId: string,
+  length: AiSummaryLength,
   fingerprint: string,
 ): string {
-  return `${AI_SUMMARY_CACHE_KEY_PREFIX}:${studentId}:${materialId}:${fingerprint}`;
+  return `${AI_SUMMARY_CACHE_KEY_PREFIX}:${studentId}:${materialId}:${length}:${fingerprint}`;
 }
 
 export function createSummaryCache(redis: RedisClient): SummaryCache {

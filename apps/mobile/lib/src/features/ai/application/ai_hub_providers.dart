@@ -1,14 +1,28 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_client.dart';
+import '../../../core/api/api_exception.dart';
+import '../../../core/api/auth_interceptor.dart';
+import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/auth/auth_providers.dart';
-import '../../../core/config/app_config.dart';
 import '../../../core/di/app_providers.dart';
 import '../../student/application/student_context_providers.dart';
+import '../data/ai_hub_client.dart';
 import '../domain/ai_checkout_link.dart';
 import '../domain/ai_hub_status.dart';
-import '../domain/ai_usage.dart';
+
+/// [AiHubClient] on its own [Dio], wired identically to `askAiClientProvider` /
+/// `aiStudyClientProvider` — same base URL, same bearer-token injection, same
+/// [ErrorMappingInterceptor] — standing alone because the `AI` tag is excluded from the generated
+/// client (see `pubspec.yaml`), so there is no `api.ai` to hang this read off.
+final aiHubClientProvider = Provider<AiHubClient>((ref) {
+  final baseUrl = ref.watch(networkConfigProvider).apiBaseUrl;
+  final session = ref.watch(authSessionProvider);
+  final dio = Dio(BaseOptions(baseUrl: baseUrl.toString()))
+    ..interceptors.add(AuthInterceptor(() => session.tokenProvider))
+    ..interceptors.add(ErrorMappingInterceptor());
+  return AiHubClient(dio);
+});
 
 /// The AI tab's top-level state: calls `GET /api/ai/usage` and maps its outcome onto
 /// [AiHubStatus] — `200` -> [AiHubSubscribed], `402 AI_SUBSCRIPTION_INACTIVE` ->
@@ -26,19 +40,10 @@ import '../domain/ai_usage.dart';
 /// screen's `WidgetsBindingObserver`) so a checkout finished in the external browser is reflected
 /// without the student having to force-quit and reopen the app.
 final aiHubStatusProvider = FutureProvider.autoDispose<AiHubStatus>((ref) async {
-  final api = ref.watch(apiClientProvider);
+  final client = ref.watch(aiHubClientProvider);
 
   try {
-    final usage = await api.ai.getAiUsage();
-    return AiHubSubscribed(
-      AiUsage(
-        budget: usage.budget,
-        usedTokens: usage.usedTokens,
-        heldTokens: usage.heldTokens,
-        remaining: usage.remaining,
-        periodEnd: usage.periodEnd,
-      ),
-    );
+    return AiHubSubscribed(await client.usage());
   } on DioException catch (error) {
     final status = aiHubStatusFromErrorCode(error.apiError?.code);
     if (status == null) rethrow;
