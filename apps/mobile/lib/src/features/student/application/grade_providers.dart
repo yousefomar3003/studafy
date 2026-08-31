@@ -119,12 +119,12 @@ final gradeReportProvider = Provider.autoDispose<AsyncValue<GradeReportStatus>>(
 /// still plots with no connectivity). Terms still loading are simply omitted — the sparkline
 /// fills in as their snapshots arrive rather than blocking the screen on all of them.
 final gradeTrendProvider = Provider.autoDispose<List<GradeTrendPoint>>((ref) {
-  final terms = ref.watch(academicYearTermsProvider).valueOrNull;
+  final terms = ref.watch(academicYearTermsProvider).value;
   if (terms == null) return const [];
 
   final points = <GradeTrendPoint>[];
   for (final term in terms) {
-    final snapshot = ref.watch(gradeSnapshotProvider(term.id)).valueOrNull;
+    final snapshot = ref.watch(gradeSnapshotProvider(term.id)).value;
     if (snapshot == null) continue;
     final summary = snapshot.data.termSummary;
     points.add(
@@ -149,11 +149,11 @@ final gradeTrendProvider = Provider.autoDispose<List<GradeTrendPoint>>((ref) {
 /// the default term (the active one — which is where a freshly published grade lives in every
 /// realistic case) until this resolves.
 final deepLinkGradeTermProvider = Provider.autoDispose.family<String?, String>((ref, courseId) {
-  final terms = ref.watch(academicYearTermsProvider).valueOrNull;
+  final terms = ref.watch(academicYearTermsProvider).value;
   if (terms == null) return null;
 
   for (final term in terms.reversed) {
-    final snapshot = ref.watch(gradeSnapshotProvider(term.id)).valueOrNull;
+    final snapshot = ref.watch(gradeSnapshotProvider(term.id)).value;
     if (snapshot == null) continue;
     final hasCourse = snapshot.data.grades.any((grade) => grade.course.id == courseId);
     if (hasCourse) return term.id;

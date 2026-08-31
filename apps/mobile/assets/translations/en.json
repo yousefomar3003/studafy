@@ -187,5 +187,16 @@
       "excused": "Excused",
       "remote": "Remote"
     }
+  },
+  "exams": {
+    "title": "Exams",
+    "error": "Couldn't load your exams.",
+    "unavailable": "Your exams aren't available yet.",
+    "empty": "No upcoming exams.",
+    "emptyHint": "You're all caught up.",
+    "scope": "Class {class}",
+    "room": "Room {room}",
+    "weight": "Weight {weight}",
+    "studyMaterials": "Study materials"
   }
 }

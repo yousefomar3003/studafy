@@ -6,6 +6,9 @@ abstract final class RoutePaths {
   /// a course-scoped notification deep link.
   static const studentAttendance = '/me/attendance';
 
+  /// The signed-in student's upcoming-exams calendar.
+  static const studentExams = '/me/exams';
+
   // Notification deep-link destinations.
   // Paths match the route templates in packages/notification-templates/src/registry.ts.
   static const grades = '/courses/:courseId/grades';
