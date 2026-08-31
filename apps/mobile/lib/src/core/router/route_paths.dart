@@ -12,6 +12,9 @@ abstract final class RoutePaths {
   /// The signed-in student's Ask AI chat, grounded in their school's study materials.
   static const askAi = '/me/ask-ai';
 
+  /// The signed-in student's AI-generated quiz player.
+  static const quiz = '/me/quiz';
+
   // Notification deep-link destinations.
   // Paths match the route templates in packages/notification-templates/src/registry.ts.
   static const grades = '/courses/:courseId/grades';
