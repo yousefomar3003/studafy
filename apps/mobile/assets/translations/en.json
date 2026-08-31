@@ -10,6 +10,7 @@
       "home": "Home",
       "timetable": "Timetable",
       "courses": "Courses",
+      "ai": "AI",
       "classes": "Classes",
       "children": "Children",
       "profile": "Profile"
@@ -188,6 +189,40 @@
       "remote": "Remote"
     }
   },
+  "ai": {
+    "hub": {
+      "title": "AI",
+      "unavailable": "AI features aren't available yet.",
+      "error": "Couldn't load your AI features.",
+      "usage": {
+        "title": "This month's AI usage",
+        "remaining": "{remaining} of {budget} tokens remaining",
+        "resets": "Resets {date}"
+      },
+      "features": {
+        "ask": { "label": "Ask AI" },
+        "exam": { "label": "Exam mode" },
+        "summary": { "label": "Summaries" },
+        "concepts": { "label": "Key concepts" },
+        "flashcards": { "label": "Flashcards" },
+        "quiz": { "label": "Quizzes" },
+        "explain": { "label": "Explain it simply" }
+      }
+    },
+    "upsell": {
+      "title": "Get the AI Study Assistant",
+      "body": "A personal AI tutor for homework help, practice, and study-material summaries. Billed separately from your school's Studafy subscription, per student.",
+      "points": {
+        "ask": "Ask questions and get grounded answers from your own class materials",
+        "quizzesAndFlashcards": "Practice with generated quizzes and flashcards",
+        "summaries": "Get quick summaries and key concepts from your materials"
+      },
+      "continueOnWebsite": "Continue on the website",
+      "continueUnavailable": "Checkout isn't available right now. Please try again later."
+    },
+    "schoolInactive": {
+      "title": "AI features are paused",
+      "body": "Your school's Studafy subscription isn't active right now, so AI features are paused for everyone at your school. Contact your school to have it reactivated."
   "exams": {
     "title": "Exams",
     "error": "Couldn't load your exams.",

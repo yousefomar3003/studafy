@@ -6,7 +6,7 @@ import '../../support/pump_studafy_app.dart';
 
 void main() {
   group('lands each role in its own shell', () {
-    testWidgets('student gets Home, Timetable, Courses, Profile — and a mutation FAB', (
+    testWidgets('student gets Home, Timetable, Courses, AI, Profile — and a mutation FAB', (
       tester,
     ) async {
       await pumpAppShell(
@@ -17,6 +17,7 @@ void main() {
       expect(find.text('Home'), findsWidgets);
       expect(find.text('Timetable'), findsWidgets);
       expect(find.text('Courses'), findsWidgets);
+      expect(find.text('AI'), findsWidgets);
       expect(find.text('Profile'), findsWidgets);
       expect(find.byType(FloatingActionButton), findsOneWidget);
     });
@@ -64,6 +65,7 @@ void main() {
       // No domain-specific tab, and zero mutation affordances.
       expect(find.text('Timetable'), findsNothing);
       expect(find.text('Courses'), findsNothing);
+      expect(find.text('AI'), findsNothing);
       expect(find.text('Classes'), findsNothing);
       expect(find.text('Children'), findsNothing);
       expect(find.byType(FloatingActionButton), findsNothing);

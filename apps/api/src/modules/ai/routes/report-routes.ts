@@ -76,15 +76,10 @@ const reportRoute = createRoute({
       content: { "application/json": { schema: reportBodySchema } },
     },
   },
-  responses: {
-    201: {
-      description: "The report was created successfully.",
-      content: {
-        "application/json": { schema: reportResponseSchema },
-      },
-    },
-    ...standardResponses({} as const, [400, 401, 404, 409, 422]),
-  },
+  responses: standardResponses(
+    { 201: { description: "The report was created successfully.", schema: reportResponseSchema } },
+    [400, 401, 404, 409, 422],
+  ),
 });
 
 function tenantFrom(c: Context<AppEnv>): {
