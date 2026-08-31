@@ -198,5 +198,62 @@
     "room": "Room {room}",
     "weight": "Weight {weight}",
     "studyMaterials": "Study materials"
+  },
+  "askAi": {
+    "title": "Ask AI",
+    "signedOut": "Sign in to ask the study assistant a question.",
+    "thinking": "Thinking…",
+    "empty": {
+      "title": "Ask about your study materials",
+      "hint": "Answers are drawn from your school's materials and cite where they came from."
+    },
+    "composer": {
+      "hint": "Ask a question…",
+      "send": "Send",
+      "tooLong": "That question is too long."
+    },
+    "citation": {
+      "heading": "Sources",
+      "fallback": "Study material",
+      "withPage": "{title} · p.{page}",
+      "openError": "Couldn't open that material."
+    },
+    "refusal": {
+      "title": "Not enough to answer that",
+      "body": "Nothing in your school's materials covers this closely enough for a grounded answer.",
+      "nearest": "Closest topics found:"
+    },
+    "blocked": {
+      "title": "Answer withheld",
+      "body": "This answer was withheld by the content filter."
+    },
+    "failed": {
+      "title": "Answer interrupted",
+      "body": "The assistant couldn't finish this answer.",
+      "retry": "Try again"
+    },
+    "report": {
+      "action": "Report answer",
+      "dialogTitle": "Report this answer",
+      "dialogHint": "What's wrong with it?",
+      "cancel": "Cancel",
+      "submit": "Report",
+      "filed": "Reported to your teacher.",
+      "alreadyFiled": "You've already reported this answer.",
+      "failed": "Couldn't send the report. Try again."
+    },
+    "sendError": {
+      "quotaExceeded": "You've used up this month's AI questions.",
+      "subscriptionInactive": "Your school's AI assistant isn't active.",
+      "schoolInactive": "Your school's subscription is inactive.",
+      "llmDisabled": "The AI assistant is currently switched off.",
+      "temporarilyUnavailable": "The AI assistant is briefly unavailable. Try again.",
+      "questionBlocked": "That question can't be sent.",
+      "notAllowed": "You're not allowed to ask here.",
+      "network": "No connection. Check your network and try again.",
+      "unknown": "Something went wrong sending your question.",
+      "retry": "Retry",
+      "dismiss": "Dismiss"
+    }
   }
 }

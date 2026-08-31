@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/ai/presentation/ask_ai_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
 import '../../features/notifications/presentation/notification_destination_screen.dart';
@@ -33,6 +34,12 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
       GoRoute(
         path: RoutePaths.studentExams,
         builder: (context, state) => const StudentExamsScreen(),
+      ),
+
+      // The signed-in student's Ask AI chat.
+      GoRoute(
+        path: RoutePaths.askAi,
+        builder: (context, state) => const AskAiScreen(),
       ),
 
       // Notification deep-link destinations. Each maps to the placeholder
