@@ -333,7 +333,13 @@ const createExamRoute = createRoute({
   method: "post",
   path: "/api/ai/students/{studentId}/exams",
   tags: ["AI"],
-  operationId: "createExam",
+  // "createExam"/"getExam" below collide with the academics module's own school-exam routes
+  // (POST/GET /api/academics/exams) -- a different resource (a scheduled school exam vs. an AI
+  // mock exam session) that happened to pick the same operationId. Never caught before this
+  // route was actually mounted into the OpenAPI document (see redis-unusable.ts's doc comment for
+  // why AI routes were invisible to it until now) -- document.test.ts's "has a unique
+  // operationId" is what surfaced it.
+  operationId: "createAiExam",
   summary: "Start generating a timed mock exam over a chosen scope",
   description:
     "Validates the requested materials, creates the exam session, and enqueues item-bank " +
@@ -367,7 +373,8 @@ const getExamRoute = createRoute({
   method: "get",
   path: "/api/ai/students/{studentId}/exams/{examId}",
   tags: ["AI"],
-  operationId: "getExam",
+  // See createExamRoute's operationId comment above -- same collision, same fix.
+  operationId: "getAiExam",
   summary: "Poll an exam session's status, and read its content once available",
   description:
     "Side-effect-free: never mutates the session, so polling can never start the timer. The " +

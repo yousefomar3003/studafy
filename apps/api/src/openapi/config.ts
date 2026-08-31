@@ -258,5 +258,14 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "URLs whose row scope is enforced by tenant-scoped RLS-backed resolution. Answers 503 " +
         "when object storage is not configured, and is authorized per content class.",
     },
+    {
+      name: "AI",
+      description:
+        "AI study assistant: ask, generate, hybrid search, summaries, quizzes, flashcards, key " +
+        "concepts, simplified explanations, and exam mode. Authenticated and tenant-scoped, then " +
+        "gated by the AI entitlement chain -- school subscription active, then the per-student AI " +
+        "add-on active, then quota available -- with a distinct HTTP status per stage (403, 402, " +
+        "429). Mounted only when a database, Redis, and the entitlement service are all present.",
+    },
   ],
 };

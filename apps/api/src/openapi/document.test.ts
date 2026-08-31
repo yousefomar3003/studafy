@@ -10,6 +10,7 @@ import { createUnusableDatabase } from "../db/unusable";
 import { createInflightTracker } from "../lifecycle";
 import { createLogger } from "../logger";
 import { KeyStore } from "../modules/auth";
+import { createUnusableRedis } from "../redis-unusable";
 
 import { buildOpenApiDocument } from "./document";
 import { PROBLEM_STATUSES } from "./responses";
@@ -97,6 +98,27 @@ describe("structure", () => {
         "/api/admin/users/{userId}/devices/{deviceId}",
         "/api/admin/users/{userId}/providers/{provider}",
         "/api/admin/users/{userId}/sessions",
+        // AI entitlement/quota-gated surface (ST-155 and siblings). Mounted only `if (database &&
+        // redis && entitlements)` — see app.ts's AI gate section — so these were invisible to this
+        // document until OpenAPI generation started passing a real (if inert) Redis placeholder
+        // instead of null. See redis-unusable.ts.
+        "/api/ai/admin/metrics",
+        "/api/ai/students/{studentId}/ask",
+        "/api/ai/students/{studentId}/concepts",
+        "/api/ai/students/{studentId}/decks",
+        "/api/ai/students/{studentId}/decks/{deckId}/review",
+        "/api/ai/students/{studentId}/exams",
+        "/api/ai/students/{studentId}/exams/{examId}",
+        "/api/ai/students/{studentId}/exams/{examId}/start",
+        "/api/ai/students/{studentId}/exams/{examId}/submit",
+        "/api/ai/students/{studentId}/explain",
+        "/api/ai/students/{studentId}/generate",
+        "/api/ai/students/{studentId}/messages/{messageId}/report",
+        "/api/ai/students/{studentId}/quizzes",
+        "/api/ai/students/{studentId}/quizzes/{quizId}/grade",
+        "/api/ai/students/{studentId}/search",
+        "/api/ai/students/{studentId}/summarize",
+        "/api/ai/usage",
         "/api/announcements",
         "/api/attendance/records/batch",
         "/api/attendance/records/{recordId}",
@@ -460,6 +482,10 @@ describe("security", () => {
         "DELETE /api/admin/users/{userId}/providers/{provider}",
         "GET /api/admin/users/{userId}/devices",
         "GET /api/admin/users/{userId}/sessions",
+        "GET /api/ai/admin/metrics",
+        "GET /api/ai/students/{studentId}/decks/{deckId}/review",
+        "GET /api/ai/students/{studentId}/exams/{examId}",
+        "GET /api/ai/usage",
         "DELETE /api/academics/classes/{classId}",
         "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
         "DELETE /api/academics/assignments/{assignmentId}",
@@ -649,6 +675,20 @@ describe("security", () => {
         "POST /api/academics/years/{yearId}/rollover",
         "POST /api/academics/years/{yearId}/terms",
         "POST /api/admin/subscriptions/sync-prices",
+        "POST /api/ai/students/{studentId}/ask",
+        "POST /api/ai/students/{studentId}/concepts",
+        "POST /api/ai/students/{studentId}/decks",
+        "POST /api/ai/students/{studentId}/decks/{deckId}/review",
+        "POST /api/ai/students/{studentId}/exams",
+        "POST /api/ai/students/{studentId}/exams/{examId}/start",
+        "POST /api/ai/students/{studentId}/exams/{examId}/submit",
+        "POST /api/ai/students/{studentId}/explain",
+        "POST /api/ai/students/{studentId}/generate",
+        "POST /api/ai/students/{studentId}/messages/{messageId}/report",
+        "POST /api/ai/students/{studentId}/quizzes",
+        "POST /api/ai/students/{studentId}/quizzes/{quizId}/grade",
+        "POST /api/ai/students/{studentId}/search",
+        "POST /api/ai/students/{studentId}/summarize",
         "POST /api/attendance/records/batch",
         "POST /api/attendance/reports/export",
         "POST /api/attendance/sessions",
@@ -736,7 +776,7 @@ describe("the generated artifact", () => {
       isReady: () => true,
       tracker: createInflightTracker(),
       logger: createLogger({ destination: () => undefined }),
-      redis: null,
+      redis: createUnusableRedis(),
       database: createUnusableDatabase(),
       keyStore,
       docsEnabled: true,
@@ -756,7 +796,7 @@ describe("the reference site", () => {
       isReady: () => true,
       tracker: createInflightTracker(),
       logger: createLogger({ destination: () => undefined }),
-      redis: null,
+      redis: createUnusableRedis(),
       database: createUnusableDatabase(),
       docsEnabled,
     });

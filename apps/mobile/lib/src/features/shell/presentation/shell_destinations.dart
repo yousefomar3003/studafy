@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../ai/presentation/ai_hub_screen.dart';
 import '../../student/presentation/timetable_screen.dart';
 import '../../student/presentation/today_screen.dart';
 import '../domain/shell_role.dart';
@@ -20,6 +21,13 @@ class ShellDestination {
 /// Every shell gets a Home and a Profile tab; roles with a mobile-relevant collection of
 /// people/courses get one more tab for it. [ShellRole.viewer] gets the minimal two-tab set —
 /// no domain-specific tab — matching its zero-mutation, view-only posture.
+///
+/// [ShellRole.student] alone also gets an AI tab. A parent can buy and manage the same per-student
+/// add-on too (see `apps/web/src/app/routes.tsx`'s `account/ai` route comment), but that needs a
+/// child-selection concept the parent shell's own "Children" tab doesn't have yet either — still a
+/// [ShellTabPlaceholder] below — so a parent-facing AI tab is future scope for whichever ticket
+/// builds that tab for real, not this one. `AiHubScreen` itself resolves
+/// subscribed/unsubscribed/school-inactive from the signed-in student session.
 List<ShellDestination> shellDestinationsFor(ShellRole role) {
   const home = ShellDestination(
     labelKey: 'shell.tabs.home',
@@ -49,6 +57,11 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
           labelKey: 'shell.tabs.courses',
           icon: Icons.menu_book_outlined,
           body: ShellTabPlaceholder(titleKey: 'shell.tabs.courses'),
+        ),
+        ShellDestination(
+          labelKey: 'shell.tabs.ai',
+          icon: Icons.auto_awesome_outlined,
+          body: AiHubScreen(),
         ),
         profile,
       ];
