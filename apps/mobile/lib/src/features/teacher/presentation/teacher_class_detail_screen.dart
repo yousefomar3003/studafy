@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/teacher_providers.dart';
+import 'attendance_taking_screen.dart';
 import 'widgets/roster_entry_tile.dart';
 
 /// A class the signed-in teacher leads: its course, roster size, and the enrolled students.
@@ -30,6 +31,15 @@ class TeacherClassDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(classCode)),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => AttendanceTakingScreen(classId: classId, classCode: classCode),
+          ),
+        ),
+        icon: const Icon(Icons.fact_check_outlined),
+        label: Text('teacher.attendance.take'.tr()),
+      ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(classRosterProvider(classId)),
         child: ListView(

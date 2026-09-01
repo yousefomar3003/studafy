@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/studafy_api_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/academics/academics_client.dart';
@@ -5,8 +6,16 @@ import 'package:studafy_mobile/src/core/api/generated/assignments/assignments_cl
 import 'package:studafy_mobile/src/core/api/generated/attendance/attendance_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/attendance_record.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/attendance_session.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/attendance_session_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/batch_record_attendance_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/batch_record_attendance_response.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/batch_record_item.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/correct_attendance_record_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/corrected_attendance_record.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/create_attendance_session_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/update_attendance_session_body.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/class.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/class_list.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/course.dart';
@@ -286,6 +295,22 @@ class FakeAttendanceClient extends Fake implements AttendanceClient {
 
   Map<String, List<AttendanceSession>> sessionsByClassId;
 
+  // --- Write path (attendance-taking screen, ST-235) ----------------------
+
+  /// Every `recordAttendanceBatch` body received, in order.
+  final List<BatchRecordAttendanceBody> batchCalls = [];
+
+  /// Session ids moved to `submitted`, in order.
+  final List<String> submittedSessionIds = [];
+
+  /// When set, every write (`openAttendanceSession`, `recordAttendanceBatch`,
+  /// `updateAttendanceSessionStatus`) throws it — the offline / rejection cases.
+  DioException? throwOnWrite;
+
+  /// Result for `correctAttendanceRecord`; defaults to a plausible version-2 record.
+  CorrectedAttendanceRecord? correctionResult;
+  DioException? throwOnCorrect;
+
   @override
   Future<AttendanceSessionList> listAttendanceSessions({
     String? classId,
@@ -295,6 +320,146 @@ class FakeAttendanceClient extends Fake implements AttendanceClient {
   }) async {
     final rows = sessionsByClassId[classId] ?? const [];
     return AttendanceSessionList(attendanceSessions: rows, total: rows.length);
+  }
+
+  @override
+  Future<AttendanceSession> openAttendanceSession({
+    required CreateAttendanceSessionBody body,
+  }) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    final existing = sessionsByClassId[body.classId] ?? const <AttendanceSession>[];
+    final match = existing.where((s) => s.period == body.period).toList();
+    if (match.isNotEmpty) return match.first;
+
+    final created = AttendanceSession.fromJson({
+      'id': 'session-${body.classId}-${body.period}',
+      'school_id': 'school-1',
+      'class_id': body.classId,
+      'session_date': _t0,
+      'period': body.period,
+      'status': 'open',
+      'taken_by_user_id': 'user-1',
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+    sessionsByClassId = {
+      ...sessionsByClassId,
+      body.classId: [...existing, created],
+    };
+    return created;
+  }
+
+  @override
+  Future<BatchRecordAttendanceResponse> recordAttendanceBatch({
+    required BatchRecordAttendanceBody body,
+  }) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    batchCalls.add(body);
+
+    // Response carries the session's whole record set — accumulate across chunks.
+    final seen = <String, BatchRecordItem>{};
+    for (final call in batchCalls) {
+      for (final item in call.records) {
+        seen[item.studentId] = item;
+      }
+    }
+    final records = [
+      for (final item in seen.values)
+        AttendanceRecord.fromJson({
+          'id': 'rec-${item.studentId}',
+          'school_id': 'school-1',
+          'attendance_session_id': body.attendanceSessionId,
+          'student_id': item.studentId,
+          'status': item.status.json,
+          'minutes_late': item.minutesLate,
+          'reason': item.reason,
+          'recorded_by_user_id': 'user-1',
+          'created_at': _t0,
+        }),
+    ];
+    return BatchRecordAttendanceResponse(
+      attendanceSessionId: body.attendanceSessionId,
+      records: records,
+      createdCount: records.length,
+      totalCount: records.length,
+    );
+  }
+
+  @override
+  Future<AttendanceSession> updateAttendanceSessionStatus({
+    required String sessionId,
+    required UpdateAttendanceSessionBody body,
+  }) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    submittedSessionIds.add(sessionId);
+
+    final next = <String, List<AttendanceSession>>{};
+    AttendanceSession? updated;
+    sessionsByClassId.forEach((classId, sessions) {
+      next[classId] = [
+        for (final session in sessions)
+          if (session.id == sessionId)
+            updated = AttendanceSession.fromJson({
+              ...session.toJson(),
+              'status': body.status.json,
+            })
+          else
+            session,
+      ];
+    });
+    sessionsByClassId = next;
+
+    return updated ??
+        AttendanceSession.fromJson({
+          'id': sessionId,
+          'school_id': 'school-1',
+          'class_id': 'class-1',
+          'session_date': _t0,
+          'period': null,
+          'status': body.status.json,
+          'taken_by_user_id': 'user-1',
+          'created_at': _t0,
+          'updated_at': _t0,
+        });
+  }
+
+  @override
+  Future<AttendanceSession> getAttendanceSession({required String sessionId}) async {
+    return AttendanceSession.fromJson({
+      'id': sessionId,
+      'school_id': 'school-1',
+      'class_id': 'class-1',
+      'session_date': _t0,
+      'period': null,
+      'status': 'submitted',
+      'taken_by_user_id': 'user-1',
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+  }
+
+  @override
+  Future<CorrectedAttendanceRecord> correctAttendanceRecord({
+    required String recordId,
+    required CorrectAttendanceRecordBody body,
+  }) async {
+    if (throwOnCorrect != null) throw throwOnCorrect!;
+    return correctionResult ??
+        CorrectedAttendanceRecord.fromJson({
+          'id': recordId,
+          'school_id': 'school-1',
+          'attendance_session_id': 'session-1',
+          'student_id': 'student-1',
+          'status': body.status.json,
+          'minutes_late': body.minutesLate,
+          'reason': null,
+          'recorded_by_user_id': 'user-1',
+          'version': 2,
+          'out_of_window': false,
+          'session_date': _t0,
+          'created_at': _t0,
+          'updated_at': _t0,
+        });
   }
 }
 

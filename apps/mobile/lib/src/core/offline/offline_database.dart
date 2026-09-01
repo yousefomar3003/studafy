@@ -51,6 +51,16 @@ class OfflineDatabase extends _$OfflineDatabase {
     );
   }
 
+  /// Every entry under [resource], oldest write first. The read/write pair above is single-key by
+  /// design; the attendance sync queue is the one caller that needs to enumerate a whole
+  /// namespace — to drain its outbox — so it lives here rather than as a bespoke query there.
+  Future<List<CacheEntryRow>> readAllForResource(String resource) {
+    return (select(cacheEntries)
+          ..where((row) => row.resource.equals(resource))
+          ..orderBy([(row) => OrderingTerm(expression: row.fetchedAt)]))
+        .get();
+  }
+
   /// Deletes one cache entry, if present. For local-only state that isn't a cache of a server
   /// resource (e.g. `QuizProgressStore`'s in-progress quiz session) — the read/write pair above
   /// has no eviction path of its own since a re-fetch would just repopulate a normal cache entry,

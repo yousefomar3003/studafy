@@ -1,13 +1,17 @@
 import 'dart:async';
 
+import 'package:drift/native.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:studafy_mobile/src/core/api/generated/models/enrollment.dart';
+import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
+import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
+import 'package:studafy_mobile/src/features/teacher/application/attendance_taking_providers.dart';
 import 'package:studafy_mobile/src/features/teacher/application/teacher_providers.dart';
+import 'package:studafy_mobile/src/features/teacher/domain/attendance_taking.dart';
 import 'package:studafy_mobile/src/features/teacher/domain/teacher_home.dart';
-import 'package:studafy_mobile/src/features/teacher/presentation/teacher_class_detail_screen.dart';
+import 'package:studafy_mobile/src/features/teacher/presentation/attendance_taking_screen.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/teacher_home_screen.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/widgets/teacher_section_card.dart';
 
@@ -135,16 +139,19 @@ void main() {
     expect(find.text('Attendance recorded'), findsOneWidget);
   });
 
-  testWidgets('tapping take attendance opens the class detail screen', (tester) async {
+  testWidgets('tapping take attendance opens the take-attendance screen', (tester) async {
     await _pumpHome(
       tester,
       ProviderScope(
         overrides: [
+          offlineDatabaseExecutorProvider.overrideWithValue(NativeDatabase.memory()),
+          apiClientProvider.overrideWithValue(FakeStudafyApiClient()),
           teacherTodaySessionsProvider
               .overrideWith((ref) => [_session(SessionAttendanceState.notStarted)]),
           teacherPendingSubmissionsProvider.overrideWith((ref) => <PendingSubmission>[]),
-          classRosterProvider('class-1').overrideWith((ref) => <Enrollment>[]),
-          classCourseNameProvider('class-1').overrideWith((ref) => 'Mathematics'),
+          attendanceRegisterProvider((classId: 'class-1', period: 2)).overrideWith(
+            (ref) async => const AttendanceTakingRegister(roster: []),
+          ),
         ],
         child: _homeApp(),
       ),
@@ -154,6 +161,6 @@ void main() {
     await tester.tap(find.text('Take attendance'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(TeacherClassDetailScreen), findsOneWidget);
+    expect(find.byType(AttendanceTakingScreen), findsOneWidget);
   });
 }
