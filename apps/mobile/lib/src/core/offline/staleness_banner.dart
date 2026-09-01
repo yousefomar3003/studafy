@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../design/theme/app_semantic_colors.dart';
 import '../../design/tokens/app_spacing_tokens.dart';
+import '../localization/relative_time.dart';
 
 /// Shown above content read from the offline cache instead of a live response — see
 /// [CachedValue.isStale] (`cached_value.dart`). [fetchedAt] renders as a relative "updated X ago"
@@ -30,7 +31,7 @@ class StalenessBanner extends StatelessWidget {
             const SizedBox(width: AppSpacing.space8),
             Expanded(
               child: Text(
-                'offline.stalenessBanner'.tr(namedArgs: {'time': _relativeTime(fetchedAt)}),
+                'offline.stalenessBanner'.tr(namedArgs: {'time': relativeTimeLabel(fetchedAt)}),
                 style: theme.textTheme.bodyMedium?.copyWith(color: semanticColors.onWarningContainer),
               ),
             ),
@@ -38,15 +39,5 @@ class StalenessBanner extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _relativeTime(DateTime fetchedAt) {
-    final age = DateTime.now().difference(fetchedAt);
-    if (age.inMinutes < 1) return 'offline.justNow'.tr();
-    if (age.inMinutes < 60) {
-      return 'offline.minutesAgo'.tr(namedArgs: {'count': '${age.inMinutes}'});
-    }
-    if (age.inHours < 24) return 'offline.hoursAgo'.tr(namedArgs: {'count': '${age.inHours}'});
-    return 'offline.daysAgo'.tr(namedArgs: {'count': '${age.inDays}'});
   }
 }
