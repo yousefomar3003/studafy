@@ -428,6 +428,38 @@
       "rosterError": "Couldn't load the roster.",
       "enrolledOn": "Enrolled {date}",
       "unknownStudent": "Student {id}"
+    },
+    "attendance": {
+      "take": "Take attendance",
+      "dailyScope": "Daily attendance",
+      "submit": "Submit attendance",
+      "retrySubmit": "Retry submit",
+      "submitSuccess": "Attendance submitted.",
+      "savedOffline": "Saved on this device — it will sync when you're back online.",
+      "retrySync": "Retry now",
+      "stillOffline": "Still offline — attendance is saved and will sync later.",
+      "loadError": "Couldn't load this class's attendance.",
+      "retry": "Try again",
+      "minutesUnit": "min",
+      "minutesLateDecrease": "One minute less",
+      "minutesLateIncrease": "One minute more",
+      "offline": "No connection. Check your network and try again.",
+      "rejectedTitle": "Attendance not recorded",
+      "rejectedBody": "The server rejected this attendance submission ({code}). Check the roster and try again.",
+      "recordedBanner": "Attendance recorded. Tap a student to correct it within the correction window.",
+      "recordedElsewhere": "Attendance for today has already been submitted.",
+      "recordedNoDetail": "Attendance for today is recorded. Corrections can be made from the web.",
+      "correction": {
+        "title": "Correct attendance",
+        "newStatus": "New status",
+        "reason": "Reason (required)",
+        "save": "Save correction",
+        "saved": "Correction saved.",
+        "windowExpired": "The correction window for this session has closed.",
+        "forbidden": "You can't correct this record.",
+        "noChange": "That's already this student's status.",
+        "failed": "Couldn't save the correction. Try again."
+      }
     }
   }
 }

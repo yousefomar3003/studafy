@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/teacher_providers.dart';
 import '../../domain/teacher_home.dart';
-import '../teacher_class_detail_screen.dart';
+import '../attendance_taking_screen.dart';
 import 'teacher_section_card.dart';
 
 /// Today's teaching sessions for the signed-in teacher, nearest period first, each with a
@@ -98,9 +98,10 @@ class _TakeAttendanceButton extends StatelessWidget {
       onPressed: session.attendance.invitesAction
           ? () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => TeacherClassDetailScreen(
+                  builder: (_) => AttendanceTakingScreen(
                     classId: session.classId,
                     classCode: session.classCode,
+                    period: session.period,
                   ),
                 ),
               )
