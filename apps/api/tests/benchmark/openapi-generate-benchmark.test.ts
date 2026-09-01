@@ -255,6 +255,8 @@ const EXPECTED_PATHS = [
   "/api/grades/config/gradebooks/{gradebookId}/scheme/link",
   "/api/grades/config/schemes",
   "/api/grades/config/schemes/{schemeId}",
+  "/api/grades/gradebooks",
+  "/api/grades/gradebooks/{gradebookId}/assessments",
   "/api/grades/gradebooks/{gradebookId}/entry",
   "/api/grades/gradebooks/{gradebookId}/grades",
   "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",

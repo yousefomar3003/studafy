@@ -255,6 +255,36 @@ export const termIdQuerySchema = z
   })
   .openapi("TermIdQuery");
 
+export const classIdQuerySchema = z
+  .object({
+    classId: uuidSchema.openapi({
+      param: { name: "classId", in: "query" },
+      description: "The class whose gradebook to resolve.",
+    }),
+  })
+  .openapi("ClassIdQuery");
+
+// ---------------------------------------------------------------------------
+// Gradebook (the class-scoped container the entry grid hangs off)
+// ---------------------------------------------------------------------------
+
+export const gradebookSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    class_id: uuidSchema.openapi({ description: "The class this gradebook belongs to." }),
+    status: z
+      .enum(["draft", "active", "archived"])
+      .openapi({ description: "Lifecycle status of the gradebook." }),
+    grading_scheme_id: uuidSchema.nullable().openapi({
+      description: "The linked grading scheme version, or null if none is assigned yet.",
+    }),
+    created_at: dateTimeSchema.openapi({ description: "Row creation timestamp." }),
+    updated_at: dateTimeSchema.openapi({ description: "Last modification timestamp." }),
+  })
+  .openapi("Gradebook");
+
+export type Gradebook = z.infer<typeof gradebookSchema>;
+
 // ---------------------------------------------------------------------------
 // Grade entry — grade submissions and grade records (ST-113)
 // ---------------------------------------------------------------------------
@@ -346,6 +376,25 @@ export const gradebookEntryQuerySchema = z
 // ---------------------------------------------------------------------------
 // Request Bodies
 // ---------------------------------------------------------------------------
+
+export const createAssessmentBodySchema = z
+  .object({
+    label: z.string().min(1).max(100).openapi({
+      description: "Human-readable identifier for the assessment (e.g. 'Midterm', 'Homework 3').",
+      example: "Midterm Exam",
+    }),
+    max_score: z.number().gt(0).openapi({
+      description: "Maximum possible score for this assessment (must be > 0).",
+      example: 100,
+    }),
+    weight: z.number().gt(0).optional().openapi({
+      description: "Relative weight of this assessment within the submission. Defaults to 1.",
+      example: 1,
+    }),
+  })
+  .openapi("CreateAssessmentBody");
+
+export type CreateAssessmentBody = z.infer<typeof createAssessmentBodySchema>;
 
 export const updateGradeEntrySchema = z
   .object({

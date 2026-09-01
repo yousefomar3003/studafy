@@ -79,7 +79,15 @@ swagger_parser:
   # union whose file it never writes, breaking the whole client's compile. Every /api/ai/ surface
   # the mobile app uses is served by a hand-written Dio client instead (features/ai/data/*), so
   # dropping the tag from codegen matches how the feature is already built.
+  #
+  # "Grade Entry" and "Grade Workflow" hit the same 1.44.1 name-collision bug as "Approval Queue":
+  # the ST-113 `Grade` schema (id / score / max_score / label / updated_at) is silently generated
+  # with the body of an unrelated published-grades summary, so `GradebookEntryList` can't
+  # deserialise a real response. Both tags are served by a hand-written Dio client instead
+  # (features/teacher/data/grade_entry_client.dart), same as the AI surface.
   exclude_tags:
     - Finance
     - Approval Queue
     - AI
+    - Grade Entry
+    - Grade Workflow

@@ -573,6 +573,63 @@
       "enrolledOn": "Enrolled {date}",
       "unknownStudent": "Student {id}"
     },
+    "grades": {
+      "open": "Grade entry",
+      "loadError": "Couldn't load grades for this class.",
+      "retry": "Try again",
+      "list": {
+        "rosterCount": "{count} students",
+        "empty": "No assessments yet. Add one to start entering grades.",
+        "assessmentMeta": "Out of {max} · weight {weight}",
+        "addAssessment": "New assessment"
+      },
+      "entry": {
+        "overMax": "Above the maximum of {max}",
+        "rejectedHint": "Returned by the reviewer — unlock to edit.",
+        "noStudents": "No students to grade for this assessment.",
+        "saving": "Saving…",
+        "unsaved": "Unsaved changes",
+        "saveConflict": "Someone else edited these grades. Reload to continue.",
+        "saveFailed": "Couldn't save your last change.",
+        "retry": "Retry",
+        "allSaved": "All changes saved",
+        "savedAt": "Saved at {time}",
+        "autosaveHint": "Grades save automatically as you type.",
+        "submitCount": "Submit {count}"
+      },
+      "keypad": {
+        "next": "Next",
+        "done": "Done",
+        "backspace": "Delete"
+      },
+      "status": {
+        "draft": "Draft",
+        "submitted": "Awaiting approval",
+        "approved": "Approved",
+        "rejected": "Returned",
+        "published": "Published"
+      },
+      "submit": {
+        "title": "Submit for approval?",
+        "body": "This submits {count} students' grades for approval and locks every assessment for them. A school admin reviews before publishing — you can't edit a submitted grade.",
+        "confirm": "Submit",
+        "success": "{count} submitted for approval.",
+        "partial": "{submitted} submitted, {failed} couldn't be submitted."
+      },
+      "createAssessment": {
+        "title": "New assessment",
+        "labelField": "Name",
+        "labelHint": "e.g. Midterm, Homework 3",
+        "labelRequired": "Give the assessment a name.",
+        "maxScoreField": "Max score",
+        "weightField": "Weight",
+        "positiveNumber": "Enter a number above 0.",
+        "submit": "Add assessment",
+        "errorForbidden": "You're not assigned to this class.",
+        "errorValidation": "Check the values and try again.",
+        "errorGeneric": "Couldn't add the assessment. Try again."
+      }
+    },
     "attendance": {
       "take": "Take attendance",
       "dailyScope": "Daily attendance",

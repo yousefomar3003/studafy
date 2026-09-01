@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/teacher_providers.dart';
 import 'attendance_taking_screen.dart';
+import 'grade_entry_screen.dart';
 import 'widgets/roster_entry_tile.dart';
 
 /// A class the signed-in teacher leads: its course, roster size, and the enrolled students.
@@ -30,7 +31,20 @@ class TeacherClassDetailScreen extends ConsumerWidget {
     final courseName = ref.watch(classCourseNameProvider(classId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(classCode)),
+      appBar: AppBar(
+        title: Text(classCode),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.grading_outlined),
+            tooltip: 'teacher.grades.open'.tr(),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => GradeEntryScreen(classId: classId, classCode: classCode),
+              ),
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute<void>(

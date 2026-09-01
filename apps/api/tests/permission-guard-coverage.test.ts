@@ -176,6 +176,7 @@ const EXPECTED_MUTATING_ROUTES = [
   // decide whether the caller may correct past the school's window.
   "PATCH /api/attendance/records/{recordId}",
   // Grade entry (ST-113). Guarded by requirePermission() on GRADE_UPDATE.
+  "POST /api/grades/gradebooks/{gradebookId}/assessments",
   "PATCH /api/grades/gradebooks/{gradebookId}/grades",
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
