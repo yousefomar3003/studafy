@@ -10,12 +10,15 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import {
   bulkUpdateGradesBodySchema,
+  classIdQuerySchema,
+  createAssessmentBodySchema,
   decideBodySchema,
   gradeSchema,
   gradeSubmissionSchema,
   gradebookEntryListSchema,
   gradebookEntryQuerySchema,
   gradebookIdParamSchema,
+  gradebookSchema,
   submissionIdParamSchema,
   submitBodySchema,
   unlockBodySchema,
@@ -24,7 +27,10 @@ import { enqueueNotificationDispatch } from "../enqueue-dispatch";
 import {
   assertCanManageGradebook,
   bulkUpdateGrades,
+  createAssessment,
   decideSubmission,
+  ensureDraftSubmissions,
+  getGradebookByClassId,
   getGradebookById,
   getSubmissionsWithGrades,
   submitSubmission,
@@ -34,6 +40,7 @@ import {
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { RedisClient } from "../../../redis";
+import type { GradebookRow } from "../config/gradebook-config-service";
 import type { GradeRow, GradeSubmissionWithGrades } from "../grade-entry-service";
 import type { Context } from "hono";
 
@@ -48,6 +55,24 @@ function tenantFrom(c: Context<AppEnv>): {
 } {
   const auth = requireAuth(c);
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
+}
+
+function toGradebookResponse(row: GradebookRow): {
+  id: string;
+  class_id: string;
+  status: "draft" | "active" | "archived";
+  grading_scheme_id: string | null;
+  created_at: string;
+  updated_at: string;
+} {
+  return {
+    id: row.id,
+    class_id: row.class_id,
+    status: row.status as "draft" | "active" | "archived",
+    grading_scheme_id: row.grading_scheme_id,
+    created_at: row.created_at.toISOString(),
+    updated_at: row.updated_at.toISOString(),
+  };
 }
 
 function toGradeResponse(row: GradeRow): {
@@ -105,6 +130,53 @@ function toSubmissionResponse(row: GradeSubmissionWithGrades & { grades: GradeRo
 // ---------------------------------------------------------------------------
 // Route definitions
 // ---------------------------------------------------------------------------
+
+const resolveGradebookRoute = createRoute({
+  method: "get",
+  path: "/api/grades/gradebooks",
+  tags: ["Grade Entry"],
+  operationId: "resolveGradebook",
+  summary: "Resolve the gradebook for a class",
+  description:
+    "Returns the class's gradebook, creating an empty draft one on first access. " +
+    "Every other grade-entry route is keyed by `gradebookId`; this is how a caller that only " +
+    "knows the class obtains it.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    query: classIdQuerySchema,
+  },
+  responses: standardResponses(
+    { 200: { description: "The class's gradebook.", schema: gradebookSchema } },
+    [400, 401, 403, 404, 500],
+  ),
+});
+
+const createAssessmentRoute = createRoute({
+  method: "post",
+  path: "/api/grades/gradebooks/{gradebookId}/assessments",
+  tags: ["Grade Entry"],
+  operationId: "createAssessment",
+  summary: "Add an assessment to the gradebook",
+  description:
+    "Writes one ungraded grade record (a `label` + `max_score` + `weight`) into every enrolled " +
+    "student's draft submission, seeding those drafts first if needed. Idempotent per " +
+    "(student, label); students whose submission is already past draft are skipped. Returns the " +
+    "refreshed entry grid.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: createAssessmentBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    {
+      200: { description: "The refreshed gradebook entry grid.", schema: gradebookEntryListSchema },
+    },
+    [400, 401, 403, 404, 500],
+  ),
+});
 
 const getGradebookEntryRoute = createRoute({
   method: "get",
@@ -246,6 +318,14 @@ export function gradeEntryRoutes(
     ? new Queue(QUEUE_NAMES.NOTIFICATIONS, { connection: redis as never })
     : null;
 
+  routes.use("/api/grades/gradebooks", requirePermission(PERMISSIONS.GRADE_READ));
+
+  routes.use(
+    "/api/grades/gradebooks/{gradebookId}/assessments",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use("/api/grades/gradebooks/{gradebookId}/assessments", auditAction("insert", "grades"));
+
   routes.use(
     "/api/grades/gradebooks/{gradebookId}/entry",
     requirePermission(PERMISSIONS.GRADE_READ),
@@ -283,6 +363,40 @@ export function gradeEntryRoutes(
     auditAction("update", "grade_submissions"),
   );
 
+  // --- Resolve the gradebook for a class ---
+
+  routes.openapi(resolveGradebookRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { classId } = c.req.valid("query");
+
+    const gradebook = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      await assertCanManageGradebook(tx, classId);
+      return getGradebookByClassId(tx, auth.schoolId, classId);
+    });
+
+    return c.json(toGradebookResponse(gradebook), 200);
+  });
+
+  // --- Add an assessment to the gradebook ---
+
+  routes.openapi(createAssessmentRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const submissions = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return createAssessment(tx, auth.schoolId, gradebookId, gradebook.class_id, {
+        label: body.label,
+        maxScore: body.max_score,
+        weight: body.weight ?? 1,
+      });
+    });
+
+    return c.json({ submissions: submissions.map(toSubmissionResponse) }, 200);
+  });
+
   // --- Get gradebook entry grid ---
 
   routes.openapi(getGradebookEntryRoute, async (c) => {
@@ -293,6 +407,10 @@ export function gradeEntryRoutes(
     const submissions = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
       await assertCanManageGradebook(tx, gradebook.class_id);
+      // Seed a draft submission per enrolled student so the grid always reflects the full
+      // roster — the entry screen shows every student even before the first assessment exists,
+      // and a `status` filter still narrows the result.
+      await ensureDraftSubmissions(tx, auth.schoolId, gradebookId, gradebook.class_id);
       return getSubmissionsWithGrades(tx, auth.schoolId, gradebookId, status);
     });
 

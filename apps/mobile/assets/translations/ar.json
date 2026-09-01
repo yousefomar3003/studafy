@@ -429,6 +429,63 @@
       "enrolledOn": "تاريخ التسجيل {date}",
       "unknownStudent": "طالب {id}"
     },
+    "grades": {
+      "open": "رصد الدرجات",
+      "loadError": "تعذّر تحميل درجات هذا الفصل.",
+      "retry": "إعادة المحاولة",
+      "list": {
+        "rosterCount": "{count} طالب",
+        "empty": "لا توجد تقييمات بعد. أضف تقييمًا لبدء إدخال الدرجات.",
+        "assessmentMeta": "من {max} · الوزن {weight}",
+        "addAssessment": "تقييم جديد"
+      },
+      "entry": {
+        "overMax": "أعلى من الحد الأقصى {max}",
+        "rejectedHint": "أُعيدت من المراجِع — افتحها للتعديل.",
+        "noStudents": "لا يوجد طلاب لرصد هذا التقييم.",
+        "saving": "جارٍ الحفظ…",
+        "unsaved": "تغييرات غير محفوظة",
+        "saveConflict": "عدّل شخص آخر هذه الدرجات. أعد التحميل للمتابعة.",
+        "saveFailed": "تعذّر حفظ آخر تغيير.",
+        "retry": "إعادة المحاولة",
+        "allSaved": "حُفِظت جميع التغييرات",
+        "savedAt": "حُفِظ في {time}",
+        "autosaveHint": "تُحفظ الدرجات تلقائيًا أثناء الكتابة.",
+        "submitCount": "إرسال {count}"
+      },
+      "keypad": {
+        "next": "التالي",
+        "done": "تم",
+        "backspace": "حذف"
+      },
+      "status": {
+        "draft": "مسوّدة",
+        "submitted": "بانتظار الاعتماد",
+        "approved": "معتمدة",
+        "rejected": "مُعادة",
+        "published": "منشورة"
+      },
+      "submit": {
+        "title": "إرسال للاعتماد؟",
+        "body": "سيُرسِل هذا درجات {count} طالب للاعتماد ويقفل جميع التقييمات لهم. يراجِعها مسؤول المدرسة قبل النشر — ولا يمكن تعديل درجة بعد إرسالها.",
+        "confirm": "إرسال",
+        "success": "تم إرسال {count} للاعتماد.",
+        "partial": "تم إرسال {submitted}، وتعذّر إرسال {failed}."
+      },
+      "createAssessment": {
+        "title": "تقييم جديد",
+        "labelField": "الاسم",
+        "labelHint": "مثال: اختبار نصفي، واجب 3",
+        "labelRequired": "أعطِ التقييم اسمًا.",
+        "maxScoreField": "الدرجة القصوى",
+        "weightField": "الوزن",
+        "positiveNumber": "أدخل رقمًا أكبر من 0.",
+        "submit": "إضافة التقييم",
+        "errorForbidden": "لست مُعيّنًا لهذا الفصل.",
+        "errorValidation": "تحقّق من القيم وأعد المحاولة.",
+        "errorGeneric": "تعذّرت إضافة التقييم. أعد المحاولة."
+      }
+    },
     "attendance": {
       "take": "تسجيل الحضور",
       "dailyScope": "حضور اليوم",

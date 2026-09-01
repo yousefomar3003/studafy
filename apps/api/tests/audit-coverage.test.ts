@@ -217,6 +217,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/attendance/records/{recordId}",
   // Grade entry (ST-113). Bulk update grades and submission status transitions.
   // Audit rows are written by auditAction middleware in grade-entry-routes.ts.
+  "POST /api/grades/gradebooks/{gradebookId}/assessments",
   "PATCH /api/grades/gradebooks/{gradebookId}/grades",
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",

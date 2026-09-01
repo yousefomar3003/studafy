@@ -387,6 +387,101 @@ export async function bulkUpdateGrades(
 }
 
 // ---------------------------------------------------------------------------
+// Assessment authoring — materialise one gradeable item across the roster
+// ---------------------------------------------------------------------------
+
+export interface CreateAssessmentInput {
+  label: string;
+  maxScore: number;
+  weight: number;
+}
+
+/**
+ * Add one assessment (a `label` + `max_score` + `weight`) to a gradebook by writing an ungraded
+ * grade record into every enrolled student's draft submission.
+ *
+ * This is the authoring counterpart to {@link bulkUpdateGrades}: `bulkUpdateGrades` only edits
+ * grade rows that already exist, and nothing else creates them. Draft submissions are seeded
+ * first (via {@link ensureDraftSubmissions}) so a brand-new gradebook becomes enterable in one
+ * call.
+ *
+ * Idempotent on `(submission, label)`: a submission that already carries a row with this label
+ * is left untouched, so a retry — or a second assessment sharing a label with an earlier one —
+ * never double-inserts. Locked submissions (anything past `draft`) are skipped; their grades are
+ * frozen and a late assessment cannot be back-filled onto an already-submitted student.
+ *
+ * Returns the refreshed entry grid so the caller does not need a follow-up read.
+ */
+export async function createAssessment(
+  tx: TransactionSql,
+  schoolId: string,
+  gradebookId: string,
+  classId: string,
+  input: CreateAssessmentInput,
+): Promise<GradeSubmissionWithGrades[]> {
+  if (input.maxScore <= 0) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      `max_score must be greater than 0. Got ${input.maxScore}`,
+    );
+  }
+  if (input.weight <= 0) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      `weight must be greater than 0. Got ${input.weight}`,
+    );
+  }
+
+  const submissions = await ensureDraftSubmissions(tx, schoolId, gradebookId, classId);
+  const draftIds = submissions.filter((s) => s.status === "draft").map((s) => s.id);
+
+  if (draftIds.length === 0) {
+    return getSubmissionsWithGrades(tx, schoolId, gradebookId);
+  }
+
+  const alreadyLabelled = await tx<{ grade_submission_id: string }[]>`
+    SELECT grade_submission_id
+    FROM app.grades
+    WHERE school_id = ${schoolId}::uuid
+      AND grade_submission_id = ANY (${draftIds}::uuid[])
+      AND label = ${input.label}
+  `;
+  const haveRow = new Set(alreadyLabelled.map((r) => r.grade_submission_id));
+  const missing = draftIds.filter((id) => !haveRow.has(id));
+
+  for (const submissionId of missing) {
+    await tx`
+      INSERT INTO app.grades (school_id, grade_submission_id, score, max_score, weight, label)
+      VALUES (
+        ${schoolId}::uuid,
+        ${submissionId}::uuid,
+        NULL,
+        ${String(input.maxScore)}::numeric(10,2),
+        ${String(input.weight)}::numeric(10,2),
+        ${input.label}
+      )
+    `;
+  }
+
+  await emitAuditLog(tx, {
+    action: "insert",
+    targetTable: "grades",
+    targetId: gradebookId,
+    newValues: {
+      gradebookId,
+      label: input.label,
+      maxScore: input.maxScore,
+      weight: input.weight,
+      seededCount: missing.length,
+    },
+  });
+
+  return getSubmissionsWithGrades(tx, schoolId, gradebookId);
+}
+
+// ---------------------------------------------------------------------------
 // Authorization helpers
 // ---------------------------------------------------------------------------
 
