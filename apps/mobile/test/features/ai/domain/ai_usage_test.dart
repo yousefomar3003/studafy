@@ -37,4 +37,36 @@ void main() {
       expect(usage.usedFraction, 0);
     });
   });
+
+  group('AiUsage.level', () {
+    test('is normal comfortably under the nearing-limit threshold', () {
+      final usage = _usage(budget: 1000, usedTokens: 500);
+
+      expect(usage.level, AiUsageLevel.normal);
+    });
+
+    test('is nearingLimit at the threshold with budget still remaining', () {
+      final usage = _usage(budget: 1000, usedTokens: 800);
+
+      expect(usage.level, AiUsageLevel.nearingLimit);
+    });
+
+    test('is nearingLimit just under exhaustion', () {
+      final usage = _usage(budget: 1000, usedTokens: 950, heldTokens: 40);
+
+      expect(usage.level, AiUsageLevel.nearingLimit);
+    });
+
+    test('is exhausted once nothing remains', () {
+      final usage = _usage(budget: 1000, usedTokens: 1000);
+
+      expect(usage.level, AiUsageLevel.exhausted);
+    });
+
+    test('is exhausted rather than nearingLimit when held tokens push remaining below zero', () {
+      final usage = _usage(budget: 1000, usedTokens: 980, heldTokens: 30);
+
+      expect(usage.level, AiUsageLevel.exhausted);
+    });
+  });
 }

@@ -38,4 +38,31 @@ class AiUsage {
     if (budget <= 0) return 0;
     return ((usedTokens + heldTokens) / budget).clamp(0, 1).toDouble();
   }
+
+  /// Where this snapshot sits relative to [budget], for the usage screen's warning banner.
+  /// [AiUsageLevel.nearingLimit] is a heads-up while a generation would still succeed;
+  /// [AiUsageLevel.exhausted] means the next one hits the gate's `AI_QUOTA_EXCEEDED` (see
+  /// `AiStudyError.quotaExceeded` in `ai_study.dart`) -- this is the warning shown *before* that
+  /// hard stop, not a replacement for it.
+  AiUsageLevel get level {
+    if (remaining <= 0) return AiUsageLevel.exhausted;
+    if (usedFraction >= aiUsageNearingLimitThreshold) return AiUsageLevel.nearingLimit;
+    return AiUsageLevel.normal;
+  }
+}
+
+/// Fraction of [AiUsage.budget] spent at which [AiUsage.level] switches from
+/// [AiUsageLevel.normal] to [AiUsageLevel.nearingLimit] -- ahead of the hard stop at 100%.
+const double aiUsageNearingLimitThreshold = 0.8;
+
+/// Where an [AiUsage] snapshot sits relative to its monthly budget.
+enum AiUsageLevel {
+  /// Comfortably under [aiUsageNearingLimitThreshold].
+  normal,
+
+  /// At or past [aiUsageNearingLimitThreshold], but budget remains -- generations still succeed.
+  nearingLimit,
+
+  /// Nothing left this period.
+  exhausted,
 }

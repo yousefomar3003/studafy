@@ -23,6 +23,11 @@ abstract final class RoutePaths {
   /// The signed-in student's AI-generated flashcard deck browser and review flow.
   static const flashcards = '/me/flashcards';
 
+  /// The signed-in student's AI usage meter: remaining monthly budget, reset date, and the
+  /// nearing-limit warning ahead of the quota hard stop. Reached by tapping the compact meter on
+  /// the AI hub.
+  static const aiUsage = '/me/ai/usage';
+
   // Notification deep-link destinations.
   // Paths match the route templates in packages/notification-templates/src/registry.ts.
   static const grades = '/courses/:courseId/grades';

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/ai/presentation/ai_usage_screen.dart';
 import '../../features/ai/presentation/ask_ai_screen.dart';
 import '../../features/ai/presentation/exam_screen.dart';
 import '../../features/ai/presentation/flashcards_screen.dart';
@@ -61,6 +62,12 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
       GoRoute(
         path: RoutePaths.flashcards,
         builder: (context, state) => const FlashcardsScreen(),
+      ),
+
+      // The signed-in student's AI usage meter.
+      GoRoute(
+        path: RoutePaths.aiUsage,
+        builder: (context, state) => const AiUsageScreen(),
       ),
 
       // Notification deep-link destinations. Each maps to the placeholder
