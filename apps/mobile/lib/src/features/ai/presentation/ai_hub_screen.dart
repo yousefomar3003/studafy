@@ -1,13 +1,16 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/route_paths.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/ai_hub_providers.dart';
 import '../domain/ai_hub_status.dart';
 import 'widgets/ai_feature_grid.dart';
 import 'widgets/ai_hub_message.dart';
 import 'widgets/ai_school_inactive_notice.dart';
+import 'widgets/ai_state_page.dart';
 import 'widgets/ai_upsell_card.dart';
 import 'widgets/ai_usage_meter.dart';
 
@@ -74,13 +77,16 @@ class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingOb
               messageKey: 'ai.hub.unavailable',
               icon: Icons.info_outline,
             ),
-            AiHubSchoolInactive() => const _StatePage(child: AiSchoolInactiveNotice()),
-            AiHubUnsubscribed() => const _StatePage(child: AiUpsellCard()),
-            AiHubSubscribed(:final usage) => _StatePage(
+            AiHubSchoolInactive() => const AiStatePage(child: AiSchoolInactiveNotice()),
+            AiHubUnsubscribed() => const AiStatePage(child: AiUpsellCard()),
+            AiHubSubscribed(:final usage) => AiStatePage(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AiUsageMeter(usage: usage),
+                  AiUsageMeter(
+                    usage: usage,
+                    onTap: () => GoRouter.of(context).push(RoutePaths.aiUsage),
+                  ),
                   const SizedBox(height: AppSpacing.space20),
                   const AiFeatureGrid(),
                 ],
@@ -89,23 +95,6 @@ class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingOb
           },
         ),
       ),
-    );
-  }
-}
-
-/// Common scroll shell for every non-error, non-loading state — always scrollable so
-/// pull-to-refresh keeps working even when [child] is short enough to fit one screen.
-class _StatePage extends StatelessWidget {
-  const _StatePage({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.space16),
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [child],
     );
   }
 }

@@ -209,6 +209,13 @@
         "explain": { "label": "Explain it simply" }
       }
     },
+    "usage": {
+      "title": "AI usage",
+      "warning": {
+        "nearingLimit": "You're nearing this month's AI limit. See the reset date below.",
+        "exhausted": "You've used this month's AI budget. It resets on the date below."
+      }
+    },
     "upsell": {
       "title": "Get the AI Study Assistant",
       "body": "A personal AI tutor for homework help, practice, and study-material summaries. Billed separately from your school's Studafy subscription, per student.",
