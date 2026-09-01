@@ -6,6 +6,7 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/teacher_providers.dart';
 import 'attendance_taking_screen.dart';
 import 'grade_entry_screen.dart';
+import 'teacher_content_screen.dart';
 import 'widgets/roster_entry_tile.dart';
 
 /// A class the signed-in teacher leads: its course, roster size, and the enrolled students.
@@ -35,11 +36,24 @@ class TeacherClassDetailScreen extends ConsumerWidget {
         title: Text(classCode),
         actions: [
           IconButton(
+            icon: const Icon(Icons.library_books_outlined),
+            tooltip: 'Assignments and materials',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TeacherContentScreen(
+                  classId: classId,
+                  classCode: classCode,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.grading_outlined),
             tooltip: 'teacher.grades.open'.tr(),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => GradeEntryScreen(classId: classId, classCode: classCode),
+                builder: (_) =>
+                    GradeEntryScreen(classId: classId, classCode: classCode),
               ),
             ),
           ),
@@ -48,7 +62,8 @@ class TeacherClassDetailScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => AttendanceTakingScreen(classId: classId, classCode: classCode),
+            builder: (_) =>
+                AttendanceTakingScreen(classId: classId, classCode: classCode),
           ),
         ),
         icon: const Icon(Icons.fact_check_outlined),
@@ -66,7 +81,9 @@ class TeacherClassDetailScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.space4),
             Text(
               'teacher.class.rosterTitle'.tr(),
-              style: textTheme.titleSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: AppSpacing.space12),
             roster.when(
@@ -122,7 +139,9 @@ class _Message extends StatelessWidget {
           Expanded(
             child: Text(
               messageKey.tr(),
-              style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],
