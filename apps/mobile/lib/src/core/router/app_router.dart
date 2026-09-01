@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/ai/presentation/ask_ai_screen.dart';
+import '../../features/ai/presentation/exam_screen.dart';
 import '../../features/ai/presentation/flashcards_screen.dart';
 import '../../features/ai/presentation/quiz_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -48,6 +49,12 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
       GoRoute(
         path: RoutePaths.quiz,
         builder: (context, state) => const QuizScreen(),
+      ),
+
+      // The signed-in student's timed mock-exam experience.
+      GoRoute(
+        path: RoutePaths.examMode,
+        builder: (context, state) => const ExamScreen(),
       ),
 
       // The signed-in student's flashcard deck browser and spaced-repetition review flow.
