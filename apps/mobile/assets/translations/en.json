@@ -352,6 +352,64 @@
       "openError": "Couldn't open that material."
     }
   },
+  "flashcards": {
+    "title": "Flashcards",
+    "signedOut": "Sign in to review flashcards.",
+    "library": {
+      "generate": "New deck",
+      "empty": "No decks yet. Generate one from your study materials to start reviewing.",
+      "untitledDeck": "Flashcard deck",
+      "cardCount": "{count} cards",
+      "dueCountFailed": "Couldn't load due count.",
+      "studyDue": "Study {count} due",
+      "caughtUp": "All caught up",
+      "streak": "{count}-day streak",
+      "studyError": "Couldn't start this deck's review. Try again."
+    },
+    "generate": {
+      "title": "Choose your materials",
+      "hint": "Pick up to 5 materials to generate a flashcard deck from.",
+      "materialsUnavailable": "Your materials aren't available yet.",
+      "materialCount": "{count} of {max} selected",
+      "cardCount": "Number of cards",
+      "start": "Generate deck",
+      "generateError": {
+        "quotaExceeded": "You've used up this month's AI questions.",
+        "subscriptionInactive": "Your school's AI assistant isn't active.",
+        "schoolInactive": "Your school's subscription is inactive.",
+        "llmDisabled": "The AI assistant is currently switched off.",
+        "materialNotFound": "One of the selected materials couldn't be found.",
+        "materialNotReady": "One of the selected materials is still being processed.",
+        "generationFailed": "Couldn't generate a deck right now. Try again.",
+        "network": "No connection. Check your network and try again.",
+        "unknown": "Something went wrong generating your deck."
+      }
+    },
+    "review": {
+      "progress": "Card {position} of {total}",
+      "showAnswer": "Show answer",
+      "flipHint": "Flashcard. Double-tap to show the answer.",
+      "rating": {
+        "again": "Again",
+        "hard": "Hard",
+        "good": "Good",
+        "easy": "Easy"
+      },
+      "syncFailed": "Couldn't save that rating. It's safe to retry.",
+      "retry": "Retry",
+      "nothingDue": "Nothing due right now. Come back later, or study another deck.",
+      "backToDecks": "Back to decks"
+    },
+    "citation": {
+      "fallback": "Study material",
+      "withPage": "{title} · p.{page}",
+      "openError": "Couldn't open that material."
+    },
+    "summary": {
+      "reviewedCount": "{count} cards reviewed",
+      "backToDecks": "Back to decks"
+    }
+  },
   "aiStudy": {
     "signedOut": "Sign in to use the AI study tools.",
     "retry": "Try again",

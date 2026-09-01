@@ -15,6 +15,9 @@ abstract final class RoutePaths {
   /// The signed-in student's AI-generated quiz player.
   static const quiz = '/me/quiz';
 
+  /// The signed-in student's AI-generated flashcard deck browser and review flow.
+  static const flashcards = '/me/flashcards';
+
   // Notification deep-link destinations.
   // Paths match the route templates in packages/notification-templates/src/registry.ts.
   static const grades = '/courses/:courseId/grades';
