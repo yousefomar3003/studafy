@@ -350,6 +350,8 @@
       "fallback": "Study material",
       "withPage": "{title} · p.{page}",
       "openError": "Couldn't open that material."
+    }
+  },
   "aiStudy": {
     "signedOut": "Sign in to use the AI study tools.",
     "retry": "Try again",
@@ -389,6 +391,43 @@
       "notAllowed": "You're not allowed to use the AI tools here.",
       "network": "No connection. Check your network and try again.",
       "unknown": "Something went wrong. Try again."
+    }
+  },
+  "teacher": {
+    "home": {
+      "sessions": {
+        "title": "Today's sessions",
+        "empty": "No sessions scheduled for today.",
+        "error": "Couldn't load today's sessions.",
+        "period": "Period {period}",
+        "takeAttendance": "Take attendance",
+        "attendanceInProgress": "Finish attendance",
+        "attendanceRecorded": "Attendance recorded"
+      },
+      "grading": {
+        "title": "Pending grading",
+        "count": "{count} submissions awaiting a mark",
+        "empty": "Nothing waiting to be graded.",
+        "error": "Couldn't load the grading queue."
+      },
+      "recent": {
+        "title": "Recent submissions",
+        "empty": "No new submissions.",
+        "error": "Couldn't load recent submissions.",
+        "late": "Late"
+      }
+    },
+    "classes": {
+      "empty": "You don't lead any classes this term.",
+      "error": "Couldn't load your classes.",
+      "roster": "{count} students"
+    },
+    "class": {
+      "rosterTitle": "Roster",
+      "rosterEmpty": "No students enrolled yet.",
+      "rosterError": "Couldn't load the roster.",
+      "enrolledOn": "Enrolled {date}",
+      "unknownStudent": "Student {id}"
     }
   }
 }

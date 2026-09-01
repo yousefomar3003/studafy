@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../ai/presentation/ai_hub_screen.dart';
 import '../../student/presentation/timetable_screen.dart';
 import '../../student/presentation/today_screen.dart';
+import '../../teacher/presentation/teacher_class_list_screen.dart';
+import '../../teacher/presentation/teacher_home_screen.dart';
 import '../domain/shell_role.dart';
 import 'shell_tab_placeholder.dart';
 
@@ -67,11 +69,15 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
       ];
     case ShellRole.teacher:
       return const [
-        home,
+        ShellDestination(
+          labelKey: 'shell.tabs.home',
+          icon: Icons.home_outlined,
+          body: TeacherHomeScreen(),
+        ),
         ShellDestination(
           labelKey: 'shell.tabs.classes',
           icon: Icons.groups_outlined,
-          body: ShellTabPlaceholder(titleKey: 'shell.tabs.classes'),
+          body: TeacherClassListScreen(),
         ),
         profile,
       ];
