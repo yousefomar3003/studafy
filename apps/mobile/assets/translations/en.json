@@ -352,6 +352,92 @@
       "openError": "Couldn't open that material."
     }
   },
+  "examMode": {
+    "title": "Exam mode",
+    "signedOut": "Sign in to take a timed exam.",
+    "newExam": "New exam",
+    "abandon": {
+      "title": "Start a new exam?",
+      "body": "You won't be able to resume your current exam after starting a new one.",
+      "cancel": "Keep going",
+      "confirm": "Start new"
+    },
+    "setup": {
+      "title": "Choose your materials",
+      "hint": "Pick up to 8 materials to build a timed exam from.",
+      "materialsUnavailable": "Your materials aren't available yet.",
+      "materialCount": "{count} of {max} selected",
+      "questionCount": "Number of questions",
+      "duration": "Time limit (minutes)",
+      "start": "Create exam",
+      "createError": {
+        "quotaExceeded": "You've used up this month's AI questions.",
+        "subscriptionInactive": "Your school's AI assistant isn't active.",
+        "schoolInactive": "Your school's subscription is inactive.",
+        "llmDisabled": "The AI assistant is currently switched off.",
+        "materialNotFound": "One of the selected materials couldn't be found.",
+        "materialNotReady": "One of the selected materials is still being processed.",
+        "generationUnavailable": "Exam generation is briefly unavailable. Try again.",
+        "network": "No connection. Check your network and try again.",
+        "unknown": "Something went wrong creating your exam."
+      },
+      "restoreFailed": "Couldn't resume your exam. Check your connection and try again.",
+      "retry": "Retry"
+    },
+    "generating": {
+      "title": "Building your exam…",
+      "hint": "This can take a moment for a longer exam."
+    },
+    "ready": {
+      "title": "Your exam is ready",
+      "summary": "{count} questions · {minutes} minutes",
+      "warning": "Once you start, the clock can't be paused. Make sure you're ready to focus.",
+      "start": "Start exam",
+      "startFailed": "Couldn't start the exam. Try again.",
+      "confirmTitle": "Start the timer now?",
+      "confirmBody": "You'll have {minutes} minutes once you confirm. There's no pausing.",
+      "confirmCancel": "Not yet",
+      "confirmStart": "Start now"
+    },
+    "player": {
+      "progress": "Question {position} of {total}",
+      "timeRemaining": "{time} left",
+      "timeUp": "Time's up",
+      "previous": "Previous",
+      "next": "Next",
+      "submit": "Submit exam",
+      "submitNow": "Submit now",
+      "shortAnswerHint": "Type your answer…",
+      "unanswered": "{count} unanswered",
+      "submitError": {
+        "expired": "Time ran out before this could be submitted.",
+        "network": "Couldn't submit. Check your connection and try again.",
+        "unknown": "Something went wrong submitting your exam."
+      },
+      "retry": "Retry",
+      "confirmSubmitTitle": "Submit your exam?",
+      "confirmSubmitBody": "{count} of {total} questions are unanswered. You won't be able to change your answers after submitting.",
+      "confirmSubmitCancel": "Keep going",
+      "confirmSubmitConfirm": "Submit"
+    },
+    "report": {
+      "score": "{correct} of {total} correct",
+      "topics": "By topic",
+      "weak": "Needs review",
+      "studyReferences": "Study these to catch up",
+      "newExam": "New exam"
+    },
+    "failed": {
+      "title": "Couldn't build this exam",
+      "body": "Something went wrong generating your exam. No time was spent — try again.",
+      "startNew": "Start a new exam"
+    },
+    "citation": {
+      "fallback": "Study material",
+      "withPage": "{title} · p.{page}",
+      "openError": "Couldn't open that material."
+    }
+  },
   "flashcards": {
     "title": "Flashcards",
     "signedOut": "Sign in to review flashcards.",

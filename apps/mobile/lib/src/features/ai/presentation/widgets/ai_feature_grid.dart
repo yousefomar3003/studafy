@@ -40,14 +40,15 @@ class _AiFeatureTile extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        // Every feature but `quiz` (ST-230) and `flashcards` (ST-231) is still a later ticket
-        // (ST-165 and siblings already implement the API side — see
+        // Every feature but `quiz` (ST-230), `flashcards` (ST-231), and `exam` (ST-232) is still
+        // a later ticket (ST-165 and siblings already implement the API side — see
         // apps/api/src/modules/ai/routes/*). Opening the same "coming soon" placeholder the shell
         // already uses for an unshipped tab keeps this honest rather than pretending the tile does
         // something it doesn't.
         onTap: () => switch (feature) {
           AiFeature.quiz => GoRouter.of(context).push(RoutePaths.quiz),
           AiFeature.flashcards => GoRouter.of(context).push(RoutePaths.flashcards),
+          AiFeature.exam => GoRouter.of(context).push(RoutePaths.examMode),
           _ => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => Scaffold(

@@ -15,6 +15,11 @@ abstract final class RoutePaths {
   /// The signed-in student's AI-generated quiz player.
   static const quiz = '/me/quiz';
 
+  /// The signed-in student's AI timed mock-exam experience. Distinct from [studentExams] (the
+  /// student's calendar of real, teacher-scheduled exams) — this is the AI hub's "exam mode"
+  /// feature.
+  static const examMode = '/me/exam-mode';
+
   /// The signed-in student's AI-generated flashcard deck browser and review flow.
   static const flashcards = '/me/flashcards';
 
