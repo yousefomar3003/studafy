@@ -9,11 +9,14 @@ import 'package:studafy_mobile/src/core/api/generated/models/child_comparison_re
 import 'package:studafy_mobile/src/core/api/generated/models/notification.dart' as api_models;
 import 'package:studafy_mobile/src/core/offline/offline_database.dart';
 import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
+import 'package:studafy_mobile/src/features/parent/application/comparison_providers.dart';
 import 'package:studafy_mobile/src/features/parent/application/parent_providers.dart';
 import 'package:studafy_mobile/src/features/parent/domain/child_fees.dart';
+import 'package:studafy_mobile/src/features/parent/presentation/comparison_screen.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/parent_home_screen.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/widgets/child_attendance_card.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/widgets/parent_section_card.dart';
+import 'package:studafy_mobile/src/features/student/application/grade_providers.dart';
 
 import '../../../support/ensure_date_formatting.dart';
 import '../../../support/wrap_with_localization.dart';
@@ -156,5 +159,62 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('85% present · 3 absences this term'), findsOneWidget);
+  });
+
+  testWidgets('one linked child: no compare entry point in the switcher', (tester) async {
+    await _pump(
+      tester,
+      ProviderScope(
+        overrides: [
+          childComparisonProvider
+              .overrideWith((ref) => comparisonReport([childItem(id: 'child-1', name: 'Amir')])),
+          familyFinanceProvider.overrideWith((ref) async => null),
+          parentNotificationsProvider.overrideWith((ref) async => <api_models.Notification>[]),
+        ],
+        child: _homeApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.compare_arrows), findsNothing);
+  });
+
+  testWidgets('two or more linked children: the switcher\'s compare action opens the comparison',
+      (tester) async {
+    await _pump(
+      tester,
+      ProviderScope(
+        overrides: [
+          childComparisonProvider.overrideWith(
+            (ref) => comparisonReport([
+              childItem(id: 'child-1', name: 'Amir'),
+              childItem(id: 'child-2', name: 'Lina'),
+            ]),
+          ),
+          // The pushed screen reads its own term-scoped report and term list, not
+          // `childComparisonProvider` — stub both so opening it never falls through to a real
+          // network call.
+          comparisonReportProvider.overrideWith(
+            (ref) => comparisonReport([
+              childItem(id: 'child-1', name: 'Amir'),
+              childItem(id: 'child-2', name: 'Lina'),
+            ]),
+          ),
+          academicYearTermsProvider.overrideWith((ref) async => const []),
+          familyFinanceProvider.overrideWith((ref) async => null),
+          parentNotificationsProvider.overrideWith((ref) async => <api_models.Notification>[]),
+        ],
+        child: _homeApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.compare_arrows), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.compare_arrows));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChildComparisonScreen), findsOneWidget);
+    expect(find.text('Amir'), findsWidgets);
   });
 }

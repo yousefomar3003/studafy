@@ -9,11 +9,21 @@ import '../../../../design/tokens/app_spacing_tokens.dart';
 /// data source yet. Kept scrollable so each tab's pull-to-refresh keeps working while it shows.
 /// Mirrors the student screens' `GradesMessage` / `TimetableMessage`.
 class ChildDetailMessage extends StatelessWidget {
-  const ChildDetailMessage({required this.messageKey, required this.icon, this.hintKey, super.key});
+  const ChildDetailMessage({
+    required this.messageKey,
+    required this.icon,
+    this.hintKey,
+    this.messageArgs,
+    super.key,
+  });
 
   final String messageKey;
   final String? hintKey;
   final IconData icon;
+
+  /// Named substitutions for [messageKey], e.g. a linked-child count. Null for the common case of
+  /// a message with no variable part.
+  final Map<String, String>? messageArgs;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +44,7 @@ class ChildDetailMessage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    messageKey.tr(),
+                    messageKey.tr(namedArgs: messageArgs),
                     style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                   if (hintKey case final hintKey?) ...[
