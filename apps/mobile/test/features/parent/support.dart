@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/child_comparison_reports/child_comparison_reports_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/families/families_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/attendance_report_period.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/child_comparison_breakdown.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/child_comparison_item.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/child_comparison_report.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/family.dart';
@@ -89,6 +90,135 @@ ChildComparisonItem childItem({
   });
 }
 
+/// A single published-grade row, as the child breakdown endpoint returns it.
+Map<String, Object?> gradeRowJson({
+  required String id,
+  required String courseId,
+  required String courseName,
+  String label = 'Quiz 1',
+  num? score = 80,
+  num maxScore = 100,
+  num weight = 1,
+  num? percentage = 80,
+  String? gradeLabel = 'B',
+  String publishedAt = '2026-02-01T00:00:00.000Z',
+}) {
+  return {
+    'id': id,
+    'grade_submission_id': 'sub-$id',
+    'gradebook_id': 'gb-$courseId',
+    'class': {'id': 'class-$courseId', 'code': '${courseName.toUpperCase()}-A'},
+    'course': {
+      'id': courseId,
+      'code': courseId.toUpperCase(),
+      'name': courseName,
+      'credit_hours': 3,
+    },
+    'label': label,
+    'score': score,
+    'max_score': maxScore,
+    'weight': weight,
+    'percentage': percentage,
+    'grade_label': gradeLabel,
+    'gpa_points': 3,
+    'published_at': publishedAt,
+  };
+}
+
+/// One linked child's academic breakdown for a term. [gradeRows] feed the Grades tab;
+/// [absentCount] / [absentPercent] / [totalRecords] drive the attendance totals and alert;
+/// [assignmentsTotal] / [submitted] / [onTime] / [late] drive the Assignments tab.
+ChildComparisonBreakdown childBreakdown({
+  String id = 'child-1',
+  String name = 'Amir',
+  String admissionNumber = 'ADM-1',
+  List<Map<String, Object?>> gradeRows = const [],
+  num? termAverage = 82,
+  num? termGpa = 3.1,
+  num totalCredits = 12,
+  List<num?> trendAverages = const [],
+  int totalRecords = 40,
+  int absentCount = 0,
+  num absentPercent = 0,
+  int lateCount = 0,
+  int excusedCount = 0,
+  List<num> weeklyPresentPercents = const [],
+  int assignmentsTotal = 10,
+  int submitted = 9,
+  int onTime = 8,
+  int late = 1,
+}) {
+  final presentCount = totalRecords - absentCount - lateCount - excusedCount;
+  return ChildComparisonBreakdown.fromJson({
+    'generated_at': _t0,
+    'period': {
+      'term_id': 'term-1',
+      'start_date': '2026-01-01',
+      'end_date': '2026-04-01',
+    },
+    'student': {
+      'student_id': id,
+      'student_name': name,
+      'admission_number': admissionNumber,
+    },
+    'grade_trend': [
+      for (var i = 0; i < trendAverages.length; i++)
+        {
+          'term_id': 'term-$i',
+          'term_name': 'Term ${i + 1}',
+          'term_average_percentage': trendAverages[i],
+          'term_gpa': null,
+        },
+    ],
+    'grade': {
+      'grades': gradeRows,
+      'term_summary': {
+        'term_average_percentage': termAverage,
+        'term_gpa': termGpa,
+        'total_credits': totalCredits,
+        'calculated_at': null,
+      },
+    },
+    'attendance': {
+      'totals': {
+        'total_records': totalRecords,
+        'present_count': presentCount,
+        'absent_count': absentCount,
+        'late_count': lateCount,
+        'excused_count': excusedCount,
+        'present_percent': totalRecords == 0 ? 0 : 100 - absentPercent,
+        'absent_percent': absentPercent,
+        'late_percent': 0,
+        'excused_percent': 0,
+      },
+      'trends': [
+        for (var i = 0; i < weeklyPresentPercents.length; i++)
+          {
+            'total_records': 5,
+            'present_count': 5,
+            'absent_count': 0,
+            'late_count': 0,
+            'excused_count': 0,
+            'present_percent': weeklyPresentPercents[i],
+            'absent_percent': 0,
+            'late_percent': 0,
+            'excused_percent': 0,
+            'bucket_start': '2026-0${i + 1}-05T00:00:00.000Z',
+          },
+      ],
+    },
+    'assignments': {
+      'total': assignmentsTotal,
+      'submitted': submitted,
+      'on_time': onTime,
+      'late': late,
+      'completion_percent': assignmentsTotal == 0
+          ? 0
+          : (submitted / assignmentsTotal * 100).round(),
+    },
+  });
+}
+
 ChildComparisonReport comparisonReport(List<ChildComparisonItem> children) {
   return ChildComparisonReport(
     generatedAt: DateTime.parse(_t0),
@@ -145,15 +275,35 @@ MoneyTotal moneyTotal({String currency = 'JOD', required int minor, String? amou
 
 class FakeChildComparisonReportsClient extends Fake
     implements ChildComparisonReportsClient {
-  FakeChildComparisonReportsClient(this._report);
+  FakeChildComparisonReportsClient(
+    this._report, {
+    this.breakdowns = const {},
+  });
+
 
   final ChildComparisonReport _report;
+  final Map<String, ChildComparisonBreakdown> breakdowns;
   String? lastTermId;
+  String? lastBreakdownStudentId;
 
   @override
   Future<ChildComparisonReport> getChildrenComparison({required String termId}) async {
     lastTermId = termId;
     return _report;
+  }
+
+  @override
+  Future<ChildComparisonBreakdown> getChildComparisonBreakdown({
+    required String studentId,
+    required String termId,
+  }) async {
+    lastTermId = termId;
+    lastBreakdownStudentId = studentId;
+    final breakdown = breakdowns[studentId];
+    if (breakdown == null) {
+      throw StateError('no breakdown fixture for $studentId');
+    }
+    return breakdown;
   }
 }
 

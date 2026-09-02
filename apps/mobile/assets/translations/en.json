@@ -758,6 +758,48 @@
       "title": "Notifications",
       "error": "Couldn't load notifications.",
       "empty": "You're all caught up."
+    },
+    "childDetail": {
+      "error": "Couldn't load this term's detail.",
+      "tabs": {
+        "grades": "Grades",
+        "attendance": "Attendance",
+        "timetable": "Timetable",
+        "assignments": "Assignments"
+      },
+      "grades": {
+        "termSummary": "Term summary",
+        "termAverage": "Term average",
+        "gpa": "GPA",
+        "credits": "Credits",
+        "trend": "Average trend",
+        "empty": "No grades published this term yet."
+      },
+      "attendance": {
+        "title": "Attendance this term",
+        "empty": "No attendance recorded this term yet.",
+        "recordedDays": "{count} days recorded",
+        "present": "Present",
+        "absent": "Absent",
+        "late": "Late",
+        "excused": "Excused",
+        "countShare": "{count} ({percent}%)",
+        "weeklyTrend": "Weekly present rate",
+        "weekOf": "Week of {date}",
+        "presentShare": "{percent}% present"
+      },
+      "assignments": {
+        "title": "Assignment completion",
+        "empty": "No assignments this term yet.",
+        "submitted": "Submitted",
+        "onTime": "On time",
+        "late": "Late",
+        "note": "Counts every published assignment in the classes this child is enrolled in for the term."
+      },
+      "timetable": {
+        "unavailable": "The weekly timetable isn't available in the family view yet.",
+        "unavailableHint": "It will appear here once class schedules are shared to parents."
+      }
     }
   }
 }
