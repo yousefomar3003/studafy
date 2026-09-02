@@ -726,6 +726,27 @@
     "switcher": {
       "title": "Children"
     },
+    "comparison": {
+      "title": "Compare children",
+      "error": "Couldn't load the comparison.",
+      "shareDisabled": "Sharing is turned off to keep each child's data within your account.",
+      "requiresTwoChildren": {
+        "message": "Comparison needs at least two linked children ({count} linked).",
+        "hint": "Once a second child is linked to your account, their grades, attendance, and assignment completion will appear here side by side."
+      },
+      "gradeTrend": {
+        "title": "Grade trend",
+        "empty": "Not enough terms yet to plot a trend."
+      },
+      "attendance": {
+        "title": "Attendance this term",
+        "presentShare": "{percent}% present"
+      },
+      "completion": {
+        "title": "Assignment completion",
+        "share": "{percent}% complete"
+      }
+    },
     "attendance": {
       "title": "Attendance",
       "error": "Couldn't load attendance.",
