@@ -5,6 +5,7 @@
   "AUDIT_LOG_EXPORT_NOT_FOUND": "لم يتم العثور على تصدير سجل التدقيق",
   "AUDIT_LOG_EXPORT_UNAVAILABLE": "تصدير سجل التدقيق غير متاح مؤقتاً. يرجى المحاولة لاحقاً.",
   "ANNOUNCEMENT_CLASS_NOT_FOUND": "لم يتم العثور على الفصل",
+  "ANNOUNCEMENT_SCOPE_FORBIDDEN": "يمكنك إرسال إعلان غير إلزامي فقط إلى فصل تُدرّسه",
   "AUTH_INVALID_CREDENTIALS": "بيانات الاعتماد غير صالحة",
   "AUTH_TOKEN_EXPIRED": "انتهت صلاحية رمز المصادقة",
   "AUTH_TOKEN_INVALID": "رمز المصادقة غير صالح",
