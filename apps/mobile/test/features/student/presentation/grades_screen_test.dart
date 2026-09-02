@@ -68,7 +68,7 @@ CachedValue<GradeReport> _readyReport(Term term, List<PublishedGrade> grades) {
           totalCredits: 12,
           calculatedAt: null,
         ),
-        cumulativeSummary: const CumulativeGradeSummary(
+        cumulativeSummary: CumulativeGradeSummary(
           cumulativeGpa: 3.3,
           totalCredits: 24,
           throughTermId: term.id,

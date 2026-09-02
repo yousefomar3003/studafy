@@ -43,23 +43,24 @@ Material _material({
   });
 }
 
-Widget _screenScope(List<Override> overrides) {
-  return wrapWithLocalization(
-    ProviderScope(
-      overrides: overrides,
-      child: Builder(
-        builder: (context) {
-          return MaterialApp(
-            theme: AppTheme.light,
-            debugShowCheckedModeBanner: false,
-            locale: context.locale,
-            supportedLocales: context.supportedLocales,
-            localizationsDelegates: context.localizationDelegates,
-            home: const MaterialsScreen(),
-          );
-        },
-      ),
-    ),
+/// Takes the already-built [scope] rather than a raw overrides list — riverpod 3.3.2's
+/// `flutter_riverpod.dart` barrel doesn't export the `Override` type `ProviderScope.overrides`
+/// is typed with, so a helper can't name `List<Override>` itself (same reason as
+/// `today_screen_test.dart`).
+Widget _screenScope(ProviderScope scope) => wrapWithLocalization(scope);
+
+Widget _materialsApp() {
+  return Builder(
+    builder: (context) {
+      return MaterialApp(
+        theme: AppTheme.light,
+        debugShowCheckedModeBanner: false,
+        locale: context.locale,
+        supportedLocales: context.supportedLocales,
+        localizationsDelegates: context.localizationDelegates,
+        home: const MaterialsScreen(),
+      );
+    },
   );
 }
 
@@ -68,7 +69,12 @@ void main() {
 
   testWidgets('shows the unavailable message when no class is resolved', (tester) async {
     await tester.pumpWidget(
-      _screenScope([currentEnrolledClassIdsProvider.overrideWithValue(const [])]),
+      _screenScope(
+        ProviderScope(
+          overrides: [currentEnrolledClassIdsProvider.overrideWithValue(const [])],
+          child: _materialsApp(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -77,20 +83,25 @@ void main() {
 
   testWidgets('renders a section per enrolled class with its materials', (tester) async {
     await tester.pumpWidget(
-      _screenScope([
-        currentEnrolledClassIdsProvider.overrideWithValue(const ['class-1']),
-        materialsClassCodeProvider('class-1').overrideWith((ref) async => 'MATH101-A'),
-        materialsForClassProvider('class-1').overrideWith(
-          (ref) => Stream.value(
-            CachedValue(
-              data: [_material(id: 'material-1', title: 'Photosynthesis Study Guide')],
-              fetchedAt: DateTime(2026, 8, 24, 8),
-              source: CacheSource.network,
+      _screenScope(
+        ProviderScope(
+          overrides: [
+            currentEnrolledClassIdsProvider.overrideWithValue(const ['class-1']),
+            materialsClassCodeProvider('class-1').overrideWith((ref) async => 'MATH101-A'),
+            materialsForClassProvider('class-1').overrideWith(
+              (ref) => Stream.value(
+                CachedValue(
+                  data: [_material(id: 'material-1', title: 'Photosynthesis Study Guide')],
+                  fetchedAt: DateTime(2026, 8, 24, 8),
+                  source: CacheSource.network,
+                ),
+              ),
             ),
-          ),
+            materialDownloadedProvider('material-1').overrideWith((ref) async => false),
+          ],
+          child: _materialsApp(),
         ),
-        materialDownloadedProvider('material-1').overrideWith((ref) async => false),
-      ]),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -101,22 +112,27 @@ void main() {
 
   testWidgets('shows a status pill and disables tapping a not-yet-ready material', (tester) async {
     await tester.pumpWidget(
-      _screenScope([
-        currentEnrolledClassIdsProvider.overrideWithValue(const ['class-1']),
-        materialsClassCodeProvider('class-1').overrideWith((ref) async => 'MATH101-A'),
-        materialsForClassProvider('class-1').overrideWith(
-          (ref) => Stream.value(
-            CachedValue(
-              data: [
-                _material(id: 'material-1', title: 'Lecture Slides', ingestStatus: 'scanning'),
-              ],
-              fetchedAt: DateTime(2026, 8, 24, 8),
-              source: CacheSource.network,
+      _screenScope(
+        ProviderScope(
+          overrides: [
+            currentEnrolledClassIdsProvider.overrideWithValue(const ['class-1']),
+            materialsClassCodeProvider('class-1').overrideWith((ref) async => 'MATH101-A'),
+            materialsForClassProvider('class-1').overrideWith(
+              (ref) => Stream.value(
+                CachedValue(
+                  data: [
+                    _material(id: 'material-1', title: 'Lecture Slides', ingestStatus: 'scanning'),
+                  ],
+                  fetchedAt: DateTime(2026, 8, 24, 8),
+                  source: CacheSource.network,
+                ),
+              ),
             ),
-          ),
+            materialDownloadedProvider('material-1').overrideWith((ref) async => false),
+          ],
+          child: _materialsApp(),
         ),
-        materialDownloadedProvider('material-1').overrideWith((ref) async => false),
-      ]),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -127,19 +143,24 @@ void main() {
 
   testWidgets('an empty class shows the empty-materials line', (tester) async {
     await tester.pumpWidget(
-      _screenScope([
-        currentEnrolledClassIdsProvider.overrideWithValue(const ['class-1']),
-        materialsClassCodeProvider('class-1').overrideWith((ref) async => 'MATH101-A'),
-        materialsForClassProvider('class-1').overrideWith(
-          (ref) => Stream.value(
-            CachedValue(
-              data: const [],
-              fetchedAt: DateTime(2026, 8, 24, 8),
-              source: CacheSource.network,
+      _screenScope(
+        ProviderScope(
+          overrides: [
+            currentEnrolledClassIdsProvider.overrideWithValue(const ['class-1']),
+            materialsClassCodeProvider('class-1').overrideWith((ref) async => 'MATH101-A'),
+            materialsForClassProvider('class-1').overrideWith(
+              (ref) => Stream.value(
+                CachedValue(
+                  data: const [],
+                  fetchedAt: DateTime(2026, 8, 24, 8),
+                  source: CacheSource.network,
+                ),
+              ),
             ),
-          ),
+          ],
+          child: _materialsApp(),
         ),
-      ]),
+      ),
     );
     await tester.pumpAndSettle();
 
