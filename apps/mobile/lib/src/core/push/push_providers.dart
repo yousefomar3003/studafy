@@ -21,7 +21,7 @@ final pushServiceProvider = Provider<PushService>((ref) {
 
   final service = PushService(
     apiBaseUrl: networkConfig.apiBaseUrl,
-    getToken: session.tokenProvider,
+    getToken: () => session.tokenProvider,
   );
 
   ref.onDispose(service.dispose);

@@ -42,25 +42,29 @@ Material _material({
   });
 }
 
-Widget _screenScope(Material material, {List<Override> overrides = const []}) {
-  return wrapWithLocalization(
-    ProviderScope(
-      overrides: overrides,
-      child: Builder(
-        builder: (context) {
-          return MaterialApp(
-            theme: AppTheme.light,
-            debugShowCheckedModeBanner: false,
-            locale: context.locale,
-            supportedLocales: context.supportedLocales,
-            localizationsDelegates: context.localizationDelegates,
-            home: MaterialViewerScreen(material: material),
-          );
-        },
-      ),
-    ),
+Widget _viewerApp(Material material) {
+  return Builder(
+    builder: (context) {
+      return MaterialApp(
+        theme: AppTheme.light,
+        debugShowCheckedModeBanner: false,
+        locale: context.locale,
+        supportedLocales: context.supportedLocales,
+        localizationsDelegates: context.localizationDelegates,
+        home: MaterialViewerScreen(material: material),
+      );
+    },
   );
 }
+
+/// Takes the already-built [scope] rather than a raw overrides list — riverpod 3.3.2's
+/// `flutter_riverpod.dart` barrel doesn't export the `Override` type `ProviderScope.overrides`
+/// is typed with, so a helper can't name `List<Override>` itself (same reason as
+/// `today_screen_test.dart`).
+Widget _screenScope(ProviderScope scope) => wrapWithLocalization(scope);
+
+/// The common case: a viewer with no provider overrides.
+Widget _screen(Material material) => _screenScope(ProviderScope(child: _viewerApp(material)));
 
 void main() {
   setUpAll(ensureDateFormattingInitialized);
@@ -68,7 +72,7 @@ void main() {
   testWidgets('shows the pending-scan message and no preview before the file is ready', (
     tester,
   ) async {
-    await tester.pumpWidget(_screenScope(_material(id: 'm1', ingestStatus: 'uploaded')));
+    await tester.pumpWidget(_screen(_material(id: 'm1', ingestStatus: 'uploaded')));
     await tester.pumpAndSettle();
 
     expect(find.text('Pending scan'), findsOneWidget);
@@ -76,7 +80,7 @@ void main() {
   });
 
   testWidgets('shows the blocked message for a quarantined material', (tester) async {
-    await tester.pumpWidget(_screenScope(_material(id: 'm1', ingestStatus: 'quarantined')));
+    await tester.pumpWidget(_screen(_material(id: 'm1', ingestStatus: 'quarantined')));
     await tester.pumpAndSettle();
 
     expect(
@@ -87,7 +91,7 @@ void main() {
 
   testWidgets('shows the AI-visible note for a ready, AI-visible material', (tester) async {
     await tester.pumpWidget(
-      _screenScope(
+      _screen(
         _material(id: 'm1', ingestStatus: 'ready', aiVisible: true, mimeType: 'application/msword'),
       ),
     );
@@ -100,7 +104,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _screenScope(_material(id: 'm1', ingestStatus: 'ready', mimeType: 'application/msword')),
+      _screen(_material(id: 'm1', ingestStatus: 'ready', mimeType: 'application/msword')),
     );
     await tester.pumpAndSettle();
 
@@ -111,10 +115,12 @@ void main() {
   testWidgets('shows a spinner while a PDF download is in flight', (tester) async {
     await tester.pumpWidget(
       _screenScope(
-        _material(id: 'm1', ingestStatus: 'ready'),
-        overrides: [
-          ensureMaterialDownloadedProvider('m1').overrideWith((ref) => Completer<File>().future),
-        ],
+        ProviderScope(
+          overrides: [
+            ensureMaterialDownloadedProvider('m1').overrideWith((ref) => Completer<File>().future),
+          ],
+          child: _viewerApp(_material(id: 'm1', ingestStatus: 'ready')),
+        ),
       ),
     );
     await tester.pump();
@@ -125,12 +131,14 @@ void main() {
   testWidgets('shows a retry action when the download fails', (tester) async {
     await tester.pumpWidget(
       _screenScope(
-        _material(id: 'm1', ingestStatus: 'ready'),
-        overrides: [
-          ensureMaterialDownloadedProvider('m1').overrideWith((ref) async {
-            throw Exception('network error');
-          }),
-        ],
+        ProviderScope(
+          overrides: [
+            ensureMaterialDownloadedProvider('m1').overrideWith((ref) async {
+              throw Exception('network error');
+            }),
+          ],
+          child: _viewerApp(_material(id: 'm1', ingestStatus: 'ready')),
+        ),
       ),
     );
     await tester.pumpAndSettle();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../ai/presentation/ai_hub_screen.dart';
+import '../../parent/presentation/child_detail_screen.dart';
 import '../../parent/presentation/parent_home_screen.dart';
 import '../../student/presentation/timetable_screen.dart';
 import '../../student/presentation/today_screen.dart';
@@ -91,7 +92,7 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
         ShellDestination(
           labelKey: 'shell.tabs.children',
           icon: Icons.family_restroom_outlined,
-          body: ShellTabPlaceholder(titleKey: 'shell.tabs.children'),
+          body: ChildDetailScreen(),
         ),
         profile,
       ];

@@ -66,8 +66,10 @@ class PushService {
       return null;
     }
 
-    _foregroundSub = _messaging.onMessage.listen(_onForegroundMessage);
-    _tapSub = _messaging.onMessageOpenedApp.listen(_onTap);
+    // `onMessage` / `onMessageOpenedApp` are static on `FirebaseMessaging`; only
+    // `onTokenRefresh` is an instance stream.
+    _foregroundSub = FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+    _tapSub = FirebaseMessaging.onMessageOpenedApp.listen(_onTap);
     _tokenRefreshSub = _messaging.onTokenRefresh.listen(_onTokenRefresh);
 
     final token = await _messaging.getToken();
