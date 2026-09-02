@@ -2,10 +2,14 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/generated/models/announcement.dart';
+import '../../../core/api/generated/models/discipline_incident.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/teacher_providers.dart';
 import 'attendance_taking_screen.dart';
+import 'class_announcement_composer_screen.dart';
 import 'grade_entry_screen.dart';
+import 'incident_report_screen.dart';
 import 'teacher_content_screen.dart';
 import 'widgets/roster_entry_tile.dart';
 
@@ -56,6 +60,16 @@ class TeacherClassDetailScreen extends ConsumerWidget {
                     GradeEntryScreen(classId: classId, classCode: classCode),
               ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.campaign_outlined),
+            tooltip: 'teacher.communication.announce.title'.tr(),
+            onPressed: () => _composeAnnouncement(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: 'teacher.communication.incident.title'.tr(),
+            onPressed: () => _reportIncident(context),
           ),
         ],
       ),
@@ -116,6 +130,46 @@ class TeacherClassDetailScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _composeAnnouncement(BuildContext context) async {
+    final announcement = await Navigator.of(context).push<Announcement>(
+      MaterialPageRoute(
+        builder: (_) => ClassAnnouncementComposerScreen(
+          classId: classId,
+          classCode: classCode,
+        ),
+      ),
+    );
+    if (announcement == null || !context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'teacher.communication.announce.sent'.tr(
+              namedArgs: {'count': '${announcement.recipientCount}'},
+            ),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _reportIncident(BuildContext context) async {
+    final incident = await Navigator.of(context).push<DisciplineIncident>(
+      MaterialPageRoute(
+        builder: (_) => IncidentReportScreen(
+          classId: classId,
+          classCode: classCode,
+        ),
+      ),
+    );
+    if (incident == null || !context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text('teacher.communication.incident.sent'.tr())),
+      );
   }
 }
 

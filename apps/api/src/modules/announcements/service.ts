@@ -3,6 +3,7 @@ import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../lib/keyset-cursor";
+import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import type { CreateAnnouncementBody } from "./schemas";
 import type { TransactionSql } from "postgres";
@@ -36,6 +37,18 @@ export interface ListAnnouncementsParams {
   limit: number;
   cursor?: string;
   status?: "scheduled" | "published";
+}
+
+export interface CreateAnnouncementOptions {
+  /**
+   * Set for the scoped teacher path (ST-238): a caller holding `notification:send` but not
+   * `notification:manage`. It narrows the compose surface to "a non-mandatory notice to one of
+   * my own classes" — the class audience is the only one whose reach a teacher can already
+   * address, and `mandatory` is withheld so a teacher cannot send the platform's
+   * un-optoutable ADMIN_ANNOUNCEMENT type. An admin holding `notification:manage` composes with
+   * this unset and keeps the full school/role/class + mandatory surface.
+   */
+  restrictToTaughtClass?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +111,25 @@ export async function createAnnouncement(
   createdBy: string,
   input: CreateAnnouncementBody,
   now: Date,
+  options: CreateAnnouncementOptions = {},
 ): Promise<AnnouncementListRow> {
+  if (options.restrictToTaughtClass) {
+    if (input.audience_type !== "class") {
+      throw new CodedHttpException(
+        403,
+        ERROR_CODES.ANNOUNCEMENT_SCOPE_FORBIDDEN,
+        "A class announcement must target one of your classes",
+      );
+    }
+    if (input.mandatory) {
+      throw new CodedHttpException(
+        403,
+        ERROR_CODES.ANNOUNCEMENT_SCOPE_FORBIDDEN,
+        "A class announcement cannot be sent as a mandatory notice",
+      );
+    }
+  }
+
   if (input.audience_type === "class") {
     // createAnnouncementBodySchema's superRefine already guarantees this at the HTTP boundary; the
     // check here is what lets TypeScript narrow audience_class_id past `string | undefined` rather
@@ -116,6 +147,22 @@ export async function createAnnouncement(
         ERROR_CODES.ANNOUNCEMENT_CLASS_NOT_FOUND,
         "Class not found",
       );
+    }
+
+    if (options.restrictToTaughtClass) {
+      // Same SECURITY DEFINER predicate the role_scope_visibility RLS policies call, so "teaches
+      // this class" has one definition system-wide: the lead teacher, or a co-teacher/substitute
+      // holding a timetable slot for it.
+      const [row] = await tx<{ allowed: boolean }[]>`
+        SELECT app.teaches_class(${input.audience_class_id}::uuid) AS allowed
+      `;
+      if (!row?.allowed) {
+        throw new CodedHttpException(
+          403,
+          ERROR_CODES.ANNOUNCEMENT_SCOPE_FORBIDDEN,
+          "You do not teach this class",
+        );
+      }
     }
   }
 
@@ -136,6 +183,24 @@ export async function createAnnouncement(
     RETURNING id
   `;
   const announcementId = created!.id;
+
+  // Written inside the same transaction as the insert (and publish, when due), so the compose is
+  // audited atomically with what it created — the `auditAction("insert", "announcements")` route
+  // declaration only records intent. `restrict_to_taught_class` marks the scoped teacher path.
+  await emitAuditLog(tx, {
+    action: "insert",
+    targetTable: "announcements",
+    targetId: announcementId,
+    newValues: {
+      title: input.title,
+      mandatory: input.mandatory,
+      audience_type: input.audience_type,
+      audience_role: input.audience_role ?? null,
+      audience_class_id: input.audience_class_id ?? null,
+      scheduled_at: scheduledAt.toISOString(),
+      restrict_to_taught_class: options.restrictToTaughtClass === true,
+    },
+  });
 
   if (scheduledAt <= now) {
     await publishAnnouncement(tx, schoolId, announcementId, now);

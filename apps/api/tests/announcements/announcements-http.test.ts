@@ -76,6 +76,17 @@ async function createAnnouncement(
   return { status: res.status, body: (await res.json()) as AnnouncementResponse };
 }
 
+async function announcementAuditRows(
+  schoolId: string,
+): Promise<{ action: string; new_values: Record<string, unknown> }[]> {
+  return database!.sql<{ action: string; new_values: Record<string, unknown> }[]>`
+    SELECT action::text AS action, new_values
+    FROM app.audit_logs
+    WHERE school_id = ${schoolId} AND target_table = 'announcements'
+    ORDER BY created_at
+  `;
+}
+
 async function inboxTitlesOf(fixture: TenantFixture, userId: string): Promise<string[]> {
   const res = await authenticatedRequest(harness!, "GET", "/api/notifications", {
     schoolId: fixture.schoolId,
@@ -215,7 +226,7 @@ describeDb("announcement management HTTP", () => {
     expect(body.notified_count).toBe(0);
   });
 
-  test("only a caller holding notification:manage may compose an announcement", async () => {
+  test("a caller holding neither notification:manage nor notification:send may not compose", async () => {
     const fixture = await createFullTenant(database!.sql);
 
     const res = await authenticatedRequest(
@@ -230,6 +241,138 @@ describeDb("announcement management HTTP", () => {
         audience_type: "school",
       }),
     );
+
+    expect(res.status).toBe(403);
+  });
+
+  // -------------------------------------------------------------------------
+  // Scoped teacher path (ST-238): notification:send, not notification:manage.
+  // -------------------------------------------------------------------------
+
+  test("a teacher may compose a non-mandatory announcement to a class they teach", async () => {
+    const fixture = await createFullTenant(database!.sql);
+    const title = `Teacher notice ${crypto.randomUUID().slice(0, 8)}`;
+
+    const res = await authenticatedRequest(
+      harness!,
+      "POST",
+      "/api/announcements",
+      {
+        schoolId: fixture.schoolId,
+        userId: fixture.teachers[0]!.userId,
+        roles: [ROLES.INSTRUCTOR],
+      },
+      jsonBody({
+        title,
+        body: "Bring your lab notebooks tomorrow.",
+        mandatory: false,
+        audience_type: "class",
+        audience_class_id: fixture.cls.id,
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as AnnouncementResponse;
+    expect(body.status).toBe("published");
+    expect(body.recipient_count).toBe(1);
+    expect(body.notified_count).toBe(1);
+
+    expect(await inboxTitlesOf(fixture, fixture.students[0]!.userId)).toContain(title);
+    expect(await inboxTitlesOf(fixture, fixture.users.STUDENT.id)).not.toContain(title);
+
+    // "both audited" — the compose writes an app.audit_logs row, tagged as the scoped path.
+    const audit = await announcementAuditRows(fixture.schoolId);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]!.action).toBe("insert");
+    expect(audit[0]!.new_values).toMatchObject({
+      audience_type: "class",
+      mandatory: false,
+      restrict_to_taught_class: true,
+    });
+  });
+
+  test("a teacher may not compose to a class they do not teach", async () => {
+    const fixture = await createFullTenant(database!.sql);
+
+    const res = await authenticatedRequest(
+      harness!,
+      "POST",
+      "/api/announcements",
+      {
+        schoolId: fixture.schoolId,
+        userId: fixture.users.INSTRUCTOR.id,
+        roles: [ROLES.INSTRUCTOR],
+      },
+      jsonBody({
+        title: "Not my class",
+        body: "This instructor does not teach this class.",
+        mandatory: false,
+        audience_type: "class",
+        audience_class_id: fixture.cls.id,
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("ANNOUNCEMENT_SCOPE_FORBIDDEN");
+  });
+
+  test("a teacher may not compose a school-wide announcement", async () => {
+    const fixture = await createFullTenant(database!.sql);
+
+    const res = await authenticatedRequest(
+      harness!,
+      "POST",
+      "/api/announcements",
+      {
+        schoolId: fixture.schoolId,
+        userId: fixture.teachers[0]!.userId,
+        roles: [ROLES.INSTRUCTOR],
+      },
+      jsonBody({
+        title: "Too wide",
+        body: "A teacher cannot address the whole school.",
+        mandatory: false,
+        audience_type: "school",
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("ANNOUNCEMENT_SCOPE_FORBIDDEN");
+  });
+
+  test("a teacher may not send a mandatory (un-optoutable) class announcement", async () => {
+    const fixture = await createFullTenant(database!.sql);
+
+    const res = await authenticatedRequest(
+      harness!,
+      "POST",
+      "/api/announcements",
+      {
+        schoolId: fixture.schoolId,
+        userId: fixture.teachers[0]!.userId,
+        roles: [ROLES.INSTRUCTOR],
+      },
+      jsonBody({
+        title: "Cannot be mandatory",
+        body: "A teacher notice is always opt-outable.",
+        mandatory: true,
+        audience_type: "class",
+        audience_class_id: fixture.cls.id,
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("ANNOUNCEMENT_SCOPE_FORBIDDEN");
+  });
+
+  test("a teacher may not read the school-wide announcement history", async () => {
+    const fixture = await createFullTenant(database!.sql);
+
+    const res = await authenticatedRequest(harness!, "GET", "/api/announcements?limit=10", {
+      schoolId: fixture.schoolId,
+      userId: fixture.teachers[0]!.userId,
+      roles: [ROLES.INSTRUCTOR],
+    });
 
     expect(res.status).toBe(403);
   });

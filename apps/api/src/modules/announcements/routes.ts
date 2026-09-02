@@ -4,7 +4,7 @@ import { PERMISSIONS } from "@studafy/constants";
 import { withTenantTx } from "../../db/tenant-tx";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
-import { requirePermission } from "../../middleware/authz";
+import { hasPermission, requirePermission, requirePermissionIn } from "../../middleware/authz";
 import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
 
@@ -74,17 +74,23 @@ const createAnnouncementRoute = createRoute({
  * Announcement management (ST-194): compose/publish with audience targeting (school/role/class) and
  * a mandatory flag, scheduled publishing, and history with reach stats.
  *
- * Gated on `notification:manage` rather than `organization:manageSettings` — the same
- * narrower-than-the-admin-dashboard-default pattern the audit explorer uses (see
- * `apps/api/src/modules/audit/routes.ts`). Only SUPER_ADMIN and ORG_ADMIN hold it
- * (`packages/constants/src/permissions.ts`), which is also exactly the role set `notification:manage`
- * was added for: the comment on NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT in
- * packages/constants/src/notifications.ts says this producer didn't exist yet — it does now.
+ * `GET` (history) is gated on `notification:manage` — only SUPER_ADMIN and ORG_ADMIN hold it
+ * (`packages/constants/src/permissions.ts`), the same narrower-than-the-admin-dashboard-default
+ * pattern the audit explorer uses (see `apps/api/src/modules/audit/routes.ts`).
+ *
+ * `POST` (compose) additionally accepts the scoped teacher path (ST-238): a caller holding
+ * `notification:send` but not `notification:manage` may compose, but only a non-mandatory notice to
+ * a class they teach — enforced in `createAnnouncement` via `restrictToTaughtClass`, because the
+ * rule needs the parsed body. An admin holding `notification:manage` keeps the full surface.
  */
 export function announcementRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  routes.use("/api/announcements", requirePermission(PERMISSIONS.NOTIFICATION_MANAGE));
+  // History is admin-only; compose has its own per-request gate in the handler below.
+  const manageOnly = requirePermission(PERMISSIONS.NOTIFICATION_MANAGE);
+  routes.use("/api/announcements", (c, next) =>
+    c.req.method === "GET" ? manageOnly(c, next) : next(),
+  );
   routes.use("/api/announcements", auditAction("insert", "announcements"));
 
   routes.openapi(listAnnouncementsRoute, async (c) => {
@@ -106,8 +112,15 @@ export function announcementRoutes(database: Database): OpenAPIHono<AppEnv> {
     const auth = requireAuth(c);
     const body = c.req.valid("json");
 
+    // notification:manage => full authority (any audience, mandatory allowed). Otherwise the caller
+    // must hold notification:send and createAnnouncement applies the scoped teacher rules.
+    const scoped = !hasPermission(auth.roles, PERMISSIONS.NOTIFICATION_MANAGE);
+    if (scoped) requirePermissionIn(c, PERMISSIONS.NOTIFICATION_SEND);
+
     const announcement = await withTenantTx(database, tenantFrom(c), (tx) =>
-      createAnnouncement(tx, auth.schoolId, auth.userId, body, new Date()),
+      createAnnouncement(tx, auth.schoolId, auth.userId, body, new Date(), {
+        restrictToTaughtClass: scoped,
+      }),
     );
 
     return c.json(announcement, 201);

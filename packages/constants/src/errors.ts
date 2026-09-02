@@ -222,6 +222,10 @@ export const ERROR_CODES = {
   // Announcement management (ST-194). The audience class named at compose time doesn't exist in
   // this school.
   ANNOUNCEMENT_CLASS_NOT_FOUND: "ANNOUNCEMENT_CLASS_NOT_FOUND",
+  // A caller composing on the scoped teacher path (notification:send, not notification:manage,
+  // ST-238) tried to send something the scoped path forbids: a non-class audience, a mandatory
+  // notice, or a class they do not teach.
+  ANNOUNCEMENT_SCOPE_FORBIDDEN: "ANNOUNCEMENT_SCOPE_FORBIDDEN",
 
   // Submissions — hand-in window, enrollment scope, and grading state (ST-104).
   SUBMISSION_NOT_FOUND: "SUBMISSION_NOT_FOUND",

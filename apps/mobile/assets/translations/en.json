@@ -668,6 +668,54 @@
         "noChange": "That's already this student's status.",
         "failed": "Couldn't save the correction. Try again."
       }
+    },
+    "communication": {
+      "announce": {
+        "title": "Class announcement",
+        "audience": "Goes to everyone enrolled in {class}. Recipients can mute class announcements in their notification settings.",
+        "titleField": "Title",
+        "titleRequired": "Give the announcement a title.",
+        "bodyField": "Message",
+        "bodyRequired": "Write a message.",
+        "submit": "Send announcement",
+        "sent": "Announcement sent to {count} class members.",
+        "errorForbidden": "You can only announce to classes you teach.",
+        "errorValidation": "Check the announcement and try again.",
+        "errorGeneric": "Couldn't send the announcement. Try again."
+      },
+      "incident": {
+        "title": "Incident report",
+        "routing": "This goes to the Principal's discipline inbox for review. You can't triage or resolve it yourself.",
+        "studentField": "Student",
+        "studentRequired": "Choose the student involved.",
+        "typeField": "Type",
+        "severityField": "Severity",
+        "summaryField": "Summary",
+        "summaryRequired": "Give the incident a short summary.",
+        "detailField": "What happened (optional)",
+        "occurredAt": "When it happened",
+        "submit": "Send report",
+        "sent": "Incident report sent to the Principal.",
+        "errorForbidden": "You're not allowed to file an incident for this student.",
+        "errorValidation": "Check the report and try again.",
+        "errorGeneric": "Couldn't send the report. Try again.",
+        "type": {
+          "behavioral": "Behavioral",
+          "academicIntegrity": "Academic integrity",
+          "attendance": "Attendance",
+          "bullying": "Bullying",
+          "substance": "Substance",
+          "vandalism": "Vandalism",
+          "safety": "Safety",
+          "other": "Other"
+        },
+        "severity": {
+          "minor": "Minor",
+          "moderate": "Moderate",
+          "major": "Major",
+          "critical": "Critical"
+        }
+      }
     }
   }
 }

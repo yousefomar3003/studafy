@@ -2,8 +2,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/studafy_api_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/academics/academics_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/announcements/announcements_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/assignments/assignments_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/attendance/attendance_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/discipline/discipline_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/announcement.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/create_announcement_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/create_incident_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/discipline_incident.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment_list.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/attendance_record.dart';
@@ -500,6 +506,79 @@ class FakeSubmissionsClient extends Fake implements SubmissionsClient {
   }
 }
 
+class FakeAnnouncementsClient extends Fake implements AnnouncementsClient {
+  FakeAnnouncementsClient({this.throwOnCreate});
+
+  /// Every `createAnnouncement` body received, in order.
+  final List<CreateAnnouncementBody> createCalls = [];
+
+  /// When set, `createAnnouncement` throws it instead of returning — the rejection cases.
+  DioException? throwOnCreate;
+
+  /// Reach reported back on the created announcement.
+  int recipientCount = 1;
+
+  @override
+  Future<Announcement> createAnnouncement({required CreateAnnouncementBody body}) async {
+    if (throwOnCreate != null) throw throwOnCreate!;
+    createCalls.add(body);
+    return Announcement.fromJson({
+      'id': 'announcement-1',
+      'school_id': 'school-1',
+      'created_by': 'user-1',
+      'created_by_name': null,
+      'title': body.title,
+      'body': body.body,
+      'mandatory': body.mandatory,
+      'audience_type': body.audienceType.json,
+      'audience_role': body.audienceRole?.json,
+      'audience_class_id': body.audienceClassId,
+      'audience_class_code': null,
+      'status': 'published',
+      'scheduled_at': _t0,
+      'published_at': _t0,
+      'recipient_count': recipientCount,
+      'notified_count': recipientCount,
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+  }
+}
+
+class FakeDisciplineClient extends Fake implements DisciplineClient {
+  FakeDisciplineClient({this.throwOnCreate});
+
+  /// Every `createDisciplineIncident` body received, in order.
+  final List<CreateIncidentBody> createCalls = [];
+
+  /// When set, `createDisciplineIncident` throws it instead of returning.
+  DioException? throwOnCreate;
+
+  @override
+  Future<DisciplineIncident> createDisciplineIncident({
+    required CreateIncidentBody body,
+  }) async {
+    if (throwOnCreate != null) throw throwOnCreate!;
+    createCalls.add(body);
+    return DisciplineIncident.fromJson({
+      'id': 'incident-1',
+      'school_id': 'school-1',
+      'student_id': body.studentId,
+      'class_id': body.classId,
+      'reporter_user_id': 'user-1',
+      'incident_type': body.incidentType.json,
+      'severity': body.severity.json,
+      'status': 'reported',
+      'title': body.title,
+      'description': body.description,
+      'incident_at': body.incidentAt.toUtc().toIso8601String(),
+      'resolved_at': null,
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+  }
+}
+
 /// A [StudafyApiClient] whose domain-client getters return the fakes above; every other getter
 /// throws (via [Fake]) so a test that reaches an unstubbed corner of the API fails loudly.
 class FakeStudafyApiClient extends Fake implements StudafyApiClient {
@@ -510,12 +589,16 @@ class FakeStudafyApiClient extends Fake implements StudafyApiClient {
     FakeAttendanceClient? attendance,
     FakeAssignmentsClient? assignments,
     FakeSubmissionsClient? submissions,
+    FakeAnnouncementsClient? announcements,
+    FakeDisciplineClient? discipline,
   })  : teachers = teachers ?? FakeTeachersClient(teacherProfile()),
         academics = academics ?? FakeAcademicsClient(),
         timetable = timetable ?? FakeTimetableClient(),
         attendance = attendance ?? FakeAttendanceClient(),
         assignments = assignments ?? FakeAssignmentsClient(),
-        submissions = submissions ?? FakeSubmissionsClient();
+        submissions = submissions ?? FakeSubmissionsClient(),
+        announcements = announcements ?? FakeAnnouncementsClient(),
+        discipline = discipline ?? FakeDisciplineClient();
 
   @override
   final FakeTeachersClient teachers;
@@ -529,4 +612,8 @@ class FakeStudafyApiClient extends Fake implements StudafyApiClient {
   final FakeAssignmentsClient assignments;
   @override
   final FakeSubmissionsClient submissions;
+  @override
+  final FakeAnnouncementsClient announcements;
+  @override
+  final FakeDisciplineClient discipline;
 }

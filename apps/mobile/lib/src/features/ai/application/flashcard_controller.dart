@@ -7,6 +7,7 @@ import '../data/flashcard_library_store.dart';
 import '../domain/flashcard.dart';
 import '../domain/flashcard_deck_summary.dart';
 import '../domain/flashcard_state.dart';
+import 'flashcard_providers.dart';
 
 /// Drives the flashcard feature end to end: the deck browser (generation plus each deck's live
 /// due-today count and the review streak) and one deck's review session (swipe/tap grading, one

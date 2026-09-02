@@ -131,6 +131,7 @@
   "AUDIT_LOG_EXPORT_NOT_FOUND": "Audit log export not found",
   "AUDIT_LOG_EXPORT_UNAVAILABLE": "Audit log export is temporarily unavailable. Please try again later.",
   "ANNOUNCEMENT_CLASS_NOT_FOUND": "Class not found",
+  "ANNOUNCEMENT_SCOPE_FORBIDDEN": "You can only send a non-mandatory announcement to a class you teach",
   "INVALID_GRADEBOOK_WEIGHT_TOTAL": "Assessment category weights must sum to exactly 100%",
   "GRADEBOOK_NOT_FOUND": "Gradebook not found",
   "GRADING_SCHEME_NOT_FOUND": "Grading scheme not found",
