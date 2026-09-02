@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../ai/presentation/ai_hub_screen.dart';
+import '../../parent/presentation/parent_home_screen.dart';
 import '../../student/presentation/timetable_screen.dart';
 import '../../student/presentation/today_screen.dart';
 import '../../teacher/presentation/teacher_class_list_screen.dart';
@@ -25,11 +26,10 @@ class ShellDestination {
 /// no domain-specific tab — matching its zero-mutation, view-only posture.
 ///
 /// [ShellRole.student] alone also gets an AI tab. A parent can buy and manage the same per-student
-/// add-on too (see `apps/web/src/app/routes.tsx`'s `account/ai` route comment), but that needs a
-/// child-selection concept the parent shell's own "Children" tab doesn't have yet either — still a
-/// [ShellTabPlaceholder] below — so a parent-facing AI tab is future scope for whichever ticket
-/// builds that tab for real, not this one. `AiHubScreen` itself resolves
-/// subscribed/unsubscribed/school-inactive from the signed-in student session.
+/// add-on too (see `apps/web/src/app/routes.tsx`'s `account/ai` route comment); the parent home
+/// now carries the per-child selection such a tab would scope through, but `AiHubScreen` still
+/// resolves subscribed/unsubscribed/school-inactive from a *student* session, so a parent-facing
+/// AI tab remains future scope for whichever ticket builds it against a parent session.
 List<ShellDestination> shellDestinationsFor(ShellRole role) {
   const home = ShellDestination(
     labelKey: 'shell.tabs.home',
@@ -83,7 +83,11 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
       ];
     case ShellRole.parent:
       return const [
-        home,
+        ShellDestination(
+          labelKey: 'shell.tabs.home',
+          icon: Icons.home_outlined,
+          body: ParentHomeScreen(),
+        ),
         ShellDestination(
           labelKey: 'shell.tabs.children',
           icon: Icons.family_restroom_outlined,

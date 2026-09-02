@@ -717,5 +717,47 @@
         }
       }
     }
+  },
+  "parent": {
+    "children": {
+      "empty": "No children are linked to your account yet.",
+      "error": "Couldn't load your children."
+    },
+    "switcher": {
+      "title": "Children"
+    },
+    "attendance": {
+      "title": "Attendance",
+      "error": "Couldn't load attendance.",
+      "empty": "No attendance recorded this term yet.",
+      "summary": "{present}% present · {absent} absences this term",
+      "badge": {
+        "watch": "Watch",
+        "alert": "Needs attention"
+      }
+    },
+    "grades": {
+      "title": "Latest grades",
+      "error": "Couldn't load grades.",
+      "empty": "No grades published this term yet.",
+      "termAverage": "Term average",
+      "gpa": "GPA",
+      "trendUp": "Up {points} pts vs last term",
+      "trendDown": "Down {points} pts vs last term",
+      "trendFlat": "No change vs last term"
+    },
+    "fees": {
+      "title": "Fees due",
+      "error": "Couldn't load fees.",
+      "empty": "No billing information yet.",
+      "settled": "All fees settled.",
+      "due": "{amount} outstanding",
+      "asOf": "As of {date}"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "error": "Couldn't load notifications.",
+      "empty": "You're all caught up."
+    }
   }
 }
