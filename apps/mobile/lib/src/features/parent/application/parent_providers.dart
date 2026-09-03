@@ -8,6 +8,8 @@ import '../../../core/api/generated/models/child_comparison_report.dart';
 // Aliased: the generated model class is named `Notification`, which collides with the Flutter
 // widget of the same name wherever a consumer also imports `flutter/material.dart`.
 import '../../../core/api/generated/models/notification.dart' as api_models;
+import '../../../core/api/generated/models/notification_preferences.dart';
+import '../../../core/api/generated/models/update_notification_preferences_request.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../core/offline/offline_providers.dart';
@@ -20,6 +22,7 @@ import '../../student/application/current_term_provider.dart';
 import '../data/family_finance_client.dart';
 import '../data/parent_selected_child_store.dart';
 import '../domain/family_finance.dart';
+import '../domain/parent_alert.dart';
 
 // ---------------------------------------------------------------------------
 // Identity
@@ -151,3 +154,75 @@ final parentNotificationsProvider = FutureProvider<List<api_models.Notification>
   return page.notifications.toList()
     ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 });
+
+// ---------------------------------------------------------------------------
+// Communication screen — the fuller, split-by-kind history behind [parentNotificationsProvider]
+// ---------------------------------------------------------------------------
+
+/// The largest page the inbox endpoint allows, newest first. A separate fetch from
+/// [parentNotificationsProvider] — same endpoint, different page size — rather than one shared
+/// provider both screens read: the home card wants a handful mixed together, the communication
+/// screen wants as much of each kind as the API will return in one page, and the two have no
+/// reason to invalidate together.
+final parentCommunicationFeedProvider = FutureProvider<List<api_models.Notification>>((ref) async {
+  final page = await ref.watch(apiClientProvider).notifications.listNotifications(limit: 100);
+  return page.notifications.toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+});
+
+/// Just the `ATTENDANCE_ALERT` rows of [parentCommunicationFeedProvider], for the alerts tab.
+final attendanceAlertsFeedProvider = Provider<AsyncValue<List<api_models.Notification>>>((ref) {
+  return ref.watch(parentCommunicationFeedProvider).whenData(
+        (feed) => [
+          for (final notification in feed)
+            if (categoryOf(notification) == ParentAlertCategory.attendance) notification,
+        ],
+      );
+});
+
+/// Just the `ANNOUNCEMENT` / `ADMIN_ANNOUNCEMENT` rows of [parentCommunicationFeedProvider], for
+/// the messages tab.
+final schoolMessagesFeedProvider = Provider<AsyncValue<List<api_models.Notification>>>((ref) {
+  return ref.watch(parentCommunicationFeedProvider).whenData(
+        (feed) => [
+          for (final notification in feed)
+            if (categoryOf(notification) == ParentAlertCategory.message) notification,
+        ],
+      );
+});
+
+// ---------------------------------------------------------------------------
+// Attendance-alert threshold — a parent's personal override on top of the school's own rules
+// ---------------------------------------------------------------------------
+
+/// The signed-in parent's full notification-preference matrix, including
+/// [NotificationPreferences.attendanceAlertThreshold] — their personal absence-count override.
+final notificationPreferencesProvider = FutureProvider<NotificationPreferences>((ref) {
+  return ref.watch(apiClientProvider).notifications.getNotificationPreferences();
+});
+
+/// Sets or clears [notificationPreferencesProvider]'s attendance-alert threshold override, and
+/// re-fetches it on success so the sheet that triggered the edit sees the round-tripped value
+/// rather than an optimistic guess.
+class AttendanceAlertThresholdController extends AsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  Future<void> setThreshold(int? days) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref
+          .read(apiClientProvider)
+          .notifications
+          .updateNotificationPreferences(
+            body: UpdateNotificationPreferencesRequest(attendanceAlertThreshold: days),
+          );
+      ref.invalidate(notificationPreferencesProvider);
+    });
+  }
+}
+
+final attendanceAlertThresholdControllerProvider =
+    AsyncNotifierProvider<AttendanceAlertThresholdController, void>(
+  AttendanceAlertThresholdController.new,
+);

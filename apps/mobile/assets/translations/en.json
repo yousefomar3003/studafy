@@ -780,6 +780,36 @@
       "error": "Couldn't load notifications.",
       "empty": "You're all caught up."
     },
+    "communication": {
+      "title": "Messages & alerts",
+      "viewAll": "View all",
+      "tabs": {
+        "messages": "Messages",
+        "alerts": "Alerts"
+      },
+      "messages": {
+        "error": "Couldn't load school messages.",
+        "empty": "No school messages yet."
+      },
+      "alerts": {
+        "error": "Couldn't load attendance alerts.",
+        "empty": "No attendance alerts."
+      },
+      "threshold": {
+        "title": "Attendance alert threshold",
+        "description": "Get an alert after this many absences, in addition to the school's own threshold.",
+        "edit": "Edit",
+        "useSchoolDefault": "Use school default",
+        "usingSchoolDefault": "Using the school's default threshold.",
+        "customValue": "Alerting after {days} absences.",
+        "daysField": "Absences before alerting",
+        "daysInvalid": "Enter a number between {min} and {max}.",
+        "save": "Save",
+        "error": "Couldn't load this setting.",
+        "errorValidation": "That value isn't valid. Enter a number between 1 and 365.",
+        "errorGeneric": "Couldn't save this setting. Try again."
+      }
+    },
     "childDetail": {
       "error": "Couldn't load this term's detail.",
       "tabs": {
