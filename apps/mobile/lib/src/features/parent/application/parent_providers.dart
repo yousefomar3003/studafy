@@ -19,7 +19,7 @@ import '../../../core/offline/offline_providers.dart';
 import '../../student/application/current_term_provider.dart';
 import '../data/family_finance_client.dart';
 import '../data/parent_selected_child_store.dart';
-import '../domain/child_fees.dart';
+import '../domain/family_finance.dart';
 
 // ---------------------------------------------------------------------------
 // Identity
@@ -129,9 +129,10 @@ final familyFinanceClientProvider = Provider<FamilyFinanceClient>((ref) {
   return FamilyFinanceClient(dio);
 });
 
-/// The household's outstanding balances, per child and in total. Null when there is no
-/// household. Its own provider so an ERPNext-backed finance outage (the endpoint can 503)
-/// surfaces in the fees card alone and never blanks attendance or grades.
+/// The household's full finance detail — invoices, fee-schedule installments, receipts, and
+/// balances, per child and in total. Null when there is no household. Its own provider so an
+/// ERPNext-backed finance outage (the endpoint can 503) surfaces in the fees card and the Finance
+/// tab alone, and never blanks attendance or grades.
 final familyFinanceProvider = FutureProvider<FamilyFinanceView?>((ref) async {
   final familyId = await ref.watch(parentFamilyIdProvider.future);
   if (familyId == null) return null;

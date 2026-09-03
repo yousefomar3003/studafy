@@ -786,7 +786,8 @@
         "grades": "الدرجات",
         "attendance": "الحضور",
         "timetable": "الجدول",
-        "assignments": "الواجبات"
+        "assignments": "الواجبات",
+        "finance": "المالية"
       },
       "grades": {
         "termSummary": "ملخّص الفصل",
@@ -820,6 +821,58 @@
       "timetable": {
         "unavailable": "الجدول الأسبوعي غير متاح في واجهة ولي الأمر بعد.",
         "unavailableHint": "سيظهر هنا بمجرد مشاركة جداول الصفوف مع أولياء الأمور."
+      },
+      "finance": {
+        "error": "تعذّر تحميل تفاصيل الرسوم لهذا الابن.",
+        "empty": "لا توجد فواتير أو أقساط أو إيصالات بعد.",
+        "balance": {
+          "title": "الرصيد",
+          "due": "{amount} مستحقّة",
+          "settled": "تمّت تسوية جميع الرسوم.",
+          "asOf": "حتى تاريخ {date}"
+        },
+        "invoices": {
+          "title": "الفواتير",
+          "empty": "لا توجد فواتير بعد.",
+          "issued": "صدرت في {date}",
+          "issuedAndDue": "صدرت في {issued} · تستحق في {due}",
+          "totalPaid": "سُدِّد {amount} بالكامل",
+          "outstandingOfTotal": "{outstanding} من أصل {total} مستحقّة",
+          "paid": "مسدّدة",
+          "due": "مستحقّة",
+          "overdue": "متأخّرة",
+          "payOnline": "الدفع عبر الموقع"
+        },
+        "installments": {
+          "title": "جدول الأقساط",
+          "empty": "لا توجد أقساط مُجدولة بعد.",
+          "due": "تستحق في {date}",
+          "totalPaid": "سُدِّد {amount} بالكامل",
+          "outstandingOfTotal": "{outstanding} من أصل {total} مستحقّة",
+          "status": {
+            "pending": "قيد الانتظار",
+            "partiallyPaid": "مسدّد جزئيًا",
+            "paid": "مسدّد",
+            "overdue": "متأخّر"
+          }
+        },
+        "receipts": {
+          "title": "الإيصالات",
+          "empty": "لا توجد إيصالات بعد.",
+          "paidOn": "دُفع في {date}",
+          "viewReceipt": "عرض الإيصال",
+          "unavailable": "لا يتوفّر ملف PDF لهذا الإيصال.",
+          "status": {
+            "pending": "قيد الانتظار",
+            "confirmed": "مؤكَّد",
+            "failed": "فشل"
+          },
+          "viewer": {
+            "title": "الإيصال",
+            "downloadError": "تعذّر تنزيل هذا الإيصال. تحقّق من اتصالك وحاول مرة أخرى.",
+            "retry": "إعادة المحاولة"
+          }
+        }
       }
     }
   }

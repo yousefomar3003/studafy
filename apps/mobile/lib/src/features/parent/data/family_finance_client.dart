@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import '../domain/child_fees.dart';
+import '../domain/family_finance.dart';
 
 /// Hand-written client for the one parent-facing finance endpoint,
 /// `GET /api/finance/families/{familyId}`.
@@ -11,9 +11,10 @@ import '../domain/child_fees.dart';
 /// [Dio] with the base URL, bearer injection and error mapping `createApiClient` uses, built in
 /// `familyFinanceClientProvider`.
 ///
-/// Only the outstanding-balance projection is parsed. Throws the shared `ApiException` (attached
-/// by `ErrorMappingInterceptor`) on any non-2xx — the endpoint can 429/503 while its ERPNext
-/// read models are cold — and the fees card renders that as its own error state.
+/// Parses every array the endpoint returns — invoices, installments, receipts, and the
+/// per-student and household totals. Throws the shared `ApiException` (attached by
+/// `ErrorMappingInterceptor`) on any non-2xx — the endpoint can 429/503 while its ERPNext read
+/// models are cold — and every screen built on this view renders that as its own error state.
 class FamilyFinanceClient {
   FamilyFinanceClient(this._dio);
 
@@ -30,14 +31,28 @@ class FamilyFinanceClient {
     final dataAsOf = body['data_as_of'] as String?;
 
     return FamilyFinanceView(
-      outstandingByStudentId: {
-        for (final section in students)
-          section['student_id']! as String: _totals(section['totals']),
-      },
+      sections: [for (final section in students) _section(section)],
       householdTotals: _totals(body['household_totals']),
       dataAsOf: dataAsOf == null ? null : DateTime.parse(dataAsOf),
     );
   }
+
+  FamilyStudentFinance _section(Map<String, Object?> json) => FamilyStudentFinance(
+        studentId: json['student_id']! as String,
+        invoices: [
+          for (final entry in (json['invoices'] as List<Object?>?) ?? const [])
+            FamilyInvoice.fromJson(Map<String, Object?>.from(entry! as Map)),
+        ],
+        installments: [
+          for (final entry in (json['installments'] as List<Object?>?) ?? const [])
+            FamilyInstallment.fromJson(Map<String, Object?>.from(entry! as Map)),
+        ],
+        receipts: [
+          for (final entry in (json['payments'] as List<Object?>?) ?? const [])
+            FamilyReceipt.fromJson(Map<String, Object?>.from(entry! as Map)),
+        ],
+        totals: _totals(json['totals']),
+      );
 
   List<MoneyTotal> _totals(Object? raw) => [
         for (final entry in (raw as List<Object?>?) ?? const [])

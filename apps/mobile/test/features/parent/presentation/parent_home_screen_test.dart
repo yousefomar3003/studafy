@@ -11,7 +11,7 @@ import 'package:studafy_mobile/src/core/offline/offline_database.dart';
 import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
 import 'package:studafy_mobile/src/features/parent/application/comparison_providers.dart';
 import 'package:studafy_mobile/src/features/parent/application/parent_providers.dart';
-import 'package:studafy_mobile/src/features/parent/domain/child_fees.dart';
+import 'package:studafy_mobile/src/features/parent/domain/family_finance.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/comparison_screen.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/parent_home_screen.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/widgets/child_attendance_card.dart';
@@ -39,9 +39,12 @@ Future<void> _pump(WidgetTester tester, ProviderScope scope) {
 }
 
 FamilyFinanceView _financeOwing() => FamilyFinanceView(
-      outstandingByStudentId: {
-        'child-1': [moneyTotal(minor: 125000, amount: '125.000')],
-      },
+      sections: [
+        financeSection(
+          studentId: 'child-1',
+          totals: [moneyTotal(minor: 125000, amount: '125.000')],
+        ),
+      ],
       householdTotals: [moneyTotal(minor: 125000, amount: '125.000')],
       dataAsOf: null,
     );
