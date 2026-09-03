@@ -11,6 +11,7 @@ import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/parent/application/child_detail_providers.dart';
 import 'package:studafy_mobile/src/features/parent/application/parent_providers.dart';
+import 'package:studafy_mobile/src/features/parent/domain/family_finance.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/child_detail_screen.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/widgets/child_detail_placeholders.dart';
 import 'package:studafy_mobile/src/features/student/presentation/widgets/subject_grades_card.dart';
@@ -35,6 +36,7 @@ Widget _app() {
 ProviderScope _scope({
   required List<String> childIds,
   required Map<String, ChildComparisonBreakdown> breakdowns,
+  FamilyFinanceView? finance,
 }) {
   return ProviderScope(
     overrides: [
@@ -51,6 +53,10 @@ ProviderScope _scope({
         if (breakdown == null) return Completer<ChildComparisonBreakdown>().future;
         return breakdown;
       }),
+      // The Finance tab is built eagerly along with every other tab (TabBarView keeps every
+      // child alive), so this needs a value even in tests that never visit it — otherwise it
+      // falls through to the real `apiClientProvider` and fires a live network call.
+      familyFinanceProvider.overrideWith((ref) async => finance),
     ],
     child: _app(),
   );
@@ -197,5 +203,66 @@ void main() {
     await tester.pump();
 
     expect(find.byType(ChildDetailSkeleton), findsOneWidget);
+  });
+
+  group('finance tab', () {
+    testWidgets('no household finance data: shows the empty state', (tester) async {
+      await tester.pumpWidget(wrapWithLocalization(_scope(
+        childIds: const ['child-1'],
+        breakdowns: {'child-1': childBreakdown(id: 'child-1')},
+      )));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Finance'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No invoices, installments, or receipts yet.'), findsOneWidget);
+    });
+
+    testWidgets('renders the balance, an invoice with its pay-online action, an installment, '
+        'and a receipt', (tester) async {
+      await tester.pumpWidget(wrapWithLocalization(_scope(
+        childIds: const ['child-1'],
+        breakdowns: {'child-1': childBreakdown(id: 'child-1')},
+        finance: FamilyFinanceView(
+          sections: [
+            financeSection(
+              studentId: 'child-1',
+              totals: [moneyTotal(minor: 125000, amount: '125.000')],
+              invoices: [
+                familyInvoice(
+                  docname: 'SI-2026-00042',
+                  outstandingMinor: 125000,
+                  payOnlineUrl: 'https://pay.example.com/checkout?invoice=SI-2026-00042',
+                ),
+              ],
+              installments: [
+                familyInstallment(
+                  erpnextFeeScheduleId: 'FS-2026-00001',
+                  outstandingMinor: 50000,
+                  status: InstallmentStatus.overdue,
+                ),
+              ],
+              receipts: [
+                familyReceipt(amountMinor: 75000, receiptUrl: 'https://erp.example.com/r.pdf'),
+              ],
+            ),
+          ],
+          householdTotals: [moneyTotal(minor: 125000, amount: '125.000')],
+          dataAsOf: null,
+        ),
+      )));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Finance'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('125.000 JOD outstanding'), findsOneWidget);
+      expect(find.text('SI-2026-00042'), findsOneWidget);
+      expect(find.text('Pay online'), findsOneWidget);
+      expect(find.text('Overdue'), findsOneWidget);
+      expect(find.text('75.000 JOD'), findsOneWidget);
+      expect(find.byIcon(Icons.picture_as_pdf_outlined), findsOneWidget);
+    });
   });
 }

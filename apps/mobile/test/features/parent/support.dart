@@ -15,7 +15,7 @@ import 'package:studafy_mobile/src/core/api/generated/models/unread_only.dart';
 import 'package:studafy_mobile/src/core/api/generated/notifications/notifications_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/studafy_api_client.dart';
 import 'package:studafy_mobile/src/features/parent/data/family_finance_client.dart';
-import 'package:studafy_mobile/src/features/parent/domain/child_fees.dart';
+import 'package:studafy_mobile/src/features/parent/domain/family_finance.dart';
 
 // ---------------------------------------------------------------------------
 // Model fixtures — built via fromJson (or public ctors) so a new field on a
@@ -267,6 +267,80 @@ MoneyTotal moneyTotal({String currency = 'JOD', required int minor, String? amou
       currency: currency,
       outstandingAmount: amount ?? (minor / 1000).toStringAsFixed(3),
       outstandingMinor: minor,
+    );
+
+FamilyInvoice familyInvoice({
+  String docname = 'SI-0001',
+  DateTime? issuedDate,
+  DateTime? dueDate,
+  String currency = 'JOD',
+  required int outstandingMinor,
+  int? totalMinor,
+  String? payOnlineUrl,
+}) {
+  final total = totalMinor ?? outstandingMinor;
+  return FamilyInvoice(
+    erpnextDocname: docname,
+    issuedDate: issuedDate ?? DateTime(2026, 1, 1),
+    dueDate: dueDate,
+    totalAmount: (total / 1000).toStringAsFixed(3),
+    outstandingAmount: (outstandingMinor / 1000).toStringAsFixed(3),
+    outstandingMinor: outstandingMinor,
+    currency: currency,
+    payOnlineUrl: payOnlineUrl,
+  );
+}
+
+FamilyInstallment familyInstallment({
+  String erpnextFeeScheduleId = 'FS-0001',
+  DateTime? dueDate,
+  String currency = 'JOD',
+  required int outstandingMinor,
+  int? totalMinor,
+  InstallmentStatus status = InstallmentStatus.pending,
+}) {
+  final total = totalMinor ?? outstandingMinor;
+  return FamilyInstallment(
+    erpnextFeeScheduleId: erpnextFeeScheduleId,
+    dueDate: dueDate ?? DateTime(2026, 2, 1),
+    totalAmount: (total / 1000).toStringAsFixed(3),
+    outstandingAmount: (outstandingMinor / 1000).toStringAsFixed(3),
+    currency: currency,
+    status: status,
+  );
+}
+
+FamilyReceipt familyReceipt({
+  String id = 'receipt-1',
+  DateTime? paymentDate,
+  String currency = 'JOD',
+  required int amountMinor,
+  ReceiptStatus status = ReceiptStatus.confirmed,
+  String? receiptUrl,
+}) {
+  return FamilyReceipt(
+    id: id,
+    amount: (amountMinor / 1000).toStringAsFixed(3),
+    currency: currency,
+    status: status,
+    receiptUrl: receiptUrl,
+    paymentDate: paymentDate ?? DateTime(2026, 1, 15),
+  );
+}
+
+FamilyStudentFinance financeSection({
+  required String studentId,
+  List<FamilyInvoice> invoices = const [],
+  List<FamilyInstallment> installments = const [],
+  List<FamilyReceipt> receipts = const [],
+  List<MoneyTotal> totals = const [],
+}) =>
+    FamilyStudentFinance(
+      studentId: studentId,
+      invoices: invoices,
+      installments: installments,
+      receipts: receipts,
+      totals: totals,
     );
 
 // ---------------------------------------------------------------------------

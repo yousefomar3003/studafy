@@ -9,11 +9,12 @@ import '../domain/attendance_alert.dart';
 import 'widgets/child_assignments_view.dart';
 import 'widgets/child_attendance_view.dart';
 import 'widgets/child_detail_placeholders.dart';
+import 'widgets/child_finance_view.dart';
 import 'widgets/child_grades_view.dart';
 import 'widgets/child_timetable_view.dart';
 
 /// The parent shell's "Children" tab: one linked child's academic detail — grades, attendance,
-/// timetable and assignment status — with a chip bar to move between children.
+/// timetable, assignment status and finance — with a chip bar to move between children.
 ///
 /// The active child is [selectedChildProvider] (this session's switcher pick, else the choice
 /// persisted on this device, else the first linked child), shared with the parent home so the
@@ -54,7 +55,7 @@ class _ChildDetail extends ConsumerWidget {
     final children = ref.watch(linkedChildrenProvider).value ?? const <ChildComparisonItem>[];
 
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Column(
         children: [
           if (children.length > 1)
@@ -69,6 +70,7 @@ class _ChildDetail extends ConsumerWidget {
                 Tab(text: 'parent.childDetail.tabs.attendance'.tr()),
                 Tab(text: 'parent.childDetail.tabs.timetable'.tr()),
                 Tab(text: 'parent.childDetail.tabs.assignments'.tr()),
+                Tab(text: 'parent.childDetail.tabs.finance'.tr()),
               ],
             ),
           ),
@@ -79,6 +81,7 @@ class _ChildDetail extends ConsumerWidget {
                 ChildAttendanceView(studentId: child.studentId),
                 const ChildTimetableView(),
                 ChildAssignmentsView(studentId: child.studentId),
+                ChildFinanceView(studentId: child.studentId),
               ],
             ),
           ),

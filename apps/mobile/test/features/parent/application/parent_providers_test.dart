@@ -5,7 +5,7 @@ import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
 import 'package:studafy_mobile/src/core/offline/offline_database.dart';
 import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
 import 'package:studafy_mobile/src/features/parent/application/parent_providers.dart';
-import 'package:studafy_mobile/src/features/parent/domain/child_fees.dart';
+import 'package:studafy_mobile/src/features/parent/domain/family_finance.dart';
 import 'package:studafy_mobile/src/features/student/application/current_term_provider.dart';
 
 import '../support.dart';
@@ -101,7 +101,7 @@ void main() {
     test('parentFamilyIdProvider is null and no finance call is made without a household',
         () async {
       final finance = FamilyFinanceView(
-        outstandingByStudentId: const {},
+        sections: const [],
         householdTotals: const [],
         dataAsOf: null,
       );
@@ -127,9 +127,9 @@ void main() {
         families: FakeFamiliesClient(families: [familyFixture(id: 'fam-9')]),
       );
       final view = FamilyFinanceView(
-        outstandingByStudentId: {
-          'child-1': [moneyTotal(minor: 125000)],
-        },
+        sections: [
+          financeSection(studentId: 'child-1', totals: [moneyTotal(minor: 125000)]),
+        ],
         householdTotals: [moneyTotal(minor: 125000)],
         dataAsOf: DateTime.parse('2026-03-01T00:00:00.000Z'),
       );

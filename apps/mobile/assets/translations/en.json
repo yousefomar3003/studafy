@@ -786,7 +786,8 @@
         "grades": "Grades",
         "attendance": "Attendance",
         "timetable": "Timetable",
-        "assignments": "Assignments"
+        "assignments": "Assignments",
+        "finance": "Finance"
       },
       "grades": {
         "termSummary": "Term summary",
@@ -820,6 +821,58 @@
       "timetable": {
         "unavailable": "The weekly timetable isn't available in the family view yet.",
         "unavailableHint": "It will appear here once class schedules are shared to parents."
+      },
+      "finance": {
+        "error": "Couldn't load this child's finance details.",
+        "empty": "No invoices, installments, or receipts yet.",
+        "balance": {
+          "title": "Balance",
+          "due": "{amount} outstanding",
+          "settled": "All fees settled.",
+          "asOf": "As of {date}"
+        },
+        "invoices": {
+          "title": "Invoices",
+          "empty": "No invoices yet.",
+          "issued": "Issued {date}",
+          "issuedAndDue": "Issued {issued} · due {due}",
+          "totalPaid": "{amount} paid in full",
+          "outstandingOfTotal": "{outstanding} of {total} outstanding",
+          "paid": "Paid",
+          "due": "Due",
+          "overdue": "Overdue",
+          "payOnline": "Pay online"
+        },
+        "installments": {
+          "title": "Fee schedule",
+          "empty": "No fee-schedule installments yet.",
+          "due": "Due {date}",
+          "totalPaid": "{amount} paid in full",
+          "outstandingOfTotal": "{outstanding} of {total} outstanding",
+          "status": {
+            "pending": "Pending",
+            "partiallyPaid": "Partially paid",
+            "paid": "Paid",
+            "overdue": "Overdue"
+          }
+        },
+        "receipts": {
+          "title": "Receipts",
+          "empty": "No receipts yet.",
+          "paidOn": "Paid {date}",
+          "viewReceipt": "View receipt",
+          "unavailable": "No PDF is available for this receipt.",
+          "status": {
+            "pending": "Pending",
+            "confirmed": "Confirmed",
+            "failed": "Failed"
+          },
+          "viewer": {
+            "title": "Receipt",
+            "downloadError": "Couldn't download this receipt. Check your connection and try again.",
+            "retry": "Retry"
+          }
+        }
       }
     }
   }
