@@ -2,9 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { decodeJwt, decodeProtectedHeader, jwtVerify } from "jose";
 
-import { createMockIdp } from "./mock-idp";
-
-import { createMockIdpIfEnabled, isMockIdpEnabled } from "./index";
+import { createMockIdp, createMockIdpIfEnabled, isMockIdpEnabled } from "../../src/dev/mock-idp";
 
 const ISSUER = "http://localhost:4000";
 
@@ -211,6 +209,38 @@ describe("MockIdp", () => {
     expect(payload.sub).toBe("eve@test.test");
     expect(payload.school_id).toBe("school-1");
     expect(payload.roles).toEqual(["STUDENT"]);
+  });
+
+  test("nonce passed to /authorize is echoed on the issued JWT", async () => {
+    const app = createMockIdp({ issuer: ISSUER, defaultSubject: "grace@test.test" });
+
+    const authRes = await app.request(
+      "/authorize?redirect_uri=http://localhost:3000/cb&nonce=n-123",
+    );
+    const code = parseRedirectUrl(authRes).searchParams.get("code")!;
+
+    const tokenRes = await app.request("/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "authorization_code", code }).toString(),
+    });
+    const { access_token } = (await tokenRes.json()) as { access_token: string };
+    expect(decodeJwt(access_token).nonce).toBe("n-123");
+  });
+
+  test("no nonce claim is set when /authorize receives none", async () => {
+    const app = createMockIdp({ issuer: ISSUER, defaultSubject: "heidi@test.test" });
+
+    const authRes = await app.request("/authorize?redirect_uri=http://localhost:3000/cb");
+    const code = parseRedirectUrl(authRes).searchParams.get("code")!;
+
+    const tokenRes = await app.request("/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "authorization_code", code }).toString(),
+    });
+    const { access_token } = (await tokenRes.json()) as { access_token: string };
+    expect(decodeJwt(access_token).nonce).toBeUndefined();
   });
 
   test("issued JWT header contains kid matching JWKS", async () => {

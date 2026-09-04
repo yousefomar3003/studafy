@@ -27,7 +27,12 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _subscribeToPushTaps();
-    _initPushOnAuth();
+    // Deferred to a microtask: `_initPushOnAuth` writes `AsyncLoading` to `pushInitProvider`'s
+    // state, and Riverpod disallows modifying a provider from inside a widget life-cycle method
+    // (didChangeDependencies included) — "Tried to modify a provider while the widget tree was
+    // building." A microtask runs once this frame's build has finished, which is Riverpod's own
+    // recommended fix for exactly this shape of mount-time kickoff.
+    Future.microtask(_initPushOnAuth);
     // Activates the auth-status listener that keeps the crash reporter's identified user in
     // sync — see `crashReportingUserSyncProvider`. Reading it is idempotent, so no init flag is
     // needed the way `_initPushOnAuth` needs `_pushInitialized`.
@@ -53,6 +58,9 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
 
   /// Initialize push when the user becomes authenticated.
   void _initPushOnAuth() {
+    // Runs after a microtask hop (see the call site in didChangeDependencies) — the widget can
+    // have been disposed by then (a fast navigation away, or a test tearing down immediately).
+    if (!mounted) return;
     final status = ref.read(authStatusProvider);
     if (status == AuthStatus.authenticated && !_pushInitialized) {
       _pushInitialized = true;

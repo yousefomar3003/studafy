@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Loading } from "../../components/Loading";
 import { consumeReturnTo, useAuthStatus, useOAuthLogin, useSessionStore } from "../../lib/auth";
+import { SHOW_MOCK_LOGIN } from "../../lib/config";
 
 /**
  * Login page (`/auth/login`).
@@ -55,6 +56,16 @@ export default function LoginPage() {
           Continue with Microsoft
         </button>
       </p>
+      {SHOW_MOCK_LOGIN && (
+        <p>
+          <button
+            type="button"
+            onClick={() => beginOAuth("mock", searchParams.get("login_hint") ?? undefined)}
+          >
+            Continue with Mock
+          </button>
+        </p>
+      )}
     </>
   );
 }

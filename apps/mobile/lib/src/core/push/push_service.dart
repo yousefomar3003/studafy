@@ -30,17 +30,44 @@ String? resolveNotificationTapRoute(Map<String, dynamic> data) {
   return route is String && route.isNotEmpty ? route : null;
 }
 
+/// [pushServiceProvider]'s contract — the surface [StudafyApp] and [PushInitNotifier] depend on.
+///
+/// A real deployment always gets [FirebasePushService]; widget tests override the provider with a
+/// no-op fake instead (`test/support/fake_push_service.dart`) — [FirebasePushService] touches real
+/// Firebase Cloud Messaging the moment it's constructed (`FirebaseMessaging.instance`), which
+/// throws outside a real app with `Firebase.initializeApp()` already run, so a test can never
+/// construct one directly.
+abstract class PushService {
+  /// Stream of messages received while the app is in the foreground.
+  Stream<RemoteMessage> get onMessage;
+
+  /// Stream of deep-link routes extracted from notification taps.
+  Stream<String> get onNotificationTap;
+
+  /// Initialize Firebase, request permission, get token, register with API.
+  ///
+  /// Returns the FCM token on success, null if permission denied or init failed.
+  Future<String?> initialize();
+
+  /// Manually trigger registration (e.g. after login when the service was
+  /// already initialized but had no auth token at the time).
+  Future<void> registerIfAuthenticated();
+
+  /// Tear down listeners. Call on logout or app dispose.
+  void dispose();
+}
+
 /// Wraps Firebase Cloud Messaging: permission, token lifecycle, and API registration.
 ///
 /// [getToken] is the same async provider the [AuthInterceptor] uses — the push
 /// service needs a live bearer token to call POST /api/auth/devices. When null
 /// is returned the user is signed out and registration is skipped.
-class PushService {
-  PushService({
+class FirebasePushService implements PushService {
+  FirebasePushService({
     required Uri apiBaseUrl,
     required TokenProvider getToken,
-  })  : _getToken = getToken,
-        _dio = Dio(BaseOptions(baseUrl: apiBaseUrl.toString()));
+  }) : _getToken = getToken,
+       _dio = Dio(BaseOptions(baseUrl: apiBaseUrl.toString()));
 
   final TokenProvider _getToken;
   final Dio _dio;
@@ -58,14 +85,17 @@ class PushService {
   bool _initialized = false;
 
   /// Stream of messages received while the app is in the foreground.
+  @override
   Stream<RemoteMessage> get onMessage => _messageController.stream;
 
   /// Stream of deep-link routes extracted from notification taps.
+  @override
   Stream<String> get onNotificationTap => _tapController.stream;
 
   /// Initialize Firebase, request permission, get token, register with API.
   ///
   /// Returns the FCM token on success, null if permission denied or init failed.
+  @override
   Future<String?> initialize() async {
     if (_initialized) return await _messaging.getToken();
     _initialized = true;
@@ -105,6 +135,7 @@ class PushService {
 
   /// Manually trigger registration (e.g. after login when the service was
   /// already initialized but had no auth token at the time).
+  @override
   Future<void> registerIfAuthenticated() async {
     final token = await _messaging.getToken();
     if (token != null) {
@@ -113,6 +144,7 @@ class PushService {
   }
 
   /// Tear down listeners. Call on logout or app dispose.
+  @override
   void dispose() {
     _foregroundSub?.cancel();
     _tapSub?.cancel();
@@ -125,19 +157,21 @@ class PushService {
   // -- Internal --------------------------------------------------------------
 
   Future<void> _initLocalNotifications() async {
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings();
-    const settings =
-        InitializationSettings(android: androidSettings, iOS: iosSettings);
+    const settings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
 
     await _localNotifications.initialize(
       settings,
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
         if (payload != null && payload.isNotEmpty) {
-          final data =
-              jsonDecode(payload) as Map<String, dynamic>;
+          final data = jsonDecode(payload) as Map<String, dynamic>;
           _handleTap(data);
         }
       },
@@ -150,7 +184,8 @@ class PushService {
     );
     await _localNotifications
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(androidChannel);
   }
 
@@ -195,8 +230,9 @@ class PushService {
     final bearerToken = await _getToken();
     if (bearerToken == null) return;
 
-    final platform =
-        defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+    final platform = defaultTargetPlatform == TargetPlatform.iOS
+        ? 'ios'
+        : 'android';
 
     try {
       await _dio.post(

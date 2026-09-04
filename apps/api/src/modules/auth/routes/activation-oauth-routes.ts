@@ -50,6 +50,16 @@ import {
 } from "../oauth/microsoft-config";
 import { validateMicrosoftIdToken } from "../oauth/microsoft-id-token";
 import {
+  MOCK_AUTH_ENDPOINT,
+  MOCK_JWKS_URI,
+  MOCK_OAUTH_CLIENT_ID,
+  MOCK_OAUTH_SCOPES,
+  MOCK_TOKEN_ENDPOINT,
+  getMockOAuthConfig,
+} from "../oauth/mock-config";
+import { validateMockIdToken } from "../oauth/mock-id-token";
+import { exchangeCode as exchangeMockCode } from "../oauth/mock-route";
+import {
   generateCodeChallenge,
   generateCodeVerifier,
   generateNonce,
@@ -76,12 +86,47 @@ interface OAuthConfig {
   frontendUrl: string | undefined;
 }
 
+/**
+ * Normalizes each provider's config loader to this route group's common shape. The mock provider
+ * has no client secret (its token endpoint checks none — dev/mock-idp.ts) and no fixed client id
+ * registry, so it gets a nominal `clientId` (MOCK_OAUTH_CLIENT_ID) and an empty `clientSecret` that
+ * `exchangeCode`'s mock branch below never sends.
+ */
 function providerConfig(provider: Provider): OAuthConfig {
+  if (provider === "mock") {
+    const config = getMockOAuthConfig();
+    if (!config) throw new HTTPException(404, { message: "mock OAuth is not configured" });
+    return {
+      clientId: MOCK_OAUTH_CLIENT_ID,
+      clientSecret: "",
+      redirectUri: config.redirectUri,
+      frontendUrl: config.frontendUrl,
+    };
+  }
   const config = provider === "google" ? getGoogleOAuthConfig() : getMicrosoftOAuthConfig();
   if (!config) {
     throw new HTTPException(404, { message: `${provider} OAuth is not configured` });
   }
   return config;
+}
+
+/** The mock IdP's issuer, re-derived from its own config — see providerConfig's mock branch. */
+function mockIssuer(): string {
+  const config = getMockOAuthConfig();
+  if (!config) throw new HTTPException(404, { message: "mock OAuth is not configured" });
+  return config.issuer;
+}
+
+function authEndpoint(provider: Provider): string {
+  if (provider === "google") return GOOGLE_AUTH_ENDPOINT;
+  if (provider === "microsoft") return MICROSOFT_AUTH_ENDPOINT;
+  return MOCK_AUTH_ENDPOINT(mockIssuer());
+}
+
+function tokenEndpoint(provider: Provider): string {
+  if (provider === "google") return GOOGLE_TOKEN_ENDPOINT;
+  if (provider === "microsoft") return MICROSOFT_TOKEN_ENDPOINT;
+  return MOCK_TOKEN_ENDPOINT(mockIssuer());
 }
 
 function authorizationParams(
@@ -90,20 +135,31 @@ function authorizationParams(
   state: string,
   nonce: string,
   codeChallenge: string,
+  loginHint: string | undefined,
 ): URLSearchParams {
+  const scope =
+    provider === "google"
+      ? GOOGLE_SCOPES
+      : provider === "microsoft"
+        ? MICROSOFT_SCOPES
+        : MOCK_OAUTH_SCOPES;
   const shared = {
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     response_type: "code",
-    scope: provider === "google" ? GOOGLE_SCOPES : MICROSOFT_SCOPES,
+    scope,
     state,
     nonce,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
   };
-  return provider === "google"
-    ? new URLSearchParams(shared)
-    : new URLSearchParams({ ...shared, response_mode: "query" });
+  const params = new URLSearchParams(shared);
+  if (provider === "microsoft") params.set("response_mode", "query");
+  // The mock IdP has no consent screen or account picker: whichever seeded persona's email is
+  // passed here is who the callback activates as. A real IdP resolves this from whoever is signed
+  // in there instead — see mock-route.ts's identical use for the login (not activation) flow.
+  if (provider === "mock" && loginHint) params.set("login_hint", loginHint);
+  return params;
 }
 
 /**
@@ -143,9 +199,15 @@ export function activationOAuthRoutes(
       token,
     });
 
-    const authEndpoint = provider === "google" ? GOOGLE_AUTH_ENDPOINT : MICROSOFT_AUTH_ENDPOINT;
-    const params = authorizationParams(provider, config, state, nonce, codeChallenge);
-    return c.redirect(`${authEndpoint}?${params.toString()}`, 302);
+    const params = authorizationParams(
+      provider,
+      config,
+      state,
+      nonce,
+      codeChallenge,
+      c.req.query("login_hint"),
+    );
+    return c.redirect(`${authEndpoint(provider)}?${params.toString()}`, 302);
   });
 
   // GET /api/auth/oauth/{provider}/invitation/callback
@@ -193,19 +255,31 @@ async function handleActivationCallback(
   stateStore.delete(state);
   const token = entry.token;
 
-  // 2. Exchange the authorization code for an id_token.
-  const idToken = await exchangeCode(
-    provider === "google" ? GOOGLE_TOKEN_ENDPOINT : MICROSOFT_TOKEN_ENDPOINT,
-    oauthConfig,
-    code,
-    entry.codeVerifier,
-  );
-
-  // 3. Validate the id_token against the provider's JWKS with the stored nonce.
-  const claims =
-    provider === "google"
-      ? await validateGoogleIdToken(idToken, oauthConfig.clientId, entry.nonce)
-      : await validateMicrosoftIdToken(idToken, oauthConfig.clientId, entry.nonce);
+  // 2. Exchange the authorization code for a token, and 3. validate it against the provider's JWKS
+  // with the stored nonce. The mock IdP's /token returns `access_token`, not `id_token` — see
+  // mock-route.ts and mock-id-token.ts's file headers — so it gets its own exchange+validate pair
+  // rather than sharing exchangeCode/the Google-Microsoft ternary below.
+  let claims: { sub: string; email: string };
+  if (provider === "mock") {
+    const accessToken = await exchangeMockCode(mockIssuer(), code, entry.codeVerifier);
+    claims = await validateMockIdToken(
+      accessToken,
+      mockIssuer(),
+      entry.nonce,
+      MOCK_JWKS_URI(mockIssuer()),
+    );
+  } else {
+    const idToken = await exchangeCode(
+      tokenEndpoint(provider),
+      oauthConfig,
+      code,
+      entry.codeVerifier,
+    );
+    claims =
+      provider === "google"
+        ? await validateGoogleIdToken(idToken, oauthConfig.clientId, entry.nonce)
+        : await validateMicrosoftIdToken(idToken, oauthConfig.clientId, entry.nonce);
+  }
 
   // 4. Run the atomic activation transaction. A lifecycle rejection (expired/revoked/consumed/
   // suspended invitation, duplicate identity) bounces back to the invite page, which re-verifies
@@ -252,20 +326,20 @@ function activationFrontendUrl(oauthConfig: OAuthConfig, token: string): string 
 }
 
 function assertProvider(provider: string): asserts provider is Provider {
-  if (provider !== "google" && provider !== "microsoft") {
+  if (provider !== "google" && provider !== "microsoft" && provider !== "mock") {
     throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Unknown OAuth provider");
   }
 }
 
 async function exchangeCode(
-  tokenEndpoint: string,
+  endpoint: string,
   oauthConfig: OAuthConfig,
   code: string,
   codeVerifier: string,
 ): Promise<string> {
   let tokenResponse: Response;
   try {
-    tokenResponse = await fetch(tokenEndpoint, {
+    tokenResponse = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({

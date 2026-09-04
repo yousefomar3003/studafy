@@ -15,11 +15,16 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 /// Creates and configures the [PushService] with the current session's auth
 /// token and the API base URL. Disposed when the provider container tears down.
+///
+/// Always a real [FirebasePushService] here — the seam tests use is overriding this whole
+/// provider (`pumpStudafyApp`'s `pushServiceProvider.overrideWithValue(FakePushService())`), not a
+/// runtime branch on environment, since [FirebasePushService] touches real Firebase the moment it's
+/// constructed.
 final pushServiceProvider = Provider<PushService>((ref) {
   final networkConfig = ref.watch(networkConfigProvider);
   final session = ref.watch(authSessionProvider);
 
-  final service = PushService(
+  final service = FirebasePushService(
     apiBaseUrl: networkConfig.apiBaseUrl,
     getToken: () => session.tokenProvider,
   );
@@ -49,5 +54,6 @@ class PushInitNotifier extends AsyncNotifier<void> {
   }
 }
 
-final pushInitProvider =
-    AsyncNotifierProvider<PushInitNotifier, void>(PushInitNotifier.new);
+final pushInitProvider = AsyncNotifierProvider<PushInitNotifier, void>(
+  PushInitNotifier.new,
+);

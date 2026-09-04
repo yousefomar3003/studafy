@@ -81,10 +81,16 @@ export function usePermissions(): ReadonlySet<Permission> {
   return useMemo(() => permissionsForRoles(roles), [roles]);
 }
 
-/** The OAuth providers the API exposes browser-redirect flows for. */
+/**
+ * The OAuth providers the API exposes browser-redirect flows for. "mock" only ever answers (see
+ * mock-config.ts) when the API's own MOCK_OAUTH_ISSUER_URL is set, which is never true in a real
+ * deployment — see SHOW_MOCK_LOGIN's doc comment (lib/config.ts) for why the button can still be
+ * gated separately on the client.
+ */
 export const OAUTH_PROVIDERS = {
   google: "/api/auth/oauth/google/start",
   microsoft: "/api/auth/oauth/microsoft/start",
+  mock: "/api/auth/oauth/mock/start",
 } as const;
 
 export type OAuthProvider = keyof typeof OAUTH_PROVIDERS;
@@ -96,10 +102,16 @@ export type OAuthProvider = keyof typeof OAUTH_PROVIDERS;
  * which is why a pending return-to must live in `sessionStorage` (`return-to.ts`) rather than in
  * memory. Does not touch the return-to itself — the `RequireAuth` guard set it before landing here,
  * and the callback falls back to the portal when none is pending.
+ *
+ * `loginHint` is forwarded as `?login_hint=` and is meaningful only for the "mock" provider — it
+ * selects which seeded persona's email the mock IdP signs the token for (mock-idp.ts); Google and
+ * Microsoft ignore an unrecognized query param on their own authorization endpoints.
  */
-export function useOAuthLogin(): (provider: OAuthProvider) => void {
-  return (provider) => {
+export function useOAuthLogin(): (provider: OAuthProvider, loginHint?: string) => void {
+  return (provider, loginHint) => {
     // eslint-disable-next-line security/detect-object-injection -- `provider` is a closed union of constant map keys
-    window.location.assign(`${API_BASE_URL}${OAUTH_PROVIDERS[provider]}`);
+    const url = new URL(`${API_BASE_URL}${OAUTH_PROVIDERS[provider]}`);
+    if (loginHint) url.searchParams.set("login_hint", loginHint);
+    window.location.assign(url.toString());
   };
 }

@@ -1,23 +1,24 @@
 import { ApiError } from "@studafy/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import { Loading } from "../../components/Loading";
 import { ACTIVATION_EVENTS, track } from "../../lib/analytics";
 import { api } from "../../lib/api";
-import { API_BASE_URL } from "../../lib/config";
+import { API_BASE_URL, SHOW_MOCK_LOGIN } from "../../lib/config";
 
 import { InvitationOutcome } from "./InvitationOutcome";
 
 import type { InvitationOutcomeProps } from "./InvitationOutcome";
 
 /** The OAuth providers the invitation activation flow offers. Mirrors `activation-oauth-routes.ts`. */
-export type InvitationOAuthProvider = "google" | "microsoft";
+export type InvitationOAuthProvider = "google" | "microsoft" | "mock";
 
 const PROVIDER_LABELS: Record<InvitationOAuthProvider, string> = {
   google: "Continue with Google",
   microsoft: "Continue with Microsoft",
+  mock: "Continue with Mock",
 };
 
 /**
@@ -25,9 +26,21 @@ const PROVIDER_LABELS: Record<InvitationOAuthProvider, string> = {
  * (`GET /api/auth/invitations/{token}/oauth/{provider}/start`, see `activation-oauth-routes.ts`).
  * A plain full-page navigation, not a fetch call — the provider round trip needs the whole browser,
  * and the API sets the session cookie on the redirect back, which no XHR/fetch response can do.
+ *
+ * `loginHint` is meaningful only for "mock" — it picks which email the mock IdP signs the token
+ * for, which must be the invitation's own target email for activation to succeed (a mismatch is the
+ * `REQUIRES_ADMIN_APPROVAL` branch, same as a real provider signing in as the wrong account).
  */
-export function activationOAuthStartUrl(token: string, provider: InvitationOAuthProvider): string {
-  return `${API_BASE_URL}/api/auth/invitations/${encodeURIComponent(token)}/oauth/${provider}/start`;
+export function activationOAuthStartUrl(
+  token: string,
+  provider: InvitationOAuthProvider,
+  loginHint?: string,
+): string {
+  const url = new URL(
+    `${API_BASE_URL}/api/auth/invitations/${encodeURIComponent(token)}/oauth/${provider}/start`,
+  );
+  if (provider === "mock" && loginHint) url.searchParams.set("login_hint", loginHint);
+  return url.toString();
 }
 
 /**
@@ -98,6 +111,7 @@ const GENERIC_FAILURE: Omit<InvitationOutcomeProps, "requestId"> = {
  */
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
+  const [searchParams] = useSearchParams();
 
   const { data, error, isPending } = useQuery({
     queryKey: ["invitation-verify", token],
@@ -161,6 +175,20 @@ export default function InvitePage() {
           {PROVIDER_LABELS.microsoft}
         </a>
       </p>
+      {SHOW_MOCK_LOGIN && (
+        <p>
+          <a
+            href={activationOAuthStartUrl(
+              token,
+              "mock",
+              searchParams.get("login_hint") ?? undefined,
+            )}
+            onClick={() => track(ACTIVATION_EVENTS.OAUTH_STARTED, { provider: "mock" })}
+          >
+            {PROVIDER_LABELS.mock}
+          </a>
+        </p>
+      )}
     </>
   );
 }

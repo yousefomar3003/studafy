@@ -12,6 +12,8 @@
     "test": "bun test src",
     "e2e": "playwright test",
     "e2e:a11y": "playwright test --config=playwright.a11y.config.ts",
+    "e2e:critical": "playwright test --config=playwright.critical.config.ts",
+    "e2e:critical:flake-check": "bun e2e/critical/support/check-flake-rate.ts",
     "i18n:pseudo": "bun src/lib/i18n/locales/generate-pseudo-locale.ts"
   },
   "dependencies": {
