@@ -905,5 +905,51 @@
         }
       }
     }
+  },
+  "viewer": {
+    "admin": {
+      "attendance": {
+        "title": "Attendance this term",
+        "empty": "No attendance recorded yet this term.",
+        "error": "Couldn't load attendance.",
+        "summary": "{present} present of {total} records"
+      },
+      "discipline": {
+        "title": "Open discipline incidents",
+        "empty": "No open incidents.",
+        "error": "Couldn't load discipline incidents.",
+        "count": "{count} incidents need attention"
+      },
+      "evaluations": {
+        "title": "Draft evaluations",
+        "empty": "No evaluations in progress.",
+        "error": "Couldn't load evaluations.",
+        "count": "{count} awaiting scoring, submission, or sharing"
+      },
+      "announcements": {
+        "title": "Recent announcements",
+        "empty": "No announcements published yet.",
+        "error": "Couldn't load announcements."
+      }
+    },
+    "finance": {
+      "payments": {
+        "title": "Recent payments",
+        "empty": "No payments recorded yet.",
+        "error": "Couldn't load recent payments.",
+        "mode": {
+          "cash": "Cash",
+          "bankTransfer": "Bank transfer",
+          "cardExternal": "Card (external)",
+          "unknown": "Unknown mode"
+        },
+        "status": {
+          "pending": "Pending",
+          "confirmed": "Confirmed",
+          "failed": "Failed",
+          "unknown": "Unknown"
+        }
+      }
+    }
   }
 }
