@@ -28,6 +28,13 @@ abstract final class RoutePaths {
   /// the AI hub.
   static const aiUsage = '/me/ai/usage';
 
+  /// The signed-in parent's attendance-alert center (opened on its Alerts tab). Not one of the
+  /// server-templated deep links below — an `ATTENDANCE_ALERT` push carries no resolvable route
+  /// of its own yet (its template is the course-scoped `/courses/{courseId}/attendance`, but the
+  /// alert's metadata carries a student id, not a course id), so [PushService] routes that
+  /// notification type here directly instead of reading `route` off the payload.
+  static const parentAlerts = '/parent/alerts';
+
   // Notification deep-link destinations.
   // Paths match the route templates in packages/notification-templates/src/registry.ts.
   static const grades = '/courses/:courseId/grades';

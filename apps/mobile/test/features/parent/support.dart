@@ -9,7 +9,9 @@ import 'package:studafy_mobile/src/core/api/generated/models/family.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/family_list.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/notification.dart' as api_models;
 import 'package:studafy_mobile/src/core/api/generated/models/notification_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/notification_preferences.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/term.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/update_notification_preferences_request.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/unread_count.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/unread_only.dart';
 import 'package:studafy_mobile/src/core/api/generated/notifications/notifications_client.dart';
@@ -235,6 +237,7 @@ api_models.Notification notificationFixture({
   required String id,
   String title = 'Grade posted',
   String body = 'A new grade is available.',
+  String notificationType = 'GRADE_POSTED',
   DateTime? createdAt,
   DateTime? readAt,
 }) {
@@ -243,7 +246,7 @@ api_models.Notification notificationFixture({
     'id': id,
     'school_id': 'school-1',
     'user_id': 'parent-1',
-    'notification_type': 'GRADE_POSTED',
+    'notification_type': notificationType,
     'title': title,
     'body': body,
     'metadata': <String, Object?>{},
@@ -251,6 +254,13 @@ api_models.Notification notificationFixture({
     'created_at': created.toUtc().toIso8601String(),
     'updated_at': created.toUtc().toIso8601String(),
   });
+}
+
+NotificationPreferences notificationPreferencesFixture({int? attendanceAlertThreshold}) {
+  return NotificationPreferences(
+    preferences: const [],
+    attendanceAlertThreshold: attendanceAlertThreshold,
+  );
 }
 
 Family familyFixture({String id = 'family-1'}) => Family(
@@ -393,10 +403,16 @@ class FakeFamiliesClient extends Fake implements FamiliesClient {
 }
 
 class FakeNotificationsClient extends Fake implements NotificationsClient {
-  FakeNotificationsClient({this.notifications = const []});
+  FakeNotificationsClient({
+    this.notifications = const [],
+    NotificationPreferences? preferences,
+  }) : preferences = preferences ?? notificationPreferencesFixture();
 
   List<api_models.Notification> notifications;
+  NotificationPreferences preferences;
   final List<String> markedRead = [];
+  int? lastThresholdUpdate;
+  bool lastThresholdUpdateCleared = false;
 
   @override
   Future<NotificationList> listNotifications({
@@ -411,6 +427,23 @@ class FakeNotificationsClient extends Fake implements NotificationsClient {
   Future<UnreadCount> markNotificationRead({required String notificationId}) async {
     markedRead.add(notificationId);
     return const UnreadCount(unreadCount: 0);
+  }
+
+  @override
+  Future<NotificationPreferences> getNotificationPreferences() async {
+    return preferences;
+  }
+
+  @override
+  Future<NotificationPreferences> updateNotificationPreferences({
+    required UpdateNotificationPreferencesRequest body,
+  }) async {
+    lastThresholdUpdate = body.attendanceAlertThreshold;
+    lastThresholdUpdateCleared = body.attendanceAlertThreshold == null;
+    preferences = notificationPreferencesFixture(
+      attendanceAlertThreshold: body.attendanceAlertThreshold,
+    );
+    return preferences;
   }
 }
 

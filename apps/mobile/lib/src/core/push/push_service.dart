@@ -8,9 +8,27 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../api/auth_interceptor.dart';
+import '../router/route_paths.dart';
 
 const _androidChannelId = 'studafy_push';
 const _androidChannelName = 'Push Notifications';
+
+/// The route to deep-link to for a tapped notification's FCM `data` payload, or null to navigate
+/// nowhere.
+///
+/// `ATTENDANCE_ALERT` is special-cased ahead of the payload's own `route`: that type's
+/// server-side template is the course-scoped `/courses/{courseId}/attendance`, but an
+/// attendance-alert notification's metadata carries a student id, not a course id, so the
+/// template placeholder is never filled in and `route` arrives empty. `notification_type` itself
+/// is always present (see `buildDataPayload` on the delivery worker), so routing on it directly
+/// reaches the parent's alert center regardless of what `route` says.
+String? resolveNotificationTapRoute(Map<String, dynamic> data) {
+  if (data['notification_type'] == 'ATTENDANCE_ALERT') {
+    return RoutePaths.parentAlerts;
+  }
+  final route = data['route'];
+  return route is String && route.isNotEmpty ? route : null;
+}
 
 /// Wraps Firebase Cloud Messaging: permission, token lifecycle, and API registration.
 ///
@@ -163,8 +181,8 @@ class PushService {
   }
 
   void _handleTap(Map<String, dynamic> data) {
-    final route = data['route'];
-    if (route is String && route.isNotEmpty) {
+    final route = resolveNotificationTapRoute(data);
+    if (route != null) {
       _tapController.add(route);
     }
   }

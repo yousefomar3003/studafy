@@ -9,6 +9,7 @@ import '../../features/ai/presentation/quiz_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
 import '../../features/notifications/presentation/notification_destination_screen.dart';
+import '../../features/parent/presentation/parent_communication_screen.dart';
 import '../../features/student/presentation/assignment_detail_screen.dart';
 import '../../features/student/presentation/grades_screen.dart';
 import '../../features/student/presentation/attendance_screen.dart';
@@ -68,6 +69,13 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
       GoRoute(
         path: RoutePaths.aiUsage,
         builder: (context, state) => const AiUsageScreen(),
+      ),
+
+      // The signed-in parent's attendance-alert center, opened on its Alerts tab. Deep-linked
+      // from an `ATTENDANCE_ALERT` push — see the routing note on `RoutePaths.parentAlerts`.
+      GoRoute(
+        path: RoutePaths.parentAlerts,
+        builder: (context, state) => const ParentCommunicationScreen(initialTabIndex: 1),
       ),
 
       // Notification deep-link destinations. Each maps to the placeholder
