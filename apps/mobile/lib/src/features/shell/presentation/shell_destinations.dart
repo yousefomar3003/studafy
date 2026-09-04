@@ -7,6 +7,7 @@ import '../../student/presentation/timetable_screen.dart';
 import '../../student/presentation/today_screen.dart';
 import '../../teacher/presentation/teacher_class_list_screen.dart';
 import '../../teacher/presentation/teacher_home_screen.dart';
+import '../../viewer/presentation/viewer_home_screen.dart';
 import '../domain/shell_role.dart';
 import 'shell_tab_placeholder.dart';
 
@@ -23,8 +24,9 @@ class ShellDestination {
 /// The bottom navigation destinations for [role]'s shell.
 ///
 /// Every shell gets a Home and a Profile tab; roles with a mobile-relevant collection of
-/// people/courses get one more tab for it. [ShellRole.viewer] gets the minimal two-tab set —
-/// no domain-specific tab — matching its zero-mutation, view-only posture.
+/// people/courses get one more tab for it. [ShellRole.viewer] gets the minimal two-tab set — no
+/// domain-specific tab — matching its zero-mutation, view-only posture; its Home tab still varies
+/// by the session's actual role, via [ViewerHomeScreen].
 ///
 /// [ShellRole.student] alone also gets an AI tab. A parent can buy and manage the same per-student
 /// add-on too (see `apps/web/src/app/routes.tsx`'s `account/ai` route comment); the parent home
@@ -32,11 +34,6 @@ class ShellDestination {
 /// resolves subscribed/unsubscribed/school-inactive from a *student* session, so a parent-facing
 /// AI tab remains future scope for whichever ticket builds it against a parent session.
 List<ShellDestination> shellDestinationsFor(ShellRole role) {
-  const home = ShellDestination(
-    labelKey: 'shell.tabs.home',
-    icon: Icons.home_outlined,
-    body: ShellTabPlaceholder(titleKey: 'shell.tabs.home'),
-  );
   const profile = ShellDestination(
     labelKey: 'shell.tabs.profile',
     icon: Icons.person_outline,
@@ -97,6 +94,13 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
         profile,
       ];
     case ShellRole.viewer:
-      return const [home, profile];
+      return const [
+        ShellDestination(
+          labelKey: 'shell.tabs.home',
+          icon: Icons.home_outlined,
+          body: ViewerHomeScreen(),
+        ),
+        profile,
+      ];
   }
 }
