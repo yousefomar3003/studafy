@@ -436,12 +436,12 @@ class FakeNotificationsClient extends Fake implements NotificationsClient {
 
   @override
   Future<NotificationPreferences> updateNotificationPreferences({
-    required UpdateNotificationPreferencesRequest body,
+    UpdateNotificationPreferencesRequest? body,
   }) async {
-    lastThresholdUpdate = body.attendanceAlertThreshold;
-    lastThresholdUpdateCleared = body.attendanceAlertThreshold == null;
+    lastThresholdUpdate = body?.attendanceAlertThreshold;
+    lastThresholdUpdateCleared = body?.attendanceAlertThreshold == null;
     preferences = notificationPreferencesFixture(
-      attendanceAlertThreshold: body.attendanceAlertThreshold,
+      attendanceAlertThreshold: body?.attendanceAlertThreshold,
     );
     return preferences;
   }
