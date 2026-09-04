@@ -30,6 +30,12 @@ interface ImportMetaEnv {
    * git commit SHA used as the release's immutable image tag. Defaults to "unknown".
    */
   readonly VITE_RELEASE_VERSION?: string;
+  /**
+   * Shows the dev/E2E-only "Continue with Mock" sign-in option even on a production build. Set only
+   * by the critical-journeys E2E suite's web build (playwright.critical.config.ts) — never in a real
+   * deployment. `vite dev` shows the option regardless of this variable — see lib/config.ts.
+   */
+  readonly VITE_ENABLE_MOCK_AUTH?: string;
 }
 
 interface ImportMeta {

@@ -48,8 +48,12 @@ import type { AuthChannel } from "../channels";
 import type { InvitationVerificationState } from "../invitation/verification";
 import type { ErrorCode } from "@studafy/constants";
 
-/** The OAuth providers the activation flow can link. Matches app.oauth_identities.provider. */
-export type ActivationProvider = "microsoft" | "google";
+/**
+ * The OAuth providers the activation flow can link. Matches app.oauth_identities.provider.
+ * "mock" is the dev/E2E-only provider (see oauth/mock-config.ts) — inert in production the same way
+ * the Google and Microsoft OAuth features are inert when unconfigured.
+ */
+export type ActivationProvider = "microsoft" | "google" | "mock";
 
 /** Default provider, retained for backward compatibility with callers that omit it. */
 export const ACTIVATION_PROVIDER: ActivationProvider = "microsoft";

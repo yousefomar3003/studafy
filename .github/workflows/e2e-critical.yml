@@ -1,0 +1,76 @@
+name: E2E critical journeys
+
+# ST-246 acceptance criteria: "all seven journeys green in CI nightly and pre-release." This repo's
+# release process is a manual `workflow_dispatch` (release.yml), not a tag/GitHub-release event, so
+# "pre-release" here is the same trigger — a human runs this before dispatching a release, the same
+# way `workflow_dispatch` lets them run it any other time they want a signal outside the nightly
+# schedule. Never on every pull request: the stack this suite stands up (real Postgres + Redis +
+# apps/api + apps/workers, plus a real ERPNext sandbox call for the invoice→payment journey) is much
+# heavier than `quality`'s per-PR lane, exactly the tradeoff a nightly/pre-release gate is for.
+on:
+  schedule:
+    # 03:00 UTC, after the ERPNext sandbox's own nightly maintenance windows (see
+    # docs/e2e/critical-journeys.md) and outside normal working hours in every timezone this team
+    # spans.
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  critical-journeys:
+    name: critical-journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Matches db/compose.yml's fixed ports and the other database-backed jobs' disposable
+      # credentials (cross-tenant-security, api-integration, database-migrations).
+      POSTGRES_PASSWORD: studafy_ci_only
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: "54329"
+      DATABASE_NAME: postgres
+      DATABASE_USER: studafy_test
+      DATABASE_PASSWORD: studafy_ci_only
+      DATABASE_SSL_MODE: disable
+      DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+      REDIS_URL: redis://127.0.0.1:6390
+      # The one real external dependency this suite does not fake — see the journey catalog
+      # (docs/e2e/critical-journeys.md) for why invoice→payment runs against a genuine sandbox while
+      # AI and Stripe are faked. Configure these as repository secrets before this job's first run;
+      # every other journey runs with no secrets at all.
+      ERPNEXT_API_URL: ${{ secrets.E2E_ERPNEXT_API_URL }}
+      ERPNEXT_API_KEY: ${{ secrets.E2E_ERPNEXT_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Build the workspace packages the API and web app import
+        run: bunx turbo run build --filter=@studafy/api^... --filter=@studafy/web^...
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Run the critical-journeys suite
+        run: bun run e2e:critical
+        working-directory: apps/web
+      - name: Flake-rate gate (<2%, ST-246 AC)
+        if: always()
+        run: bun run e2e:critical:flake-check
+        working-directory: apps/web
+      # ST-246 AC: "failure artifacts (trace/video) retained." Uploaded regardless of outcome so a
+      # flaky-but-passing run's traces are still available to diagnose before it crosses the flake
+      # budget above.
+      - name: Upload traces, videos, and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: critical-journeys-artifacts
+          path: |
+            apps/web/test-results/**
+          if-no-files-found: ignore
+          retention-days: 14
+      # Stand-alone from the suite's own global-teardown.ts (which already tears down the containers
+      # it started): a hard job timeout or a killed runner can skip global-teardown entirely, and a
+      # leftover container must never survive into the next scheduled run on the same runner pool.
+      - name: Stop disposable Postgres + Redis
+        if: always()
+        run: docker compose -f db/compose.yml down

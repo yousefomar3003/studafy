@@ -116,6 +116,12 @@ export const envSchema = z
     MICROSOFT_OAUTH_CLIENT_ID: z.string().min(1).optional(),
     MICROSOFT_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
     MICROSOFT_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // Mock OAuth (OIDC) — dev and E2E only (mock-config.ts, dev/mock-idp.ts). Both optional — the
+    // "mock" login/activation provider activates only when both are set, and the refinement below
+    // additionally refuses to boot at all with either set in a staging/production deployment, so a
+    // misconfiguration is a loud failure to start rather than a quietly-inert route.
+    MOCK_OAUTH_ISSUER_URL: z.string().url().optional(),
+    MOCK_OAUTH_REDIRECT_URI: z.string().url().optional(),
     // Where to redirect after a successful OAuth callback. Not setting it disables the redirect.
     FRONTEND_URL: z.string().url().optional(),
     // Base URL for the pay-online redirect entry point served on outstanding invoices in the family
@@ -240,6 +246,33 @@ export const envSchema = z
         code: "custom",
         path: ["MICROSOFT_OAUTH_CLIENT_ID"],
         message: `All Microsoft OAuth variables must be set together. Missing: ${missing}`,
+      });
+    }
+
+    // Mock OAuth: both must be present or both absent, exactly like Google/Microsoft above.
+    const mockOAuthVars = [env.MOCK_OAUTH_ISSUER_URL, env.MOCK_OAUTH_REDIRECT_URI];
+    const mockOAuthSetCount = mockOAuthVars.filter((v) => v !== undefined).length;
+    if (mockOAuthSetCount > 0 && mockOAuthSetCount < 2) {
+      const missing = [
+        !env.MOCK_OAUTH_ISSUER_URL && "MOCK_OAUTH_ISSUER_URL",
+        !env.MOCK_OAUTH_REDIRECT_URI && "MOCK_OAUTH_REDIRECT_URI",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      context.addIssue({
+        code: "custom",
+        path: ["MOCK_OAUTH_ISSUER_URL"],
+        message: `Both mock OAuth variables must be set together. Missing: ${missing}`,
+      });
+    }
+    // A misconfigured mock provider must fail loud, not fail inert: mock-config.ts already refuses
+    // to activate outside dev/test on its own, but a deploy that somehow set these in staging or
+    // production should never boot at all rather than silently carry a dead route.
+    if (mockOAuthSetCount > 0 && (env.NODE_ENV === "production" || env.APP_ENV === "production")) {
+      context.addIssue({
+        code: "custom",
+        path: ["MOCK_OAUTH_ISSUER_URL"],
+        message: "Mock OAuth variables must not be set when NODE_ENV or APP_ENV is production",
       });
     }
 

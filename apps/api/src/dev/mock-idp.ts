@@ -20,6 +20,7 @@ interface StoredCode {
   subject: string;
   claims: Record<string, unknown>;
   redirectUri: string;
+  nonce: string | null;
   createdAt: number;
 }
 
@@ -47,7 +48,7 @@ const SIGNING_ALG = "RS256";
  * screen) and redirects back. The token endpoint exchanges the code for a
  * signed JWT. No external state is required — the IdP is fully offline.
  *
- * Mount this Hono app at a path prefix (e.g. `app.route("/", mockIdp(...))`)
+ * Mount this Hono app at a path prefix (e.g. `app.route("/mock-idp", mockIdp(...))`)
  * or run it as a standalone server via `Bun.serve`.
  */
 export function createMockIdp(options: MockIdpOptions): OpenAPIHono {
@@ -99,6 +100,9 @@ export function createMockIdp(options: MockIdpOptions): OpenAPIHono {
   // redirects to redirect_uri with ?code=...&state=...
   //
   // login_hint: selects the subject. Falls back to defaultSubject.
+  // nonce: echoed back as a `nonce` claim on the issued JWT (below) so a caller that verifies OIDC
+  // nonce binding end-to-end — the same check real providers require — has something real to check
+  // against, rather than a fixture that silently can't support it.
   // -----------------------------------------------------------------------
 
   app.get("/authorize", async (c) => {
@@ -111,10 +115,11 @@ export function createMockIdp(options: MockIdpOptions): OpenAPIHono {
 
     const state = c.req.query("state") ?? "";
     const subject = c.req.query("login_hint") ?? options.defaultSubject ?? "mock@test.test";
+    const nonce = c.req.query("nonce") ?? null;
     const claims = { ...options.defaultClaims };
 
     const code = randomUUID();
-    codes.set(code, { subject, claims, redirectUri, createdAt: Date.now() });
+    codes.set(code, { subject, claims, redirectUri, nonce, createdAt: Date.now() });
 
     const url = new URL(redirectUri);
     url.searchParams.set("code", code);
@@ -154,8 +159,9 @@ export function createMockIdp(options: MockIdpOptions): OpenAPIHono {
     codes.delete(code);
 
     const now = Math.floor(Date.now() / 1000);
-    const accessToken = await new SignJWT({
+    const jwt = new SignJWT({
       sub: stored.subject,
+      ...(stored.nonce ? { nonce: stored.nonce } : {}),
       ...stored.claims,
     })
       .setProtectedHeader({ alg: SIGNING_ALG, kid })
@@ -164,8 +170,8 @@ export function createMockIdp(options: MockIdpOptions): OpenAPIHono {
       .setIssuedAt(now)
       .setExpirationTime("1h")
       .setNotBefore(now)
-      .setJti(randomUUID())
-      .sign(keyPair!.privateKey);
+      .setJti(randomUUID());
+    const accessToken = await jwt.sign(keyPair!.privateKey);
 
     return c.json({
       access_token: accessToken,
@@ -195,4 +201,34 @@ export function createMockIdp(options: MockIdpOptions): OpenAPIHono {
   });
 
   return app;
+}
+
+// ---------------------------------------------------------------------------
+// Environment gate
+// ---------------------------------------------------------------------------
+
+/**
+ * True when the mock IdP may be mounted. Disabled in staging and production
+ * builds so the mock is unreachable outside dev/test environments.
+ */
+export function isMockIdpEnabled(
+  env: { NODE_ENV?: string; APP_ENV?: string } = process.env,
+): boolean {
+  return env.NODE_ENV !== "production" && env.APP_ENV !== "production";
+}
+
+/**
+ * Create the mock IdP if the environment allows it, or return null.
+ *
+ * @example
+ * ```typescript
+ * const idp = createMockIdpIfEnabled({ issuer: "http://localhost:4000/mock-idp" });
+ * if (idp) app.route("/mock-idp", idp);
+ * ```
+ */
+export function createMockIdpIfEnabled(
+  options: MockIdpOptions,
+  env: { NODE_ENV?: string; APP_ENV?: string } = process.env,
+): OpenAPIHono | null {
+  return isMockIdpEnabled(env) ? createMockIdp(options) : null;
 }

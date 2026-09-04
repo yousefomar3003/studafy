@@ -74,6 +74,7 @@ import {
   microsoftOAuthRoutes,
   mobileActivationOAuthRoutes,
   mobileOAuthRoutes,
+  mockOAuthRoutes,
   providerLinkRoutes,
   returningUserLoginRoutes,
   sessionRoutes,
@@ -512,6 +513,29 @@ export function createApp({
     app.route(
       "/",
       microsoftOAuthRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        logger,
+      ),
+    );
+  }
+
+  // Mock OAuth (dev/E2E only). Same database and key store requirements as Google/Microsoft above.
+  // Inert by default: getMockOAuthConfig() (mock-config.ts) is null unless MOCK_OAUTH_ISSUER_URL /
+  // MOCK_OAUTH_REDIRECT_URI are both set AND the environment is non-production, so mounting this
+  // unconditionally is the same posture Google and Microsoft already take when their own env vars
+  // are absent — a route that 404s per request, not one whose presence depends on a deployment. Also
+  // mounts the mock IdP itself at /mock-idp on this same app — see mock-route.ts's own comment.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      mockOAuthRoutes(
         database,
         {
           keyStore,
