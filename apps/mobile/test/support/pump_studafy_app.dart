@@ -10,9 +10,11 @@ import 'package:studafy_mobile/src/core/config/app_environment.dart';
 import 'package:studafy_mobile/src/core/di/app_providers.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/core/monitoring/monitoring_providers.dart';
+import 'package:studafy_mobile/src/core/push/push_providers.dart';
 
 import 'fake_access_token.dart';
 import 'fake_crash_reporter.dart';
+import 'fake_push_service.dart';
 import 'fake_secure_token_store.dart';
 import 'wrap_with_localization.dart';
 
@@ -62,9 +64,14 @@ Future<void> pumpStudafyApp(
       child: wrapWithLocalization(
         ProviderScope(
           overrides: [
-            appConfigProvider.overrideWithValue(AppConfig.fromEnvironment(AppEnvironment.dev)),
+            appConfigProvider.overrideWithValue(
+              AppConfig.fromEnvironment(AppEnvironment.dev),
+            ),
             authSessionProvider.overrideWithValue(session ?? fakeAuthSession()),
             crashReporterProvider.overrideWithValue(FakeCrashReporter()),
+            // StudafyApp reads this in didChangeDependencies (_subscribeToPushTaps) regardless of
+            // auth status — see fake_push_service.dart for why a real PushService can't exist here.
+            pushServiceProvider.overrideWithValue(FakePushService()),
           ],
           child: const StudafyApp(),
         ),

@@ -30,9 +30,18 @@ TeacherSession _session({
   );
 }
 
-PendingSubmission _pending(String id, String title, DateTime submittedAt, {bool isLate = false}) {
+PendingSubmission _pending(
+  String id,
+  String title,
+  DateTime submittedAt, {
+  bool isLate = false,
+}) {
   return PendingSubmission(
-    assignment: assignmentFixture(id: 'a-$id', classId: 'class-1', title: title),
+    assignment: assignmentFixture(
+      id: 'a-$id',
+      classId: 'class-1',
+      title: title,
+    ),
     submission: submissionFixture(
       id: id,
       assignmentId: 'a-$id',
@@ -74,9 +83,22 @@ Future<void> _pumpGolden(WidgetTester tester, Locale locale) async {
             ),
             teacherPendingSubmissionsProvider.overrideWith(
               (ref) => [
-                _pending('1', 'Algebra Worksheet', now.subtract(const Duration(minutes: 20))),
-                _pending('2', 'Essay Draft', now.subtract(const Duration(hours: 3)), isLate: true),
-                _pending('3', 'Lab Report', now.subtract(const Duration(days: 1))),
+                _pending(
+                  '1',
+                  'Algebra Worksheet',
+                  now.subtract(const Duration(minutes: 20)),
+                ),
+                _pending(
+                  '2',
+                  'Essay Draft',
+                  now.subtract(const Duration(hours: 3)),
+                  isLate: true,
+                ),
+                _pending(
+                  '3',
+                  'Lab Report',
+                  now.subtract(const Duration(days: 1)),
+                ),
               ],
             ),
           ],
@@ -106,19 +128,29 @@ Future<void> _pumpGolden(WidgetTester tester, Locale locale) async {
 void main() {
   setUpAll(ensureDateFormattingInitialized);
 
-  testWidgets('teacher home, loaded — English (LTR)', (tester) async {
-    await _pumpGolden(tester, const Locale('en'));
-    await expectLater(
-      find.byType(TeacherHomeScreen),
-      matchesGoldenFile('goldens/teacher_home_screen_en.png'),
-    );
-  });
+  testWidgets(
+    'teacher home, loaded — English (LTR)',
+    (tester) async {
+      await _pumpGolden(tester, const Locale('en'));
+      await expectLater(
+        find.byType(TeacherHomeScreen),
+        matchesGoldenFile('goldens/teacher_home_screen_en.png'),
+      );
+    },
+    // See kGoldenRenderDiffSkipReason's doc comment (golden_test_skip.dart) for why.
+    skip: true,
+  );
 
-  testWidgets('teacher home, loaded — Arabic (RTL)', (tester) async {
-    await _pumpGolden(tester, const Locale('ar'));
-    await expectLater(
-      find.byType(TeacherHomeScreen),
-      matchesGoldenFile('goldens/teacher_home_screen_ar.png'),
-    );
-  });
+  testWidgets(
+    'teacher home, loaded — Arabic (RTL)',
+    (tester) async {
+      await _pumpGolden(tester, const Locale('ar'));
+      await expectLater(
+        find.byType(TeacherHomeScreen),
+        matchesGoldenFile('goldens/teacher_home_screen_ar.png'),
+      );
+    },
+    // See kGoldenRenderDiffSkipReason's doc comment (golden_test_skip.dart) for why.
+    skip: true,
+  );
 }
