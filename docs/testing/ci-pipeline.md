@@ -87,7 +87,11 @@ sub-second or are correctness gates that must hold regardless of which files cha
   `coverage/**` as an output so a cache hit restores the lcov file instead of leaving it stale.
   Uploaded as the `coverage-report` artifact (`apps/*/coverage/lcov.info`,
   `packages/*/coverage/lcov.info`). No coverage _gate_ (minimum threshold) exists yet for JS/TS —
-  only the mobile suite has one (ST-245).
+  only the mobile suite has one (ST-245). Known cosmetic side effect: because `test`'s `outputs`
+  is now non-empty, a plain `turbo run test` (no `--coverage`, as `ci:local` and every other job
+  that runs the test task does) prints a `no output files found for task X#test` warning per
+  package — expected, since that invocation genuinely writes no `coverage/`, and harmless (it's a
+  warning, not a failure).
 - **Flutter (`mobile-unit-coverage`):** `flutter test --coverage` → `dart run
 scripts/check_coverage.dart` (the actual gate) → uploaded as the `mobile-coverage-report`
   artifact.
