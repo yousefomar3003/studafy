@@ -294,13 +294,20 @@ jobs:
       # apps/mobile's own "lint"/"check-types" scripts are no-ops in the turbo pipeline (see their
       # package.json) because the generated client above must exist first -- this is that check,
       # run directly rather than through turbo.
+      #
+      # continue-on-error, not a hard stop, for the same reason the test step below is: analyze
+      # and test are independent checks, and an analyze failure shouldn't skip the test run (and
+      # then the coverage-upload step below it) and report a confusing second failure on top of
+      # the real one. "Fail on analyze errors" at the end still turns the job red.
       - name: flutter analyze
+        id: analyze
+        continue-on-error: true
         run: flutter analyze
         working-directory: apps/mobile
       # continue-on-error, not a hard stop: a failing test still exercises the lines it reaches
-      # before failing, and the coverage gate below needs that lcov.info regardless. The "Fail on
-      # any failing test" step at the end still turns this job red when tests fail -- this just
-      # keeps the coverage report (and its artifact) from being skipped along with it.
+      # before failing, and the coverage gate below needs that lcov.info regardless. "Fail on any
+      # failing test" at the end still turns this job red when tests fail -- this just keeps the
+      # coverage report (and its artifact) from being skipped along with it.
       - name: Run unit and widget tests with coverage
         id: test
         continue-on-error: true
@@ -318,6 +325,11 @@ jobs:
             apps/mobile/coverage/lcov.info
             apps/mobile/coverage/coverage-report.md
           if-no-files-found: error
+      - name: Fail on analyze errors
+        if: steps.analyze.outcome == 'failure'
+        run: |
+          echo '::error::flutter analyze reported issues -- see the "flutter analyze" step above.'
+          exit 1
       - name: Fail on any failing test
         if: steps.test.outcome == 'failure'
         run: |
@@ -327,14 +339,14 @@ jobs:
   security-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       # Pinned to match the trivy-action/trivy versions containers.yml and terraform.yml already
       # use -- .trivyignore's header documents this pin as the project's trivy baseline; running
       # an unpinned `@master` here (as this job used to) drifts from that baseline on trivy's own
       # schedule, not the codebase's.
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.72.0
           scan-type: fs
@@ -344,6 +356,12 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
           trivyignores: .trivyignore
+          # node_modules/build output aren't source; walking them (node_modules alone is ~1100
+          # packages here) is why this job first failed with a context-deadline timeout rather
+          # than a real finding. .claude/.opencode/.serena/.sisyphus are local agent-tool state,
+          # not part of the codebase either.
+          skip-dirs: "**/node_modules,.git,**/.turbo,**/dist,**/build,graphify-out,.claude,.opencode,.serena,.sisyphus"
+          timeout: 10m0s
         env:
           TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
           TRIVY_JAVA_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-java-db:1
@@ -351,7 +369,7 @@ jobs:
       # no meaning on a push -- unlike the trivy scan above, which scans the full tree either way.
       - name: Review dependency changes for new vulnerabilities/licenses
         if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: high
 
@@ -366,17 +384,34 @@ jobs:
     container:
       image: semgrep/semgrep:1.176.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Full history: --baseline-commit below needs the base/pre-push commit present locally.
+          fetch-depth: 0
+      # Without this, git refuses to run inside a directory it doesn't consider "safe" when the
+      # checkout is owned by a different uid than the container runs as -- the semgrep image's
+      # default user isn't the runner's, unlike the ubuntu-latest-run jobs elsewhere in this file.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       # p/ci is Semgrep's own recommended default ruleset for CI: OWASP Top 10 coverage across
       # this repo's languages (TS/JS, Dart) without the noisier experimental rulesets. `--error`
       # is what turns findings into a non-zero exit; without it `semgrep scan` always exits 0.
+      #
+      # --baseline-commit scopes the scan to what this PR/push actually changed -- without it,
+      # every PR is gated on this repo's entire pre-existing p/ci backlog (unpinned Action tags,
+      # a couple of bunfig.toml settings, etc.), not just what it touched. Falls back to scanning
+      # everything when resolve-base-sha.sh can't find a usable base (e.g. a branch's first push).
       - name: Run Semgrep SAST
-        run: semgrep scan --config p/ci --sarif --output semgrep.sarif --error
+        run: |
+          base="$(bash .github/scripts/resolve-base-sha.sh)"
+          semgrep scan --config p/ci --sarif --output semgrep.sarif --error ${base:+--baseline-commit="$base"}
         env:
           SEMGREP_SEND_METRICS: "off"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
       - name: Upload SARIF to code scanning
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         with:
           sarif_file: semgrep.sarif
 
@@ -394,7 +429,7 @@ jobs:
       # this just carries yesterday's task outputs into today's job so unaffected packages replay
       # instead of recomputing.
       - name: Restore Turbo task cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .turbo/cache
           key: turbo-quality-${{ runner.os }}-${{ github.sha }}
@@ -427,7 +462,7 @@ jobs:
             --continue=dependencies-successful -- --coverage --coverage-reporter=lcov
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-report
           path: |

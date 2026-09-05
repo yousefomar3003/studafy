@@ -8,3 +8,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # A newly published release/tag can be malicious or unstable (the same supply-chain risk the
+    # SHA-pinning in ci.yml defends against); waiting a week before proposing it gives a compromised
+    # release time to be caught and yanked upstream.
+    cooldown:
+      default-days: 7
