@@ -111,7 +111,15 @@ export function childComparisonRoutes(
   const databases: DatabasePools = { primary, readReplica };
 
   routes.use(comparisonRoute.path, requirePermission(PERMISSIONS.GRADE_READ));
-  routes.use(breakdownRoute.path, requirePermission(PERMISSIONS.GRADE_READ));
+  // ST-249: not `breakdownRoute.path` — that's the OpenAPI-style "{studentId}" form `createRoute`
+  // needs, but Hono's own `.use()` router only matches its own ":studentId" param syntax. The two
+  // look interchangeable but the OpenAPI form silently never matches a real request here, which
+  // left this route's grade:read gate dead (the inline PARENT-role check below was the only thing
+  // actually enforcing anything).
+  routes.use(
+    "/api/reports/children/:studentId/breakdown",
+    requirePermission(PERMISSIONS.GRADE_READ),
+  );
 
   routes.openapi(comparisonRoute, async (c) => {
     const auth = requireAuth(c);

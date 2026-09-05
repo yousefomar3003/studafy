@@ -181,17 +181,21 @@ export function scholarshipDiscountRoutes(
 
   routes.use("/api/finance/scholarship-discounts/awards", auditAction("insert", "award_cache"));
   routes.use(
-    "/api/finance/scholarship-discounts/awards/{awardId}/confirm",
+    "/api/finance/scholarship-discounts/awards/:awardId/confirm",
     auditAction("update", "award_cache"),
   );
 
-  routes.use("/api/finance/scholarship-discounts*", requirePermission(PERMISSIONS.BILLING_READ));
+  // ST-249: the `/*` slash matters — Hono's `.use()` only propagates a glued "prefix*" pattern
+  // through `app.route()` composition when the app is invoked directly, not once mounted into the
+  // parent app the way every module here actually is; "prefix*" silently never matches a mounted
+  // request, and the guard below would never run. "prefix/*" does not have this gap.
+  routes.use("/api/finance/scholarship-discounts/*", requirePermission(PERMISSIONS.BILLING_READ));
   routes.use(
     "/api/finance/scholarship-discounts/awards",
     requirePermission(PERMISSIONS.BILLING_UPDATE),
   );
   routes.use(
-    "/api/finance/scholarship-discounts/awards/{awardId}/confirm",
+    "/api/finance/scholarship-discounts/awards/:awardId/confirm",
     requirePermission(PERMISSIONS.BILLING_UPDATE),
   );
 

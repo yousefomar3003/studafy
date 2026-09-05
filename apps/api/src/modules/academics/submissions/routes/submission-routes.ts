@@ -385,18 +385,18 @@ export function submissionRoutes(
   // Permission gates, per method. Teachers hold submission:read but not submission:create, and
   // students the reverse, so a path-wide gate on either would be wrong in one direction.
   routes.use(
-    "/api/academics/assignments/{assignmentId}/submissions",
+    "/api/academics/assignments/:assignmentId/submissions",
     permissionByMethod([
       ["GET", PERMISSIONS.SUBMISSION_READ],
       ["POST", PERMISSIONS.SUBMISSION_CREATE],
     ]),
   );
   routes.use(
-    "/api/academics/submissions/{submissionId}",
+    "/api/academics/submissions/:submissionId",
     permissionByMethod([["GET", PERMISSIONS.SUBMISSION_READ]]),
   );
   routes.use(
-    "/api/academics/submissions/{submissionId}/grade",
+    "/api/academics/submissions/:submissionId/grade",
     permissionByMethod([["PATCH", PERMISSIONS.SUBMISSION_GRADE]]),
   );
   // submission:update rather than a permission of its own, and the choice does real work: only
@@ -404,38 +404,38 @@ export function submissionRoutes(
   // right -- a submission attachment is the student's evidence and a teacher must not be able to
   // add to it or remove from it. The service asserts ownership as the second half of the same rule.
   routes.use(
-    "/api/academics/submissions/{submissionId}/attachments/upload-url",
+    "/api/academics/submissions/:submissionId/attachments/upload-url",
     permissionByMethod([["POST", PERMISSIONS.SUBMISSION_UPDATE]]),
   );
   routes.use(
-    "/api/academics/submissions/{submissionId}/attachments",
+    "/api/academics/submissions/:submissionId/attachments",
     permissionByMethod([["POST", PERMISSIONS.SUBMISSION_UPDATE]]),
   );
   routes.use(
-    "/api/academics/submissions/{submissionId}/attachments/{attachmentId}",
+    "/api/academics/submissions/:submissionId/attachments/:attachmentId",
     permissionByMethod([["DELETE", PERMISSIONS.SUBMISSION_UPDATE]]),
   );
 
   // Audit declarations. Read by the CI coverage gate (tests/audit-coverage.test.ts); the actual
   // rows are written inside each service transaction by emitAuditLog.
   routes.use(
-    "/api/academics/assignments/{assignmentId}/submissions",
+    "/api/academics/assignments/:assignmentId/submissions",
     auditAction("insert", "assignment_submissions"),
   );
   routes.use(
-    "/api/academics/submissions/{submissionId}/grade",
+    "/api/academics/submissions/:submissionId/grade",
     auditAction("update", "assignment_submissions"),
   );
   routes.use(
-    "/api/academics/submissions/{submissionId}/attachments/upload-url",
+    "/api/academics/submissions/:submissionId/attachments/upload-url",
     auditAction("update", "assignment_submissions"),
   );
   routes.use(
-    "/api/academics/submissions/{submissionId}/attachments",
+    "/api/academics/submissions/:submissionId/attachments",
     auditAction("insert", "submission_attachments"),
   );
   routes.use(
-    "/api/academics/submissions/{submissionId}/attachments/{attachmentId}",
+    "/api/academics/submissions/:submissionId/attachments/:attachmentId",
     auditAction("delete", "submission_attachments"),
   );
 

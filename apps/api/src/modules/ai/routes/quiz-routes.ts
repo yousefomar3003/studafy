@@ -342,9 +342,9 @@ export function aiQuizRoutes(deps: {
   // its audit intent. Generation's writes are app.quizzes, app.quiz_questions, and the durable usage
   // meter. Grading writes nothing -- it reads the persisted answer key and scores in memory -- so
   // "read" is the accurate declaration rather than borrowing a write verb that did not happen.
-  routes.use("/api/ai/students/{studentId}/quizzes", auditAction("insert", "quiz_questions"));
+  routes.use("/api/ai/students/:studentId/quizzes", auditAction("insert", "quiz_questions"));
   routes.use(
-    "/api/ai/students/{studentId}/quizzes/{quizId}/grade",
+    "/api/ai/students/:studentId/quizzes/:quizId/grade",
     auditAction("read", "quiz_questions"),
   );
 

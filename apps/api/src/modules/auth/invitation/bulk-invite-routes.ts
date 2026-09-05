@@ -210,7 +210,7 @@ export function bulkInviteRoutes(
 
   // Audit declarations.
   routes.use("/api/invitations/bulk", auditAction("insert", "bulk_invites"));
-  routes.use("/api/invitations/bulk/{bulkInviteId}/retry", auditAction("update", "bulk_invites"));
+  routes.use("/api/invitations/bulk/:bulkInviteId/retry", auditAction("update", "bulk_invites"));
 
   // --- Handlers ---
 

@@ -433,6 +433,25 @@ jobs:
         with:
           sarif_file: semgrep.sarif
 
+  # ST-249: `secret-scan` above is trivy in `fs` mode — it only ever looks at the working tree at
+  # HEAD, so a secret committed and later deleted (in the same PR or in history already on `dev`)
+  # is invisible to it. gitleaks walks every commit's diff instead, which is what an actual
+  # "secrets scan history" pass needs; `.gitleaks.toml` allowlists the six commits already audited
+  # as synthetic test fixtures (ST-249's security pass report has the detail).
+  secret-scan-history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Pinned to a commit SHA, not the mutable `v2` tag: this repo's SAST job (ST-251) flags any
+      # third-party action reference that isn't (a floating tag can be silently repointed by the
+      # action owner). ff98106 is v2.3.9, the newest v2 release as of this writing.
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
   quality:
     runs-on: ubuntu-latest
     steps:

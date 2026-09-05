@@ -90,7 +90,7 @@ export function emailVerificationRoutes(
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  routes.use("/api/schools/verify-email/{token}", auditAction("update", "schools"));
+  routes.use("/api/schools/verify-email/:token", auditAction("update", "schools"));
   routes.use("/api/schools/resend-verification", auditAction("update", "schools"));
 
   routes.openapi(verifyEmailRoute, async (c) => {

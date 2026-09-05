@@ -272,26 +272,26 @@ export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
   // --- Channel guard: mutations restricted to web sessions ---
   const channelGuard = requireChannel(AUTH_CHANNELS.WEB);
   routes.use("/api/students", channelGuard);
-  routes.use("/api/students/{studentId}", channelGuard);
+  routes.use("/api/students/:studentId", channelGuard);
 
   // --- Permission guards ---
   routes.use("/api/students", requirePermission(PERMISSIONS.STUDENT_READ));
   routes.use("/api/students", requirePermission(PERMISSIONS.STUDENT_CREATE));
-  routes.use("/api/students/{studentId}", requirePermission(PERMISSIONS.STUDENT_READ));
-  routes.use("/api/students/{studentId}", requirePermission(PERMISSIONS.STUDENT_UPDATE));
-  routes.use("/api/students/{studentId}/guardians", requirePermission(PERMISSIONS.STUDENT_READ));
-  routes.use("/api/students/{studentId}/guardians", requirePermission(PERMISSIONS.STUDENT_UPDATE));
+  routes.use("/api/students/:studentId", requirePermission(PERMISSIONS.STUDENT_READ));
+  routes.use("/api/students/:studentId", requirePermission(PERMISSIONS.STUDENT_UPDATE));
+  routes.use("/api/students/:studentId/guardians", requirePermission(PERMISSIONS.STUDENT_READ));
+  routes.use("/api/students/:studentId/guardians", requirePermission(PERMISSIONS.STUDENT_UPDATE));
   routes.use(
-    "/api/students/{studentId}/guardians/{userId}",
+    "/api/students/:studentId/guardians/:userId",
     requirePermission(PERMISSIONS.STUDENT_UPDATE),
   );
 
   // --- Audit declarations ---
   routes.use("/api/students", auditAction("insert", "students"));
-  routes.use("/api/students/{studentId}", auditAction("update", "students"));
-  routes.use("/api/students/{studentId}/guardians", auditAction("insert", "parent_child_links"));
+  routes.use("/api/students/:studentId", auditAction("update", "students"));
+  routes.use("/api/students/:studentId/guardians", auditAction("insert", "parent_child_links"));
   routes.use(
-    "/api/students/{studentId}/guardians/{userId}",
+    "/api/students/:studentId/guardians/:userId",
     auditAction("delete", "parent_child_links"),
   );
 

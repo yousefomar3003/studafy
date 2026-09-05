@@ -387,9 +387,9 @@ export function aiFlashcardRoutes(deps: {
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to declare
   // its audit intent. Generation's writes are app.flashcard_decks, app.flashcards, and the durable
   // usage meter. Review submission's one write is the student's per-card SM-2 progress row.
-  routes.use("/api/ai/students/{studentId}/decks", auditAction("insert", "flashcards"));
+  routes.use("/api/ai/students/:studentId/decks", auditAction("insert", "flashcards"));
   routes.use(
-    "/api/ai/students/{studentId}/decks/{deckId}/review",
+    "/api/ai/students/:studentId/decks/:deckId/review",
     auditAction("update", "flashcard_reviews"),
   );
 

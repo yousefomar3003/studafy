@@ -212,16 +212,16 @@ export function financeReportRoutes(
     routes.use(path, requirePermission(PERMISSIONS.REPORT_VIEW_FINANCIAL));
   }
   routes.use(
-    "/api/finance/reports/joinvoice/{invoiceId}",
+    "/api/finance/reports/joinvoice/:invoiceId",
     requirePermission(PERMISSIONS.REPORT_VIEW_FINANCIAL),
   );
   routes.use(
-    "/api/finance/reports/joinvoice/{invoiceId}",
+    "/api/finance/reports/joinvoice/:invoiceId",
     requirePermission(PERMISSIONS.BILLING_VIEW_INVOICES),
   );
   routes.use("/api/finance/reports/export", requirePermission(PERMISSIONS.REPORT_EXPORT));
   routes.use("/api/finance/reports/export", requirePermission(PERMISSIONS.REPORT_VIEW_FINANCIAL));
-  routes.use("/api/finance/reports/export/{jobId}", requirePermission(PERMISSIONS.REPORT_EXPORT));
+  routes.use("/api/finance/reports/export/:jobId", requirePermission(PERMISSIONS.REPORT_EXPORT));
   routes.use("/api/finance/reports/export", auditAction("insert", "finance_report_jobs"));
 
   routes.openapi(arAgingRoute, async (c) => {

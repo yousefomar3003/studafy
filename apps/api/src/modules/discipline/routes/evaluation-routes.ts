@@ -387,33 +387,30 @@ export function evaluationRoutes(database: Database): OpenAPIHono<AppEnv> {
   // Audit middleware
   routes.use("/api/evaluations/templates", auditAction("insert", "evaluation_criteria_templates"));
   routes.use(
-    "/api/evaluations/templates/{templateId}",
+    "/api/evaluations/templates/:templateId",
     auditAction("update", "evaluation_criteria_templates"),
   );
   routes.use("/api/evaluations", auditAction("insert", "teacher_evaluations"));
-  routes.use("/api/evaluations/{evaluationId}", auditAction("update", "teacher_evaluations"));
+  routes.use("/api/evaluations/:evaluationId", auditAction("update", "teacher_evaluations"));
+  routes.use("/api/evaluations/:evaluationId/submit", auditAction("update", "teacher_evaluations"));
+  routes.use("/api/evaluations/:evaluationId/share", auditAction("update", "teacher_evaluations"));
   routes.use(
-    "/api/evaluations/{evaluationId}/submit",
-    auditAction("update", "teacher_evaluations"),
-  );
-  routes.use("/api/evaluations/{evaluationId}/share", auditAction("update", "teacher_evaluations"));
-  routes.use(
-    "/api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+    "/api/evaluations/:evaluationId/scores/:criteriaTemplateId",
     auditAction("insert", "evaluation_scores"),
   );
 
   // Template read — any authenticated user with READ perm
   routes.use("/api/evaluations/templates", requirePermission(PERMISSIONS.EVALUATION_TEMPLATE_READ));
   routes.use(
-    "/api/evaluations/templates/{templateId}",
+    "/api/evaluations/templates/:templateId",
     requirePermission(PERMISSIONS.EVALUATION_TEMPLATE_READ),
   );
 
   // Evaluation read — principal and teacher (with different visibility)
   routes.use("/api/evaluations", requirePermission(PERMISSIONS.EVALUATION_READ));
-  routes.use("/api/evaluations/{evaluationId}", requirePermission(PERMISSIONS.EVALUATION_READ));
+  routes.use("/api/evaluations/:evaluationId", requirePermission(PERMISSIONS.EVALUATION_READ));
   routes.use(
-    "/api/evaluations/{evaluationId}/scores",
+    "/api/evaluations/:evaluationId/scores",
     requirePermission(PERMISSIONS.EVALUATION_SCORE_READ),
   );
 

@@ -225,7 +225,7 @@ export function aiConceptsRoutes(deps: {
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to declare
   // its audit intent. This POST's one write is the metered student's own usage ledger; the
   // declaration is metadata (auditAction never writes a row) — the storage-upload precedent.
-  routes.use("/api/ai/students/{studentId}/concepts", auditAction("update", "ai_usage_meters"));
+  routes.use("/api/ai/students/:studentId/concepts", auditAction("update", "ai_usage_meters"));
 
   routes.openapi(conceptsRoute, async (c) => {
     const auth = requireAuth(c);

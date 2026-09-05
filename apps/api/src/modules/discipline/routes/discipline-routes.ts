@@ -246,33 +246,33 @@ export function disciplineRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.use("/api/discipline/incidents", auditAction("insert", "discipline_incidents"));
   routes.use(
-    "/api/discipline/incidents/{incidentId}",
+    "/api/discipline/incidents/:incidentId",
     auditAction("update", "discipline_incidents"),
   );
   routes.use(
-    "/api/discipline/incidents/{incidentId}/resolve",
+    "/api/discipline/incidents/:incidentId/resolve",
     auditAction("update", "discipline_incidents"),
   );
   routes.use(
-    "/api/discipline/incidents/{incidentId}/actions",
+    "/api/discipline/incidents/:incidentId/actions",
     auditAction("insert", "discipline_actions"),
   );
   routes.use(
-    "/api/discipline/incidents/{incidentId}/actions/{actionId}",
+    "/api/discipline/incidents/:incidentId/actions/:actionId",
     auditAction("update", "discipline_actions"),
   );
 
   routes.use("/api/discipline/incidents", requirePermission(PERMISSIONS.DISCIPLINE_INCIDENT_READ));
   routes.use(
-    "/api/discipline/incidents/{incidentId}",
+    "/api/discipline/incidents/:incidentId",
     requirePermission(PERMISSIONS.DISCIPLINE_INCIDENT_READ),
   );
   routes.use(
-    "/api/discipline/incidents/{incidentId}/actions",
+    "/api/discipline/incidents/:incidentId/actions",
     requirePermission(PERMISSIONS.DISCIPLINE_ACTION_READ),
   );
   routes.use(
-    "/api/discipline/incidents/{incidentId}/actions/{actionId}",
+    "/api/discipline/incidents/:incidentId/actions/:actionId",
     requirePermission(PERMISSIONS.DISCIPLINE_ACTION_READ),
   );
 

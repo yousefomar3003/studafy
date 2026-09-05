@@ -189,8 +189,8 @@ export function academicYearRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   // Audit declarations
   routes.use("/api/academics/years", auditAction("insert", "academic_years"));
-  routes.use("/api/academics/years/{yearId}", auditAction("update", "academic_years"));
-  routes.use("/api/academics/years/{yearId}/rollover", auditAction("update", "academic_years"));
+  routes.use("/api/academics/years/:yearId", auditAction("update", "academic_years"));
+  routes.use("/api/academics/years/:yearId/rollover", auditAction("update", "academic_years"));
 
   routes.openapi(listYearsRoute, async (c) => {
     const auth = requireAuth(c);

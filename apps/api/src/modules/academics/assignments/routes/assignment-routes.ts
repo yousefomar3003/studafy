@@ -375,7 +375,7 @@ export function assignmentRoutes(
     ]),
   );
   routes.use(
-    "/api/academics/assignments/{assignmentId}",
+    "/api/academics/assignments/:assignmentId",
     permissionByMethod([
       ["GET", PERMISSIONS.ASSIGNMENT_READ],
       ["PATCH", PERMISSIONS.ASSIGNMENT_UPDATE],
@@ -385,32 +385,32 @@ export function assignmentRoutes(
   // Attaching and detaching files edits the assignment, so both are assignment:update rather than
   // a permission of their own -- an attachment has no lifecycle apart from its assignment.
   routes.use(
-    "/api/academics/assignments/{assignmentId}/attachments/upload-url",
+    "/api/academics/assignments/:assignmentId/attachments/upload-url",
     permissionByMethod([["POST", PERMISSIONS.ASSIGNMENT_UPDATE]]),
   );
   routes.use(
-    "/api/academics/assignments/{assignmentId}/attachments",
+    "/api/academics/assignments/:assignmentId/attachments",
     permissionByMethod([["POST", PERMISSIONS.ASSIGNMENT_UPDATE]]),
   );
   routes.use(
-    "/api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+    "/api/academics/assignments/:assignmentId/attachments/:attachmentId",
     permissionByMethod([["DELETE", PERMISSIONS.ASSIGNMENT_UPDATE]]),
   );
 
   // Audit declarations. Read by the CI coverage gate (tests/audit-coverage.test.ts); the actual
   // rows are written inside each service transaction by emitAuditLog.
   routes.use("/api/academics/assignments", auditAction("insert", "assignments"));
-  routes.use("/api/academics/assignments/{assignmentId}", auditAction("update", "assignments"));
+  routes.use("/api/academics/assignments/:assignmentId", auditAction("update", "assignments"));
   routes.use(
-    "/api/academics/assignments/{assignmentId}/attachments/upload-url",
+    "/api/academics/assignments/:assignmentId/attachments/upload-url",
     auditAction("update", "assignments"),
   );
   routes.use(
-    "/api/academics/assignments/{assignmentId}/attachments",
+    "/api/academics/assignments/:assignmentId/attachments",
     auditAction("insert", "assignment_attachments"),
   );
   routes.use(
-    "/api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+    "/api/academics/assignments/:assignmentId/attachments/:attachmentId",
     auditAction("delete", "assignment_attachments"),
   );
 

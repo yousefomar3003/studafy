@@ -9,9 +9,19 @@
  *
  * Only internal paths are accepted (`/` but not `//`), so a crafted return-to cannot turn the
  * post-login redirect into an open redirect to an attacker's origin.
+ *
+ * ST-249: a leading backslash is rejected too, not just `//`. Browsers normalize a leading `\` to
+ * `/` before a URL is parsed, so `/\evil.example` reaches `navigate()` looking internal (starts
+ * with `/`, is not `//`) but resolves as protocol-relative to `evil.example` — the exact shape of
+ * GHSA-wrjc-x8rr-h8h6 (react-router open redirect via backslash). That bug is patched upstream as
+ * of react-router(-dom) 6.30.6, but this check does not rely on the router version to catch it:
+ * rejecting any backslash or control character anywhere in the path is the app's own boundary.
  */
 
 const RETURN_TO_KEY = "studafy.auth.return-to";
+
+/** Backslash, or any C0 control character — never legitimate in a route path. */
+const UNSAFE_PATH_CHARS = new RegExp(String.raw`[\\\x00-\x1f]`);
 
 function readStorage(): Storage | null {
   try {
@@ -22,9 +32,14 @@ function readStorage(): Storage | null {
   }
 }
 
-/** True for a same-origin path: starts with `/` and is not protocol-relative (`//host`). */
+/**
+ * True for a same-origin path: starts with `/`, is not protocol-relative (`//host`), and carries
+ * no backslash or control character a browser could normalize into a scheme/host separator before
+ * routing sees it.
+ */
 export function isInternalPath(path: string): boolean {
-  return path.startsWith("/") && !path.startsWith("//");
+  if (!path.startsWith("/") || path.startsWith("//")) return false;
+  return !UNSAFE_PATH_CHARS.test(path);
 }
 
 /** Remember the route to restore after login. Ignores non-internal paths. */

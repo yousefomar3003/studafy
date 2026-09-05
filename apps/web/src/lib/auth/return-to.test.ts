@@ -33,6 +33,21 @@ describe("return-to routing", () => {
     expect(getReturnTo()).toBeNull();
   });
 
+  test("rejects a leading backslash — GHSA-wrjc-x8rr-h8h6 shape", () => {
+    setReturnTo("/\\evil.example/phish");
+    expect(getReturnTo()).toBeNull();
+  });
+
+  test("rejects an embedded backslash", () => {
+    setReturnTo("/portal\\@evil.example");
+    expect(getReturnTo()).toBeNull();
+  });
+
+  test("rejects a control character", () => {
+    setReturnTo("/portal\x00evil.example");
+    expect(getReturnTo()).toBeNull();
+  });
+
   test("an empty value resolves to null", () => {
     expect(getReturnTo()).toBeNull();
   });

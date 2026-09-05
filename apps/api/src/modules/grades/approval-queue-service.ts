@@ -37,11 +37,16 @@ export async function listPendingApprovals(
   tx: TransactionSql,
   schoolId: string,
 ): Promise<{ items: ApprovalQueueRow[]; total: number }> {
+  // ST-249: both arms cast status to text. app.grade_submission_status and
+  // app.timetable_version_status are different enums with no cast between them, so a bare UNION ALL
+  // of the two columns fails Postgres's type resolution for every call — not a data-dependent bug,
+  // it never returned a result even with matching pending items. ApprovalQueueRow's `status: string`
+  // was always the intended shape; the enums just never got cast to it.
   const rows = await tx<ApprovalQueueRow[]>`
     SELECT
       gs.id,
       'grade_submission' AS item_type,
-      gs.status,
+      gs.status::text,
       concat(
         'Grade submission — ',
         coalesce(st.preferred_name, concat(st.first_name, ' ', st.last_name))
@@ -86,7 +91,7 @@ export async function listPendingApprovals(
     SELECT
       tv.id,
       'timetable_version' AS item_type,
-      tv.status,
+      tv.status::text,
       concat('Timetable — ', tv.name) AS summary,
       tv.submitted_by_user_id AS requested_by_user_id,
       u_sub2.display_name AS requested_by_display_name,

@@ -131,7 +131,7 @@ export function feeStructureRoutes(
   // Audit declarations
   routes.use("/api/finance/fee-structures", auditAction("insert", "fee_structure_cache"));
   routes.use(
-    "/api/finance/fee-structures/{feeStructureId}",
+    "/api/finance/fee-structures/:feeStructureId",
     auditAction("update", "fee_structure_cache"),
   );
 
@@ -139,7 +139,7 @@ export function feeStructureRoutes(
   // already holds both, so the FINANCE role gains this surface without a matrix change.
   routes.use("/api/finance/fee-structures", requirePermission(PERMISSIONS.BILLING_UPDATE));
   routes.use(
-    "/api/finance/fee-structures/{feeStructureId}",
+    "/api/finance/fee-structures/:feeStructureId",
     requirePermission(PERMISSIONS.BILLING_UPDATE),
   );
 

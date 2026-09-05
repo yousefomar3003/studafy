@@ -155,13 +155,13 @@ export function enrollmentRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // Audit declarations
-  routes.use("/api/academics/classes/{classId}/enrollments", auditAction("insert", "enrollments"));
+  routes.use("/api/academics/classes/:classId/enrollments", auditAction("insert", "enrollments"));
   routes.use(
-    "/api/academics/classes/{classId}/enrollments/{studentId}",
+    "/api/academics/classes/:classId/enrollments/:studentId",
     auditAction("update", "enrollments"),
   );
   routes.use(
-    "/api/academics/classes/{classId}/enrollments/transfer",
+    "/api/academics/classes/:classId/enrollments/transfer",
     auditAction("update", "enrollments"),
   );
 

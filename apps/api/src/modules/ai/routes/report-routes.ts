@@ -96,7 +96,7 @@ export function aiReportRoutes(deps: { database: Database }): OpenAPIHono<AppEnv
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use(
-    "/api/ai/students/{studentId}/messages/{messageId}/report",
+    "/api/ai/students/:studentId/messages/:messageId/report",
     auditAction("insert", "ai_answer_reports"),
   );
 

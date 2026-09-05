@@ -209,15 +209,15 @@ export function expenseRoutes(
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use("/api/finance/expenses", auditAction("insert", "expense_cache"));
-  routes.use("/api/finance/expenses/{expenseId}", auditAction("update", "expense_cache"));
+  routes.use("/api/finance/expenses/:expenseId", auditAction("update", "expense_cache"));
   routes.use("/api/finance/expenses/upload-url", auditAction("insert", "expense_cache"));
   routes.use(
-    "/api/finance/expenses/{expenseId}/attachments",
+    "/api/finance/expenses/:expenseId/attachments",
     auditAction("update", "expense_cache"),
   );
 
   routes.use("/api/finance/expenses", requirePermission(PERMISSIONS.BILLING_UPDATE));
-  routes.use("/api/finance/expenses/{expenseId}", requirePermission(PERMISSIONS.BILLING_UPDATE));
+  routes.use("/api/finance/expenses/:expenseId", requirePermission(PERMISSIONS.BILLING_UPDATE));
   routes.use("/api/finance/expenses/summary", requirePermission(PERMISSIONS.BILLING_READ));
 
   routes.openapi(listRoute, async (c) => {
@@ -229,6 +229,22 @@ export function expenseRoutes(
     );
 
     return c.json({ expenses: rows.map(toResponse), total }, 200);
+  });
+
+  // ST-249: registered ahead of getRoute below, not after — Hono resolves an ambiguous path by
+  // registration order, not specificity, and "/api/finance/expenses/summary" also matches
+  // getRoute's "{expenseId}" pattern with expenseId="summary". Registered after, this route was
+  // dead: every request to it hit getExpense("summary", ...) instead, which failed a uuid cast in
+  // Postgres and surfaced as an unhandled 500 rather than the summary payload.
+  routes.openapi(summaryRoute, async (c) => {
+    const auth = requireAuth(c);
+    const query = c.req.valid("query");
+
+    const summary = await withTenantTx(database, tenantFrom(c), (tx) =>
+      getMonthlySummary(tx, auth.schoolId, query.year, query.month, query.document_type),
+    );
+
+    return c.json({ year: query.year, month: query.month, ...summary }, 200);
   });
 
   routes.openapi(getRoute, async (c) => {
@@ -299,17 +315,6 @@ export function expenseRoutes(
     );
 
     return c.json(toResponse(row), 200);
-  });
-
-  routes.openapi(summaryRoute, async (c) => {
-    const auth = requireAuth(c);
-    const query = c.req.valid("query");
-
-    const summary = await withTenantTx(database, tenantFrom(c), (tx) =>
-      getMonthlySummary(tx, auth.schoolId, query.year, query.month, query.document_type),
-    );
-
-    return c.json({ year: query.year, month: query.month, ...summary }, 200);
   });
 
   return routes;

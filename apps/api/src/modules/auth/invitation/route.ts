@@ -171,8 +171,8 @@ export function invitationRoutes(db: Database, _logger: Logger): OpenAPIHono<App
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use("/api/invitations", auditAction("insert", "invitations"));
-  routes.use("/api/invitations/{id}/revoke", auditAction("update", "invitations"));
-  routes.use("/api/invitations/{id}/regenerate", auditAction("update", "invitations"));
+  routes.use("/api/invitations/:id/revoke", auditAction("update", "invitations"));
+  routes.use("/api/invitations/:id/regenerate", auditAction("update", "invitations"));
 
   routes.openapi(verifyInvitationRoute, async (c) => {
     const { token } = c.req.valid("param");

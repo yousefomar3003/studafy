@@ -157,8 +157,8 @@ export function termRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // Audit declarations
-  routes.use("/api/academics/years/{yearId}/terms", auditAction("insert", "terms"));
-  routes.use("/api/academics/terms/{termId}", auditAction("update", "terms"));
+  routes.use("/api/academics/years/:yearId/terms", auditAction("insert", "terms"));
+  routes.use("/api/academics/terms/:termId", auditAction("update", "terms"));
 
   routes.openapi(listTermsRoute, async (c) => {
     const auth = requireAuth(c);

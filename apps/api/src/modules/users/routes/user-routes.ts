@@ -241,24 +241,24 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
   const channelGuard = requireChannel(AUTH_CHANNELS.WEB);
   routes.use("/api/users", channelGuard);
   routes.use("/api/users/status-counts", channelGuard);
-  routes.use("/api/users/{userId}", channelGuard);
-  routes.use("/api/users/{userId}/role", channelGuard);
-  routes.use("/api/users/{userId}/deactivate", channelGuard);
+  routes.use("/api/users/:userId", channelGuard);
+  routes.use("/api/users/:userId/role", channelGuard);
+  routes.use("/api/users/:userId/deactivate", channelGuard);
 
   // --- Permission guards ---
   routes.use("/api/users", requirePermission(PERMISSIONS.USER_READ));
   routes.use("/api/users", requirePermission(PERMISSIONS.USER_CREATE));
   routes.use("/api/users/status-counts", requirePermission(PERMISSIONS.USER_READ));
-  routes.use("/api/users/{userId}", requirePermission(PERMISSIONS.USER_READ));
-  routes.use("/api/users/{userId}", requirePermission(PERMISSIONS.USER_UPDATE));
-  routes.use("/api/users/{userId}/role", requirePermission(PERMISSIONS.ROLE_ASSIGN));
-  routes.use("/api/users/{userId}/deactivate", requirePermission(PERMISSIONS.USER_SUSPEND));
+  routes.use("/api/users/:userId", requirePermission(PERMISSIONS.USER_READ));
+  routes.use("/api/users/:userId", requirePermission(PERMISSIONS.USER_UPDATE));
+  routes.use("/api/users/:userId/role", requirePermission(PERMISSIONS.ROLE_ASSIGN));
+  routes.use("/api/users/:userId/deactivate", requirePermission(PERMISSIONS.USER_SUSPEND));
 
   // --- Audit declarations ---
   routes.use("/api/users", auditAction("insert", "users"));
-  routes.use("/api/users/{userId}", auditAction("update", "users"));
-  routes.use("/api/users/{userId}/role", auditAction("update", "user_roles"));
-  routes.use("/api/users/{userId}/deactivate", auditAction("update", "users"));
+  routes.use("/api/users/:userId", auditAction("update", "users"));
+  routes.use("/api/users/:userId/role", auditAction("update", "user_roles"));
+  routes.use("/api/users/:userId/deactivate", auditAction("update", "users"));
 
   // --- Handlers ---
 
