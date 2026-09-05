@@ -12,6 +12,9 @@ import 'package:studafy_mobile/src/core/api/generated/models/published_term_summ
 import 'package:studafy_mobile/src/core/api/generated/models/term.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/term_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/published_grades/published_grades_client.dart';
+import 'package:studafy_mobile/src/core/config/app_config.dart';
+import 'package:studafy_mobile/src/core/config/app_environment.dart';
+import 'package:studafy_mobile/src/core/di/app_providers.dart';
 import 'package:studafy_mobile/src/core/offline/offline_database.dart';
 import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
 import 'package:studafy_mobile/src/core/offline/published_grades_offline_repository.dart';
@@ -24,6 +27,16 @@ import 'package:studafy_mobile/src/features/student/domain/today_section.dart';
 
 const _studentId = 'student-1';
 const _termId = 'term-1';
+
+/// `currentStudentIdProvider`'s doc comment describes its `ref.watch(authSessionProvider)` as a
+/// cheap, side-effect-free dependency touch — but `authSessionProvider`'s default body builds
+/// `authClientProvider`, which (since ST-247's fix to that client's hardcoded-localhost base URL)
+/// now reads `appConfigProvider`, whose own default throws `StateError` until something provides
+/// one. A bare `ProviderContainer()` needs this override for the same reason `pumpStudafyApp` and
+/// `pumpAppShell` already provide one.
+final _appConfigOverride = appConfigProvider.overrideWithValue(
+  AppConfig.fromEnvironment(AppEnvironment.dev),
+);
 
 Term _fakeTerm() {
   final now = DateTime(2026, 1, 1);
@@ -148,7 +161,7 @@ void main() {
   });
 
   test('resolves TodaySectionUnavailable when the student context cannot be resolved', () async {
-    final unresolvedContainer = ProviderContainer();
+    final unresolvedContainer = ProviderContainer(overrides: [_appConfigOverride]);
     addTearDown(unresolvedContainer.dispose);
     _keepAlive(unresolvedContainer);
 

@@ -48,4 +48,18 @@ class AppConfig {
   /// The `plan_prices.id` (Stripe-synced) for the AI add-on's one price, injected per environment
   /// via `--dart-define=AI_ADDON_PRICE_ID=...`. Empty when unset.
   final String aiAddonPriceId;
+
+  /// Used by `integration_test/support/test_app.dart` to repoint [apiBaseUrl] at an unroutable
+  /// host mid-test (the attendance-offline-replay journey's "airplane mode") via
+  /// `ProviderContainer.updateOverrides` — see that file for why a real OS-level network toggle
+  /// isn't available to an instrumented test.
+  AppConfig copyWith({Uri? apiBaseUrl}) {
+    return AppConfig(
+      environment: environment,
+      apiBaseUrl: apiBaseUrl ?? this.apiBaseUrl,
+      realtimeBaseUrl: realtimeBaseUrl,
+      webBaseUrl: webBaseUrl,
+      aiAddonPriceId: aiAddonPriceId,
+    );
+  }
 }

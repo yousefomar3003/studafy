@@ -32,4 +32,9 @@ class FakePushService implements PushService {
     _messageController.close();
     _tapController.close();
   }
+
+  /// Simulates the user tapping a notification whose payload resolved to [route]
+  /// (`resolveNotificationTapRoute`) — [StudafyApp] listens on [onNotificationTap] and pushes it
+  /// via `GoRouter`, exactly as [FirebasePushService] would after a real tap.
+  void simulateNotificationTap(String route) => _tapController.add(route);
 }

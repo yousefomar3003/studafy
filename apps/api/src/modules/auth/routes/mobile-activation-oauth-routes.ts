@@ -25,6 +25,11 @@
  * email-divergence REQUIRES_ADMIN_APPROVAL both surface as ordinary problem+json — there is no
  * redirect to bounce through, so unlike the browser callback this route lets `activateAccount`'s
  * `CodedHttpException` propagate exactly like the web `POST /activate` endpoint does.
+ *
+ * A third "mock" provider sits alongside Google and Microsoft (ST-247), mirroring
+ * `oauth/mobile-oauth-routes.ts`'s own mock addition — dev/E2E only, inert unless
+ * `getMockOAuthConfig()` is non-null, and the only provider the Flutter integration_test suite can
+ * drive end-to-end without a real Google/Microsoft app registration.
  */
 
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
@@ -41,6 +46,9 @@ import { validateGoogleIdToken } from "../oauth/google-id-token";
 import { MICROSOFT_TOKEN_ENDPOINT, getMicrosoftOAuthConfig } from "../oauth/microsoft-config";
 import { validateMicrosoftIdToken } from "../oauth/microsoft-id-token";
 import { MOBILE_OAUTH_REDIRECT_URI } from "../oauth/mobile-redirect";
+import { MOCK_JWKS_URI, getMockOAuthConfig } from "../oauth/mock-config";
+import { validateMockIdToken } from "../oauth/mock-id-token";
+import { exchangeCode as exchangeMockCode } from "../oauth/mock-route";
 import {
   generateCodeChallenge,
   generateCodeVerifier,
@@ -109,7 +117,9 @@ const invitationMobileExchangeRequestSchema = z
 // ---------------------------------------------------------------------------
 
 function providerLabel(provider: Provider): string {
-  return provider === "google" ? "Google" : "Microsoft";
+  if (provider === "google") return "Google";
+  if (provider === "microsoft") return "Microsoft";
+  return "Mock";
 }
 
 function createInvitationMobileStartRoute(provider: Provider) {
@@ -348,6 +358,96 @@ export function mobileActivationOAuthRoutes(
       nonce,
     });
     return c.json(body, 200);
+  });
+
+  // ----- Mock (dev/E2E only, see file header) -----
+
+  routes.openapi(createInvitationMobileStartRoute("mock"), (c) => {
+    const { token } = c.req.valid("param");
+    if (!getMockOAuthConfig()) {
+      throw new HTTPException(404, { message: "mock OAuth is not configured" });
+    }
+
+    const state = generateState();
+    const nonce = generateNonce();
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = generateCodeChallenge(codeVerifier);
+
+    stateStore.set(state, {
+      codeVerifier,
+      nonce,
+      createdAt: Date.now(),
+      purpose: "activation",
+      token,
+    });
+
+    return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
+  });
+
+  routes.openapi(createInvitationMobileExchangeRoute("mock"), async (c) => {
+    const { token } = c.req.valid("param");
+    const { code, state, nonce } = c.req.valid("json");
+    const mockConfig = getMockOAuthConfig();
+    if (!mockConfig) {
+      throw new HTTPException(404, { message: "mock OAuth is not configured" });
+    }
+
+    const entry = stateStore.get(state);
+    if (!entry || entry.purpose !== "activation" || entry.token !== token) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.OAUTH_STATE_INVALID,
+        "Invalid or expired activation state",
+      );
+    }
+    stateStore.delete(state);
+
+    if (entry.nonce !== nonce) {
+      throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
+    }
+
+    try {
+      // The mock IdP's /token returns `access_token`, not `id_token` — see mock-route.ts's file
+      // header — so this gets its own exchange+validate pair rather than runMobileExchange's
+      // google/microsoft id_token flow.
+      const accessToken = await exchangeMockCode(mockConfig.issuer, code, entry.codeVerifier);
+      const claims = await validateMockIdToken(
+        accessToken,
+        mockConfig.issuer,
+        nonce,
+        MOCK_JWKS_URI(mockConfig.issuer),
+      );
+
+      const result = await activateAccount(db, config, {
+        rawToken: token,
+        identity: { provider: "mock", subject: claims.sub, email: claims.email },
+        channel: AUTH_CHANNELS.MOBILE,
+        device: { userAgent: c.req.header("user-agent") ?? null },
+        requestId: c.get("requestId"),
+        logger,
+      });
+
+      if (result.outcome === "REQUIRES_ADMIN_APPROVAL") {
+        throw new CodedHttpException(
+          403,
+          ERROR_CODES.REQUIRES_ADMIN_APPROVAL,
+          "Activation requires administrator approval.",
+        );
+      }
+
+      const body = deliverTokenPair(c, result.tokens);
+      return c.json({ status: "active" as const, ...body }, 200);
+    } catch (error) {
+      if (error instanceof CodedHttpException) throw error;
+      if (error instanceof HTTPException) {
+        throw new CodedHttpException(
+          502,
+          ERROR_CODES.OAUTH_PROVIDER_ERROR,
+          "Failed to exchange authorization code with the mock provider",
+        );
+      }
+      throw error;
+    }
   });
 
   return routes;

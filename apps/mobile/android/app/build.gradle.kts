@@ -28,6 +28,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // ST-247: lets `integration_test/` build an androidTest APK (`assemble<Flavor>DebugAndroidTest`)
+        // for `flutter test integration_test/` and for Firebase Test Lab's `gcloud firebase test
+        // android run --type instrumentation`. See src/androidTest/.../MainActivityTest.kt.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     flavorDimensions += "environment"
@@ -65,4 +69,12 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // ST-247: instrumentation-runner deps for the androidTest APK integration_test builds. Pinned
+    // to the same androidx.test major line Flutter's own integration_test package targets.
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }

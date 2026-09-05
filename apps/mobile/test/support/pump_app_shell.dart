@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
 import 'package:studafy_mobile/src/core/auth/auth_session.dart';
+import 'package:studafy_mobile/src/core/config/app_config.dart';
+import 'package:studafy_mobile/src/core/config/app_environment.dart';
+import 'package:studafy_mobile/src/core/di/app_providers.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/app_shell.dart';
@@ -24,7 +27,14 @@ Future<void> pumpAppShell(
       key: UniqueKey(),
       child: wrapWithLocalization(
         ProviderScope(
-          overrides: [authSessionProvider.overrideWithValue(session)],
+          overrides: [
+            authSessionProvider.overrideWithValue(session),
+            // `shellRoleProvider` -> `authNotifierProvider` builds `authClientProvider`
+            // regardless of `authSessionProvider` being overridden — it reads `appConfigProvider`
+            // for its base URL since ST-247's fix to that hardcoded-localhost bug, so this needs
+            // a value the same way `pumpStudafyApp` already provides one.
+            appConfigProvider.overrideWithValue(AppConfig.fromEnvironment(AppEnvironment.dev)),
+          ],
           child: Builder(
             builder: (context) {
               return MaterialApp(

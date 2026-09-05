@@ -43,6 +43,14 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # ST-247's integration_test suite (apps/mobile/integration_test/). Ships with the Flutter SDK
+  # (no pub.dev version to pin) and provides both the on-device test binding `flutter test
+  # integration_test/` needs and the Android/iOS native test-runner glue a device farm drives.
+  integration_test:
+    sdk: flutter
+  # ST-247: the AI-upsell integration test intercepts `launchUrl` by swapping this platform
+  # interface for a recording fake, instead of actually opening a system browser mid-suite.
+  url_launcher_platform_interface: ^2.3.2
   flutter_lints: ^6.0.0
   build_runner: ^2.15.1
   retrofit_generator: ^10.2.9

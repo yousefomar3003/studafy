@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
+import 'package:studafy_mobile/src/core/config/app_config.dart';
+import 'package:studafy_mobile/src/core/config/app_environment.dart';
+import 'package:studafy_mobile/src/core/di/app_providers.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/app_shell.dart';
 
@@ -40,6 +43,8 @@ Future<void> _pumpShellGolden(
             authSessionProvider.overrideWithValue(
               await fakeAuthenticatedSession(roles: roles),
             ),
+            // See the identical note in `test/support/pump_app_shell.dart`.
+            appConfigProvider.overrideWithValue(AppConfig.fromEnvironment(AppEnvironment.dev)),
           ],
           child: Builder(
             builder: (context) {
