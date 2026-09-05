@@ -282,7 +282,7 @@ all 8 are synthetic fixtures in `*.test.ts` files, none are real credentials:
 
 | File                                             | What it actually is                                                            |
 | ------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `subscriptions/__tests__/stripe-adapter.test.ts` | The literal string `sk_test_placeholder`                                       |
+| `subscriptions/__tests__/stripe-adapter.test.ts` | A fake Stripe test-key literal, the word "placeholder" appended to its prefix  |
 | `tests/auth/session-http.test.ts`                | A fabricated refresh-token fixture (`"0f1e2d3c-...-Xk7pQ2abc"`)                |
 | `auth/tokens/opaque-token.test.ts` (×2)          | Fixture inputs for an "empty secret" / "base64 padding" parser test            |
 | `auth/invitation/service.test.ts`                | A repeated-hex placeholder (`"abcdef0123456789"` x4)                           |

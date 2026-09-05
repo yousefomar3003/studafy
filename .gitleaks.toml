@@ -12,7 +12,7 @@ useDefault = true
 # including a later commit touching these same files, still fails the scan.
 [allowlist]
   commits = [
-    "d3d28020911ff23f040081adb4d7f4a370b1577a", # stripe-adapter.test.ts: sk_test_placeholder
+    "d3d28020911ff23f040081adb4d7f4a370b1577a", # stripe-adapter.test.ts: a fake Stripe test key literal
     "68d799e04168a657a72c7d27e075c8e86bbd2ca0", # session-http.test.ts: fake refresh token fixture
     "e1daef0e4062c13daae70e38c3edf31d20cebdae", # opaque-token.test.ts: fake opaque token fixtures
     "e9c2d6e9483ad901e1285d69c82cd462ee4eab00", # invitation/service.test.ts: repeated-hex placeholder
