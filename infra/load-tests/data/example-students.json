@@ -1,0 +1,16 @@
+[
+  {
+    "email": "loadtest.student.0001@load.studafy.test",
+    "accessToken": "REPLACE_ME_EXAMPLE_TOKEN",
+    "schoolId": "00000000-0000-0000-0000-000000000001",
+    "studentId": "00000000-0000-0000-0000-0000000000a1",
+    "termId": "00000000-0000-0000-0000-0000000000t1"
+  },
+  {
+    "email": "loadtest.parent.0001@load.studafy.test",
+    "accessToken": "REPLACE_ME_EXAMPLE_TOKEN",
+    "schoolId": "00000000-0000-0000-0000-000000000001",
+    "studentId": "00000000-0000-0000-0000-0000000000a2",
+    "termId": "00000000-0000-0000-0000-0000000000t1"
+  }
+]
