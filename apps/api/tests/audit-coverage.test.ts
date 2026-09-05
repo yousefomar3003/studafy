@@ -419,10 +419,17 @@ interface MutatingRoute {
  * `routes.use(path, auditAction(...))` -- but a 15-line window around any mention of the path keeps
  * this working if a declaration is wrapped across lines. Anchoring on the path rather than on
  * proximity alone is what stops one audited route from vouching for an unaudited neighbour.
+ *
+ * `path` always comes from a `createRoute({ path: "...{param}..." })` config, in the OpenAPI
+ * `{param}` style. A `routes.use(...)` mounting `auditAction()` for that same route must instead be
+ * written in Hono's own `:param` style (ST-249: `.use()` never matches a literal `{param}` path —
+ * see route-guard-wiring.test.ts), so both spellings of every param segment are searched for here.
  */
 function hasAuditActionForPath(lines: readonly string[], path: string): boolean {
+  const colonPath = path.replace(/\{([^}]+)\}/g, ":$1");
+
   for (let i = 0; i < lines.length; i++) {
-    if (!lines[i]!.includes(`"${path}"`)) continue;
+    if (!lines[i]!.includes(`"${path}"`) && !lines[i]!.includes(`"${colonPath}"`)) continue;
 
     const window = lines.slice(Math.max(0, i - 15), Math.min(lines.length, i + 16)).join("\n");
     if (/\bauditAction\s*\(/.test(window)) return true;

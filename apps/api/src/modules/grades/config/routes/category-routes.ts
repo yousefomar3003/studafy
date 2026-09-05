@@ -149,19 +149,19 @@ export function categoryRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use(
-    "/api/grades/config/gradebooks/{gradebookId}/categories",
+    "/api/grades/config/gradebooks/:gradebookId/categories",
     requirePermission(PERMISSIONS.GRADE_READ),
   );
   routes.use(
-    "/api/grades/config/gradebooks/{gradebookId}/categories",
+    "/api/grades/config/gradebooks/:gradebookId/categories",
     auditAction("insert", "assessment_categories"),
   );
   routes.use(
-    "/api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+    "/api/grades/config/gradebooks/:gradebookId/categories/:categoryId",
     requirePermission(PERMISSIONS.GRADE_READ),
   );
   routes.use(
-    "/api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+    "/api/grades/config/gradebooks/:gradebookId/categories/:categoryId",
     auditAction("update", "assessment_categories"),
   );
 

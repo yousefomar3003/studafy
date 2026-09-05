@@ -77,8 +77,8 @@ const triggerProvisioningRoute = createRoute({
 export function provisioningRoutes(db: Database, _logger: Logger): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  routes.use("/api/schools/{schoolId}/provisioning-status", auditAction("update", "schools"));
-  routes.use("/api/schools/{schoolId}/provision", auditAction("update", "schools"));
+  routes.use("/api/schools/:schoolId/provisioning-status", auditAction("update", "schools"));
+  routes.use("/api/schools/:schoolId/provision", auditAction("update", "schools"));
 
   routes.openapi(getProvisioningStatusRoute, async (c) => {
     const { schoolId } = c.req.valid("param");

@@ -164,8 +164,8 @@ export function courseRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // Audit declarations
-  routes.use("/api/academics/subjects/{subjectId}/courses", auditAction("insert", "courses"));
-  routes.use("/api/academics/courses/{courseId}", auditAction("update", "courses"));
+  routes.use("/api/academics/subjects/:subjectId/courses", auditAction("insert", "courses"));
+  routes.use("/api/academics/courses/:courseId", auditAction("update", "courses"));
 
   routes.openapi(listCoursesRoute, async (c) => {
     const auth = requireAuth(c);

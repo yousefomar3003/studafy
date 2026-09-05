@@ -154,7 +154,7 @@ export function classRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   // Audit declarations
   routes.use("/api/academics/classes", auditAction("insert", "classes"));
-  routes.use("/api/academics/classes/{classId}", auditAction("update", "classes"));
+  routes.use("/api/academics/classes/:classId", auditAction("update", "classes"));
 
   routes.openapi(listClassesRoute, async (c) => {
     const auth = requireAuth(c);

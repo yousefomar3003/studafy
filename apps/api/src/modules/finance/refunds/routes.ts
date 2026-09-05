@@ -216,17 +216,21 @@ export function refundRoutes(
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use("/api/finance/refunds/initiate", auditAction("insert", "refund_requests"));
-  routes.use("/api/finance/refunds/{refundId}/approve", auditAction("update", "refund_requests"));
-  routes.use("/api/finance/refunds/{refundId}/reject", auditAction("update", "refund_requests"));
+  routes.use("/api/finance/refunds/:refundId/approve", auditAction("update", "refund_requests"));
+  routes.use("/api/finance/refunds/:refundId/reject", auditAction("update", "refund_requests"));
 
-  routes.use("/api/finance/refunds*", requirePermission(PERMISSIONS.BILLING_READ));
+  // ST-249: the `/*` slash matters — Hono's `.use()` only propagates a glued "prefix*" pattern
+  // through `app.route()` composition when the app is invoked directly, not once mounted into the
+  // parent app the way every module here actually is; "prefix*" silently never matches a mounted
+  // request, and the guard below would never run. "prefix/*" does not have this gap.
+  routes.use("/api/finance/refunds/*", requirePermission(PERMISSIONS.BILLING_READ));
   routes.use("/api/finance/refunds/initiate", requirePermission(PERMISSIONS.BILLING_UPDATE));
   routes.use(
-    "/api/finance/refunds/{refundId}/approve",
+    "/api/finance/refunds/:refundId/approve",
     requirePermission(PERMISSIONS.BILLING_REFUND),
   );
   routes.use(
-    "/api/finance/refunds/{refundId}/reject",
+    "/api/finance/refunds/:refundId/reject",
     requirePermission(PERMISSIONS.BILLING_REFUND),
   );
 

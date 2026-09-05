@@ -83,9 +83,18 @@ export async function getSchoolSettings(
     if (rows.length > 0) return rowToSettings(rows[0]);
 
     // Lazy init: create the default settings row for this school.
+    //
+    // ST-249: ON CONFLICT DO UPDATE, not a plain INSERT. Two concurrent first-ever reads for the
+    // same school (two admin tabs, or a client retry racing the original) both see zero rows above
+    // and both reach this insert; the loser used to hit school_settings' primary key violation
+    // directly, surfacing as an unhandled 500 instead of the settings it asked to read. The
+    // `DO UPDATE SET school_id = EXCLUDED.school_id` is a no-op write — Postgres has no
+    // `DO NOTHING ... RETURNING` for the row that already exists, only for the row it just
+    // inserted — so this is the standard way to make RETURNING unconditional.
     const created = await tx<SchoolSettingsRow[]>`
       INSERT INTO app.school_settings (school_id)
       VALUES (${schoolId}::uuid)
+      ON CONFLICT (school_id) DO UPDATE SET school_id = EXCLUDED.school_id
       RETURNING
         school_id::text,
         locale, timezone, grading_scheme,
@@ -142,10 +151,14 @@ export async function updateSchoolSettings(
     const before = beforeRows[0];
 
     // 2. Ensure the row exists (create defaults if this is the first mutation).
+    // ST-249: ON CONFLICT DO NOTHING — see the matching note in getSchoolSettings above. Two
+    // concurrent first-ever PATCHes can both see `before` as undefined and both reach this insert;
+    // without the conflict clause the loser hit school_settings' primary key violation directly.
     if (!before) {
       await tx`
         INSERT INTO app.school_settings (school_id)
         VALUES (${schoolId}::uuid)
+        ON CONFLICT (school_id) DO NOTHING
       `;
     }
 

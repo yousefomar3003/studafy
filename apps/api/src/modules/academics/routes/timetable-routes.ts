@@ -404,24 +404,24 @@ export function timetableRoutes(database: Database): OpenAPIHono<AppEnv> {
   // Audit declarations
   routes.use("/api/academics/timetable-versions", auditAction("insert", "timetable_versions"));
   routes.use(
-    "/api/academics/timetable-versions/{versionId}",
+    "/api/academics/timetable-versions/:versionId",
     auditAction("update", "timetable_versions"),
   );
   routes.use(
-    "/api/academics/timetable-versions/{versionId}/slots",
+    "/api/academics/timetable-versions/:versionId/slots",
     auditAction("insert", "timetable_slots"),
   );
-  routes.use("/api/academics/slots/{slotId}", auditAction("update", "timetable_slots"));
+  routes.use("/api/academics/slots/:slotId", auditAction("update", "timetable_slots"));
   routes.use(
-    "/api/academics/timetable-versions/{versionId}/submit",
+    "/api/academics/timetable-versions/:versionId/submit",
     auditAction("update", "timetable_versions"),
   );
   routes.use(
-    "/api/academics/timetable-versions/{versionId}/approve",
+    "/api/academics/timetable-versions/:versionId/approve",
     auditAction("update", "timetable_versions"),
   );
   routes.use(
-    "/api/academics/timetable-versions/{versionId}/reject",
+    "/api/academics/timetable-versions/:versionId/reject",
     auditAction("update", "timetable_versions"),
   );
   routes.use("/api/academics/timetable-versions/copy", auditAction("insert", "timetable_versions"));

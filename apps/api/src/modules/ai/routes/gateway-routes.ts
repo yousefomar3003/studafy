@@ -180,7 +180,7 @@ export function aiGatewayRoutes(deps: {
   // its audit intent. This POST's one write is the metered student's own usage ledger; the
   // declaration is metadata (auditAction never writes a row) — the storage-upload precedent, which
   // declares against a mutation whose record is the object itself rather than an audit_logs row.
-  routes.use("/api/ai/students/{studentId}/generate", auditAction("update", "ai_usage_meters"));
+  routes.use("/api/ai/students/:studentId/generate", auditAction("update", "ai_usage_meters"));
 
   routes.openapi(generateRoute, async (c) => {
     const auth = requireAuth(c);

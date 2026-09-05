@@ -1,5 +1,7 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { ERROR_CODES } from "@studafy/constants";
 
+import { CodedHttpException } from "../../../coded-http-exception";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
@@ -61,16 +63,11 @@ export function reconciliationRoutes(
     const expectedKey = process.env.RECONCILIATION_API_KEY;
 
     if (!apiKey || !expectedKey || apiKey !== expectedKey) {
-      return c.json(
-        {
-          type: "about:blank",
-          title: "Forbidden",
-          status: 403,
-          code: "ACCESS_DENIED",
-          request_id: c.get("requestId") ?? "",
-        },
-        403,
-      );
+      // ST-249: was a hand-rolled `c.json(..., 403)` that skipped errorHandlerMiddleware entirely,
+      // so it carried `Content-Type: application/json` instead of the RFC 9457
+      // `application/problem+json` every other error response in the app uses, and no request_id
+      // correlation. Throwing here, like every other denial in the app, restores both.
+      throw new CodedHttpException(403, ERROR_CODES.ACCESS_DENIED, "Access denied");
     }
 
     const result = await runGlobalReconciliation(database, erpnextFactory, logger);

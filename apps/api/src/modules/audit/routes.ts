@@ -166,7 +166,7 @@ export function auditRoutes(
   routes.use("/api/audit/logs", requirePermission(PERMISSIONS.AUDIT_LOG_READ));
   routes.use("/api/audit/logs/export", requirePermission(PERMISSIONS.AUDIT_LOG_EXPORT));
   routes.use("/api/audit/logs/export", auditAction("insert", "audit_export_jobs"));
-  routes.use("/api/audit/logs/export/{jobId}", requirePermission(PERMISSIONS.AUDIT_LOG_EXPORT));
+  routes.use("/api/audit/logs/export/:jobId", requirePermission(PERMISSIONS.AUDIT_LOG_EXPORT));
 
   routes.openapi(listLogsRoute, async (c) => {
     const auth = requireAuth(c);

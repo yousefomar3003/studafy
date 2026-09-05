@@ -201,7 +201,7 @@ export function attendanceSessionRoutes(
 
   // Audit declarations
   routes.use("/api/attendance/sessions", auditAction("insert", "attendance_sessions"));
-  routes.use("/api/attendance/sessions/{sessionId}", auditAction("update", "attendance_sessions"));
+  routes.use("/api/attendance/sessions/:sessionId", auditAction("update", "attendance_sessions"));
 
   // Audit declarations
   routes.use("/api/attendance/records/batch", auditAction("insert", "attendance_records"));

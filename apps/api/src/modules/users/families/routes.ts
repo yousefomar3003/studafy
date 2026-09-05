@@ -182,41 +182,38 @@ export function familyRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.use("/api/families", onlyMethods(["POST"], auditAction("insert", "families")));
   routes.use("/api/families", onlyMethods(["POST"], requirePermission(PERMISSIONS.PARENT_LINK)));
-  routes.use("/api/families/{familyId}", onlyMethods(["PATCH"], auditAction("update", "families")));
+  routes.use("/api/families/:familyId", onlyMethods(["PATCH"], auditAction("update", "families")));
+  routes.use("/api/families/:familyId", onlyMethods(["DELETE"], auditAction("delete", "families")));
   routes.use(
-    "/api/families/{familyId}",
-    onlyMethods(["DELETE"], auditAction("delete", "families")),
-  );
-  routes.use(
-    "/api/families/{familyId}",
+    "/api/families/:familyId",
     onlyMethods(["PATCH"], requirePermission(PERMISSIONS.PARENT_LINK)),
   );
   routes.use(
-    "/api/families/{familyId}",
+    "/api/families/:familyId",
     onlyMethods(["DELETE"], requirePermission(PERMISSIONS.PARENT_UNLINK)),
   );
   routes.use(
-    "/api/families/{familyId}/links",
+    "/api/families/:familyId/links",
     onlyMethods(["POST"], auditAction("insert", "parent_child_links")),
   );
   routes.use(
-    "/api/families/{familyId}/links",
+    "/api/families/:familyId/links",
     onlyMethods(["POST"], requirePermission(PERMISSIONS.PARENT_LINK)),
   );
   routes.use(
-    "/api/families/{familyId}/links/{parentUserId}/{studentId}",
+    "/api/families/:familyId/links/:parentUserId/:studentId",
     onlyMethods(["PATCH"], auditAction("update", "parent_child_links")),
   );
   routes.use(
-    "/api/families/{familyId}/links/{parentUserId}/{studentId}",
+    "/api/families/:familyId/links/:parentUserId/:studentId",
     onlyMethods(["DELETE"], auditAction("delete", "parent_child_links")),
   );
   routes.use(
-    "/api/families/{familyId}/links/{parentUserId}/{studentId}",
+    "/api/families/:familyId/links/:parentUserId/:studentId",
     onlyMethods(["PATCH"], requirePermission(PERMISSIONS.PARENT_LINK)),
   );
   routes.use(
-    "/api/families/{familyId}/links/{parentUserId}/{studentId}",
+    "/api/families/:familyId/links/:parentUserId/:studentId",
     onlyMethods(["DELETE"], requirePermission(PERMISSIONS.PARENT_UNLINK)),
   );
 
