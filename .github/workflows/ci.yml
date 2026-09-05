@@ -441,12 +441,17 @@ jobs:
   secret-scan-history:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to a commit SHA, not the mutable `v4` tag: this repo's SAST job (ST-251) flags any
+      # action reference that isn't (a floating tag can be silently repointed by the action owner).
+      # This job's own checkout is a fresh addition, so it's the one instance that actually got
+      # caught by the rule -- every other `actions/checkout@v4` in this file predates that job and
+      # wasn't part of the diff the check re-scans. 11d5960 is v4.4.0, the newest v4 release as of
+      # this writing.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      # Pinned to a commit SHA, not the mutable `v2` tag: this repo's SAST job (ST-251) flags any
-      # third-party action reference that isn't (a floating tag can be silently repointed by the
-      # action owner). ff98106 is v2.3.9, the newest v2 release as of this writing.
+      # Pinned to a commit SHA, not the mutable `v2` tag, for the same reason. ff98106 is v2.3.9,
+      # the newest v2 release as of this writing.
       - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -461,6 +466,14 @@ jobs:
           # base commit (or the pre-push commit) present locally to diff against.
           fetch-depth: 0
       - uses: ./.github/actions/setup-bun-workspace
+      # Unconditional, not folded into the affected-packages build below: the oasdiff step and the
+      # two benchmarks further down all read the real apps/api/openapi.json off disk directly
+      # (not through turbo), but that file is otherwise only ever produced as a side effect of
+      # turbo building @studafy/api -- which the affected-package filter skips entirely on any PR
+      # that doesn't touch apps/api's own source (this workflow file is exactly such a PR). Without
+      # this, those steps ENOENT on a clean checkout whenever @studafy/api isn't "affected".
+      - name: Generate the OpenAPI document
+        run: bun run --cwd apps/api openapi:generate
       # Keyed on the commit so today's run always starts from the closest prior state; content
       # hashing inside turbo (not this cache key) is what actually decides which tasks re-run --
       # this just carries yesterday's task outputs into today's job so unaffected packages replay
