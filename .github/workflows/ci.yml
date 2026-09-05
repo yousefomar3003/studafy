@@ -12,6 +12,10 @@ jobs:
   cross-tenant-security:
     name: cross-tenant-security
     runs-on: ubuntu-latest
+    # ST-252 runtime budget. The three database-backed suites run in parallel, so the suite's
+    # wall-clock gate is the slowest job, not their sum; capping each one here turns "runtime
+    # < 12 min" into a hard failure instead of a job that hangs until the 6-hour default.
+    timeout-minutes: 12
     env:
       POSTGRES_PASSWORD: studafy_ci_only
       TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
@@ -37,6 +41,7 @@ jobs:
   api-integration:
     name: api-integration
     runs-on: ubuntu-latest
+    timeout-minutes: 12 # ST-252 runtime budget -- see cross-tenant-security.
     env:
       POSTGRES_PASSWORD: studafy_ci_only
       TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
@@ -105,6 +110,7 @@ jobs:
 
   database-migrations:
     runs-on: ubuntu-latest
+    timeout-minutes: 12 # ST-252 runtime budget -- see cross-tenant-security.
     # The database is started from db/compose.yml rather than a `services:` block because it must run
     # `pgvector/pgvector:pg16` (for the `vector` extension) with `pg_stat_statements` preloaded via a
     # container command -- a GitHub `services:` block cannot override the container command. Reusing
@@ -177,6 +183,40 @@ jobs:
       - name: Stop PostgreSQL
         if: always()
         run: docker compose -f db/compose.yml down
+
+  # ST-252's single merge-blocking gate for the database-backed suites. `cross-tenant-security`,
+  # `api-integration`, and `database-migrations` already provision ephemeral Postgres/Redis, run the
+  # migrations, the integration harness, the RLS coverage audit, and the cross-tenant probe -- this
+  # job adds nothing to that work, it only folds their three results into one status check to mark
+  # "Required" in branch protection, so that list stays stable if a job is renamed or split.
+  # `if: always()` so it still reports a conclusion when an upstream job fails or is cancelled.
+  integration-suite:
+    name: integration-suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [cross-tenant-security, api-integration, database-migrations]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require every database-backed suite to pass
+        env:
+          RESULTS: >-
+            cross-tenant-security=${{ needs.cross-tenant-security.result }}
+            api-integration=${{ needs.api-integration.result }}
+            database-migrations=${{ needs.database-migrations.result }}
+        run: |
+          echo "$RESULTS"
+          for entry in $RESULTS; do
+            if [ "${entry#*=}" != "success" ]; then
+              echo "::error::${entry} -- the integration + RLS suite is merge-blocking and must be 'success'"
+              exit 1
+            fi
+          done
+      # Informational, never fails the job: prints the current quarantine set to the run summary so a
+      # skipped-because-flaky test cannot be forgotten. See docs/testing/flaky-test-quarantine.md.
+      - name: Quarantined-test inventory
+        if: always()
+        run: bash .github/scripts/list-quarantined-tests.sh >> "$GITHUB_STEP_SUMMARY"
 
   # ST-211's axe budget (zero critical/serious violations) and its keyboard-only walkthrough of 5
   # core journeys. Its own job, not folded into `quality`, because it needs a Chromium install and a

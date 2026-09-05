@@ -2,8 +2,8 @@
 
 Reference for what runs on every pull request and every push to `dev`, why it's split the way it
 is, and the honest limits of the caching/annotation machinery. For the mobile-specific integration
-suite, accessibility budget, and load tests, see the other files in this directory — this doc
-covers the `CI` workflow itself.
+suite, accessibility budget, load tests, and the flaky-test quarantine process, see the other files
+in this directory — this doc covers the `CI` workflow itself.
 
 ## Jobs
 
@@ -12,6 +12,7 @@ covers the `CI` workflow itself.
 | `cross-tenant-security` | NFR-05 cross-tenant isolation probe                                                                                                                        | Yes (Postgres)        |
 | `api-integration`       | API integration suite, ST-116/ST-071 probes, email/ERPNext webhook DB tests, auth+refresh-rotation benchmarks                                              | Yes (Postgres, Redis) |
 | `database-migrations`   | Migrations apply cleanly, RLS coverage, `packages/db` tests, partition maintenance, seed integration                                                       | Yes (Postgres)        |
+| `integration-suite`     | **Merge gate:** the three database-backed jobs above all succeeded; prints the quarantined-test inventory to the run summary                               | No                    |
 | `web-accessibility`     | ST-211 axe budget + keyboard-only walkthrough                                                                                                              | No                    |
 | `mobile-api-client`     | Generated Dart client matches `openapi.json` (no drift) and reaches a live `/healthz`                                                                      | No                    |
 | `mobile-unit-coverage`  | `flutter analyze` (report-only for now), Flutter unit+widget tests, ST-245 coverage gate                                                                   | No                    |
@@ -23,7 +24,18 @@ covers the `CI` workflow itself.
 `database-migrations`, `api-integration`, and `cross-tenant-security` each start their own
 disposable Postgres/Redis via `db/compose.yml` rather than a `services:` block, because the
 Postgres image needs `pg_stat_statements` preloaded via a container command — see those jobs'
-own comments for why.
+own comments for why. Each stops its containers in an `if: always()` step, and the runner itself
+is discarded after the job, so nothing survives a run either way.
+
+### The merge gate and the runtime budget (ST-252)
+
+The three database-backed jobs run in parallel and each carries `timeout-minutes: 12`, so a suite
+that blows the ST-252 runtime budget fails instead of hanging on the 6-hour default; because they
+run in parallel, the wall-clock gate is the slowest of the three, not their sum. `integration-suite`
+`needs:` all three and fails unless every one reports `success` — it does no test work itself, it
+just collapses three results into **one** status check to mark Required in branch protection, so
+that list does not have to be re-edited every time a job is renamed or split. The three jobs still
+report individually for triage.
 
 ## Affected-only Turbo, and its actual cache story
 
@@ -86,6 +98,16 @@ sub-second or are correctness gates that must hold regardless of which files cha
   a `::warning::`; it does not red the job. Restore the hard gate (exit 1 in the "Report analyze
   findings" step) once the backlog is cleared in its own pass.
 
+## Flaky tests
+
+A test that fails without a code change is **quarantined, not retried** — full process in
+[`flaky-test-quarantine.md`](./flaky-test-quarantine.md). It gets a `test.skip` with a
+`QUARANTINE(<ticket>, <date>): <reason>` annotation and a tracking ticket, and must be fixed or
+deleted within two weeks. `integration-suite` runs `.github/scripts/list-quarantined-tests.sh`
+every build and writes the current quarantine set to the run summary so none is forgotten.
+`bun test` runs with no retries anywhere in this workflow; the Playwright suite in `e2e-critical`
+is the sole exception and pairs its retries with a `<2%` flake-rate gate.
+
 ## Coverage
 
 - **JS/TS (`quality`):** `bunx turbo run test ... -- --coverage --coverage-reporter=lcov` (a
@@ -139,14 +161,17 @@ workflow file, and this session had no authenticated `gh`/API access to the repo
 rule for `main`/`dev` → Require status checks to pass):
 
 ```
-CI / cross-tenant-security
-CI / api-integration
-CI / database-migrations
+CI / integration-suite
 CI / quality
 CI / security-scan
 CI / sast
 CI / hooks
 ```
+
+`CI / integration-suite` is the one gate for the three database-backed suites (it fails unless
+`cross-tenant-security`, `api-integration`, and `database-migrations` all succeed), so those three
+do not need to be listed individually — they still show on the PR for triage, but requiring the
+aggregator keeps the list stable across job renames.
 
 `web-accessibility`, `mobile-api-client`, and `mobile-unit-coverage` are deliberately left off that
 list as _recommended-but-optional_ required checks — the team should decide whether a PR that
@@ -164,3 +189,4 @@ bun run --cwd apps/mobile test:coverage && bun run --cwd apps/mobile coverage:ch
 
 `bun run ci:local` runs the non-database subset of this in one command (see `package.json`);
 `ci:local:db` additionally spins up Postgres for the database-backed suites.
+`bun run test:quarantine-list` prints the same quarantined-test inventory `integration-suite` does.
