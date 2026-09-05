@@ -46,7 +46,10 @@
     },
     "test": {
       "dependsOn": ["^build", "generate"],
-      "outputs": [],
+      // "coverage/**" lets a cache hit restore the lcov report the CI coverage-upload step reads,
+      // instead of silently leaving a stale or missing file behind when a package's test task
+      // wasn't re-run.
+      "outputs": ["coverage/**"],
       "env": ["LOCALAPPDATA"]
     }
   }

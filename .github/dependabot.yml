@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Keeps pinned Action/image versions patched (aquasecurity/trivy-action, semgrep/semgrep,
+  # actions/checkout, etc.) -- the versions this CI pins are exactly the surface a supply-chain
+  # dependency scan is supposed to cover, so leaving them to drift unpatched would undercut
+  # security-scan/sast rather than complement them.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

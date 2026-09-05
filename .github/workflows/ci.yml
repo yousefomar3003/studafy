@@ -291,6 +291,12 @@ jobs:
       - name: Generate the Dart API client (ST-062)
         run: bun run client:generate
         working-directory: apps/mobile
+      # apps/mobile's own "lint"/"check-types" scripts are no-ops in the turbo pipeline (see their
+      # package.json) because the generated client above must exist first -- this is that check,
+      # run directly rather than through turbo.
+      - name: flutter analyze
+        run: flutter analyze
+        working-directory: apps/mobile
       # continue-on-error, not a hard stop: a failing test still exercises the lines it reaches
       # before failing, and the coverage gate below needs that lcov.info regardless. The "Fail on
       # any failing test" step at the end still turns this job red when tests fail -- this just
@@ -318,26 +324,116 @@ jobs:
           echo '::error::flutter test reported failing tests -- see the "Run unit and widget tests with coverage" step above.'
           exit 1
 
-  secret-scan:
+  security-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: aquasecurity/trivy-action@master
+      # Pinned to match the trivy-action/trivy versions containers.yml and terraform.yml already
+      # use -- .trivyignore's header documents this pin as the project's trivy baseline; running
+      # an unpinned `@master` here (as this job used to) drifts from that baseline on trivy's own
+      # schedule, not the codebase's.
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
+          version: v0.72.0
           scan-type: fs
           scan-ref: .
-          scanners: secret
+          scanners: secret,vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: "1"
+          trivyignores: .trivyignore
+        env:
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_JAVA_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-java-db:1
+      # Dependency-review is PR-diff-scoped (it compares the base and head manifests), so it has
+      # no meaning on a push -- unlike the trivy scan above, which scans the full tree either way.
+      - name: Review dependency changes for new vulnerabilities/licenses
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  sast:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required by upload-sarif to attach findings to the Security tab and annotate the PR diff
+      # (GitHub Advanced Security must also be enabled for a private repo to get PR-line
+      # annotations from this -- see docs/testing/ci-pipeline.md).
+      security-events: write
+    container:
+      image: semgrep/semgrep:1.176.0
+    steps:
+      - uses: actions/checkout@v4
+      # p/ci is Semgrep's own recommended default ruleset for CI: OWASP Top 10 coverage across
+      # this repo's languages (TS/JS, Dart) without the noisier experimental rulesets. `--error`
+      # is what turns findings into a non-zero exit; without it `semgrep scan` always exits 0.
+      - name: Run Semgrep SAST
+        run: semgrep scan --config p/ci --sarif --output semgrep.sarif --error
+        env:
+          SEMGREP_SEND_METRICS: "off"
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
 
   quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history, not the default shallow clone: resolve-affected-filter.sh needs the PR
+          # base commit (or the pre-push commit) present locally to diff against.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-bun-workspace
+      # Keyed on the commit so today's run always starts from the closest prior state; content
+      # hashing inside turbo (not this cache key) is what actually decides which tasks re-run --
+      # this just carries yesterday's task outputs into today's job so unaffected packages replay
+      # instead of recomputing.
+      - name: Restore Turbo task cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-quality-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-quality-${{ runner.os }}-
+      - name: Resolve the affected-package filter
+        id: affected
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: echo "filter=$(bash .github/scripts/resolve-affected-filter.sh)" >> "$GITHUB_OUTPUT"
       - run: bun run format:check
-      - run: bunx turbo run lint check-types test build --filter=!@studafy/mobile
+      # `--continue=dependencies-successful` surfaces every independent package's failures in one
+      # run instead of stopping at the first, so a PR sees all its annotations at once. Piped
+      # through annotate-diagnostics.mjs to turn tsc/ESLint output into inline PR annotations --
+      # see that script's header for why a GitHub problem matcher can't do this on its own.
+      # `set -o pipefail` is what makes turbo's exit code (not the annotator's) fail the step.
+      - name: Lint, typecheck, build (affected packages)
+        run: |
+          set -o pipefail
+          bunx turbo run lint check-types build --filter=!@studafy/mobile ${{ steps.affected.outputs.filter }} \
+            --log-order=grouped --continue=dependencies-successful \
+            | bun .github/scripts/annotate-diagnostics.mjs
+      # Its own invocation, not folded into the line above: `-- --coverage` forwards to every
+      # underlying script in the command, and lint/check-types/build don't take that flag.
+      - name: Unit tests with coverage (affected packages)
+        run: |
+          bunx turbo run test --filter=!@studafy/mobile ${{ steps.affected.outputs.filter }} \
+            --continue=dependencies-successful -- --coverage --coverage-reporter=lcov
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            apps/*/coverage/lcov.info
+            packages/*/coverage/lcov.info
+          if-no-files-found: warn
       - name: Regenerate the permission matrix and fail on drift
         run: |
           bun run --cwd packages/constants docs:generate
@@ -354,10 +450,11 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-      # oasdiff needs the base revision of the document to compare against. actions/checkout fetches
-      # depth 1, so the base branch is not in the object store; fetch the single commit rather than
-      # paying for full history. The file is written inside the workspace, not $RUNNER_TEMP, because
-      # the step below is a Docker action and only $GITHUB_WORKSPACE is bind-mounted into it.
+      # oasdiff needs the base revision of the document to compare against. The job's checkout is
+      # now fetch-depth: 0 (the affected-filter step above needs the same history), so the base
+      # commit is already in the object store -- no separate fetch needed. The file is written
+      # inside the workspace, not $RUNNER_TEMP, because the step below is a Docker action and only
+      # $GITHUB_WORKSPACE is bind-mounted into it.
       #
       # The exists guard is not hypothetical: the pull request that introduces this workflow has no
       # document on its base branch, and `git show` would take the job down.
@@ -365,10 +462,9 @@ jobs:
         if: github.event_name == 'pull_request'
         id: base_spec
         run: |
-          git fetch --depth=1 origin "$GITHUB_BASE_REF"
           mkdir -p .oasdiff
-          if git cat-file -e FETCH_HEAD:apps/api/openapi.json 2>/dev/null; then
-            git show FETCH_HEAD:apps/api/openapi.json > .oasdiff/base.json
+          if git cat-file -e "${{ github.event.pull_request.base.sha }}:apps/api/openapi.json" 2>/dev/null; then
+            git show "${{ github.event.pull_request.base.sha }}:apps/api/openapi.json" > .oasdiff/base.json
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -429,7 +525,7 @@ jobs:
         working-directory: apps/api
       - run: bun run --cwd packages/ui build-storybook
       - name: Verify Turbo cache replay
-        run: bunx turbo run build --filter=!@studafy/mobile --summarize
+        run: bunx turbo run build --filter=!@studafy/mobile ${{ steps.affected.outputs.filter }} --summarize
 
   hooks:
     runs-on: ubuntu-latest
