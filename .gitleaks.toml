@@ -18,4 +18,9 @@ useDefault = true
     "e9c2d6e9483ad901e1285d69c82cd462ee4eab00", # invitation/service.test.ts: repeated-hex placeholder
     "52c17b55471d6ee78398fbf659fd7e663e6e5e53", # csrf.test.ts: base64 "test-token-32-bytes..." fixture
     "84929bf424322823e4e52fb9c42a1a19718514d0", # idempotency.test.ts: "mismatch-key-1" fixture
+    # This ST-249 PR's own first commit described the stripe-adapter.test.ts fixture above using
+    # the literal "sk_test_" prefix in this file's own comment (fixed in a later commit on the same
+    # PR, along with the same wording in the findings report doc) -- a self-inflicted repeat of the
+    # exact false positive this file exists to allowlist, not a new secret.
+    "1e31f23e37387acc43bd39fa4e0b922635be19de",
   ]
