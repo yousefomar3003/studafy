@@ -247,12 +247,9 @@ export function materialRoutes(
 
   // Audit declarations
   routes.use("/api/academics/materials/upload", auditAction("insert", "materials"));
-  routes.use("/api/academics/materials/{materialId}", auditAction("update", "materials"));
-  routes.use("/api/academics/materials/{materialId}/confirm", auditAction("update", "materials"));
-  routes.use(
-    "/api/academics/materials/{materialId}/ai-visible",
-    auditAction("update", "materials"),
-  );
+  routes.use("/api/academics/materials/:materialId", auditAction("update", "materials"));
+  routes.use("/api/academics/materials/:materialId/confirm", auditAction("update", "materials"));
+  routes.use("/api/academics/materials/:materialId/ai-visible", auditAction("update", "materials"));
 
   routes.openapi(listMaterialsRoute, async (c) => {
     const auth = requireAuth(c);

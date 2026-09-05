@@ -177,7 +177,7 @@ export function attendanceReportRoutes(
   );
   routes.use("/api/attendance/reports/export", auditAction("insert", "report_export_jobs"));
   routes.use(
-    "/api/attendance/reports/export/{jobId}",
+    "/api/attendance/reports/export/:jobId",
     requirePermission(PERMISSIONS.ATTENDANCE_REPORT_EXPORT),
   );
 

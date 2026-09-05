@@ -331,6 +331,21 @@ jobs:
           scanners: secret
           exit-code: "1"
 
+  # ST-249: `secret-scan` above is trivy in `fs` mode — it only ever looks at the working tree at
+  # HEAD, so a secret committed and later deleted (in the same PR or in history already on `dev`)
+  # is invisible to it. gitleaks walks every commit's diff instead, which is what an actual
+  # "secrets scan history" pass needs; `.gitleaks.toml` allowlists the six commits already audited
+  # as synthetic test fixtures (ST-249's security pass report has the detail).
+  secret-scan-history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+
   quality:
     runs-on: ubuntu-latest
     steps:

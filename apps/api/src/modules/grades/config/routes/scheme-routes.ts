@@ -196,19 +196,19 @@ export function schemeRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   // Permission gates
   routes.use(
-    "/api/grades/config/gradebooks/{gradebookId}/scheme",
+    "/api/grades/config/gradebooks/:gradebookId/scheme",
     requirePermission(PERMISSIONS.GRADE_READ),
   );
   routes.use(
-    "/api/grades/config/gradebooks/{gradebookId}/scheme/link",
+    "/api/grades/config/gradebooks/:gradebookId/scheme/link",
     requirePermission(PERMISSIONS.GRADE_UPDATE),
   );
   routes.use("/api/grades/config/schemes", requirePermission(PERMISSIONS.GRADE_READ));
-  routes.use("/api/grades/config/schemes/{schemeId}", requirePermission(PERMISSIONS.GRADE_READ));
+  routes.use("/api/grades/config/schemes/:schemeId", requirePermission(PERMISSIONS.GRADE_READ));
 
   // Audit declarations
   routes.use(
-    "/api/grades/config/gradebooks/{gradebookId}/scheme/link",
+    "/api/grades/config/gradebooks/:gradebookId/scheme/link",
     auditAction("update", "gradebooks"),
   );
   routes.use("/api/grades/config/schemes", auditAction("insert", "grading_schemes"));

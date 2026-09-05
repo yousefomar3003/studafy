@@ -506,14 +506,14 @@ export function aiExamRoutes(deps: {
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to declare
   // its audit intent. Get makes no write; start's substantive write is the session's status/timer
   // columns; submit's is the exam_item_answers it inserts.
-  routes.use("/api/ai/students/{studentId}/exams", auditAction("insert", "exam_sessions"));
-  routes.use("/api/ai/students/{studentId}/exams/{examId}", auditAction("read", "exam_sessions"));
+  routes.use("/api/ai/students/:studentId/exams", auditAction("insert", "exam_sessions"));
+  routes.use("/api/ai/students/:studentId/exams/:examId", auditAction("read", "exam_sessions"));
   routes.use(
-    "/api/ai/students/{studentId}/exams/{examId}/start",
+    "/api/ai/students/:studentId/exams/:examId/start",
     auditAction("update", "exam_sessions"),
   );
   routes.use(
-    "/api/ai/students/{studentId}/exams/{examId}/submit",
+    "/api/ai/students/:studentId/exams/:examId/submit",
     auditAction("insert", "exam_item_answers"),
   );
 

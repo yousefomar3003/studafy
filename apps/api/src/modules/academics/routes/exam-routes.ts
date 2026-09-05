@@ -156,7 +156,7 @@ export function examRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   // Audit declarations
   routes.use("/api/academics/exams", auditAction("insert", "exams"));
-  routes.use("/api/academics/exams/{examId}", auditAction("update", "exams"));
+  routes.use("/api/academics/exams/:examId", auditAction("update", "exams"));
 
   routes.openapi(listExamsRoute, async (c) => {
     const auth = requireAuth(c);

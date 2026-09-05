@@ -152,7 +152,7 @@ const markAllReadRoute = createRoute({
 export function notificationRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  routes.use("/api/notifications/{notificationId}/read", auditAction("update", "notifications"));
+  routes.use("/api/notifications/:notificationId/read", auditAction("update", "notifications"));
   routes.use("/api/notifications/read-all", auditAction("update", "notifications"));
 
   routes.openapi(listNotificationsRoute, async (c) => {

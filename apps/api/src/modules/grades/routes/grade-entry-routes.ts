@@ -321,45 +321,45 @@ export function gradeEntryRoutes(
   routes.use("/api/grades/gradebooks", requirePermission(PERMISSIONS.GRADE_READ));
 
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/assessments",
+    "/api/grades/gradebooks/:gradebookId/assessments",
     requirePermission(PERMISSIONS.GRADE_UPDATE),
   );
-  routes.use("/api/grades/gradebooks/{gradebookId}/assessments", auditAction("insert", "grades"));
+  routes.use("/api/grades/gradebooks/:gradebookId/assessments", auditAction("insert", "grades"));
 
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/entry",
+    "/api/grades/gradebooks/:gradebookId/entry",
     requirePermission(PERMISSIONS.GRADE_READ),
   );
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/grades",
+    "/api/grades/gradebooks/:gradebookId/grades",
     requirePermission(PERMISSIONS.GRADE_UPDATE),
   );
-  routes.use("/api/grades/gradebooks/{gradebookId}/grades", auditAction("update", "grades"));
+  routes.use("/api/grades/gradebooks/:gradebookId/grades", auditAction("update", "grades"));
 
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/submit",
     requirePermission(PERMISSIONS.GRADE_UPDATE),
   );
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/submit",
     auditAction("update", "grade_submissions"),
   );
 
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/decide",
     requirePermission(PERMISSIONS.GRADE_OVERRIDE),
   );
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/decide",
     auditAction("update", "grade_submissions"),
   );
 
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/unlock",
     requirePermission(PERMISSIONS.GRADE_UPDATE),
   );
   routes.use(
-    "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/unlock",
     auditAction("update", "grade_submissions"),
   );
 

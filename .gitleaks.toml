@@ -1,0 +1,21 @@
+title = "Studafy gitleaks config"
+
+# Use gitleaks' full default ruleset; this file only narrows it with an allowlist.
+[extend]
+useDefault = true
+
+# ST-249: audited on 2026-09-05 (`gitleaks detect --log-opts="--all"` against full history).
+# Every hit in these six commits was a synthetic fixture in a *.test.ts file used to exercise
+# token/idempotency-key parsing (a fake refresh token, "mismatch-key-1", a repeated hex placeholder,
+# etc.) — never a real credential. Allowlisting by commit SHA, not by rule or pattern, keeps the
+# allowlist as narrow as gitleaks' schema allows: a genuinely new secret added in any other commit,
+# including a later commit touching these same files, still fails the scan.
+[allowlist]
+  commits = [
+    "d3d28020911ff23f040081adb4d7f4a370b1577a", # stripe-adapter.test.ts: sk_test_placeholder
+    "68d799e04168a657a72c7d27e075c8e86bbd2ca0", # session-http.test.ts: fake refresh token fixture
+    "e1daef0e4062c13daae70e38c3edf31d20cebdae", # opaque-token.test.ts: fake opaque token fixtures
+    "e9c2d6e9483ad901e1285d69c82cd462ee4eab00", # invitation/service.test.ts: repeated-hex placeholder
+    "52c17b55471d6ee78398fbf659fd7e663e6e5e53", # csrf.test.ts: base64 "test-token-32-bytes..." fixture
+    "84929bf424322823e4e52fb9c42a1a19718514d0", # idempotency.test.ts: "mismatch-key-1" fixture
+  ]

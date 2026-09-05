@@ -161,7 +161,7 @@ export function subjectRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   // Audit declarations
   routes.use("/api/academics/subjects", auditAction("insert", "subjects"));
-  routes.use("/api/academics/subjects/{subjectId}", auditAction("update", "subjects"));
+  routes.use("/api/academics/subjects/:subjectId", auditAction("update", "subjects"));
 
   routes.openapi(listSubjectsRoute, async (c) => {
     const auth = requireAuth(c);

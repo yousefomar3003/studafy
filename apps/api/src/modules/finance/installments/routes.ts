@@ -103,7 +103,7 @@ export function installmentRoutes(
   routes.use("/api/finance/fee-schedules/generate", auditAction("insert", "installment_cache"));
 
   routes.use(
-    "/api/finance/students/{studentId}/installments",
+    "/api/finance/students/:studentId/installments",
     requirePermission(PERMISSIONS.BILLING_READ),
   );
   routes.use("/api/finance/fee-schedules/generate", requirePermission(PERMISSIONS.BILLING_UPDATE));

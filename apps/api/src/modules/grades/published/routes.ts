@@ -58,7 +58,7 @@ export function publishedGradeRoutes(
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use(
-    "/api/grades/published/students/{studentId}/terms/{termId}",
+    "/api/grades/published/students/:studentId/terms/:termId",
     requirePermission(PERMISSIONS.GRADE_READ),
   );
 

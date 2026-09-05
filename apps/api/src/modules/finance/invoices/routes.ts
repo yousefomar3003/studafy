@@ -211,7 +211,7 @@ export function financeInvoiceRoutes(
   // its own permission via `requirePermissionIn` instead.
   routes.use("/api/finance/invoices", requirePermission(PERMISSIONS.BILLING_READ));
   routes.use("/api/finance/invoices/batches/*", requirePermission(PERMISSIONS.BILLING_READ));
-  routes.use("/api/finance/invoices/{invoiceId}", requirePermission(PERMISSIONS.BILLING_READ));
+  routes.use("/api/finance/invoices/:invoiceId", requirePermission(PERMISSIONS.BILLING_READ));
 
   routes.use("/api/finance/invoices/batches", auditAction("insert", "invoice_batches"));
 
@@ -226,6 +226,22 @@ export function financeInvoiceRoutes(
     );
 
     return c.json({ invoices: rows.map(toInvoiceResponse), next_cursor }, 200);
+  });
+
+  // ST-249: registered ahead of getInvoiceRoute below, not after — Hono resolves an ambiguous path
+  // by registration order, not specificity, and "/api/finance/invoices/batches" also matches
+  // getInvoiceRoute's "{invoiceId}" pattern with invoiceId="batches". Registered after, this route
+  // was dead: every request to it hit getInvoiceDetail("batches", ...) instead.
+  routes.openapi(listInvoiceBatchesRoute, async (c) => {
+    const auth = requireAuth(c);
+    requirePermissionIn(c, PERMISSIONS.BILLING_READ);
+    const query = c.req.valid("query");
+
+    const { rows, next_cursor } = await withTenantTx(database, tenantFrom(c), (tx) =>
+      listInvoiceBatches(tx, auth.schoolId, query),
+    );
+
+    return c.json({ invoice_batches: rows.map(toBatchResponse), next_cursor }, 200);
   });
 
   routes.openapi(getInvoiceRoute, async (c) => {
@@ -287,18 +303,6 @@ export function financeInvoiceRoutes(
     log?.info({ invoice_batch_id: batch.id, total: batch.total_count }, "invoice batch created");
 
     return c.json(toBatchResponse(batch), 201);
-  });
-
-  routes.openapi(listInvoiceBatchesRoute, async (c) => {
-    const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.BILLING_READ);
-    const query = c.req.valid("query");
-
-    const { rows, next_cursor } = await withTenantTx(database, tenantFrom(c), (tx) =>
-      listInvoiceBatches(tx, auth.schoolId, query),
-    );
-
-    return c.json({ invoice_batches: rows.map(toBatchResponse), next_cursor }, 200);
   });
 
   routes.openapi(getInvoiceBatchRoute, async (c) => {

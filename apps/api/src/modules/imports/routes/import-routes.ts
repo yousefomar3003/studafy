@@ -265,7 +265,7 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
 
   // --- Audit declarations ---
   routes.use("/api/imports/students/upload", auditAction("insert", "student_imports"));
-  routes.use("/api/imports/students/{importId}/confirm", auditAction("update", "student_imports"));
+  routes.use("/api/imports/students/:importId/confirm", auditAction("update", "student_imports"));
 
   // --- Handlers ---
 
@@ -314,6 +314,21 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
     return c.json(toResponse(record), 200);
   });
 
+  // ST-249: registered ahead of getStudentImportRoute below, not after — Hono resolves an
+  // ambiguous path by registration order, not specificity, and "/api/imports/students/template"
+  // also matches getStudentImportRoute's "{importId}" pattern with importId="template".
+  // Registered after, this route was dead: every request to it hit getImport("template", ...)
+  // instead of serving the CSV template.
+  routes.openapi(downloadTemplateRoute, async (_c) => {
+    return new Response(CSV_TEMPLATE, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="student-import-template.csv"',
+      },
+    });
+  });
+
   routes.openapi(getStudentImportRoute, async (c) => {
     const auth = requireAuth(c);
     const { importId } = c.req.valid("param");
@@ -334,16 +349,6 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
     );
 
     return c.json({ imports: rows.map(toResponse), next_cursor }, 200);
-  });
-
-  routes.openapi(downloadTemplateRoute, async (_c) => {
-    return new Response(CSV_TEMPLATE, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="student-import-template.csv"',
-      },
-    });
   });
 
   return routes;

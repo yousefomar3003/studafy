@@ -145,7 +145,7 @@ export function paymentRoutes(
   // BILLING_UPDATE to record money, BILLING_READ to look at it. Registered narrowest-last so the
   // collection path's write permission does not leak onto the read routes.
   routes.use("/api/finance/payments", requirePermission(PERMISSIONS.BILLING_UPDATE));
-  routes.use("/api/finance/payments/{paymentId}", requirePermission(PERMISSIONS.BILLING_READ));
+  routes.use("/api/finance/payments/:paymentId", requirePermission(PERMISSIONS.BILLING_READ));
 
   routes.openapi(createRouteDef, async (c) => {
     const body = c.req.valid("json");

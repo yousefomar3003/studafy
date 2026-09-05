@@ -128,7 +128,7 @@ export function activationRoutes(
   // Declared with the same {token} path string the OpenAPI route uses, matching the sibling
   // invitation routes — the audit-coverage scanner anchors on that exact string. The authoritative
   // audit rows are emitted from inside the activation transaction (activation-service.ts).
-  routes.use("/api/auth/invitations/{token}/activate", auditAction("update", "invitations"));
+  routes.use("/api/auth/invitations/:token/activate", auditAction("update", "invitations"));
 
   routes.openapi(activateAccountRoute, async (c) => {
     const { token } = c.req.valid("param");

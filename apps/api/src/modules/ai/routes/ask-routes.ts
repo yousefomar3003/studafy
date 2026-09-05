@@ -329,7 +329,7 @@ export function aiAskRoutes(deps: {
   // declare its audit intent. This POST's writes are the conversation/message/citation rows; the
   // declaration is metadata (auditAction never writes a row) — the storage-upload precedent, where
   // the mutation's own record is the audit record rather than a parallel audit_logs row.
-  routes.use("/api/ai/students/{studentId}/ask", auditAction("insert", "ai_messages"));
+  routes.use("/api/ai/students/:studentId/ask", auditAction("insert", "ai_messages"));
 
   routes.openapi(askRoute, async (c) => {
     const auth = requireAuth(c);

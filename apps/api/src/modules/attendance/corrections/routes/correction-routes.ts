@@ -109,15 +109,15 @@ export function attendanceCorrectionRoutes(
     : null;
 
   // Audit declarations
-  routes.use("/api/attendance/records/{recordId}", auditAction("update", "attendance_records"));
+  routes.use("/api/attendance/records/:recordId", auditAction("update", "attendance_records"));
 
   // Permission guards
   routes.use(
-    "/api/attendance/records/{recordId}",
+    "/api/attendance/records/:recordId",
     requirePermission(PERMISSIONS.ATTENDANCE_RECORD_CORRECT),
   );
   routes.use(
-    "/api/attendance/records/{recordId}/history",
+    "/api/attendance/records/:recordId/history",
     requirePermission(PERMISSIONS.ATTENDANCE_RECORD_READ),
   );
 
