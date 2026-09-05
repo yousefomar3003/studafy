@@ -291,10 +291,30 @@ jobs:
       - name: Generate the Dart API client (ST-062)
         run: bun run client:generate
         working-directory: apps/mobile
+      # apps/mobile's own "lint"/"check-types" scripts are no-ops in the turbo pipeline (see their
+      # package.json) because the generated client above must exist first -- this is that check,
+      # run directly rather than through turbo.
+      #
+      # continue-on-error, not a hard stop, for the same reason the test step below is: analyze
+      # and test are independent checks, and an analyze failure shouldn't skip the test run (and
+      # then the coverage-upload step below it) and report a confusing second failure on top of
+      # the real one.
+      #
+      # Report-only for now (see "Report analyze findings" below): this job is *new* in the branch
+      # that added it, and the branch touches only CI YAML/scripts -- so every finding it reports
+      # is a pre-existing issue in apps/mobile, not a regression this change introduced. `dart
+      # analyze` has no --baseline-commit equivalent to scope it to the diff the way the sast job
+      # scopes Semgrep, so gating on it here would block unrelated PRs on a pre-existing backlog.
+      # Tracked for its own cleanup pass; flip this back to a hard gate (exit 1) once that lands.
+      - name: flutter analyze
+        id: analyze
+        continue-on-error: true
+        run: flutter analyze
+        working-directory: apps/mobile
       # continue-on-error, not a hard stop: a failing test still exercises the lines it reaches
-      # before failing, and the coverage gate below needs that lcov.info regardless. The "Fail on
-      # any failing test" step at the end still turns this job red when tests fail -- this just
-      # keeps the coverage report (and its artifact) from being skipped along with it.
+      # before failing, and the coverage gate below needs that lcov.info regardless. "Fail on any
+      # failing test" at the end still turns this job red when tests fail -- this just keeps the
+      # coverage report (and its artifact) from being skipped along with it.
       - name: Run unit and widget tests with coverage
         id: test
         continue-on-error: true
@@ -312,32 +332,161 @@ jobs:
             apps/mobile/coverage/lcov.info
             apps/mobile/coverage/coverage-report.md
           if-no-files-found: error
+      # Report-only, not a gate -- see the "flutter analyze" step's comment for why (new job,
+      # CI-only branch, pre-existing findings, no diff-scoping available). Surfaces the result
+      # without redding the job.
+      - name: Report analyze findings
+        if: steps.analyze.outcome == 'failure'
+        run: |
+          echo '::warning::flutter analyze reported issues -- see the "flutter analyze" step above. Report-only for now (pre-existing apps/mobile backlog); not gating this job.'
       - name: Fail on any failing test
         if: steps.test.outcome == 'failure'
         run: |
           echo '::error::flutter test reported failing tests -- see the "Run unit and widget tests with coverage" step above.'
           exit 1
 
-  secret-scan:
+  security-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: aquasecurity/trivy-action@master
+      # Pinned to match the trivy-action/trivy versions containers.yml and terraform.yml already
+      # use -- .trivyignore's header documents this pin as the project's trivy baseline; running
+      # an unpinned `@master` here (as this job used to) drifts from that baseline on trivy's own
+      # schedule, not the codebase's.
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.72.0
           scan-type: fs
           scan-ref: .
-          scanners: secret
+          scanners: secret,vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: "1"
+          trivyignores: .trivyignore
+          # node_modules/build output aren't source; walking them (node_modules alone is ~1100
+          # packages here) is why this job first failed with a context-deadline timeout rather
+          # than a real finding. .claude/.opencode/.serena/.sisyphus are local agent-tool state,
+          # not part of the codebase either.
+          skip-dirs: "**/node_modules,.git,**/.turbo,**/dist,**/build,graphify-out,.claude,.opencode,.serena,.sisyphus"
+          timeout: 10m0s
+        env:
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_JAVA_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-java-db:1
+      # Dependency-review is PR-diff-scoped (it compares the base and head manifests), so it has
+      # no meaning on a push -- unlike the trivy scan above, which scans the full tree either way.
+      #
+      # continue-on-error: the action hard-fails ("Dependency review is not supported on this
+      # repository") unless GitHub's Dependency Graph is enabled -- which, on a private repo,
+      # requires GitHub Advanced Security. Until that's turned on for this repo it can't run, and
+      # that repo-settings gap shouldn't red the whole security-scan job. The trivy step above
+      # already gates on HIGH/CRITICAL dependency CVEs across the full tree; this step only adds
+      # the "newly introduced in this PR" call-out, so losing it as a hard gate is tolerable.
+      # Drop this line once Dependency Graph is enabled (Settings > Security & analysis).
+      - name: Review dependency changes for new vulnerabilities/licenses
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+
+  sast:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required by upload-sarif to attach findings to the Security tab and annotate the PR diff
+      # (GitHub Advanced Security must also be enabled for a private repo to get PR-line
+      # annotations from this -- see docs/testing/ci-pipeline.md).
+      security-events: write
+    container:
+      image: semgrep/semgrep:1.176.0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Full history: --baseline-commit below needs the base/pre-push commit present locally.
+          fetch-depth: 0
+      # Without this, git refuses to run inside a directory it doesn't consider "safe" when the
+      # checkout is owned by a different uid than the container runs as -- the semgrep image's
+      # default user isn't the runner's, unlike the ubuntu-latest-run jobs elsewhere in this file.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # p/ci is Semgrep's own recommended default ruleset for CI: OWASP Top 10 coverage across
+      # this repo's languages (TS/JS, Dart) without the noisier experimental rulesets. `--error`
+      # is what turns findings into a non-zero exit; without it `semgrep scan` always exits 0.
+      #
+      # --baseline-commit scopes the scan to what this PR/push actually changed -- without it,
+      # every PR is gated on this repo's entire pre-existing p/ci backlog (unpinned Action tags,
+      # a couple of bunfig.toml settings, etc.), not just what it touched. Falls back to scanning
+      # everything when resolve-base-sha.sh can't find a usable base (e.g. a branch's first push).
+      - name: Run Semgrep SAST
+        run: |
+          base="$(bash .github/scripts/resolve-base-sha.sh)"
+          semgrep scan --config p/ci --sarif --output semgrep.sarif --error ${base:+--baseline-commit="$base"}
+        env:
+          SEMGREP_SEND_METRICS: "off"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        with:
+          sarif_file: semgrep.sarif
 
   quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history, not the default shallow clone: resolve-affected-filter.sh needs the PR
+          # base commit (or the pre-push commit) present locally to diff against.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-bun-workspace
+      # Keyed on the commit so today's run always starts from the closest prior state; content
+      # hashing inside turbo (not this cache key) is what actually decides which tasks re-run --
+      # this just carries yesterday's task outputs into today's job so unaffected packages replay
+      # instead of recomputing.
+      - name: Restore Turbo task cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .turbo/cache
+          key: turbo-quality-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-quality-${{ runner.os }}-
+      - name: Resolve the affected-package filter
+        id: affected
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: echo "filter=$(bash .github/scripts/resolve-affected-filter.sh)" >> "$GITHUB_OUTPUT"
       - run: bun run format:check
-      - run: bunx turbo run lint check-types test build --filter=!@studafy/mobile
+      # `--continue=dependencies-successful` surfaces every independent package's failures in one
+      # run instead of stopping at the first, so a PR sees all its annotations at once. Piped
+      # through annotate-diagnostics.mjs to turn tsc/ESLint output into inline PR annotations --
+      # see that script's header for why a GitHub problem matcher can't do this on its own.
+      # `set -o pipefail` is what makes turbo's exit code (not the annotator's) fail the step.
+      - name: Lint, typecheck, build (affected packages)
+        run: |
+          set -o pipefail
+          bunx turbo run lint check-types build --filter=!@studafy/mobile ${{ steps.affected.outputs.filter }} \
+            --log-order=grouped --continue=dependencies-successful \
+            | bun .github/scripts/annotate-diagnostics.mjs
+      # Its own invocation, not folded into the line above: `-- --coverage` forwards to every
+      # underlying script in the command, and lint/check-types/build don't take that flag.
+      - name: Unit tests with coverage (affected packages)
+        run: |
+          bunx turbo run test --filter=!@studafy/mobile ${{ steps.affected.outputs.filter }} \
+            --continue=dependencies-successful -- --coverage --coverage-reporter=lcov
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-report
+          path: |
+            apps/*/coverage/lcov.info
+            packages/*/coverage/lcov.info
+          if-no-files-found: warn
       - name: Regenerate the permission matrix and fail on drift
         run: |
           bun run --cwd packages/constants docs:generate
@@ -354,10 +503,11 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-      # oasdiff needs the base revision of the document to compare against. actions/checkout fetches
-      # depth 1, so the base branch is not in the object store; fetch the single commit rather than
-      # paying for full history. The file is written inside the workspace, not $RUNNER_TEMP, because
-      # the step below is a Docker action and only $GITHUB_WORKSPACE is bind-mounted into it.
+      # oasdiff needs the base revision of the document to compare against. The job's checkout is
+      # now fetch-depth: 0 (the affected-filter step above needs the same history), so the base
+      # commit is already in the object store -- no separate fetch needed. The file is written
+      # inside the workspace, not $RUNNER_TEMP, because the step below is a Docker action and only
+      # $GITHUB_WORKSPACE is bind-mounted into it.
       #
       # The exists guard is not hypothetical: the pull request that introduces this workflow has no
       # document on its base branch, and `git show` would take the job down.
@@ -365,10 +515,9 @@ jobs:
         if: github.event_name == 'pull_request'
         id: base_spec
         run: |
-          git fetch --depth=1 origin "$GITHUB_BASE_REF"
           mkdir -p .oasdiff
-          if git cat-file -e FETCH_HEAD:apps/api/openapi.json 2>/dev/null; then
-            git show FETCH_HEAD:apps/api/openapi.json > .oasdiff/base.json
+          if git cat-file -e "${{ github.event.pull_request.base.sha }}:apps/api/openapi.json" 2>/dev/null; then
+            git show "${{ github.event.pull_request.base.sha }}:apps/api/openapi.json" > .oasdiff/base.json
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -429,7 +578,7 @@ jobs:
         working-directory: apps/api
       - run: bun run --cwd packages/ui build-storybook
       - name: Verify Turbo cache replay
-        run: bunx turbo run build --filter=!@studafy/mobile --summarize
+        run: bunx turbo run build --filter=!@studafy/mobile ${{ steps.affected.outputs.filter }} --summarize
 
   hooks:
     runs-on: ubuntu-latest

@@ -5,6 +5,7 @@ storybook-static/
 *.tsbuildinfo
 playwright-report/
 test-results/
+coverage/
 
 # Terraform — see infra/terraform/README.md
 **/.terraform/*

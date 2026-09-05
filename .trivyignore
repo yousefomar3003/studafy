@@ -34,3 +34,30 @@ AWS-0164
 # erpnext image rides the unmodified third-party frappe/erpnext base whose CVE set churns with
 # trivy's DB, so its scan is report-only via the trivy_exit_code matrix field in containers.yml
 # rather than an unmaintainable per-CVE allowlist here.
+
+# --- JS/TS dependencies (bun.lock), found by ci.yml's security-scan job's new vuln scanner --------
+# Both are nested devDependency-tooling transitives (eslint/typescript-eslint's minimatch chain;
+# vite's postcss chain), not runtime/production code paths. A fix exists upstream for each, but
+# bumping them safely needs more than a one-line change: bun has no npm-style *scoped* override
+# (confirmed against bun 1.3.14 -- it warns "does not support nested overrides" and falls back to
+# a flat one), and a flat override is unsafe here -- nanoid in particular has two dependents on
+# genuinely incompatible major versions in this tree (postcss wants ^3.3.x, @scalar/types wants
+# ^5.1.x; forcing one flat version breaks the other). `bun update` (bare or by name) only rewrites
+# ranges declared directly in a workspace package.json, so it can't reach either package the way
+# it's used here. A regenerated bun.lock (`rm bun.lock && bun install`) does resolve both, but on
+# this run also touched ~250 other packages and introduced a new peer-dependency warning against
+# `vite@8.1.3` -- too broad a change to fold into an unrelated CI-pipeline PR. Revisit as its own
+# dependency-update change.
+
+# brace-expansion@5.0.7 (via minimatch@10.2.5, pulled by eslint/@eslint/config-array/
+# @typescript-eslint/typescript-estree) -- DoS via memory exhaustion in expand(). Fixed at 5.0.8.
+CVE-2026-14257
+# Same chain -- DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation.
+# Fixed at 5.0.9.
+CVE-2026-69152
+# nanoid@3.3.15 (via postcss@8.5.16, pulled by vite) -- DoS via infinite loop in ID generation.
+# Fixed at 3.3.18 (the already-present nanoid@5.1.16, used separately by @scalar/types, is
+# unaffected -- it's already past both fixed versions below).
+CVE-2026-67213
+# Same chain -- DoS via negative size input in the non-secure module. Fixed at 3.3.16.
+CVE-2026-67214
