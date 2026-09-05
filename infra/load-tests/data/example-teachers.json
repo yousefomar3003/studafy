@@ -1,0 +1,33 @@
+[
+  {
+    "email": "loadtest.teacher.0001@load.studafy.test",
+    "accessToken": "REPLACE_ME_EXAMPLE_TOKEN",
+    "schoolId": "00000000-0000-0000-0000-000000000001",
+    "classes": [
+      {
+        "classId": "00000000-0000-0000-0000-0000000000c1",
+        "period": 1,
+        "studentIds": [
+          "00000000-0000-0000-0000-0000000000a1",
+          "00000000-0000-0000-0000-0000000000a2",
+          "00000000-0000-0000-0000-0000000000a3"
+        ]
+      }
+    ]
+  },
+  {
+    "email": "loadtest.teacher.0002@load.studafy.test",
+    "accessToken": "REPLACE_ME_EXAMPLE_TOKEN",
+    "schoolId": "00000000-0000-0000-0000-000000000001",
+    "classes": [
+      {
+        "classId": "00000000-0000-0000-0000-0000000000c2",
+        "period": 1,
+        "studentIds": [
+          "00000000-0000-0000-0000-0000000000a4",
+          "00000000-0000-0000-0000-0000000000a5"
+        ]
+      }
+    ]
+  }
+]
