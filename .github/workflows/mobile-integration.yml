@@ -1,0 +1,309 @@
+name: Mobile integration tests
+
+# ST-247 acceptance criteria: "runs on CI device farm for iOS+Android; offline replay passes; flake
+# rate <3%." Two jobs, not one, because they answer different questions:
+#
+#   - `android-emulator` runs on every push to this workflow's own trigger and on a schedule: a
+#     real Android emulator co-located on the runner, reaching a real backend over the same
+#     10.0.2.2 loopback alias `apps/mobile`'s own `dev` AppEnvironment already assumes. This is the
+#     fast, always-green-or-honestly-red signal — no external vendor, no secrets, nothing that can
+#     be down when this job runs.
+#   - `firebase-test-lab` is the literal "device farm" the acceptance criteria names — real iOS and
+#     Android hardware/virtual devices in Google's cloud, which cannot reach the runner's own
+#     localhost, so the backend is tunnelled out over `cloudflared` for the run's lifetime (a fresh,
+#     disposable tunnel per run; nothing but this run's own `.test`-domain seed data is ever behind
+#     it). Gated behind repository secrets (`FIREBASE_TEST_LAB_PROJECT_ID`,
+#     `FIREBASE_TEST_LAB_SA_KEY`) the same way `e2e-critical.yml` gates its ERPNext secrets — until
+#     they're configured this job fails fast with a clear message instead of silently skipping.
+#
+# Neither job runs on every PR: the stack this suite stands up (real Postgres + Redis + apps/api +
+# apps/realtime, plus a full emulator boot or a cloud device rental) is much heavier than `quality`'s
+# per-PR lane — the same tradeoff `e2e-critical.yml` makes for the same reason.
+on:
+  schedule:
+    # 03:30 UTC — after e2e-critical's own 03:00 run so the two heavy suites don't contend for the
+    # same runner pool.
+    - cron: "30 3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  # Matches e2e-critical.yml's own disposable Postgres/Redis credentials — same db/compose.yml,
+  # same ports, same "fixed not dynamic" reasoning (ports.ts's doc comment applies here too).
+  POSTGRES_PASSWORD: studafy_ci_only
+  DATABASE_HOST: 127.0.0.1
+  DATABASE_PORT: "54329"
+  DATABASE_NAME: postgres
+  DATABASE_USER: studafy_test
+  DATABASE_PASSWORD: studafy_ci_only
+  DATABASE_SSL_MODE: disable
+  DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+  REDIS_URL: redis://127.0.0.1:6390
+  API_PORT: "38090"
+  REALTIME_PORT: "38091"
+  # `buildAiCheckoutUrl` (ai_checkout_link.dart) only checks this is non-empty before putting it in
+  # the outbound URL as an opaque query param — the AI-upsell journey never calls
+  # `POST /api/subscriptions/ai/checkout` (that endpoint validates a real, Stripe-synced
+  # `plan_prices` row, which this suite doesn't seed and doesn't need to: it asserts on the URL the
+  # app builds, not on a live Stripe checkout). Any non-empty string is a faithful value here.
+  AI_ADDON_PRICE_ID: integration-test-ai-price
+
+jobs:
+  android-emulator:
+    name: mobile-integration-android-emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bun-workspace
+
+      - name: Build the workspace packages the API and realtime gateway import
+        run: bunx turbo run build --filter=@studafy/api^... --filter=@studafy/realtime^...
+
+      - name: Start disposable Postgres + Redis
+        run: docker compose -f db/compose.yml up -d --wait
+
+      - name: Run migrations
+        run: bun run db:migrate
+
+      - name: Seed the demo tenant (idempotent)
+        run: bun run db:seed
+
+      # Mock OAuth (ST-247's own addition — see oauth/mock-mobile routes) needs both variables set
+      # and a non-production environment; 10.0.2.2 is the Android emulator's alias for the host
+      # loopback, the same one `AppEnvironment.dev`'s defaults already assume.
+      - name: Start the API (mock OAuth enabled)
+        env:
+          PORT: ${{ env.API_PORT }}
+          HOST: 0.0.0.0
+          NODE_ENV: development
+          MOCK_OAUTH_ISSUER_URL: http://10.0.2.2:${{ env.API_PORT }}/mock-idp
+          MOCK_OAUTH_REDIRECT_URI: http://10.0.2.2:${{ env.API_PORT }}/api/auth/oauth/mock/callback
+        run: |
+          nohup bun run --cwd apps/api src/index.ts > api-server.log 2>&1 &
+          echo $! > api-server.pid
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:${{ env.API_PORT }}/healthz > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "::error::API did not become ready within 30s"; cat api-server.log; exit 1
+
+      - name: Start the realtime gateway
+        env:
+          PORT: ${{ env.REALTIME_PORT }}
+          HOST: 0.0.0.0
+        run: |
+          nohup bun run --cwd apps/realtime src/index.ts > realtime-server.log 2>&1 &
+          echo $! > realtime-server.pid
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:${{ env.REALTIME_PORT }}/healthz > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "::error::realtime gateway did not become ready within 30s"; cat realtime-server.log; exit 1
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+        working-directory: apps/mobile
+
+      - name: Generate the Dart API client (ST-062)
+        run: bun run client:generate
+        working-directory: apps/mobile
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | \
+            sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # ST-247 AC: "offline replay test passes" + "flake rate <3%". This runs the whole suite once;
+      # `--dart-define`s point every journey at the servers started above. `resetHomeOnCleanUp` is
+      # left default (a fresh AVD state each run) so a previous run's outbox can never leak into
+      # this one — see attendance_offline_replay_test.dart's own pre-flight check for that failure
+      # mode.
+      - name: Run the integration_test suite on a real Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          working-directory: apps/mobile
+          script: |
+            flutter test integration_test/ \
+              --dart-define=API_BASE_URL=http://10.0.2.2:${{ env.API_PORT }} \
+              --dart-define=REALTIME_BASE_URL=ws://10.0.2.2:${{ env.REALTIME_PORT }} \
+              --dart-define=WEB_BASE_URL=http://10.0.2.2:4174 \
+              --dart-define=AI_ADDON_PRICE_ID=${{ env.AI_ADDON_PRICE_ID }}
+
+      - name: Stop the API and realtime gateway
+        if: always()
+        run: |
+          kill "$(cat api-server.pid)" 2>/dev/null || true
+          kill "$(cat realtime-server.pid)" 2>/dev/null || true
+
+      - name: Stop disposable Postgres + Redis
+        if: always()
+        run: docker compose -f db/compose.yml down
+
+  # The literal "device farm" leg of the acceptance criteria. Requires FIREBASE_TEST_LAB_PROJECT_ID
+  # and FIREBASE_TEST_LAB_SA_KEY (a GCP service account key JSON with Firebase Test Lab + Cloud
+  # Storage permissions) as repository secrets — see docs/testing/mobile-integration-suite.md's "CI
+  # device farm" section for exactly what to provision. Every other journey needs no secrets at all.
+  firebase-test-lab:
+    name: mobile-integration-firebase-test-lab
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bun-workspace
+
+      - name: Build the workspace packages the API and realtime gateway import
+        run: bunx turbo run build --filter=@studafy/api^... --filter=@studafy/realtime^...
+
+      - name: Start disposable Postgres + Redis
+        run: docker compose -f db/compose.yml up -d --wait
+      - name: Run migrations
+        run: bun run db:migrate
+      - name: Seed the demo tenant (idempotent)
+        run: bun run db:seed
+
+      - name: Install cloudflared
+        run: |
+          curl -sL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+            -o /usr/local/bin/cloudflared
+          chmod +x /usr/local/bin/cloudflared
+
+      # Cloud Test Lab devices run in Google's own network, not on this runner — they cannot reach
+      # 127.0.0.1 here the way the Android-emulator job's 10.0.2.2 alias can. A quick tunnel is a
+      # free, no-account, disposable-per-run public HTTPS URL for exactly the run's lifetime; it is
+      # torn down (`always()`, below) as soon as the tests finish either way, and nothing behind it
+      # is anything but this run's own `.test`-domain seed data.
+      - name: Start the API (mock OAuth enabled) and tunnel it publicly
+        run: |
+          PORT=${{ env.API_PORT }} HOST=0.0.0.0 NODE_ENV=development \
+            MOCK_OAUTH_ISSUER_URL=http://127.0.0.1:${{ env.API_PORT }}/mock-idp \
+            MOCK_OAUTH_REDIRECT_URI=http://127.0.0.1:${{ env.API_PORT }}/api/auth/oauth/mock/callback \
+            nohup bun run --cwd apps/api src/index.ts > api-server.log 2>&1 &
+          echo $! > api-server.pid
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:${{ env.API_PORT }}/healthz > /dev/null; then break; fi
+            sleep 1
+          done
+          nohup cloudflared tunnel --url http://127.0.0.1:${{ env.API_PORT }} > tunnel.log 2>&1 &
+          echo $! > tunnel.pid
+          for _ in $(seq 1 30); do
+            URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' tunnel.log | head -1 || true)
+            if [ -n "$URL" ]; then echo "API_PUBLIC_URL=$URL" >> "$GITHUB_ENV"; break; fi
+            sleep 1
+          done
+          if [ -z "${API_PUBLIC_URL:-}" ]; then
+            echo "::error::cloudflared did not produce a public URL within 30s"; cat tunnel.log; exit 1
+          fi
+          # The mock IdP mounts on this same API origin (mock-config.ts) and must resolve to the
+          # *public* URL too — the browser hop this suite drives (FakeOAuthBrowser/apiLoginAs) is a
+          # real HTTP round trip a cloud device makes for itself, not something this job proxies.
+          kill "$(cat api-server.pid)"
+          PORT=${{ env.API_PORT }} HOST=0.0.0.0 NODE_ENV=development \
+            MOCK_OAUTH_ISSUER_URL="$API_PUBLIC_URL/mock-idp" \
+            MOCK_OAUTH_REDIRECT_URI="$API_PUBLIC_URL/api/auth/oauth/mock/callback" \
+            nohup bun run --cwd apps/api src/index.ts > api-server.log 2>&1 &
+          echo $! > api-server.pid
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:${{ env.API_PORT }}/healthz > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "::error::API did not become ready on restart"; cat api-server.log; exit 1
+
+      - name: Start the realtime gateway and tunnel it publicly
+        run: |
+          PORT=${{ env.REALTIME_PORT }} HOST=0.0.0.0 \
+            nohup bun run --cwd apps/realtime src/index.ts > realtime-server.log 2>&1 &
+          echo $! > realtime-server.pid
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:${{ env.REALTIME_PORT }}/healthz > /dev/null; then break; fi
+            sleep 1
+          done
+          nohup cloudflared tunnel --url http://127.0.0.1:${{ env.REALTIME_PORT }} > realtime-tunnel.log 2>&1 &
+          echo $! > realtime-tunnel.pid
+          for _ in $(seq 1 30); do
+            URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' realtime-tunnel.log | head -1 || true)
+            if [ -n "$URL" ]; then echo "REALTIME_PUBLIC_URL=${URL/https/wss}" >> "$GITHUB_ENV"; break; fi
+            sleep 1
+          done
+          if [ -z "${REALTIME_PUBLIC_URL:-}" ]; then
+            echo "::error::cloudflared did not produce a public URL within 30s"; cat realtime-tunnel.log; exit 1
+          fi
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+      - name: Install Flutter dependencies
+        run: flutter pub get
+        working-directory: apps/mobile
+      - name: Generate the Dart API client (ST-062)
+        run: bun run client:generate
+        working-directory: apps/mobile
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_TEST_LAB_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.FIREBASE_TEST_LAB_PROJECT_ID }}
+
+      # One androidTest APK per integration_test file, matching Firebase Test Lab's instrumentation
+      # contract (one `-Ptarget=` compiles in exactly one Dart test's `main()` — see
+      # android/app/src/androidTest/.../MainActivityTest.kt's own doc comment for what that
+      # instrumentation entry point does).
+      - name: Build and run each journey on Firebase Test Lab (Android)
+        working-directory: apps/mobile
+        run: |
+          flutter build apk --debug --dart-define=API_BASE_URL="$API_PUBLIC_URL" \
+            --dart-define=REALTIME_BASE_URL="$REALTIME_PUBLIC_URL" \
+            --dart-define=WEB_BASE_URL="$API_PUBLIC_URL" \
+            --dart-define=AI_ADDON_PRICE_ID=${{ env.AI_ADDON_PRICE_ID }}
+          for f in integration_test/*_test.dart; do
+            echo "::group::$f"
+            (cd android && ./gradlew app:assembleDebugAndroidTest -Ptarget="$f")
+            gcloud firebase test android run \
+              --type instrumentation \
+              --app build/app/outputs/flutter-apk/app-debug.apk \
+              --test build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+              --device model=Pixel7,version=34,locale=en,orientation=portrait \
+              --timeout 10m
+            echo "::endgroup::"
+          done
+
+      # iOS needs a `RunnerUITests` XCUITest target that does not exist in this repo yet — adding
+      # one means editing ios/Runner.xcodeproj/project.pbxproj, which this repo does not attempt
+      # blind (no Xcode available to verify it doesn't corrupt the project file — see
+      # ios/RunnerUITests/RunnerUITests.swift's own doc comment and
+      # docs/testing/mobile-integration-suite.md's "iOS test target" section for the one-time
+      # manual step). This step intentionally fails until that target exists, rather than silently
+      # skipping iOS off the acceptance criteria.
+      - name: Build and run each journey on Firebase Test Lab (iOS)
+        run: |
+          echo "::error::iOS needs a RunnerUITests target added in Xcode first — see docs/testing/mobile-integration-suite.md"
+          exit 1
+
+      - name: Stop the API, realtime gateway, and tunnels
+        if: always()
+        run: |
+          kill "$(cat api-server.pid)" 2>/dev/null || true
+          kill "$(cat realtime-server.pid)" 2>/dev/null || true
+          kill "$(cat tunnel.pid)" 2>/dev/null || true
+          kill "$(cat realtime-tunnel.pid)" 2>/dev/null || true
+      - name: Stop disposable Postgres + Redis
+        if: always()
+        run: docker compose -f db/compose.yml down

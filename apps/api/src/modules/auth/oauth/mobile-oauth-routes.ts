@@ -11,6 +11,13 @@
  * performs the IdP code exchange, validates the id_token, and returns a TokenPair as JSON.
  *
  * The state store is shared with the browser-redirect routes (same in-memory TTL).
+ *
+ * A third "mock" provider sits alongside Google and Microsoft (ST-247) — dev/E2E only, inert
+ * unless `getMockOAuthConfig()` returns non-null (mock-config.ts's own production kill switch).
+ * It exists so the Flutter integration_test suite can drive the real PKCE round trip against the
+ * same mock IdP (`dev/mock-idp.ts`) the browser-redirect mock routes and the web critical-journeys
+ * E2E suite already use — without it, "login" has no mobile-drivable provider at all: Google and
+ * Microsoft both require a real IdP app registration, which CI/E2E environments don't have.
  */
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
@@ -28,6 +35,9 @@ import { validateGoogleIdToken } from "./google-id-token";
 import { MICROSOFT_TOKEN_ENDPOINT, getMicrosoftOAuthConfig } from "./microsoft-config";
 import { validateMicrosoftIdToken } from "./microsoft-id-token";
 import { MOBILE_OAUTH_REDIRECT_URI } from "./mobile-redirect";
+import { MOCK_JWKS_URI, getMockOAuthConfig } from "./mock-config";
+import { validateMockIdToken } from "./mock-id-token";
+import { exchangeCode as exchangeMockCode } from "./mock-route";
 import { generateCodeChallenge, generateCodeVerifier, generateNonce, generateState } from "./pkce";
 import { createStateStore } from "./state-store";
 
@@ -326,6 +336,100 @@ export function mobileOAuthRoutes(
           502,
           ERROR_CODES.OAUTH_PROVIDER_ERROR,
           "Failed to exchange authorization code with Microsoft",
+        );
+      }
+      throw error;
+    }
+  });
+
+  // ----- Mock mobile routes (dev/E2E only, see file header) -----
+
+  routes.openapi(createMobileStartRoute("mock"), async (c) => {
+    if (!getMockOAuthConfig()) {
+      throw new HTTPException(404, { message: "Mock OAuth is not configured" });
+    }
+
+    const state = generateState();
+    const nonce = generateNonce();
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = generateCodeChallenge(codeVerifier);
+
+    stateStore.set(state, { codeVerifier, nonce, createdAt: Date.now() });
+
+    return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
+  });
+
+  routes.openapi(createMobileExchangeRoute("mock"), async (c) => {
+    const { code, state, nonce } = c.req.valid("json");
+    const mockConfig = getMockOAuthConfig();
+    if (!mockConfig) {
+      throw new HTTPException(404, { message: "Mock OAuth is not configured" });
+    }
+
+    const entry = stateStore.get(state);
+    if (!entry) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.OAUTH_STATE_INVALID,
+        "Invalid or expired OAuth state",
+      );
+    }
+    stateStore.delete(state);
+
+    if (entry.nonce !== nonce) {
+      throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
+    }
+
+    try {
+      // The mock IdP's /token returns `access_token`, not `id_token` (see mock-route.ts's file
+      // header), so it gets its own exchange+validate pair rather than the google/microsoft
+      // id_token flow above.
+      const accessToken = await exchangeMockCode(mockConfig.issuer, code, entry.codeVerifier);
+      const claims = await validateMockIdToken(
+        accessToken,
+        mockConfig.issuer,
+        entry.nonce,
+        MOCK_JWKS_URI(mockConfig.issuer),
+      );
+
+      const result = await loginReturningUser(db, config, {
+        subject: claims.sub,
+        provider: "mock",
+        channel: "mobile",
+        logger,
+      });
+
+      switch (result.outcome) {
+        case "LOGIN_SUCCESS": {
+          const body = {
+            access_token: result.tokens.accessToken,
+            token_type: "Bearer" as const,
+            expires_in: result.tokens.accessExpiresInSeconds,
+            session_id: result.tokens.sessionId,
+            refresh_token: result.tokens.refreshToken,
+          };
+          return c.json(body, 200);
+        }
+        case "NO_ACCOUNT":
+          throw new CodedHttpException(
+            403,
+            ERROR_CODES.NO_ACCOUNT,
+            "No account found — ask your school admin for an invitation.",
+          );
+        case "SCHOOL_SUSPENDED":
+          throw new CodedHttpException(
+            403,
+            ERROR_CODES.SCHOOL_SUSPENDED,
+            "Your school's account has been suspended. Contact your administrator.",
+          );
+      }
+    } catch (error) {
+      if (error instanceof CodedHttpException) throw error;
+      if (error instanceof HTTPException) {
+        throw new CodedHttpException(
+          502,
+          ERROR_CODES.OAUTH_PROVIDER_ERROR,
+          "Failed to exchange authorization code with the mock provider",
         );
       }
       throw error;
