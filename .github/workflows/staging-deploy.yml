@@ -5,8 +5,8 @@ name: Staging deploy
 # ever builds into dev's registry (see its own top comment); this workflow builds staging's own
 # signed images (release.yml, same reusable job build-and-sign.yml calls, just a different
 # `environment`) rather than promoting dev's, because dev/staging use separate registries and
-# signing keys (module.registry, one instantiation per environment). prod stays exclusively a
-# human's deliberate release.yml workflow_dispatch — nothing here builds or deploys it.
+# signing keys (module.registry, one instantiation per environment). prod has its own deliberate,
+# approval-gated path (prod-deploy.yml, workflow_dispatch only) — nothing here builds or deploys it.
 on:
   push:
     branches: [main]
