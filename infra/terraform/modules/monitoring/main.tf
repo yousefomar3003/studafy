@@ -101,7 +101,42 @@ locals {
         }
       },
     ] : [],
+    [
+      {
+        # "Deploy annotations appear in monitoring" (staging deploy pipeline acceptance
+        # criterion): a log widget, not a metric one — CloudWatch dashboards have no API to plot a
+        # discrete per-deploy timestamped marker on a live metric graph outside a fixed dashboard
+        # revision, but a Logs Insights table reads the same "what happened and when" question
+        # directly. `.github/workflows/staging-deploy.yml` is the only writer, one line per
+        # migration/deploy/smoke outcome (see that workflow's `annotate` job).
+        type   = "log"
+        x      = 0
+        y      = 18
+        width  = 24
+        height = 6
+        properties = {
+          title  = "Recent deploys"
+          region = var.aws_region
+          view   = "table"
+          query  = "SOURCE '${aws_cloudwatch_log_group.deploys.name}' | fields @timestamp, environment, service, imageTag, status, actor, runUrl | sort @timestamp desc | limit 20"
+        }
+      },
+    ],
   )
+}
+
+# --- Deploy annotations --------------------------------------------------------------------------
+# One structured line per deploy-pipeline outcome (migration halted, service deployed, smoke
+# passed/failed, auto-rollback). The writer is CI (`staging-deploy.yml`'s `annotate` job), not any
+# resource in this module — so, unlike the realtime probe's self-contained IAM above, this module
+# cannot grant its own writer permission without knowing that identity's role ARN. Known gap:
+# whichever role `staging-deploy.yml` assumes (today `AWS_APPLY_ROLE_ARN`, the same identity
+# `deploy.yml` already uses for ECS operations — see infra/deploy/README.md's "Known gaps") needs
+# `logs:CreateLogStream`/`logs:PutLogEvents` on this log group's ARN, attached wherever that role's
+# policy is actually defined; not something this module owns.
+resource "aws_cloudwatch_log_group" "deploys" {
+  name              = "/${var.name_prefix}/deploys"
+  retention_in_days = var.log_retention_days
 }
 
 resource "aws_cloudwatch_metric_alarm" "rds_cpu" {

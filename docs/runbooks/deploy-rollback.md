@@ -71,6 +71,48 @@ revision still exists (`aws ecs describe-task-definition`, so a typo'd revision 
 before touching the live service, not mid-rollback), points the service at it with
 `--force-new-deployment`, waits for `services-stable`, and prints the elapsed wall-clock time.
 
+## Staging auto-deploy
+
+`.github/workflows/staging-deploy.yml` (ST-255) runs everything above automatically on every merge
+to `main`, with no human dispatch — `deploy.yml` above stays the manual, any-environment path;
+this is staging's own continuous counterpart, the same relationship `build-and-sign.yml` already
+has to `release.yml` for dev. Job order:
+
+```
+build (release.yml, environment: staging) → migrate → deploy [api, realtime, workers] → smoke → (rollback if smoke fails) → annotate
+```
+
+**Migration gate.** `migrate` runs before either `deploy` job; `migrate.sh`'s own non-zero exit
+(a failed statement, or `packages/db/src/runner.ts`'s `pg_try_advisory_lock` finding another
+migration process already holding the lock) fails that job, and every downstream job that
+`needs: migrate` is skipped — the pipeline halts with nothing touched. An `alert-migration-failed`
+job opens a GitHub issue (label `deploy-failure`) linking the failed run: no Slack/PagerDuty/SNS
+topic exists in this repo to page into yet (the same gap `docs/runbooks/pgbouncer-conventions.md`'s
+"Known gaps" already flags for the `ClientsWaiting` alarm), so a durable, assignable GitHub issue
+is the interim alert rather than a stand-in for a channel that doesn't exist.
+
+**Post-deploy smoke**, two legs:
+
+- _Synthetics_ — the real edge domain's `/healthz`/`/readyz` (api), retried for up to 30s, plus a
+  check that the synthetic realtime probe (`modules/monitoring`, already running every minute in
+  staging) reported a fresh `RealtimeProbeLatency` datapoint through the deploy window, rather than
+  this job re-implementing its own WebSocket check.
+- _E2E smoke tag_ — `apps/web`'s `playwright.smoke.config.ts` (`bun run e2e:smoke`), run against
+  the real deployed `SMOKE_WEB_URL`/`SMOKE_API_URL`, distinct from `e2e/critical`'s own full-stack
+  suite (that one stands up a disposable Postgres/Redis/api and is meant for pre-release
+  verification, not for asserting the real staging origin still answers post-deploy).
+
+A smoke failure triggers `rollback.sh` for all three services (the same manual command above,
+run automatically) and a second GitHub issue. **This reverts the service images only — not the
+migration.** `packages/db`'s migration runner has no "down" command by design (see
+`infra/deploy/README.md`'s "Staging auto-deploy pipeline"), so every migration must stay
+backward-compatible with the code it might get rolled back to underneath.
+
+**Deploy annotations.** Regardless of outcome, an `annotate` job writes one line
+(`infra/deploy/scripts/annotate-deploy.sh`) to `modules/monitoring`'s deploy log group, rendered as
+the operations dashboard's "Recent deploys" table — the acceptance criterion "deploy annotations
+appear in monitoring."
+
 ## Verifying the acceptance criteria
 
 **"Rolling deploy in staging keeps availability (0 failed synthetic checks during deploy)"** — run

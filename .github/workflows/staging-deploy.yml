@@ -1,0 +1,314 @@
+name: Staging deploy
+
+# Continuous delivery to staging, gated by a migration and a post-deploy smoke check — the
+# automatic counterpart to deploy.yml's manual, any-environment dispatch. build-and-sign.yml only
+# ever builds into dev's registry (see its own top comment); this workflow builds staging's own
+# signed images (release.yml, same reusable job build-and-sign.yml calls, just a different
+# `environment`) rather than promoting dev's, because dev/staging use separate registries and
+# signing keys (module.registry, one instantiation per environment). prod stays exclusively a
+# human's deliberate release.yml workflow_dispatch — nothing here builds or deploys it.
+on:
+  push:
+    branches: [main]
+    paths:
+      [
+        "apps/**",
+        "packages/**",
+        "db/**",
+        "infra/docker/**",
+        "infra/deploy/**",
+        "bun.lock",
+        ".github/workflows/release.yml",
+        ".github/workflows/staging-deploy.yml",
+      ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+  # gh issue create — the "alert" half of "failed migration halts deploy with alert". No
+  # Slack/PagerDuty/SNS topic exists in this repo to page into yet (same gap
+  # docs/runbooks/pgbouncer-conventions.md's "Known gaps" already flags for the ClientsWaiting
+  # alarm); a GitHub issue is the interim alert — real and actionable, not a stand-in for a channel
+  # that doesn't exist.
+  issues: write
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+env:
+  # infra/deploy/scripts/*.sh all key off IMAGE_TAG — the immutable image tag every step below
+  # (build, migrate, deploy, rollback, annotate) refers to. Not the workflow's tagging authority:
+  # release.yml is that, this just carries the same value everywhere it's needed.
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # --- Build ---------------------------------------------------------------------------------
+  # Builds, pushes, cosign-signs, and (for `web`) uploads Sentry source maps for all six images
+  # (api/realtime/workers/web/erpnext/migrations) into staging's registry — identical matrix to
+  # build-and-sign.yml's dev call. `web`/`erpnext` are unused by the jobs below (see
+  # infra/deploy/README.md's "Why not apps/web" and modules/erpnext/README.md's own promotion
+  # story) but are built anyway for the same reason build-and-sign.yml already does: release.yml
+  # has one matrix, not a per-caller subset, and an unused signed image sitting in ECR is inert.
+  build:
+    uses: ./.github/workflows/release.yml
+    with:
+      environment: staging
+      tag: ${{ github.sha }}
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+  # --- Migrate (the gate) ----------------------------------------------------------------------
+  # migrate.sh runs the signed migrations image as a one-off Fargate task; a non-zero exit (a
+  # migration statement fails, or packages/db/src/runner.ts's pg_try_advisory_lock finds another
+  # migration already holding the lock) fails this job before either `deploy` job below runs —
+  # "failed migration halts deploy" needs nothing beyond this job ordering, since migrate.sh
+  # already halts on its own non-zero exit (see that script's own header comment).
+  migrate:
+    needs: build
+    if: vars.AWS_DEPLOYMENTS_ENABLED == 'true'
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      # Every `uses:` in this file is pinned to a commit SHA, not a mutable major-version tag
+      # (`@v4`): this whole file is a fresh addition, so — unlike most `@v4`-style references
+      # elsewhere in this repo, which predate the SAST job's diff-scoped rescan — every line here
+      # is new to the diff and gets caught by semgrep's github-actions-mutable-action-tag rule.
+      # Same reasoning ci.yml's secret-scan-history/gitleaks jobs already document for that rule;
+      # the trailing comment names the exact release each SHA resolved to as of this writing.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.11.4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          # Reuses deploy.yml's existing role choice, not a new one — see infra/deploy/README.md's
+          # "Known gaps" #5 for why no more narrowly-scoped role exists yet.
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      - name: Install deployment utilities
+        run: sudo apt-get update && sudo apt-get install -y gettext-base jq
+      - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
+        working-directory: infra/terraform
+      - run: ./scripts/migrate.sh staging "$IMAGE_TAG"
+        working-directory: infra/deploy
+
+  alert-migration-failed:
+    needs: migrate
+    if: failure() && needs.migrate.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Staging deploy halted: migration failed ($IMAGE_TAG)" \
+            --label "deploy-failure" \
+            --body "$(cat <<EOF
+          migrate.sh failed for staging at commit $IMAGE_TAG — the deploy pipeline halted before
+          any service was touched (see acceptance criteria: "failed migration halts deploy").
+
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          Runbook: docs/runbooks/deploy-rollback.md#staging-auto-deploy
+          EOF
+          )"
+
+  # --- Deploy (rolling update) -------------------------------------------------------------------
+  # Each service is verified, registered, and rolled independently (deploy.sh; no "deploy
+  # everything" wrapper — see docs/runbooks/deploy-rollback.md). The rolling-update behaviour
+  # itself — 0 dropped-below-desiredCount tasks, automatic circuit-breaker rollback if a revision
+  # never stabilizes — is entirely infra/deploy/ecs/*/service.json.tpl's deploymentConfiguration;
+  # nothing in this workflow implements it, it only invokes the script that applies it.
+  deploy:
+    needs: migrate
+    if: vars.AWS_DEPLOYMENTS_ENABLED == 'true'
+    environment: staging
+    strategy:
+      matrix:
+        service: [api, realtime, workers]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.11.4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      - name: Install deployment utilities
+        run: sudo apt-get update && sudo apt-get install -y gettext-base jq
+      - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
+        working-directory: infra/terraform
+      - run: ./scripts/deploy.sh ${{ matrix.service }} staging "$IMAGE_TAG"
+        working-directory: infra/deploy
+
+  # --- Post-deploy smoke -----------------------------------------------------------------------
+  # Two legs, matching the ticket's "synthetics + E2E smoke tag":
+  #   1. Synthetics: the real edge domain's /healthz+/readyz (api), and the already-running
+  #      synthetic realtime probe (modules/monitoring, staging/prod only) — this job checks that
+  #      probe reported a fresh datapoint through the deploy rather than re-inventing its own
+  #      WebSocket check.
+  #   2. E2E smoke tag: apps/web's dedicated smoke suite (playwright.smoke.config.ts), run against
+  #      the real deployed origins. Known gap: apps/web's own deploy path (CDN sync vs. container)
+  #      is undecided (infra/docker/README.md's "Known gaps"; infra/deploy/README.md's "Why not
+  #      apps/web") — until that lands, SMOKE_WEB_URL points at a domain with no verified deploy
+  #      pipeline of its own, the same "written to work, not exercised against a real account" gap
+  #      the rest of infra/deploy already carries.
+  smoke:
+    needs: deploy
+    if: vars.AWS_DEPLOYMENTS_ENABLED == 'true'
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.11.4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
+        working-directory: infra/terraform
+      - name: Resolve staging domains
+        id: domains
+        run: |
+          echo "api=https://$(terraform -chdir=infra/terraform output -raw edge_domain_name)" >> "$GITHUB_OUTPUT"
+          echo "web=https://$(terraform -chdir=infra/terraform output -raw cdn_domain_name)" >> "$GITHUB_OUTPUT"
+      - name: Synthetic check — api edge health
+        run: |
+          for path in /healthz /readyz; do
+            for attempt in $(seq 1 10); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.domains.outputs.api }}$path")
+              [ "$code" = "200" ] && break
+              echo "attempt $attempt: $path returned $code" >&2
+              sleep 3
+            done
+            [ "$code" = "200" ] || { echo "$path never returned 200 (last: $code)" >&2; exit 1; }
+          done
+      - name: Synthetic check — realtime probe reporting fresh datapoints
+        run: |
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%S)
+          SINCE=$(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S)
+          COUNT=$(aws cloudwatch get-metric-statistics \
+            --namespace Studafy/Realtime --metric-name RealtimeProbeLatency \
+            --start-time "$SINCE" --end-time "$NOW" --period 60 --statistics Maximum \
+            --query 'length(Datapoints)' --output text)
+          [ "$COUNT" -gt 0 ] || { echo "no realtime probe datapoints in the last 5 minutes" >&2; exit 1; }
+      - uses: ./.github/actions/setup-bun-workspace
+      - run: bunx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: E2E smoke tag
+        env:
+          SMOKE_WEB_URL: ${{ steps.domains.outputs.web }}
+          SMOKE_API_URL: ${{ steps.domains.outputs.api }}
+        run: bun run e2e:smoke
+        working-directory: apps/web
+
+  # --- Auto-rollback on smoke failure -------------------------------------------------------------
+  # rollback.sh defaults to "current revision - 1", which is exactly the revision `deploy` replaced
+  # a few minutes earlier — the manual path docs/runbooks/deploy-rollback.md already describes,
+  # triggered automatically here instead of by a human running the same command. Does not (and
+  # cannot) revert the migration — see infra/deploy/README.md's "Staging auto-deploy pipeline" for
+  # why migrations are forward-only by design.
+  rollback:
+    needs: [deploy, smoke]
+    if: always() && vars.AWS_DEPLOYMENTS_ENABLED == 'true' && needs.smoke.result == 'failure'
+    environment: staging
+    strategy:
+      matrix:
+        service: [api, realtime, workers]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.11.4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
+        working-directory: infra/terraform
+      - run: ./scripts/rollback.sh ${{ matrix.service }} staging
+        working-directory: infra/deploy
+
+  alert-smoke-failed:
+    needs: [smoke, rollback]
+    if: always() && needs.smoke.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          ROLLBACK_RESULT: ${{ needs.rollback.result }}
+        run: |
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Staging deploy rolled back: smoke check failed ($IMAGE_TAG)" \
+            --label "deploy-failure" \
+            --body "$(cat <<EOF
+          Post-deploy smoke checks failed for staging at commit $IMAGE_TAG. Auto-rollback of
+          api/realtime/workers: $ROLLBACK_RESULT.
+
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          Runbook: docs/runbooks/deploy-rollback.md#staging-auto-deploy
+          EOF
+          )"
+
+  # --- Deploy annotation (always runs) --------------------------------------------------------
+  # "Deploy annotations appear in monitoring": one line to modules/monitoring's deploy log group
+  # regardless of outcome, rendered by the operations dashboard's "Recent deploys" widget.
+  annotate:
+    needs: [migrate, deploy, smoke, rollback]
+    if: always() && vars.AWS_DEPLOYMENTS_ENABLED == 'true'
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.11.4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - name: Install deployment utilities
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
+        working-directory: infra/terraform
+      - name: Determine outcome
+        id: outcome
+        env:
+          MIGRATE: ${{ needs.migrate.result }}
+          DEPLOY: ${{ needs.deploy.result }}
+          SMOKE: ${{ needs.smoke.result }}
+          ROLLBACK: ${{ needs.rollback.result }}
+        run: |
+          if [ "$MIGRATE" != "success" ]; then
+            status="migration_failed"
+          elif [ "$DEPLOY" != "success" ]; then
+            status="deploy_failed"
+          elif [ "$SMOKE" != "success" ]; then
+            status="smoke_failed_rolled_back_${ROLLBACK}"
+          else
+            status="succeeded"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+      - env:
+          SERVICES: api,realtime,workers
+          ACTOR: ${{ github.actor }}
+        run: |
+          ./scripts/annotate-deploy.sh staging "${{ steps.outcome.outputs.status }}" \
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        working-directory: infra/deploy

@@ -38,6 +38,22 @@ The probe publishes to the `school:*` Redis channel the gateway's `PSUBSCRIBE` p
 covers, so the gateway instance holding the probe's socket receives the publish regardless of which
 gateway the ALB routed the connection to.
 
+## Deploy annotations (ST-255)
+
+`aws_cloudwatch_log_group.deploys` (`/<name_prefix>/deploys`) plus the dashboard's "Recent deploys"
+log widget (a Logs Insights table, not a metric graph — CloudWatch has no API to drop a discrete
+timestamped marker on a live metric widget outside a fixed dashboard revision). `infra/deploy/
+scripts/annotate-deploy.sh` is the only writer, called once per outcome from `.github/workflows/
+staging-deploy.yml`'s `annotate` job: one structured line per migration/deploy/smoke result,
+queryable by `environment`/`service`/`status`/`actor` straight from the widget or `aws logs
+start-query`.
+
+**Known gap**: this module cannot grant its own writer permission, because the writer is a GitHub
+Actions role defined outside it. Whichever role `staging-deploy.yml` assumes (today
+`AWS_APPLY_ROLE_ARN`, the same identity `deploy.yml` already reuses for ECS operations — see
+`infra/deploy/README.md`'s "Known gaps") needs `logs:CreateLogStream`/`logs:PutLogEvents` scoped to
+`aws_cloudwatch_log_group.deploys.arn`. Not attached here.
+
 ## Inputs
 
 | Name                                | Type           | Default            | Description                                                                         |
@@ -66,6 +82,7 @@ gateway the ALB routed the connection to.
 | `dashboard_name`               | Operations dashboard name.                                          |
 | `alarm_arns`                   | All action-free alarm ARNs, including the probe alarm when enabled. |
 | `realtime_probe_function_name` | Probe Lambda name, or `null` when the probe is disabled.            |
+| `deploys_log_group_name`       | CloudWatch Logs group the staging deploy pipeline annotates.        |
 
 ## What this module does not do
 
