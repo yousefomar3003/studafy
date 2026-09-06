@@ -10,6 +10,20 @@ on:
       tag:
         description: Immutable release tag, normally the Git commit SHA
         required: true
+  # Lets build-and-sign.yml call this same job on every main merge instead of duplicating the
+  # build/SBOM/provenance/sign matrix below. workflow_call inputs can't use type: choice, so the
+  # caller is trusted to pass a valid environment.
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
+    secrets:
+      SENTRY_AUTH_TOKEN:
+        required: false
 
 permissions:
   contents: read

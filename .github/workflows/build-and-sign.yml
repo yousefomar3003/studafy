@@ -1,0 +1,31 @@
+name: Build and sign images
+
+# Continuous delivery to dev only: staging/prod are separate registries and signing keys
+# (infra/terraform provisions module.registry once per environment), promoted deliberately via
+# release.yml's workflow_dispatch, not picked automatically from a main merge.
+on:
+  push:
+    branches: [main]
+    paths:
+      [
+        "apps/**",
+        "packages/**",
+        "db/**",
+        "infra/docker/**",
+        "bun.lock",
+        ".github/workflows/release.yml",
+        ".github/workflows/build-and-sign.yml",
+      ]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-sign:
+    uses: ./.github/workflows/release.yml
+    with:
+      environment: dev
+      tag: ${{ github.sha }}
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
