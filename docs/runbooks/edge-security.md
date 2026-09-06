@@ -81,6 +81,15 @@ rate-limit loop). Two things worth calling out here:
   requests around the configured limit (AWS's own documented behavior, not a bug in this module).
   Don't treat "blocked at request 301, not exactly 301" as a failure.
 
+## External penetration testing
+
+`module.edge`'s WAF (managed rule groups + the two rate limits above) will mask or truncate an
+external tester's findings if left on unmodified — a blocked payload or a rate-limited source IP
+proves the edge works, not that `apps/api` would have handled the request safely on its own.
+`pentest_allowed_cidrs` (see `modules/edge/README.md`'s "Pen test allowlist") exempts a tester's
+source range from the whole WAF for the engagement's testing window only. Commissioning process,
+scope, and the cross-tenant standing objective: `docs/runbooks/security/st-250-external-pentest-commissioning.md`.
+
 ## Known gaps
 
 - **No target group, no routing.** Same gap called out in the module README — this doc doesn't

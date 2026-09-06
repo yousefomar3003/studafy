@@ -41,6 +41,7 @@ internet ──80/443──► alb security group (module.network) ──► aws
                                                                                  │
                                                                      aws_wafv2_web_acl.this
                                                                      (associated, REGIONAL)
+                                                                       ├─ pentest-allowlist (priority 1, opt-in)
                                                                        ├─ AWSManagedRulesCommonRuleSet
                                                                        ├─ AWSManagedRulesSQLiRuleSet
                                                                        ├─ rate-limit /auth
@@ -67,6 +68,7 @@ security group — there is exactly one place ALB network reachability is define
 
 | Rule                          | Type                                                      | Action                       | Purpose                                                                                                                                                               |
 | ----------------------------- | --------------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pentest-allowlist`           | IP set reference, priority 1 (opt-in, absent by default)  | Allow (terminating)          | Exempts `pentest_allowed_cidrs` from every rule below for an authorized penetration test's testing window. See [Pen test allowlist](#pen-test-allowlist).             |
 | `aws-common-rule-set`         | AWS managed rule group                                    | Group's own (block on match) | `AWSManagedRulesCommonRuleSet` **is** AWS's OWASP Core Rule Set implementation — this satisfies the ticket's "WAF with OWASP core ruleset" literally, not by analogy. |
 | `aws-sqli-rule-set`           | AWS managed rule group                                    | Group's own (block on match) | `AWSManagedRulesSQLiRuleSet`, layered on top per AWS's own guidance that CRS alone under-catches SQLi.                                                                |
 | `rate-limit-auth`             | Rate-based, scoped to `/auth` (`STARTS_WITH`)             | Block                        | `auth_rate_limit` (default 300) requests / 5-min rolling window / source IP.                                                                                          |
@@ -74,6 +76,25 @@ security group — there is exactly one place ALB network reachability is define
 
 `default_action` on the web ACL itself is `allow` — only requests matching one of the rules above
 are blocked; everything else reaches the ALB's listener default action.
+
+## Pen test allowlist
+
+`pentest_allowed_cidrs` (default `[]`, no resources created) exempts a set of source CIDRs from
+every rule in the table above — not just the rate limits, the managed rule groups too — by
+matching them at priority 1, before anything else evaluates. WAFv2 rules run in priority order and
+a terminating `allow`/`block` on an earlier rule wins outright, so a match here never reaches the
+OWASP/SQLi rule groups or the rate limits at all.
+
+This exists for exactly one purpose: during a scoped, time-boxed external penetration test
+(`docs/runbooks/security/st-250-external-pentest-commissioning.md`), the WAF would otherwise mask
+or truncate findings that belong to the application itself — a payload the managed rule group
+blocks, or a source IP the rate limit blocks partway through a test run, tells you the edge works,
+not whether `apps/api` would have handled that request safely on its own. Populate this variable
+with the tester's assigned source range for the engagement's testing window only
+(`TF_VAR_edge_pentest_allowed_cidrs`, same not-committed-to-`*.tfvars` convention as
+`bastion_allowed_ssh_cidrs` — see `infra/terraform/variables.tf`), then re-apply with an explicit
+`[]` once the window closes. Verify it's actually empty between engagements with
+`terraform output edge_pentest_ip_set_arn` (root module) — it should print `null`.
 
 Every rule and the web ACL itself report to CloudWatch metrics (`sampled_requests_enabled = true`,
 so you can pull the actual blocked request from the console, not just the count). Request-level
@@ -123,33 +144,35 @@ done
 
 ## Inputs
 
-| Name                          | Type           | Default                               | Description                                                                  |
-| ----------------------------- | -------------- | ------------------------------------- | ---------------------------------------------------------------------------- |
-| `name_prefix`                 | `string`       | —                                     | Resource name prefix, from `module.naming.name_prefix`.                      |
-| `public_subnet_ids`           | `list(string)` | —                                     | Required, ≥2 entries. From `module.network.public_subnet_ids`.               |
-| `alb_security_group_id`       | `string`       | —                                     | From `module.network.alb_security_group_id`.                                 |
-| `domain_name`                 | `string`       | —                                     | Public hostname, e.g. `api.studafy.com`. Must resolve inside the zone below. |
-| `route53_zone_id`             | `string`       | —                                     | Existing public hosted zone ID, from the shared bootstrap stack.             |
-| `create_dns_record`           | `bool`         | `true`                                | Alias `domain_name` at the ALB. Set `false` if DNS is managed elsewhere.     |
-| `ssl_policy`                  | `string`       | `ELBSecurityPolicy-TLS13-1-2-2021-06` | ALB HTTPS listener security policy.                                          |
-| `enable_deletion_protection`  | `bool`         | `false`                               | Override `true` in `prod.tfvars`.                                            |
-| `idle_timeout`                | `number`       | `60`                                  | ALB idle connection timeout, seconds.                                        |
-| `access_logs_bucket_id`       | `string`       | `null`                                | S3 bucket for ALB access logs. `null` disables logging.                      |
-| `access_logs_prefix`          | `string`       | `"alb"`                               | Key prefix within `access_logs_bucket_id`.                                   |
-| `auth_rate_limit`             | `number`       | `300`                                 | Requests / 5-min / IP on `/auth*` before block. Floor: 100.                  |
-| `schools_register_rate_limit` | `number`       | `100`                                 | Requests / 5-min / IP on `/schools/register` before block. Floor: 100.       |
-| `enable_waf_logging`          | `bool`         | `true`                                | Ship WAF request logs to CloudWatch Logs.                                    |
-| `waf_log_retention_days`      | `number`       | `90`                                  | Retention for WAF request logs.                                              |
+| Name                          | Type           | Default                               | Description                                                                                                     |
+| ----------------------------- | -------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `name_prefix`                 | `string`       | —                                     | Resource name prefix, from `module.naming.name_prefix`.                                                         |
+| `public_subnet_ids`           | `list(string)` | —                                     | Required, ≥2 entries. From `module.network.public_subnet_ids`.                                                  |
+| `alb_security_group_id`       | `string`       | —                                     | From `module.network.alb_security_group_id`.                                                                    |
+| `domain_name`                 | `string`       | —                                     | Public hostname, e.g. `api.studafy.com`. Must resolve inside the zone below.                                    |
+| `route53_zone_id`             | `string`       | —                                     | Existing public hosted zone ID, from the shared bootstrap stack.                                                |
+| `create_dns_record`           | `bool`         | `true`                                | Alias `domain_name` at the ALB. Set `false` if DNS is managed elsewhere.                                        |
+| `ssl_policy`                  | `string`       | `ELBSecurityPolicy-TLS13-1-2-2021-06` | ALB HTTPS listener security policy.                                                                             |
+| `enable_deletion_protection`  | `bool`         | `false`                               | Override `true` in `prod.tfvars`.                                                                               |
+| `idle_timeout`                | `number`       | `60`                                  | ALB idle connection timeout, seconds.                                                                           |
+| `access_logs_bucket_id`       | `string`       | `null`                                | S3 bucket for ALB access logs. `null` disables logging.                                                         |
+| `access_logs_prefix`          | `string`       | `"alb"`                               | Key prefix within `access_logs_bucket_id`.                                                                      |
+| `auth_rate_limit`             | `number`       | `300`                                 | Requests / 5-min / IP on `/auth*` before block. Floor: 100.                                                     |
+| `schools_register_rate_limit` | `number`       | `100`                                 | Requests / 5-min / IP on `/schools/register` before block. Floor: 100.                                          |
+| `pentest_allowed_cidrs`       | `list(string)` | `[]`                                  | CIDRs exempted from the whole WAF for an active pen test window. See [Pen test allowlist](#pen-test-allowlist). |
+| `enable_waf_logging`          | `bool`         | `true`                                | Ship WAF request logs to CloudWatch Logs.                                                                       |
+| `waf_log_retention_days`      | `number`       | `90`                                  | Retention for WAF request logs.                                                                                 |
 
 ## Outputs
 
-| Name                                     | Description                                                             |
-| ---------------------------------------- | ----------------------------------------------------------------------- |
-| `alb_arn`, `alb_dns_name`, `alb_zone_id` | The load balancer.                                                      |
-| `alb_security_group_id`                  | Echoes the input, for convenience.                                      |
-| `https_listener_arn`                     | Attach point for a future compute tier's target groups/listener rules.  |
-| `http_listener_arn`                      | The redirect-only listener — nothing should ever attach rules here.     |
-| `certificate_arn`                        | The validated ACM certificate bound to the HTTPS listener.              |
-| `domain_name`                            | Echoes the input.                                                       |
-| `web_acl_arn`, `web_acl_id`              | The WAFv2 web ACL.                                                      |
-| `waf_log_group_name`                     | Where WAF request logs land. `null` if `enable_waf_logging` is `false`. |
+| Name                                     | Description                                                                                                                   |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `alb_arn`, `alb_dns_name`, `alb_zone_id` | The load balancer.                                                                                                            |
+| `alb_security_group_id`                  | Echoes the input, for convenience.                                                                                            |
+| `https_listener_arn`                     | Attach point for a future compute tier's target groups/listener rules.                                                        |
+| `http_listener_arn`                      | The redirect-only listener — nothing should ever attach rules here.                                                           |
+| `certificate_arn`                        | The validated ACM certificate bound to the HTTPS listener.                                                                    |
+| `domain_name`                            | Echoes the input.                                                                                                             |
+| `web_acl_arn`, `web_acl_id`              | The WAFv2 web ACL.                                                                                                            |
+| `waf_log_group_name`                     | Where WAF request logs land. `null` if `enable_waf_logging` is `false`.                                                       |
+| `pentest_ip_set_arn`                     | ARN of the pentest-allowlist IP set. `null` when `pentest_allowed_cidrs` is empty — check this is `null` between engagements. |

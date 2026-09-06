@@ -213,6 +213,7 @@ module "edge" {
   create_dns_record          = var.edge_create_dns_record
   enable_deletion_protection = var.edge_enable_deletion_protection
   idle_timeout               = var.edge_idle_timeout
+  pentest_allowed_cidrs      = var.edge_pentest_allowed_cidrs
 }
 
 # Not instantiated for dev: the ticket this module implements ("Provision CDN for web assets")

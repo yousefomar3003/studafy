@@ -1,13 +1,30 @@
-# Regional WAFv2 web ACL, associated with the ALB. Two kinds of rule:
+# Regional WAFv2 web ACL, associated with the ALB. Three kinds of rule:
 #
-#   1. AWS managed rule groups (OWASP core rule set + the dedicated SQLi set) — these are what
+#   1. An optional IP-based allow rule (priority 1, so it's evaluated before anything else) for an
+#      authorized penetration test's source CIDRs. WAFv2 rules run in priority order and a
+#      terminating action (allow/block) on an earlier rule wins outright — a match here exits
+#      evaluation before the managed rule groups or rate limits ever run. Empty allow-list by
+#      default: zero resources created, zero behavior change. See pentest_allowed_cidrs.
+#   2. AWS managed rule groups (OWASP core rule set + the dedicated SQLi set) — these are what
 #      block the SQLi/XSS test payloads in the acceptance criteria. AWSManagedRulesCommonRuleSet
 #      IS AWS's OWASP Core Rule Set implementation (that's its literal description in the AWS
 #      docs, not an approximation of one); it already carries baseline SQLi/XSS coverage.
 #      AWSManagedRulesSQLiRuleSet is layered on top because AWS's own guidance is that CRS alone
 #      under-catches SQLi compared to pairing it with the dedicated set.
-#   2. Two rate-based rules scoped to /auth and /schools/register specifically, per the ticket —
+#   3. Two rate-based rules scoped to /auth and /schools/register specifically, per the ticket —
 #      not a blanket rate limit across every path, which would be a different, blunter control.
+
+resource "aws_wafv2_ip_set" "pentest_allowed" {
+  count = length(var.pentest_allowed_cidrs) > 0 ? 1 : 0
+
+  name               = "${var.name_prefix}-pentest-allowed"
+  description        = "Source CIDRs exempted from WAF for an authorized penetration test's testing window. Empty outside an active engagement."
+  scope              = "REGIONAL"
+  ip_address_version = "IPV4"
+  addresses          = var.pentest_allowed_cidrs
+
+  tags = { Name = "${var.name_prefix}-pentest-allowed" }
+}
 
 resource "aws_wafv2_web_acl" "this" {
   name        = "${var.name_prefix}-edge"
@@ -16,6 +33,31 @@ resource "aws_wafv2_web_acl" "this" {
 
   default_action {
     allow {}
+  }
+
+  dynamic "rule" {
+    for_each = length(var.pentest_allowed_cidrs) > 0 ? [1] : []
+
+    content {
+      name     = "pentest-allowlist"
+      priority = 1
+
+      action {
+        allow {}
+      }
+
+      statement {
+        ip_set_reference_statement {
+          arn = aws_wafv2_ip_set.pentest_allowed[0].arn
+        }
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        sampled_requests_enabled   = true
+        metric_name                = "${var.name_prefix}-pentest-allowlist"
+      }
+    }
   }
 
   rule {

@@ -52,3 +52,8 @@ output "waf_log_group_name" {
   description = "CloudWatch Logs group WAF request logs (including every rule match/block) land in. Null if enable_waf_logging is false."
   value       = var.enable_waf_logging ? aws_cloudwatch_log_group.waf[0].name : null
 }
+
+output "pentest_ip_set_arn" {
+  description = "ARN of the pentest-allowlist WAFv2 IP set, for confirming its contents from the AWS CLI during an engagement. Null when pentest_allowed_cidrs is empty (the default)."
+  value       = length(var.pentest_allowed_cidrs) > 0 ? aws_wafv2_ip_set.pentest_allowed[0].arn : null
+}

@@ -91,6 +91,12 @@ variable "schools_register_rate_limit" {
   }
 }
 
+variable "pentest_allowed_cidrs" {
+  description = "CIDRs exempted from every WAF rule (managed rule groups and both rate limits) — not from TLS or the ALB security group, only WAF evaluation. Empty by default (no behavior change, no resources created). Populate for the duration of an authorized external penetration test so findings reflect the application's own behavior instead of being masked or truncated by the edge; see docs/runbooks/security/st-250-external-pentest-commissioning.md. Set via the root module's edge_pentest_allowed_cidrs (TF_VAR_edge_pentest_allowed_cidrs, not committed to *.tfvars — a tester's IP range is a per-engagement fact, not a stable environment one). Set back to [] once the engagement's testing window ends."
+  type        = list(string)
+  default     = []
+}
+
 variable "enable_waf_logging" {
   description = "Whether to ship WAF request logs (every rule match, including blocks) to CloudWatch Logs. Needed to actually verify the SQLi/XSS-block and rate-limit acceptance criteria after the fact, not just at test time."
   type        = bool
