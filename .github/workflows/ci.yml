@@ -563,8 +563,17 @@ jobs:
       # `permissions: pull-requests: write`, a privilege no workflow here grants. Turning both off
       # keeps every document inside CI and keeps the token read-only; a breaking change surfaces as
       # a red job and a step summary instead.
+      #
+      # continue-on-error is conditional on the PR carrying the "version-bump" label (ST-253): a
+      # true expression here makes the step's own failure non-fatal to the job while still recording
+      # outcome: failure, the same continue-on-error-plus-outcome-check idiom the mobile-unit-coverage
+      # job's "flutter analyze" step already uses below. Without the label the expression is false, so
+      # a breaking change fails the job exactly as before -- the label only ever widens the gate for
+      # the one PR that carries it, never for the branch as a whole.
       - name: Detect breaking API changes
         if: github.event_name == 'pull_request' && steps.base_spec.outputs.exists == 'true'
+        id: breaking_check
+        continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'version-bump') }}
         uses: oasdiff/oasdiff-action/breaking@v0.1.6
         with:
           base: .oasdiff/base.json
@@ -572,6 +581,29 @@ jobs:
           fail-on: ERR
           review: false
           github-token: ""
+      # Report-only: makes an intentional, label-approved break visible in the job summary instead
+      # of a silently green job. See the "Detect breaking API changes" step's comment for why
+      # outcome (not conclusion) is the right check here.
+      - name: Report label-bypassed breaking API change
+        if: steps.breaking_check.outcome == 'failure'
+        run: |
+          echo '::warning::Breaking OpenAPI change detected but allowed through via the "version-bump" label -- see the "Detect breaking API changes" step above. Bump the API major version and record the break in docs/api/CHANGELOG.md (see docs/api/api-versioning-policy.md).'
+      # Any contract change -- breaking or additive -- must ship with a changelog entry (ST-253's
+      # acceptance criteria: "additive change passes with changelog note"). Compared as plain files
+      # rather than `git diff`, because .oasdiff/base.json and apps/api/openapi.json are two
+      # different paths, not two revisions of the same path. CHANGELOG.md is compared against the PR
+      # base revision instead, since that file's path is stable across both sides.
+      - name: Require a changelog note for API contract changes
+        if: github.event_name == 'pull_request' && steps.base_spec.outputs.exists == 'true'
+        run: |
+          if diff -q .oasdiff/base.json apps/api/openapi.json > /dev/null; then
+            echo 'apps/api/openapi.json is unchanged; no changelog note required.'
+          elif git diff --quiet "${{ github.event.pull_request.base.sha }}" -- docs/api/CHANGELOG.md; then
+            echo '::error::apps/api/openapi.json changed but docs/api/CHANGELOG.md was not. Add an Unreleased entry describing the change (see docs/api/api-versioning-policy.md).'
+            exit 1
+          else
+            echo 'docs/api/CHANGELOG.md was updated alongside the contract change.'
+          fi
       # Asserts the ST-060 acceptance target. Unlike the two benchmarks below, this one is an
       # absolute wall clock: there is no baseline arm to subtract, because generating the document is
       # the whole program. Median of five spawns, several times the budget in headroom -- see the
@@ -611,6 +643,33 @@ jobs:
       - run: bun run --cwd packages/ui build-storybook
       - name: Verify Turbo cache replay
         run: bunx turbo run build --filter=!@studafy/mobile ${{ steps.affected.outputs.filter }} --summarize
+      # ST-253 acceptance criterion: "clients regenerate deterministically". Regenerating twice and
+      # diffing the byte output is a stronger check than re-running the codegen once and trusting it --
+      # it catches the exact failure mode build-api-client.ts's own normalize() step exists to prevent
+      # (see packages/api-client/scripts/build-api-client.ts), directly, in the pipeline that ships it,
+      # rather than only in that file's own unit test.
+      - name: Regenerate the TypeScript API client twice and diff (determinism check)
+        run: |
+          bun run client:generate
+          cp packages/api-client/src/generated-types.ts "$RUNNER_TEMP/generated-types.first.ts"
+          bun run client:generate
+          if ! diff -q "$RUNNER_TEMP/generated-types.first.ts" packages/api-client/src/generated-types.ts; then
+            echo '::error::packages/api-client/src/generated-types.ts differed across two back-to-back generations from the same apps/api/openapi.json -- client codegen is not deterministic.'
+            exit 1
+          fi
+      # Publishes the exact contract and client this PR would ship, so a reviewer or a downstream
+      # consumer (e.g. someone building against the TS client before it's merged) can pull them
+      # without checking the branch out. Both inputs are gitignored (see .gitignore) precisely so
+      # they never cause merge conflicts -- this is their one durable, inspectable home per run.
+      - name: Publish OpenAPI contract + TypeScript client artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: openapi-contract
+          path: |
+            apps/api/openapi.json
+            packages/api-client/src/generated-types.ts
+          if-no-files-found: error
+          retention-days: 14
 
   hooks:
     runs-on: ubuntu-latest
