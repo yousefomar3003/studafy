@@ -27,4 +27,5 @@ jobs:
     with:
       environment: dev
       tag: ${{ github.sha }}
-    secrets: inherit
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
