@@ -113,58 +113,6 @@ backward-compatible with the code it might get rolled back to underneath.
 the operations dashboard's "Recent deploys" table — the acceptance criterion "deploy annotations
 appear in monitoring."
 
-## Production deploy
-
-`.github/workflows/prod-deploy.yml` — `workflow_dispatch` only, never triggered by a merge. The
-deliberate, approval-gated counterpart to the staging pipeline above; it reuses the same
-`migrate.sh` → `deploy.sh` → `rollback.sh` scripts in the same order. Dispatch it with the image
-`tag` to release (normally a commit SHA on `main`); optionally override `verification_window_minutes`
-(default `10`) and `error_rate_threshold` (default `0.02`).
-
-Job order:
-
-```
-gate ──▶ build (release.yml, environment: prod) ──▶ migrate ──▶ deploy [api, realtime, workers] ──┐
-                                                            └──▶ synthetics ─────────────────────┤
-                                                                                                 ▼
-                                    annotate ◀── (rollback, if synthetics/verify failed) ◀── verify
-dora runs last regardless of outcome.
-```
-
-**Approval gate.** The `gate` job targets the `prod` GitHub Environment. Configure that environment
-with required reviewers (Settings → Environments → `prod` → Required reviewers); until a reviewer
-approves the run, no job after `gate` starts. This is the only enforcement of "prod deploy requires
-approval" — there is deliberately no second check in the YAML to keep in sync. `gate` is also the
-one job not guarded by `AWS_DEPLOYMENTS_ENABLED`, so the approval is exercised even on a dispatch
-that will then no-op.
-
-**Migration gate.** Identical to staging: `migrate` runs before any `deploy`, its non-zero exit
-halts the run with nothing touched, and `alert-migration-failed` opens a `deploy-failure` issue.
-
-**Synthetic checks during the rollout.** `synthetics` runs alongside `deploy`, polling the prod
-edge's `/healthz`+`/readyz` and the realtime probe every 10s until all three services report a
-settled deployment. Any non-200 or stale probe seen while the rollout is in flight fails the job →
-`rollback`. This is the "synthetic checks stay green during rolling update" criterion.
-
-**Verification window + auto-halt.** After the rollout settles, `verify` watches the api+realtime
-ALB target groups' 5xx rate for `verification_window_minutes`. Two consecutive one-minute samples
-over `error_rate_threshold`, or one hard `/healthz` failure, exit the job non-zero → `rollback` +
-`alert-rollout-halted`. **Game-day test:** deploy a knowingly-broken revision (or lower
-`error_rate_threshold` for a run), and the error rate crosses the threshold and the deploy
-auto-halts and rolls back with no operator action.
-
-**Rollback scope.** Same as staging — `rollback.sh` reverts api/realtime/workers one
-task-definition revision; it does **not** revert the migration. A `deploy` job that never
-stabilizes is instead auto-reverted by the ECS deployment circuit breaker, so `rollback` here
-covers only the synthetics/verify failure shapes.
-
-**DORA metrics.** `dora` always runs and emits to the `Studafy/DORA` CloudWatch namespace, dimension
-`Environment=prod`: `Deployments` (frequency), `DeploymentFailed` (change-failure rate is its
-average), `LeadTimeForChangesSeconds`, `TimeToRestoreServiceSeconds` (only when a rollback ran), and
-`DeploymentDurationSeconds`. Nothing graphs them yet — they are emitted so the history exists when a
-dashboard or query is added, and the assuming role needs `cloudwatch:PutMetricData` (see
-`infra/deploy/README.md`'s "Known gaps" #5).
-
 ## Verifying the acceptance criteria
 
 **"Rolling deploy in staging keeps availability (0 failed synthetic checks during deploy)"** — run

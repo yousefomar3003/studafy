@@ -151,22 +151,6 @@ without reading that doc:
 writes one line to `modules/monitoring`'s deploy log group, which the operations dashboard renders
 as a "Recent deploys" table — the "deploy annotations appear in monitoring" acceptance criterion.
 
-## Production deploy pipeline
-
-`.github/workflows/prod-deploy.yml` is the manual, approval-gated production path — `workflow_dispatch`
-only, never a merge trigger. It reuses the same scripts as staging (`migrate.sh` → `deploy.sh` →
-`rollback.sh`) in the same order, and adds four things staging does not have:
-
-- a `gate` job on the `prod` GitHub Environment, whose required-reviewers rule enforces the approval;
-- a `synthetics` job that asserts `/healthz`/`/readyz` and the realtime probe stay green _during_ the
-  rolling update, not just after — a non-200 mid-rollout fails it and triggers `rollback.sh`;
-- a `verify` job that watches the api/realtime ALB target 5xx rate for a configurable window and
-  auto-halts (failing the run, which triggers `rollback.sh`) on an error-rate regression;
-- a `dora` job that emits deployment frequency / lead time / change-failure / time-to-restore to the
-  `Studafy/DORA` CloudWatch namespace.
-
-Full runbook: `docs/runbooks/deploy-rollback.md`'s "Production deploy" section.
-
 ## Known gaps / prerequisites
 
 Gaps 1–3 below are now closed by `infra/terraform/modules/compute` (the "future compute-tier
