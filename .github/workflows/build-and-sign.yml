@@ -3,8 +3,8 @@ name: Build and sign images
 # Continuous delivery to dev's own registry only (infra/terraform provisions module.registry once
 # per environment — dev/staging/prod each get separate repositories and signing keys). staging has
 # its own equivalent continuous pipeline (staging-deploy.yml, ST-255), which builds staging's
-# images via this same release.yml rather than promoting dev's; prod alone stays a deliberate
-# human release.yml workflow_dispatch, never picked automatically from a main merge.
+# images via this same release.yml rather than promoting dev's; prod has its own deliberate,
+# approval-gated pipeline (prod-deploy.yml), never picked automatically from a main merge.
 on:
   push:
     branches: [main]
