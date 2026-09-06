@@ -209,6 +209,19 @@ variable "edge_idle_timeout" {
   default     = 60
 }
 
+variable "edge_pentest_allowed_cidrs" {
+  description = <<-EOT
+    CIDRs exempted from module.edge's WAF for the duration of an authorized external
+    penetration test — see docs/runbooks/security/st-250-external-pentest-commissioning.md.
+    Defaults to [] (no exemption, no behavior change) and is not committed to *.tfvars with a
+    non-empty value: like bastion_allowed_ssh_cidrs, a tester's source range is a per-engagement
+    fact, not a stable environment one. Supply via TF_VAR_edge_pentest_allowed_cidrs only while an
+    engagement's testing window is open, and apply with an explicit [] again once it closes.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 variable "cdn_domain_name" {
   description = <<-EOT
     Public hostname module.cdn's CloudFront distribution serves the apps/web bundle at, e.g.

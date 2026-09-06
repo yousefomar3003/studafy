@@ -223,6 +223,11 @@ output "edge_web_acl_arn" {
   value       = module.edge.web_acl_arn
 }
 
+output "edge_pentest_ip_set_arn" {
+  description = "ARN of the pentest-allowlist WAFv2 IP set. null when edge_pentest_allowed_cidrs is empty (the default) — check this is null between penetration test engagements."
+  value       = module.edge.pentest_ip_set_arn
+}
+
 output "compute_migrations_execution_role_arn" {
   description = "Dedicated ECS execution role for the one-off database migration task."
   value       = module.compute.migrations_execution_role_arn
