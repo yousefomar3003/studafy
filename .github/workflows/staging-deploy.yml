@@ -71,17 +71,23 @@ jobs:
     environment: staging
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      # Every `uses:` in this file is pinned to a commit SHA, not a mutable major-version tag
+      # (`@v4`): this whole file is a fresh addition, so — unlike most `@v4`-style references
+      # elsewhere in this repo, which predate the SAST job's diff-scoped rescan — every line here
+      # is new to the diff and gets caught by semgrep's github-actions-mutable-action-tag rule.
+      # Same reasoning ci.yml's secret-scan-history/gitleaks jobs already document for that rule;
+      # the trailing comment names the exact release each SHA resolved to as of this writing.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: 1.11.4
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           # Reuses deploy.yml's existing role choice, not a new one — see infra/deploy/README.md's
           # "Known gaps" #5 for why no more narrowly-scoped role exists yet.
           role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
           aws-region: eu-central-1
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
       - name: Install deployment utilities
         run: sudo apt-get update && sudo apt-get install -y gettext-base jq
       - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
@@ -128,15 +134,15 @@ jobs:
       fail-fast: false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: 1.11.4
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
           aws-region: eu-central-1
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
       - name: Install deployment utilities
         run: sudo apt-get update && sudo apt-get install -y gettext-base jq
       - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
@@ -162,11 +168,11 @@ jobs:
     environment: staging
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: 1.11.4
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
           aws-region: eu-central-1
@@ -223,11 +229,11 @@ jobs:
       fail-fast: false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: 1.11.4
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
           aws-region: eu-central-1
@@ -269,11 +275,11 @@ jobs:
     environment: staging
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: 1.11.4
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
           aws-region: eu-central-1
