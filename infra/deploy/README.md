@@ -16,7 +16,7 @@ infra/deploy/
 │   └── workers/{task-definition,service}.json.tpl
 ├── erpnext/seed/    — synthetic seed fixtures for the ERPNext plane's seed tenant (see its own README)
 ├── environments/{dev,staging,prod}.env    — replica counts, cpu/memory, rolling-update thresholds
-└── scripts/{render,deploy,rollback,populate-env,erpnext-new-site}.sh
+└── scripts/{render,migrate,deploy,rollback,populate-env,annotate-deploy,erpnext-new-site}.sh
 ```
 
 The ERPNext plane (`infra/terraform/modules/erpnext`) has no `ecs/erpnext/*.json.tpl` pair here —
@@ -124,6 +124,33 @@ provisioned) or a containerized nginx image hasn't been decided (`infra/docker/R
 gaps"). Authoring ECS manifests for it here would be picking that decision by default, silently,
 from the wrong ticket. Out of scope until that's resolved.
 
+## Staging auto-deploy pipeline (ST-255)
+
+`.github/workflows/staging-deploy.yml` runs `migrate.sh` → `deploy.sh` (api/realtime/workers, in
+parallel) → a post-deploy smoke check on every merge to `main`, with no human dispatch — the
+continuous-delivery counterpart to `deploy.yml`'s manual, any-environment dispatch. Full runbook:
+`docs/runbooks/deploy-rollback.md`'s "Staging auto-deploy" section. Two things worth knowing
+without reading that doc:
+
+- **A failed migration halts the pipeline before either `deploy.sh` call runs** — `migrate.sh`'s
+  own non-zero exit does that (see its header comment); nothing new was needed for the "gate," only
+  for turning that halt into a human-visible signal, which is what the workflow's `alert` step (a
+  `gh issue create`) is for. No Slack/PagerDuty/SNS topic exists in this repo to page into yet —
+  same gap `docs/runbooks/pgbouncer-conventions.md`'s "Known gaps" already flags for the
+  `ClientsWaiting` alarm — so a GitHub issue is the interim alert: real, actionable, and zero new
+  secrets, not a placeholder for a channel that doesn't exist.
+- **A smoke failure rolls back the service images, not the migration.** `packages/db`'s migration
+  runner has no "down" command (`cli.ts`'s command set is `migrate|status|validate|pending|seed`
+  only) — migrations are forward-only by design, so `scripts/rollback.sh` reverting api/realtime/
+  workers to their previous task-definition revision after a smoke failure can leave the schema
+  ahead of the code it just rolled back to. This is why every migration in `db/migrations/` must
+  stay backward-compatible with the previous release (expand/contract, additive-first) — a schema
+  rollback story is future work, not something this pipeline attempts.
+
+`infra/deploy/scripts/annotate-deploy.sh` is the pipeline's last step regardless of outcome: it
+writes one line to `modules/monitoring`'s deploy log group, which the operations dashboard renders
+as a "Recent deploys" table — the "deploy annotations appear in monitoring" acceptance criterion.
+
 ## Known gaps / prerequisites
 
 Gaps 1–3 below are now closed by `infra/terraform/modules/compute` (the "future compute-tier
@@ -151,6 +178,15 @@ section is what a reader lands on when a `scripts/deploy.sh` run fails and needs
    the three starts calling AWS directly (e.g. presigned S3 URLs against `modules/storage`), it
    needs a task role — attach `secrets_service_iam_policy_arns.<service>` to it at that point
    (`docs/runbooks/secrets-conventions.md`). Still open; unrelated to 1–3 above.
+
+5. **No IAM role has exactly the permissions `deploy.sh`/`migrate.sh` need.**
+   `modules/registry`'s `deploy_pull` role (environment-scoped via GitHub OIDC) covers only the ECR
+   pull + KMS verify half; the ECS (`RegisterTaskDefinition`/`UpdateService`/`CreateService`/
+   `DescribeServices`) and `iam:PassRole` half this script's own header comment lists has no
+   Terraform-managed role anywhere in this repo yet. `deploy.yml` and `staging-deploy.yml` both
+   work around this today by reusing `AWS_APPLY_ROLE_ARN` (the terraform-apply identity, broader
+   than either half needs) — least-privilege cleanup here is scoping `deploy_pull` up to cover the
+   ECS half, or a new dedicated role, not something this ticket's workflow authored.
 
 `scripts/deploy.sh` and `scripts/rollback.sh` are meant to work as written once `terraform apply`
 and `populate-env.sh` have run against a real AWS account — they were exercised in this ticket

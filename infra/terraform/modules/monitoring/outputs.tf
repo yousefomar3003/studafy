@@ -22,3 +22,8 @@ output "realtime_probe_function_name" {
   description = "Name of the synthetic realtime probe Lambda, or null when the probe is disabled."
   value       = var.probe_enabled ? aws_lambda_function.realtime_probe[0].function_name : null
 }
+
+output "deploys_log_group_name" {
+  description = "CloudWatch Logs group the staging deploy pipeline writes one line per outcome to; rendered as the dashboard's 'Recent deploys' widget."
+  value       = aws_cloudwatch_log_group.deploys.name
+}

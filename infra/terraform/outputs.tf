@@ -248,6 +248,11 @@ output "monitoring_realtime_probe_function_name" {
   value       = module.monitoring.realtime_probe_function_name
 }
 
+output "monitoring_deploys_log_group_name" {
+  description = "CloudWatch Logs group the staging deploy pipeline annotates; read by scripts/annotate-deploy.sh."
+  value       = module.monitoring.deploys_log_group_name
+}
+
 # module.cdn is not instantiated for dev (main.tf's count), so every output below is null there —
 # one(...) rather than [0] indexing so `terraform output` doesn't error out on an empty list.
 output "cdn_web_bundle_bucket_id" {
