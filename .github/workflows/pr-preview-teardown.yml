@@ -1,0 +1,113 @@
+name: PR preview teardown
+
+# Removes a PR's preview environment and verifies nothing billable is left behind:
+#   - on `pull_request: closed`   — tear down that PR's preview
+#   - on a schedule               — sweep: stop any preview task older than PREVIEW_TASK_TTL_HOURS
+#                                   (a backstop for a missed close event, and a hard cost ceiling)
+#   - on workflow_dispatch        — tear down one PR by number, on demand
+#
+# The heavy lifting and the "teardown verified" acceptance check live in
+# infra/deploy/scripts/preview-down.sh: it stops the tasks, deletes the DNS record, drops the
+# database, then re-checks all three and exits non-zero on any residue — which reds this workflow.
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    # Hourly, off the hour. The sweep is cheap (one list-tasks + a describe) when there is nothing
+    # stale, which is the common case.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number whose preview to tear down.
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  # Never cancel a teardown in flight; serialise per PR (and serialise the sweep with itself).
+  group: pr-preview-teardown-${{ github.event.pull_request.number || inputs.pr_number || 'sweep' }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+
+jobs:
+  # --- Tear down one PR's preview --------------------------------------------------------------
+  teardown:
+    if: >-
+      vars.AWS_DEPLOYMENTS_ENABLED == 'true' &&
+      github.event_name != 'schedule' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_PREVIEW_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Tear down and verify
+        env:
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: bash infra/deploy/scripts/preview-down.sh "$PR_NUMBER"
+
+      - name: Update the sticky comment
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/pr-preview-comment.sh torn-down
+
+  # --- Scheduled TTL sweep ------------------------------------------------------------------------
+  sweep:
+    if: vars.AWS_DEPLOYMENTS_ENABLED == 'true' && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_PREVIEW_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Stop preview tasks older than the TTL
+        env:
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
+        run: |
+          set -euo pipefail
+          set -a; source infra/deploy/environments/preview.env; set +a
+          : "${PREVIEW_ECS_CLUSTER:?preview layer not provisioned}"
+          ttl_hours="${PREVIEW_TASK_TTL_HOURS:-72}"
+          cutoff=$(( $(date -u +%s) - ttl_hours * 3600 ))
+
+          mapfile -t arns < <(aws ecs list-tasks --cluster "$PREVIEW_ECS_CLUSTER" \
+            --desired-status RUNNING --query 'taskArns[]' --output text | tr '\t' '\n' | sed '/^$/d')
+          if [ "${#arns[@]}" -eq 0 ]; then echo "no running tasks"; exit 0; fi
+
+          # describe-tasks takes up to 100 ARNs per call; a preview cluster never approaches that.
+          # startedAt is an ISO-8601 string (aws-cli v2 default); `date -d` parses the offset that
+          # jq's fromdateiso8601 cannot, so the age check is done here rather than in jq.
+          stale_prs="$(aws ecs describe-tasks --cluster "$PREVIEW_ECS_CLUSTER" --tasks "${arns[@]}" \
+            --query 'tasks[].[startedBy,startedAt]' --output text \
+            | while read -r started_by started_at; do
+                case "$started_by" in studafy-preview-pr-*) ;; *) continue ;; esac
+                started_epoch="$(date -u -d "$started_at" +%s 2>/dev/null)" || continue
+                [ "$started_epoch" -lt "$cutoff" ] || continue
+                echo "${started_by#studafy-preview-pr-}"
+              done | sort -u)"
+
+          if [ -z "$stale_prs" ]; then echo "nothing older than ${ttl_hours}h"; exit 0; fi
+
+          rc=0
+          while read -r pr; do
+            [ -n "$pr" ] || continue
+            echo "::notice::sweeping stale preview for PR #${pr} (older than ${ttl_hours}h)"
+            bash infra/deploy/scripts/preview-down.sh "$pr" || rc=1
+          done <<< "$stale_prs"
+          exit "$rc"
