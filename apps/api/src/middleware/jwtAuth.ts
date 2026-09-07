@@ -104,6 +104,10 @@ const DEFAULT_PUBLIC_PATHS = [
   // Plan/price listing is pre-signup content (the marketing pricing page reads it anonymously) and
   // the query is not school-scoped — see getActivePlans in subscription-service.ts.
   "/api/subscriptions/plans",
+  // Mobile release floor (ST-257): the native app reads this on launch to decide whether to block
+  // itself behind a forced-update screen — necessarily before it has a session to bear a token.
+  // Exact path, not a prefix: nothing else lives under /api/mobile.
+  "/api/mobile/config",
 ];
 
 function isInvitationSubPath(path: string, action: "verify" | "activate"): boolean {

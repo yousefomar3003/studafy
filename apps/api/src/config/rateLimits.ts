@@ -98,6 +98,10 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/finance/fee-structures/*": "default",
   "/api/finance/expenses": "default",
   "/api/finance/expenses/*": "default",
+  // Mobile release floor (ST-257) — public, unauthenticated, IP-scoped, polled on app launch/resume.
+  // Generous (default) budget: it is a tiny static read, and throttling it hard would only delay a
+  // client learning it must force-update.
+  "/api/mobile/config": "default",
   // AI (metered, tenant+user scoped)
   // "/api/ai/*": "ai",
 };

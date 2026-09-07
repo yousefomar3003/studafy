@@ -6,6 +6,7 @@ import '../auth/auth_providers.dart';
 import '../config/app_config.dart';
 import '../network/network_config.dart';
 import '../router/app_router.dart';
+import '../update/update_providers.dart';
 
 final appConfigProvider = Provider<AppConfig>((ref) {
   throw StateError('AppConfig must be provided during app bootstrap.');
@@ -25,19 +26,22 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   // One GoRouter for the provider's lifetime: recreating it on every auth change (rather than
   // just re-running its redirect) abandons whatever async route resolution was already in
-  // flight, which can leave the app stuck on a blank page. `refreshListenable` re-runs
-  // `authGuard`'s redirect on this same instance whenever auth status flips (restore
-  // completes, login, logout) instead.
-  final authRefresh = _AuthRefreshListenable(ref);
-  ref.onDispose(authRefresh.dispose);
+  // flight, which can leave the app stuck on a blank page. `refreshListenable` re-runs the
+  // redirect on this same instance whenever auth status flips (restore completes, login, logout),
+  // and also when the forced-update decision resolves — so a build below the floor is pinned to
+  // /forced-update the moment `updateStatusProvider` reports it.
+  final routerRefresh = _RouterRefreshListenable(ref);
+  ref.onDispose(routerRefresh.dispose);
 
-  return createAppRouter(appConfig: appConfig, refreshListenable: authRefresh);
+  return createAppRouter(appConfig: appConfig, refreshListenable: routerRefresh);
 });
 
-/// Bridges [authStatusProvider] changes to a [Listenable] `GoRouter.refreshListenable` can
-/// observe — Riverpod providers aren't `Listenable` themselves.
-class _AuthRefreshListenable extends ChangeNotifier {
-  _AuthRefreshListenable(Ref ref) {
+/// Bridges the providers the router's redirect reads — [authStatusProvider] and
+/// [updateStatusProvider] — to a [Listenable] `GoRouter.refreshListenable` can observe, since
+/// Riverpod providers aren't `Listenable` themselves.
+class _RouterRefreshListenable extends ChangeNotifier {
+  _RouterRefreshListenable(Ref ref) {
     ref.listen(authStatusProvider, (previous, next) => notifyListeners());
+    ref.listen(updateStatusProvider, (previous, next) => notifyListeners());
   }
 }

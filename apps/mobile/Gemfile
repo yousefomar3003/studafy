@@ -1,0 +1,11 @@
+# Ruby toolchain for the mobile release lane (ST-257). fastlane only — every plugin this repo
+# would otherwise reach for (flutter_version, versioning) is replaced by a few lines of Fastfile,
+# so there is no Pluginfile and no plugin supply chain to pin.
+#
+# Pinned exact, matching this repo's "no mutable version references" posture (see
+# .github/workflows/staging-deploy.yml's SHA-pinned actions). `bundle install` in CI resolves and
+# writes Gemfile.lock; committing that lock once it has been generated on a real machine is the
+# follow-up — see docs/runbooks/mobile-release.md#toolchain.
+source "https://rubygems.org"
+
+gem "fastlane", "2.228.0"

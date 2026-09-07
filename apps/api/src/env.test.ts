@@ -225,4 +225,33 @@ describe("loadEnv", () => {
       loadEnv({ AI_LLM_ENABLED: "true", ANTHROPIC_API_KEY: "sk-test", AI_LLM_TIMEOUT_MS: "500" }),
     ).toThrow(EnvValidationError);
   });
+
+  test("passes through the mobile release floor / latest versions when set", () => {
+    const env = loadEnv({
+      MOBILE_MIN_SUPPORTED_VERSION_IOS: "1.2.0",
+      MOBILE_LATEST_VERSION_IOS: "1.5.1",
+      MOBILE_MIN_SUPPORTED_VERSION_ANDROID: "1.3.0",
+      MOBILE_LATEST_VERSION_ANDROID: "1.5.0",
+    });
+
+    expect(env.MOBILE_MIN_SUPPORTED_VERSION_IOS).toBe("1.2.0");
+    expect(env.MOBILE_LATEST_VERSION_IOS).toBe("1.5.1");
+    expect(env.MOBILE_MIN_SUPPORTED_VERSION_ANDROID).toBe("1.3.0");
+    expect(env.MOBILE_LATEST_VERSION_ANDROID).toBe("1.5.0");
+  });
+
+  test("leaves the mobile release versions undefined when unset", () => {
+    const env = loadEnv({});
+
+    expect(env.MOBILE_MIN_SUPPORTED_VERSION_IOS).toBeUndefined();
+    expect(env.MOBILE_LATEST_VERSION_ANDROID).toBeUndefined();
+  });
+
+  test("rejects a mobile release version that is not x.y.z", () => {
+    expect(() => loadEnv({ MOBILE_MIN_SUPPORTED_VERSION_IOS: "1.2" })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ MOBILE_LATEST_VERSION_IOS: "1.2.3-beta" })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ MOBILE_MIN_SUPPORTED_VERSION_ANDROID: "v1.2.3" })).toThrow(
+      EnvValidationError,
+    );
+  });
 });

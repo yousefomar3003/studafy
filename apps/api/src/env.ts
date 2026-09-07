@@ -180,6 +180,29 @@ export const envSchema = z
       .enum(["true", "false"])
       .optional()
       .transform((value) => value === "true"),
+    // Mobile release floor / latest versions, served verbatim at GET /api/mobile/config (ST-257).
+    // Operational config, not code: the mobile app polls the endpoint and blocks itself below
+    // MIN_SUPPORTED, so raising the floor mid-rollout is an env change on this service, never an
+    // app release. All optional — an unset value resolves to "0.0.0" in the route (mobileConfigRoutes),
+    // which the client reads as "no floor" / "no newer build advertised". `x.y.z` only, matching
+    // Flutter's `pubspec.yaml` version-name grammar (the `+build` suffix is not part of the compare).
+    // See docs/runbooks/mobile-release.md#forced-update-floor.
+    MOBILE_MIN_SUPPORTED_VERSION_IOS: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, "expected a x.y.z version")
+      .optional(),
+    MOBILE_MIN_SUPPORTED_VERSION_ANDROID: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, "expected a x.y.z version")
+      .optional(),
+    MOBILE_LATEST_VERSION_IOS: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, "expected a x.y.z version")
+      .optional(),
+    MOBILE_LATEST_VERSION_ANDROID: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, "expected a x.y.z version")
+      .optional(),
   })
   .superRefine((env, context) => {
     // Checked before the NODE_ENV gate below: this constraint keys off the deployment tier, and a

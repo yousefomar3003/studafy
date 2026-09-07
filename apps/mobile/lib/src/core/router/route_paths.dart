@@ -2,6 +2,10 @@ abstract final class RoutePaths {
   static const home = '/';
   static const login = '/login';
 
+  /// The blocking forced-update screen. `forcedUpdateGuard` pins every route here while the
+  /// running build is below the release floor served by `GET /api/mobile/config`.
+  static const forcedUpdate = '/forced-update';
+
   /// The signed-in student's personal attendance history. Distinct from [attendance], which is
   /// a course-scoped notification deep link.
   static const studentAttendance = '/me/attendance';

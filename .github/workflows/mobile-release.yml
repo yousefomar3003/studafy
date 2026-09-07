@@ -1,0 +1,324 @@
+name: Mobile release
+
+# The mobile counterpart to staging-deploy.yml / prod-deploy.yml (ST-257). fastlane
+# (apps/mobile/fastlane/Fastfile) owns every store interaction; this workflow only decides which
+# lane runs when, and prepares the build inputs Flutter needs.
+#
+#   push to main (apps/mobile/**)   → android internal  + ios beta    — internal builds auto-distribute
+#   push tag mobile-v*              → android release    + ios release — staged store submission
+#   workflow_dispatch(rollout)      → android promote_rollout          — advance the live rollout
+#
+# Every job fails fast with a named error when its store credentials are absent, the same posture
+# mobile-integration.yml takes for its Firebase Test Lab secrets — never a silent skip.
+#
+# Every `uses:` is pinned to a commit SHA, not a mutable tag: this file is new to the diff, so
+# semgrep's github-actions-mutable-action-tag rule (ci.yml's SAST job) catches every line — the
+# same reasoning staging-deploy.yml documents. The trailing comment names the release each SHA is.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/mobile-release.yml"
+    tags:
+      - "mobile-v*"
+  workflow_dispatch:
+    inputs:
+      rollout:
+        description: "Play production rollout fraction to advance to, 0..1 (1.0 completes it)."
+        required: true
+        default: "0.25"
+
+permissions:
+  contents: read
+
+concurrency:
+  # One release action at a time; never cancel one mid-upload.
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.44.8" # in step with ci.yml / mobile-integration.yml
+  RUBY_VERSION: "3.3"
+
+jobs:
+  # --- Android: internal track on every merge to main -----------------------------------------
+  android-internal:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: mobile-release-android-internal
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0 # MOBILE_BUILD_NUMBER is the commit count — needs full history
+
+      - name: Verify Play credentials are configured
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          missing=()
+          [ -n "$PLAY_STORE_JSON_KEY" ] || missing+=("PLAY_STORE_JSON_KEY")
+          [ -n "$ANDROID_UPLOAD_KEYSTORE_BASE64" ] || missing+=("ANDROID_UPLOAD_KEYSTORE_BASE64")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::mobile release needs these repository secrets: ${missing[*]} — see docs/runbooks/mobile-release.md#secrets"
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Emit apps/api's OpenAPI document (the Dart client generates from it)
+        run: bunx turbo run generate --filter=@studafy/api
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - name: Install Flutter dependencies and generate the Dart API client (ST-062)
+        working-directory: apps/mobile
+        run: |
+          flutter pub get
+          bun run client:generate
+
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: apps/mobile
+
+      - name: fastlane android internal
+        working-directory: apps/mobile
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          # fastlane's json_key_file wants a path, and the secret is the JSON itself.
+          printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
+          # The version code / build number is this commit's position in history — monotonic and
+          # derivable anywhere, so it never has to be hand-bumped.
+          export MOBILE_BUILD_NUMBER="$(git rev-list --count HEAD)"
+          bundle exec fastlane android internal
+
+  # --- iOS: TestFlight on every merge to main -------------------------------------------------
+  ios-beta:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: mobile-release-ios-beta
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Verify App Store Connect + match credentials are configured
+        env:
+          APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: |
+          missing=()
+          [ -n "$APP_STORE_CONNECT_KEY_CONTENT" ] || missing+=("APP_STORE_CONNECT_KEY_CONTENT")
+          [ -n "$MATCH_GIT_URL" ] || missing+=("MATCH_GIT_URL")
+          [ -n "$MATCH_PASSWORD" ] || missing+=("MATCH_PASSWORD")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::mobile release needs these repository secrets: ${missing[*]} — see docs/runbooks/mobile-release.md#secrets"
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Emit apps/api's OpenAPI document (the Dart client generates from it)
+        run: bunx turbo run generate --filter=@studafy/api
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - name: Install Flutter dependencies and generate the Dart API client (ST-062)
+        working-directory: apps/mobile
+        run: |
+          flutter pub get
+          bun run client:generate
+
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: apps/mobile
+
+      - name: fastlane ios beta
+        working-directory: apps/mobile
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+          APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: |
+          export MOBILE_BUILD_NUMBER="$(git rev-list --count HEAD)"
+          bundle exec fastlane ios beta
+
+  # --- Android: production @ 10% staged rollout on a mobile-v* tag ---------------------------
+  android-release:
+    if: startsWith(github.ref, 'refs/tags/mobile-v')
+    name: mobile-release-android-store
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Verify Play credentials are configured
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          missing=()
+          [ -n "$PLAY_STORE_JSON_KEY" ] || missing+=("PLAY_STORE_JSON_KEY")
+          [ -n "$ANDROID_UPLOAD_KEYSTORE_BASE64" ] || missing+=("ANDROID_UPLOAD_KEYSTORE_BASE64")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::mobile release needs these repository secrets: ${missing[*]} — see docs/runbooks/mobile-release.md#secrets"
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Emit apps/api's OpenAPI document (the Dart client generates from it)
+        run: bunx turbo run generate --filter=@studafy/api
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - name: Install Flutter dependencies and generate the Dart API client (ST-062)
+        working-directory: apps/mobile
+        run: |
+          flutter pub get
+          bun run client:generate
+
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: apps/mobile
+
+      - name: fastlane android release (10% rollout)
+        working-directory: apps/mobile
+        env:
+          MOBILE_RELEASE_TAG: ${{ github.ref_name }}
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
+          export MOBILE_BUILD_NUMBER="$(git rev-list --count HEAD)"
+          bundle exec fastlane android release
+
+      - name: Compute the forced-update floor this release implies
+        working-directory: apps/mobile
+        run: bundle exec fastlane update_floor
+
+  # --- iOS: App Store review + phased release on a mobile-v* tag -----------------------------
+  ios-release:
+    if: startsWith(github.ref, 'refs/tags/mobile-v')
+    name: mobile-release-ios-store
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Verify App Store Connect + match credentials are configured
+        env:
+          APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: |
+          missing=()
+          [ -n "$APP_STORE_CONNECT_KEY_CONTENT" ] || missing+=("APP_STORE_CONNECT_KEY_CONTENT")
+          [ -n "$MATCH_GIT_URL" ] || missing+=("MATCH_GIT_URL")
+          [ -n "$MATCH_PASSWORD" ] || missing+=("MATCH_PASSWORD")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::mobile release needs these repository secrets: ${missing[*]} — see docs/runbooks/mobile-release.md#secrets"
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Emit apps/api's OpenAPI document (the Dart client generates from it)
+        run: bunx turbo run generate --filter=@studafy/api
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - name: Install Flutter dependencies and generate the Dart API client (ST-062)
+        working-directory: apps/mobile
+        run: |
+          flutter pub get
+          bun run client:generate
+
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: apps/mobile
+
+      - name: fastlane ios release (submit for review, phased release)
+        working-directory: apps/mobile
+        env:
+          MOBILE_RELEASE_TAG: ${{ github.ref_name }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+          APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: |
+          export MOBILE_BUILD_NUMBER="$(git rev-list --count HEAD)"
+          bundle exec fastlane ios release
+
+  # --- Android: advance the live production rollout (10% → 25% → 50% → 100%) -----------------
+  android-promote-rollout:
+    if: github.event_name == 'workflow_dispatch'
+    name: mobile-release-android-promote-rollout
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Verify Play credentials are configured
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+        run: |
+          if [ -z "$PLAY_STORE_JSON_KEY" ]; then
+            echo "::error::PLAY_STORE_JSON_KEY is not configured — see docs/runbooks/mobile-release.md#secrets"
+            exit 1
+          fi
+
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: apps/mobile
+
+      - name: fastlane android promote_rollout
+        working-directory: apps/mobile
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+        run: |
+          printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
+          export MOBILE_BUILD_NUMBER="$(git rev-list --count HEAD)"
+          bundle exec fastlane android promote_rollout rollout:${{ inputs.rollout }}

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/ai/presentation/ai_usage_screen.dart';
@@ -17,15 +18,36 @@ import '../../features/student/presentation/exams_screen.dart';
 import '../auth/auth_guard.dart';
 import '../config/app_config.dart';
 import '../config/app_environment.dart';
+import '../update/forced_update_screen.dart';
+import '../update/update_providers.dart';
+import '../update/update_status.dart';
 import 'route_paths.dart';
 
 GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListenable}) {
   return GoRouter(
     debugLogDiagnostics: appConfig.environment == AppEnvironment.dev,
     initialLocation: RoutePaths.home,
-    redirect: (context, state) => authGuard(context, state),
+    // Forced-update first, and it fully owns the decision when it fires: a build below the release
+    // floor is pinned to /forced-update regardless of auth state, and authGuard never runs (it
+    // would otherwise bounce an unauthenticated user off /forced-update to /login). authGuard runs
+    // only once the update check has let the app through. `updateStatusProvider` is fail-open — a
+    // still-loading or errored check reads as "not required" here.
+    redirect: (context, state) {
+      final updateRequired =
+          ProviderScope.containerOf(context).read(updateStatusProvider).valueOrNull ==
+          UpdateStatus.updateRequired;
+      final onForcedUpdate = state.matchedLocation == RoutePaths.forcedUpdate;
+
+      if (updateRequired) return onForcedUpdate ? null : RoutePaths.forcedUpdate;
+      if (onForcedUpdate) return RoutePaths.home;
+      return authGuard(context, state);
+    },
     refreshListenable: refreshListenable,
     routes: [
+      GoRoute(
+        path: RoutePaths.forcedUpdate,
+        builder: (context, state) => const ForcedUpdateScreen(),
+      ),
       GoRoute(path: RoutePaths.login, builder: (context, state) => const LoginScreen()),
       GoRoute(path: RoutePaths.home, builder: (context, state) => const AppShell()),
 

@@ -105,6 +105,7 @@ import {
   publishedGradeRoutes,
 } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
+import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { childComparisonRoutes } from "./modules/reports";
 import { storageRoutes } from "./modules/storage";
@@ -138,6 +139,7 @@ import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
 import type { AiModelTier, LlmProvider } from "./modules/ai";
 import type { KeyStore } from "./modules/auth";
+import type { MobileReleaseConfig } from "./modules/mobile";
 import type { PaymentProviderPort } from "./modules/subscriptions";
 import type { RedisClient } from "./redis";
 
@@ -237,6 +239,16 @@ export interface AppOptions {
    * contract does not depend on a deployment's environment) and answer 503 at request time.
    */
   stripeProvider?: PaymentProviderPort | null;
+  /**
+   * Mobile release floor / latest versions served at `GET /api/mobile/config` (ST-257).
+   *
+   * Threaded from this service's environment by src/index.ts (`resolveMobileReleaseConfig`), so
+   * raising the forced-update floor is an env change, not a code change. Defaulted to
+   * `EMPTY_MOBILE_RELEASE_CONFIG` (every field `0.0.0` — "no floor"): the route mounts and answers
+   * unconditionally, like the health probes, so the published contract never depends on whether a
+   * deployment has set the variables.
+   */
+  mobileReleaseConfig?: MobileReleaseConfig;
 }
 
 /**
@@ -268,6 +280,7 @@ export function createApp({
   microsoftIdentityVerifier,
   storage = null,
   stripeProvider = null,
+  mobileReleaseConfig = EMPTY_MOBILE_RELEASE_CONFIG,
 }: AppOptions): OpenAPIHono<AppEnv> {
   const eventSink = securityEventSink ?? createNoopSecurityEventSink();
   // The defaultHook makes request-validation failures throw into errorHandlerMiddleware instead of
@@ -372,6 +385,12 @@ export function createApp({
   }
 
   app.route("/", healthRoutes(isReady));
+
+  // Mobile release floor (ST-257). Public and un-scoped like the health probes — the native app
+  // calls it on launch/resume, before any session exists — and mounted unconditionally so the
+  // OpenAPI contract does not depend on a deployment's environment. `/api/mobile/config` is in
+  // jwtAuth.ts's DEFAULT_PUBLIC_PATHS. See docs/runbooks/mobile-release.md#forced-update-floor.
+  app.route("/", mobileConfigRoutes(mobileReleaseConfig));
 
   // ERPNext webhook ingestion — mounted only when a database is available. The route is public
   // (no auth middleware) because ERPNext authenticates via HMAC signature, not a session token.
