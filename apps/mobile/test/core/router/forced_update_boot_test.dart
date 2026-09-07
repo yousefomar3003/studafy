@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/update/forced_update_screen.dart';
-import 'package:studafy_mobile/src/core/update/update_providers.dart';
 import 'package:studafy_mobile/src/core/update/update_status.dart';
 
 import '../../support/pump_studafy_app.dart';
@@ -21,9 +20,7 @@ void main() {
     await pumpStudafyApp(
       tester,
       session: await fakeAuthenticatedSession(roles: const ['STUDENT']),
-      extraOverrides: [
-        updateStatusProvider.overrideWith((ref) async => UpdateStatus.updateRequired),
-      ],
+      updateStatus: UpdateStatus.updateRequired,
     );
 
     expect(find.byType(ForcedUpdateScreen), findsOneWidget);

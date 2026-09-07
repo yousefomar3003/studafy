@@ -318,7 +318,10 @@ jobs:
         working-directory: apps/mobile
         env:
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          # Via env, never interpolated into the script: `inputs.*` is attacker-controllable and
+          # `${{ }}` in a run: block is a shell-injection sink (semgrep run-shell-injection).
+          ROLLOUT: ${{ inputs.rollout }}
         run: |
           printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
           export MOBILE_BUILD_NUMBER="$(git rev-list --count HEAD)"
-          bundle exec fastlane android promote_rollout rollout:${{ inputs.rollout }}
+          bundle exec fastlane android promote_rollout "rollout:${ROLLOUT}"

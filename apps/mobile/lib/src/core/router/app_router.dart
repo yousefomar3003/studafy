@@ -34,7 +34,7 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
     // still-loading or errored check reads as "not required" here.
     redirect: (context, state) {
       final updateRequired =
-          ProviderScope.containerOf(context).read(updateStatusProvider).valueOrNull ==
+          ProviderScope.containerOf(context).read(updateStatusProvider).value ==
           UpdateStatus.updateRequired;
       final onForcedUpdate = state.matchedLocation == RoutePaths.forcedUpdate;
 
