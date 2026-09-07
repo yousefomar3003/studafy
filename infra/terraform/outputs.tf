@@ -118,6 +118,11 @@ output "secrets_service_secret_arns" {
   value       = module.secrets.service_secret_arns
 }
 
+output "monitoring_metrics_discovery_service_arns" {
+  description = "Map of {api, realtime, workers} -> Cloud Map aws_service_discovery_service ARN (ST-259). infra/deploy/scripts/render.sh reads this the same way it reads secrets_service_secret_arns, to fill each service's own serviceRegistries entry."
+  value       = module.monitoring.metrics_discovery_service_arns
+}
+
 output "secrets_service_iam_policy_arns" {
   description = "Map of service name -> IAM managed policy ARN scoped to that service's own app-secrets container plus the shared data-tier secrets it needs. Attach to the service's compute task role once one exists."
   value       = module.secrets.service_iam_policy_arns

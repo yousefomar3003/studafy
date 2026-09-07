@@ -19,5 +19,12 @@
       "assignPublicIp": "DISABLED"
     }
   },
+  "serviceRegistries": [
+    {
+      "registryArn": "${WORKERS_METRICS_SD_ARN}",
+      "containerName": "workers",
+      "containerPort": 9464
+    }
+  ],
   "enableExecuteCommand": true
 }

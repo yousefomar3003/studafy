@@ -90,3 +90,122 @@ variable "probe_slo_ms" {
     error_message = "probe_slo_ms must be a positive number of milliseconds."
   }
 }
+
+# --- Prometheus/Grafana metrics stack (ST-259) ---------------------------------------------------
+
+variable "monitoring_enabled" {
+  description = "Whether to provision Prometheus, Grafana and the DB exporters. Dev omits the whole stack (same reasoning as probe_enabled: no separate environment to page on, and Container Insights/CloudWatch already cover dev's own needs); staging/prod pass true."
+  type        = bool
+  default     = false
+}
+
+variable "vpc_id" {
+  description = "VPC ID the Cloud Map private DNS namespace (Prometheus's scrape-target discovery) is created in."
+  type        = string
+}
+
+variable "cluster_arn" {
+  description = "ECS cluster ARN (module.compute) the Prometheus/Grafana/exporter services run in."
+  type        = string
+}
+
+variable "execution_role_arn" {
+  description = "Shared ECS task execution role ARN (module.compute) — reused here exactly as modules/erpnext reuses it, rather than this module creating its own. Its secrets-read policy for the \"monitoring\" service key (module.secrets, attached in root main.tf the same way every other service is) is what lets the exporter/Grafana task definitions resolve monitoring_secret_arn."
+  type        = string
+}
+
+variable "private_app_subnet_ids" {
+  description = "Private app-tier subnet IDs the monitoring plane's Fargate tasks run in."
+  type        = list(string)
+}
+
+variable "monitoring_security_group_id" {
+  description = "Security group ID for the monitoring plane (module.network's aws_security_group.monitoring): Grafana reachable only from the bastion, egresses to the app tier/db/mariadb it scrapes."
+  type        = string
+}
+
+variable "metrics_port" {
+  description = "Port apps/api, apps/realtime and apps/workers each expose their Prometheus-format /metrics endpoint on (ST-259). Must match module.network's metrics_port and each service's own METRICS_PORT env var."
+  type        = number
+  default     = 9464
+}
+
+variable "grafana_port" {
+  description = "Port Grafana listens on. Must match module.network's grafana_port."
+  type        = number
+  default     = 3000
+}
+
+variable "monitoring_secret_arn" {
+  description = "ARN of module.secrets's \"monitoring\" app-secrets container, holding POSTGRES_EXPORTER_DSN, MYSQLD_EXPORTER_DSN (only read when mariadb_exporter_enabled) and GRAFANA_ADMIN_PASSWORD. Assembled and supplied the same way REDIS_URL/DATABASE_URL are (infra/terraform/README.md) — Terraform never sees the plaintext DSNs, only this container's ARN."
+  type        = string
+}
+
+variable "mariadb_exporter_enabled" {
+  description = "Whether to provision mysqld_exporter against the ERPNext plane's MariaDB instance. Should match local.erpnext_plane_enabled in the root module — there is nothing to export when that plane doesn't exist."
+  type        = bool
+  default     = false
+}
+
+variable "prometheus_image" {
+  description = "Full image reference (registry/repo:tag) for the Prometheus image this repo builds (infra/docker/prometheus.Dockerfile), pushed to module.registry's \"prometheus\" repository."
+  type        = string
+}
+
+variable "grafana_image" {
+  description = "Full image reference (registry/repo:tag) for the Grafana image this repo builds (infra/docker/grafana.Dockerfile), pushed to module.registry's \"grafana\" repository."
+  type        = string
+}
+
+variable "prometheus_retention" {
+  description = "How long Prometheus retains scraped samples (its own --storage.tsdb.retention.time duration syntax, e.g. \"15d\"). Bounded by Fargate's ephemeral task storage (prometheus_storage_gb) — see this module's README for why there is no persistent volume yet."
+  type        = string
+  default     = "15d"
+}
+
+variable "prometheus_storage_gb" {
+  description = "Fargate ephemeral storage (GiB) for the Prometheus task. 21-200; 20 is Fargate's own included minimum, so this is deliberately the first paid increment above it."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.prometheus_storage_gb >= 21 && var.prometheus_storage_gb <= 200
+    error_message = "prometheus_storage_gb must be between 21 and 200 (Fargate's ephemeral-storage range above its free 20GiB default)."
+  }
+}
+
+variable "prometheus_cpu" {
+  description = "Fargate CPU units for the Prometheus task."
+  type        = number
+  default     = 512
+}
+
+variable "prometheus_memory" {
+  description = "Fargate memory (MiB) for the Prometheus task."
+  type        = number
+  default     = 1024
+}
+
+variable "grafana_cpu" {
+  description = "Fargate CPU units for the Grafana task."
+  type        = number
+  default     = 256
+}
+
+variable "grafana_memory" {
+  description = "Fargate memory (MiB) for the Grafana task."
+  type        = number
+  default     = 512
+}
+
+variable "exporter_cpu" {
+  description = "Fargate CPU units for each DB exporter task (postgres_exporter, mysqld_exporter)."
+  type        = number
+  default     = 256
+}
+
+variable "exporter_memory" {
+  description = "Fargate memory (MiB) for each DB exporter task."
+  type        = number
+  default     = 512
+}

@@ -60,6 +60,10 @@ if [ "$REPO_URL" = "null" ] || [ -z "$REPO_URL" ]; then
 fi
 
 SECRET_ARN="$(terraform -chdir="$TF_DIR" output -json secrets_service_secret_arns | jq -r --arg s "$SERVICE" '.[$s] // empty')"
+# ST-259: Cloud Map discovery-service ARN this service's own serviceRegistries entry registers
+# into, so Prometheus can find it (module.monitoring's discovery.tf). Empty for migrations, which
+# has no service.json.tpl/serviceRegistries entry at all — jq's // empty makes that a non-error.
+METRICS_SD_ARN="$(terraform -chdir="$TF_DIR" output -json monitoring_metrics_discovery_service_arns | jq -r --arg s "$SERVICE" '.[$s] // empty')"
 REDIS_SECRET_ARN="$(terraform -chdir="$TF_DIR" output -raw redis_auth_secret_arn)"
 PGBOUNCER_SECRET_ARN="$(terraform -chdir="$TF_DIR" output -raw pgbouncer_connection_secret_arn)"
 PGBOUNCER_HOST="$(terraform -chdir="$TF_DIR" output -raw pgbouncer_private_ip)"
@@ -74,5 +78,6 @@ export MIGRATIONS_EXECUTION_ROLE_ARN API_TASK_ROLE_ARN WORKERS_TASK_ROLE_ARN S3_
 SERVICE_UPPER="$(echo "$SERVICE" | tr '[:lower:]' '[:upper:]')"
 export "${SERVICE_UPPER}_IMAGE=${REPO_URL}:${IMAGE_TAG}"
 export "${SERVICE_UPPER}_APP_SECRETS_ARN=${SECRET_ARN}"
+export "${SERVICE_UPPER}_METRICS_SD_ARN=${METRICS_SD_ARN}"
 
 envsubst < "$TEMPLATE"

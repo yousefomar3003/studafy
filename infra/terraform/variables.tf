@@ -328,8 +328,42 @@ variable "erpnext_port" {
   }
 }
 
+variable "metrics_port" {
+  description = "TCP port apps/api, apps/realtime and apps/workers each expose their Prometheus-format /metrics endpoint on (ST-259). Shared between module.network (security group rule) and module.monitoring (Prometheus scrape config) so the two can never drift apart — same convention as db_port/mariadb_port/erpnext_port above. Matches each service's own METRICS_PORT default (apps/*/src/env.ts)."
+  type        = number
+  default     = 9464
+
+  validation {
+    condition     = var.metrics_port > 0 && var.metrics_port <= 65535
+    error_message = "metrics_port must be a valid TCP port (1-65535)."
+  }
+}
+
+variable "grafana_port" {
+  description = "TCP port Grafana listens on inside the monitoring security group (ST-259). Shared between module.network (security group rule) and module.monitoring (task definition) for the same reason as metrics_port above."
+  type        = number
+  default     = 3000
+
+  validation {
+    condition     = var.grafana_port > 0 && var.grafana_port <= 65535
+    error_message = "grafana_port must be a valid TCP port (1-65535)."
+  }
+}
+
 variable "erpnext_image_tag" {
   description = "Tag of module.registry's erpnext ECR repository to deploy for the backend/websocket/queue/scheduler roles. Bumping this and re-applying is how an ERPNext image update ships — see modules/erpnext/README.md's Known gaps for why there's no rolling-deploy script for this plane."
+  type        = string
+  default     = "latest"
+}
+
+variable "prometheus_image_tag" {
+  description = "Tag of module.registry's prometheus ECR repository to deploy (ST-259). Bumping this and re-applying is how a scrape-config change (infra/docker/prometheus/prometheus.yml) ships — same rolling-deploy shape as erpnext_image_tag."
+  type        = string
+  default     = "latest"
+}
+
+variable "grafana_image_tag" {
+  description = "Tag of module.registry's grafana ECR repository to deploy (ST-259). Bumping this and re-applying is how a dashboard change (infra/docker/grafana/dashboards/*.json) ships — same rolling-deploy shape as erpnext_image_tag."
   type        = string
   default     = "latest"
 }

@@ -1,3 +1,4 @@
+import { createRedMetricsMiddleware } from "@studafy/observability";
 import { Hono } from "hono";
 import { upgradeWebSocket } from "hono/bun";
 
@@ -86,6 +87,12 @@ export function createApp({
   metrics,
 }: AppOptions): Hono<Bindings> {
   const app = new Hono<Bindings>();
+
+  // RED metrics (ST-259): Rate/Errors/Duration for the /ws handshake and health routes, on
+  // @studafy/observability's own Prometheus port — never this app's own PORT. Distinct from
+  // `metrics` (src/metrics.ts, mounted below via healthRoutes) — the existing JSON fan-out
+  // counter debug endpoint, unchanged.
+  app.use("*", createRedMetricsMiddleware());
 
   app.route("/", healthRoutes(isReady, metrics));
 

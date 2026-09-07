@@ -9,6 +9,8 @@ describe("loadEnv", () => {
       NODE_ENV: "development",
       PORT: 3001,
       HOST: "0.0.0.0",
+      SERVICE_NAME: "realtime",
+      METRICS_PORT: 9464,
       REDIS_URL: "redis://localhost:6379",
       WS_JWT_SECRET: "dev-insecure-secret-change-me",
     });
@@ -27,6 +29,8 @@ describe("loadEnv", () => {
       NODE_ENV: "production",
       PORT: 8080,
       HOST: "127.0.0.1",
+      SERVICE_NAME: "realtime",
+      METRICS_PORT: 9464,
       REDIS_URL: "redis://cache:6379",
       WS_JWT_SECRET: "super-secret",
     });

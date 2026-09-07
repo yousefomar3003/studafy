@@ -1,5 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
+import { createRedMetricsMiddleware } from "@studafy/observability";
 
 import { emailEventWebhookRoutes } from "./email/webhook";
 import { ErpNextClient } from "./erpnext/client";
@@ -287,6 +288,12 @@ export function createApp({
       tracker.end();
     }
   });
+
+  // RED metrics (ST-259): Rate/Errors/Duration per route, on @studafy/observability's own
+  // Prometheus port (never this app's own PORT — see env.ts's METRICS_PORT). Placed right after
+  // the inflight tracker so it measures as close to the full request as this app's middleware
+  // chain allows, without disturbing that middleware's own "must stay outermost" invariant.
+  app.use("*", createRedMetricsMiddleware());
 
   // Request ID middleware: generates unique ID per request, creates child logger, stamps X-Request-Id
   app.use("*", requestIdMiddleware({ logger, generateRequestId }));

@@ -7,6 +7,8 @@ describe("loadEnv", () => {
   test("applies defaults for an empty environment", () => {
     expect(loadEnv({})).toEqual({
       NODE_ENV: "development",
+      SERVICE_NAME: "workers",
+      METRICS_PORT: 9464,
       REDIS_URL: "redis://localhost:6379",
       SHUTDOWN_TIMEOUT_MS: 10_000,
       DATABASE_URL: "postgres://localhost:5432/studafy",
@@ -35,6 +37,8 @@ describe("loadEnv", () => {
       }),
     ).toEqual({
       NODE_ENV: "test",
+      SERVICE_NAME: "workers",
+      METRICS_PORT: 9464,
       REDIS_URL: "redis://redis.internal:6380",
       SHUTDOWN_TIMEOUT_MS: 30_000,
       DATABASE_URL: "postgres://localhost:5432/studafy",

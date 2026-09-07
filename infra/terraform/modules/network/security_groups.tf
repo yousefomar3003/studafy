@@ -73,6 +73,15 @@ resource "aws_vpc_security_group_ingress_rule" "app_from_alb" {
   referenced_security_group_id = aws_security_group.alb.id
 }
 
+resource "aws_vpc_security_group_ingress_rule" "app_from_monitoring" {
+  security_group_id            = aws_security_group.app.id
+  description                  = "From the monitoring plane, Prometheus scraping /metrics (ST-259)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.metrics_port
+  to_port                      = var.metrics_port
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
 resource "aws_vpc_security_group_egress_rule" "app_to_db" {
   security_group_id            = aws_security_group.app.id
   description                  = "To the database"
@@ -175,6 +184,15 @@ resource "aws_vpc_security_group_ingress_rule" "db_from_app" {
   from_port                    = var.db_port
   to_port                      = var.db_port
   referenced_security_group_id = aws_security_group.app.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "db_from_monitoring" {
+  security_group_id            = aws_security_group.db.id
+  description                  = "From the monitoring plane (postgres_exporter, ST-259)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.db_port
+  to_port                      = var.db_port
+  referenced_security_group_id = aws_security_group.monitoring.id
 }
 
 resource "aws_vpc_security_group_ingress_rule" "db_from_bastion" {
@@ -399,6 +417,15 @@ resource "aws_vpc_security_group_ingress_rule" "mariadb_from_erpnext" {
   referenced_security_group_id = aws_security_group.erpnext.id
 }
 
+resource "aws_vpc_security_group_ingress_rule" "mariadb_from_monitoring" {
+  security_group_id            = aws_security_group.mariadb.id
+  description                  = "From the monitoring plane (mysqld_exporter, ERPNext plane only, ST-259)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.mariadb_port
+  to_port                      = var.mariadb_port
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
 resource "aws_vpc_security_group_ingress_rule" "mariadb_from_bastion" {
   security_group_id            = aws_security_group.mariadb.id
   description                  = "From the bastion"
@@ -502,6 +529,123 @@ resource "aws_vpc_security_group_egress_rule" "erpnext_dns_udp" {
   cidr_ipv4         = var.vpc_cidr
 }
 
+# --- Monitoring (ST-259): Prometheus, Grafana, postgres_exporter, mysqld_exporter --------------
+
+# One shared group for the whole observability plane, the same "one group per logical plane,
+# reused by every role in it" pattern modules/erpnext's own security group already uses for its
+# four bench roles — Prometheus, Grafana and both exporters have an identical trust boundary
+# (reachable only from the bastion; egresses to whatever they scrape), so a second group would add
+# no isolation, only more rules to keep in sync.
+resource "aws_security_group" "monitoring" {
+  name_prefix = "${var.name_prefix}-monitoring-"
+  description = "Monitoring plane (Prometheus, Grafana, postgres_exporter, mysqld_exporter): dashboards reachable only from the bastion; scrapes the app tier, db and mariadb."
+  vpc_id      = aws_vpc.this.id
+
+  tags = { Name = "${var.name_prefix}-monitoring" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "monitoring_from_bastion" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "From the bastion, Grafana dashboards (SSH port-forward — see docs/runbooks/metrics-dashboard-catalog.md)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.grafana_port
+  to_port                      = var.grafana_port
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
+# Self-referencing rules for east-west traffic within the monitoring plane itself: Grafana's
+# Prometheus datasource (9090) and Prometheus's own scrape of both exporters (9187, 9104 — the
+# postgres_exporter/mysqld_exporter upstream projects' own registered default ports). One rule per
+# port rather than a collapsed range, matching this file's existing per-concern convention (e.g.
+# the erpnext group's own single-purpose self-referencing NFS rule above).
+resource "aws_vpc_security_group_ingress_rule" "monitoring_self_prometheus" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "Grafana to Prometheus"
+  ip_protocol                  = "tcp"
+  from_port                    = 9090
+  to_port                      = 9090
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "monitoring_self_postgres_exporter" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "Prometheus to postgres_exporter"
+  ip_protocol                  = "tcp"
+  from_port                    = 9187
+  to_port                      = 9187
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "monitoring_self_mysqld_exporter" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "Prometheus to mysqld_exporter (ERPNext plane only)"
+  ip_protocol                  = "tcp"
+  from_port                    = 9104
+  to_port                      = 9104
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "monitoring_to_app" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "To the app tier, scraping /metrics"
+  ip_protocol                  = "tcp"
+  from_port                    = var.metrics_port
+  to_port                      = var.metrics_port
+  referenced_security_group_id = aws_security_group.app.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "monitoring_to_db" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "To the database (postgres_exporter)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.db_port
+  to_port                      = var.db_port
+  referenced_security_group_id = aws_security_group.db.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "monitoring_to_mariadb" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "To MariaDB (mysqld_exporter, ERPNext plane only)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.mariadb_port
+  to_port                      = var.mariadb_port
+  referenced_security_group_id = aws_security_group.mariadb.id
+}
+
+# HTTPS egress for ECR image pulls, Secrets Manager, CloudWatch Logs, and Grafana's own CloudWatch
+# datasource (GetMetricData/ListMetrics — see modules/monitoring's grafana.tf). Same coarse
+# IP-based control point as every other group's own HTTPS egress rule in this file.
+resource "aws_vpc_security_group_egress_rule" "monitoring_https" {
+  security_group_id = aws_security_group.monitoring.id
+  description       = "HTTPS to ECR, Secrets Manager, CloudWatch and the CloudWatch API"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "monitoring_dns_tcp" {
+  security_group_id = aws_security_group.monitoring.id
+  description       = "DNS to the VPC resolver (Cloud Map scrape-target discovery)"
+  ip_protocol       = "tcp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
+}
+
+resource "aws_vpc_security_group_egress_rule" "monitoring_dns_udp" {
+  security_group_id = aws_security_group.monitoring.id
+  description       = "DNS to the VPC resolver (Cloud Map scrape-target discovery)"
+  ip_protocol       = "udp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
+}
+
 # --- Bastion: audited SSH jump host for DB/Redis administration --------------------
 
 resource "aws_security_group" "bastion" {
@@ -552,6 +696,15 @@ resource "aws_vpc_security_group_egress_rule" "bastion_to_pgbouncer" {
   from_port                    = var.pgbouncer_port
   to_port                      = var.pgbouncer_port
   referenced_security_group_id = aws_security_group.pgbouncer.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_to_monitoring" {
+  security_group_id            = aws_security_group.bastion.id
+  description                  = "To Grafana, for dashboard access (SSH port-forward, ST-259)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.grafana_port
+  to_port                      = var.grafana_port
+  referenced_security_group_id = aws_security_group.monitoring.id
 }
 
 resource "aws_vpc_security_group_egress_rule" "bastion_to_mariadb" {

@@ -10,11 +10,16 @@
       "name": "realtime",
       "image": "${REALTIME_IMAGE}",
       "essential": true,
-      "portMappings": [{ "containerPort": 3001, "protocol": "tcp" }],
+      "portMappings": [
+        { "containerPort": 3001, "protocol": "tcp" },
+        { "containerPort": 9464, "protocol": "tcp", "name": "metrics" }
+      ],
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
         { "name": "PORT", "value": "3001" },
-        { "name": "HOST", "value": "0.0.0.0" }
+        { "name": "HOST", "value": "0.0.0.0" },
+        { "name": "SERVICE_NAME", "value": "realtime" },
+        { "name": "METRICS_PORT", "value": "9464" }
       ],
       "secrets": [
         {

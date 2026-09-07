@@ -28,6 +28,8 @@ module "network" {
   pgbouncer_port            = var.pgbouncer_port
   mariadb_port              = var.mariadb_port
   erpnext_port              = var.erpnext_port
+  metrics_port              = var.metrics_port
+  grafana_port              = var.grafana_port
   bastion_allowed_ssh_cidrs = var.bastion_allowed_ssh_cidrs
   bastion_key_name          = var.bastion_key_name
 }
@@ -78,6 +80,11 @@ locals {
   # module.cdn's existing count = var.environment == "dev" ? 0 : 1 precedent, dev doesn't need
   # the ERPNext plane.
   erpnext_plane_enabled = var.environment != "dev"
+
+  # Prometheus/Grafana/the exporters (ST-259) — same reasoning and same condition as
+  # erpnext_plane_enabled and module.monitoring's own probe_enabled: no separate environment to
+  # page on for dev, and Container Insights/CloudWatch already cover its own needs.
+  monitoring_enabled = var.environment != "dev"
 }
 
 module "secrets" {
@@ -93,6 +100,11 @@ module "secrets" {
   # — same "ready before the code catches up" precedent). erpnext's entry only exists where the
   # plane itself does (staging/prod) — its shared secrets are the ERPNext plane's own MariaDB and
   # its Redis cache/queue DB slots (docs/runbooks/redis-conventions.md).
+  # monitoring's entry (ST-259) has no shared_secret_arns: unlike api/realtime/workers, it doesn't
+  # read another module's connection secret — POSTGRES_EXPORTER_DSN/MYSQLD_EXPORTER_DSN/
+  # GRAFANA_ADMIN_PASSWORD are pre-assembled DSN/password strings supplied directly via
+  # TF_VAR_secrets_app_secret_values (infra/terraform/README.md's existing REDIS_URL/DATABASE_URL
+  # convention), not composed from another module's own secret.
   services = merge(
     {
       api        = { shared_secret_arns = [module.pgbouncer.connection_secret_arn, module.redis.auth_secret_arn] }
@@ -102,6 +114,9 @@ module "secrets" {
     },
     local.erpnext_plane_enabled ? {
       erpnext = { shared_secret_arns = [module.mariadb[0].connection_secret_arn, module.redis.auth_secret_arn] }
+    } : {},
+    local.monitoring_enabled ? {
+      monitoring = { shared_secret_arns = [] }
     } : {}
   )
 
@@ -273,6 +288,25 @@ module "monitoring" {
   redis_auth_secret_arn    = module.redis.auth_secret_arn
   probe_subnet_ids         = module.network.private_app_subnet_ids
   probe_security_group_ids = [module.network.app_security_group_id]
+
+  # Prometheus/Grafana metrics stack (ST-259): staging/prod only, same reasoning as probe_enabled
+  # above — see local.monitoring_enabled. Reuses module.compute's shared execution role exactly
+  # the way module.erpnext does (its secrets-read policy for the "monitoring" service key, from
+  # the services map above, is attached to that role the same generic way every service's is).
+  monitoring_enabled           = local.monitoring_enabled
+  vpc_id                       = module.network.vpc_id
+  cluster_arn                  = module.compute.cluster_arn
+  execution_role_arn           = module.compute.execution_role_arn
+  private_app_subnet_ids       = module.network.private_app_subnet_ids
+  monitoring_security_group_id = module.network.monitoring_security_group_id
+  metrics_port                 = var.metrics_port
+  grafana_port                 = var.grafana_port
+  mariadb_exporter_enabled     = local.erpnext_plane_enabled
+  # Empty string, never used, when monitoring is disabled (dev) — service_secret_arns has no
+  # "monitoring" key there, since local.monitoring_enabled gates that services map entry too.
+  monitoring_secret_arn = lookup(module.secrets.service_secret_arns, "monitoring", "")
+  prometheus_image      = "${module.registry.repository_urls["prometheus"]}:${var.prometheus_image_tag}"
+  grafana_image         = "${module.registry.repository_urls["grafana"]}:${var.grafana_image_tag}"
 }
 
 # MariaDB for the ERPNext + Frappe Education plane. staging/prod only — see local.erpnext_plane_enabled.

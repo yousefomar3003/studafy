@@ -28,6 +28,7 @@
     "@studafy/finance-reporting": "workspace:*",
     "@studafy/grades-reporting": "workspace:*",
     "@studafy/notification-templates": "workspace:*",
+    "@studafy/observability": "workspace:*",
     "@studafy/progress-reporting": "workspace:*",
     "@xmldom/xmldom": "0.8.13",
     "bidi-js": "1.0.3",

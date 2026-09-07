@@ -31,6 +31,17 @@ honesty gap `modules/postgres`'s own `engine_version`/`instance_class` defaults 
   (a second rotation Lambda, its own subnet/security-group wiring).
 - **Not exercised against a live AWS account** — validated with `terraform validate` and an
   offline `plan`, same caveat every module in this repo not yet applied for real carries.
+- **`mysqld_exporter`'s monitoring user is a manual bootstrap step**, same as Postgres's
+  `metrics_reader` role (`docs/runbooks/postgres-conventions.md`'s "Monitoring role" section) and
+  for the same reason: no SQL-executing Terraform provider exists in this repo. Create it once via
+  the bastion —
+  ```sql
+  CREATE USER 'metrics_reader'@'%' IDENTIFIED BY '<generate one, do not reuse the master password>';
+  GRANT PROCESS, REPLICATION CLIENT ON *.* TO 'metrics_reader'@'%';
+  ```
+  — then supply `mysqld_exporter`'s DSN (`user:password@tcp(host:port)/`) as
+  `TF_VAR_secrets_app_secret_values`'s `monitoring.MYSQLD_EXPORTER_DSN` key, exactly like
+  `POSTGRES_EXPORTER_DSN`.
 
 ## Usage
 

@@ -78,6 +78,11 @@ output "erpnext_security_group_id" {
   value       = aws_security_group.erpnext.id
 }
 
+output "monitoring_security_group_id" {
+  description = "Security group ID for the monitoring plane (modules/monitoring): Prometheus, Grafana, postgres_exporter, mysqld_exporter."
+  value       = aws_security_group.monitoring.id
+}
+
 output "bastion_security_group_id" {
   description = "Security group ID of the bastion."
   value       = aws_security_group.bastion.id

@@ -1,0 +1,19 @@
+# Dashboards-as-code (ST-259 acceptance criterion: "dashboards in repo"). File-provider
+# provisioning: Grafana loads every *.json under infra/docker/grafana/dashboards/ (baked into the
+# image alongside this file — see infra/docker/grafana.Dockerfile) at startup and keeps them in
+# sync with the files on disk. No templating needed, unlike datasources.yml — dashboard JSON
+# references only the "Prometheus"/"CloudWatch" datasource names above, never an environment-
+# specific value.
+
+apiVersion: 1
+
+providers:
+  - name: studafy
+    orgId: 1
+    folder: Studafy
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

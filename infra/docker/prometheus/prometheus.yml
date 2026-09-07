@@ -1,0 +1,61 @@
+# Baked into infra/docker/prometheus.Dockerfile at build time — static, not templated at
+# container start. Safe because "metrics.internal" (the Cloud Map private DNS namespace
+# discovery.tf creates) is fixed across every environment: it's a Route 53 private hosted zone
+# scoped to the one VPC it's associated with, and dev/staging/prod are three separate, unpeered
+# VPCs, so the same zone name in each cannot collide. See modules/monitoring/discovery.tf.
+#
+# 9464 (the app-tier /metrics port) and 9090 (Prometheus's own port) are this repo's fixed
+# convention — module.network's metrics_port/grafana_port variables and every apps/*/src/env.ts's
+# METRICS_PORT default to the same values. Update all of them together if either ever changes.
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  # apps/api, apps/realtime, apps/workers: one job per service rather than one job with three
+  # dns_sd_configs entries, so a per-service scrape failure (or a per-service relabel rule, should
+  # one ever be needed) never has to be disentangled from the others in Prometheus's own UI.
+  - job_name: api
+    metrics_path: /metrics
+    dns_sd_configs:
+      - names: ["api.metrics.internal"]
+        type: A
+        port: 9464
+
+  - job_name: realtime
+    metrics_path: /metrics
+    dns_sd_configs:
+      - names: ["realtime.metrics.internal"]
+        type: A
+        port: 9464
+
+  - job_name: workers
+    metrics_path: /metrics
+    dns_sd_configs:
+      - names: ["workers.metrics.internal"]
+        type: A
+        port: 9464
+
+  # postgres_exporter's own registered default port (9187). Always present — see
+  # modules/monitoring/prometheus.tf, its aws_ecs_service is unconditional whenever
+  # monitoring_enabled is true, unlike mysqld-exporter below.
+  - job_name: postgres-exporter
+    dns_sd_configs:
+      - names: ["postgres-exporter.metrics.internal"]
+        type: A
+        port: 9187
+
+  # mysqld_exporter's own registered default port (9104). Conditional on
+  # var.mariadb_exporter_enabled (the ERPNext plane) — when disabled this DNS name simply resolves
+  # to zero records, which Prometheus treats as zero targets for this job, not a scrape failure.
+  - job_name: mysqld-exporter
+    dns_sd_configs:
+      - names: ["mysqld-exporter.metrics.internal"]
+        type: A
+        port: 9104
+
+  # Prometheus's own /metrics — its ECS task talks to itself over localhost, not through Cloud Map.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

@@ -1,3 +1,5 @@
+import { startMetricsServer } from "@studafy/observability";
+
 import { createApp } from "./app";
 import { checkDatabase, closeDatabasePools, createDatabase, createReadDatabase } from "./database";
 import { loadEnv } from "./env";
@@ -19,6 +21,12 @@ import { checkRedis, closeRedis, createRedisClient } from "./redis";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a port.
 const env = loadEnv();
+
+// Prometheus-format metrics (ST-259), on its own port — must run before createApp() registers
+// createRedMetricsMiddleware(), since an OTel instrument stays bound to whichever meter created
+// it and this call is what registers the real global MeterProvider (see
+// packages/observability/src/redMetrics.ts).
+const metricsServer = startMetricsServer({ serviceName: env.SERVICE_NAME, port: env.METRICS_PORT });
 
 // The root logger. Every line this process writes descends from it, so stdout is uniformly NDJSON —
 // a single unparseable line would break JSON filters across the whole log group.
@@ -166,6 +174,7 @@ const shutdown = (signal: string) => {
     await entitlementInvalidationSubscriber?.close();
     await closeRedis(redis);
     await closeDatabasePools(database, readDatabase);
+    await metricsServer.shutdown();
     logger.info({ signal }, "shutdown complete");
     process.exit(0);
   });

@@ -1,3 +1,4 @@
+import { startMetricsServer, startQueueDepthGauge } from "@studafy/observability";
 import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
@@ -28,8 +29,23 @@ import type { RelayHandle } from "./queues/outbox-relay/relay";
 // Fail fast: an invalid environment throws EnvValidationError here, before any Redis connection opens.
 const env = loadEnv();
 
+// Prometheus-format metrics (ST-259), on its own port — must run before startWorkers()/worker.ts's
+// createBullmqWorker records anything, since an OTel instrument stays bound to whichever meter
+// created it and this call is what registers the real global MeterProvider (see
+// packages/observability/src/redMetrics.ts).
+const metricsServer = startMetricsServer({ serviceName: env.SERVICE_NAME, port: env.METRICS_PORT });
+
 const connection = createRedisConnection(env);
 const workers = startWorkers(QUEUE_REGISTRY, connection);
+// Queue depth (ST-259), one gauge per queue x job-count state, observed lazily on every scrape.
+// A dedicated Redis connection: BullMQ's own connection option for a Queue handle must not be the
+// same object a Worker mutates the mode of (see createRedisConnection's own callers elsewhere in
+// this file for the same "one connection per BullMQ client" convention).
+const queueMetricsConnection = createRedisConnection(env);
+const queueDepthGauge = startQueueDepthGauge(
+  QUEUE_REGISTRY.map((definition) => definition.name),
+  queueMetricsConnection as never,
+);
 
 // Outbox relay: separate polling loop alongside BullMQ workers. Uses its own postgres and Redis
 // connections because the BullMQ connection is tied to the queue DB and the relay needs pub/sub.
@@ -178,6 +194,13 @@ const shutdown = (signal: string) => {
     await relayDb.end({ timeout: 5 });
     await emailDb.end({ timeout: 5 });
     await entitlementDb.end({ timeout: 5 });
+    // startQueueDepthGauge() was given queueMetricsConnection as a live IORedis instance rather
+    // than plain connection options, so BullMQ treats it as externally owned and never closes it
+    // itself — queue.close() only stops the per-queue Queue wrapper. Closing it here is what
+    // actually releases the socket.
+    await queueDepthGauge.close();
+    queueMetricsConnection.disconnect();
+    await metricsServer.shutdown();
     console.log("Shutdown complete.");
     process.exit(0);
   });

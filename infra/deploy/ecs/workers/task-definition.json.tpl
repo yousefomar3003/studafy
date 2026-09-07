@@ -11,8 +11,11 @@
       "name": "workers",
       "image": "${WORKERS_IMAGE}",
       "essential": true,
+      "portMappings": [{ "containerPort": 9464, "protocol": "tcp", "name": "metrics" }],
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
+        { "name": "SERVICE_NAME", "value": "workers" },
+        { "name": "METRICS_PORT", "value": "9464" },
         { "name": "DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },
         { "name": "DATABASE_PORT", "value": "6432" },
         { "name": "DATABASE_NAME", "value": "api" },
