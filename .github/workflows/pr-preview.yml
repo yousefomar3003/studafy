@@ -1,0 +1,215 @@
+name: PR preview environment
+
+# Ephemeral per-PR preview: the web bundle + the API, one FARGATE task, reachable at
+# http://pr-<number>.<preview-domain>:8080, backed by its own database (preview_pr_<number>) on the
+# shared preview Postgres server with the demo tenant seeded into it. Torn down by
+# pr-preview-teardown.yml when the PR closes. Full design + prerequisites:
+# docs/runbooks/pr-preview-environments.md.
+#
+# This is the light, no-load-balancer counterpart to staging-deploy.yml — a functional check of PR
+# code, not a production-parity rehearsal. It shares staging-deploy.yml's building blocks only
+# loosely: it builds its own unsigned images into a preview registry (previews run unmerged code,
+# so reusing the prod cosign key here would weaken that signal) and runs the API in
+# NODE_ENV=development so it boots against a plain, non-TLS per-PR database without the production
+# env contract (see infra/deploy/preview/task-definition.json.tpl).
+#
+# Opt-in and same-repo only: a preview is built only for a PR from this repository that carries the
+# `preview` label (keeps cost and noise down) while vars.AWS_DEPLOYMENTS_ENABLED == 'true'. Fork
+# PRs get no preview — they have no access to OIDC or secrets, by GitHub's design, and this
+# workflow does not use pull_request_target to work around that.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+  id-token: write # assume the AWS preview role via OIDC
+  pull-requests: write # post/update the sticky preview comment
+
+concurrency:
+  # One preview build per PR; a new push supersedes an in-flight one. preview-up.sh stops the
+  # superseded task so a cancelled run cannot leak a running preview.
+  group: pr-preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: eu-central-1
+  # Short, immutable, human-legible: pr-42-1a2b3c4. The PR head SHA, not github.sha (which on a
+  # pull_request event is the ephemeral merge commit).
+  IMAGE_TAG: pr-${{ github.event.number }}-${{ github.event.pull_request.head.sha }}
+
+jobs:
+  # --- Eligibility gate --------------------------------------------------------------------------
+  # A single place that decides whether a preview runs at all, so every downstream job is just
+  # `needs: guard` + `if: needs.guard.outputs.eligible == 'true'` and the skip reason is logged
+  # once. Not a job-level `if:` on each job, which would silently no-op with no explanation.
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      eligible: ${{ steps.check.outputs.eligible }}
+    steps:
+      - id: check
+        env:
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
+          DEPLOYMENTS_ENABLED: ${{ vars.AWS_DEPLOYMENTS_ENABLED == 'true' }}
+        run: |
+          if [ "$SAME_REPO" = "true" ] && [ "$HAS_LABEL" = "true" ] && [ "$DEPLOYMENTS_ENABLED" = "true" ]; then
+            echo "eligible=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::preview skipped — same_repo=$SAME_REPO has_label=$HAS_LABEL deployments_enabled=$DEPLOYMENTS_ENABLED"
+          fi
+
+  # --- Build + push the two preview images -----------------------------------------------------
+  build:
+    needs: guard
+    if: needs.guard.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      api_image: ${{ steps.images.outputs.api_image }}
+      web_image: ${{ steps.images.outputs.web_image }}
+    steps:
+      # Every `uses:` here is pinned to a commit SHA, not a mutable major tag — this file is new to
+      # the diff, so semgrep's github-actions-mutable-action-tag rule catches every reference
+      # (same reasoning, same pinned SHAs, as staging-deploy.yml / prod-deploy.yml).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Load preview environment handles
+        run: |
+          set -a; source infra/deploy/environments/preview.env; set +a
+          for v in PREVIEW_ECR_REGISTRY; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty in infra/deploy/environments/preview.env — the preview layer is not provisioned"; exit 1; }
+            echo "$v=${!v}" >> "$GITHUB_ENV"
+          done
+
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_PREVIEW_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to the preview registry
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$PREVIEW_ECR_REGISTRY"
+
+      # A container-driver builder so `--cache-to type=registry` can export a cache layer back to
+      # ECR — the default `docker` driver only imports. buildx itself ships with the runner.
+      - run: docker buildx create --name preview --driver docker-container --use
+
+      - id: images
+        run: |
+          api_image="${PREVIEW_ECR_REGISTRY}/studafy-preview/api:${IMAGE_TAG}"
+          web_image="${PREVIEW_ECR_REGISTRY}/studafy-preview/web:${IMAGE_TAG}"
+          echo "api_image=$api_image" >> "$GITHUB_OUTPUT"
+          echo "web_image=$web_image" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push the API image
+        run: |
+          docker buildx build \
+            --file infra/docker/api.Dockerfile \
+            --tag "${{ steps.images.outputs.api_image }}" \
+            --cache-from "type=registry,ref=${PREVIEW_ECR_REGISTRY}/studafy-preview/api:buildcache" \
+            --cache-to "type=registry,ref=${PREVIEW_ECR_REGISTRY}/studafy-preview/api:buildcache,mode=max,image-manifest=true,oci-mediatypes=true" \
+            --push .
+
+      - uses: ./.github/actions/setup-bun-workspace
+
+      # apps/web bakes import.meta.env.VITE_* at build time. VITE_API_BASE_URL=/api makes the SPA
+      # call its own origin, which infra/deploy/preview/nginx.conf reverse-proxies to the api
+      # container — no CORS config needed on the API.
+      - name: Build the web bundle
+        env:
+          VITE_API_BASE_URL: /api
+          VITE_RELEASE_VERSION: ${{ env.IMAGE_TAG }}
+        run: bunx turbo run build --filter=@studafy/web
+
+      - name: Build and push the web image
+        run: |
+          ctx="$RUNNER_TEMP/web-ctx"
+          mkdir -p "$ctx"
+          cp infra/deploy/preview/nginx.conf "$ctx/nginx.conf"
+          cp -r apps/web/dist "$ctx/dist"
+          docker buildx build \
+            --file infra/deploy/preview/web.Dockerfile \
+            --tag "${{ steps.images.outputs.web_image }}" \
+            --cache-from "type=registry,ref=${PREVIEW_ECR_REGISTRY}/studafy-preview/web:buildcache" \
+            --cache-to "type=registry,ref=${PREVIEW_ECR_REGISTRY}/studafy-preview/web:buildcache,mode=max,image-manifest=true,oci-mediatypes=true" \
+            --push "$ctx"
+
+  # --- Per-PR database: recreate, migrate, seed ------------------------------------------------
+  # Runs in parallel with `build` (both only need `guard`) so neither is on the other's critical
+  # path — the sub-8-minute budget depends on it.
+  database:
+    needs: guard
+    if: needs.guard.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    env:
+      PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
+      DATABASE_SSL_MODE: disable
+      SEED_ALLOW_NONLOCAL: "true"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup-bun-workspace
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      # preview-db.sh create drops preview_pr_<n> if it exists and recreates it empty — every
+      # deploy starts from a clean schema, so a long-lived PR never accumulates migration-history
+      # drift and the seed's "abort if the demo tenant already exists" guard is never hit.
+      - name: Recreate, migrate and seed the per-PR database
+        run: |
+          set -euo pipefail
+          DB_URL="$(bash infra/deploy/scripts/preview-db.sh create "${{ github.event.number }}")"
+          echo "::add-mask::$DB_URL"
+          export DATABASE_URL="$DB_URL"
+          bun run db:migrate
+          bun run db:seed
+
+  # --- Launch the task, publish DNS, comment -------------------------------------------------------
+  deploy:
+    needs: [guard, build, database]
+    if: needs.guard.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      preview_url: ${{ steps.up.outputs.preview_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_PREVIEW_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install deployment utilities
+        run: sudo apt-get update && sudo apt-get install -y gettext-base
+
+      - id: up
+        run: |
+          bash infra/deploy/scripts/preview-up.sh \
+            "${{ github.event.number }}" \
+            "${{ needs.build.outputs.api_image }}" \
+            "${{ needs.build.outputs.web_image }}" \
+            "${IMAGE_TAG}"
+
+      - name: Post the preview URL on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_URL: ${{ steps.up.outputs.preview_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/pr-preview-comment.sh ready
+
+  # --- Failure notice on the PR --------------------------------------------------------------------
+  # Only when a genuinely-attempted preview failed — not on the `guard`-skipped path.
+  report-failure:
+    needs: [guard, build, database, deploy]
+    if: always() && needs.guard.outputs.eligible == 'true' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Update the sticky comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/pr-preview-comment.sh failed

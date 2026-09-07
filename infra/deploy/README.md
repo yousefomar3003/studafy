@@ -14,9 +14,10 @@ infra/deploy/
 │   ├── api/{task-definition,service}.json.tpl
 │   ├── realtime/{task-definition,service}.json.tpl
 │   └── workers/{task-definition,service}.json.tpl
+├── preview/    — per-PR preview: one two-container task-definition template + its nginx.conf + web.Dockerfile
 ├── erpnext/seed/    — synthetic seed fixtures for the ERPNext plane's seed tenant (see its own README)
-├── environments/{dev,staging,prod}.env    — replica counts, cpu/memory, rolling-update thresholds
-└── scripts/{render,migrate,deploy,rollback,populate-env,annotate-deploy,erpnext-new-site}.sh
+├── environments/{dev,staging,prod,preview}.env    — replica counts, cpu/memory, rolling-update thresholds
+└── scripts/{render,migrate,deploy,rollback,populate-env,annotate-deploy,erpnext-new-site,preview-db,preview-up,preview-down}.sh
 ```
 
 The ERPNext plane (`infra/terraform/modules/erpnext`) has no `ecs/erpnext/*.json.tpl` pair here —
@@ -166,6 +167,38 @@ only, never a merge trigger. It reuses the same scripts as staging (`migrate.sh`
   `Studafy/DORA` CloudWatch namespace.
 
 Full runbook: `docs/runbooks/deploy-rollback.md`'s "Production deploy" section.
+
+## PR preview environments (ST-258)
+
+`.github/workflows/pr-preview.yml` builds an ephemeral preview for every `preview`-labelled PR from
+this repo: the `apps/web` bundle plus `apps/api` as **one FARGATE `run-task`** (two containers —
+`preview/task-definition.json.tpl`), reachable on the task's own public IP at
+`http://pr-<number>.<preview-domain>:8080`, backed by its own `preview_pr_<number>` database on a
+shared preview Postgres with the demo tenant seeded in. `pr-preview-teardown.yml` removes it on
+`pull_request: closed` and sweeps stale tasks hourly by TTL.
+
+It is **not** a fourth `render.sh`/`deploy.sh` environment. `render.sh` exists to share the
+dev/staging/prod `terraform output` set (PgBouncer, Redis, task roles, target groups) across those
+three; a preview consumes none of it, so `preview-up.sh` does its own `envsubst` against a much
+smaller variable set. What it deliberately drops relative to `staging-deploy.yml` — the ALB, image
+signing, `NODE_ENV=production`, PgBouncer, an RDS database — and why, is the table in
+`docs/runbooks/pr-preview-environments.md`, which is also the authoritative list of the eleven
+`PREVIEW_*` handles in `environments/preview.env` that must be filled in before any of it runs.
+Until then it is inert: `pr-preview.yml`'s `guard` job requires `vars.AWS_DEPLOYMENTS_ENABLED`
+**and** the `preview` label, and every preview script exits early on a blank handle.
+
+Scripts:
+
+- `preview-db.sh <create|drop|url|exists> <pr>` — per-PR database lifecycle on the shared server,
+  driven by the `PREVIEW_DATABASE_ADMIN_URL` secret. `create` drops-then-creates (a preview is
+  ephemeral; every deploy starts on a clean schema so a long-lived PR never drifts and the seed's
+  "already seeded" guard is never hit).
+- `preview-up.sh <pr> <api-image> <web-image> <tag>` — stop any prior task for the PR, render +
+  register the task definition, `run-task`, resolve the ENI public IP, UPSERT the Route 53 record,
+  poll `/healthz` + `/api/healthz`.
+- `preview-down.sh <pr>` — stop tasks, delete the DNS record, drop the database, deregister the
+  task-definition revisions, then **re-check the first three and exit non-zero on any residue** —
+  that failing exit is the "teardown verified" acceptance gate.
 
 ## Known gaps / prerequisites
 
