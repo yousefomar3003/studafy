@@ -15,7 +15,10 @@ and task definition are written to be correct once the layer exists, and are hel
 by two independent guards —
 
 - `pr-preview.yml`'s `guard` job requires `vars.AWS_DEPLOYMENTS_ENABLED == 'true'` (the same repo
-  variable every other deploy workflow keys off) **and** the PR to carry a `preview` label;
+  variable every other deploy workflow keys off) **and** the PR to carry a `preview` label. Every
+  other PR event still runs the `build` / `database` / `deploy` jobs, but their real steps are
+  `if`-gated on that eligibility — so they finish green in a few seconds with a one-line reason in
+  the log, rather than showing as four "Skipped" checks on every unrelated PR;
 - the eleven `PREVIEW_*` handles in
   [`infra/deploy/environments/preview.env`](../../infra/deploy/environments/preview.env) are blank,
   and `preview-up.sh` / `preview-down.sh` exit early on any empty one.
