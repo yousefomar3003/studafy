@@ -11,11 +11,15 @@
       "name": "api",
       "image": "${API_IMAGE}",
       "essential": true,
-      "portMappings": [{ "containerPort": 3000, "protocol": "tcp" }],
+      "portMappings": [
+        { "containerPort": 3000, "protocol": "tcp" },
+        { "containerPort": 9464, "protocol": "tcp", "name": "metrics" }
+      ],
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
         { "name": "PORT", "value": "3000" },
         { "name": "HOST", "value": "0.0.0.0" },
+        { "name": "METRICS_PORT", "value": "9464" },
         { "name": "LOG_LEVEL", "value": "info" },
         { "name": "SERVICE_NAME", "value": "api" },
         { "name": "RELEASE_VERSION", "value": "${IMAGE_TAG}" },

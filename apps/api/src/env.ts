@@ -60,6 +60,11 @@ export const envSchema = z
     CORS_ALLOWED_ORIGINS: z.string().optional(),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     HOST: z.string().min(1).default("0.0.0.0"),
+    // A separate port from PORT, on purpose (ST-259): the Prometheus-format /metrics endpoint
+    // (@studafy/observability's startMetricsServer) must never be reachable through the public ALB
+    // path api's own PORT is, since it carries no auth of its own — only the monitoring security
+    // group can route to it. 9464 is Prometheus's own registered default port.
+    METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
     // Derived from the logger's own level names, so an added level cannot drift out of the
     // environment contract. The dependency runs one way: env knows the logger, never the reverse.

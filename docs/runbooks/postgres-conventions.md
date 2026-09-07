@@ -47,6 +47,37 @@ Never write the password into a `*.tfvars` file, a `terraform output` consumed b
 create a least-privilege application role instead of running the app as the master user; this
 module doesn't create one today because nothing yet connects to enforce that separation.
 
+## Monitoring role (ST-259)
+
+`postgres_exporter` (`infra/terraform/modules/monitoring`'s `postgres-exporter` service) needs a
+Postgres login, but not the master credential and not an application role scoped by RLS — it reads
+`pg_stat_*` system views across every database, which the built-in `pg_monitor` role grants without
+handing out any actual table data. Same reasoning as the master credential above: this repo has no
+SQL-executing Terraform provider (`versions.tf` pins only `hashicorp/aws`), so creating this role is
+a one-time manual step via the bastion, not something `terraform apply` does for you:
+
+```sql
+CREATE ROLE metrics_reader WITH LOGIN PASSWORD '<generate one, do not reuse the master password>';
+GRANT pg_monitor TO metrics_reader;
+```
+
+Then assemble the DSN `postgres_exporter`'s `DATA_SOURCE_NAME` expects and supply it the same way
+`WS_JWT_SECRET`/`REDIS_URL` already are (`infra/terraform/README.md`), as one key inside the
+`monitoring` service's app-secrets container:
+
+```
+TF_VAR_secrets_app_secret_values='{"monitoring":{"POSTGRES_EXPORTER_DSN":"postgresql://metrics_reader:<password>@<pgbouncer-or-postgres-host>:<port>/postgres?sslmode=require"}}'
+```
+
+Point it at PgBouncer or directly at Postgres — `pg_monitor`'s queries are simple `SELECT`s against
+system views, not the session-scoped operations `docs/runbooks/pgbouncer-conventions.md` flags as
+hostile to transaction pooling, so either path works; PgBouncer is the lower-footprint choice if
+its connection budget has room. Rotate `metrics_reader`'s password the same way any other
+externally-supplied secret is rotated today: manually, by re-running the `ALTER ROLE ... PASSWORD`
+statement and re-applying with the new `TF_VAR_secrets_app_secret_values` value — this role is not
+enrolled in the master credential's automatic rotation Lambda (`modules/secrets/rotation.tf`),
+which only ever rotates the one credential it was written for.
+
 ## Extensions
 
 Four extensions are enabled by migration

@@ -26,6 +26,13 @@
       "containerPort": 3000
     }
   ],
+  "serviceRegistries": [
+    {
+      "registryArn": "${API_METRICS_SD_ARN}",
+      "containerName": "api",
+      "containerPort": 9464
+    }
+  ],
   "healthCheckGracePeriodSeconds": 30,
   "enableExecuteCommand": true
 }

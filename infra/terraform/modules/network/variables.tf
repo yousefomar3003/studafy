@@ -119,6 +119,28 @@ variable "erpnext_port" {
   }
 }
 
+variable "metrics_port" {
+  description = "TCP port apps/api, apps/realtime and apps/workers each expose their Prometheus-format /metrics endpoint on (ST-259) — deliberately not one of app_ports, since it carries no auth of its own and must never be reachable through the ALB. Only the monitoring security group may reach it."
+  type        = number
+  default     = 9464
+
+  validation {
+    condition     = var.metrics_port > 0 && var.metrics_port <= 65535
+    error_message = "metrics_port must be a valid TCP port (1-65535)."
+  }
+}
+
+variable "grafana_port" {
+  description = "TCP port Grafana listens on inside the monitoring security group (ST-259). Reachable only from the bastion — see docs/runbooks/metrics-dashboard-catalog.md for the SSH-tunnel access path."
+  type        = number
+  default     = 3000
+
+  validation {
+    condition     = var.grafana_port > 0 && var.grafana_port <= 65535
+    error_message = "grafana_port must be a valid TCP port (1-65535)."
+  }
+}
+
 variable "bastion_allowed_ssh_cidrs" {
   description = "CIDRs allowed to SSH into the bastion (e.g. office/VPN egress IPs). Required and deliberately has no default: an operator must make an explicit choice rather than inherit an open one. 0.0.0.0/0 is rejected outright."
   type        = list(string)

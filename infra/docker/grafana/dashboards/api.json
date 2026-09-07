@@ -1,0 +1,120 @@
+{
+  "uid": "studafy-api",
+  "title": "API — RED",
+  "tags": ["studafy", "api", "red"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "ecs_service",
+        "type": "query",
+        "label": "ECS service",
+        "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+        "query": "dimension_values(default,AWS/ECS,CPUUtilization,ServiceName)",
+        "regex": "/.*-api$/",
+        "refresh": 2,
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request rate by route",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (http_route) (rate(http_server_request_duration_count{job=\"api\"}[5m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Error rate (5xx) by route",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (http_route) (rate(http_server_request_duration_count{job=\"api\",http_response_status_code=~\"5..\"}[5m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "p95 latency by route",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_bucket{job=\"api\"}[5m])))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "p99 latency (overall)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_bucket{job=\"api\"}[5m])))"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Error ratio (overall)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_count{job=\"api\",http_response_status_code=~\"5..\"}[5m])) / sum(rate(http_server_request_duration_count{job=\"api\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "ECS CPU / memory (Container Insights)",
+      "type": "timeseries",
+      "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "targets": [
+        {
+          "namespace": "AWS/ECS",
+          "metricName": "CPUUtilization",
+          "dimensions": { "ServiceName": "$ecs_service" },
+          "statistic": "Average",
+          "region": "default",
+          "refId": "A"
+        },
+        {
+          "namespace": "AWS/ECS",
+          "metricName": "MemoryUtilization",
+          "dimensions": { "ServiceName": "$ecs_service" },
+          "statistic": "Average",
+          "region": "default",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}

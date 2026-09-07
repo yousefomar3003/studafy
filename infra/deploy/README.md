@@ -102,6 +102,20 @@ container-level init step — an application change, not a manifest change, so i
 Same reasoning applies to `apps/api` and Postgres/PgBouncer: `apps/api/src/env.ts` has no database
 variable at all yet, so there is nothing for this ticket to wire.
 
+## Metrics scrape wiring (ST-259)
+
+Every service's `task-definition.json.tpl` now also exposes a `metrics` port mapping (9464 —
+`@studafy/observability`'s Prometheus-format `/metrics` endpoint, `packages/observability/src/
+metricsServer.ts`) alongside its main port, and every `service.json.tpl` registers into a Cloud
+Map `aws_service_discovery_service` via `serviceRegistries` so `infra/terraform/modules/monitoring`'s
+Prometheus task can find every replica by DNS (`modules/monitoring/discovery.tf` — one A record
+per task, not one shared load-balanced address, which is what a scraper needs and Service Connect
+specifically doesn't give). `scripts/render.sh` resolves each service's own registry ARN the same
+way it already resolves `SECRET_ARN` — live, via `terraform output -json
+monitoring_metrics_discovery_service_arns | jq`, never duplicated into `environments/<env>.env`.
+`migrations` has neither a port mapping nor a `serviceRegistries` entry — it's a one-off task, not
+a long-running service Prometheus would ever have a reason to scrape.
+
 ## Why ECS (not Kubernetes or Compose)
 
 No EKS cluster, Swarm cluster, or any `kubernetes`/`ecs`/`fargate` resource existed in this repo

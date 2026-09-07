@@ -26,6 +26,13 @@
       "containerPort": 3001
     }
   ],
+  "serviceRegistries": [
+    {
+      "registryArn": "${REALTIME_METRICS_SD_ARN}",
+      "containerName": "realtime",
+      "containerPort": 9464
+    }
+  ],
   "healthCheckGracePeriodSeconds": 30,
   "enableExecuteCommand": true
 }

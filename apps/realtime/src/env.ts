@@ -9,6 +9,13 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   HOST: z.string().min(1).default("0.0.0.0"),
+  SERVICE_NAME: z.string().min(1).default("realtime"),
+  // A separate port from PORT, on purpose (ST-259): the Prometheus-format /metrics endpoint
+  // (@studafy/observability's startMetricsServer) must never be reachable through the public ALB
+  // path PORT is, since it carries no auth of its own — only the monitoring security group can
+  // route to it. 9464 is Prometheus's own registered default port. Distinct from this app's own
+  // existing GET /metrics (src/health.ts) — the JSON fan-out-counter debug endpoint, unchanged.
+  METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
   REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
   /**
    * Shared HMAC secret for the JWT handshake stub (see src/auth.ts). This is a placeholder for

@@ -1,6 +1,7 @@
 # `monitoring`
 
-CloudWatch alarms, the operations dashboard, and the synthetic realtime probe (ST-149).
+CloudWatch alarms, the operations dashboard, the synthetic realtime probe (ST-149), and the
+Prometheus/Grafana metrics stack (ST-259).
 
 ## Alarms & dashboard
 
@@ -54,6 +55,71 @@ Actions role defined outside it. Whichever role `staging-deploy.yml` assumes (to
 `infra/deploy/README.md`'s "Known gaps") needs `logs:CreateLogStream`/`logs:PutLogEvents` scoped to
 `aws_cloudwatch_log_group.deploys.arn`. Not attached here.
 
+## Prometheus/Grafana metrics stack (ST-259)
+
+`monitoring_enabled = true` (staging/prod) provisions, all Terraform-owned directly (like
+`modules/erpnext`'s own ECS resources, not `infra/deploy/scripts/deploy.sh`'s JSON-template path —
+this is static infra, not an app-deploy artifact with a CI-pushed `IMAGE_TAG`):
+
+- **Prometheus** (`prometheus.tf`): one Fargate task running this repo's own image
+  (`infra/docker/prometheus.Dockerfile`, layering `infra/docker/prometheus/prometheus.yml` onto the
+  upstream `prom/prometheus` image), scraping `apps/api`/`apps/realtime`/`apps/workers`' `/metrics`
+  endpoints (`@studafy/observability`, `packages/observability/src/metricsServer.ts`) plus both DB
+  exporters below. Ephemeral Fargate storage, not EFS — see "What this module does not do".
+- **postgres_exporter** (`prometheus.tf`): unconditional whenever `monitoring_enabled` — every
+  environment has a Postgres instance. Unmodified upstream image
+  (`prometheuscommunity/postgres-exporter`); its `DATA_SOURCE_NAME` comes from
+  `var.monitoring_secret_arn`'s `POSTGRES_EXPORTER_DSN` key. See
+  `docs/runbooks/postgres-conventions.md`'s "Monitoring role" section for how that role/DSN is
+  created — a manual bootstrap step, same as the Postgres master credential itself.
+- **mysqld_exporter** (`prometheus.tf`): additionally conditional on `mariadb_exporter_enabled`
+  (the ERPNext plane). Same shape as postgres_exporter; DSN key `MYSQLD_EXPORTER_DSN`. See
+  `modules/mariadb/README.md`'s "Known gaps" for the equivalent bootstrap step.
+- **Grafana** (`grafana.tf`): one Fargate task running this repo's own image
+  (`infra/docker/grafana.Dockerfile`), with dashboards and datasources provisioned entirely from
+  files in this repo (`infra/docker/grafana/{dashboards,provisioning}/**` — the "dashboards in
+  repo" acceptance criterion). Its own task role grants exactly
+  `cloudwatch:GetMetricData`/`ListMetrics`/`DescribeAlarms` (read-only) for its CloudWatch
+  datasource — nothing else.
+
+**Scrape-target discovery** (`discovery.tf`) is DNS-based, not IAM-based: a Cloud Map private DNS
+namespace fixed at `metrics.internal` in every environment (see that file's own comment for why a
+fixed name is safe — dev/staging/prod are separate, unpeered VPCs) gets one `A` record per running
+task (`MULTIVALUE` routing), and Prometheus's `dns_sd_configs` resolves the whole fleet on every
+scrape with zero AWS IAM permissions. `api`/`realtime`/`workers` register into it via their own
+`service.json.tpl`'s `serviceRegistries` (`infra/deploy/scripts/render.sh` resolves each service's
+registry ARN from this module's `metrics_discovery_service_arns` output, the same way it already
+resolves each service's own secret ARN); Prometheus/Grafana/both exporters register directly, since
+those `aws_ecs_service` resources are Terraform-owned here.
+
+**Access**: Grafana has no public endpoint and no ALB in front of it — `module.network`'s
+`monitoring` security group admits only the bastion, the same access model already used for
+Postgres/Redis/PgBouncer administration. See `docs/runbooks/metrics-dashboard-catalog.md` for the
+exact SSH port-forward command and the dashboard catalog itself.
+
+### Cardinality budget
+
+Every label on every metric this stack collects comes from a fixed, small vocabulary — never a
+user id, school id, job id, or raw request path:
+
+- **RED metrics** (`packages/observability/src/redMetrics.ts`): `http.route` is the _matched route
+  pattern_ Hono's router resolved (`/students/:id`, never `/students/8f14e45f-...`), enforced
+  structurally by which function computes the label, not by convention — see that file's own
+  `redMetrics.test.ts` for a test that would fail if this regressed. `http.request.method` and
+  `http.response.status_code` are bounded by construction (HTTP has finitely many of each).
+- **Queue metrics** (`packages/observability/src/queueMetrics.ts`): `messaging.destination.name`
+  is one of `QUEUE_NAMES` (`@studafy/constants`) — apps/workers' own fixed queue registry, not a
+  job id or job name. `state`/`outcome` are BullMQ's own small enum of terminal/count states.
+- **DB exporters**: `postgres_exporter`/`mysqld_exporter`'s own default collectors label by
+  `datname`/database name and internal Postgres/MySQL identifiers — never a row, a query, or a
+  tenant.
+
+Estimated series count stays in the low hundreds even at full scale: `routes × methods ×
+status_classes` per HTTP service (tens of routes × ~4 methods × ~5 status classes), `queues ×
+states` for depth plus `queues × outcomes` for throughput (a dozen queues × ~7), and a small fixed
+set per DB exporter — none of it scales with tenant count, user count, or traffic volume the way a
+per-user or per-school label would.
+
 ## Inputs
 
 | Name                                | Type           | Default            | Description                                                                         |
@@ -74,15 +140,34 @@ Actions role defined outside it. Whichever role `staging-deploy.yml` assumes (to
 | `log_retention_days`                | `number`       | `30`               | Probe Lambda log retention.                                                         |
 | `probe_metric_namespace`            | `string`       | `Studafy/Realtime` | CloudWatch namespace for `RealtimeProbeLatency` (`Studafy/<component>` convention). |
 | `probe_slo_ms`                      | `number`       | `2000`             | Propagation SLO in ms; the probe alarm threshold.                                   |
+| `monitoring_enabled`                | `bool`         | `false`            | Provision Prometheus/Grafana/the exporters. Dev omits it; staging/prod pass `true`. |
+| `vpc_id`                            | `string`       | —                  | VPC the Cloud Map private DNS namespace is created in.                              |
+| `cluster_arn`                       | `string`       | —                  | ECS cluster ARN the metrics stack's own services run in.                            |
+| `execution_role_arn`                | `string`       | —                  | Shared ECS execution role (`module.compute`), reused rather than a new one.         |
+| `private_app_subnet_ids`            | `list(string)` | —                  | Private app-tier subnets for the metrics stack's Fargate tasks.                     |
+| `monitoring_security_group_id`      | `string`       | —                  | Security group for the metrics stack (`module.network`'s `monitoring` group).       |
+| `metrics_port`                      | `number`       | `9464`             | Port apps/api, apps/realtime, apps/workers expose `/metrics` on.                    |
+| `grafana_port`                      | `number`       | `3000`             | Port Grafana listens on.                                                            |
+| `monitoring_secret_arn`             | `string`       | —                  | ARN of the `monitoring` app-secrets container (exporter DSNs, Grafana password).    |
+| `mariadb_exporter_enabled`          | `bool`         | `false`            | Provision `mysqld_exporter`. Should match `local.erpnext_plane_enabled`.            |
+| `prometheus_image`                  | `string`       | —                  | Full image reference for this repo's Prometheus image.                              |
+| `grafana_image`                     | `string`       | —                  | Full image reference for this repo's Grafana image.                                 |
+| `prometheus_retention`              | `string`       | `"15d"`            | Prometheus `--storage.tsdb.retention.time` value.                                   |
+| `prometheus_storage_gb`             | `number`       | `30`               | Fargate ephemeral storage (GiB) for the Prometheus task.                            |
+| `prometheus_cpu` / `_memory`        | `number`       | `512` / `1024`     | Fargate sizing for the Prometheus task.                                             |
+| `grafana_cpu` / `_memory`           | `number`       | `256` / `512`      | Fargate sizing for the Grafana task.                                                |
+| `exporter_cpu` / `_memory`          | `number`       | `256` / `512`      | Fargate sizing for each DB exporter task.                                           |
 
 ## Outputs
 
-| Name                           | Description                                                         |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `dashboard_name`               | Operations dashboard name.                                          |
-| `alarm_arns`                   | All action-free alarm ARNs, including the probe alarm when enabled. |
-| `realtime_probe_function_name` | Probe Lambda name, or `null` when the probe is disabled.            |
-| `deploys_log_group_name`       | CloudWatch Logs group the staging deploy pipeline annotates.        |
+| Name                             | Description                                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `dashboard_name`                 | Operations dashboard name.                                                                          |
+| `alarm_arns`                     | All action-free alarm ARNs, including the probe alarm when enabled.                                 |
+| `realtime_probe_function_name`   | Probe Lambda name, or `null` when the probe is disabled.                                            |
+| `deploys_log_group_name`         | CloudWatch Logs group the staging deploy pipeline annotates.                                        |
+| `metrics_discovery_service_arns` | Map of `{api, realtime, workers}` -> Cloud Map registry ARN — see `infra/deploy/scripts/render.sh`. |
+| `grafana_access_hint`            | Reminder of the SSH port-forward command to reach Grafana.                                          |
 
 ## What this module does not do
 
@@ -98,3 +183,26 @@ Actions role defined outside it. Whichever role `staging-deploy.yml` assumes (to
   the realtime gateway fan-out core (Redis PUBLISH → PSUBSCRIBE → room broadcast) directly; the
   outbox relay additionally involves Postgres and the workers queue, which is outside a per-minute
   probe's scope.
+- **Prometheus has no persistent volume.** Its TSDB lives on Fargate's own ephemeral task storage
+  (`prometheus_storage_gb`), so a task replacement (deploy, crash, AZ event) resets scraped history
+  — up to `prometheus_retention`'s worth of data, not just since the last scrape. Grafana's
+  dashboards themselves are unaffected (dashboards-as-code, re-provisioned from the image on every
+  start), and CloudWatch's own long-term retention is untouched by this. Adding EFS would fix it,
+  at the cost of mount targets, an access point, and its own security-group wiring — not done here
+  because nothing in ST-259's acceptance criteria requires history to survive a deploy.
+- **It does not create the Postgres/MariaDB monitoring roles or assemble their DSNs.** Same
+  "no SQL-executing Terraform provider" gap the master credential itself has — see
+  `docs/runbooks/postgres-conventions.md`'s "Monitoring role" section and
+  `modules/mariadb/README.md`'s "Known gaps" for the exact one-time bootstrap SQL, and
+  `infra/terraform/README.md` for why the resulting DSN is supplied via
+  `TF_VAR_secrets_app_secret_values` rather than assembled by Terraform.
+- **Grafana has no public endpoint, SSO, or per-user accounts.** It's reachable only from the
+  bastion (`module.network`'s `monitoring` security group), behind one shared admin credential
+  (`monitoring_secret_arn`'s `GRAFANA_ADMIN_PASSWORD`). Fine for the small number of people who
+  need dashboards today; fronting it with an internal ALB and real SSO is future work if that
+  changes, not something this ticket's acceptance criteria ask for.
+- **It does not mirror `prometheuscommunity/postgres-exporter` or `prom/mysqld-exporter` into this
+  repo's own ECR.** Both task definitions pull the upstream images directly from Docker Hub —
+  unlike Prometheus/Grafana, this repo doesn't layer any config onto them (a DSN is a runtime
+  secret, not a file), so there's nothing to build. `module.network`'s `monitoring_https` egress
+  rule is what makes that pull possible.

@@ -33,6 +33,7 @@
         "@studafy/finance-reporting": "workspace:*",
         "@studafy/grades-reporting": "workspace:*",
         "@studafy/notification-templates": "workspace:*",
+        "@studafy/observability": "workspace:*",
         "@studafy/shared-schemas": "workspace:*",
         "bullmq": "5.79.3",
         "hono": "4.12.34",
@@ -59,6 +60,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@studafy/constants": "workspace:*",
+        "@studafy/observability": "workspace:*",
         "hono": "4.12.34",
         "ioredis": "5.10.1",
         "zod": "4.1.12",
@@ -124,6 +126,7 @@
         "@studafy/finance-reporting": "workspace:*",
         "@studafy/grades-reporting": "workspace:*",
         "@studafy/notification-templates": "workspace:*",
+        "@studafy/observability": "workspace:*",
         "@studafy/progress-reporting": "workspace:*",
         "@xmldom/xmldom": "0.8.13",
         "bidi-js": "1.0.3",
@@ -293,6 +296,25 @@
       "version": "0.0.0",
       "dependencies": {
         "@studafy/constants": "workspace:*",
+      },
+      "devDependencies": {
+        "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
+        "@types/bun": "1.3.14",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/observability": {
+      "name": "@studafy/observability",
+      "version": "0.0.0",
+      "dependencies": {
+        "@opentelemetry/api": "1.9.1",
+        "@opentelemetry/exporter-prometheus": "0.222.0",
+        "@opentelemetry/resources": "2.11.0",
+        "@opentelemetry/sdk-metrics": "2.11.0",
+        "@opentelemetry/semantic-conventions": "1.43.0",
+        "bullmq": "5.79.3",
+        "hono": "4.12.34",
       },
       "devDependencies": {
         "@studafy/config": "workspace:*",
@@ -677,6 +699,16 @@
 
     "@opentelemetry/api": ["@opentelemetry/api@1.9.1", "", {}, "sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q=="],
 
+    "@opentelemetry/core": ["@opentelemetry/core@2.11.0", "", { "dependencies": { "@opentelemetry/semantic-conventions": "^1.29.0" }, "peerDependencies": { "@opentelemetry/api": ">=1.0.0 <1.10.0" } }, "sha512-7YP44XH0tV6+Mb54x2YGf84i7yi+31MBZlE8JwvozkxyTvXbSp10X7cI7YE49ChJ3shMJoBmCJF3+1QFBJctGA=="],
+
+    "@opentelemetry/exporter-prometheus": ["@opentelemetry/exporter-prometheus@0.222.0", "", { "dependencies": { "@opentelemetry/core": "2.11.0", "@opentelemetry/resources": "2.11.0", "@opentelemetry/sdk-metrics": "2.11.0", "@opentelemetry/semantic-conventions": "^1.29.0" }, "peerDependencies": { "@opentelemetry/api": "^1.3.0" } }, "sha512-I7nalnnBZrhlTgjlqsVeEjJGcQCFK5kKAYVk7XTz/cbubvj5fvjLOal/Many0taHF2GIkOWmegsbQ8vbQJjhFg=="],
+
+    "@opentelemetry/resources": ["@opentelemetry/resources@2.11.0", "", { "dependencies": { "@opentelemetry/core": "2.11.0", "@opentelemetry/semantic-conventions": "^1.29.0" }, "peerDependencies": { "@opentelemetry/api": ">=1.3.0 <1.10.0" } }, "sha512-Ie7+8q8MDF4FAEQCKVMTx3ReUvxiIAgIiiW3c9JdmP8+HMcDy20puT+AHjexnExgnbvBxjQ9fjkFDWrikJ2jQA=="],
+
+    "@opentelemetry/sdk-metrics": ["@opentelemetry/sdk-metrics@2.11.0", "", { "dependencies": { "@opentelemetry/core": "2.11.0", "@opentelemetry/resources": "2.11.0" }, "peerDependencies": { "@opentelemetry/api": ">=1.9.0 <1.10.0" } }, "sha512-7GXXcObyHyDUUSG+L+kJoquty01bzm7ivE7+SSgXXJcHuPzGviptxwARmI2c+bnnxjexGQbJnyNlN8HxBP/Y7A=="],
+
+    "@opentelemetry/semantic-conventions": ["@opentelemetry/semantic-conventions@1.43.0", "", {}, "sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg=="],
+
     "@oxc-project/types": ["@oxc-project/types@0.139.0", "", {}, "sha512-r9gHphtCs+1M7J0pw6Sn/hh/Wpa/iQrOOkrNAlVLF/gHq+/CJmHIWKKUUhdWjcD6CIa8idarspCsASiXCXvFUw=="],
 
     "@pdf-lib/fontkit": ["@pdf-lib/fontkit@1.1.1", "", { "dependencies": { "pako": "^1.0.6" } }, "sha512-KjMd7grNapIWS/Dm0gvfHEilSyAmeLvrEGVcqLGi0VYebuqqzTbgF29efCx7tvx+IEbG3zQciRSWl3GkUSvjZg=="],
@@ -858,6 +890,8 @@
     "@studafy/mobile": ["@studafy/mobile@workspace:apps/mobile"],
 
     "@studafy/notification-templates": ["@studafy/notification-templates@workspace:packages/notification-templates"],
+
+    "@studafy/observability": ["@studafy/observability@workspace:packages/observability"],
 
     "@studafy/progress-reporting": ["@studafy/progress-reporting@workspace:packages/progress-reporting"],
 

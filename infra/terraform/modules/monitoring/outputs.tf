@@ -27,3 +27,18 @@ output "deploys_log_group_name" {
   description = "CloudWatch Logs group the staging deploy pipeline writes one line per outcome to; rendered as the dashboard's 'Recent deploys' widget."
   value       = aws_cloudwatch_log_group.deploys.name
 }
+
+# --- Prometheus/Grafana metrics stack (ST-259) ---------------------------------------------------
+
+output "metrics_discovery_service_arns" {
+  description = "Map of {api, realtime, workers} -> Cloud Map aws_service_discovery_service ARN. infra/deploy/scripts/populate-env.sh reads these into infra/deploy/environments/<env>.env, and each service's own service.json.tpl registers into them via serviceRegistries — see discovery.tf for why api/realtime/workers, deploy.sh-owned rather than Terraform-owned, still get their registration target created here."
+  value = {
+    for name in ["api", "realtime", "workers"] :
+    name => aws_service_discovery_service.this[name].arn
+  }
+}
+
+output "grafana_access_hint" {
+  description = "Reminder of how to reach Grafana: it has no public endpoint (module.network's monitoring security group admits only the bastion). See docs/runbooks/metrics-dashboard-catalog.md for the full access instructions."
+  value       = "ssh -L 3000:grafana.metrics.internal:${var.grafana_port} <bastion>  # then open http://localhost:3000"
+}

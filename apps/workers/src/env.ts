@@ -8,6 +8,12 @@ import { z } from "zod";
 export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    SERVICE_NAME: z.string().min(1).default("workers"),
+    // apps/workers has no HTTP surface of its own (infra/docker/README.md), so unlike api/realtime
+    // this is not "a separate port from PORT" — it is the *only* port this process listens on, and
+    // it exists solely for @studafy/observability's Prometheus-format /metrics endpoint (ST-259).
+    // 9464 is Prometheus's own registered default port.
+    METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
     REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
     DATABASE_URL: z.string().min(1).default("postgres://localhost:5432/studafy"),

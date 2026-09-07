@@ -1,3 +1,4 @@
+import { startMetricsServer } from "@studafy/observability";
 import { websocket } from "hono/bun";
 
 import { createApp } from "./app";
@@ -16,6 +17,12 @@ import type { RoomManager } from "./rooms";
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a
 // port or opens a Redis connection.
 const env = loadEnv();
+
+// Prometheus-format metrics (ST-259), on its own port — must run before createApp() registers
+// createRedMetricsMiddleware(), since an OTel instrument stays bound to whichever meter created
+// it and this call is what registers the real global MeterProvider (see
+// packages/observability/src/redMetrics.ts).
+const metricsServer = startMetricsServer({ serviceName: env.SERVICE_NAME, port: env.METRICS_PORT });
 
 const rooms: RoomManager<RawSocket> = createRoomManager();
 const tracker = createConnectionTracker<RawSocket>();
@@ -76,10 +83,11 @@ const shutdown = (signal: string) => {
     },
     unsubscribe,
     tracker,
-  }).then(() => {
+  }).then(async () => {
     server.stop();
     redisSubscriber.disconnect();
     outboxSubscriber.disconnect();
+    await metricsServer.shutdown();
     console.log("Shutdown complete.");
     process.exit(0);
   });
