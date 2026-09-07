@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/app.dart';
 import 'package:studafy_mobile/src/core/auth/auth_notifier.dart';
@@ -11,6 +12,8 @@ import 'package:studafy_mobile/src/core/di/app_providers.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/core/monitoring/monitoring_providers.dart';
 import 'package:studafy_mobile/src/core/push/push_providers.dart';
+import 'package:studafy_mobile/src/core/update/update_providers.dart';
+import 'package:studafy_mobile/src/core/update/update_status.dart';
 
 import 'fake_access_token.dart';
 import 'fake_crash_reporter.dart';
@@ -52,6 +55,8 @@ Future<void> pumpStudafyApp(
   WidgetTester tester, {
   AuthSession? session,
   Locale startLocale = AppLocales.fallback,
+  UpdateStatus updateStatus = UpdateStatus.upToDate,
+  List<Override> extraOverrides = const [],
 }) async {
   await tester.pumpWidget(
     // Keyed uniquely so each call gets a genuinely fresh element tree. Without this, two
@@ -72,6 +77,12 @@ Future<void> pumpStudafyApp(
             // StudafyApp reads this in didChangeDependencies (_subscribeToPushTaps) regardless of
             // auth status — see fake_push_service.dart for why a real PushService can't exist here.
             pushServiceProvider.overrideWithValue(FakePushService()),
+            // Forced-update check stubbed: its real path calls PackageInfo (no plugin in a widget
+            // test) and the config endpoint (no server), and it is fail-open in production anyway,
+            // so [updateStatus] (default `upToDate`) is the honest default. Pass `updateStatus:`
+            // to exercise the blocking path — see forced_update_boot_test.dart.
+            updateStatusProvider.overrideWith((ref) async => updateStatus),
+            ...extraOverrides,
           ],
           child: const StudafyApp(),
         ),

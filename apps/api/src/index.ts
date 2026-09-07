@@ -14,6 +14,7 @@ import {
 } from "./modules/ai";
 import { KeyStore } from "./modules/auth";
 import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
+import { resolveMobileReleaseConfig } from "./modules/mobile";
 import { startEntitlementInvalidationSubscriber, StripeAdapter } from "./modules/subscriptions";
 import { checkRedis, closeRedis, createRedisClient } from "./redis";
 
@@ -130,6 +131,9 @@ const app = createApp({
   aiRerankEnabled: env.AI_RERANK_ENABLED,
   aiLlmProvider,
   aiLlmModelOverrides,
+  // Folds MOBILE_MIN_SUPPORTED_VERSION_* / MOBILE_LATEST_VERSION_* into the shape
+  // GET /api/mobile/config serves (ST-257). An unset variable becomes "0.0.0" ("no floor").
+  mobileReleaseConfig: resolveMobileReleaseConfig(env),
 });
 
 const server = Bun.serve({

@@ -1,0 +1,16 @@
+# `match` — managed iOS signing (ST-257). The distribution certificate and App Store provisioning
+# profile live encrypted in a dedicated git repo; every runner fetches them read-only. Only a
+# deliberate, local `bundle exec fastlane match appstore` (no readonly) ever mints or renews them,
+# so CI can never regenerate a cert and invalidate every other machine's copy.
+#
+# git_url and the passphrase come from the environment (MATCH_GIT_URL, MATCH_PASSWORD) — see
+# docs/runbooks/mobile-release.md#ios-signing.
+
+git_url(ENV["MATCH_GIT_URL"])
+storage_mode("git")
+git_branch(ENV["MATCH_GIT_BRANCH"] || "main")
+
+type("appstore")
+app_identifier([ENV["IOS_APP_IDENTIFIER"] || "com.studafy.studafyMobile"])
+
+readonly(true)

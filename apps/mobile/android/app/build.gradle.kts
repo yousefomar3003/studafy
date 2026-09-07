@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -6,6 +9,19 @@ plugins {
     // Uploads the ProGuard/R8 mapping file on release builds so obfuscated Crashlytics stack
     // traces get symbolicated — see docs/monitoring.md.
     id("com.google.firebase.crashlytics")
+}
+
+// Play upload-key material (ST-257). `android/key.properties` is written at release time by
+// `fastlane android signing` from CI secrets and is gitignored — it never exists on a dev machine
+// or in the repo. When it is absent every build falls back to the debug keystore, so
+// `flutter run --release` and CI test builds keep working untouched. Google's Play App Signing
+// re-signs the uploaded bundle with the real distribution key on its side; this is only the
+// upload key. See docs/runbooks/mobile-release.md#android-signing.
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        FileInputStream(keystorePropertiesFile).use { load(it) }
+    }
 }
 
 android {
@@ -53,10 +69,26 @@ android {
         }
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // The real upload key when fastlane has provisioned key.properties (CI release lane);
+            // the debug keystore otherwise, so `flutter run --release` and CI test builds still work.
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

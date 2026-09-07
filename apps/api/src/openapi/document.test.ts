@@ -177,6 +177,8 @@ describe("structure", () => {
         // ST-127. Parent-facing household financial view.
         "/api/finance/families/{familyId}",
         "/api/finance/students/{studentId}/installments",
+        // ST-257. Public, un-scoped, mounted unconditionally alongside the health probes.
+        "/api/mobile/config",
         "/api/evaluations",
         "/api/evaluations/{evaluationId}",
         "/api/evaluations/{evaluationId}/scores",

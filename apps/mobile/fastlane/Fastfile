@@ -1,0 +1,271 @@
+# Studafy mobile release lanes (ST-257).
+#
+# Runbook (authoritative): docs/runbooks/mobile-release.md — provisioning, secrets, the one-time
+# iOS Xcode wiring, and how the two acceptance criteria are verified.
+#
+# Canonical location is fastlane/ (lowercase): fastlane discovers ./fastlane/Fastfile and nothing
+# else. The ticket's "/apps/mobile/Fastlane" names the concern, not the on-disk path.
+#
+# ── Lane map ────────────────────────────────────────────────────────────────────────────────────
+#   ios   signing          match (read-only) — distribution cert + App Store profile
+#   ios   beta             build IPA → TestFlight            ← every merge to main
+#   ios   release          build IPA → App Store review, phased release  ← mobile-v* tag
+#   android signing        materialise the upload keystore from CI secrets
+#   android internal       build AAB → Play "internal" track ← every merge to main
+#   android release        build AAB → Play "production" @ 10% staged rollout  ← mobile-v* tag
+#   android promote_rollout advance the live production rollout (…→25→50→100)  ← manual
+#   update_floor           compute the forced-update floor this release implies (see runbook)
+#
+# ── Versioning ──────────────────────────────────────────────────────────────────────────────────
+# The version *name* (x.y.z) is pubspec.yaml's single source of truth. The version *code* / build
+# number is the CI run's commit count (MOBILE_BUILD_NUMBER) — monotonic, derivable anywhere, never
+# hand-maintained. Both are passed to `flutter build` as --build-name / --build-number.
+
+require "base64"
+require "shellwords"
+
+skip_docs          # never let `fastlane` regenerate fastlane/README.md over the runbook
+opt_out_usage
+
+MOBILE_DIR = File.expand_path("..", __dir__)                    # → apps/mobile
+PUBSPEC    = File.join(MOBILE_DIR, "pubspec.yaml")
+FLAVOR     = "prod"                                             # the only store-distributed flavour
+ENTRYPOINT = "lib/main_prod.dart"
+
+# ── Helpers ─────────────────────────────────────────────────────────────────────────────────────
+
+def pubspec_version_name
+  line = File.readlines(PUBSPEC).find { |l| l.start_with?("version:") }
+  UI.user_error!("no `version:` line in #{PUBSPEC}") if line.nil?
+  line.split(":", 2).last.strip.split("+", 2).first
+end
+
+# CI passes MOBILE_BUILD_NUMBER (the run's commit count). Locally, derive the same value so a
+# `bundle exec fastlane` from a dev machine still produces a plausibly-ordered build.
+def resolved_build_number
+  from_env = ENV["MOBILE_BUILD_NUMBER"].to_s.strip
+  return from_env.to_i unless from_env.empty?
+  `git -C #{MOBILE_DIR.shellescape} rev-list --count HEAD`.strip.to_i
+end
+
+# A mobile-v* tag must name the version pubspec.yaml already carries — releasing without bumping
+# the pubspec is the mistake this guards against. CI sets MOBILE_RELEASE_TAG from the pushed ref.
+def ensure_tag_matches_pubspec!
+  tag = ENV["MOBILE_RELEASE_TAG"].to_s.strip
+  return if tag.empty?  # a manual dispatch with no tag context: trust the operator
+  tagged = tag.sub(/\Amobile-v/, "")
+  pubspec = pubspec_version_name
+  return if tagged == pubspec
+  UI.user_error!("tag #{tag} → #{tagged}, but pubspec.yaml is #{pubspec}. Bump pubspec first.")
+end
+
+def flutter(*args)
+  Dir.chdir(MOBILE_DIR) { sh("flutter", *args) }
+end
+
+# `flutter pub get`, and a check that the generated API client (ST-062) is present — the app will
+# not compile without it. Generating it needs bun + apps/api's OpenAPI document, so the CI
+# workflow (.github/workflows/mobile-release.yml) runs `bun run client:generate` before invoking
+# any lane; this only fails fast with a clear message if that step was skipped.
+def flutter_prepare
+  flutter("pub", "get")
+  generated = File.join(MOBILE_DIR, "lib/src/core/api/generated")
+  unless Dir.exist?(generated) && !Dir.empty?(generated)
+    UI.user_error!("generated API client missing at #{generated} — run `bun run client:generate` first")
+  end
+end
+
+def app_store_api_key
+  app_store_connect_api_key(
+    key_id:                    ENV.fetch("APP_STORE_CONNECT_KEY_ID"),
+    issuer_id:                 ENV.fetch("APP_STORE_CONNECT_ISSUER_ID"),
+    key_content:               ENV.fetch("APP_STORE_CONNECT_KEY_CONTENT"),
+    is_key_content_base64:     true,
+    in_house:                  false,
+  )
+end
+
+def build_ios_ipa
+  flutter_prepare
+  flutter(
+    "build", "ipa", "--release",
+    "--flavor", FLAVOR, "-t", ENTRYPOINT,
+    "--build-name=#{pubspec_version_name}",
+    "--build-number=#{resolved_build_number}",
+    "--export-method=app-store",
+  )
+  Dir.glob(File.join(MOBILE_DIR, "build/ios/ipa/*.ipa")).first ||
+    UI.user_error!("flutter build ipa produced no .ipa under build/ios/ipa/")
+end
+
+def build_android_aab
+  flutter_prepare
+  flutter(
+    "build", "appbundle", "--release",
+    "--flavor", FLAVOR, "-t", ENTRYPOINT,
+    "--build-name=#{pubspec_version_name}",
+    "--build-number=#{resolved_build_number}",
+  )
+  path = File.join(MOBILE_DIR, "build/app/outputs/bundle/#{FLAVOR}Release/app-#{FLAVOR}-release.aab")
+  File.exist?(path) ? path : UI.user_error!("no app bundle at #{path}")
+end
+
+# ── iOS ─────────────────────────────────────────────────────────────────────────────────────────
+
+platform :ios do
+  desc "Fetch the App Store distribution cert + provisioning profile (match, read-only)."
+  lane :signing do
+    setup_ci if is_ci   # ephemeral keychain, so match can install without a login password prompt
+    match(readonly: true)  # all other options come from fastlane/Matchfile
+  end
+
+  desc "Build a release IPA and upload it to TestFlight. Runs on every merge to main."
+  lane :beta do
+    signing
+    ipa = build_ios_ipa
+    upload_to_testflight(
+      api_key:                          app_store_api_key,
+      ipa:                              ipa,
+      skip_waiting_for_build_processing: true,   # don't hold a runner for Apple's processing queue
+      distribute_external:              false,   # internal testers only — no external review
+      skip_submission:                  true,
+    )
+  end
+
+  desc "Submit the current version to the App Store for review. Runs on a mobile-v* tag."
+  lane :release do
+    ensure_tag_matches_pubspec!
+    signing
+    ipa = build_ios_ipa
+    upload_to_app_store(
+      api_key:            app_store_api_key,
+      ipa:                ipa,
+      submit_for_review:  true,
+      automatic_release:  false,   # a human taps "Release this version" once review passes
+      phased_release:     true,    # Apple's 7-day 1%→100% ramp — the iOS staged-rollout control
+      force:              true,    # no interactive HTML preview in CI
+      run_precheck_before_submit: false,
+      skip_metadata:      true,    # store copy is managed in App Store Connect, not this repo
+      skip_screenshots:   true,
+      skip_binary_upload: false,
+      precheck_include_in_app_purchases: false,
+    )
+  end
+end
+
+# ── Android ─────────────────────────────────────────────────────────────────────────────────────
+
+platform :android do
+  desc "Materialise the Play upload keystore from CI secrets into android/key.properties."
+  lane :signing do
+    b64 = ENV["ANDROID_UPLOAD_KEYSTORE_BASE64"].to_s
+    UI.user_error!("ANDROID_UPLOAD_KEYSTORE_BASE64 is not set") if b64.empty?
+
+    keystore = File.join(MOBILE_DIR, "android/app/studafy-upload.jks")
+    File.binwrite(keystore, Base64.decode64(b64))
+
+    File.write(File.join(MOBILE_DIR, "android/key.properties"), <<~PROPERTIES)
+      storeFile=studafy-upload.jks
+      storePassword=#{ENV.fetch("ANDROID_UPLOAD_STORE_PASSWORD")}
+      keyAlias=#{ENV.fetch("ANDROID_UPLOAD_KEY_ALIAS")}
+      keyPassword=#{ENV.fetch("ANDROID_UPLOAD_KEY_PASSWORD")}
+    PROPERTIES
+    UI.message("Wrote android/key.properties → #{keystore} (Play App Signing re-signs on Google's side).")
+  end
+
+  desc "Build an app bundle and upload it to the Play internal track. Runs on every merge to main."
+  lane :internal do
+    signing
+    upload_to_play_store(
+      track:                   "internal",
+      aab:                     build_android_aab,
+      release_status:          "completed",
+      skip_upload_apk:         true,
+      skip_upload_metadata:    true,
+      skip_upload_changelogs:  true,
+      skip_upload_images:      true,
+      skip_upload_screenshots: true,
+    )
+  end
+
+  desc "Promote the current build to production at a 10% staged rollout. Runs on a mobile-v* tag."
+  lane :release do
+    ensure_tag_matches_pubspec!
+    signing
+    upload_to_play_store(
+      track:                   "production",
+      aab:                     build_android_aab,
+      rollout:                 "0.1",          # 10% — the staged-rollout floor
+      release_status:          "inProgress",
+      skip_upload_apk:         true,
+      skip_upload_metadata:    true,
+      skip_upload_changelogs:  true,
+      skip_upload_images:      true,
+      skip_upload_screenshots: true,
+    )
+  end
+
+  desc "Advance the live production rollout, e.g. `fastlane android promote_rollout rollout:0.5`."
+  lane :promote_rollout do |options|
+    fraction = options[:rollout].to_s
+    UI.user_error!("pass rollout:<0..1>, e.g. rollout:0.5 (1.0 completes the rollout)") if fraction.empty?
+    version_code = (options[:version_code] || resolved_build_number).to_i
+    upload_to_play_store(
+      track:                   "production",
+      version_code:            version_code,
+      rollout:                 fraction,
+      release_status:          fraction.to_f >= 1.0 ? "completed" : "inProgress",
+      skip_upload_aab:         true,
+      skip_upload_apk:         true,
+      skip_upload_metadata:    true,
+      skip_upload_changelogs:  true,
+      skip_upload_images:      true,
+      skip_upload_screenshots: true,
+    )
+  end
+end
+
+# ── Forced-update floor ─────────────────────────────────────────────────────────────────────────
+
+desc <<~DESC
+  Compute the forced-update floor this release implies and surface it for the API env update.
+
+  The floor is served by GET /api/mobile/config from the API service's own environment
+  (MOBILE_MIN_SUPPORTED_VERSION_IOS/_ANDROID, MOBILE_LATEST_VERSION_IOS/_ANDROID). This lane does
+  not — and cannot — mutate that runtime environment; it prints the values, writes them to
+  $GITHUB_OUTPUT / the job summary in CI, and drops fastlane/mobile-release-floor.env for the
+  operator to apply. See docs/runbooks/mobile-release.md#forced-update-floor.
+
+  Options:
+    floor:<x.y.z>   the new minimum supported version (default: keep — prints the current pubspec
+                    as `latest` only, leaving the floor for an explicit call)
+    latest:<x.y.z>  the newest published version (default: the pubspec version)
+DESC
+lane :update_floor do |options|
+  latest = (options[:latest] || pubspec_version_name).to_s
+  floor  = (options[:floor]  || latest).to_s
+  [floor, latest].each do |v|
+    UI.user_error!("#{v.inspect} is not a x.y.z version") unless v.match?(/\A\d+\.\d+\.\d+\z/)
+  end
+
+  pairs = {
+    "MOBILE_MIN_SUPPORTED_VERSION_IOS"     => floor,
+    "MOBILE_MIN_SUPPORTED_VERSION_ANDROID" => floor,
+    "MOBILE_LATEST_VERSION_IOS"            => latest,
+    "MOBILE_LATEST_VERSION_ANDROID"        => latest,
+  }
+
+  body = pairs.map { |k, v| "#{k}=#{v}" }.join("\n")
+  File.write(File.join(__dir__, "mobile-release-floor.env"), "#{body}\n")
+  UI.important("Forced-update floor for the API service environment:")
+  UI.message("\n#{body}\n")
+
+  if ENV["GITHUB_OUTPUT"]
+    File.open(ENV["GITHUB_OUTPUT"], "a") { |f| pairs.each { |k, v| f.puts("#{k}=#{v}") } }
+  end
+  if ENV["GITHUB_STEP_SUMMARY"]
+    File.open(ENV["GITHUB_STEP_SUMMARY"], "a") do |f|
+      f.puts("### Forced-update floor\n\nSet on the API service, then restart it:\n\n```\n#{body}\n```")
+    end
+  end
+end

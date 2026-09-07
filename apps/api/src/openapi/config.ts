@@ -46,6 +46,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Liveness and readiness probes. Never authenticated — an orchestrator has no credentials.",
     },
     {
+      name: "Mobile",
+      description:
+        "Support for the native app's release lane (ST-257). Public and un-scoped — the app " +
+        "reads the release floor on launch, before a session exists — and served from this " +
+        "service's environment, so raising the forced-update floor is a config change, not a deploy.",
+    },
+    {
       name: "ERPNext",
       description:
         "Inbound webhook ingestion from ERPNext. Authenticated by an HMAC signature over the raw " +

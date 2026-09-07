@@ -23,6 +23,14 @@
     "hoursAgo": "{count}h ago",
     "daysAgo": "{count}d ago"
   },
+  "update": {
+    "required": {
+      "title": "Update required",
+      "body": "This version of Studafy is no longer supported. Update to the latest version to keep going.",
+      "action": "Update now",
+      "error": "Couldn’t open the store. Search for “Studafy” in your app store to update."
+    }
+  },
   "today": {
     "timetable": {
       "title": "Today's timetable",
