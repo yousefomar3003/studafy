@@ -83,6 +83,11 @@ output "monitoring_security_group_id" {
   value       = aws_security_group.monitoring.id
 }
 
+output "logging_security_group_id" {
+  description = "Security group ID for the log-aggregation plane (modules/logging): Vector and Loki. Loki's API is reachable only from the bastion, Grafana and Vector; egress is HTTPS to AWS APIs only."
+  value       = aws_security_group.logging.id
+}
+
 output "bastion_security_group_id" {
   description = "Security group ID of the bastion."
   value       = aws_security_group.bastion.id

@@ -646,6 +646,103 @@ resource "aws_vpc_security_group_egress_rule" "monitoring_dns_udp" {
   cidr_ipv4         = var.vpc_cidr
 }
 
+# Grafana's Loki datasource (infra/docker/grafana/provisioning/datasources/datasources.yml.tpl)
+# reaches Loki on var.loki_port, which the 443-only monitoring_https rule above does not cover.
+resource "aws_vpc_security_group_egress_rule" "monitoring_to_loki" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "To Loki, Grafana's Loki datasource (ST-261)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.loki_port
+  to_port                      = var.loki_port
+  referenced_security_group_id = aws_security_group.logging.id
+}
+
+# --- Logging plane (ST-261): Vector, Loki --------------------------------------------------------
+
+# One shared group for the whole log-aggregation plane, same "one group per logical plane" pattern
+# as the monitoring group above. Vector and Loki have the same trust boundary: Loki's HTTP API is
+# reachable only from the bastion (logcli / the PII audit script over an SSH tunnel), from Grafana
+# and from Vector; both egress to AWS APIs (S3, SQS, ECR, Firehose, CloudWatch) over HTTPS and to
+# nothing else. Vector has no inbound listener at all — it pulls from SQS.
+resource "aws_security_group" "logging" {
+  name_prefix = "${var.name_prefix}-logging-"
+  description = "Log-aggregation plane (Vector, Loki): Loki's API reachable only from the bastion, Grafana and Vector; HTTPS egress to AWS APIs only."
+  vpc_id      = aws_vpc.this.id
+
+  tags = { Name = "${var.name_prefix}-logging" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "logging_self_loki" {
+  security_group_id            = aws_security_group.logging.id
+  description                  = "Vector to Loki (and Loki task-to-task if ever scaled out)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.loki_port
+  to_port                      = var.loki_port
+  referenced_security_group_id = aws_security_group.logging.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "logging_from_bastion" {
+  security_group_id            = aws_security_group.logging.id
+  description                  = "From the bastion, Loki queries over an SSH port-forward (docs/runbooks/log-aggregation.md)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.loki_port
+  to_port                      = var.loki_port
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "logging_from_monitoring" {
+  security_group_id            = aws_security_group.logging.id
+  description                  = "From the monitoring plane, Grafana's Loki datasource"
+  ip_protocol                  = "tcp"
+  from_port                    = var.loki_port
+  to_port                      = var.loki_port
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "logging_self_loki" {
+  security_group_id            = aws_security_group.logging.id
+  description                  = "Vector to Loki within the plane"
+  ip_protocol                  = "tcp"
+  from_port                    = var.loki_port
+  to_port                      = var.loki_port
+  referenced_security_group_id = aws_security_group.logging.id
+}
+
+# HTTPS egress for ECR image pulls plus the pipeline's actual data path: S3 (archive + chunks +
+# security buckets), SQS (the ingest queue), Firehose has no runtime call here, CloudWatch Logs
+# (the awslogs driver). None of those has a security-group-referenceable endpoint, so this is the
+# coarsest control point available — same as every other plane's HTTPS egress rule in this file.
+resource "aws_vpc_security_group_egress_rule" "logging_https" {
+  security_group_id = aws_security_group.logging.id
+  description       = "HTTPS to ECR, S3, SQS and CloudWatch"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "logging_dns_tcp" {
+  security_group_id = aws_security_group.logging.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "tcp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
+}
+
+resource "aws_vpc_security_group_egress_rule" "logging_dns_udp" {
+  security_group_id = aws_security_group.logging.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "udp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
+}
+
 # --- Bastion: audited SSH jump host for DB/Redis administration --------------------
 
 resource "aws_security_group" "bastion" {
@@ -714,6 +811,15 @@ resource "aws_vpc_security_group_egress_rule" "bastion_to_mariadb" {
   from_port                    = var.mariadb_port
   to_port                      = var.mariadb_port
   referenced_security_group_id = aws_security_group.mariadb.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_to_loki" {
+  security_group_id            = aws_security_group.bastion.id
+  description                  = "To Loki, for log search (SSH port-forward — logcli / the PII audit script, ST-261)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.loki_port
+  to_port                      = var.loki_port
+  referenced_security_group_id = aws_security_group.logging.id
 }
 
 resource "aws_vpc_security_group_egress_rule" "bastion_https" {

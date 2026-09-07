@@ -141,6 +141,17 @@ variable "grafana_port" {
   }
 }
 
+variable "loki_port" {
+  description = "TCP port Loki serves its HTTP API on inside the logging security group (ST-261). Reachable from the bastion (logcli / the PII audit script over an SSH tunnel), from Grafana (its Loki datasource) and from Vector. Loki's own conventional default; distinct from grafana_port."
+  type        = number
+  default     = 3100
+
+  validation {
+    condition     = var.loki_port > 0 && var.loki_port <= 65535
+    error_message = "loki_port must be a valid TCP port (1-65535)."
+  }
+}
+
 variable "bastion_allowed_ssh_cidrs" {
   description = "CIDRs allowed to SSH into the bastion (e.g. office/VPN egress IPs). Required and deliberately has no default: an operator must make an explicit choice rather than inherit an open one. 0.0.0.0/0 is rejected outright."
   type        = list(string)
