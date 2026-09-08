@@ -1,4 +1,4 @@
-import { startMetricsServer } from "@studafy/observability";
+import { startMetricsServer, startTracing } from "@studafy/observability";
 
 import { createApp } from "./app";
 import { checkDatabase, closeDatabasePools, createDatabase, createReadDatabase } from "./database";
@@ -28,6 +28,15 @@ const env = loadEnv();
 // it and this call is what registers the real global MeterProvider (see
 // packages/observability/src/redMetrics.ts).
 const metricsServer = startMetricsServer({ serviceName: env.SERVICE_NAME, port: env.METRICS_PORT });
+
+// Distributed tracing (ST-260), same "before anything can call trace.getTracer()" ordering
+// requirement — null when OTEL_EXPORTER_OTLP_ENDPOINT is unset (dev, test, the OpenAPI generator).
+const tracing = startTracing({
+  serviceName: env.SERVICE_NAME,
+  // `|| undefined`, not the bare env value: dev's task definition sets this to "" rather than
+  // omitting it (see env.ts's own comment), and startTracing() only treats undefined as "disabled".
+  otlpEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || undefined,
+});
 
 // The root logger. Every line this process writes descends from it, so stdout is uniformly NDJSON —
 // a single unparseable line would break JSON filters across the whole log group.
@@ -179,6 +188,7 @@ const shutdown = (signal: string) => {
     await closeRedis(redis);
     await closeDatabasePools(database, readDatabase);
     await metricsServer.shutdown();
+    await tracing?.shutdown();
     logger.info({ signal }, "shutdown complete");
     process.exit(0);
   });

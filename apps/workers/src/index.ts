@@ -1,4 +1,4 @@
-import { startMetricsServer, startQueueDepthGauge } from "@studafy/observability";
+import { startMetricsServer, startQueueDepthGauge, startTracing } from "@studafy/observability";
 import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
@@ -34,6 +34,14 @@ const env = loadEnv();
 // created it and this call is what registers the real global MeterProvider (see
 // packages/observability/src/redMetrics.ts).
 const metricsServer = startMetricsServer({ serviceName: env.SERVICE_NAME, port: env.METRICS_PORT });
+
+// Distributed tracing (ST-260), same ordering requirement — before startWorkers()/worker.ts's
+// createBullmqWorker calls trace.getTracer(). Null when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
+const tracing = startTracing({
+  serviceName: env.SERVICE_NAME,
+  // See apps/api/src/index.ts's own comment on this same `|| undefined`.
+  otlpEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || undefined,
+});
 
 const connection = createRedisConnection(env);
 const workers = startWorkers(QUEUE_REGISTRY, connection);
@@ -201,6 +209,7 @@ const shutdown = (signal: string) => {
     await queueDepthGauge.close();
     queueMetricsConnection.disconnect();
     await metricsServer.shutdown();
+    await tracing?.shutdown();
     console.log("Shutdown complete.");
     process.exit(0);
   });

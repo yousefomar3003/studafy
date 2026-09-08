@@ -16,6 +16,9 @@ export const envSchema = z.object({
   // route to it. 9464 is Prometheus's own registered default port. Distinct from this app's own
   // existing GET /metrics (src/health.ts) — the JSON fan-out-counter debug endpoint, unchanged.
   METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+  // Distributed tracing (ST-260): see apps/api/src/env.ts's own OTEL_EXPORTER_OTLP_ENDPOINT for
+  // what this is, why it's optional, and why an empty string is also accepted.
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional().or(z.literal("")),
   REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
   /**
    * Shared HMAC secret for the JWT handshake stub (see src/auth.ts). This is a placeholder for

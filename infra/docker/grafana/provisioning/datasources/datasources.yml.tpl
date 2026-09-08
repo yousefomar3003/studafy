@@ -15,6 +15,7 @@ datasources:
   # which metric.
   - name: Prometheus
     type: prometheus
+    uid: prometheus
     access: proxy
     url: http://prometheus.metrics.internal:9090
     isDefault: true
@@ -23,10 +24,30 @@ datasources:
 
   # Node/infra-level metrics: ECS Container Insights (CPU/memory/network per service), RDS, and
   # ElastiCache — signals Fargate's own boundary makes impossible to get any other way (no host to
-  # run node_exporter against — see this module's README's "What this module does not do").
+  # run node_exporter against — see this module's README's "What this module does not do"). Also
+  # Tempo's "trace to logs" target below: CloudWatch Logs Insights is this repo's actual log store
+  # (apps/*'s own NDJSON stdout, see docs/architecture/SAD_28_logging_conventions.md), and Grafana's
+  # CloudWatch datasource can query Logs Insights directly — no separate Loki needed.
   - name: CloudWatch
+    uid: cloudwatch
     type: cloudwatch
     access: proxy
     jsonData:
       authType: default
       defaultRegion: ${AWS_REGION}
+
+  # Distributed tracing (ST-260): the OTel collector's tail-sampled output. "Trace links from logs"
+  # is bidirectional — requestId.ts/activeTraceFields() put trace_id/span_id on every log line
+  # (that's the logs -> trace direction), and tracesToLogsV2 below is the trace -> logs direction:
+  # a span in the Tempo UI links straight to a Logs Insights query filtered to its own trace_id,
+  # across every service's log group at once.
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo.metrics.internal:3200
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: cloudwatch
+        filterByTraceID: true
+        query: 'fields @timestamp, @message | filter trace_id = "$${__trace.traceId}"'

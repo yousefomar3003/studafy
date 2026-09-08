@@ -30,7 +30,10 @@ const METRIC_NAME = "http.server.request.duration";
 // string — still a single bounded value, just not the friendly one a dashboard should show.
 const UNMATCHED_ROUTE_PATTERNS = new Set(["", "*", "/*"]);
 
-function resolveRoute(c: Context): string {
+// Exported for httpTracing.ts's tracing middleware (ST-260): the trace span's `http.route`
+// attribute must stay the exact same bounded value the RED metric's own label uses, or the two
+// signals would disagree about which route a request belonged to. One function, two consumers.
+export function resolveRoute(c: Context): string {
   const matched = routePath(c);
   return UNMATCHED_ROUTE_PATTERNS.has(matched) ? "unmatched" : matched;
 }
