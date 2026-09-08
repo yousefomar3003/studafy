@@ -38,6 +38,11 @@ output "erpnext_security_group_id" {
   value       = module.network.erpnext_security_group_id
 }
 
+output "backup_security_group_id" {
+  description = "Security group ID for the Postgres restore-verify ECS task. infra/deploy/scripts/postgres-restore-verify.sh reads this for its run-task network configuration."
+  value       = module.network.backup_security_group_id
+}
+
 output "nat_gateway_public_ips" {
   description = "Elastic IPs the app tier's outbound traffic originates from — share with third-party providers that need IP allowlisting."
   value       = module.network.nat_gateway_public_ips
@@ -379,4 +384,21 @@ output "erpnext_site_setup_task_definition_arn" {
 output "erpnext_cluster_service_names" {
   description = "Map of role -> ECS service name for the five long-running ERPNext services, for `aws ecs describe-services` health checks (docs/runbooks/environment-matrix.md's verification steps). Empty map in dev."
   value       = one(module.erpnext[*].cluster_service_names) == null ? {} : one(module.erpnext[*].cluster_service_names)
+}
+
+# --- Backup automation and restore verification (modules/backup, ST-265) -----------------------
+
+output "backup_postgres_restore_verify_task_definition_arn" {
+  description = "ARN of the Postgres restore-verify task definition. Pass to infra/deploy/scripts/postgres-restore-verify.sh — registered in every environment, including dev, for the manual PITR demo."
+  value       = module.backup.postgres_restore_verify_task_definition_arn
+}
+
+output "backup_monthly_locked_vault_name" {
+  description = "AWS Backup vault (Vault Lock, Compliance mode) holding the monthly immutable Postgres/MariaDB snapshots. null in dev."
+  value       = module.backup.monthly_locked_vault_name
+}
+
+output "backup_erpnext_restore_drill_task_definition_arn" {
+  description = "ARN of the ERPNext monthly restore-drill task definition. Pass to infra/deploy/scripts/erpnext-restore-drill.sh. null in dev / when erpnext_plane_enabled is false."
+  value       = module.backup.erpnext_restore_drill_task_definition_arn
 }

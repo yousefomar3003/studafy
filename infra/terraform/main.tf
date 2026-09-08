@@ -88,6 +88,13 @@ locals {
   # page on for dev, and Container Insights/CloudWatch already cover its own needs.
   monitoring_enabled = var.environment != "dev"
 
+  # Backup automation (ST-265): cross-region replication, the monthly locked vault, and every
+  # EventBridge schedule are staging/prod only, same reasoning as monitoring_enabled — dev has no DR
+  # requirement to exercise on a recurring, cost-bearing schedule. dev still gets module.backup's
+  # Postgres restore-verify task definition itself (module.backup's own automation_enabled variable
+  # only gates the recurring pieces, not the task definition), so
+  # infra/deploy/scripts/postgres-restore-verify.sh can demonstrate PITR there by hand.
+  backup_automation_enabled = var.environment != "dev"
   # Vector + Loki log-aggregation pipeline (ST-261) — same condition again: `aws logs tail` over
   # the per-service CloudWatch groups already covers a single-developer environment, and there is
   # no separate on-call to correlate a request across. staging/prod get the pipeline.
@@ -399,4 +406,63 @@ module "erpnext" {
   redis_port                     = var.redis_port
   redis_auth_secret_arn          = module.redis.auth_secret_arn
   erpnext_secret_arn             = module.secrets.service_secret_arns["erpnext"]
+}
+
+# Backup automation and restore verification (ST-265): WAL-archiving-based continuous backup +
+# cross-region copy (RDS-native, already true of module.postgres/module.mariadb's own
+# backup_retention_period — see modules/backup/replication.tf), a monthly immutable snapshot
+# (AWS Backup Vault Lock), and the weekly Postgres restore-verify / nightly ERPNext site-backup /
+# monthly ERPNext restore-drill jobs. See infra/terraform/modules/backup/README.md and
+# docs/architecture/SAD_30_backup_policy.md.
+module "backup" {
+  source = "./modules/backup"
+
+  providers = {
+    aws    = aws
+    aws.dr = aws.dr
+  }
+
+  name_prefix           = module.naming.name_prefix
+  aws_region            = var.aws_region
+  automation_enabled    = local.backup_automation_enabled
+  erpnext_plane_enabled = local.erpnext_plane_enabled
+  dr_region             = var.backup_dr_region
+
+  vpc_id                    = module.network.vpc_id
+  private_app_subnet_ids    = module.network.private_app_subnet_ids
+  backup_security_group_id  = module.network.backup_security_group_id
+  erpnext_security_group_id = local.erpnext_plane_enabled ? module.network.erpnext_security_group_id : null
+
+  cluster_arn        = module.compute.cluster_arn
+  execution_role_arn = module.compute.execution_role_arn
+  log_retention_days = 30
+
+  postgres_db_instance_id        = module.postgres.db_instance_id
+  postgres_address               = module.postgres.address
+  postgres_port                  = var.db_port
+  postgres_connection_secret_arn = module.postgres.connection_secret_arn
+  postgres_db_subnet_group_name  = module.network.db_subnet_group_name
+  postgres_db_security_group_id  = module.network.db_security_group_id
+  postgres_backup_retention_days = module.postgres.backup_retention_days
+
+  mariadb_db_instance_id        = local.erpnext_plane_enabled ? module.mariadb[0].db_instance_id : null
+  mariadb_backup_retention_days = local.erpnext_plane_enabled ? module.mariadb[0].backup_retention_days : 7
+
+  erpnext_image_repository_url           = local.erpnext_plane_enabled ? module.registry.repository_urls["erpnext"] : null
+  erpnext_image_tag                      = var.erpnext_image_tag
+  erpnext_efs_file_system_id             = local.erpnext_plane_enabled ? module.erpnext[0].efs_file_system_id : null
+  erpnext_efs_access_point_id            = local.erpnext_plane_enabled ? module.erpnext[0].efs_access_point_id : null
+  erpnext_mariadb_address                = local.erpnext_plane_enabled ? module.mariadb[0].address : null
+  erpnext_mariadb_port                   = var.mariadb_port
+  erpnext_mariadb_connection_secret_arn  = local.erpnext_plane_enabled ? module.mariadb[0].connection_secret_arn : null
+  erpnext_redis_primary_endpoint_address = local.erpnext_plane_enabled ? module.redis.primary_endpoint_address : null
+  erpnext_redis_port                     = var.redis_port
+  erpnext_redis_auth_secret_arn          = local.erpnext_plane_enabled ? module.redis.auth_secret_arn : null
+  erpnext_site_hostnames                 = var.erpnext_site_hostnames
+
+  backups_archive_bucket_name = module.storage.backups_archive_bucket_id
+  backups_archive_bucket_arn  = module.storage.backups_archive_bucket_arn
+
+  backup_verify_image_repository_url = module.registry.repository_urls["backup-verify"]
+  backup_verify_image_tag            = var.backup_verify_image_tag
 }

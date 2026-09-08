@@ -37,3 +37,8 @@ output "parameter_group_name" {
   description = "Name of the aws_db_parameter_group applied to the instance."
   value       = aws_db_parameter_group.this.name
 }
+
+output "backup_retention_days" {
+  description = "Echoes var.backup_retention_days — the single source of truth for how long RDS's own continuous backup exists, which modules/backup's cross-region replication (ST-265) must never exceed (a replica can't outlive backups the source has already expired)."
+  value       = var.backup_retention_days
+}

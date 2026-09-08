@@ -93,6 +93,11 @@ output "bastion_security_group_id" {
   value       = aws_security_group.bastion.id
 }
 
+output "backup_security_group_id" {
+  description = "Security group ID for the Postgres restore-verify ECS task (modules/backup, ST-265). Egresses to the database only."
+  value       = aws_security_group.backup.id
+}
+
 output "bastion_instance_id" {
   description = "Instance ID of the bastion."
   value       = aws_instance.bastion.id
