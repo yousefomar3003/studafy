@@ -71,39 +71,41 @@ this drill exercises) landed in the same state every other module is in.
 | Gaps ticketed                                                             | **Met** — see backlog below.                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Runbooks versioned in repo                                                | **Met** — six scenario runbooks + index, `docs/runbooks/dr/`.                                                                                                                                                                                                                                                                                                                                                                               |
 
-## Gap backlog (ready to file; not yet filed — this repo has no issue tracker reachable from here)
+## Gap backlog (filed as GitHub issues, label `dr-gap`)
 
 Ordered by how much they block a _future_ live drill, most-blocking first.
 
 1. **No AWS account has ever been applied to.** Every other gap below is secondary to this one —
    none of scenarios 1-6 can be genuinely drilled until `infra/terraform` is `apply`'d somewhere
    real. This is pre-existing (not introduced by ST-266) but is the actual reason this drill
-   couldn't produce a number.
+   couldn't produce a number. [#278](https://github.com/yousefomar3003/studafy/issues/278)
 2. **No break-glass IAM role for AWS Backup vault restores exists** (scenario 4). By the vault's own
    design, nobody — including whoever runs the next real drill — can call `backup:StartRestoreJob`
    today. Highest-priority gap that _is_ fixable independent of gap #1's timeline.
+   [#279](https://github.com/yousefomar3003/studafy/issues/279)
 3. **The DR region (`eu-west-1`) has no network in it at all** (scenario 5) — no VPC, no subnets, no
    subnet group. The cross-region backup replication (`replication.tf`) works; there is nowhere to
-   restore it to.
+   restore it to. [#280](https://github.com/yousefomar3003/studafy/issues/280)
 4. **No automated restore-verify drill exists for the MariaDB/ERPNext-instance plane** (scenario 2)
    — `restore_verify.tf` is Postgres-only; the monthly ERPNext drill restores a _site_, never the
-   raw instance.
+   raw instance. [#281](https://github.com/yousefomar3003/studafy/issues/281)
 5. **No RDS "instance unreachable" alarm** for either engine (scenarios 1, 2) —
    `modules/monitoring/main.tf` covers CPU/storage/replica-lag, not availability.
+   [#282](https://github.com/yousefomar3003/studafy/issues/282)
 6. **`--db-subnet-group-name`/`--vpc-security-group-ids` for Postgres, and the raw MariaDB instance
    identifier, aren't exposed as root Terraform outputs** (scenarios 1, 2) — an operator needs state
-   access to find them today.
+   access to find them today. [#283](https://github.com/yousefomar3003/studafy/issues/283)
 7. **No script performs the real-incident cutover** for scenarios 1 or 2 — only the drill's
    restore-then-delete path is automated. Each runbook documents the manual sequence; nobody has run
-   it.
+   it. [#284](https://github.com/yousefomar3003/studafy/issues/284)
 8. **The rename-based cutover (RDS endpoint DNS following instance identifier) has never been
    watched actually working against this repo's PgBouncer or ERPNext bench containers** — it's
-   standard AWS practice, not confirmed here.
+   standard AWS practice, not confirmed here. [#285](https://github.com/yousefomar3003/studafy/issues/285)
 9. **No consolidated list of imperative (non-Terraform) provisioning steps** needed after a
    from-scratch rebuild (scenario 6) — assembled ad hoc from each module's README for this drill;
-   worth its own doc once run for real.
+   worth its own doc once run for real. [#286](https://github.com/yousefomar3003/studafy/issues/286)
 10. **No security-incident-commander role is defined** to pair with the data-plane operator for
-    scenario 4 specifically.
+    scenario 4 specifically. [#287](https://github.com/yousefomar3003/studafy/issues/287)
 
 ## What the next drill needs, to actually produce a number
 
