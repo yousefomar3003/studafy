@@ -37,7 +37,6 @@ jobs:
     strategy:
       matrix:
         service:
-          [api, realtime, workers, web, erpnext, migrations, prometheus, grafana, loki, vector]
           [
             api,
             realtime,
@@ -49,6 +48,8 @@ jobs:
             grafana,
             otel-collector,
             tempo,
+            loki,
+            vector,
           ]
     steps:
       - uses: actions/checkout@v4
