@@ -1,10 +1,11 @@
 # Baked into infra/docker/grafana.Dockerfile, expanded by docker-entrypoint.sh at container start.
 #
-# The Prometheus URL is static — "prometheus.metrics.internal" never varies per environment, for
-# the same reason infra/docker/prometheus/prometheus.yml's scrape targets don't (see
-# infra/terraform/modules/monitoring/discovery.tf). ${AWS_REGION} is the one genuinely
-# per-environment value here (module.monitoring's aws_region input), so this file is a template,
-# not a static file — envsubst fills it in at container start from the container's own environment.
+# The Prometheus and Loki URLs are static — "prometheus.metrics.internal" / "loki.logging.internal"
+# never vary per environment, for the same reason infra/docker/prometheus/prometheus.yml's scrape
+# targets don't (see infra/terraform/modules/monitoring/discovery.tf and
+# infra/terraform/modules/logging/discovery.tf). ${AWS_REGION} is the one genuinely per-environment
+# value here (module.monitoring's aws_region input), so this file is a template, not a static file
+# — envsubst fills it in at container start from the container's own environment.
 
 apiVersion: 1
 
@@ -36,6 +37,17 @@ datasources:
       authType: default
       defaultRegion: ${AWS_REGION}
 
+  # Aggregated application logs (ST-261): Vector ships every service's NDJSON here with
+  # service/tenant/env/level labels. This is what answers "show me every line for this request_id
+  # across every service" — `{env="production"} | json | request_id="<id>"` in Explore. Only
+  # populated where module.logging is deployed (staging/prod); in an environment without it the
+  # datasource simply returns no data. See docs/runbooks/log-aggregation.md.
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki.logging.internal:3100
+    jsonData:
+      maxLines: 5000
   # Distributed tracing (ST-260): the OTel collector's tail-sampled output. "Trace links from logs"
   # is bidirectional — requestId.ts/activeTraceFields() put trace_id/span_id on every log line
   # (that's the logs -> trace direction), and tracesToLogsV2 below is the trace -> logs direction:

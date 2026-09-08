@@ -48,6 +48,8 @@ jobs:
             grafana,
             otel-collector,
             tempo,
+            loki,
+            vector,
           ]
     steps:
       - uses: actions/checkout@v4
