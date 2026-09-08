@@ -1,6 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
-import { createRedMetricsMiddleware } from "@studafy/observability";
+import { createRedMetricsMiddleware, createTracingMiddleware } from "@studafy/observability";
 
 import { emailEventWebhookRoutes } from "./email/webhook";
 import { ErpNextClient } from "./erpnext/client";
@@ -301,6 +301,12 @@ export function createApp({
       tracker.end();
     }
   });
+
+  // Distributed tracing (ST-260): one SERVER span per request, made active for the rest of the
+  // request's async chain. Before requestIdMiddleware, which reads activeTraceFields() while
+  // building its per-request logger — that only sees a span if this already ran. Before RED
+  // metrics too, so the two never disagree about ordering, though nothing here depends on that.
+  app.use("*", createTracingMiddleware());
 
   // RED metrics (ST-259): Rate/Errors/Duration per route, on @studafy/observability's own
   // Prometheus port (never this app's own PORT — see env.ts's METRICS_PORT). Placed right after

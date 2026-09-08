@@ -1,7 +1,8 @@
-import { recordJobOutcome } from "@studafy/observability";
+import { recordJobOutcome, withConsumerSpan } from "@studafy/observability";
 import { Worker } from "bullmq";
 
 import type { QueueDefinition } from "./registry";
+import type { TraceContextCarrier } from "@studafy/observability";
 import type { ConnectionOptions, Job } from "bullmq";
 
 /** Minimal surface of a BullMQ Worker needed for shutdown — satisfied by the real `Worker` class. */
@@ -24,10 +25,25 @@ export type WorkerFactory = (
  * nothing — and the listener's own logic lives in a plain function that tests call directly.
  */
 export const createBullmqWorker: WorkerFactory = (definition, connection) => {
-  const worker = new Worker(definition.name, definition.processor, {
-    connection,
-    concurrency: definition.concurrency,
-  });
+  const worker = new Worker(
+    definition.name,
+    // Distributed tracing (ST-260): one CONSUMER span per job, continuing whatever trace the
+    // producer's own `traceContext` field (written by `injectTraceContext()` at the `queue.add()`
+    // call site) belongs to — one shared wrapper here covers the whole registry, the same
+    // "instrument the boundary once" shape `recordOutcome` below already uses for queue metrics,
+    // rather than every processor file importing `withConsumerSpan` itself. `job.data` is read
+    // generically (`traceContext` is not part of any per-queue job-data type) because this wrapper
+    // is queue-agnostic by construction.
+    (job: Job) => {
+      const carrier = (job.data as { traceContext?: TraceContextCarrier } | undefined)
+        ?.traceContext;
+      return withConsumerSpan(definition.name, job.name, carrier, () => definition.processor(job));
+    },
+    {
+      connection,
+      concurrency: definition.concurrency,
+    },
+  );
 
   if (definition.onFailed) {
     worker.on("failed", definition.onFailed);

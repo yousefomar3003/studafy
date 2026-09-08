@@ -29,6 +29,7 @@
  */
 
 import { DOMAIN_EVENTS, JOB_NAMES } from "@studafy/constants";
+import { activeTraceFields, injectTraceContext } from "@studafy/observability";
 
 import type { AppEnv } from "../../middleware/requestId";
 import type { Queue } from "bullmq";
@@ -75,6 +76,10 @@ export async function enqueueNotificationDispatch(
         eventId: payload.submissionId,
         eventType: DOMAIN_EVENTS.GRADES_PUBLISHED,
         submissionId: payload.submissionId,
+        // Distributed tracing (ST-260): carries this request's span across the Redis boundary so
+        // worker.ts's createBullmqWorker can continue the same trace when it processes the job —
+        // see @studafy/observability's queueTracing.ts for why this is a plain object, not a span.
+        traceContext: injectTraceContext(),
       },
       JOB_OPTIONS,
     );

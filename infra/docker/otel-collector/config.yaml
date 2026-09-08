@@ -1,0 +1,58 @@
+# Baked into infra/docker/otel-collector.Dockerfile at build time — static, not templated at
+# container start, for the same reason infra/docker/prometheus/prometheus.yml is: "tempo.metrics.
+# internal" (the Cloud Map private DNS namespace infra/terraform/modules/monitoring/discovery.tf
+# creates) is fixed across every environment, so nothing here is genuinely per-environment. See
+# that file's own header comment.
+#
+# 4318 (OTLP/HTTP) is this repo's fixed convention for the whole tracing pipeline — module.network's
+# otel_collector_port variable, apps/*'s OTEL_EXPORTER_OTLP_ENDPOINT, and Tempo's own OTLP receiver
+# below all default to it. Update all of them together if it ever changes.
+
+receivers:
+  # HTTP only, not grpc: @studafy/observability's tracing.ts (packages/observability/src/tracing.ts)
+  # exports over OTLP/HTTP exclusively (see that file's own header for why — Bun, not Node, is the
+  # runtime), so a grpc receiver here would be dead weight nothing in this repo ever calls.
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # This is the tail-sampling decision ST-260's acceptance criterion asks for: "sampled at 10% +
+  # always-on for errors". Every span this repo's services emit reaches this processor unsampled
+  # (see tracing.ts's own `AlwaysOnSampler`) — it buffers each trace for decision_wait, then samples
+  # the whole trace if *either* policy below matches. Multiple top-level policies combine as OR, not
+  # AND, which is exactly "errors ∪ 10%" rather than "errors that are also in the 10%".
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: probabilistic-10-percent
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+  batch:
+    timeout: 5s
+
+exporters:
+  otlphttp/tempo:
+    endpoint: http://tempo.metrics.internal:4318
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      # tail_sampling before batch: batching first would let the batch exporter's own grouping
+      # split one trace's spans across two batches before tail_sampling ever sees the whole trace,
+      # which is exactly the ordering the processor's own docs warn against.
+      processors: [tail_sampling, batch]
+      exporters: [otlphttp/tempo]
+  telemetry:
+    logs:
+      level: info

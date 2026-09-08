@@ -82,6 +82,15 @@ resource "aws_vpc_security_group_ingress_rule" "app_from_monitoring" {
   referenced_security_group_id = aws_security_group.monitoring.id
 }
 
+resource "aws_vpc_security_group_egress_rule" "app_to_monitoring" {
+  security_group_id            = aws_security_group.app.id
+  description                  = "To the monitoring plane, pushing OTLP spans to the tracing collector (ST-260)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.otel_collector_port
+  to_port                      = var.otel_collector_port
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
 resource "aws_vpc_security_group_egress_rule" "app_to_db" {
   security_group_id            = aws_security_group.app.id
   description                  = "To the database"
@@ -548,6 +557,15 @@ resource "aws_security_group" "monitoring" {
   }
 }
 
+resource "aws_vpc_security_group_ingress_rule" "monitoring_from_app" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "From the app tier, OTLP spans pushed to the tracing collector (ST-260)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.otel_collector_port
+  to_port                      = var.otel_collector_port
+  referenced_security_group_id = aws_security_group.app.id
+}
+
 resource "aws_vpc_security_group_ingress_rule" "monitoring_from_bastion" {
   security_group_id            = aws_security_group.monitoring.id
   description                  = "From the bastion, Grafana dashboards (SSH port-forward — see docs/runbooks/metrics-dashboard-catalog.md)"
@@ -586,6 +604,28 @@ resource "aws_vpc_security_group_ingress_rule" "monitoring_self_mysqld_exporter"
   ip_protocol                  = "tcp"
   from_port                    = 9104
   to_port                      = 9104
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
+# Tracing pipeline (ST-260), same "self-referencing, one group for the whole plane" shape as the
+# metrics stack above: the OTel collector forwards sampled traces to Tempo on its own OTLP port
+# (same var.otel_collector_port value — Tempo's OTLP receiver is just another OTLP endpoint), and
+# Grafana queries Tempo's HTTP query API (3200, Tempo's own registered default) for its datasource.
+resource "aws_vpc_security_group_ingress_rule" "monitoring_self_tempo_otlp" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "OTel collector to Tempo (OTLP)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.otel_collector_port
+  to_port                      = var.otel_collector_port
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "monitoring_self_tempo_query" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "Grafana to Tempo (query API)"
+  ip_protocol                  = "tcp"
+  from_port                    = 3200
+  to_port                      = 3200
   referenced_security_group_id = aws_security_group.monitoring.id
 }
 

@@ -33,13 +33,16 @@ variable "image_repository_names" {
   description = <<-EOT
     One ECR repository is created per name as "<name_prefix>/<name>". The defaults cover every
     non-mobile deployable artifact, including the one-off SQL migrations image and the two
-    monitoring-stack images (ST-259: infra/docker/prometheus.Dockerfile, grafana.Dockerfile — this
-    repo's own scrape config/dashboards layered onto the upstream images, same "third-party base,
-    our config on top" shape as erpnext). apps/mobile is a native app and is intentionally
-    excluded. A list is used because the deployable set can grow.
+    monitoring-stack images (ST-259: infra/docker/prometheus.Dockerfile, grafana.Dockerfile; ST-260:
+    otel-collector.Dockerfile, tempo.Dockerfile — this repo's own config layered onto the upstream
+    images, same "third-party base, our config on top" shape as erpnext). apps/mobile is a native
+    app and is intentionally excluded. A list is used because the deployable set can grow.
   EOT
   type        = list(string)
-  default     = ["api", "realtime", "workers", "web", "erpnext", "migrations", "prometheus", "grafana"]
+  default = [
+    "api", "realtime", "workers", "web", "erpnext", "migrations",
+    "prometheus", "grafana", "otel-collector", "tempo",
+  ]
 
   validation {
     condition     = length(var.image_repository_names) > 0

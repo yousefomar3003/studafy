@@ -22,6 +22,22 @@ The bastion's public IP is `module.network`'s `bastion_public_ip` output; the ad
 whatever was supplied as `monitoring.GRAFANA_ADMIN_PASSWORD` in
 `TF_VAR_secrets_app_secret_values` (see `infra/terraform/README.md`).
 
+## Distributed tracing (ST-260)
+
+Traces are not a dashboard panel — they're explored per-trace, not aggregated — so there is no
+`tracing.json` file here. Once you're through the same SSH port-forward above (Grafana, not Tempo
+directly: Tempo has no UI of its own), open **Explore**, pick the **Tempo** datasource, and either
+search by service/span name or paste a `trace_id` straight from a log line — every `apps/api`
+request log and the workers-side log lines closest to an active job span carry one (`requestId.ts`/
+`activeTraceFields()`, `@studafy/observability`). From a trace view, "Logs" on any span jumps to a
+CloudWatch Logs Insights query pre-filtered to that trace, via the Tempo datasource's
+`tracesToLogsV2` config (`infra/docker/grafana/provisioning/datasources/datasources.yml.tpl`).
+
+Remember only sampled traces are here at all: the OTel collector
+(`infra/docker/otel-collector/config.yaml`) keeps a trace only if some span in it errored, or with
+10% probability otherwise — "the request I'm looking for isn't in Tempo" is the expected outcome
+90% of the time for a request that didn't error, not a broken pipeline.
+
 ## Dashboards
 
 All four live in the "Studafy" folder, refresh every 30s, and default to the last 6 hours.

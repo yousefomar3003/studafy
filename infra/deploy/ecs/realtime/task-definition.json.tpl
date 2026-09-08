@@ -19,7 +19,8 @@
         { "name": "PORT", "value": "3001" },
         { "name": "HOST", "value": "0.0.0.0" },
         { "name": "SERVICE_NAME", "value": "realtime" },
-        { "name": "METRICS_PORT", "value": "9464" }
+        { "name": "METRICS_PORT", "value": "9464" },
+        { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "${OTEL_COLLECTOR_ENDPOINT}" }
       ],
       "secrets": [
         {

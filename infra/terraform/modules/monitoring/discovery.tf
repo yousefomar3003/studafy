@@ -47,6 +47,12 @@ locals {
     "grafana",
     "postgres-exporter",
     "mysqld-exporter",
+    # Tracing pipeline (ST-260): apps/*'s OTEL_EXPORTER_OTLP_ENDPOINT resolves "otel-collector.
+    # metrics.internal" (see tracing.tf), and the collector itself forwards to "tempo.metrics.
+    # internal" (infra/docker/otel-collector/config.yaml) — both Terraform-owned here, same as
+    # prometheus/grafana above.
+    "otel-collector",
+    "tempo",
   ])
 }
 
