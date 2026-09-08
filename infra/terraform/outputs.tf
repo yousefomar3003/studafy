@@ -258,6 +258,43 @@ output "monitoring_deploys_log_group_name" {
   value       = module.monitoring.deploys_log_group_name
 }
 
+# --- Log aggregation pipeline (modules/logging, ST-261) — null in dev (see local.logging_enabled) ---
+
+output "logging_loki_internal_url" {
+  description = "In-VPC base URL of Loki's HTTP API. Port-forward to it from the bastion for log search / the PII audit (docs/runbooks/log-aggregation.md). null in dev."
+  value       = one(module.logging[*].loki_internal_url)
+}
+
+output "logging_archive_bucket_id" {
+  description = "Cold-archive bucket (every delivered line, ~13-month lifecycle). Pass to `aws s3api get-bucket-lifecycle-configuration` to verify retention. null in dev."
+  value       = one(module.logging[*].archive_bucket_id)
+}
+
+output "logging_security_bucket_id" {
+  description = "Write-once security-stream bucket (S3 Object Lock, COMPLIANCE). Pass to `aws s3api get-object-lock-configuration` to verify the write-once guarantee. null in dev."
+  value       = one(module.logging[*].security_bucket_id)
+}
+
+output "logging_ingest_queue_url" {
+  description = "SQS queue Vector drains. Check ApproximateNumberOfMessages for pipeline backlog. null in dev."
+  value       = one(module.logging[*].ingest_queue_url)
+}
+
+output "logging_ingest_dlq_url" {
+  description = "Dead-letter queue for the ingest path. A non-zero depth means Vector is repeatedly failing on some archive object. null in dev."
+  value       = one(module.logging[*].ingest_dlq_url)
+}
+
+output "logging_firehose_delivery_stream_name" {
+  description = "Main Firehose delivery stream (CloudWatch groups -> archive bucket). Pass to `aws firehose describe-delivery-stream`. null in dev."
+  value       = one(module.logging[*].firehose_delivery_stream_name)
+}
+
+output "logging_subscribed_log_group_names" {
+  description = "Every CloudWatch Logs group forwarded into the pipeline — the cross-service set the 'request_id search' acceptance criterion is verified against. Empty/null in dev."
+  value       = one(module.logging[*].subscribed_log_group_names)
+}
+
 # module.cdn is not instantiated for dev (main.tf's count), so every output below is null there —
 # one(...) rather than [0] indexing so `terraform output` doesn't error out on an empty list.
 output "cdn_web_bundle_bucket_id" {

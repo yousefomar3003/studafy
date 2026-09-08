@@ -30,6 +30,7 @@ module "network" {
   erpnext_port              = var.erpnext_port
   metrics_port              = var.metrics_port
   grafana_port              = var.grafana_port
+  loki_port                 = var.loki_port
   otel_collector_port       = var.otel_collector_port
   bastion_allowed_ssh_cidrs = var.bastion_allowed_ssh_cidrs
   bastion_key_name          = var.bastion_key_name
@@ -86,6 +87,11 @@ locals {
   # erpnext_plane_enabled and module.monitoring's own probe_enabled: no separate environment to
   # page on for dev, and Container Insights/CloudWatch already cover its own needs.
   monitoring_enabled = var.environment != "dev"
+
+  # Vector + Loki log-aggregation pipeline (ST-261) — same condition again: `aws logs tail` over
+  # the per-service CloudWatch groups already covers a single-developer environment, and there is
+  # no separate on-call to correlate a request across. staging/prod get the pipeline.
+  logging_enabled = var.environment != "dev"
 }
 
 module "secrets" {
@@ -315,6 +321,41 @@ module "monitoring" {
   otel_collector_port  = var.otel_collector_port
   otel_collector_image = "${module.registry.repository_urls["otel-collector"]}:${var.otel_collector_image_tag}"
   tempo_image          = "${module.registry.repository_urls["tempo"]}:${var.tempo_image_tag}"
+}
+
+# Vector + Loki log-aggregation pipeline (ST-261). staging/prod only — see local.logging_enabled.
+# Gated at the call site (like module.cdn/mariadb/erpnext), not with an internal enable flag like
+# module.monitoring: this module creates nothing that should exist in dev, so it is simply not
+# instantiated there.
+#
+# Depends on module.compute (the ECS cluster + shared execution role the Vector/Loki Fargate
+# services run on, and the api/realtime/workers CloudWatch log groups the pipeline subscribes to)
+# and module.network (the VPC for the logging.internal Cloud Map namespace, the logging security
+# group, and the bastion's own SSH audit log group — the security stream's first source).
+module "logging" {
+  source = "./modules/logging"
+  count  = local.logging_enabled ? 1 : 0
+
+  name_prefix               = module.naming.name_prefix
+  aws_region                = var.aws_region
+  environment               = var.environment
+  vpc_id                    = module.network.vpc_id
+  cluster_arn               = module.compute.cluster_arn
+  execution_role_arn        = module.compute.execution_role_arn
+  private_app_subnet_ids    = module.network.private_app_subnet_ids
+  logging_security_group_id = module.network.logging_security_group_id
+  loki_port                 = var.loki_port
+
+  # api/realtime/workers/migrations — module.compute pre-creates these groups and the deploy.sh
+  # task-definition templates log into them. The bastion's SSH audit log is the security stream:
+  # every line is a security event, so it is force-mirrored to the write-once bucket.
+  app_log_group_names      = values(module.compute.log_group_names)
+  security_log_group_names = [module.network.bastion_ssh_log_group_name]
+
+  # Same rolling-deploy shape as prometheus_image_tag/grafana_image_tag (ST-259): bump the tag and
+  # re-apply to ship a vector.yaml or loki-config.yml.tpl change.
+  vector_image = "${module.registry.repository_urls["vector"]}:${var.vector_image_tag}"
+  loki_image   = "${module.registry.repository_urls["loki"]}:${var.loki_image_tag}"
 }
 
 # MariaDB for the ERPNext + Frappe Education plane. staging/prod only — see local.erpnext_plane_enabled.

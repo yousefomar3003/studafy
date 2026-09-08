@@ -46,7 +46,7 @@ jobs:
           trivyignores: .trivyignore
 
   plan:
-    if: vars.AWS_TERRAFORM_PLANS_ENABLED == 'true'
+    if: vars.AWS_PLAN_ROLE_ARN != ''
     needs: validate
     runs-on: ubuntu-latest
     strategy:
