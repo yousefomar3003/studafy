@@ -1,4 +1,4 @@
-import { createRedMetricsMiddleware } from "@studafy/observability";
+import { createRedMetricsMiddleware, createTracingMiddleware } from "@studafy/observability";
 import { Hono } from "hono";
 import { upgradeWebSocket } from "hono/bun";
 
@@ -87,6 +87,11 @@ export function createApp({
   metrics,
 }: AppOptions): Hono<Bindings> {
   const app = new Hono<Bindings>();
+
+  // Distributed tracing (ST-260): one SERVER span per HTTP request (the /ws handshake and health
+  // routes — the upgraded WebSocket connection itself, once established, is out of scope for this
+  // span-per-request model). Before RED metrics, same ordering as apps/api.
+  app.use("*", createTracingMiddleware());
 
   // RED metrics (ST-259): Rate/Errors/Duration for the /ws handshake and health routes, on
   // @studafy/observability's own Prometheus port — never this app's own PORT. Distinct from

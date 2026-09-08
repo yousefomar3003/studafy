@@ -1,4 +1,5 @@
 import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
+import { injectTraceContext } from "@studafy/observability";
 import { Queue } from "bullmq";
 import postgres from "postgres";
 
@@ -96,8 +97,16 @@ function enqueueDelivery(data: DeliverNotificationJobData): Promise<void> {
     connection: createRedisConnection(workerEnv) as never,
   });
 
+  // Distributed tracing (ST-260): captures whatever span is active when this runs — the dispatcher
+  // job's own CONSUMER span, since createBullmqWorker (worker.ts) made it active around the whole
+  // processNotificationDispatch() call this function is called from — so the delivery job continues
+  // the same trace the dispatch job did, rather than the dispatch job's parent (the API request).
   return deliveryQueue
-    .add(JOB_NAMES.DELIVER_NOTIFICATION, data, DELIVERY_JOB_OPTIONS)
+    .add(
+      JOB_NAMES.DELIVER_NOTIFICATION,
+      { ...data, traceContext: injectTraceContext() },
+      DELIVERY_JOB_OPTIONS,
+    )
     .then(() => undefined);
 }
 

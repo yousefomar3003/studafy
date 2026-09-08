@@ -16,6 +16,7 @@
         { "name": "NODE_ENV", "value": "production" },
         { "name": "SERVICE_NAME", "value": "workers" },
         { "name": "METRICS_PORT", "value": "9464" },
+        { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "${OTEL_COLLECTOR_ENDPOINT}" },
         { "name": "DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },
         { "name": "DATABASE_PORT", "value": "6432" },
         { "name": "DATABASE_NAME", "value": "api" },

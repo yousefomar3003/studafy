@@ -36,6 +36,7 @@
  * design exists to keep bounded to this single window.
  */
 
+import { activeTraceFields, withClientSpan } from "@studafy/observability";
 import postgres from "postgres";
 
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -226,14 +227,26 @@ async function deliverPush(
 
   let result;
   try {
-    result = await deps.push.send(
-      { title, body, route, notificationType, dispatchLogId },
-      routes.tokens,
+    // Distributed tracing (ST-260, "...-> FCM"): a CLIENT span around the actual FCM call — the
+    // last hop of the trace this ticket's acceptance criterion names. `withClientSpan` also marks
+    // the span as an error and records the exception before rethrowing, which is what makes a
+    // dead FCM credential or a quota error show up as a trace-level error, not just a log line.
+    result = await withClientSpan(
+      "fcm.send",
+      { "messaging.system": "fcm", "messaging.batch.message_count": routes.tokens.length },
+      () => deps.push.send({ title, body, route, notificationType, dispatchLogId }, routes.tokens),
     );
   } catch (error) {
     deps.log.error(
       {
         event: "notification_push_send_failed",
+        // Distributed tracing (ST-260): "trace links from logs" — workerLogger has no per-job
+        // child() the way apps/api's request-scoped logger does (see requestId.ts), so the active
+        // span's ids are spread in at the call site instead. `withClientSpan` above has already
+        // ended the "fcm.send" span by the time this catch runs; what's active here is the
+        // enclosing delivery job's own CONSUMER span (worker.ts), which carries the same trace_id
+        // as the API request and dispatcher job that led here.
+        ...activeTraceFields(),
         school_id: schoolId,
         dispatch_log_id: dispatchLogId,
         recipient_id: recipientId,

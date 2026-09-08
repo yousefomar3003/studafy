@@ -149,6 +149,14 @@ variable "loki_port" {
   validation {
     condition     = var.loki_port > 0 && var.loki_port <= 65535
     error_message = "loki_port must be a valid TCP port (1-65535)."
+variable "otel_collector_port" {
+  description = "TCP port the OTel collector's OTLP/HTTP receiver listens on (ST-260). The traffic direction is the reverse of metrics_port's: apps/api, apps/realtime and apps/workers *push* spans to the collector, so the app tier gets an egress rule to it and the monitoring plane gets a matching ingress rule from it — see @studafy/observability's tracing.ts for why every span is shipped here, sampled or not."
+  type        = number
+  default     = 4318
+
+  validation {
+    condition     = var.otel_collector_port > 0 && var.otel_collector_port <= 65535
+    error_message = "otel_collector_port must be a valid TCP port (1-65535)."
   }
 }
 

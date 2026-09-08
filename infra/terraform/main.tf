@@ -31,6 +31,7 @@ module "network" {
   metrics_port              = var.metrics_port
   grafana_port              = var.grafana_port
   loki_port                 = var.loki_port
+  otel_collector_port       = var.otel_collector_port
   bastion_allowed_ssh_cidrs = var.bastion_allowed_ssh_cidrs
   bastion_key_name          = var.bastion_key_name
 }
@@ -313,6 +314,13 @@ module "monitoring" {
   monitoring_secret_arn = lookup(module.secrets.service_secret_arns, "monitoring", "")
   prometheus_image      = "${module.registry.repository_urls["prometheus"]}:${var.prometheus_image_tag}"
   grafana_image         = "${module.registry.repository_urls["grafana"]}:${var.grafana_image_tag}"
+
+  # Distributed tracing pipeline (ST-260): staging/prod only, riding on the same monitoring_enabled
+  # flag as the metrics stack above rather than a second toggle — this ticket's own dependency on
+  # ST-259 makes "monitoring plane exists" and "tracing pipeline exists" the same condition.
+  otel_collector_port  = var.otel_collector_port
+  otel_collector_image = "${module.registry.repository_urls["otel-collector"]}:${var.otel_collector_image_tag}"
+  tempo_image          = "${module.registry.repository_urls["tempo"]}:${var.tempo_image_tag}"
 }
 
 # Vector + Loki log-aggregation pipeline (ST-261). staging/prod only — see local.logging_enabled.

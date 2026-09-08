@@ -209,3 +209,56 @@ variable "exporter_memory" {
   type        = number
   default     = 512
 }
+
+# --- Distributed tracing pipeline (ST-260) -------------------------------------------------------
+
+variable "otel_collector_port" {
+  description = "Port the OTel collector's OTLP/HTTP receiver listens on, and Tempo's own OTLP receiver (tracing.tf reuses the same port for both — see that file's own comment). Must match module.network's otel_collector_port and each service's own OTEL_EXPORTER_OTLP_ENDPOINT."
+  type        = number
+  default     = 4318
+}
+
+variable "otel_collector_image" {
+  description = "Full image reference (registry/repo:tag) for the OTel collector image this repo builds (infra/docker/otel-collector.Dockerfile), pushed to module.registry's \"otel-collector\" repository."
+  type        = string
+}
+
+variable "tempo_image" {
+  description = "Full image reference (registry/repo:tag) for the Tempo image this repo builds (infra/docker/tempo.Dockerfile), pushed to module.registry's \"tempo\" repository."
+  type        = string
+}
+
+variable "otel_collector_cpu" {
+  description = "Fargate CPU units for the OTel collector task."
+  type        = number
+  default     = 256
+}
+
+variable "otel_collector_memory" {
+  description = "Fargate memory (MiB) for the OTel collector task."
+  type        = number
+  default     = 512
+}
+
+variable "tempo_cpu" {
+  description = "Fargate CPU units for the Tempo task."
+  type        = number
+  default     = 512
+}
+
+variable "tempo_memory" {
+  description = "Fargate memory (MiB) for the Tempo task."
+  type        = number
+  default     = 1024
+}
+
+variable "tempo_storage_gb" {
+  description = "Fargate ephemeral storage (GiB) for the Tempo task, same reasoning as prometheus_storage_gb: no persistent volume, traces live on the task's own ephemeral disk (see infra/docker/tempo/tempo.yaml's 24h block_retention and this module's README)."
+  type        = number
+  default     = 21
+
+  validation {
+    condition     = var.tempo_storage_gb >= 21 && var.tempo_storage_gb <= 200
+    error_message = "tempo_storage_gb must be between 21 and 200 (Fargate's ephemeral-storage range above its free 20GiB default)."
+  }
+}

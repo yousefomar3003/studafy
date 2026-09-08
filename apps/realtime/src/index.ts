@@ -1,4 +1,4 @@
-import { startMetricsServer } from "@studafy/observability";
+import { startMetricsServer, startTracing } from "@studafy/observability";
 import { websocket } from "hono/bun";
 
 import { createApp } from "./app";
@@ -23,6 +23,14 @@ const env = loadEnv();
 // it and this call is what registers the real global MeterProvider (see
 // packages/observability/src/redMetrics.ts).
 const metricsServer = startMetricsServer({ serviceName: env.SERVICE_NAME, port: env.METRICS_PORT });
+
+// Distributed tracing (ST-260), same ordering requirement — before createApp() registers
+// createTracingMiddleware(). Null when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
+const tracing = startTracing({
+  serviceName: env.SERVICE_NAME,
+  // See apps/api/src/index.ts's own comment on this same `|| undefined`.
+  otlpEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || undefined,
+});
 
 const rooms: RoomManager<RawSocket> = createRoomManager();
 const tracker = createConnectionTracker<RawSocket>();
@@ -88,6 +96,7 @@ const shutdown = (signal: string) => {
     redisSubscriber.disconnect();
     outboxSubscriber.disconnect();
     await metricsServer.shutdown();
+    await tracing?.shutdown();
     console.log("Shutdown complete.");
     process.exit(0);
   });

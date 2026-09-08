@@ -38,6 +38,18 @@ jobs:
       matrix:
         service:
           [api, realtime, workers, web, erpnext, migrations, prometheus, grafana, loki, vector]
+          [
+            api,
+            realtime,
+            workers,
+            web,
+            erpnext,
+            migrations,
+            prometheus,
+            grafana,
+            otel-collector,
+            tempo,
+          ]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

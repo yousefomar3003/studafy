@@ -358,6 +358,14 @@ variable "loki_port" {
   validation {
     condition     = var.loki_port > 0 && var.loki_port <= 65535
     error_message = "loki_port must be a valid TCP port (1-65535)."
+variable "otel_collector_port" {
+  description = "TCP port the OTel collector's OTLP/HTTP receiver listens on (ST-260). Shared between module.network (security group rules) and module.monitoring (task definition, apps/*'s OTEL_EXPORTER_OTLP_ENDPOINT) for the same reason as metrics_port above."
+  type        = number
+  default     = 4318
+
+  validation {
+    condition     = var.otel_collector_port > 0 && var.otel_collector_port <= 65535
+    error_message = "otel_collector_port must be a valid TCP port (1-65535)."
   }
 }
 
@@ -381,12 +389,16 @@ variable "grafana_image_tag" {
 
 variable "loki_image_tag" {
   description = "Tag of module.registry's loki ECR repository to deploy (ST-261). Bumping this and re-applying is how a loki-config.yml.tpl change ships — same rolling-deploy shape as erpnext_image_tag. Ignored in dev (module.logging is not instantiated there)."
+variable "otel_collector_image_tag" {
+  description = "Tag of module.registry's otel-collector ECR repository to deploy (ST-260). Bumping this and re-applying is how a tail-sampling policy change (infra/docker/otel-collector/config.yaml) ships — same rolling-deploy shape as erpnext_image_tag."
   type        = string
   default     = "latest"
 }
 
 variable "vector_image_tag" {
   description = "Tag of module.registry's vector ECR repository to deploy (ST-261). Bumping this and re-applying is how a vector.yaml pipeline change (parsing, labels, routing) ships. Ignored in dev."
+variable "tempo_image_tag" {
+  description = "Tag of module.registry's tempo ECR repository to deploy (ST-260). Same rolling-deploy shape as erpnext_image_tag."
   type        = string
   default     = "latest"
 }

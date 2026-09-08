@@ -20,6 +20,7 @@
         { "name": "PORT", "value": "3000" },
         { "name": "HOST", "value": "0.0.0.0" },
         { "name": "METRICS_PORT", "value": "9464" },
+        { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "${OTEL_COLLECTOR_ENDPOINT}" },
         { "name": "LOG_LEVEL", "value": "info" },
         { "name": "SERVICE_NAME", "value": "api" },
         { "name": "RELEASE_VERSION", "value": "${IMAGE_TAG}" },

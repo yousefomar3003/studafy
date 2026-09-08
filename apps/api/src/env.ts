@@ -65,6 +65,15 @@ export const envSchema = z
     // path api's own PORT is, since it carries no auth of its own — only the monitoring security
     // group can route to it. 9464 is Prometheus's own registered default port.
     METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+    // Distributed tracing (ST-260): base URL of the OTel collector's OTLP/HTTP receiver, e.g.
+    // "http://otel-collector.metrics.internal:4318" (infra/terraform/modules/monitoring/tracing.tf).
+    // Optional and unset by default — dev, test and the OpenAPI generator all run with no collector
+    // reachable, the same nullable-producer shape REDIS_URL/S3_* already use. `.or(z.literal(""))`:
+    // dev's task definition sets this key to an empty string rather than omitting it (render.sh
+    // substitutes an unset infra/deploy/environments/dev.env value into the JSON literally), and
+    // index.ts's `|| undefined` is what turns that back into "disabled" for startTracing(). See
+    // @studafy/observability's tracing.ts for why sampling happens at the collector, not here.
+    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional().or(z.literal("")),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
     // Derived from the logger's own level names, so an added level cannot drift out of the
     // environment contract. The dependency runs one way: env knows the logger, never the reverse.

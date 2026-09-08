@@ -97,6 +97,59 @@ those `aws_ecs_service` resources are Terraform-owned here.
 Postgres/Redis/PgBouncer administration. See `docs/runbooks/metrics-dashboard-catalog.md` for the
 exact SSH port-forward command and the dashboard catalog itself.
 
+## Distributed tracing pipeline (ST-260)
+
+`monitoring_enabled = true` (the same flag as the metrics stack — this ticket depends on ST-259,
+so there is no separate toggle) additionally provisions, in `tracing.tf`:
+
+- **OTel collector** (`otel-collector.tf` section of `tracing.tf`): one Fargate task running this
+  repo's own image (`infra/docker/otel-collector.Dockerfile`, layering
+  `infra/docker/otel-collector/config.yaml` onto the upstream `otel/opentelemetry-collector-contrib`
+  image), receiving OTLP/HTTP spans from apps/api, apps/realtime and apps/workers
+  (`@studafy/observability`'s `tracing.ts`, `httpTracing.ts`, `queueTracing.ts`) on
+  `otel_collector_port` (4318). Every span reaches the collector — the SDK samples nothing
+  (`AlwaysOnSampler`) — and the collector's `tail_sampling` processor makes the actual sampling
+  decision ST-260's acceptance criterion asks for: sample the whole trace if any span in it has
+  `status_code = ERROR`, **or** with 10% probability otherwise (two top-level policies combine as
+  OR, not AND). See that config file's own comments for why this can't be done as head sampling.
+- **Tempo** (same file): one Fargate task running this repo's own image
+  (`infra/docker/tempo.Dockerfile`, layering `infra/docker/tempo/tempo.yaml` onto the upstream
+  `grafana/tempo` image, single-binary mode), storing whatever the collector forwards. Ephemeral
+  Fargate storage, not EFS — same "What this module does not do" trade-off as Prometheus, and Tempo's
+  own `block_retention` is deliberately short (24h) because that storage is not durable across a
+  task replacement anyway.
+- **Grafana's Tempo datasource** (`grafana.tf`'s existing task, no new resource): provisioned from
+  `infra/docker/grafana/provisioning/datasources/datasources.yml.tpl`, with `tracesToLogsV2`
+  pointed at the CloudWatch datasource — a span in the Tempo UI links straight to a CloudWatch Logs
+  Insights query filtered to that trace's id. The other direction ("trace links from logs") is
+  `requestId.ts`/`activeTraceFields()`: every apps/api request log line, and the handful of
+  workers-side log lines closest to an active job span, already carry `trace_id`/`span_id`.
+
+**One trace across API -> outbox -> dispatcher -> FCM** (the acceptance criterion's own example,
+a grade-publish request) holds together end to end without any layer in between taking a tracing
+dependency:
+
+1. `createTracingMiddleware()` (apps/api's `app.ts`) starts a SERVER span for the request and makes
+   it active via `context.with()` — every `await` inside the request, including nested service
+   calls, sees it as the ambient active span through Node/Bun's `AsyncLocalStorage`.
+2. `emit()` (apps/api's `lib/events/emitter.ts`) wraps the `app.outbox_events` insert in a CLIENT
+   span (`outbox.emit`) for every domain event this codebase writes, not just grades — this is what
+   gives the trace its "outbox" segment (see `enqueue-dispatch.ts`'s own header for why the
+   grades-published path enqueues its BullMQ job directly rather than the dispatcher consuming this
+   row).
+3. `enqueueNotificationDispatch()` (apps/api) calls `injectTraceContext()` and carries the result on
+   the job payload's `traceContext` field, across the Redis boundary.
+4. `worker.ts`'s `createBullmqWorker` (apps/workers) wraps every processor in the registry — every
+   queue, not just this one — in `withConsumerSpan()`, extracting `job.data.traceContext` and
+   continuing the same trace. `dispatcher.worker.ts`'s `processNotificationDispatch` runs inside
+   that span with no tracing import of its own.
+5. `enqueueDelivery()` (apps/workers' `registry.ts`) captures the dispatcher's own active span with
+   `injectTraceContext()` when it fans out to the delivery job, so step 4 repeats one hop later for
+   `processNotificationDelivery`.
+6. `delivery.worker.ts` wraps the actual FCM call in a CLIENT span (`fcm.send`) — the trace's last
+   hop, and where a dead credential or a quota error shows up as a trace-level error rather than
+   only a log line.
+
 ### Cardinality budget
 
 Every label on every metric this stack collects comes from a fixed, small vocabulary — never a
@@ -157,6 +210,12 @@ per-user or per-school label would.
 | `prometheus_cpu` / `_memory`        | `number`       | `512` / `1024`     | Fargate sizing for the Prometheus task.                                             |
 | `grafana_cpu` / `_memory`           | `number`       | `256` / `512`      | Fargate sizing for the Grafana task.                                                |
 | `exporter_cpu` / `_memory`          | `number`       | `256` / `512`      | Fargate sizing for each DB exporter task.                                           |
+| `otel_collector_port`               | `number`       | `4318`             | OTLP/HTTP port, shared by the collector's receiver and Tempo's own OTLP receiver.   |
+| `otel_collector_image`              | `string`       | —                  | Full image reference for this repo's OTel collector image.                          |
+| `tempo_image`                       | `string`       | —                  | Full image reference for this repo's Tempo image.                                   |
+| `otel_collector_cpu` / `_memory`    | `number`       | `256` / `512`      | Fargate sizing for the OTel collector task.                                         |
+| `tempo_cpu` / `_memory`             | `number`       | `512` / `1024`     | Fargate sizing for the Tempo task.                                                  |
+| `tempo_storage_gb`                  | `number`       | `21`               | Fargate ephemeral storage (GiB) for the Tempo task.                                 |
 
 ## Outputs
 
@@ -190,6 +249,17 @@ per-user or per-school label would.
   start), and CloudWatch's own long-term retention is untouched by this. Adding EFS would fix it,
   at the cost of mount targets, an access point, and its own security-group wiring — not done here
   because nothing in ST-259's acceptance criteria requires history to survive a deploy.
+- **Tempo has no persistent volume either**, for the identical reason Prometheus doesn't — see the
+  bullet above. `tempo_storage_gb` bounds it, and `tempo.yaml`'s `block_retention: 24h` is
+  deliberately short because that storage was never going to survive a task replacement anyway.
+- **Dev has no collector to push to, and does not try.** `infra/deploy/environments/dev.env` leaves
+  `OTEL_COLLECTOR_ENDPOINT` empty, which each service's `env.ts` and `index.ts` turn into
+  `startTracing()` never running at all — not a client that dials a DNS name with zero records
+  behind it. See `apps/api/src/env.ts`'s own comment on `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- **The collector's `tail_sampling` decision is per-collector-instance, not fleet-wide.** With a
+  single collector task (`desired_count = 1`, unconditionally) this doesn't matter; it would if this
+  ever scaled to multiple collector replicas without a consistent-routing load balancer in front,
+  since a trace's spans could then land on different instances and never be evaluated together.
 - **It does not create the Postgres/MariaDB monitoring roles or assemble their DSNs.** Same
   "no SQL-executing Terraform provider" gap the master credential itself has — see
   `docs/runbooks/postgres-conventions.md`'s "Monitoring role" section and

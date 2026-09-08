@@ -1,3 +1,5 @@
+import { activeTraceFields } from "@studafy/observability";
+
 import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
 
 import type { AuthContext } from "./authContext";
@@ -52,6 +54,13 @@ export function requestIdMiddleware({
       path: sanitizeSensitivePath(c.req.path),
       school_id: auth?.schoolId ?? null,
       user_id: auth?.userId ?? null,
+      // Distributed tracing (ST-260): "trace links from logs" — a CloudWatch Logs line carrying
+      // trace_id lets a reader paste it straight into Grafana Tempo's search and land on the exact
+      // request. {} outside any span (tracing disabled, or the OpenAPI generator's own boot run),
+      // so this is safe to spread unconditionally. Read here, once, rather than at every log call
+      // site: createTracingMiddleware() (app.ts) runs before this middleware, so its span is
+      // already active by the time this child logger is built.
+      ...activeTraceFields(),
     });
 
     c.set("requestId", requestId);
