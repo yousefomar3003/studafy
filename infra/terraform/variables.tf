@@ -391,6 +391,35 @@ variable "tempo_image_tag" {
   default     = "latest"
 }
 
+variable "backup_dr_region" {
+  description = "DR region module.backup's cross-region automated-backups replication (modules/backup/replication.tf) ships continuous Postgres/MariaDB backups into. See that variable's own description in modules/backup/variables.tf for the honesty gap around this being an unresearched placeholder."
+  type        = string
+  default     = "eu-west-1"
+
+  validation {
+    condition     = can(regex("^[a-z]{2}-[a-z]+-[0-9]$", var.backup_dr_region))
+    error_message = "backup_dr_region must look like an AWS region code, e.g. \"eu-west-1\"."
+  }
+}
+
+variable "backup_verify_image_tag" {
+  description = "Tag of module.registry's backup-verify ECR repository to deploy (ST-265). Bumping this and re-applying is how a change to infra/docker/backup-verify.Dockerfile or its scripts ships — same rolling-deploy shape as erpnext_image_tag."
+  type        = string
+  default     = "latest"
+}
+
+variable "erpnext_site_hostnames" {
+  description = <<-EOT
+    Hostnames of the real ERPNext sites module.backup's nightly site-backup and monthly
+    restore-drill tasks operate on (ST-265). Empty by default — there is no way to discover this
+    list at plan time (sites are created imperatively by infra/deploy/scripts/erpnext-new-site.sh
+    after apply, never by Terraform), so it must be maintained by hand alongside every
+    erpnext-new-site.sh run. See modules/backup/variables.tf's erpnext_site_hostnames.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 variable "web_origin" {
   description = <<-EOT
     Scheme+host of the apps/web frontend for this environment, e.g. "https://app.studafy.com" or

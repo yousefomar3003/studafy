@@ -13,6 +13,11 @@ output "efs_file_system_id" {
   value       = aws_efs_file_system.sites.id
 }
 
+output "efs_access_point_id" {
+  description = "EFS access point ID (uid/gid 1000, rooted at /sites) — the other half `mountPoints`/`efs_volume_configuration` needs alongside efs_file_system_id. modules/backup's site-backup and restore-drill tasks (ST-265) mount the same access point read-write, exactly like the backend/websocket/queue/scheduler roles above, so `bench backup`/`bench restore` see the real sites directory."
+  value       = aws_efs_access_point.sites.id
+}
+
 output "cluster_service_names" {
   description = "Names of the five long-running ECS services (backend/websocket/queue/scheduler/frontend), for `aws ecs describe-services` health checks."
   value       = merge({ for k, s in aws_ecs_service.bench : k => s.name }, { frontend = aws_ecs_service.frontend.name })
