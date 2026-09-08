@@ -45,26 +45,23 @@ jobs:
           exit-code: "1"
           trivyignores: .trivyignore
 
-  # Plan assumes the read-only OIDC role created by infra/terraform/bootstrap (studafy-terraform-plan).
-# Set the AWS_PLAN_ROLE_ARN repo variable to its ARN to enable plan checks; until then the job is
-# skipped (a hardcoded ARN cannot be assumed because the role/provider live in each AWS account).
-plan:
-  needs: validate
-  if: vars.AWS_PLAN_ROLE_ARN != ''
-  runs-on: ubuntu-latest
-  strategy:
-    matrix:
-      environment: [dev, staging, prod]
-  steps:
-    - uses: actions/checkout@v4
-    - uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: 1.11.4
-    - uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
-        aws-region: eu-central-1
-    - run: terraform init -reconfigure -backend-config=environments/${{ matrix.environment }}/backend.hcl
-      working-directory: infra/terraform
-    - run: terraform plan -lock=false -input=false -var-file=environments/${{ matrix.environment }}/${{ matrix.environment }}.tfvars
-      working-directory: infra/terraform
+  plan:
+    if: vars.AWS_PLAN_ROLE_ARN != ''
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: eu-central-1
+      - run: terraform init -reconfigure -backend-config=environments/${{ matrix.environment }}/backend.hcl
+        working-directory: infra/terraform
+      - run: terraform plan -lock=false -input=false -var-file=environments/${{ matrix.environment }}/${{ matrix.environment }}.tfvars
+        working-directory: infra/terraform
