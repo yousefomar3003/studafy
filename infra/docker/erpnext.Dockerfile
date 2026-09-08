@@ -27,6 +27,11 @@ FROM frappe/erpnext:${ERPNEXT_VERSION}
 # CLI is added here, as root before the switch to the unprivileged frappe user below, purely so
 # those tasks can `aws s3 cp`/`aws s3 sync` backups to/from the backups-archive bucket and read the
 # MariaDB root credential from Secrets Manager, without vendoring a second S3/Secrets Manager client.
+#
+# frappe/erpnext's own image already ends on `USER frappe` (not root), so we have to switch back to
+# root explicitly here or apt-get fails with "Permission denied" on /var/lib/apt/lists/partial
+# (exit code 100) instead of ever reaching a package-resolution error.
+USER root
 RUN apt-get update && apt-get install -y --no-install-recommends awscli jq && rm -rf /var/lib/apt/lists/*
 
 USER frappe
