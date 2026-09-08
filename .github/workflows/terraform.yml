@@ -58,7 +58,7 @@ jobs:
           terraform_version: 1.11.4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN || 'arn:aws:iam::862910165270:role/studafy-terraform-plan' }}
           aws-region: eu-central-1
       - run: terraform init -reconfigure -backend-config=environments/${{ matrix.environment }}/backend.hcl
         working-directory: infra/terraform
