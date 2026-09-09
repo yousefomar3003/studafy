@@ -431,6 +431,12 @@ variable "backup_verify_image_tag" {
   default     = "latest"
 }
 
+variable "tenant_restore_operator_principal_arns" {
+  description = "Passed straight through to module.backup's variable of the same name (ST-267) -- see its description there. Empty by default: nobody can assume the tenant-restore-operator role until an environment's tfvars explicitly lists who should be able to."
+  type        = list(string)
+  default     = []
+}
+
 variable "erpnext_site_hostnames" {
   description = <<-EOT
     Hostnames of the real ERPNext sites module.backup's nightly site-backup and monthly

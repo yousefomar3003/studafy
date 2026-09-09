@@ -1,0 +1,43 @@
+# Default table exclusions for extract-tenant-slice.sh (ST-267).
+#
+# Every table discover-tenant-tables.sql finds is a candidate; this file is the *default*
+# subtraction from that list, not a hardcoded ceiling -- extract-tenant-slice.sh's own
+# --include-table can add any of these back for a specific run. A blind "restore every
+# school_id-carrying row" is wrong for tables where reintroducing an old row is itself a
+# side-effecting action, not a neutral data restore. Each line: table_name  # reason.
+#
+# Format: one bare table name per line, optional trailing "# comment", blank lines and lines
+# starting with # ignored.
+
+# Relay queue to external systems (db/migrations/000022). A row already relayed and then deleted
+# stays relayed on the receiving end; restoring it re-queues a redelivery of something that already
+# happened once.
+outbox_events
+
+# Same relay-queue shape as outbox_events, for the ERPNext finance sync path
+# (db/migrations/000015).
+finance_sync_outbox
+
+# Idempotency/dedup ledger keyed by an inbound webhook's own event id (db/migrations/000027). A
+# restored stale row can make a genuinely-changed retry of that same event id look like a duplicate
+# and get silently dropped instead of processed.
+erpnext_webhook_dedup
+
+# Idempotency ledger for the notification dispatcher. Same dedup-collision risk as
+# erpnext_webhook_dedup: a restored key can cause a real, since-changed notification to be wrongly
+# treated as already-sent.
+notification_idempotency_keys
+
+# Idempotency ledgers for payment/refund write paths (db/migrations/000069, 000071). These guard
+# real money movement; a restored stale entry can cause a legitimate retried payment/refund request
+# to be wrongly treated as already-processed.
+payment_idempotency_logs
+refund_idempotency_logs
+
+# Security-sensitive session state (db/migrations/000029). A refresh token deleted because a
+# session was revoked/rotated must stay revoked; restoring the row reactivates it.
+refresh_tokens
+
+# Failure log the notification dispatcher's own retry sweep reads from. Restoring a stale
+# dead-letter row can cause an already-superseded delivery failure to be retried again.
+notification_dead_letters

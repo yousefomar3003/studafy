@@ -33,6 +33,11 @@ output "erpnext_restore_drill_task_definition_arn" {
   value       = one(aws_ecs_task_definition.erpnext_restore_drill[*].arn)
 }
 
+output "tenant_restore_operator_role_arn" {
+  description = "ARN of the role infra/tools/tenant-restore's scripts assume. null when var.tenant_restore_operator_principal_arns is empty (nobody configured to run this tooling in this environment)."
+  value       = one(aws_iam_role.tenant_restore_operator[*].arn)
+}
+
 output "dr_kms_key_arn" {
   description = "ARN (in var.dr_region) of the KMS key encrypting cross-region replicated automated backups."
   value       = aws_kms_key.dr_backup.arn

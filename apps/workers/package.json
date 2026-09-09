@@ -30,7 +30,7 @@
     "@studafy/notification-templates": "workspace:*",
     "@studafy/observability": "workspace:*",
     "@studafy/progress-reporting": "workspace:*",
-    "@xmldom/xmldom": "0.8.13",
+    "@xmldom/xmldom": "0.8.15",
     "bidi-js": "1.0.3",
     "bullmq": "5.79.3",
     "exceljs": "4.4.0",

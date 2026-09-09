@@ -299,6 +299,22 @@ variable "backup_plan_monthly_schedule" {
   default     = "cron(0 4 1 * ? *)"
 }
 
+# --- Tenant-slice restore tooling (ST-267) -----------------------------------------------------
+
+variable "tenant_restore_operator_principal_arns" {
+  description = <<-EOT
+    IAM principal ARNs (users or roles) allowed to assume tenant_restore.tf's
+    aws_iam_role.tenant_restore_operator, which infra/tools/tenant-restore's scripts run as. Empty
+    by default: no aws_iam_role.tenant_restore_operator is created at all when this list is empty
+    (see tenant_restore.tf's local.tenant_restore_operator_enabled) -- an environment that never
+    sets this has nobody who can run that tooling, the same "restricted starts from zero access"
+    posture main.tf's aws_iam_role.backup_service already has. AssumeRole additionally requires
+    aws:MultiFactorAuthPresent regardless of what this list contains.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 # --- Restore-verify / backup / drill container images -----------------------------------------
 
 variable "backup_verify_image_repository_url" {

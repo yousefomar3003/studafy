@@ -193,8 +193,29 @@ jobs:
       - uses: ./.github/actions/setup-bun-workspace
       - name: Build the workspace packages the web app imports
         run: bunx turbo run build --filter=@studafy/web^...
+      # No --with-deps: it runs `apt-get update`, and Playwright's own install-deps logic adds
+      # (or re-adds, if something upstream already removed it) an apt source for
+      # dl.google.com/linux/chrome-stable regardless of anything this workflow does beforehand --
+      # confirmed by two separate runs, an hour apart, both hitting the exact same stale package
+      # index with an identical "Last modification" timestamp: this is a broken upstream CDN edge
+      # on Google's own infrastructure, not a rotating mirror a retry or a pre-emptive `rm` of the
+      # source file can route around. --with-deps was never actually needed here: GitHub's
+      # ubuntu-latest runner image ships Chromium's own OS-level shared-library dependencies
+      # pre-installed (its documented software list includes Chromium/Chrome/Edge), so a plain
+      # `playwright install chromium` only downloads Playwright's own bundled binary -- no apt
+      # involved, nothing to fail on dl.google.com's account.
       - name: Install Playwright Chromium
-        run: bunx playwright install --with-deps chromium
+        run: |
+          for attempt in 1 2 3; do
+            echo "--- Install attempt $attempt/3 ---"
+            if bunx playwright install chromium; then
+              exit 0
+            fi
+            echo "Install failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "Install failed after 3 attempts" >&2
+          exit 1
         working-directory: apps/web
       - name: Axe CI budget + keyboard-only walkthrough (ST-211)
         run: bun run e2e:a11y
