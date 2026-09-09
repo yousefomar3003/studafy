@@ -18,6 +18,7 @@ this README covers only what the module does and how to operate it.
 | ERPNext scheduled site + database backups, off-site retention               | Nightly `bench backup --with-files` per site, uploaded to S3 and deleted from EFS.                                                                                     | `erpnext_backup.tf`         |
 | ERPNext site backup restores to a scratch environment                       | Monthly drill: downloads the latest backup, `bench new-site`/`bench restore`/`bench doctor` against a new site on the same MariaDB instance, then drops it.            | `erpnext_backup.tf`         |
 | Immutable copy inaccessible with prod credentials                           | Vault Lock Compliance mode (undeletable by anyone until the retention floor passes) + no prod IAM identity anywhere in this repo is granted any `backup:*` permission. | `main.tf`, see "Known gaps" |
+| Single-tenant slice restore, tooling access restricted and audited (ST-267) | A dedicated, MFA-gated `tenant_restore_operator` IAM role (empty-by-default principal list) scoped to its own scratch-instance prefix and S3 audit prefix.             | `tenant_restore.tf`         |
 
 ## What this module does not do
 
@@ -96,6 +97,17 @@ pointed at an explicit timestamp instead of "latest restorable time". Must be a 
 infra/deploy/scripts/erpnext-restore-drill.sh staging
 ```
 
+## Tenant-slice restore (ST-267)
+
+`tenant_restore.tf` adds the IAM role `infra/tools/tenant-restore`'s scripts assume to restore a
+school's deleted data from a scratch instance without a global point-in-time rollback of the whole
+instance — a different problem from this module's own restore-verify drill (which proves the
+_mechanism_ works, not that any one school's rows are recoverable in isolation). See
+[`infra/tools/tenant-restore/README.md`](../../../tools/tenant-restore/README.md) for the tool
+itself and [`docs/runbooks/tenant-restore.md`](../../../../docs/runbooks/tenant-restore.md) for the
+runbook. That role does not exist until `var.tenant_restore_operator_principal_arns` names who may
+assume it — empty by default, same zero-access-until-configured posture as `backup_service`.
+
 ## Known gaps
 
 - **No dedicated backup AWS account.** Vault Lock's Compliance mode makes the monthly snapshot
@@ -106,6 +118,18 @@ infra/deploy/scripts/erpnext-restore-drill.sh staging
   replication is cross-region; the AWS Backup vault holding the monthly immutable snapshot is not.
   Add an `aws_backup_vault` in `var.dr_region` and a `copy_action` on the plan rule if that gap needs
   closing.
+- **`restore_verify.tf`'s `postgres-restore-verify.sh` has never been confirmed to actually see
+  RLS-filtered rows against a real RDS master credential.** Building `tenant_restore.tf`'s own
+  extraction path (ST-267) against a real local Postgres instance surfaced that this schema
+  deliberately has no `BYPASSRLS` role anywhere (`docs/database/role-model.md` and about a dozen
+  other docs say so explicitly) — so if the RDS master user does not bypass RLS the way a local
+  Docker superuser does, its unfiltered `SELECT count(*) FROM app."table"` calls would need
+  `app.school_id` set first or they'd fail outright (`current_setting` with no `missing_ok` on an
+  unset GUC raises, it does not return zero rows). Nobody has run this script against real
+  infrastructure to find out either way — same "never applied to a live AWS account" status every
+  module in this repo already carries. See `infra/tools/tenant-restore/README.md`'s own Known gaps
+  for the fuller writeup and the workaround (`SET ROLE studafy_admin` + explicit GUCs) this ticket's
+  tooling had to adopt because it cannot assume otherwise.
 - **The restore-verify checksum comparison has an unavoidable drift window.** It captures the
   source's baseline immediately before requesting the restore, then compares against the scratch
   instance once available (typically 10-20 minutes later) — any write to the source in that window

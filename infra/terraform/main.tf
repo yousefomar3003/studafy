@@ -465,4 +465,6 @@ module "backup" {
 
   backup_verify_image_repository_url = module.registry.repository_urls["backup-verify"]
   backup_verify_image_tag            = var.backup_verify_image_tag
+
+  tenant_restore_operator_principal_arns = var.tenant_restore_operator_principal_arns
 }

@@ -402,3 +402,10 @@ output "backup_erpnext_restore_drill_task_definition_arn" {
   description = "ARN of the ERPNext monthly restore-drill task definition. Pass to infra/deploy/scripts/erpnext-restore-drill.sh. null in dev / when erpnext_plane_enabled is false."
   value       = module.backup.erpnext_restore_drill_task_definition_arn
 }
+
+# --- Tenant-slice restore tooling (ST-267) ------------------------------------------------------
+
+output "tenant_restore_operator_role_arn" {
+  description = "ARN infra/tools/tenant-restore's scripts assume. null until var.tenant_restore_operator_principal_arns lists who may."
+  value       = module.backup.tenant_restore_operator_role_arn
+}

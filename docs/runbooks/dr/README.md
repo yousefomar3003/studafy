@@ -8,6 +8,11 @@ That doc says _what_ the RPO/RTO targets are and which mechanism meets which acc
 this directory says _what a human does, in order, with which command,_ when one of the six failure
 shapes below actually happens.
 
+**Not the right runbook for a single school's data, only one school?** See
+[`docs/runbooks/tenant-restore.md`](../tenant-restore.md) instead (ST-267) — every scenario below
+restores the whole instance and affects every tenant; that one restores one school's slice without
+rolling back anyone else's writes.
+
 ## Status — read this before treating any runbook below as "ready to run in prod"
 
 **Nothing in `infra/terraform` has ever been applied to a real AWS account.** Every module's own
