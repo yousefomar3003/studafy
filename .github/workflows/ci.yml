@@ -193,8 +193,23 @@ jobs:
       - uses: ./.github/actions/setup-bun-workspace
       - name: Build the workspace packages the web app imports
         run: bunx turbo run build --filter=@studafy/web^...
+      # Retry: `--with-deps` runs `apt-get update` against dl.google.com's own Chrome repo, which
+      # intermittently serves a stale package index whose hash doesn't match its own just-rotated
+      # Release file (a transient upstream mirror-propagation race, not anything in this repo's
+      # control) — a fresh `apt-get update` moments later almost always lands on a consistent
+      # mirror. Same bash-loop retry shape containers.yml already uses for flaky image pulls.
       - name: Install Playwright Chromium
-        run: bunx playwright install --with-deps chromium
+        run: |
+          for attempt in 1 2 3; do
+            echo "--- Install attempt $attempt/3 ---"
+            if bunx playwright install --with-deps chromium; then
+              exit 0
+            fi
+            echo "Install failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "Install failed after 3 attempts" >&2
+          exit 1
         working-directory: apps/web
       - name: Axe CI budget + keyboard-only walkthrough (ST-211)
         run: bun run e2e:a11y
