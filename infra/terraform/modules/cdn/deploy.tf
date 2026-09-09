@@ -1,6 +1,9 @@
-# IAM role a deploy job assumes via GitHub OIDC to (1) sync apps/web's built dist/ into the
+# IAM role a deploy job assumes via GitHub OIDC to (1) sync a static site's build output into the
 # web-bundle bucket and (2) invalidate the CloudFront distribution — the "invalidation hook"
-# deliverable. Trust condition is environment-scoped
+# deliverable. Scoped to the whole bucket rather than a key prefix, so it already covers every site
+# that shares it (today: apps/web at the bucket root, once its own deploy job lands, and
+# apps/docs-api's API reference under docs/api/ — see docs/runbooks/cdn-cache-policy.md's "A second
+# site shares this bucket" section). Trust condition is environment-scoped
 # (repo:<github_repository>:environment:<environment>), the same shape as modules/registry's
 # deploy_pull: this role can overwrite what every visitor to var.domain_name sees next, so it gets
 # the tighter, GitHub-Environment-scoped trust boundary, not ci_push's blanket "any branch" one.
@@ -36,7 +39,7 @@ data "aws_iam_policy_document" "deploy_trust" {
 
 resource "aws_iam_role" "deploy" {
   name               = "${var.name_prefix}-cdn-deploy"
-  description        = "Assumed by a GitHub Actions run deploying to the '${var.environment}' GitHub Environment, to sync apps/web's build output into ${aws_s3_bucket.web_bundle.id} and invalidate the CloudFront distribution."
+  description        = "Assumed by a GitHub Actions run deploying to the '${var.environment}' GitHub Environment, to sync a static site's build output into ${aws_s3_bucket.web_bundle.id} and invalidate the CloudFront distribution."
   assume_role_policy = data.aws_iam_policy_document.deploy_trust.json
 }
 

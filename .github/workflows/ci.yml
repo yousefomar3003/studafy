@@ -691,6 +691,22 @@ jobs:
             packages/api-client/src/generated-types.ts
           if-no-files-found: error
           retention-days: 14
+      # ST-269. Unconditional for the same reason the oasdiff/benchmark steps above are: the site's
+      # build validates every guide's worked examples (request paths, methods, error codes) against
+      # the real apps/api/openapi.json generated at the top of this job, and it must catch drift on
+      # any PR that moves the contract -- not only the PRs that happen to also touch apps/docs-api,
+      # which is all the affected-package filter above would run this under.
+      - name: Build and validate the API reference site
+        env:
+          DOCS_API_RELEASE_TAG: ${{ github.sha }}
+        run: bun run --cwd apps/docs-api build
+      - name: Publish the API reference site artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: api-docs-site
+          path: apps/docs-api/dist
+          if-no-files-found: error
+          retention-days: 14
 
   hooks:
     runs-on: ubuntu-latest

@@ -140,6 +140,55 @@ jobs:
           EOF
           )"
 
+  # --- API reference site deploy (ST-269) ---------------------------------------------------------
+  # Same job as staging-deploy.yml's `deploy-docs` — see that file's comment for the full rationale
+  # (the docs/api/ prefix sharing module.cdn's web-bundle bucket, the two-role-assumption pattern,
+  # and the known ".../latest/" trailing-slash caching gap). Gated on `build` alone: like the rolling
+  # deploy below, nothing here runs before the prod approval gate, because `build` itself needs it.
+  deploy-docs:
+    needs: build
+    if: vars.AWS_DEPLOYMENTS_ENABLED == 'true'
+    environment: prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup-bun-workspace
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.11.4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - run: terraform init -reconfigure -backend-config=environments/prod/backend.hcl
+        working-directory: infra/terraform
+      - name: Resolve the CDN deploy target
+        id: cdn
+        run: |
+          echo "bucket=$(terraform -chdir=infra/terraform output -raw cdn_web_bundle_bucket_id)" >> "$GITHUB_OUTPUT"
+          echo "distribution=$(terraform -chdir=infra/terraform output -raw cdn_distribution_id)" >> "$GITHUB_OUTPUT"
+          echo "role=$(terraform -chdir=infra/terraform output -raw cdn_deploy_role_arn)" >> "$GITHUB_OUTPUT"
+      - name: Assume the CDN deploy role
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ steps.cdn.outputs.role }}
+          aws-region: eu-central-1
+      - name: Build the reference site
+        env:
+          DOCS_API_RELEASE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          bun run --cwd apps/api openapi:generate
+          bun run --cwd apps/docs-api build
+      - name: Publish the reference site
+        run: |
+          aws s3 sync apps/docs-api/dist "s3://${{ steps.cdn.outputs.bucket }}/docs/api/$IMAGE_TAG" --delete
+          aws s3 sync apps/docs-api/dist "s3://${{ steps.cdn.outputs.bucket }}/docs/api/latest" --delete
+      - name: Invalidate the previous "latest"
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.cdn.outputs.distribution }}" \
+            --paths "/docs/api/latest/*"
+
   # --- Deploy (rolling update) -----------------------------------------------------------------
   # Each service is verified, registered and rolled independently (deploy.sh; no "deploy everything"
   # wrapper). The rolling behaviour — never below desiredCount healthy tasks, ECS circuit-breaker

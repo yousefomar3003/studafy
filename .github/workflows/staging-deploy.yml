@@ -150,6 +150,82 @@ jobs:
       - run: ./scripts/deploy.sh ${{ matrix.service }} staging "$IMAGE_TAG"
         working-directory: infra/deploy
 
+  # --- API reference site deploy (ST-269) ---------------------------------------------------------
+  # Independent of the api/realtime/workers rolling deploy above: the reference site is a static
+  # build of this commit's OpenAPI contract (apps/api/openapi.json) plus the hand-authored guides in
+  # apps/docs-api, not a running service — nothing here to migrate against, nothing to roll back.
+  # Needs only `build` (so a commit whose signed images failed to build never gets its docs
+  # published either) and otherwise runs in parallel with `migrate`/`deploy`.
+  #
+  # Publishes into module.cdn's existing web-bundle bucket and distribution under a `docs/api/`
+  # prefix, distinct from the bundle root apps/web's own (still-undecided, see `smoke`'s comment
+  # below) CDN-vs-container deploy path would occupy — this is the bucket's first real write, made
+  # for an independent static site, not a resolution of that open question. See
+  # docs/runbooks/cdn-cache-policy.md for the "sharing this bucket" note and a known caching
+  # limitation: because module.cdn's `default_root_object` only rewrites the bundle *root* (`/`),
+  # not every sub-path, a request to ".../docs/api/latest/" (no filename) 403s through to
+  # apps/web's own index.html rather than the docs site's — link to "…/latest/index.html"
+  # explicitly, which every page this site generates already does for its own navigation.
+  deploy-docs:
+    needs: build
+    if: vars.AWS_DEPLOYMENTS_ENABLED == 'true'
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup-bun-workspace
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.11.4
+      # First role assumption: AWS_APPLY_ROLE_ARN only to read terraform state/outputs (the bucket,
+      # distribution, and deploy-role identifiers) — the same role the `smoke` job below already
+      # uses for the same purpose. It has no S3/CloudFront write access of its own.
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
+        working-directory: infra/terraform
+      - name: Resolve the CDN deploy target
+        id: cdn
+        run: |
+          echo "bucket=$(terraform -chdir=infra/terraform output -raw cdn_web_bundle_bucket_id)" >> "$GITHUB_OUTPUT"
+          echo "distribution=$(terraform -chdir=infra/terraform output -raw cdn_distribution_id)" >> "$GITHUB_OUTPUT"
+          echo "role=$(terraform -chdir=infra/terraform output -raw cdn_deploy_role_arn)" >> "$GITHUB_OUTPUT"
+      # Second role assumption, via the same GitHub OIDC token: module.cdn's own deploy role
+      # (deploy.tf), scoped to exactly this bucket and this distribution — narrower than
+      # AWS_APPLY_ROLE_ARN's terraform-apply-shaped grant, and the same role a future apps/web sync
+      # step would use.
+      - name: Assume the CDN deploy role
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ steps.cdn.outputs.role }}
+          aws-region: eu-central-1
+      - name: Build the reference site
+        env:
+          DOCS_API_RELEASE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          bun run --cwd apps/api openapi:generate
+          bun run --cwd apps/docs-api build
+      # Two copies: an immutable one under this release's own commit SHA, so a past release's docs
+      # stay addressable after `latest` moves on, and `latest` itself, the URL this environment's
+      # docs link points at. `--delete` on `latest` prunes a page a guide removed since the previous
+      # release; the versioned copy is never touched again after this sync, so `--delete` there is
+      # inert rather than risky.
+      - name: Publish the reference site
+        run: |
+          aws s3 sync apps/docs-api/dist "s3://${{ steps.cdn.outputs.bucket }}/docs/api/$IMAGE_TAG" --delete
+          aws s3 sync apps/docs-api/dist "s3://${{ steps.cdn.outputs.bucket }}/docs/api/latest" --delete
+      # Not required for correctness — the bundle's default cache behavior (docs/runbooks/
+      # cdn-cache-policy.md) is already TTL 0 for every non-assets/* path, `latest`'s included, so
+      # the very next request is already a miss served from what was just synced. Same
+      # defense-in-depth reasoning as apps/web's own (not yet wired) invalidation call.
+      - name: Invalidate the previous "latest"
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.cdn.outputs.distribution }}" \
+            --paths "/docs/api/latest/*"
+
   # --- Post-deploy smoke -----------------------------------------------------------------------
   # Two legs, matching the ticket's "synthetics + E2E smoke tag":
   #   1. Synthetics: the real edge domain's /healthz+/readyz (api), and the already-running
