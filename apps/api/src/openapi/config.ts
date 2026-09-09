@@ -168,6 +168,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "download URLs expire after a short window.",
     },
     {
+      name: "Privacy",
+      description:
+        "GDPR data subject request tooling. Files an export or erasure request for one user and " +
+        "reports its status; apps/workers/src/queues/maintenance drains the queue this enqueues onto.",
+    },
+    {
       name: "Announcements",
       description:
         "Compose and publish school/role/class-targeted announcements, with an optional mandatory " +

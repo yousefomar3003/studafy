@@ -105,7 +105,13 @@ approved_flexible_columns(table_name, column_name) AS (
     ('email_events', 'payload'),
     ('student_imports', 'rows_data'),
     ('student_imports', 'errors'),
-    ('student_imports', 'summary')
+    ('student_imports', 'summary'),
+    -- ST-268: an erasure's outcome is one entry per table it actually touched -- a variable-length,
+    -- worker-produced audit detail (which tables, which columns, how many rows), not a relational
+    -- fact with a fixed shape. The stable relational fields (tenant, subject, reason, status and
+    -- timestamps) remain normalized and constrained.
+    ('data_subject_requests', 'redacted_tables'),
+    ('data_subject_requests', 'retained_tables')
 ),
 relations AS (
   SELECT

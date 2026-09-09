@@ -65,6 +65,8 @@ const EXPECTED_PATHS = [
   "/api/reports/children/comparison",
   "/api/reports/children/{studentId}/breakdown",
   "/api/notification-preferences",
+  "/api/privacy/dsr",
+  "/api/privacy/dsr/{requestId}",
   "/api/announcements",
   "/api/auth/refresh",
   "/api/auth/logout",
