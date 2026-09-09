@@ -193,11 +193,19 @@ jobs:
       - uses: ./.github/actions/setup-bun-workspace
       - name: Build the workspace packages the web app imports
         run: bunx turbo run build --filter=@studafy/web^...
-      # Retry: `--with-deps` runs `apt-get update` against dl.google.com's own Chrome repo, which
-      # intermittently serves a stale package index whose hash doesn't match its own just-rotated
-      # Release file (a transient upstream mirror-propagation race, not anything in this repo's
-      # control) — a fresh `apt-get update` moments later almost always lands on a consistent
-      # mirror. Same bash-loop retry shape containers.yml already uses for flaky image pulls.
+      # `--with-deps` runs a plain `apt-get update` before installing chromium's shared-library
+      # dependencies, which touches every apt source configured on the runner image -- including
+      # /etc/apt/sources.list.d/google-chrome.list, which ubuntu-latest ships pre-configured for
+      # actual Google Chrome (this step never installs or needs real Chrome, only Playwright's own
+      # bundled chromium binary + Ubuntu's shared libs). dl.google.com's repo intermittently serves
+      # a package index whose hash doesn't match its own just-rotated Release file for several
+      # minutes at a stretch -- a short retry loop lands on the exact same stale response, not a
+      # different mirror, so removing the unused source entirely is the fix, not a retry.
+      - name: Remove unused Google Chrome apt source
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+      # Retry kept as a safety net for other, genuinely transient mirror failures (Ubuntu's own
+      # archive, Microsoft's) -- same bash-loop shape containers.yml already uses for flaky image
+      # pulls.
       - name: Install Playwright Chromium
         run: |
           for attempt in 1 2 3; do
