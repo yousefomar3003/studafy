@@ -16,6 +16,7 @@ import { createAnthropicClient } from "./queues/exam-generation/anthropic-client
 import { processExamGeneration } from "./queues/exam-generation/worker";
 import { purgeAbandonedStudentImports } from "./queues/imports/abandoned-import-sweep";
 import { processStudentImport } from "./queues/imports/worker";
+import { processMaintenanceJob } from "./queues/maintenance";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
 import { deadLetterListener } from "./queues/notifications/dead-letter";
@@ -138,6 +139,40 @@ function enqueueIngestion(schoolId: string, materialId: string): Promise<void> {
     connection: createRedisConnection(workerEnv) as never,
   });
   return enqueueAiIngestion(aiIngestionQueueInstance, schoolId, materialId);
+}
+
+/**
+ * The maintenance queue's own producer handle: the tenant-closure sweep (ST-268) files a data
+ * subject request and then enqueues the job that drains it, back onto this same queue. Lazily
+ * created for the same reason `derivationQueue` is.
+ */
+let maintenanceQueueInstance: Queue | null = null;
+
+function enqueueDsrJob(input: {
+  schoolId: string;
+  requestId: string;
+  kind: "export" | "erasure";
+}): Promise<void> {
+  maintenanceQueueInstance ??= new Queue(QUEUE_NAMES.MAINTENANCE, {
+    connection: createRedisConnection(workerEnv) as never,
+  });
+  const jobName =
+    input.kind === "export"
+      ? JOB_NAMES.RUN_DATA_SUBJECT_EXPORT
+      : JOB_NAMES.RUN_DATA_SUBJECT_ERASURE;
+  return maintenanceQueueInstance
+    .add(
+      jobName,
+      { requestId: input.requestId, schoolId: input.schoolId },
+      {
+        jobId: input.requestId,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5_000 },
+        removeOnComplete: { age: 30 * 24 * 60 * 60 },
+        removeOnFail: { age: 30 * 24 * 60 * 60 },
+      },
+    )
+    .then(() => undefined);
 }
 
 /**
@@ -421,6 +456,24 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     name: QUEUE_NAMES.OUTBOX_RELAY,
     concurrency: 5,
     processor: placeholderProcessor(QUEUE_NAMES.OUTBOX_RELAY),
+  },
+  {
+    name: QUEUE_NAMES.MAINTENANCE,
+    // 1: an erasure walks every discovered tenant table inside one transaction (tenant-erasure.
+    // worker.ts) -- concurrent runs buy nothing but lock contention on the same rows.
+    concurrency: 1,
+    processor: (job: Job) =>
+      processMaintenanceJob(
+        job,
+        {
+          primaryDatabaseUrl: databaseUrl,
+          databaseCaCert: workerEnv.DATABASE_CA_CERT,
+          s3Region: workerEnv.S3_REGION,
+          s3Endpoint: workerEnv.S3_ENDPOINT,
+          bucket: workerEnv.S3_APP_FILES_BUCKET,
+        },
+        enqueueDsrJob,
+      ),
   },
   {
     name: QUEUE_NAMES.PROVISIONING,

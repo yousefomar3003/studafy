@@ -108,6 +108,7 @@ import {
 import { importRoutes } from "./modules/imports";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
+import { privacyRoutes } from "./modules/privacy";
 import { childComparisonRoutes } from "./modules/reports";
 import { storageRoutes } from "./modules/storage";
 import {
@@ -837,6 +838,13 @@ export function createApp({
   // 'read' audit row (target_table 'audit_logs') inside the same transaction.
   if (database) {
     app.route("/", auditRoutes(database, redis ?? null, storage));
+  }
+
+  // Data subject request tooling (ST-268). Files a GDPR export or erasure request for one user and
+  // reports its status; apps/workers/src/queues/maintenance drains the queue this enqueues onto.
+  // Gated on PRIVACY_DSR_MANAGE (ORG_ADMIN/SUPER_ADMIN only).
+  if (database) {
+    app.route("/", privacyRoutes(database, redis ?? null, storage));
   }
 
   // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with

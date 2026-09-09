@@ -94,6 +94,12 @@ export const PERMISSIONS = {
   AUDIT_LOG_READ: "auditLog:read",
   AUDIT_LOG_EXPORT: "auditLog:export",
 
+  // GDPR data subject requests (ST-268): filing and reading the export/erasure pipeline for one
+  // user. Deliberately not granted to FINANCE (which reads AUDIT_LOG_* for billing recovery, not to
+  // erase anyone) or SUPPORT_AGENT -- a DSR is an ORG_ADMIN/SUPER_ADMIN decision, not a read-only
+  // support lookup.
+  PRIVACY_DSR_MANAGE: "privacy:manageDsr",
+
   API_KEY_CREATE: "apiKey:create",
   API_KEY_READ: "apiKey:read",
   API_KEY_REVOKE: "apiKey:revoke",
