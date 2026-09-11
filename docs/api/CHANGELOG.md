@@ -17,3 +17,6 @@ when it required the `version-bump` label.
   (`PRIVACY_DSR_MANAGE`). ST-268.
 - `GET /api/privacy/dsr/{requestId}` — read a data subject request's status and, once a completed
   export, a short-lived download URL. ST-268.
+- `GET /api/ai/health` — unauthenticated black-box check reporting whether the `AI_LLM_ENABLED`
+  kill switch is on. Backs the public status page's `ai` component
+  (`infra/terraform/modules/monitoring`); deliberately does not call the Anthropic provider. ST-264.

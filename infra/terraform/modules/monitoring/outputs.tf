@@ -43,6 +43,33 @@ output "availability_slo_dashboard_name" {
   value       = var.synthetics_enabled ? aws_cloudwatch_dashboard.availability_slo[0].dashboard_name : null
 }
 
+# --- Public status page (ST-264) --------------------------------------------------------------
+
+output "status_page_url" {
+  description = "Public HTTPS URL of the status page (CloudFront's own *.cloudfront.net domain — see status_page.tf's header for the no-custom-domain known gap), or null when disabled."
+  value       = var.status_page_enabled ? "https://${aws_cloudfront_distribution.status_page[0].domain_name}" : null
+}
+
+output "status_page_sync_function_name" {
+  description = "Name of the status-page sync Lambda, or null when disabled. Its log group is where a failed components.json write (bad IAM, CloudWatch throttling) is diagnosed."
+  value       = var.status_page_enabled ? aws_lambda_function.status_page_sync[0].function_name : null
+}
+
+output "status_page_incident_function_url" {
+  description = "Function URL for posting a manual incident update (docs/runbooks/incident-comms-templates.md) — POST with header x-status-page-admin-token: <STATUS_PAGE_ADMIN_TOKEN from the monitoring app-secrets container>. Null wherever local.status_page_email_enabled is false (no verified SES identity for this environment)."
+  value       = local.status_page_email_enabled ? aws_lambda_function_url.status_page_incident[0].function_url : null
+}
+
+output "status_page_site_bucket_name" {
+  description = "S3 bucket serving the public status page's content (index.html, app.js, components.json, incidents.json), or null when disabled."
+  value       = var.status_page_enabled ? aws_s3_bucket.status_page["site"].id : null
+}
+
+output "status_page_data_bucket_name" {
+  description = "S3 bucket holding subscribers.json — private, never granted to CloudFront (status_page.tf's header explains why this is a separate bucket from the site content). Null when disabled."
+  value       = var.status_page_enabled ? aws_s3_bucket.status_page["data"].id : null
+}
+
 # --- Prometheus/Grafana metrics stack (ST-259) ---------------------------------------------------
 
 output "metrics_discovery_service_arns" {

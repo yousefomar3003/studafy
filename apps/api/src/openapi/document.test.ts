@@ -103,6 +103,7 @@ describe("structure", () => {
         // document until OpenAPI generation started passing a real (if inert) Redis placeholder
         // instead of null. See redis-unusable.ts.
         "/api/ai/admin/metrics",
+        "/api/ai/health",
         "/api/ai/students/{studentId}/ask",
         "/api/ai/students/{studentId}/concepts",
         "/api/ai/students/{studentId}/decks",

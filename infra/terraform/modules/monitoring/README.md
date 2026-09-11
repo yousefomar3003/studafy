@@ -2,7 +2,8 @@
 
 CloudWatch alarms, the operations dashboard, the synthetic realtime probe (ST-149), the
 Prometheus/Grafana metrics stack (ST-259), the tracing pipeline (ST-260), alerting and on-call
-(ST-262), and the black-box synthetic availability probes (ST-263).
+(ST-262), the black-box synthetic availability probes (ST-263), and the self-hosted public status
+page (ST-264).
 
 ## Alarms & dashboard
 
@@ -89,6 +90,101 @@ for a different audience.
 [`docs/testing/load-test-scenarios.md`](../../../../docs/testing/load-test-scenarios.md) records for
 NFR-01/02. `synthetics_availability_slo_percent` (99.9, overridable) is a conventional default, not
 a transcription of a real target.
+
+## Public status page (ST-264)
+
+`status_page_enabled = true` (staging/prod) provisions a **self-hosted** public status page in
+`status_page.tf` — S3 (private, OAC) behind CloudFront, plus up to four Lambdas. No third-party
+account to create by hand anywhere in this: `terraform apply` is the entire "go live" step.
+
+**Two buckets.** `status_page["site"]` is public through CloudFront: the static page
+(`status-page-site/index.html`/`styles.css`/`app.js`) plus `components.json` and `incidents.json`.
+`status_page["data"]` is private, IAM-only, never granted to CloudFront: `subscribers.json`, the one
+place a subscriber's email address is stored. Splitting PII into its own bucket makes "a subscriber
+email becomes publicly readable" structurally impossible rather than a bucket policy to get right by
+hand.
+
+**Four Lambdas:**
+
+| Lambda                     | Trigger                         | Job                                                                                                                                                        |
+| -------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status-page-sync`         | EventBridge, `rate(1 minute)`   | `DescribeAlarms`s the synthetic/probe alarms below and writes `components.json`. Automatic — satisfies "synthetic failure reflects on page automatically". |
+| `status-page-incident`     | Function URL, bearer-token auth | Manual incident post/update: writes `incidents.json` and emails every confirmed subscriber.                                                                |
+| `status-page-subscribe`    | Function URL, public            | The page's "email me" form backend — double opt-in, sends a confirmation link.                                                                             |
+| `status-page-subscription` | Function URL, public            | Confirms or unsubscribes, from the link an email sent.                                                                                                     |
+
+The last three exist only where `ses_domain_identity_arn != null` (`local.status_page_email_enabled`
+in `status_page.tf`) — see "Honesty note" below for what that means today.
+
+**Component -> automatic signal:**
+
+| Public component | Automatic signal                                                               |
+| ---------------- | ------------------------------------------------------------------------------ |
+| `web`            | `login-page` synthetic check, both probing regions                             |
+| `api`            | `healthz` + `oauth-start` + `invitation-verify` synthetic checks, both regions |
+| `billing`        | `checkout-page` synthetic check, both regions                                  |
+| `realtime`       | the ST-149 probe's own `realtime-probe-latency-high` SLO alarm                 |
+| `ai`             | `ai-health` synthetic check (ST-264) — see "Honesty note" below                |
+
+Any mapped alarm in `ALARM` flips that component to `major_outage`; all clear flips it back to
+`operational`. `INSUFFICIENT_DATA` (and a `DescribeAlarms` call that simply didn't return a state)
+is not treated as a failure, for the same "absence of an opinion" reason
+[`alert-catalog.md`](../../../../docs/runbooks/alert-catalog.md) already gives for CloudWatch
+alarms generally — see `lambda/status-page-sync/index.mjs`'s own header.
+
+**Why polling, not the SNS alert bridge next door.** `alerts.tf`'s `alert_topic` already fans every
+alarm state change out over SNS to `lambda/cloudwatch-alert-bridge`. Reacting the same way here
+would need hand-rolled state aggregation (a component maps to more than one alarm); polling
+`DescribeAlarms` every minute instead recomputes every component's status from scratch each run, so
+a missed or out-of-order notification self-corrects on the very next run rather than leaving the
+public page wrong until someone notices.
+
+**Why S3 JSON, not DynamoDB; why Function URLs, not API Gateway.** This repo has neither service
+anywhere else, and the volume here (a page fetch, an occasional incident post, an occasional
+subscribe/confirm) does not justify introducing either — see `status_page.tf`'s header for the full
+reasoning.
+
+**Manual incident updates** go through `status-page-incident`'s Function URL — `POST` a JSON body
+with `status` (`investigating`/`identified`/`monitoring`/`resolved`), `body` (the update text — copy
+from a template) and, for a new incident, `title`/`components`/`impact`, with header
+`x-status-page-admin-token: <STATUS_PAGE_ADMIN_TOKEN>`. Full walkthrough and copy-paste templates:
+[`docs/runbooks/incident-comms-templates.md`](../../../../docs/runbooks/incident-comms-templates.md).
+
+**Subscriber emails** are double opt-in and genuinely sent by this repo's own infrastructure via SES
+(`status-page-subscribe` sends the confirmation link; `status-page-incident` emails every confirmed
+subscriber on each update; `status-page-subscription` handles both confirm and unsubscribe). This
+only works where `ses_domain_identity_arn` is set — see "Honesty note" below.
+
+**Required secret**, added to the existing `monitoring` app-secrets container
+(`monitoring_secret_arn` — see "Alerting and on-call" below for how that container already carries
+Alertmanager's receiver URLs the identical way):
+
+| Key                       | Holds                                                                 |
+| ------------------------- | --------------------------------------------------------------------- |
+| `STATUS_PAGE_ADMIN_TOKEN` | Long random bearer token `status-page-incident` checks on every POST. |
+
+**Honesty note, two parts.**
+
+1. `ai` now has a real automatic signal — `ai-health` (`synthetics.tf`), which hits apps/api's
+   `GET /api/ai/health` (`apps/api/src/health.ts`). That route deliberately does **not** call
+   Anthropic (a real completion request once a minute, in every environment, would be a meaningful
+   and pointless cost, and would answer "is the provider up" rather than "is this deployment's AI
+   feature switched on") — it reports whether the `AI_LLM_ENABLED` kill switch is on, the same "is
+   the route mounted and answering" contract `oauth-start` already has. A genuine Anthropic-provider
+   outage is still detected and triaged the way
+   [`docs/runbooks/ai-provider-outage.md`](../../../../docs/runbooks/ai-provider-outage.md) already
+   describes.
+2. **Subscriber emails and manual incident posting only work where SES is provisioned** for that
+   environment — `ses_domain_identity_arn != null`, i.e. `dns_create_email_records = true` (prod
+   today; see `infra/terraform/environments/*/*.tfvars`). Where it isn't (dev, and staging until
+   that's turned on there too), the page and automatic component sync still deploy and work
+   correctly; `status-page-incident`/`-subscribe`/`-subscription` simply aren't created rather than
+   existing half-broken. Turning it on for another environment is a `dns_create_email_records`/
+   `dns_ses_domain` change in that environment's `.tfvars`, not a change to this module.
+
+See `status_page.tf`'s own header for the rest of the design reasoning, including the remaining
+known gaps (no custom domain — the page is served at CloudFront's own `*.cloudfront.net` domain; no
+rate limiting on the two public Function URLs; `incidents.json` capped at the most recent 25).
 
 ## Deploy annotations (ST-255)
 
@@ -269,73 +365,82 @@ per-user or per-school label would.
 
 ## Inputs
 
-| Name                                  | Type           | Default              | Description                                                                         |
-| ------------------------------------- | -------------- | -------------------- | ----------------------------------------------------------------------------------- |
-| `name_prefix`                         | `string`       | —                    | Resource name prefix, from `module.naming.name_prefix`.                             |
-| `aws_region`                          | `string`       | —                    | Dashboard widget region.                                                            |
-| `postgres_instance_id`                | `string`       | —                    | Primary RDS instance identifier.                                                    |
-| `postgres_read_replica_instance_id`   | `string`       | —                    | Read-replica identifier (lag alarm + widget).                                       |
-| `mariadb_instance_id`                 | `string`       | `null`               | Optional MariaDB instance identifier.                                               |
-| `redis_replication_group_id`          | `string`       | —                    | ElastiCache replication group id (CPU/connections/evictions widget).                |
-| `ecs_cluster_name`                    | `string`       | —                    | ECS cluster containing api/realtime/workers.                                        |
-| `probe_enabled`                       | `bool`         | `false`              | Provision the synthetic realtime probe. Dev omits it; staging/prod pass `true`.     |
-| `realtime_ws_url`                     | `string`       | —                    | Public `wss://…/ws` handshake URL the probe connects to.                            |
-| `realtime_jwt_secret_arn`             | `string`       | —                    | ARN of the secret holding `WS_JWT_SECRET` (for the probe's handshake token).        |
-| `redis_auth_secret_arn`               | `string`       | —                    | ARN of the Redis connection secret; the probe reads `pubsub_url`.                   |
-| `probe_subnet_ids`                    | `list(string)` | —                    | Private app-tier subnets for the probe Lambda.                                      |
-| `probe_security_group_ids`            | `list(string)` | —                    | App security group: egress covers Redis/HTTPS/DNS; nothing connects in.             |
-| `log_retention_days`                  | `number`       | `30`                 | Probe Lambda log retention.                                                         |
-| `probe_metric_namespace`              | `string`       | `Studafy/Realtime`   | CloudWatch namespace for `RealtimeProbeLatency` (`Studafy/<component>` convention). |
-| `probe_slo_ms`                        | `number`       | `2000`               | Propagation SLO in ms; the probe alarm threshold.                                   |
-| `monitoring_enabled`                  | `bool`         | `false`              | Provision Prometheus/Grafana/the exporters. Dev omits it; staging/prod pass `true`. |
-| `vpc_id`                              | `string`       | —                    | VPC the Cloud Map private DNS namespace is created in.                              |
-| `cluster_arn`                         | `string`       | —                    | ECS cluster ARN the metrics stack's own services run in.                            |
-| `execution_role_arn`                  | `string`       | —                    | Shared ECS execution role (`module.compute`), reused rather than a new one.         |
-| `private_app_subnet_ids`              | `list(string)` | —                    | Private app-tier subnets for the metrics stack's Fargate tasks.                     |
-| `monitoring_security_group_id`        | `string`       | —                    | Security group for the metrics stack (`module.network`'s `monitoring` group).       |
-| `metrics_port`                        | `number`       | `9464`               | Port apps/api, apps/realtime, apps/workers expose `/metrics` on.                    |
-| `grafana_port`                        | `number`       | `3000`               | Port Grafana listens on.                                                            |
-| `monitoring_secret_arn`               | `string`       | —                    | ARN of the `monitoring` app-secrets container (exporter DSNs, Grafana password).    |
-| `mariadb_exporter_enabled`            | `bool`         | `false`              | Provision `mysqld_exporter`. Should match `local.erpnext_plane_enabled`.            |
-| `prometheus_image`                    | `string`       | —                    | Full image reference for this repo's Prometheus image.                              |
-| `grafana_image`                       | `string`       | —                    | Full image reference for this repo's Grafana image.                                 |
-| `prometheus_retention`                | `string`       | `"15d"`              | Prometheus `--storage.tsdb.retention.time` value.                                   |
-| `prometheus_storage_gb`               | `number`       | `30`                 | Fargate ephemeral storage (GiB) for the Prometheus task.                            |
-| `prometheus_cpu` / `_memory`          | `number`       | `512` / `1024`       | Fargate sizing for the Prometheus task.                                             |
-| `grafana_cpu` / `_memory`             | `number`       | `256` / `512`        | Fargate sizing for the Grafana task.                                                |
-| `exporter_cpu` / `_memory`            | `number`       | `256` / `512`        | Fargate sizing for each DB exporter task.                                           |
-| `otel_collector_port`                 | `number`       | `4318`               | OTLP/HTTP port, shared by the collector's receiver and Tempo's own OTLP receiver.   |
-| `otel_collector_image`                | `string`       | —                    | Full image reference for this repo's OTel collector image.                          |
-| `tempo_image`                         | `string`       | —                    | Full image reference for this repo's Tempo image.                                   |
-| `otel_collector_cpu` / `_memory`      | `number`       | `256` / `512`        | Fargate sizing for the OTel collector task.                                         |
-| `tempo_cpu` / `_memory`               | `number`       | `512` / `1024`       | Fargate sizing for the Tempo task.                                                  |
-| `tempo_storage_gb`                    | `number`       | `21`                 | Fargate ephemeral storage (GiB) for the Tempo task.                                 |
-| `alertmanager_image`                  | `string`       | —                    | Full image reference for this repo's Alertmanager image.                            |
-| `alertmanager_port`                   | `number`       | `9093`               | Port Alertmanager serves its API/UI on.                                             |
-| `alertmanager_cpu` / `_memory`        | `number`       | `256` / `512`        | Fargate sizing for the Alertmanager task.                                           |
-| `edge_certificate_arn`                | `string`       | —                    | `module.edge`'s ACM certificate, watched for expiry.                                |
-| `cdn_certificate_arn`                 | `string`       | `null`               | `module.cdn`'s us-east-1 ACM certificate; `null` where there is no CDN.             |
-| `synthetics_enabled`                  | `bool`         | `false`              | Provision the black-box synthetic probes. Dev omits it; staging/prod pass `true`.   |
-| `web_origin`                          | `string`       | —                    | apps/web origin; builds the `login-page`/`checkout-page` probe URLs.                |
-| `api_origin`                          | `string`       | —                    | apps/api origin; builds the `healthz`/`oauth-start`/`invitation-verify` probe URLs. |
-| `synthetics_dr_region`                | `string`       | —                    | Second probing region (root passes `var.backup_dr_region`).                         |
-| `synthetics_metric_namespace`         | `string`       | `Studafy/Synthetics` | CloudWatch namespace for the probe's metrics.                                       |
-| `synthetics_availability_slo_percent` | `number`       | `99.9`               | Proposed per-check NFR-03 availability SLO, as a percent (see honesty note above).  |
+| Name                                  | Type           | Default              | Description                                                                                                                           |
+| ------------------------------------- | -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `name_prefix`                         | `string`       | —                    | Resource name prefix, from `module.naming.name_prefix`.                                                                               |
+| `aws_region`                          | `string`       | —                    | Dashboard widget region.                                                                                                              |
+| `postgres_instance_id`                | `string`       | —                    | Primary RDS instance identifier.                                                                                                      |
+| `postgres_read_replica_instance_id`   | `string`       | —                    | Read-replica identifier (lag alarm + widget).                                                                                         |
+| `mariadb_instance_id`                 | `string`       | `null`               | Optional MariaDB instance identifier.                                                                                                 |
+| `redis_replication_group_id`          | `string`       | —                    | ElastiCache replication group id (CPU/connections/evictions widget).                                                                  |
+| `ecs_cluster_name`                    | `string`       | —                    | ECS cluster containing api/realtime/workers.                                                                                          |
+| `probe_enabled`                       | `bool`         | `false`              | Provision the synthetic realtime probe. Dev omits it; staging/prod pass `true`.                                                       |
+| `realtime_ws_url`                     | `string`       | —                    | Public `wss://…/ws` handshake URL the probe connects to.                                                                              |
+| `realtime_jwt_secret_arn`             | `string`       | —                    | ARN of the secret holding `WS_JWT_SECRET` (for the probe's handshake token).                                                          |
+| `redis_auth_secret_arn`               | `string`       | —                    | ARN of the Redis connection secret; the probe reads `pubsub_url`.                                                                     |
+| `probe_subnet_ids`                    | `list(string)` | —                    | Private app-tier subnets for the probe Lambda.                                                                                        |
+| `probe_security_group_ids`            | `list(string)` | —                    | App security group: egress covers Redis/HTTPS/DNS; nothing connects in.                                                               |
+| `log_retention_days`                  | `number`       | `30`                 | Probe Lambda log retention.                                                                                                           |
+| `probe_metric_namespace`              | `string`       | `Studafy/Realtime`   | CloudWatch namespace for `RealtimeProbeLatency` (`Studafy/<component>` convention).                                                   |
+| `probe_slo_ms`                        | `number`       | `2000`               | Propagation SLO in ms; the probe alarm threshold.                                                                                     |
+| `monitoring_enabled`                  | `bool`         | `false`              | Provision Prometheus/Grafana/the exporters. Dev omits it; staging/prod pass `true`.                                                   |
+| `vpc_id`                              | `string`       | —                    | VPC the Cloud Map private DNS namespace is created in.                                                                                |
+| `cluster_arn`                         | `string`       | —                    | ECS cluster ARN the metrics stack's own services run in.                                                                              |
+| `execution_role_arn`                  | `string`       | —                    | Shared ECS execution role (`module.compute`), reused rather than a new one.                                                           |
+| `private_app_subnet_ids`              | `list(string)` | —                    | Private app-tier subnets for the metrics stack's Fargate tasks.                                                                       |
+| `monitoring_security_group_id`        | `string`       | —                    | Security group for the metrics stack (`module.network`'s `monitoring` group).                                                         |
+| `metrics_port`                        | `number`       | `9464`               | Port apps/api, apps/realtime, apps/workers expose `/metrics` on.                                                                      |
+| `grafana_port`                        | `number`       | `3000`               | Port Grafana listens on.                                                                                                              |
+| `monitoring_secret_arn`               | `string`       | —                    | ARN of the `monitoring` app-secrets container (exporter DSNs, Grafana password).                                                      |
+| `mariadb_exporter_enabled`            | `bool`         | `false`              | Provision `mysqld_exporter`. Should match `local.erpnext_plane_enabled`.                                                              |
+| `prometheus_image`                    | `string`       | —                    | Full image reference for this repo's Prometheus image.                                                                                |
+| `grafana_image`                       | `string`       | —                    | Full image reference for this repo's Grafana image.                                                                                   |
+| `prometheus_retention`                | `string`       | `"15d"`              | Prometheus `--storage.tsdb.retention.time` value.                                                                                     |
+| `prometheus_storage_gb`               | `number`       | `30`                 | Fargate ephemeral storage (GiB) for the Prometheus task.                                                                              |
+| `prometheus_cpu` / `_memory`          | `number`       | `512` / `1024`       | Fargate sizing for the Prometheus task.                                                                                               |
+| `grafana_cpu` / `_memory`             | `number`       | `256` / `512`        | Fargate sizing for the Grafana task.                                                                                                  |
+| `exporter_cpu` / `_memory`            | `number`       | `256` / `512`        | Fargate sizing for each DB exporter task.                                                                                             |
+| `otel_collector_port`                 | `number`       | `4318`               | OTLP/HTTP port, shared by the collector's receiver and Tempo's own OTLP receiver.                                                     |
+| `otel_collector_image`                | `string`       | —                    | Full image reference for this repo's OTel collector image.                                                                            |
+| `tempo_image`                         | `string`       | —                    | Full image reference for this repo's Tempo image.                                                                                     |
+| `otel_collector_cpu` / `_memory`      | `number`       | `256` / `512`        | Fargate sizing for the OTel collector task.                                                                                           |
+| `tempo_cpu` / `_memory`               | `number`       | `512` / `1024`       | Fargate sizing for the Tempo task.                                                                                                    |
+| `tempo_storage_gb`                    | `number`       | `21`                 | Fargate ephemeral storage (GiB) for the Tempo task.                                                                                   |
+| `alertmanager_image`                  | `string`       | —                    | Full image reference for this repo's Alertmanager image.                                                                              |
+| `alertmanager_port`                   | `number`       | `9093`               | Port Alertmanager serves its API/UI on.                                                                                               |
+| `alertmanager_cpu` / `_memory`        | `number`       | `256` / `512`        | Fargate sizing for the Alertmanager task.                                                                                             |
+| `edge_certificate_arn`                | `string`       | —                    | `module.edge`'s ACM certificate, watched for expiry.                                                                                  |
+| `cdn_certificate_arn`                 | `string`       | `null`               | `module.cdn`'s us-east-1 ACM certificate; `null` where there is no CDN.                                                               |
+| `synthetics_enabled`                  | `bool`         | `false`              | Provision the black-box synthetic probes. Dev omits it; staging/prod pass `true`.                                                     |
+| `web_origin`                          | `string`       | —                    | apps/web origin; builds the `login-page`/`checkout-page` probe URLs.                                                                  |
+| `api_origin`                          | `string`       | —                    | apps/api origin; builds the `healthz`/`oauth-start`/`invitation-verify` probe URLs.                                                   |
+| `synthetics_dr_region`                | `string`       | —                    | Second probing region (root passes `var.backup_dr_region`).                                                                           |
+| `synthetics_metric_namespace`         | `string`       | `Studafy/Synthetics` | CloudWatch namespace for the probe's metrics.                                                                                         |
+| `synthetics_availability_slo_percent` | `number`       | `99.9`               | Proposed per-check NFR-03 availability SLO, as a percent (see honesty note above).                                                    |
+| `status_page_enabled`                 | `bool`         | `false`              | Provision the self-hosted status page (S3+CloudFront+status-page-sync). Should track `monitoring_enabled`/`synthetics_enabled`.       |
+| `status_page_force_destroy_bucket`    | `bool`         | `false`              | Allow the two status-page buckets to be destroyed while non-empty. `false` in every real environment.                                 |
+| `ses_domain_identity_arn`             | `string`       | `null`               | `module.dns`'s verified SES identity ARN. `null` where that environment has none — gates the incident/subscribe/subscription Lambdas. |
+| `status_page_from_address`            | `string`       | `null`               | The `From:` address the status page's emails send as. Only read when `ses_domain_identity_arn` is set.                                |
 
 ## Outputs
 
-| Name                              | Description                                                                                         |
-| --------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `dashboard_name`                  | Operations dashboard name.                                                                          |
-| `alarm_arns`                      | Every CloudWatch alarm ARN this module creates, both regions.                                       |
-| `realtime_probe_function_name`    | Probe Lambda name, or `null` when the probe is disabled.                                            |
-| `deploys_log_group_name`          | CloudWatch Logs group the staging deploy pipeline annotates.                                        |
-| `metrics_discovery_service_arns`  | Map of `{api, realtime, workers}` -> Cloud Map registry ARN — see `infra/deploy/scripts/render.sh`. |
-| `grafana_access_hint`             | Reminder of the SSH port-forward command to reach Grafana.                                          |
-| `alert_topic_arn`                 | SNS topic in-region alarms publish to, bridged into Alertmanager. `null` in dev.                    |
-| `alert_bridge_function_name`      | The bridge Lambda; its log group is where an undelivered alarm notification is diagnosed.           |
-| `synthetics_probe_function_name`  | Synthetic probe Lambda name (same in both regions), or `null` when disabled.                        |
-| `availability_slo_dashboard_name` | NFR-03 availability SLO dashboard name, or `null` when synthetics are disabled.                     |
+| Name                                | Description                                                                                         |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `dashboard_name`                    | Operations dashboard name.                                                                          |
+| `alarm_arns`                        | Every CloudWatch alarm ARN this module creates, both regions.                                       |
+| `realtime_probe_function_name`      | Probe Lambda name, or `null` when the probe is disabled.                                            |
+| `deploys_log_group_name`            | CloudWatch Logs group the staging deploy pipeline annotates.                                        |
+| `metrics_discovery_service_arns`    | Map of `{api, realtime, workers}` -> Cloud Map registry ARN — see `infra/deploy/scripts/render.sh`. |
+| `grafana_access_hint`               | Reminder of the SSH port-forward command to reach Grafana.                                          |
+| `alert_topic_arn`                   | SNS topic in-region alarms publish to, bridged into Alertmanager. `null` in dev.                    |
+| `alert_bridge_function_name`        | The bridge Lambda; its log group is where an undelivered alarm notification is diagnosed.           |
+| `synthetics_probe_function_name`    | Synthetic probe Lambda name (same in both regions), or `null` when disabled.                        |
+| `availability_slo_dashboard_name`   | NFR-03 availability SLO dashboard name, or `null` when synthetics are disabled.                     |
+| `status_page_url`                   | Public HTTPS URL of the status page, or `null` when disabled.                                       |
+| `status_page_sync_function_name`    | Status-page sync Lambda name, or `null` when disabled.                                              |
+| `status_page_incident_function_url` | Function URL for posting a manual incident update, or `null` where SES isn't provisioned.           |
+| `status_page_site_bucket_name`      | Bucket serving the page's public content, or `null` when disabled.                                  |
+| `status_page_data_bucket_name`      | Bucket holding `subscribers.json` (private), or `null` when disabled.                               |
 
 ## What this module does not do
 
@@ -419,3 +524,18 @@ per-user or per-school label would.
   `ApiAvailabilitySlowBurn` (Prometheus, `slo.yml`). Building the CloudWatch equivalent (metric math
   over a rolling 30-day window, evaluated at multiple burn rates) is future work if NFR-03 turns out
   to need it once a real target exists.
+- **The status page has no custom domain.** It's served at CloudFront's own `*.cloudfront.net`
+  domain — a vanity domain needs a DNS-validated ACM certificate in us-east-1 (the same constraint
+  `module.cdn` already works around with its `aws.us_east_1` alias) and a Route 53 record, neither
+  wired up here. The page is genuinely public HTTPS either way; see "Public status page"'s own
+  known-gaps list (`status_page.tf`'s header) for the rest.
+- **It does not rate-limit the two public Function URLs** (subscribe, subscription). This repo has
+  no WAF wired to a Lambda Function URL today. Double opt-in bounds subscribe abuse to "someone gets
+  one unwanted confirmation email", not an actual subscription.
+- **Subscriber emails and manual incident posting depend on `ses_domain_identity_arn`.** Where an
+  environment has no verified SES sending domain (`dns_create_email_records = false`), the page and
+  automatic component sync still deploy and work; `status-page-incident`/`-subscribe`/
+  `-subscription` simply aren't created. Prod has this today; other environments need
+  `dns_create_email_records`/`dns_ses_domain` set in their own `.tfvars` first.
+- **`incidents.json` is capped at the most recent 25 incidents**, not a full archive — proportionate
+  to what a status page needs to show. This repo does not mirror incident history anywhere else.

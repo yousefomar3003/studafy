@@ -108,6 +108,9 @@ const DEFAULT_PUBLIC_PATHS = [
   // itself behind a forced-update screen — necessarily before it has a session to bear a token.
   // Exact path, not a prefix: nothing else lives under /api/mobile.
   "/api/mobile/config",
+  // AI subsystem health (ST-264): a black-box synthetic probe has no session to bear a token, the
+  // same reasoning as every other entry here. See health.ts's aiHealthRoute.
+  "/api/ai/health",
 ];
 
 function isInvitationSubPath(path: string, action: "verify" | "activate"): boolean {

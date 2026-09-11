@@ -99,6 +99,7 @@ const EXPECTED_PATHS = [
   "/api/admin/users/{userId}/providers/{provider}",
   "/api/admin/subscriptions/sync-prices",
   "/api/ai/admin/metrics",
+  "/api/ai/health",
   "/api/ai/students/{studentId}/ask",
   "/api/ai/students/{studentId}/concepts",
   "/api/ai/students/{studentId}/decks",
