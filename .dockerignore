@@ -32,8 +32,13 @@ apps/mobile/test
 apps/mobile/.dart_tool
 apps/mobile/.metadata
 
-# Docs, IaC, and CI config: irrelevant to any application image
-docs
+# Docs, IaC, and CI config: irrelevant to any application image. `docs/help` is the exception —
+# the web app's Vite build imports the markdown article sources in it through the `@docs` alias
+# (see apps/web/vite.config.ts), so those files must be present in the build context.
+# Note: `docs/*` (not `docs`) so the walker still descends into the directory and can re-include
+# `docs/help` — Docker skips excluded directories entirely, making re-inclusion beneath them a no-op.
+docs/*
+!docs/help
 infra/terraform
 .github
 
