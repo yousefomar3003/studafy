@@ -15,6 +15,9 @@ it, a follow-up ticket reconciles the two.
 Four parts of the ticket describe a system that does not exist here. Each is called out at the point
 where this implementation diverges, with the reason.
 
+The event source (`app.outbox_events`) and its relay semantics are recorded in
+[ADR-0012](../adr/0012-transactional-outbox.md).
+
 ## The path
 
 ```

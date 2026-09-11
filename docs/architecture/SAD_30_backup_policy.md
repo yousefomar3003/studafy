@@ -29,6 +29,9 @@ These are the numbers this implementation actually produces, not independently v
 requirements — no incident-response or compliance review of "how much data loss is acceptable" has
 happened in this repo. Revisit once one does.
 
+The single-database-per-deployment assumption this policy is written against is recorded in
+[ADR-0008](../adr/0008-tenancy-model.md).
+
 ## Acceptance criteria → mechanism
 
 | Acceptance criterion                                           | How it's met                                                                                                                                                   |
