@@ -367,6 +367,11 @@ module "monitoring" {
   web_origin           = var.web_origin
   api_origin           = "https://${var.edge_domain_name}"
   synthetics_dr_region = var.backup_dr_region
+
+  # Public status page sync (ST-264): staging/prod only, same reasoning as synthetics_enabled
+  # above — it has nothing to read without both that and monitoring_enabled also being true, and
+  # both already are wherever this is (see modules/monitoring/variables.tf's status_page_enabled).
+  status_page_enabled = var.environment != "dev"
 }
 
 # Vector + Loki log-aggregation pipeline (ST-261). staging/prod only — see local.logging_enabled.

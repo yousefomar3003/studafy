@@ -43,6 +43,13 @@ output "availability_slo_dashboard_name" {
   value       = var.synthetics_enabled ? aws_cloudwatch_dashboard.availability_slo[0].dashboard_name : null
 }
 
+# --- Public status page sync (ST-264) -------------------------------------------------------------
+
+output "status_page_sync_function_name" {
+  description = "Name of the status-page sync Lambda (ST-264), or null when disabled. Its log group is where a failed component-status push (bad API key, missing component id, provider outage) is diagnosed."
+  value       = var.status_page_enabled ? aws_lambda_function.status_page_sync[0].function_name : null
+}
+
 # --- Prometheus/Grafana metrics stack (ST-259) ---------------------------------------------------
 
 output "metrics_discovery_service_arns" {

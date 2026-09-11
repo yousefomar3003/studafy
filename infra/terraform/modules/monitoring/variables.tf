@@ -339,3 +339,11 @@ variable "synthetics_availability_slo_percent" {
     error_message = "synthetics_availability_slo_percent must be a percent in (0, 100]."
   }
 }
+
+# --- Public status page sync (ST-264) -------------------------------------------------------------
+
+variable "status_page_enabled" {
+  description = "Whether to provision the status-page sync Lambda (ST-264), which polls synthetic/probe alarm state and pushes each public component's status to the status-page provider (status_page.tf). Should be true whenever monitoring_enabled and synthetics_enabled both are — it has no monitoring_secret_arn to read credentials from, and no alarms to poll, otherwise. Enabled for staging/prod, same reasoning as synthetics_enabled: dev has no publicly reachable web_origin/api_origin for a public status page to describe."
+  type        = bool
+  default     = false
+}
