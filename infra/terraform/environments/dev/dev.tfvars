@@ -29,3 +29,11 @@ edge_domain_name = "dev-api.studafy.com"
 # because cdn_domain_name is a required root variable regardless of which modules consume it; not
 # a real host, and applying dev never touches it.
 cdn_domain_name = "dev.studafy.com"
+
+# This account's own AWS Free Tier restriction currently rejects any RDS instance requesting a
+# backup_retention_period above what free tier allows (`FreeTierRestrictionError`, hit on this
+# account's first real apply, 2026-09-11) — 0 (backups off) is what that restriction allows today.
+# Not a statement that dev shouldn't have backups on principle; revert to the module default (7,
+# don't set this at all) once the account's restriction lifts. staging/prod.tfvars intentionally
+# do not carry this override.
+postgres_backup_retention_days = 0

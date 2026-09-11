@@ -9,13 +9,13 @@ output "address" {
 }
 
 output "read_replica_instance_id" {
-  description = "RDS read-replica identifier used for reporting health and lag alarms."
-  value       = aws_db_instance.read_replica.identifier
+  description = "RDS read-replica identifier used for reporting health and lag alarms, or null when backup_retention_days is 0 and no replica exists (see main.tf's read_replica count) — a caller building a replica-lag alarm should skip it entirely when this is null rather than alarm on the primary under a misleading name."
+  value       = try(aws_db_instance.read_replica[0].identifier, null)
 }
 
 output "read_replica_address" {
-  description = "Read-replica endpoint (host only). Route reporting traffic through PgBouncer's read pools."
-  value       = aws_db_instance.read_replica.address
+  description = "Read-replica endpoint (host only) when one exists; falls back to the primary's own address when backup_retention_days is 0 (see main.tf's read_replica count) so module.pgbouncer's read pools always get a real, live endpoint to route to — reads just aren't offloaded from the primary in that case, the same outcome as deliberately choosing zero replicas."
+  value       = try(aws_db_instance.read_replica[0].address, aws_db_instance.this.address)
 }
 
 output "port" {

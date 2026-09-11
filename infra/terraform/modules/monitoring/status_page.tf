@@ -149,9 +149,9 @@ resource "aws_s3_bucket" "status_page" {
 }
 
 resource "aws_s3_bucket_ownership_controls" "status_page" {
-  for_each = aws_s3_bucket.status_page
+  for_each = local.status_page_buckets
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.status_page[each.key].id
 
   rule {
     object_ownership = "BucketOwnerEnforced"
@@ -159,9 +159,9 @@ resource "aws_s3_bucket_ownership_controls" "status_page" {
 }
 
 resource "aws_s3_bucket_public_access_block" "status_page" {
-  for_each = aws_s3_bucket.status_page
+  for_each = local.status_page_buckets
 
-  bucket                  = each.value.id
+  bucket                  = aws_s3_bucket.status_page[each.key].id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -169,9 +169,9 @@ resource "aws_s3_bucket_public_access_block" "status_page" {
 }
 
 resource "aws_s3_bucket_versioning" "status_page" {
-  for_each = aws_s3_bucket.status_page
+  for_each = local.status_page_buckets
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.status_page[each.key].id
 
   versioning_configuration {
     status = "Enabled"
@@ -182,9 +182,9 @@ resource "aws_s3_bucket_versioning" "status_page" {
 # and modules/cdn's web_bundle bucket already make, for the same reason.
 #trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "status_page" {
-  for_each = aws_s3_bucket.status_page
+  for_each = local.status_page_buckets
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.status_page[each.key].id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -225,9 +225,9 @@ resource "aws_s3_bucket_policy" "status_page_data" {
 # version, containing that email, recoverable from version history until this expires it. The site
 # bucket has no such PII concern but gets the identical lifecycle for one less thing to keep in sync.
 resource "aws_s3_bucket_lifecycle_configuration" "status_page" {
-  for_each = aws_s3_bucket.status_page
+  for_each = local.status_page_buckets
 
-  bucket     = each.value.id
+  bucket     = aws_s3_bucket.status_page[each.key].id
   depends_on = [aws_s3_bucket_versioning.status_page]
 
   rule {

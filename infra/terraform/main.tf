@@ -50,13 +50,14 @@ module "redis" {
 module "postgres" {
   source = "./modules/postgres"
 
-  name_prefix          = module.naming.name_prefix
-  db_subnet_group_name = module.network.db_subnet_group_name
-  security_group_ids   = [module.network.db_security_group_id]
-  port                 = var.db_port
-  instance_class       = var.postgres_instance_class
-  deletion_protection  = var.postgres_deletion_protection
-  skip_final_snapshot  = var.postgres_skip_final_snapshot
+  name_prefix           = module.naming.name_prefix
+  db_subnet_group_name  = module.network.db_subnet_group_name
+  security_group_ids    = [module.network.db_security_group_id]
+  port                  = var.db_port
+  instance_class        = var.postgres_instance_class
+  deletion_protection   = var.postgres_deletion_protection
+  skip_final_snapshot   = var.postgres_skip_final_snapshot
+  backup_retention_days = var.postgres_backup_retention_days
 }
 
 module "pgbouncer" {
@@ -283,6 +284,7 @@ module "compute" {
   app_files_bucket_arn = module.storage.app_files_bucket_arn
 
   secrets_service_iam_policy_arns = module.secrets.service_iam_policy_arns
+  secrets_service_names           = module.secrets.service_names
 }
 
 module "monitoring" {

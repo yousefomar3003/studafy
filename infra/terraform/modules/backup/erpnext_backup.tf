@@ -53,6 +53,13 @@ resource "aws_iam_role" "erpnext_backup_task" {
 }
 
 data "aws_iam_policy_document" "erpnext_backup_task" {
+  # This file's header says every resource here is count-gated on erpnext_plane_enabled — this data
+  # source was the one exception, missed because a `data` block still evaluates eagerly even though
+  # it isn't a `resource`. Ungated, its ReadMariadbRootCredentialForDrill statement below references
+  # var.erpnext_mariadb_connection_secret_arn, which is null whenever the ERPNext plane isn't
+  # instantiated (dev) — found on dev's first real apply: "Null value found in list."
+  count = var.erpnext_plane_enabled ? 1 : 0
+
   statement {
     sid       = "ListBackupsPrefix"
     effect    = "Allow"
@@ -96,7 +103,7 @@ resource "aws_iam_role_policy" "erpnext_backup_task" {
 
   name   = "erpnext-backup"
   role   = aws_iam_role.erpnext_backup_task[0].id
-  policy = data.aws_iam_policy_document.erpnext_backup_task.json
+  policy = data.aws_iam_policy_document.erpnext_backup_task[0].json
 }
 
 # --- Nightly site + database backup --------------------------------------------------------------

@@ -81,6 +81,12 @@ variable "postgres_skip_final_snapshot" {
   default     = true
 }
 
+variable "postgres_backup_retention_days" {
+  description = "Days of automated Postgres backups to retain — see modules/postgres/variables.tf's own default (7) and 0-35 validation. Previously not exposed at root at all (every environment silently got the module default); added because some AWS accounts reject any RDS instance whose backup_retention_period exceeds what that account's current Free Tier restriction allows (`FreeTierRestrictionError`, seen on this account's first real apply) — override to 0 in an affected environment's own tfvars until the account's restriction lifts, rather than changing the module's real default for every environment."
+  type        = number
+  default     = 7
+}
+
 variable "postgres_rotation_days" {
   description = "Days between automatic rotations of module.postgres's master credential via module.secrets. 30 is AWS's own commonly documented starting point for RDS rotation, not an unresearched placeholder like postgres_instance_class above."
   type        = number

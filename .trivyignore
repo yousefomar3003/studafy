@@ -28,6 +28,18 @@ AWS-0104
 AWS-0132
 # VPC finding (modules/network).
 AWS-0164
+# ECR repository policy (modules/registry) -- data.aws_iam_policy_document.repository_policy has
+# exactly two statements, both effect = "Deny" with a StringNotEquals condition restricting them to
+# named principals (ci_push/deploy_pull/additional_pull_role_arns); there is no Allow statement
+# anywhere in the policy. AWS-0032 flags the wildcard principals["*"] on those Deny statements as
+# "provides public access" without accounting for the Deny effect -- the wildcard-plus-Deny pair is
+# the correct IAM shape for "deny everyone except these roles", not a grant. This finding was
+# previously invisible to trivy for an unrelated reason: aws_ecr_repository_policy.this's for_each
+# referenced the whole aws_ecr_repository.this resource instead of local.repositories, which kept
+# trivy's static resolver from fully evaluating this resource at all (ST-274, fixed alongside the
+# same anti-pattern in five other modules) -- so this is a newly-visible pre-existing false
+# positive, not a newly-introduced one.
+AWS-0032
 
 # --- Container images ----------------------------------------------------------------------------
 # No image CVEs are waived here. The app-owned images are scanned strictly (exit-code 1). The
