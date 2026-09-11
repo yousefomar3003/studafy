@@ -1,0 +1,184 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #5f6368;
+  --border: #e0e0e0;
+  --operational: #1e8e3e;
+  --outage: #d93025;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121212;
+    --fg: #f1f1f1;
+    --muted: #a0a0a0;
+    --border: #333333;
+    --operational: #4caf6e;
+    --outage: #f28b82;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  line-height: 1.5;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+}
+
+.overall {
+  margin: 0 0 2rem;
+  font-weight: 600;
+}
+
+.overall.operational {
+  color: var(--operational);
+}
+
+.overall.major_outage {
+  color: var(--outage);
+}
+
+h2 {
+  font-size: 1.125rem;
+  margin: 2rem 0 0.75rem;
+}
+
+.components {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.components li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.components li:last-child {
+  border-bottom: none;
+}
+
+.badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+}
+
+.badge.operational {
+  color: var(--operational);
+  background: color-mix(in srgb, var(--operational) 15%, transparent);
+}
+
+.badge.major_outage {
+  color: var(--outage);
+  background: color-mix(in srgb, var(--outage) 15%, transparent);
+}
+
+.incidents {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.incidents li {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.incidents .incident-title {
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.incidents .incident-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 0.5rem;
+}
+
+.incidents .update {
+  font-size: 0.9rem;
+  margin: 0.25rem 0;
+}
+
+.incidents .update .update-status {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+#subscribe-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+#subscribe-form input {
+  flex: 1;
+  min-width: 12rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+#subscribe-form button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--fg);
+  color: var(--bg);
+  cursor: pointer;
+}
+
+#subscribe-message {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+footer {
+  margin-top: 3rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+footer a {
+  color: inherit;
+}

@@ -398,7 +398,7 @@ export function createApp({
     app.use("/api/attendance/records/batch", idempotencyMiddleware({ redis }));
   }
 
-  app.route("/", healthRoutes(isReady));
+  app.route("/", healthRoutes(isReady, aiLlmProvider !== null && aiLlmProvider !== undefined));
 
   // Mobile release floor (ST-257). Public and un-scoped like the health probes — the native app
   // calls it on launch/resume, before any session exists — and mounted unconditionally so the

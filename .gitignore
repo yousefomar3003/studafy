@@ -32,6 +32,9 @@ infra/terraform/modules/monitoring/lambda/realtime-probe/index.zip
 infra/terraform/modules/monitoring/lambda/cloudwatch-alert-bridge/index.zip
 infra/terraform/modules/monitoring/lambda/synthetics-probe/index.zip
 infra/terraform/modules/monitoring/lambda/status-page-sync/index.zip
+infra/terraform/modules/monitoring/lambda/status-page-incident/index.zip
+infra/terraform/modules/monitoring/lambda/status-page-subscribe/index.zip
+infra/terraform/modules/monitoring/lambda/status-page-subscription/index.zip
 
 # Environment
 .env

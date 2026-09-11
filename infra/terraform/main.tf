@@ -368,10 +368,16 @@ module "monitoring" {
   api_origin           = "https://${var.edge_domain_name}"
   synthetics_dr_region = var.backup_dr_region
 
-  # Public status page sync (ST-264): staging/prod only, same reasoning as synthetics_enabled
-  # above — it has nothing to read without both that and monitoring_enabled also being true, and
-  # both already are wherever this is (see modules/monitoring/variables.tf's status_page_enabled).
-  status_page_enabled = var.environment != "dev"
+  # Public status page (ST-264): staging/prod only, same reasoning as synthetics_enabled above —
+  # it has no alarms to poll without that also being true, and both already are wherever this is.
+  # ses_domain_identity_arn/status_page_from_address are null wherever module.dns has no verified
+  # sending domain (dev, and staging until dns_create_email_records is turned on there too) — the
+  # page and automatic component sync still work without them; only the incident/subscribe/
+  # subscription Lambdas additionally need SES, and simply aren't created otherwise (status_page.tf's
+  # local.status_page_email_enabled).
+  status_page_enabled      = var.environment != "dev"
+  ses_domain_identity_arn  = module.dns.ses_domain_identity_arn
+  status_page_from_address = var.dns_create_email_records ? "status@${var.dns_ses_domain}" : null
 }
 
 # Vector + Loki log-aggregation pipeline (ST-261). staging/prod only — see local.logging_enabled.

@@ -6,14 +6,16 @@ import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwat
  * (../../synthetics.tf deploys this same code once under the default provider and once under
  * aws.dr — see that file's header for why two regions and why these two) via EventBridge Scheduler.
  *
- * Five unauthenticated, side-effect-free HTTP checks against the five entry points named in the
- * ticket:
+ * Six unauthenticated, side-effect-free HTTP checks — the five entry points named in this
+ * ticket, plus `ai-health` (ST-264, added when the public status page needed a real automatic
+ * signal for its `ai` component rather than leaving it the one component nothing ever checks):
  *
  *   login-page         GET  {WEB_ORIGIN}/auth/login
  *   healthz             GET  {API_ORIGIN}/healthz
  *   oauth-start         GET  {API_ORIGIN}/api/auth/oauth/google/start
  *   checkout-page       GET  {WEB_ORIGIN}/pricing
  *   invitation-verify   GET  {API_ORIGIN}/api/auth/invitations/{SYNTHETIC_INVITATION_TOKEN}/verify
+ *   ai-health           GET  {API_ORIGIN}/api/ai/health
  *
  * "checkout-page" -> /pricing: apps/web has no route literally named "checkout" — every checkout
  * endpoint (POST /api/subscriptions/checkout et al., school-checkout-routes.ts, ai-checkout-routes.ts)
@@ -22,8 +24,16 @@ import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwat
  * actually starts from, so it is the honest stand-in: it proves the funnel's entry point is up,
  * not that a purchase can complete.
  *
+ * "ai-health" -> /api/ai/health, not a real completion request: calling Anthropic once a minute
+ * from every environment would be a meaningful, pointless cost, and would answer "is the provider
+ * up" rather than "is this deployment's AI feature even switched on". The route
+ * (apps/api/src/health.ts) reports AI_LLM_ENABLED's value but this check only requires 200 +
+ * `{status:"ok"}` — a deployment with AI disabled is a config choice, not an outage, so `enabled`
+ * being false does not fail the check. Real Anthropic provider outages are detected the way
+ * docs/runbooks/ai-provider-outage.md already describes, not by this probe.
+ *
  * Each check publishes one CloudWatch metric point regardless of outcome (unlike the realtime
- * probe next door, which emits nothing on failure): five independent checks per run need to tell
+ * probe next door, which emits nothing on failure): six independent checks per run need to tell
  * "healthz is up but checkout-page is down" apart from "the whole run failed", which a
  * publish-on-success-only metric cannot do. `SyntheticCheckSuccess` is 1/0 per check;
  * alerts.tf's alarms alarm on its rolling average falling below 1, with `treat_missing_data =
@@ -93,6 +103,20 @@ const CHECKS = [
   {
     name: "checkout-page",
     run: async () => (await fetchWithTimeout(`${WEB_ORIGIN}/pricing`)).status === 200,
+  },
+  {
+    name: "ai-health",
+    run: async () => {
+      // Deliberately does not exercise AI_LLM_ENABLED's actual value: a deployment with it off is
+      // not an outage, just a disabled feature, and treating "enabled: false" as a failure would
+      // alarm on a config choice rather than a broken service — the same "not configured is not a
+      // failure" reasoning oauth-start above already applies. This only proves the route (and
+      // therefore the process) is up, the same contract healthz already has.
+      const res = await fetchWithTimeout(`${API_ORIGIN}/api/ai/health`);
+      if (res.status !== 200) return false;
+      const body = await res.json().catch(() => null);
+      return body?.status === "ok";
+    },
   },
   {
     name: "invitation-verify",

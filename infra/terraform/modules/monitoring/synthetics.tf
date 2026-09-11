@@ -48,6 +48,11 @@ locals {
     "oauth-start",
     "checkout-page",
     "invitation-verify",
+    # ai-health (ST-264): added so the public status page's `ai` component has the same shape of
+    # automatic signal as every other component, rather than being the one nothing ever checks —
+    # see lambda/synthetics-probe/index.mjs's header for why this is a cheap route check, not a
+    # real Anthropic call.
+    "ai-health",
   ]
 
   synthetics_probe_env = {

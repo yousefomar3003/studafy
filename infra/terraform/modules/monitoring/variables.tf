@@ -340,10 +340,30 @@ variable "synthetics_availability_slo_percent" {
   }
 }
 
-# --- Public status page sync (ST-264) -------------------------------------------------------------
+# --- Public status page (ST-264) --------------------------------------------------------------
 
 variable "status_page_enabled" {
-  description = "Whether to provision the status-page sync Lambda (ST-264), which polls synthetic/probe alarm state and pushes each public component's status to the status-page provider (status_page.tf). Should be true whenever monitoring_enabled and synthetics_enabled both are — it has no monitoring_secret_arn to read credentials from, and no alarms to poll, otherwise. Enabled for staging/prod, same reasoning as synthetics_enabled: dev has no publicly reachable web_origin/api_origin for a public status page to describe."
+  description = "Whether to provision the self-hosted public status page (status_page.tf): the S3+CloudFront site and the status-page-sync Lambda that writes its components.json. Should be true whenever monitoring_enabled and synthetics_enabled both are — it has no alarms to poll otherwise. Enabled for staging/prod, same reasoning as synthetics_enabled: dev has no publicly reachable web_origin/api_origin for a public status page to describe. Independent of ses_domain_identity_arn: the page and automatic component sync work without it, only the incident/subscribe/subscription Lambdas (manual updates, subscriber emails) additionally require it — see status_page.tf's header."
   type        = bool
   default     = false
+}
+
+variable "status_page_force_destroy_bucket" {
+  description = "Whether the two status-page S3 buckets (site content, subscriber data) can be destroyed while non-empty. false in every real environment; true only for a throwaway/test stack. Same convention as modules/cdn's force_destroy_bucket."
+  type        = bool
+  default     = false
+}
+
+variable "ses_domain_identity_arn" {
+  description = "ARN of module.dns's verified SES domain identity (its ses_domain_identity_arn output), or null where that environment has no verified sending domain (dns_create_email_records = false — staging/dev today). Gates the status-page-incident/-subscribe/-subscription Lambdas: local.status_page_email_enabled is status_page_enabled && this != null. Grants ses:SendEmail scoped to this exact identity, never a broader SES grant."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "status_page_from_address" {
+  description = "The From: address status-page-incident and status-page-subscribe send as, e.g. \"status@send.studafy.com\" — must be a mailbox at (or subdomain of) ses_domain_identity_arn's verified identity, the same constraint apps/workers' own SES sender already has (docs/runbooks/deliverability.md). Only read when ses_domain_identity_arn is set; null otherwise."
+  type        = string
+  default     = null
+  nullable    = true
 }
