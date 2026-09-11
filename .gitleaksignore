@@ -1,0 +1,7 @@
+# ST-270: gitleaks flagged the sample `Idempotency-Key: 6c1f7a3e-…` UUID in the ST-269 docs
+# commit (90535696) as a high-entropy `generic-api-key`. It is a synthetic example header value in
+# apps/docs-api/src/content/idempotency.ts, not a credential — the guide now uses an explicit
+# `<your unique UUID>` placeholder. The pre-placeholder version of that line only exists in the
+# already-reviewed, immutable commit 90535696, so the commit cannot be rewritten; this ignores exactly
+# that one finding by fingerprint instead of allowlisting the whole commit.
+90535696cedbe48881ec94ef740521bc6fe1c740:apps/docs-api/src/content/idempotency.ts:generic-api-key:47

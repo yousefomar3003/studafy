@@ -67,7 +67,7 @@ jobs:
             max_mb: 3072
             trivy_exit_code: "0"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # erpnext's image (~2.7 GB) exhausts ubuntu-latest's default free disk when trivy exports
       # it for analysis.  Pre-installed toolchains (Android SDK, .NET, GHC, Boost) are irrelevant
       # to a Docker build and together account for ~25 GB — removing them gives trivy enough room.

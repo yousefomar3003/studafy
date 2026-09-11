@@ -15,6 +15,18 @@
       "outputs": ["src/generated-types.ts"],
       "env": ["LOCALAPPDATA"]
     },
+    // The reference site's build validates every guide's examples against apps/api/openapi.json
+    // (ST-269) and its own build.test.ts does the same in "test" — both need the document generated
+    // first, the same edge @studafy/api-client#generate declares for the same file.
+    "@studafy/docs-api#build": {
+      "dependsOn": ["@studafy/api#generate", "^build"],
+      "outputs": ["dist/**"],
+      "env": ["DOCS_API_RELEASE_TAG"]
+    },
+    "@studafy/docs-api#test": {
+      "dependsOn": ["@studafy/api#generate", "^build"],
+      "outputs": []
+    },
     "build": {
       "dependsOn": ["^build", "generate"],
       "outputs": ["dist/**", "build/**"],
