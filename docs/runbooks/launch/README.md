@@ -1,9 +1,9 @@
 # Launch runbooks
 
 Step-level runbooks for taking Studafy from "self-service registration works" to "a small
-number of real schools depend on it daily". The pilot is the proving ground; everything here is
-written to be disposable after it — the process, the queries, and the report are means to a
-go/no-go decision, not permanent product state.
+number of real schools depend on it daily" to "generally available". The pilot is the proving
+ground; everything here is written to be disposable after it — the process, the queries, and the
+report are means to a go/no-go decision, not permanent product state.
 
 Source of the mechanisms every runbook here operates:
 [`docs/runbooks/tenant-provisioning-checklist.md`](../tenant-provisioning-checklist.md) (ST-089)
@@ -34,30 +34,34 @@ Consequences, stated so nobody mistakes preparation for execution:
 
 ## Dependency gates
 
-| Dependency                                                                    | Status   | Evidence                                                                                                         |
-| ----------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
-| DR runbooks authored and first drill executed (this task's stated dependency) | **Met**  | `docs/runbooks/dr/` — six scenarios + `st-266-game-day-drill-report.md`                                          |
-| Pre-launch security pass clean                                                | **Met**  | `docs/runbooks/security/st-249-security-pass.md` — zero critical/high open; cross-tenant suite green (462 tests) |
-| Cross-tenant isolation regression gate in CI                                  | Met      | `tests/security/route-guard-wiring.test.ts` runs on every PR via `cross-tenant-security` job                     |
-| **Prod environment applied to real AWS and verified**                         | **Open** | No live account in this repo's history; run `environment-matrix.md`'s _apply-to-verified_ runbook first          |
+| Dependency                                                                      | Status   | Evidence                                                                                                         |
+| ------------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| DR runbooks authored and first drill executed (this task's stated dependency)   | **Met**  | `docs/runbooks/dr/` — six scenarios + `st-266-game-day-drill-report.md`                                          |
+| Pre-launch security pass clean                                                  | **Met**  | `docs/runbooks/security/st-249-security-pass.md` — zero critical/high open; cross-tenant suite green (462 tests) |
+| Cross-tenant isolation regression gate in CI                                    | Met      | `tests/security/route-guard-wiring.test.ts` runs on every PR via `cross-tenant-security` job                     |
+| **Prod environment applied to real AWS and verified**                           | **Open** | No live account in this repo's history; run `environment-matrix.md`'s _apply-to-verified_ runbook first          |
+| Pilot school onboarding executed with a **Go** verdict (GA's stated dependency) | **Open** | `pilot-completion-report.md` has no cohort filled in — the pilot has not run                                     |
 
 A pilot school is not "live" until the prod gate is closed. Until then, treat everything in
 [`pilot-school-onboarding.md`](pilot-school-onboarding.md) as rehearsal-ready, hold the
-completion report, and keep the cohort list internal.
+completion report, and keep the cohort list internal. The same applies one level up:
+[`ga-launch-checklist.md`](ga-launch-checklist.md) does not start until the pilot itself reaches a
+Go verdict.
 
 ## Canonical naming
 
-- **Runbook filenames** are a kebab-case noun phrase naming _what is being done_ (`pilot-school-onboarding.md`, `pilot-completion-report.md`). The manual is one noun; the report is one noun — two files, two jobs, no overlap.
+- **Runbook filenames** are a kebab-case noun phrase naming _what is being done_ (`pilot-school-onboarding.md`, `pilot-completion-report.md`, `ga-launch-checklist.md`). The manual is one noun; the report is one noun; the checklist is one noun — one file per job, no overlap.
 - **Environment tokens**: `dev | staging | prod`, exactly as `infra/terraform/README.md` and `environment-matrix.md` define them. Never "production", "prd", or "live".
 - **School identity**: a pilot school is identified by its `app.schools.slug` (canonical) plus `app.schools.id`. Never invent shorthand for a real school.
 - **Metric names**: `staff_activation_rate`, `daily_attendance_usage`, `sev_incident_count` — fixed across the onboarding runbook, the report template, and any SQL, so a number means the same thing in all three places.
 
 ## The runbooks
 
-| #   | Runbook                                                  | Purpose                                                                                                       |
-| --- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| 1   | [pilot-school-onboarding.md](pilot-school-onboarding.md) | Select 2–3 schools, white-glove import them on prod, run the feedback loop for 4 weeks, measure the criteria  |
-| 2   | [pilot-completion-report.md](pilot-completion-report.md) | The deliverable: one doc per pilot cohort with measured metrics, feedback disposition, and a go/no-go verdict |
+| #   | Runbook                                                  | Purpose                                                                                                                                                           |
+| --- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | [pilot-school-onboarding.md](pilot-school-onboarding.md) | Select 2–3 schools, white-glove import them on prod, run the feedback loop for 4 weeks, measure the criteria                                                      |
+| 2   | [pilot-completion-report.md](pilot-completion-report.md) | The deliverable: one doc per pilot cohort with measured metrics, feedback disposition, and a go/no-go verdict                                                     |
+| 3   | [ga-launch-checklist.md](ga-launch-checklist.md)         | GA gate: eight evidenced checklist items (NFR, security/pentest, DR, on-call, status page, store apps, pricing, support), a go/no-go review, and launch execution |
 
 ## Ownership — roles, not people
 
