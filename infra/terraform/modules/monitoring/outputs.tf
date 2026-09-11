@@ -4,18 +4,21 @@ output "dashboard_name" {
 }
 
 output "alarm_arns" {
-  description = "All action-free alarm ARNs, ready for notification actions after ownership is agreed."
+  description = "Every CloudWatch alarm ARN this module creates, both regions. They notify through module.alert_topic into Alertmanager wherever monitoring_enabled is true, and notify nobody in dev — see alerts.tf's local.alarm_actions."
   value = concat(
-    [for alarm in aws_cloudwatch_metric_alarm.rds_cpu : alarm.arn],
-    [
-      aws_cloudwatch_metric_alarm.postgres_storage.arn,
-      aws_cloudwatch_metric_alarm.postgres_replica_lag.arn,
-      aws_cloudwatch_metric_alarm.redis_cpu.arn,
-    ],
-    [for alarm in aws_cloudwatch_metric_alarm.ecs_cpu : alarm.arn],
-    # The probe alarm is conditional (probe_enabled); a null element drops it from the list.
-    compact([for alarm in aws_cloudwatch_metric_alarm.realtime_probe_latency : alarm.arn]),
+    [for alarm in aws_cloudwatch_metric_alarm.this : alarm.arn],
+    [for alarm in aws_cloudwatch_metric_alarm.us_east_1 : alarm.arn],
   )
+}
+
+output "alert_topic_arn" {
+  description = "SNS topic every in-region CloudWatch alarm publishes to, bridged into Alertmanager. Null in dev. Exposed so a future alarm defined outside this module has one documented way to reach the same on-call rotation rather than inventing a second notification path."
+  value       = var.monitoring_enabled ? module.alert_topic[0].topic_arn : null
+}
+
+output "alert_bridge_function_name" {
+  description = "Name of the CloudWatch alarm -> Alertmanager bridge Lambda, or null when the monitoring plane is disabled. Its log group is where an undelivered alarm notification is diagnosed."
+  value       = var.monitoring_enabled ? aws_lambda_function.alert_bridge[0].function_name : null
 }
 
 output "realtime_probe_function_name" {

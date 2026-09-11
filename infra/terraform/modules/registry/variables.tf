@@ -35,13 +35,14 @@ variable "image_repository_names" {
     non-mobile deployable artifact, including the one-off SQL migrations image, the two
     monitoring-stack images (ST-259: infra/docker/prometheus.Dockerfile, grafana.Dockerfile), the
     two tracing images (ST-260: infra/docker/otel-collector.Dockerfile, tempo.Dockerfile) and the
-    two log-pipeline images (ST-261: infra/docker/loki.Dockerfile, vector.Dockerfile) — all of them
-    this repo's own config layered onto an upstream image, same "third-party base, our config on
-    top" shape as erpnext. apps/mobile is a native app and is intentionally excluded. A list is
-    used because the deployable set can grow.
+    two log-pipeline images (ST-261: infra/docker/loki.Dockerfile, vector.Dockerfile) and the
+    alerting image (ST-262: infra/docker/alertmanager.Dockerfile) — all of them this repo's own
+    config layered onto an upstream image, same "third-party base, our config on top" shape as
+    erpnext. apps/mobile is a native app and is intentionally excluded. A list is used because the
+    deployable set can grow.
   EOT
   type        = list(string)
-  default     = ["api", "realtime", "workers", "web", "erpnext", "migrations", "prometheus", "grafana", "otel-collector", "tempo", "loki", "vector"]
+  default     = ["api", "realtime", "workers", "web", "erpnext", "migrations", "prometheus", "grafana", "alertmanager", "otel-collector", "tempo", "loki", "vector"]
 
   validation {
     condition     = length(var.image_repository_names) > 0

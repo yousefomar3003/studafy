@@ -1,9 +1,10 @@
-import { startMetricsServer, startQueueDepthGauge, startTracing } from "@studafy/observability";
+import { startMetricsServer, startQueueGauges, startTracing } from "@studafy/observability";
 import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
+import { startBillingPipelineGauges } from "./metrics/billing-pipeline";
 import { scheduleAnnouncementPublishJob } from "./queues/announcements";
 import {
   scheduleDunningJob,
@@ -45,15 +46,30 @@ const tracing = startTracing({
 
 const connection = createRedisConnection(env);
 const workers = startWorkers(QUEUE_REGISTRY, connection);
-// Queue depth (ST-259), one gauge per queue x job-count state, observed lazily on every scrape.
-// A dedicated Redis connection: BullMQ's own connection option for a Queue handle must not be the
-// same object a Worker mutates the mode of (see createRedisConnection's own callers elsewhere in
-// this file for the same "one connection per BullMQ client" convention).
+// Queue depth (ST-259) and backlog age (ST-262), observed lazily on every scrape from one shared
+// set of read-only Queue handles. A dedicated Redis connection: BullMQ's own connection option for
+// a Queue handle must not be the same object a Worker mutates the mode of (see
+// createRedisConnection's own callers elsewhere in this file for the same "one connection per
+// BullMQ client" convention).
 const queueMetricsConnection = createRedisConnection(env);
-const queueDepthGauge = startQueueDepthGauge(
+const queueGauges = startQueueGauges(
   QUEUE_REGISTRY.map((definition) => definition.name),
   queueMetricsConnection as never,
 );
+
+// Payment pipeline liveness (ST-262): `app.billing_events`' unresolved tail, read on every scrape.
+// Its own small pool, like every other polling loop in this file — the scrape path must never wait
+// behind a job processor for a connection, and vice versa. `max: 1` because there is exactly one
+// in-flight query at a time (one scrape, one callback) and a second connection would only sit idle.
+const billingPipelineDb = postgres(databaseUrlFrom(env), {
+  max: 1,
+  idle_timeout: 20,
+  prepare: false,
+});
+const billingPipelineGauges = startBillingPipelineGauges({
+  db: billingPipelineDb,
+  logger: workerLogger,
+});
 
 // Outbox relay: separate polling loop alongside BullMQ workers. Uses its own postgres and Redis
 // connections because the BullMQ connection is tied to the queue DB and the relay needs pub/sub.
@@ -202,12 +218,14 @@ const shutdown = (signal: string) => {
     await relayDb.end({ timeout: 5 });
     await emailDb.end({ timeout: 5 });
     await entitlementDb.end({ timeout: 5 });
-    // startQueueDepthGauge() was given queueMetricsConnection as a live IORedis instance rather
+    // startQueueGauges() was given queueMetricsConnection as a live IORedis instance rather
     // than plain connection options, so BullMQ treats it as externally owned and never closes it
     // itself — queue.close() only stops the per-queue Queue wrapper. Closing it here is what
     // actually releases the socket.
-    await queueDepthGauge.close();
+    await queueGauges.close();
     queueMetricsConnection.disconnect();
+    billingPipelineGauges.close();
+    await billingPipelineDb.end({ timeout: 5 });
     await metricsServer.shutdown();
     await tracing?.shutdown();
     console.log("Shutdown complete.");

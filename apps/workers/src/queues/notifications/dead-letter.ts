@@ -37,6 +37,10 @@
  */
 
 import { DOMAIN_EVENTS, QUEUE_NAMES } from "@studafy/constants";
+// Aliased: this module already owns a `recordDeadLetter` — the durable INSERT below. The metric
+// and the row are two different records of the same event, and the alias keeps which is which
+// readable at every call site.
+import { recordDeadLetter as recordDeadLetterMetric } from "@studafy/observability";
 import postgres from "postgres";
 
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -234,6 +238,16 @@ export async function handleDeadLetter(params: {
     },
     "notification dispatch job exhausted its retries",
   );
+
+  // Counted here — beside the log line, before any database work — rather than beside the INSERT
+  // below, for the same reason the log line is unconditional: the moment this signal matters most
+  // is a Postgres outage dead-lettering the whole fleet, which is exactly when the INSERT cannot
+  // run. Two consequences, both deliberate: an *unattributable* job (no school_id, so no row to
+  // write) is still counted, and a manual replay from BullMQ's own failed set that re-enters this
+  // handler counts a second time where the unique index would have suppressed the row. Inflating a
+  // rate-based alert during a replay someone is already watching is the cheaper error than a
+  // silently uncounted dead letter. See ST-262's alert `NotificationDeadLetterArrived`.
+  recordDeadLetterMetric("notifications", queueName);
 
   if (schoolId === null || jobId === null) {
     log.warn(

@@ -10,11 +10,19 @@ import type { Meter } from "@opentelemetry/api";
 import type { Context, MiddlewareHandler } from "hono";
 
 const METER_NAME = "studafy.http";
-// OTel HTTP semantic-conventions metric name. One histogram gives Rate (its count), Errors (its
-// count filtered to http.response.status_code >= 500) and Duration (its buckets) — RED from a
-// single instrument, exactly the shape ST-259 asks for, rather than three separately-drifting
-// counters.
-const METRIC_NAME = "http.server.request.duration";
+/**
+ * OTel HTTP semantic-conventions metric name. One histogram gives Rate (its count), Errors (its
+ * count filtered to http.response.status_code >= 500) and Duration (its buckets) — RED from a
+ * single instrument, exactly the shape ST-259 asks for, rather than three separately-drifting
+ * counters.
+ *
+ * Exported so metricsServer.ts's bucket-boundary view can select this instrument by its real name
+ * rather than by a second string literal that a rename here would silently orphan (a view whose
+ * selector matches nothing does not fail — the instrument just keeps the SDK's default
+ * boundaries). See metricsServer.ts's HISTOGRAM_VIEWS.
+ */
+export const HTTP_SERVER_REQUEST_DURATION = "http.server.request.duration";
+const METRIC_NAME = HTTP_SERVER_REQUEST_DURATION;
 
 /**
  * The matched route *pattern* (e.g. `/students/:id`), never the raw request path. This is the

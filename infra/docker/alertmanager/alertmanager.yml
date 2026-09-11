@@ -1,0 +1,142 @@
+# Alertmanager routing for the Studafy monitoring plane (ST-262).
+#
+# Baked into infra/docker/alertmanager.Dockerfile. Entirely static — unlike Loki's config
+# (infra/docker/loki/loki-config.yml.tpl) there is no envsubst pass here, because the only
+# per-environment values are the three receiver URLs and those are *secrets*. They are read from
+# files that docker-entrypoint.sh writes from the ECS task's injected secrets, via `url_file`, so
+# no rendered config anywhere on disk or in a task definition ever contains one.
+#
+# ## What this file decides, and what it deliberately does not
+#
+# It maps **severity to urgency class**, and stops there:
+#
+#   critical -> the paging integration        warning -> the ticket integration
+#   info     -> dropped                       Watchdog -> the heartbeat integration
+#
+# It does **not** decide who is on call, what time of day a warning is allowed to wake someone, or
+# how long an unacknowledged page waits before escalating. Those belong to the on-call provider
+# behind these webhook URLs, which is where the rotation and the schedules already live — see
+# `docs/runbooks/on-call-rotation.md`.
+#
+# That division is not a simplification, it is forced by how Alertmanager works. Time intervals
+# here (`mute_time_intervals` / `active_time_intervals`) *mute a matched route*; they do not send
+# an alert somewhere else. Alertmanager's own reference is explicit that a muted route "acts
+# normally (including ending the route-matching process)". So "page a warning during working hours,
+# raise a ticket otherwise" cannot be expressed as two sibling routes — the out-of-hours alert
+# would be routed to the first one and silently muted, never reaching the second. Encoding working
+# hours here would therefore mean either shipping a rule that does not do what it reads as, or
+# duplicating the provider's schedule in a second place that drifts from it. Neither is worth it.
+#
+# ## Severity vocabulary
+#
+# `critical` / `warning` / `info`, the Prometheus ecosystem's own convention, and a closed set:
+# `scripts/check-alert-rules.ts` fails CI on any alert rule carrying a severity outside it, and the
+# routes below have no catch-all that would quietly swallow a fourth value. The full matrix — what
+# each tier promises, who answers it, and how fast — is in `docs/runbooks/alert-catalog.md`.
+
+global:
+  # How long after the last evaluation an alert is assumed resolved if Prometheus stops sending it.
+  # Comfortably above the 30s `evaluation_interval` in prometheus.yml, so a slow evaluation cycle
+  # never reads as "resolved".
+  resolve_timeout: 5m
+
+route:
+  # Group an alert storm into one notification per (alert, service) rather than one per series: a
+  # deploy that breaks three queues at once is one incident, and three pages for it is how an
+  # on-call engineer learns to stop reading them. Queue and route labels are deliberately *not* in
+  # the grouping key for the same reason — "the workers are behind on 3 queues" is one page.
+  group_by: ["alertname", "service"]
+  # Wait this long after the first alert in a new group before notifying, so alerts that fire
+  # together arrive together.
+  group_wait: 30s
+  # Wait this long before notifying about alerts *added* to a group that has already notified.
+  group_interval: 5m
+  repeat_interval: 12h
+
+  # The default receiver. Nothing should ever reach it: every alert in this repo carries one of the
+  # three severities the child routes match, and CI enforces that. It is the ticket integration
+  # rather than a drop, so that if something ever does slip through, it surfaces as a ticket
+  # somebody reads instead of disappearing.
+  receiver: ticket
+
+  routes:
+    # First, and terminal: the watchdog is not an alert about the system, it is the proof that this
+    # pipeline is alive. `repeat_interval: 5m` is the heartbeat cadence — the provider raises an
+    # incident when the pings *stop*, so this interval is the detection latency for "our alerting
+    # broke", and `group_wait: 0s` keeps a restarted Alertmanager from adding 30s to it.
+    - matchers:
+        - alertname = "Watchdog"
+      receiver: heartbeat
+      group_wait: 0s
+      group_interval: 5m
+      repeat_interval: 5m
+
+    - matchers:
+        - severity = "critical"
+      receiver: page
+      # Re-page hourly while unresolved. Short enough that a page lost to a phone in a tunnel is
+      # retried within the hour; long enough not to punish someone who is actively working it and
+      # has acknowledged it in the provider.
+      repeat_interval: 1h
+
+    - matchers:
+        - severity = "warning"
+      receiver: ticket
+      repeat_interval: 12h
+
+    # Terminal and silent, by design. `info` exists so an alert can be defined, evaluated and seen
+    # in Prometheus and in Grafana without ever reaching a person — the tier a noisy alert is
+    # demoted *to* while it is being tuned, rather than deleted and forgotten. A receiver with no
+    # integrations configured is Alertmanager's supported way to express "route here, notify
+    # nobody".
+    - matchers:
+        - severity = "info"
+      receiver: drop
+
+# --- Inhibition ----------------------------------------------------------------------------------
+#
+# Several signals are alerted on at two thresholds against the same metric — `QueueBacklogAgeHigh`
+# and `QueueBacklogStalled`, `BillingEventPipelineStalling` and `BillingEventPipelineHalted`. When
+# the worse one fires the milder one is firing too, and both would notify.
+#
+# `equal` compares the two labels that identify *the same subject*, not the alert name, precisely
+# because the tiers have different names. A label absent from both sides compares equal, which is
+# what lets one rule cover both the per-queue pairs (both carry `messaging_destination_name`) and
+# the service-wide pairs (neither does). It also means a critical alert can suppress a warning that
+# is merely *about the same service*, not the same condition — deliberate, and the reason the
+# suppressed warning still appears in Alertmanager's UI marked inhibited rather than vanishing.
+inhibit_rules:
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ["service", "messaging_destination_name"]
+
+# --- Receivers -----------------------------------------------------------------------------------
+#
+# Generic `webhook_configs`, not a vendor-specific integration block. Every mainstream on-call
+# provider (PagerDuty's Events API integration, Opsgenie, Grafana OnCall, incident.io) accepts
+# Alertmanager's own webhook payload at a per-service URL, so a generic webhook keeps the provider
+# a deployment detail — a rotated secret, not a config change and an image rebuild.
+#
+# `url_file`, not `url`: the file is written at container start by docker-entrypoint.sh from the
+# ECS task's injected secret, and Alertmanager re-reads it on every notification. A rotated URL
+# takes effect on the next task replacement without this file changing at all.
+#
+# `send_resolved` is left at the webhook default (true) — the provider needs the resolve to close
+# the incident it opened.
+receivers:
+  - name: page
+    webhook_configs:
+      - url_file: /tmp/alertmanager-secrets/page_url
+
+  - name: ticket
+    webhook_configs:
+      - url_file: /tmp/alertmanager-secrets/ticket_url
+
+  - name: heartbeat
+    webhook_configs:
+      - url_file: /tmp/alertmanager-secrets/heartbeat_url
+
+  # No integrations, on purpose. See the `info` route above.
+  - name: drop

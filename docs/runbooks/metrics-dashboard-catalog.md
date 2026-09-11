@@ -6,6 +6,12 @@ is provisioned into Grafana read-only at container start (`allowUiUpdates: false
 `infra/docker/grafana/provisioning/dashboards/dashboards.yml`): to change a panel, edit the JSON
 file and redeploy Grafana (bump `grafana_image_tag`, `terraform apply`), not the UI.
 
+> **If the "Studafy" folder is empty in a Grafana older than ST-262**, that is the
+> `COPY --chmod=644` bug fixed in `infra/docker/grafana.Dockerfile`: the flag applied 644 to the
+> dashboards _directory_ as well as its files, leaving it without an execute bit and every
+> dashboard unreadable. Provisioning logs the read failure and starts anyway, so there was no other
+> symptom. Redeploy with a `grafana_image_tag` built after that fix.
+
 ## Access
 
 Grafana has no public endpoint — `module.network`'s `monitoring` security group admits only the
@@ -116,10 +122,12 @@ or a database name — never a user id, school id, job id, or raw request path. 
 - Dashboard JSON is hand-written, not generated from a typed library (e.g. grafonnet/grafana-
   foundation-sdk) — acceptable at four dashboards and a dozen panels; revisit if the catalog grows
   much larger and hand-edited JSON starts drifting or duplicating boilerplate.
-- No alerting rules are defined in Grafana or Prometheus itself for these metrics — the existing
-  CloudWatch alarms (`modules/monitoring/main.tf`) are the only paging surface today, and they're
-  action-free pending notification-ownership decisions (that module's own README). Extending
-  alerting to Prometheus's own Alertmanager, or Grafana-managed alert rules, is future work.
+- Grafana-managed alert rules are still not used, and deliberately: alerting is owned by Prometheus
+  rules plus Alertmanager (ST-262 — `infra/docker/prometheus/rules/*.yml`,
+  `docs/runbooks/alert-catalog.md`), so Grafana here is for looking at things, not for paging. Two
+  alerting surfaces over the same metrics would be two places to silence an alert at 3am. The
+  CloudWatch alarms are no longer action-free either — they reach the same Alertmanager through the
+  bridge in `modules/monitoring/alerts.tf`.
 - No long-term (>`prometheus_retention`) metrics history — see
   `infra/terraform/modules/monitoring/README.md`'s "What this module does not do" for the ephemeral-
   storage tradeoff.

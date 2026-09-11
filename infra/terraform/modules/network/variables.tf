@@ -152,6 +152,17 @@ variable "loki_port" {
   }
 }
 
+variable "alertmanager_port" {
+  description = "TCP port Alertmanager serves its API and UI on inside the monitoring security group (ST-262). Prometheus pushes firing alerts to it; the bastion reaches it over an SSH port-forward for `amtool` (silences, and the test-fire drill in docs/runbooks/alert-catalog.md). Alertmanager's own conventional default."
+  type        = number
+  default     = 9093
+
+  validation {
+    condition     = var.alertmanager_port > 0 && var.alertmanager_port <= 65535
+    error_message = "alertmanager_port must be a valid TCP port (1-65535)."
+  }
+}
+
 variable "otel_collector_port" {
   description = "TCP port the OTel collector's OTLP/HTTP receiver listens on (ST-260). The traffic direction is the reverse of metrics_port's: apps/api, apps/realtime and apps/workers *push* spans to the collector, so the app tier gets an egress rule to it and the monitoring plane gets a matching ingress rule from it — see @studafy/observability's tracing.ts for why every span is shipped here, sampled or not."
   type        = number

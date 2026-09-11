@@ -1,0 +1,116 @@
+# Inbound-webhook and payment-pipeline rules (ST-262).
+#
+# ## Webhooks: why the transport layer and the ledger are both watched
+#
+# Every inbound webhook this system accepts is an HTTP route on apps/api, so the RED histogram the
+# service already records (`@studafy/observability`'s `createRedMetricsMiddleware`) is a complete
+# view of the *transport* outcome: did the sender get a 2xx or a 5xx. That is deliberately not the
+# whole story for Stripe, which answers 200 to events it cannot attribute or apply (see
+# `apps/api/src/modules/subscriptions/routes/webhook-routes.ts` — a 4xx would make Stripe redeliver
+# indefinitely, so those are "parked" behind a 200). Those events are invisible to any HTTP metric
+# and are caught instead by the ledger rules below, which read
+# `app.billing_events` through `billing_events_*` (apps/workers' `metrics/billing-pipeline.ts`).
+#
+# Two layers, two genuinely different failure modes: "the sender could not reach us" and "we
+# accepted it and never finished with it". Neither one implies the other.
+#
+# ## The route selector
+#
+# `http_route=~".*/webhooks?(/.*)?"` matches all three of today's inbound webhook routes without
+# naming them — `/api/subscriptions/webhook/stripe`, `/erpnext/webhooks`, `/email/webhooks/sns` —
+# so a fourth one is covered the day it is registered rather than the day someone remembers to edit
+# this file. `http_route` is the matched *route pattern*, never a raw path (`redMetrics.ts`'s
+# `resolveRoute`), so this cannot be widened by a crafted request.
+
+groups:
+  - name: webhook-ingestion
+    rules:
+      # Stripe first and on its own, at critical: Stripe retries a failing endpoint for up to three
+      # days and then stops forever. A sustained 5xx here is a countdown to permanently lost
+      # subscription events, which is a different thing from a webhook integration being flaky.
+      - alert: StripeWebhookFailureRateHigh
+        expr: |
+          (
+              sum(rate(http_server_request_duration_count{job="api",http_route="/api/subscriptions/webhook/stripe",http_response_status_code=~"5.."}[10m]))
+            /
+              sum(rate(http_server_request_duration_count{job="api",http_route="/api/subscriptions/webhook/stripe"}[10m]))
+          ) > 0.05
+          and
+          sum(rate(http_server_request_duration_count{job="api",http_route="/api/subscriptions/webhook/stripe"}[10m])) > 0.01
+        for: 10m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "The Stripe webhook endpoint is returning 5xx"
+          description: >-
+            Over 5% of Stripe webhook deliveries have failed for 10 minutes. Stripe retries with
+            backoff and then gives up permanently; events dropped that way are not recoverable from
+            our side.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#stripewebhookfailureratehigh"
+
+      # Every other webhook route, grouped by route so the alert names which integration broke.
+      #
+      # The `and` clause is a minimum-traffic floor, not decoration: 0.01 req/s over 10 minutes is
+      # roughly six deliveries, and without it a single 500 out of two requests on a quiet endpoint
+      # is a 50% failure rate and a page.
+      - alert: WebhookEndpointFailureRateHigh
+        expr: |
+          (
+              sum by (http_route) (rate(http_server_request_duration_count{job="api",http_route=~".*/webhooks?(/.*)?",http_route!="/api/subscriptions/webhook/stripe",http_response_status_code=~"5.."}[15m]))
+            /
+              sum by (http_route) (rate(http_server_request_duration_count{job="api",http_route=~".*/webhooks?(/.*)?",http_route!="/api/subscriptions/webhook/stripe"}[15m]))
+          ) > 0.1
+          and
+          sum by (http_route) (rate(http_server_request_duration_count{job="api",http_route=~".*/webhooks?(/.*)?",http_route!="/api/subscriptions/webhook/stripe"}[15m])) > 0.01
+        for: 15m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "{{ $labels.http_route }} is rejecting over 10% of deliveries"
+          description: >-
+            {{ $value | printf "%.1f" }}x the acceptable 5xx ratio on {{ $labels.http_route }} for
+            15 minutes. Whatever upstream system sends to this route is losing data or retrying
+            into a wall.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#webhookendpointfailureratehigh"
+
+  # --- Payment pipeline --------------------------------------------------------------------------
+  #
+  # `billing_events_backlog_age` is seconds since the oldest `pending`/`failed` row in
+  # `app.billing_events` was received; `0` when the ledger is clear. Age, not depth, is what these
+  # alert on: a burst of renewals is a deep backlog that drains, and a dead consumer is a shallow
+  # one that does not.
+  #
+  # Both series go *absent* rather than stale if the scrape-path query fails (see
+  # `startBillingPipelineGauges`), which is why absence is not treated as breaching here — the
+  # database being unreachable has its own alarms, and a second page for it would be noise.
+  - name: payment-pipeline
+    rules:
+      - alert: BillingEventPipelineStalling
+        expr: billing_events_backlog_age > 300
+        for: 10m
+        labels:
+          severity: warning
+          service: workers
+        annotations:
+          summary: "Stripe billing events are taking over 5 minutes to process"
+          description: >-
+            The oldest unresolved billing event has been waiting
+            {{ $value | printf "%.0f" }}s. Intake is working; something downstream of it is slow.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#billingeventpipelinestalling"
+
+      - alert: BillingEventPipelineHalted
+        expr: billing_events_backlog_age > 900
+        for: 10m
+        labels:
+          severity: critical
+          service: workers
+        annotations:
+          summary: "The payment pipeline has stopped processing billing events"
+          description: >-
+            The oldest unresolved billing event has been waiting
+            {{ $value | printf "%.0f" }}s. Events are being accepted and written to the ledger but
+            not applied, so every affected school's subscription state is now stale — including
+            schools that have paid and schools that have cancelled.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#billingeventpipelinehalted"

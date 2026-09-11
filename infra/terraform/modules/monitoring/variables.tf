@@ -262,3 +262,40 @@ variable "tempo_storage_gb" {
     error_message = "tempo_storage_gb must be between 21 and 200 (Fargate's ephemeral-storage range above its free 20GiB default)."
   }
 }
+
+# --- Alerting and on-call (ST-262) ---------------------------------------------------------------
+
+variable "alertmanager_image" {
+  description = "Full image reference (registry/repo:tag) for the Alertmanager image this repo builds (infra/docker/alertmanager.Dockerfile), pushed to module.registry's \"alertmanager\" repository."
+  type        = string
+}
+
+variable "alertmanager_port" {
+  description = "Port Alertmanager serves its API and UI on. Must match module.network's alertmanager_port and the `alerting` block in infra/docker/prometheus/prometheus.yml, which hardcodes it for the same reason every other port in that file is hardcoded (see its header)."
+  type        = number
+  default     = 9093
+}
+
+variable "alertmanager_cpu" {
+  description = "Fargate CPU units for the Alertmanager task."
+  type        = number
+  default     = 256
+}
+
+variable "alertmanager_memory" {
+  description = "Fargate memory (MiB) for the Alertmanager task."
+  type        = number
+  default     = 512
+}
+
+variable "edge_certificate_arn" {
+  description = "ARN of module.edge's validated ACM certificate (the public ALB's TLS certificate, in var.aws_region). Watched for expiry — see alerts.tf's own comment on why an auto-renewing certificate is still worth alerting on."
+  type        = string
+}
+
+variable "cdn_certificate_arn" {
+  description = "ARN of module.cdn's validated ACM certificate, which CloudFront requires to be in us-east-1. Null where there is no CDN (dev), which drops both of its expiry alarms and the us-east-1 SNS topic that would carry them."
+  type        = string
+  default     = null
+  nullable    = true
+}

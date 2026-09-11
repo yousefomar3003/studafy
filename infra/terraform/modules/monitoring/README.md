@@ -1,13 +1,21 @@
 # `monitoring`
 
-CloudWatch alarms, the operations dashboard, the synthetic realtime probe (ST-149), and the
-Prometheus/Grafana metrics stack (ST-259).
+CloudWatch alarms, the operations dashboard, the synthetic realtime probe (ST-149), the
+Prometheus/Grafana metrics stack (ST-259), the tracing pipeline (ST-260), and alerting and on-call
+(ST-262).
 
 ## Alarms & dashboard
 
-All alarms are **action-free** (`alarm_actions = []` / `ok_actions = []`): notification ownership
-is still to be agreed, so nobody gets paged for them yet. Their ARNs are collected in
-`alarm_arns` for the day that lands.
+Every alarm is defined once, in `alerts.tf`'s `local.cloudwatch_alarms`, with a severity, an
+Alertmanager alert name and the description that becomes the notification's summary. That one map
+drives three consumers — the alarms themselves, the bridge Lambda's routing catalog, and
+`scripts/check-alert-rules.ts` in CI — which is what makes "every alert has a severity and a
+runbook" a property of the type rather than a review comment: an entry missing either is a
+plan-time error.
+
+Alarms notify through `module.alert_topic` into Alertmanager wherever `monitoring_enabled` is true.
+They stay **action-free in dev**, where there is no monitoring plane to deliver to and no rotation
+to deliver to it — they still evaluate, and still show their state on the dashboard.
 
 The operations dashboard (`<prefix>-operations`) shows RDS CPU, Redis health, ECS service CPU/memory
 and PostgreSQL replica lag, plus the probe's latency widget when the probe is enabled.
@@ -96,6 +104,49 @@ those `aws_ecs_service` resources are Terraform-owned here.
 `monitoring` security group admits only the bastion, the same access model already used for
 Postgres/Redis/PgBouncer administration. See `docs/runbooks/metrics-dashboard-catalog.md` for the
 exact SSH port-forward command and the dashboard catalog itself.
+
+## Alerting and on-call (ST-262)
+
+`monitoring_enabled = true` additionally provisions **Alertmanager** (`alertmanager.tf`) — one
+Fargate task running this repo's own image (`infra/docker/alertmanager.Dockerfile`), registered at
+`alertmanager.metrics.internal` like every other member of the plane.
+
+It is the single place every alert is routed, deduplicated, grouped and silenced, **including the
+ones that do not come from Prometheus**. That is the point of the bridge:
+
+```
+  Prometheus rules ─────────────┐
+  (infra/docker/prometheus/     │
+   rules/*.yml, baked into      ▼
+   the Prometheus image)   Alertmanager ──► severity route ──► on-call provider
+                                ▲
+  CloudWatch alarms ─► SNS ─► alert-bridge Lambda
+  (this module's alerts.tf)    (lambda/cloudwatch-alert-bridge)
+```
+
+The split at the _source_ is forced and cannot be removed: Fargate has no host to run
+`node_exporter` on, and RDS replica lag, ElastiCache CPU, ACM certificate expiry and the ST-149
+probe have no scrapeable endpoint at all. The split stops at the source. Both planes use the same
+three severities (`critical` / `warning` / `info`), the same receivers, the same silences and the
+same fortnightly noisy-alert review — one place to look during an incident, one place to silence
+something at 3am.
+
+**Receiver URLs are secrets and never reach a rendered config.** `alertmanager.yml` references them
+as `url_file` paths; `docker-entrypoint.sh` materialises each into a 0600 file from the task's
+injected `ALERTMANAGER_PAGE_URL` / `ALERTMANAGER_TICKET_URL` / `ALERTMANAGER_HEARTBEAT_URL`, which
+come from the `monitoring` app-secrets container. Alertmanager re-reads the file per notification,
+so a rotated URL needs no image rebuild.
+
+**Certificate expiry is the one thing here that needs two regions.** CloudFront only accepts ACM
+certificates issued in us-east-1, and a CloudWatch alarm can only publish to an SNS topic in its own
+region — so the CDN certificate's alarms and their topic live there. `modules/alert-topic/` is that
+topic, its customer-managed KMS key and its subscription, packaged as a sub-module because Terraform
+cannot select a provider per `for_each` key. The _Lambda_ is not duplicated: SNS delivers
+cross-region, so both topics subscribe the same function.
+
+See [`docs/runbooks/alert-catalog.md`](../../../../docs/runbooks/alert-catalog.md) for the alert
+catalog, the severity matrix, the test-fire drill and the noisy-alert review, and
+[`on-call-rotation.md`](../../../../docs/runbooks/on-call-rotation.md) for the rotation itself.
 
 ## Distributed tracing pipeline (ST-260)
 
@@ -216,17 +267,24 @@ per-user or per-school label would.
 | `otel_collector_cpu` / `_memory`    | `number`       | `256` / `512`      | Fargate sizing for the OTel collector task.                                         |
 | `tempo_cpu` / `_memory`             | `number`       | `512` / `1024`     | Fargate sizing for the Tempo task.                                                  |
 | `tempo_storage_gb`                  | `number`       | `21`               | Fargate ephemeral storage (GiB) for the Tempo task.                                 |
+| `alertmanager_image`                | `string`       | —                  | Full image reference for this repo's Alertmanager image.                            |
+| `alertmanager_port`                 | `number`       | `9093`             | Port Alertmanager serves its API/UI on.                                             |
+| `alertmanager_cpu` / `_memory`      | `number`       | `256` / `512`      | Fargate sizing for the Alertmanager task.                                           |
+| `edge_certificate_arn`              | `string`       | —                  | `module.edge`'s ACM certificate, watched for expiry.                                |
+| `cdn_certificate_arn`               | `string`       | `null`             | `module.cdn`'s us-east-1 ACM certificate; `null` where there is no CDN.             |
 
 ## Outputs
 
 | Name                             | Description                                                                                         |
 | -------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `dashboard_name`                 | Operations dashboard name.                                                                          |
-| `alarm_arns`                     | All action-free alarm ARNs, including the probe alarm when enabled.                                 |
+| `alarm_arns`                     | Every CloudWatch alarm ARN this module creates, both regions.                                       |
 | `realtime_probe_function_name`   | Probe Lambda name, or `null` when the probe is disabled.                                            |
 | `deploys_log_group_name`         | CloudWatch Logs group the staging deploy pipeline annotates.                                        |
 | `metrics_discovery_service_arns` | Map of `{api, realtime, workers}` -> Cloud Map registry ARN — see `infra/deploy/scripts/render.sh`. |
 | `grafana_access_hint`            | Reminder of the SSH port-forward command to reach Grafana.                                          |
+| `alert_topic_arn`                | SNS topic in-region alarms publish to, bridged into Alertmanager. `null` in dev.                    |
+| `alert_bridge_function_name`     | The bridge Lambda; its log group is where an undelivered alarm notification is diagnosed.           |
 
 ## What this module does not do
 
@@ -271,6 +329,26 @@ per-user or per-school label would.
   (`monitoring_secret_arn`'s `GRAFANA_ADMIN_PASSWORD`). Fine for the small number of people who
   need dashboards today; fronting it with an internal ALB and real SSO is future work if that
   changes, not something this ticket's acceptance criteria ask for.
+- **It does not define the on-call rotation.** Alertmanager maps severity to one of three webhook
+  URLs; who is on call, what hours a `warning` may wake someone, and how long an unacknowledged page
+  waits before escalating all live in the on-call provider behind those URLs. That boundary is
+  partly forced — Alertmanager's time intervals _mute_ a matched route rather than diverting it, so
+  "page in hours, ticket otherwise" cannot be written as two sibling routes — and partly deliberate:
+  the provider already owns the schedule, and a second copy here would drift from it. The
+  specification the provider is configured to is
+  `docs/runbooks/on-call-rotation.md`.
+- **Alertmanager runs at `desired_count = 1`.** Its HA story is a gossip cluster needing a stable
+  peer list, which Fargate does not provide; two _unclustered_ replicas would notify twice for every
+  alert, which is worse than one. The `Watchdog` alert's five-minute heartbeat is the mitigation
+  this trade rests on — see `alertmanager.tf`'s own comment, and do not remove one without
+  revisiting the other.
+- **It does not alert on the standing size of either dead-letter store.**
+  `app.notification_dead_letters` is RLS-forced per school, so a global count would be one query per
+  tenant on every scrape. The alerts count _arrivals_ instead
+  (`dead_letter_entries_total`), which answers "something was parked and nobody has looked at it";
+  the undrained backlog is a drain-time question the runbook answers with SQL. The practical
+  consequence is in the runbook: those alerts resolving means "no new dead letters", never "the
+  store is empty".
 - **It does not mirror `prometheuscommunity/postgres-exporter` or `prom/mysqld-exporter` into this
   repo's own ECR.** Both task definitions pull the upstream images directly from Docker Hub —
   unlike Prometheus/Grafana, this repo doesn't layer any config onto them (a DSN is a runtime

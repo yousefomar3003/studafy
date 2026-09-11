@@ -47,6 +47,12 @@ locals {
     "grafana",
     "postgres-exporter",
     "mysqld-exporter",
+    # Alerting (ST-262): Prometheus pushes firing alerts to "alertmanager.metrics.internal" (see
+    # infra/docker/prometheus/prometheus.yml's `alerting` block) and scrapes its /metrics on the
+    # same name, and the CloudWatch alert bridge Lambda (alerts.tf) POSTs to it too — three
+    # consumers of one name, all resolving it the same way every other target in this namespace is
+    # resolved.
+    "alertmanager",
     # Tracing pipeline (ST-260): apps/*'s OTEL_EXPORTER_OTLP_ENDPOINT resolves "otel-collector.
     # metrics.internal" (see tracing.tf), and the collector itself forwards to "tempo.metrics.
     # internal" (infra/docker/otel-collector/config.yaml) — both Terraform-owned here, same as

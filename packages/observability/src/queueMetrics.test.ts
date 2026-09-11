@@ -8,12 +8,12 @@ import {
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { beforeAll, describe, expect, test } from "bun:test";
 
-import { recordJobOutcome } from "./queueMetrics";
+import { recordDeadLetter, recordJobOutcome } from "./queueMetrics";
 
 import type { MetricData, ResourceMetrics } from "@opentelemetry/sdk-metrics";
 
-// recordJobOutcome is the only pure/local piece of this module — startQueueDepthGauge
-// constructs a real BullMQ `Queue`, which opens a Redis connection (see
+// recordJobOutcome and recordDeadLetter are the pure/local pieces of this module —
+// startQueueGauges constructs a real BullMQ `Queue`, which opens a Redis connection (see
 // apps/workers/src/registry.ts's own comment on the same tradeoff), so it is exercised by
 // apps/workers' own integration coverage instead, not here.
 //
@@ -73,5 +73,31 @@ describe("recordJobOutcome", () => {
     expect(
       duration?.dataPoints.some((dp) => dp.attributes["messaging.destination.name"] === "billing"),
     ).toBe(false);
+  });
+});
+
+describe("recordDeadLetter", () => {
+  test("labels by parking store and queue, never by school or job id", async () => {
+    recordDeadLetter("billing", "billing");
+
+    const entries = await collectMetric("dead_letter.entries");
+    const point = entries?.dataPoints.find((dp) => dp.attributes.source === "billing");
+    expect(point?.attributes["messaging.destination.name"]).toBe("billing");
+    expect(point?.value).toBe(1);
+    // The cardinality budget is the point of the assertion, not an incidental detail: a school id
+    // here would make this series unbounded (docs/runbooks/metrics-dashboard-catalog.md).
+    expect(Object.keys(point?.attributes ?? {}).sort()).toEqual([
+      "messaging.destination.name",
+      "source",
+    ]);
+  });
+
+  test("counts each parked unit of work separately per source", async () => {
+    recordDeadLetter("notifications", "notifications");
+    recordDeadLetter("notifications", "notifications");
+
+    const entries = await collectMetric("dead_letter.entries");
+    const point = entries?.dataPoints.find((dp) => dp.attributes.source === "notifications");
+    expect(point?.value).toBe(2);
   });
 });
