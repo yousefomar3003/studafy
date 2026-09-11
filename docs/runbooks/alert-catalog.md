@@ -719,6 +719,50 @@ slow, follow the realtime path: gateway task health, Redis CPU, and whether
 
 **Escalate.** 15 minutes.
 
+### SyntheticCheckFailing
+
+**Means.** One of the five black-box probes (`login-page`, `healthz`, `oauth-start`,
+`checkout-page`, `invitation-verify` — the `service` label says which, as `synthetic-<check>`)
+failed, **or the probe stopped reporting**, for two consecutive minutes. This is ST-263's
+availability SLO (NFR-03): a real, unauthenticated GET against the app's own public entry points,
+run from two regions every minute. A `-dr` suffix on `service` (e.g. `synthetic-healthz-dr`) means
+the failure is regional — that probe's own region, not `service`'s bare form's region, is the one
+that cannot reach the app; see "Confirm" below for the two regions this can mean.
+
+Same "missing data is breaching" reasoning as `RealtimeProbeLatencyHigh` above: every successful run
+publishes a datapoint every minute, so a probe that stopped running and a probe that is genuinely
+failing look the same from here, and both mean "this entry point cannot be shown to be working".
+
+**What each check actually verifies:**
+
+- `login-page` / `checkout-page` — the SPA shell loads (200) at `/auth/login` / `/pricing`. No
+  route in `apps/web` is literally named "checkout"; `/pricing` is the public page the real
+  checkout flow starts from — see `lambda/synthetics-probe/index.mjs`'s header for that mapping.
+- `healthz` — `GET /healthz` returns `200 {"status":"ok"}`.
+- `oauth-start` — `GET /api/auth/oauth/google/start` answers with anything under 500 (a 302 to
+  Google when configured, or the route's own coded 404 when it is not — both mean the route is
+  mounted and answering; only a 5xx or a timeout fails this check).
+- `invitation-verify` — `GET /api/auth/invitations/{token}/verify` against a fixed, never-issued
+  token returns `400 INVITATION_INVALID` (see
+  [`invitation_verification_matrix.md`](../security/invitation_verification_matrix.md)) —
+  deterministic and side-effect-free, so no live invitation fixture is needed.
+
+**Confirm.** The `<prefix>-availability-slo` dashboard: each check has its own widget with both
+regions' rolling success rate and the SLO line. A single region dipping while the other holds
+means a regional network/DNS/edge problem, not an application outage — check that region's probe
+Lambda logs at `/aws/lambda/<prefix>-synthetics-probe` (the log group exists once per region; open
+the one in the affected region) for which check failed and why.
+
+**Act.** Both regions failing the same check points at the application: reproduce the exact request
+by hand (`curl -i` the same URL) and follow whichever service owns that path — `apps/web`'s
+CloudFront distribution for `login-page`/`checkout-page`, `apps/api` for the other three. One
+region only failing points at that region's path to the app (DNS resolution, that region's route to
+CloudFront/the ALB) rather than the app itself — there is nothing to roll back or restart in the
+application.
+
+**Escalate.** 15 minutes — these are the same "is a real user affected right now" question
+`RealtimeProbeLatencyHigh` answers, just for the rest of the app.
+
 ### CertificateExpiringSoon
 
 **Means.** A TLS certificate (`edge` = the public ALB, `cdn` = CloudFront — the `service` label says

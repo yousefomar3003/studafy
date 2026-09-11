@@ -289,10 +289,14 @@ module "monitoring" {
   source = "./modules/monitoring"
 
   # The us-east-1 alias, for the same reason module.cdn takes it: CloudFront's ACM certificate can
-  # only live there, so its expiry alarm can only be created there. See that module's versions.tf.
+  # only live there, so its expiry alarm can only be created there. The aws.dr alias is the same one
+  # module.backup uses for cross-region backup replication, reused here as the synthetic probe's
+  # second probing region (ST-263) rather than adding a third region-only alias. See that module's
+  # versions.tf.
   providers = {
     aws           = aws
     aws.us_east_1 = aws.us_east_1
+    aws.dr        = aws.dr
   }
 
   name_prefix                       = module.naming.name_prefix
@@ -352,6 +356,17 @@ module "monitoring" {
   # Null in dev, where module.cdn is not instantiated at all — which drops both CDN certificate
   # alarms and the whole us-east-1 SNS topic that would carry them.
   cdn_certificate_arn = var.environment == "dev" ? null : module.cdn[0].certificate_arn
+
+  # Black-box synthetic availability probes (ST-263): staging/prod only, same reasoning as
+  # probe_enabled above — dev's web_origin/edge_domain_name are Vite-dev-server/placeholder values,
+  # not something an external probe can reach. web_origin is passed straight through; api_origin is
+  # assembled from edge_domain_name the same way realtime_ws_url is above. synthetics_dr_region
+  # reuses var.backup_dr_region — see modules/monitoring/versions.tf for why that alias rather than
+  # a new one.
+  synthetics_enabled   = var.environment != "dev"
+  web_origin           = var.web_origin
+  api_origin           = "https://${var.edge_domain_name}"
+  synthetics_dr_region = var.backup_dr_region
 }
 
 # Vector + Loki log-aggregation pipeline (ST-261). staging/prod only — see local.logging_enabled.

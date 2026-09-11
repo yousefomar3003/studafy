@@ -299,3 +299,43 @@ variable "cdn_certificate_arn" {
   default     = null
   nullable    = true
 }
+
+# --- Black-box synthetic availability probes (ST-263) --------------------------------------------
+
+variable "synthetics_enabled" {
+  description = "Whether to provision the black-box synthetic probes (login page, /healthz, OAuth start, checkout page, invitation verify) in both var.aws_region and synthetics_dr_region. Enabled for staging/prod, same reasoning as probe_enabled: dev has no publicly reachable web_origin/edge_domain_name for an external probe to reach."
+  type        = bool
+  default     = false
+}
+
+variable "web_origin" {
+  description = "Scheme+host of the apps/web frontend (root's var.web_origin, e.g. https://app.studafy.com). Builds the login-page and checkout-page (/pricing — see synthetics.tf) probe URLs."
+  type        = string
+}
+
+variable "api_origin" {
+  description = "Scheme+host of the apps/api origin (root assembles this as \"https://$${var.edge_domain_name}\", the same way realtime_ws_url is assembled from edge_domain_name above). Builds the /healthz, OAuth-start and invitation-verify probe URLs."
+  type        = string
+}
+
+variable "synthetics_dr_region" {
+  description = "Second AWS region the synthetic probe also runs from (root passes var.backup_dr_region — see versions.tf's header for why that alias, not a new one, satisfies ST-263's 'per region' / 'regional failure alerts' acceptance criteria)."
+  type        = string
+}
+
+variable "synthetics_metric_namespace" {
+  description = "CloudWatch namespace the synthetics probe publishes SyntheticCheckSuccess/SyntheticCheckLatency under. Same Studafy/<component> convention as probe_metric_namespace."
+  type        = string
+  default     = "Studafy/Synthetics"
+}
+
+variable "synthetics_availability_slo_percent" {
+  description = "Proposed per-check availability SLO (NFR-03), as a percent, rendered as the availability dashboard's annotation line. No NFR-03 document exists anywhere in this repo — checked docs/, same honesty gap docs/testing/load-test-scenarios.md records for NFR-01/02 — so 99.9 is a conventional default, not a transcription of a real target. Whoever holds the real NFR-03 number should override this rather than have this value read as one."
+  type        = number
+  default     = 99.9
+
+  validation {
+    condition     = var.synthetics_availability_slo_percent > 0 && var.synthetics_availability_slo_percent <= 100
+    error_message = "synthetics_availability_slo_percent must be a percent in (0, 100]."
+  }
+}

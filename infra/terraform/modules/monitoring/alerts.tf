@@ -171,12 +171,14 @@ locals {
     }
   }
 
-  # The ST-149 synthetic probe's SLO alarm. Critical, unlike everything else in this file: it is the
-  # only CloudWatch alarm here that measures a user-facing objective rather than a resource level,
-  # and it is apps/realtime's *only* SLO (slo.yml explains why the HTTP burn-rate rules deliberately
-  # exclude that service). `treat_missing_data = "breaching"` because every successful run publishes
-  # a datapoint every minute, so a wedged probe and a slow one are the same alarm — see this
-  # module's README.
+  # The ST-149 synthetic probe's SLO alarm. Critical, unlike most of this file: it measures a
+  # user-facing objective rather than a resource level, and it is apps/realtime's *only* SLO
+  # (slo.yml explains why the HTTP burn-rate rules deliberately exclude that service). The ST-263
+  # black-box probe alarms below (`synthetic_alarms`/`synthetic_alarms_dr`) are the same kind of
+  # alarm for a different set of user-facing entry points — this is no longer the only one, just
+  # the first. `treat_missing_data = "breaching"` because every successful run publishes a
+  # datapoint every minute, so a wedged probe and a slow one are the same alarm — see this module's
+  # README.
   probe_alarms = var.probe_enabled ? {
     "realtime-probe-latency-high" = {
       alertname           = "RealtimeProbeLatencyHigh"
@@ -257,19 +259,72 @@ locals {
     }
   }
 
+  # --- Synthetic black-box probes (ST-263) ---------------------------------------------------
+  #
+  # Same "critical, user-facing objective" tier as probe_alarms above, one alarm per check per
+  # region. `SyntheticCheckSuccess` is 1/0 per minute (synthetics.tf's header explains why the
+  # Lambda always publishes rather than only on success), so `Average` falling below 1 over 2
+  # consecutive minutes means at least one of that window's two runs failed; `treat_missing_data =
+  # "breaching"` covers the Lambda itself not having run at all.
+  #
+  # Two maps, not one `for_each` over checks x regions, for the same reason certificate_alarms and
+  # certificate_alarms_us_east_1 are two maps: a CloudWatch alarm can only be created in the region
+  # its metric was published to, and Terraform cannot select a provider per `for_each` key. The `key`
+  # (and therefore the alarm name) gets an explicit `-dr` suffix in the second map — synthetics.tf's
+  # two Lambdas publish the *same* check names into two *different* regions' CloudWatch, so without
+  # a distinct key the two regions' alarms would collide on one name and the bridge's alarm_catalog
+  # below would have no way to tell an on-call engineer which region actually failed. `service`
+  # carries the same suffix, since it is what becomes the alert's Alertmanager label.
+  synthetic_alarms = var.synthetics_enabled ? {
+    for check in local.synthetic_check_names : "synthetic-${check}-failing" => {
+      alertname           = "SyntheticCheckFailing"
+      severity            = "critical"
+      service             = "synthetic-${check}"
+      description         = "The synthetic black-box probe for '${check}' (region ${var.aws_region}) failed, or stopped reporting, for 2 consecutive minutes."
+      namespace           = var.synthetics_metric_namespace
+      metric_name         = "SyntheticCheckSuccess"
+      statistic           = "Average"
+      period              = 60
+      evaluation_periods  = 2
+      threshold           = 1
+      comparison_operator = "LessThanThreshold"
+      treat_missing_data  = "breaching"
+      dimensions          = { Check = check }
+    }
+  } : {}
+
+  synthetic_alarms_dr = var.synthetics_enabled ? {
+    for check in local.synthetic_check_names : "synthetic-${check}-failing-dr" => {
+      alertname           = "SyntheticCheckFailing"
+      severity            = "critical"
+      service             = "synthetic-${check}-dr"
+      description         = "The synthetic black-box probe for '${check}' (region ${var.synthetics_dr_region}) failed, or stopped reporting, for 2 consecutive minutes."
+      namespace           = var.synthetics_metric_namespace
+      metric_name         = "SyntheticCheckSuccess"
+      statistic           = "Average"
+      period              = 60
+      evaluation_periods  = 2
+      threshold           = 1
+      comparison_operator = "LessThanThreshold"
+      treat_missing_data  = "breaching"
+      dimensions          = { Check = check }
+    }
+  } : {}
+
   cloudwatch_alarms = merge(
     local.rds_cpu_alarms,
     local.ecs_cpu_alarms,
     local.data_plane_alarms,
     local.probe_alarms,
+    local.synthetic_alarms,
     local.certificate_alarms,
   )
 
   # What the bridge needs and nothing more: the summary comes from the alarm's own description in
-  # the notification, and the runbook URL is derived. Both regions' alarms, since one Lambda serves
-  # both topics.
+  # the notification, and the runbook URL is derived. Every region's alarms, since one Lambda
+  # serves every topic.
   alarm_catalog = {
-    for key, alarm in merge(local.cloudwatch_alarms, local.certificate_alarms_us_east_1) :
+    for key, alarm in merge(local.cloudwatch_alarms, local.certificate_alarms_us_east_1, local.synthetic_alarms_dr) :
     "${var.name_prefix}-${key}" => {
       alertname = alarm.alertname
       severity  = alarm.severity
@@ -327,6 +382,36 @@ resource "aws_cloudwatch_metric_alarm" "us_east_1" {
 
   alarm_actions = var.monitoring_enabled ? [module.alert_topic_us_east_1[0].topic_arn] : []
   ok_actions    = var.monitoring_enabled ? [module.alert_topic_us_east_1[0].topic_arn] : []
+
+  lifecycle {
+    precondition {
+      condition     = contains(local.allowed_severities, each.value.severity)
+      error_message = "Alarm '${each.key}' has a severity outside critical/warning/info — see aws_cloudwatch_metric_alarm.this's own precondition."
+    }
+  }
+}
+
+# The synthetics_dr_region twin of the synthetic-probe alarms already merged into
+# aws_cloudwatch_metric_alarm.this above — same shape as aws_cloudwatch_metric_alarm.us_east_1,
+# same reason (an alarm can only watch a metric published in its own region).
+resource "aws_cloudwatch_metric_alarm" "synthetic_dr" {
+  for_each = local.synthetic_alarms_dr
+  provider = aws.dr
+
+  alarm_name          = "${var.name_prefix}-${each.key}"
+  alarm_description   = each.value.description
+  namespace           = each.value.namespace
+  metric_name         = each.value.metric_name
+  statistic           = each.value.statistic
+  period              = each.value.period
+  evaluation_periods  = each.value.evaluation_periods
+  threshold           = each.value.threshold
+  comparison_operator = each.value.comparison_operator
+  treat_missing_data  = each.value.treat_missing_data
+  dimensions          = each.value.dimensions
+
+  alarm_actions = var.monitoring_enabled ? [module.alert_topic_dr[0].topic_arn] : []
+  ok_actions    = var.monitoring_enabled ? [module.alert_topic_dr[0].topic_arn] : []
 
   lifecycle {
     precondition {
@@ -430,9 +515,12 @@ resource "aws_lambda_function" "alert_bridge" {
       ALERTMANAGER_URL = local.alertmanager_url
       RUNBOOK_BASE_URL = local.runbook_base_url
       # Lambda's environment has a 4KB total budget, which is why this carries three short fields
-      # per alarm rather than the full alert. At today's alarm count it is comfortably under 2KB;
-      # if it ever approaches the limit, the answer is to move the catalog into the deployment
-      # package as a generated file, not to trim what an on-call engineer sees.
+      # per alarm rather than the full alert. ST-263 added ten entries (five checks x two regions)
+      # on top of what was already here, which is enough to be worth saying plainly: at prod's full
+      # alarm count (every optional alarm group enabled) this is roughly 3-3.5KB, not "comfortably
+      # under 2KB" any more. It still fits, but there is materially less headroom than there was —
+      # if the next addition pushes it over the limit, the answer is to move the catalog into the
+      # deployment package as a generated file, not to trim what an on-call engineer sees.
       ALARM_CATALOG = jsonencode(local.alarm_catalog)
     }
   }
@@ -458,6 +546,21 @@ module "alert_topic_us_east_1" {
   }
 
   name                 = "${var.name_prefix}-alerts-us-east-1"
+  bridge_function_arn  = aws_lambda_function.alert_bridge[0].arn
+  bridge_function_name = aws_lambda_function.alert_bridge[0].function_name
+}
+
+# The synthetics_dr_region twin, same reasoning as alert_topic_us_east_1 — only instantiated where
+# there are dr-region synthetic alarms to deliver (ST-263).
+module "alert_topic_dr" {
+  source = "./modules/alert-topic"
+  count  = var.monitoring_enabled && var.synthetics_enabled ? 1 : 0
+
+  providers = {
+    aws = aws.dr
+  }
+
+  name                 = "${var.name_prefix}-alerts-dr"
   bridge_function_arn  = aws_lambda_function.alert_bridge[0].arn
   bridge_function_name = aws_lambda_function.alert_bridge[0].function_name
 }
