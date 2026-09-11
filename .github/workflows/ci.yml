@@ -709,6 +709,18 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Runbook-library gate: every CloudWatch alarm in modules/monitoring/main.tf must be
+  # linked to (documented by) at least one file under docs/runbooks/. Adding an alarm
+  # without the runbook that names it fails here — the acceptance criterion "every alert
+  # rule links to an existing runbook".
+  runbook-links:
+    name: runbook-links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify every CloudWatch alarm links to a runbook
+        run: bash .github/scripts/verify-alert-runbook-links.sh
+
   hooks:
     runs-on: ubuntu-latest
     steps:
