@@ -139,97 +139,10 @@ resource "aws_cloudwatch_log_group" "deploys" {
   retention_in_days = var.log_retention_days
 }
 
-resource "aws_cloudwatch_metric_alarm" "rds_cpu" {
-  for_each = local.rds_instances
-
-  alarm_name          = "${var.name_prefix}-${each.key}-cpu-high"
-  alarm_description   = "${each.key} CPU has exceeded 80 percent for 10 minutes."
-  namespace           = "AWS/RDS"
-  metric_name         = "CPUUtilization"
-  statistic           = "Average"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 80
-  comparison_operator = "GreaterThanThreshold"
-  treat_missing_data  = "missing"
-  alarm_actions       = []
-  ok_actions          = []
-
-  dimensions = { DBInstanceIdentifier = each.value }
-}
-
-resource "aws_cloudwatch_metric_alarm" "postgres_replica_lag" {
-  alarm_name          = "${var.name_prefix}-postgres-replica-lag-high"
-  alarm_description   = "PostgreSQL reporting replica lag has exceeded 60 seconds for 10 minutes."
-  namespace           = "AWS/RDS"
-  metric_name         = "ReplicaLag"
-  statistic           = "Average"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 60
-  comparison_operator = "GreaterThanThreshold"
-  treat_missing_data  = "breaching"
-  alarm_actions       = []
-  ok_actions          = []
-
-  dimensions = { DBInstanceIdentifier = var.postgres_read_replica_instance_id }
-}
-
-resource "aws_cloudwatch_metric_alarm" "postgres_storage" {
-  alarm_name          = "${var.name_prefix}-postgres-storage-low"
-  alarm_description   = "PostgreSQL free storage is below 10 GiB."
-  namespace           = "AWS/RDS"
-  metric_name         = "FreeStorageSpace"
-  statistic           = "Average"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 10737418240
-  comparison_operator = "LessThanThreshold"
-  treat_missing_data  = "missing"
-  alarm_actions       = []
-  ok_actions          = []
-
-  dimensions = { DBInstanceIdentifier = var.postgres_instance_id }
-}
-
-resource "aws_cloudwatch_metric_alarm" "redis_cpu" {
-  alarm_name          = "${var.name_prefix}-redis-engine-cpu-high"
-  alarm_description   = "Redis engine CPU has exceeded 75 percent for 10 minutes."
-  namespace           = "AWS/ElastiCache"
-  metric_name         = "EngineCPUUtilization"
-  statistic           = "Average"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 75
-  comparison_operator = "GreaterThanThreshold"
-  treat_missing_data  = "missing"
-  alarm_actions       = []
-  ok_actions          = []
-
-  dimensions = { ReplicationGroupId = var.redis_replication_group_id }
-}
-
-resource "aws_cloudwatch_metric_alarm" "ecs_cpu" {
-  for_each = local.ecs_services
-
-  alarm_name          = "${var.name_prefix}-${each.key}-ecs-cpu-high"
-  alarm_description   = "${each.key} ECS CPU has exceeded 80 percent for 10 minutes."
-  namespace           = "AWS/ECS"
-  metric_name         = "CPUUtilization"
-  statistic           = "Average"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 80
-  comparison_operator = "GreaterThanThreshold"
-  treat_missing_data  = "missing"
-  alarm_actions       = []
-  ok_actions          = []
-
-  dimensions = {
-    ClusterName = var.ecs_cluster_name
-    ServiceName = "${var.name_prefix}-${each.key}"
-  }
-}
+# The CloudWatch alarms that used to live here — RDS/ECS/Redis CPU, replica lag, free storage, and
+# the probe's own SLO alarm below — moved to alerts.tf (ST-262), where one catalog gives each of
+# them a severity, a runbook and a delivery path into Alertmanager. `moved` blocks there carry the
+# existing state across.
 
 resource "aws_cloudwatch_dashboard" "operations" {
   dashboard_name = "${var.name_prefix}-operations"
@@ -262,18 +175,7 @@ resource "aws_iam_role" "realtime_probe" {
   count = var.probe_enabled ? 1 : 0
 
   name               = "${var.name_prefix}-realtime-probe"
-  assume_role_policy = data.aws_iam_policy_document.realtime_probe_assume_role.json
-}
-
-data "aws_iam_policy_document" "realtime_probe_assume_role" {
-  statement {
-    effect = "Allow"
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-    actions = ["sts:AssumeRole"]
-  }
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 
 # The probe only needs read-connection material (two secrets), one metric namespace and its own
@@ -396,24 +298,4 @@ resource "aws_lambda_permission" "realtime_probe" {
   function_name = aws_lambda_function.realtime_probe[0].function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.realtime_probe[0].arn
-}
-
-# One SLO alarm: breaches the moment a run exceeds the SLO *or* the probe stops reporting
-# (treat_missing_data = breaching covers a wedged/removed probe, since every successful run emits
-# a datapoint every minute). Action-free like the other alarms until notification ownership lands.
-resource "aws_cloudwatch_metric_alarm" "realtime_probe_latency" {
-  count = var.probe_enabled ? 1 : 0
-
-  alarm_name          = "${var.name_prefix}-realtime-probe-latency-high"
-  alarm_description   = "Realtime end-to-end propagation exceeded the ${var.probe_slo_ms}ms SLO, or the probe stopped reporting, for 2 consecutive minutes."
-  namespace           = var.probe_metric_namespace
-  metric_name         = "RealtimeProbeLatency"
-  statistic           = "Maximum"
-  period              = 60
-  evaluation_periods  = 2
-  threshold           = var.probe_slo_ms
-  comparison_operator = "GreaterThanThreshold"
-  treat_missing_data  = "breaching"
-  alarm_actions       = []
-  ok_actions          = []
 }

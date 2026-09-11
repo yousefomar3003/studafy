@@ -46,6 +46,7 @@ jobs:
             migrations,
             prometheus,
             grafana,
+            alertmanager,
             otel-collector,
             tempo,
             loki,

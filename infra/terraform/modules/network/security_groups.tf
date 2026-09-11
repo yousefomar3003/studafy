@@ -643,6 +643,18 @@ resource "aws_vpc_security_group_ingress_rule" "monitoring_from_bastion" {
   referenced_security_group_id = aws_security_group.bastion.id
 }
 
+# Alertmanager's API/UI from the bastion, over the same SSH port-forward as Grafana. This is how an
+# operator lists and creates silences and runs the test-fire drill in
+# docs/runbooks/alert-catalog.md — `amtool` talks to this port, and there is no other way in.
+resource "aws_vpc_security_group_ingress_rule" "monitoring_from_bastion_alertmanager" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "From the bastion, Alertmanager silences and test-fires (SSH port-forward, ST-262)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.alertmanager_port
+  to_port                      = var.alertmanager_port
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
 # Self-referencing rules for east-west traffic within the monitoring plane itself: Grafana's
 # Prometheus datasource (9090) and Prometheus's own scrape of both exporters (9187, 9104 — the
 # postgres_exporter/mysqld_exporter upstream projects' own registered default ports). One rule per
@@ -694,6 +706,38 @@ resource "aws_vpc_security_group_ingress_rule" "monitoring_self_tempo_query" {
   ip_protocol                  = "tcp"
   from_port                    = 3200
   to_port                      = 3200
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
+# Prometheus pushes firing alerts here (infra/docker/prometheus/prometheus.yml's `alerting` block)
+# and scrapes Alertmanager's own /metrics on the same port.
+resource "aws_vpc_security_group_ingress_rule" "monitoring_self_alertmanager" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "Prometheus to Alertmanager (ST-262)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.alertmanager_port
+  to_port                      = var.alertmanager_port
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
+# The egress counterpart to every `monitoring_self_*` ingress rule above.
+#
+# It is one rule rather than six mirrored ones, and that is the correction of a real gap rather
+# than a shortcut: a security group created by `aws_security_group` with its rules declared as
+# separate `aws_vpc_security_group_*_rule` resources has its default allow-all egress revoked by
+# the AWS provider, so until this rule existed *none* of the plane's east-west traffic was
+# permitted outbound — Grafana to Prometheus, Prometheus to either exporter, the OTel collector to
+# Tempo, Grafana to Tempo. Each had an ingress rule and no matching egress, which is exactly the
+# failure six hand-mirrored rules invite: the pairs drift, and only the ingress half gets written.
+#
+# The grant is narrow despite the wide protocol: the destination is this same security group, whose
+# only members are the Fargate tasks modules/monitoring creates. What is actually reachable inside
+# the plane stays enumerated by the per-port ingress rules above — those remain the control point
+# and the documentation; this says only "the plane may answer itself".
+resource "aws_vpc_security_group_egress_rule" "monitoring_self" {
+  security_group_id            = aws_security_group.monitoring.id
+  description                  = "Within the monitoring plane (see the monitoring_self_* ingress rules for the ports actually reachable)"
+  ip_protocol                  = "-1"
   referenced_security_group_id = aws_security_group.monitoring.id
 }
 
@@ -909,6 +953,15 @@ resource "aws_vpc_security_group_egress_rule" "bastion_to_monitoring" {
   ip_protocol                  = "tcp"
   from_port                    = var.grafana_port
   to_port                      = var.grafana_port
+  referenced_security_group_id = aws_security_group.monitoring.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_to_alertmanager" {
+  security_group_id            = aws_security_group.bastion.id
+  description                  = "To Alertmanager, for silences and test-fires (SSH port-forward, ST-262)"
+  ip_protocol                  = "tcp"
+  from_port                    = var.alertmanager_port
+  to_port                      = var.alertmanager_port
   referenced_security_group_id = aws_security_group.monitoring.id
 }
 

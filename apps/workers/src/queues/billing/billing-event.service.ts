@@ -22,7 +22,8 @@
  */
 
 import { reprocessClaimedEvent, truncateError } from "@studafy/billing";
-import { JOB_NAMES } from "@studafy/constants";
+import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
+import { recordDeadLetter } from "@studafy/observability";
 import postgres from "postgres";
 
 import { emitAuditLog } from "../../db/audit";
@@ -185,6 +186,14 @@ export function billingDeadLetterListener(
       },
       "stripe billing event exhausted its retries",
     );
+
+    // Unconditional and beside the log line, for the identical reason -- see
+    // notifications/dead-letter.ts's own comment at the same point for the two trade-offs this
+    // placement makes (an unattributable job is still counted; a manual replay counts twice).
+    // `source: "billing"` is what separates this from a notification dead letter at alert-routing
+    // time: ST-262 pages `BillingDeadLetterArrived` at critical and its notifications counterpart
+    // at warning, because an unprocessed provider event leaves a school's subscription state wrong.
+    recordDeadLetter("billing", QUEUE_NAMES.BILLING);
 
     if (typeof providerEventId !== "string" || providerEventId === "") {
       log.warn(

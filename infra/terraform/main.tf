@@ -30,6 +30,7 @@ module "network" {
   erpnext_port              = var.erpnext_port
   metrics_port              = var.metrics_port
   grafana_port              = var.grafana_port
+  alertmanager_port         = var.alertmanager_port
   loki_port                 = var.loki_port
   otel_collector_port       = var.otel_collector_port
   bastion_allowed_ssh_cidrs = var.bastion_allowed_ssh_cidrs
@@ -116,9 +117,13 @@ module "secrets" {
   # its Redis cache/queue DB slots (docs/runbooks/redis-conventions.md).
   # monitoring's entry (ST-259) has no shared_secret_arns: unlike api/realtime/workers, it doesn't
   # read another module's connection secret — POSTGRES_EXPORTER_DSN/MYSQLD_EXPORTER_DSN/
-  # GRAFANA_ADMIN_PASSWORD are pre-assembled DSN/password strings supplied directly via
+  # GRAFANA_ADMIN_PASSWORD, and ST-262's ALERTMANAGER_PAGE_URL/ALERTMANAGER_TICKET_URL/
+  # ALERTMANAGER_HEARTBEAT_URL, are pre-assembled DSN/password/URL strings supplied directly via
   # TF_VAR_secrets_app_secret_values (infra/terraform/README.md's existing REDIS_URL/DATABASE_URL
-  # convention), not composed from another module's own secret.
+  # convention), not composed from another module's own secret. The three Alertmanager URLs are the
+  # on-call provider's per-service inbound webhooks; rotating one is a secret update plus an
+  # Alertmanager task replacement, then the test-fire drill in docs/runbooks/alert-catalog.md — a
+  # URL pasted wrong fails silently and looks exactly like a quiet week.
   services = merge(
     {
       api        = { shared_secret_arns = [module.pgbouncer.connection_secret_arn, module.redis.auth_secret_arn] }
@@ -283,6 +288,13 @@ module "compute" {
 module "monitoring" {
   source = "./modules/monitoring"
 
+  # The us-east-1 alias, for the same reason module.cdn takes it: CloudFront's ACM certificate can
+  # only live there, so its expiry alarm can only be created there. See that module's versions.tf.
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
   name_prefix                       = module.naming.name_prefix
   aws_region                        = var.aws_region
   postgres_instance_id              = module.postgres.db_instance_id
@@ -328,6 +340,18 @@ module "monitoring" {
   otel_collector_port  = var.otel_collector_port
   otel_collector_image = "${module.registry.repository_urls["otel-collector"]}:${var.otel_collector_image_tag}"
   tempo_image          = "${module.registry.repository_urls["tempo"]}:${var.tempo_image_tag}"
+
+  # Alerting and on-call (ST-262). Alertmanager rides monitoring_enabled like everything else in
+  # the plane; the certificate alarms do not, because a certificate expiring silently is worth
+  # knowing about in every environment that has one — they simply notify nobody in dev, the same
+  # posture every alarm in this module had before this ticket (see modules/monitoring/alerts.tf's
+  # local.alarm_actions).
+  alertmanager_port    = var.alertmanager_port
+  alertmanager_image   = "${module.registry.repository_urls["alertmanager"]}:${var.alertmanager_image_tag}"
+  edge_certificate_arn = module.edge.certificate_arn
+  # Null in dev, where module.cdn is not instantiated at all — which drops both CDN certificate
+  # alarms and the whole us-east-1 SNS topic that would carry them.
+  cdn_certificate_arn = var.environment == "dev" ? null : module.cdn[0].certificate_arn
 }
 
 # Vector + Loki log-aggregation pipeline (ST-261). staging/prod only — see local.logging_enabled.

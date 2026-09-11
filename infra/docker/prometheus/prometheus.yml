@@ -12,6 +12,25 @@ global:
   scrape_interval: 30s
   evaluation_interval: 30s
 
+# Alert rules (ST-262). One file per concern, all baked into the image beside this one — see
+# infra/docker/prometheus.Dockerfile. `promtool check rules` over this directory, plus the
+# runbook-link and severity invariants, are enforced in CI by scripts/check-alert-rules.ts; see
+# docs/runbooks/alert-catalog.md for the catalog and severity matrix.
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# Alertmanager is a sibling Fargate task in the same monitoring plane, reached over the same Cloud
+# Map private DNS namespace as every scrape target (modules/monitoring/discovery.tf), so this is a
+# static name for the same reason the scrape targets are. `dns_sd_configs` rather than
+# `static_configs` because the name resolves to whichever task is currently registered, and a
+# replaced Alertmanager task gets a new address.
+alerting:
+  alertmanagers:
+    - dns_sd_configs:
+        - names: ["alertmanager.metrics.internal"]
+          type: A
+          port: 9093
+
 scrape_configs:
   # apps/api, apps/realtime, apps/workers: one job per service rather than one job with three
   # dns_sd_configs entries, so a per-service scrape failure (or a per-service relabel rule, should
@@ -59,3 +78,13 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+
+  # Alertmanager's own /metrics. Scraped for the same reason Prometheus scrapes itself: the
+  # notification pipeline's own failures (a receiver returning 5xx, notifications dropped) are
+  # visible nowhere else. Unlike Prometheus above it is a separate task, so it goes through Cloud
+  # Map like every other target.
+  - job_name: alertmanager
+    dns_sd_configs:
+      - names: ["alertmanager.metrics.internal"]
+        type: A
+        port: 9093

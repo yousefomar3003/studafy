@@ -350,6 +350,17 @@ variable "grafana_port" {
   }
 }
 
+variable "alertmanager_port" {
+  description = "TCP port Alertmanager serves its API and UI on (ST-262). Shared between module.network (security group rules), module.monitoring (task definition) and — as a static value — infra/docker/prometheus/prometheus.yml's `alerting` block and the CloudWatch alert bridge, for the same never-drift reason as grafana_port/metrics_port above."
+  type        = number
+  default     = 9093
+
+  validation {
+    condition     = var.alertmanager_port > 0 && var.alertmanager_port <= 65535
+    error_message = "alertmanager_port must be a valid TCP port (1-65535)."
+  }
+}
+
 variable "loki_port" {
   description = "TCP port Loki serves its HTTP API on (ST-261). Shared between module.network (security group rules), module.logging (task definition + Vector sink URL) and — as a static value — infra/docker/grafana/provisioning/datasources/datasources.yml.tpl's Loki datasource, so all four can never drift apart. Same convention as grafana_port/metrics_port above."
   type        = number
@@ -380,6 +391,12 @@ variable "erpnext_image_tag" {
 
 variable "prometheus_image_tag" {
   description = "Tag of module.registry's prometheus ECR repository to deploy (ST-259). Bumping this and re-applying is how a scrape-config change (infra/docker/prometheus/prometheus.yml) ships — same rolling-deploy shape as erpnext_image_tag."
+  type        = string
+  default     = "latest"
+}
+
+variable "alertmanager_image_tag" {
+  description = "Tag of module.registry's alertmanager ECR repository to deploy (ST-262). Bumping this and re-applying is how a routing change (infra/docker/alertmanager/alertmanager.yml) ships — same rolling-deploy shape as prometheus_image_tag. Note that an *alert rule* change ships through prometheus_image_tag instead: the rules are baked into the Prometheus image, not this one."
   type        = string
   default     = "latest"
 }

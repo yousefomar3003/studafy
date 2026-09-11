@@ -721,3 +721,33 @@ jobs:
             exit 1
           fi
           printf 'test: validate conventional commits\n' | bunx commitlint
+
+  # Alerting config (ST-262). Three checks, deliberately separate because they answer different
+  # questions and fail for different reasons.
+  alerting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-bun-workspace
+      # Is the PromQL valid, do the durations parse, are the rule groups well-formed. Run from the
+      # exact image tag infra/docker/prometheus.Dockerfile builds from, so "valid" here means valid
+      # to the Prometheus that will actually load these files -- not to whatever promtool a runner
+      # happens to have.
+      - name: promtool check rules
+        run: |
+          docker run --rm -v "$PWD/infra/docker/prometheus:/work:ro" \
+            --entrypoint /bin/promtool prom/prometheus:v3.14.0 \
+            check rules /work/rules/slo.yml /work/rules/queues.yml \
+                        /work/rules/pipelines.yml /work/rules/platform.yml
+      # Same idea for the routing config: does every route reference a receiver that exists, is
+      # every matcher well-formed. amtool resolves `url_file` paths lazily, at notification time,
+      # so this passes without the secret files the running task materialises.
+      - name: amtool check-config
+        run: |
+          docker run --rm -v "$PWD/infra/docker/alertmanager:/work:ro" \
+            --entrypoint /bin/amtool prom/alertmanager:v0.28.1 \
+            check-config /work/alertmanager.yml
+      # This repo's own invariants, which no upstream tool has an opinion about: a routable
+      # severity and a runbook that exists, on both alerting planes. See the script's header.
+      - name: Alerting invariants (severity vocabulary, runbook links)
+        run: bun run scripts/check-alert-rules.ts
