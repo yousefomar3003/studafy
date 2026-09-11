@@ -44,7 +44,7 @@ export const idempotencyGuide: Guide = {
           language: "http",
           code:
             "POST /api/finance/payments\n" +
-            "Idempotency-Key: 6c1f7a3e-2e0a-4b8b-9c1d-1a2b3c4d5e6f\n" +
+            "Idempotency-Key: <your unique UUID>\n" +
             "Content-Type: application/json\n\n" +
             "{ … }",
         },
