@@ -43,6 +43,19 @@ variable "image_repository_names" {
   EOT
   type        = list(string)
   default     = ["api", "realtime", "workers", "web", "erpnext", "migrations", "prometheus", "grafana", "alertmanager", "otel-collector", "tempo", "loki", "vector"]
+    two log-pipeline images (ST-261: infra/docker/loki.Dockerfile, vector.Dockerfile) — all of them
+    this repo's own config layered onto an upstream image, same "third-party base, our config on
+    top" shape as erpnext. "backup-verify" (ST-265: infra/docker/backup-verify.Dockerfile) is the
+    one-off image modules/backup's weekly Postgres restore-verify task runs — its own image, not a
+    reuse of "migrations", because it never touches db/migrations and instead needs a psql/awscli
+    toolchain "migrations"'s Bun runtime doesn't carry. apps/mobile is a native app and is
+    intentionally excluded. A list is used because the deployable set can grow.
+  EOT
+  type        = list(string)
+  default = [
+    "api", "realtime", "workers", "web", "erpnext", "migrations",
+    "prometheus", "grafana", "otel-collector", "tempo", "loki", "vector", "backup-verify",
+  ]
 
   validation {
     condition     = length(var.image_repository_names) > 0

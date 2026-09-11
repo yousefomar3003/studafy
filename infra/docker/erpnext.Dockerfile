@@ -21,6 +21,19 @@ ARG ERPNEXT_VERSION=version-15
 
 FROM frappe/erpnext:${ERPNEXT_VERSION}
 
+# The backup/restore-drill ECS tasks (infra/terraform/modules/backup, ST-265) reuse this same bench
+# image to run `bench backup`/`bench restore`/`bench doctor` against a real Frappe site — no separate
+# image exists for that purpose (KISS: one bench-capable image, not two nearly-identical ones). AWS
+# CLI is added here, as root before the switch to the unprivileged frappe user below, purely so
+# those tasks can `aws s3 cp`/`aws s3 sync` backups to/from the backups-archive bucket and read the
+# MariaDB root credential from Secrets Manager, without vendoring a second S3/Secrets Manager client.
+#
+# frappe/erpnext's own image already ends on `USER frappe` (not root), so we have to switch back to
+# root explicitly here or apt-get fails with "Permission denied" on /var/lib/apt/lists/partial
+# (exit code 100) instead of ever reaching a package-resolution error.
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends awscli jq && rm -rf /var/lib/apt/lists/*
+
 USER frappe
 WORKDIR /home/frappe/frappe-bench
 
@@ -39,6 +52,12 @@ RUN bench get-app education --branch version-15.2 https://github.com/frappe/educ
 # script, not a Frappe app with its own doctypes/migrations.
 COPY --chown=frappe:frappe infra/deploy/erpnext/seed/ /home/frappe/frappe-bench/erpnext_seed/
 ENV PYTHONPATH=/home/frappe/frappe-bench
+
+# infra/terraform/modules/backup's site-backup/restore-drill task definitions override `command` to
+# run one of these directly (e.g. ["bash", "erpnext-backup.sh"]) — same "COPY the script in, select
+# it via the task's own command override" shape as erpnext_seed/ above, not a bench app.
+COPY --chown=frappe:frappe infra/deploy/erpnext/backup/*.sh /home/frappe/frappe-bench/
+RUN chmod +x /home/frappe/frappe-bench/erpnext-backup.sh /home/frappe/frappe-bench/erpnext-restore-drill.sh
 
 # No EXPOSE, no ENTRYPOINT/CMD override: modules/erpnext's task-definition templates set the
 # actual command per role (gunicorn for backend, node for websocket, bench worker/schedule for

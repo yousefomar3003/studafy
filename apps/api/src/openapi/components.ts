@@ -20,10 +20,11 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
  * by apps/web, where attaching zod-to-openapi metadata would drag an OpenAPI generator into a
  * browser bundle for no benefit. Composing its primitives from here is the intended relationship.
  *
- * No route serves these today: the API has no domain endpoints, and it has no authentication with
- * which to scope one to a tenant. They are registered as components so the contract for the entities
- * is settled and reviewable now, and so the first authenticated route references a schema that has
- * already been checked against the database.
+ * No route serves these two specific schemas today — every route with a User- or School-shaped
+ * response projects its own narrower, route-specific schema instead. They stay registered as
+ * components so the full entity contract is settled and reviewable in one place, checked against the
+ * database by tests/openapi/db-conformance.test.ts, independent of which columns any one route
+ * currently chooses to expose.
  */
 
 /** Zod's `.openapi()` is added to the prototype by @hono/zod-openapi's import side effect. */
@@ -112,11 +113,9 @@ export const apiProblemOpenApiSchema = apiProblemSchema.openapi("ProblemDetails"
  * School — which no endpoint serves yet — need registering by hand or they vanish from the artifact
  * and db-conformance.test.ts has nothing to check.
  *
- * bearerAuth is declared but deliberately required by nothing: no operation references it, and the
- * document sets no root-level `security`. Declaring a scheme documents that a token will eventually
- * be the way in; requiring it on an operation that does not check one would document an enforcement
- * this app does not have. It is here so the reference site offers an Authorize control and so the
- * authentication ticket inherits a settled name and shape rather than inventing one.
+ * bearerAuth is registered here rather than left to zod-to-openapi's automatic component collection
+ * because it must exist before the first route that references it via `security: [{ bearerAuth: [] }]`
+ * — same registration-order reasoning as User/School above.
  */
 export function registerOpenApiComponents(app: OpenAPIHono<AppEnv>): void {
   app.openAPIRegistry.register("User", userSchema);
@@ -128,8 +127,8 @@ export function registerOpenApiComponents(app: OpenAPIHono<AppEnv>): void {
     scheme: "bearer",
     bearerFormat: "JWT",
     description:
-      "Not yet implemented. No operation requires it, and no code path validates one — this app " +
-      "has no authentication. Declared so the scheme's shape is settled before the first route " +
-      "needs it.",
+      "RS256 JWT access token, issued by POST /api/auth/login/oauth (or the mobile/mock OAuth " +
+      "exchange routes) and verified on every /api/* request by jwtAuthMiddleware — see the " +
+      "Authentication guide.",
   });
 }

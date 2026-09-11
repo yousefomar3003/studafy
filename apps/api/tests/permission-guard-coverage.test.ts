@@ -258,6 +258,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // and added to GUARD_EXEMPT_ROUTES below for the same reason the session-lifecycle routes are.
   "POST /api/notifications/{notificationId}/read",
   "POST /api/notifications/read-all",
+  // Data subject requests (ST-268). Guarded by PRIVACY_DSR_MANAGE — filing a DSR about another
+  // user is exactly the "acts on another user's data" case this gate exists for.
+  "POST /api/privacy/dsr",
   // Notification preferences (ST-143). Self-service on the caller's own rows; the mandatory-type
   // and digest-eligibility rules are enforced in the handler and, redundantly, by CHECK constraints
   // in migration 000083 — there is no other user's row this could reach.

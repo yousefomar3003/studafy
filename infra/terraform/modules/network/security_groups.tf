@@ -403,6 +403,74 @@ resource "aws_vpc_security_group_egress_rule" "secrets_rotation_dns_udp" {
   cidr_ipv4         = var.vpc_cidr
 }
 
+# --- Backup (ST-265): weekly Postgres restore-verify task, egresses to the database only -------
+
+# Mirrors secrets_rotation's shape exactly (a scheduled AWS-run task that only ever originates
+# outbound calls) rather than reusing the app or bastion group: this task is neither app-tier
+# traffic nor an interactive operator session, and it must reach the database from a group db's own
+# ingress rules explicitly admit. It does not egress to mariadb — modules/backup's ERPNext drill
+# runs bench backup/restore over EFS instead of a raw MariaDB connection, and reuses
+# erpnext_security_group_id for that (see modules/backup/README.md), so this group only ever needs
+# to reach Postgres and its restored scratch instance (same subnet group, same security group).
+resource "aws_security_group" "backup" {
+  name_prefix = "${var.name_prefix}-backup-"
+  description = "Backup automation (modules/backup): the Postgres restore-verify ECS task. Egresses to the database only."
+  vpc_id      = aws_vpc.this.id
+
+  tags = { Name = "${var.name_prefix}-backup" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_security_group_egress_rule" "backup_to_db" {
+  security_group_id            = aws_security_group.backup.id
+  description                  = "To Postgres and its restored scratch instance, for the row-count/checksum/RLS verification queries"
+  ip_protocol                  = "tcp"
+  from_port                    = var.db_port
+  to_port                      = var.db_port
+  referenced_security_group_id = aws_security_group.db.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "db_from_backup" {
+  security_group_id            = aws_security_group.db.id
+  description                  = "From the backup restore-verify task"
+  ip_protocol                  = "tcp"
+  from_port                    = var.db_port
+  to_port                      = var.db_port
+  referenced_security_group_id = aws_security_group.backup.id
+}
+
+# Same coarse IP-based control point as secrets_rotation_https/pgbouncer_https above: the task's
+# own AWS API calls (RDS restore/describe/delete, Secrets Manager, S3) route through this ENI.
+resource "aws_vpc_security_group_egress_rule" "backup_https" {
+  security_group_id = aws_security_group.backup.id
+  description       = "HTTPS to the RDS/Secrets Manager/S3 APIs"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "backup_dns_tcp" {
+  security_group_id = aws_security_group.backup.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "tcp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
+}
+
+resource "aws_vpc_security_group_egress_rule" "backup_dns_udp" {
+  security_group_id = aws_security_group.backup.id
+  description       = "DNS to the VPC resolver"
+  ip_protocol       = "udp"
+  from_port         = 53
+  to_port           = 53
+  cidr_ipv4         = var.vpc_cidr
+}
+
 # --- MariaDB (ERPNext plane): reachable only from the erpnext tier and the bastion -------
 
 resource "aws_security_group" "mariadb" {

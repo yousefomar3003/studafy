@@ -13,6 +13,7 @@ import {
 } from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
 import { scheduleAbandonedImportSweepJob } from "./queues/imports";
+import { scheduleClosureSweepJob } from "./queues/maintenance";
 import {
   createSesSender,
   scheduleDigestJob,
@@ -192,6 +193,12 @@ const announcementPublishRedis = createRedisConnection(env);
 void scheduleAnnouncementPublishJob(announcementPublishRedis).then(() =>
   announcementPublishRedis.disconnect(),
 );
+
+// Tenant-closure sweep scheduler (ST-268): idempotently register the daily 08:30 sweep on the
+// maintenance queue, after dunning and seat reconciliation so a school suspended overnight is
+// already `closed` before this sweep looks for it.
+const closureSweepRedis = createRedisConnection(env);
+void scheduleClosureSweepJob(closureSweepRedis).then(() => closureSweepRedis.disconnect());
 
 console.log(
   `Workers started for queues: ${QUEUE_REGISTRY.map((definition) => definition.name).join(", ")} (${env.NODE_ENV})`,

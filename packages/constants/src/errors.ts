@@ -219,6 +219,14 @@ export const ERROR_CODES = {
   AUDIT_LOG_EXPORT_NOT_FOUND: "AUDIT_LOG_EXPORT_NOT_FOUND",
   AUDIT_LOG_EXPORT_UNAVAILABLE: "AUDIT_LOG_EXPORT_UNAVAILABLE",
 
+  // Data subject requests (ST-268) — GDPR export/erasure pipeline.
+  DSR_NOT_FOUND: "DSR_NOT_FOUND",
+  DSR_UNAVAILABLE: "DSR_UNAVAILABLE",
+  // The subject already has a queued or processing request of this type — filing a second would
+  // race the first's claim rather than usefully queue behind it.
+  DSR_ALREADY_PENDING: "DSR_ALREADY_PENDING",
+  DSR_SUBJECT_NOT_FOUND: "DSR_SUBJECT_NOT_FOUND",
+
   // Announcement management (ST-194). The audience class named at compose time doesn't exist in
   // this school.
   ANNOUNCEMENT_CLASS_NOT_FOUND: "ANNOUNCEMENT_CLASS_NOT_FOUND",

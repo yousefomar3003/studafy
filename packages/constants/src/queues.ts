@@ -25,6 +25,12 @@ export const QUEUE_NAMES = {
   // from ai-ingestion because this queue calls the LLM plane (a different failure mode and latency
   // budget than parse/OCR/embed) rather than only transforming already-ingested text.
   AI_EXAM_GENERATION: "ai-exam-generation",
+  // GDPR export/erasure pipeline (ST-268). Carries the tenant-closure sweep and every data subject
+  // request (export or erasure, tenant- or user-scoped) apps/workers/src/queues/maintenance drains
+  // from app.data_subject_requests. Separate from `reports`: a DSR outcome is a structured bundle or
+  // an in-place redaction, not one rendered artifact, and its retry/failure posture (never silently
+  // drop a legal obligation) does not belong mixed in with report generation's.
+  MAINTENANCE: "maintenance",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -137,6 +143,21 @@ export const JOB_NAMES = {
   // synchronously for an immediate send. Registered on the notifications queue via Job Scheduler,
   // since it is a notifications-shaped concern, not a report or import one.
   PUBLISH_DUE_ANNOUNCEMENTS: "publish-due-announcements",
+  // Scheduled tenant-closure sweep (ST-268). Carries no payload: reads every school whose
+  // subscription has reached 'closed' (packages/billing's state machine) and, per school, files the
+  // one export request the closure needs and -- once it has completed and the retention hold has
+  // elapsed -- the one erasure request that follows it. Idempotent by construction: it only ever
+  // files a row that does not already exist (app.data_subject_requests). Registered on the
+  // maintenance queue via Job Scheduler.
+  RUN_TENANT_CLOSURE_SWEEP: "run-tenant-closure-sweep",
+  // One data subject request, export half (ST-268). Carries only the request id and school id --
+  // the request's scope (tenant/user), subject and reason are read from app.data_subject_requests at
+  // claim time, the same "queue carries identity, the row carries the rest" split
+  // GENERATE_AUDIT_EXPORT already uses.
+  RUN_DATA_SUBJECT_EXPORT: "run-data-subject-export",
+  // One data subject request, erasure half (ST-268). Same payload shape as the export job above;
+  // dispatched to a different processor because an erasure has no artifact to render and upload.
+  RUN_DATA_SUBJECT_ERASURE: "run-data-subject-erasure",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

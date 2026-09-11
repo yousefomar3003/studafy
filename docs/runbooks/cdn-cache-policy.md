@@ -103,12 +103,35 @@ change in place — a low number would point at something serving assets outside
 pattern (this module's `immutable_asset_path_pattern` variable exists specifically so that pattern
 can be corrected without editing the module if `apps/web`'s build output layout ever changes).
 
+## A second site shares this bucket: the API reference (ST-269)
+
+`.github/workflows/staging-deploy.yml`'s `deploy-docs` job (mirrored in `prod-deploy.yml`) is the
+bucket's first real writer — not apps/web (see "Known gaps" below), but `apps/docs-api`'s static
+API reference site, published under the `docs/api/` key prefix rather than the bucket root apps/web
+would occupy. It reuses `module.cdn`'s bucket, distribution, and `cdn_deploy_role_arn` as-is — no
+Terraform change was needed, since the deploy role's `s3:PutObject`/`s3:DeleteObject` grant is
+already scoped to the whole bucket ARN (`deploy.tf`), not a sub-path, and the distribution's default
+cache behavior (the no-cache class above) already applies to any path outside `assets/*` without
+being told about `docs/api/` specifically.
+
+This is a deliberate, narrow reuse, not a redesign of the bucket's purpose: `docs/api/` is an
+independent static site with its own build (`apps/docs-api`) and its own deploy job, sharing
+infrastructure that already exists and was otherwise unused — it does not resolve, or depend on the
+resolution of, apps/web's own still-open CDN-vs-container question below.
+
+One real limitation comes along with that reuse: `default_root_object` only rewrites the bundle's
+literal root (`/`), not every sub-path, so a request to `.../docs/api/latest/` with no filename
+403s through `custom_error_response` to apps/web's own `index.html` rather than the docs site's.
+Every page the site generates links to `index.html` explicitly for its own navigation for exactly
+this reason — link to `.../docs/api/latest/index.html`, not the bare directory.
+
 ## Known gaps
 
-- No `.github/workflows` file wires the sync+invalidate sequence above into CI yet — same status
-  as `modules/registry`'s known gaps. `cdn_deploy_role_arn`, `cdn_web_bundle_bucket_id` and
-  `cdn_distribution_id` are the three outputs that workflow will need once it's written, a
-  separate CI-scoped ticket.
+- No `.github/workflows` file wires apps/web's own sync+invalidate sequence above into CI yet —
+  same status as `modules/registry`'s known gaps, and unrelated to `docs/api/`'s deploy job above:
+  the CDN-vs-container question for apps/web itself remains open (see `staging-deploy.yml`'s
+  `smoke` job comment). `cdn_deploy_role_arn`, `cdn_web_bundle_bucket_id` and `cdn_distribution_id`
+  are the three outputs that workflow will need once it's written.
 - `modules/cdn` is not instantiated for `dev` (`infra/terraform/main.tf`'s `count` on
   `module.cdn`) — dev serves `apps/web` from the local Vite dev server (`http://localhost:5173`,
   `dev.tfvars`'s `web_origin`), not a deployed bundle, so there is nothing to put a CDN in front of

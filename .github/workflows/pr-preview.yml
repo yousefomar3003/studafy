@@ -82,7 +82,7 @@ jobs:
       # the diff, so semgrep's github-actions-mutable-action-tag rule catches every reference
       # (same reasoning, same pinned SHAs, as staging-deploy.yml / prod-deploy.yml).
       - if: env.ELIGIBLE == 'true'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Load preview environment handles
         if: env.ELIGIBLE == 'true'
@@ -169,7 +169,7 @@ jobs:
         run: echo "Preview not enabled for this event — no per-PR database to build. See the guard job."
 
       - if: env.ELIGIBLE == 'true'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - if: env.ELIGIBLE == 'true'
         uses: ./.github/actions/setup-bun-workspace
       - if: env.ELIGIBLE == 'true'
@@ -204,7 +204,7 @@ jobs:
         run: echo "Preview not enabled for this event — nothing to deploy. See the guard job."
 
       - if: env.ELIGIBLE == 'true'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - if: env.ELIGIBLE == 'true'
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:

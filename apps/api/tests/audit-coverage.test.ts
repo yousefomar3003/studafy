@@ -302,6 +302,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // modules/notifications/notification-service.ts.
   "POST /api/notifications/{notificationId}/read",
   "POST /api/notifications/read-all",
+  // Data subject requests (ST-268). Filing inserts app.data_subject_requests inside a tenant
+  // transaction — see modules/privacy/routes.ts.
+  "POST /api/privacy/dsr",
   // Notification preferences (ST-143). Audit rows are written from inside
   // notification-preferences-service.ts's updatePreferences, alongside the preference writes — see
   // routes/notification-preferences-routes.ts.

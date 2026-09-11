@@ -10,3 +10,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/): group en
 when it required the `version-bump` label.
 
 ## Unreleased
+
+### Added
+
+- `POST /api/privacy/dsr` — file a GDPR export or erasure request for one user
+  (`PRIVACY_DSR_MANAGE`). ST-268.
+- `GET /api/privacy/dsr/{requestId}` — read a data subject request's status and, once a completed
+  export, a short-lived download URL. ST-268.
