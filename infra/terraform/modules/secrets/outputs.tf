@@ -8,6 +8,11 @@ output "service_iam_policy_arns" {
   value       = { for k, v in aws_iam_policy.service_secrets : k => v.arn }
 }
 
+output "service_names" {
+  description = "Set of service_iam_policy_arns's keys, computed from var.services (a plain variable) rather than from aws_iam_policy.service_secrets (a resource) — a caller for_each-ing over service_iam_policy_arns's keys directly hits Terraform's 'known only after apply' limitation for a map built from a resource's own attributes; this output stays statically known across the module boundary instead. See module.compute's secrets_service_names for the consumer."
+  value       = toset(keys(var.services))
+}
+
 output "postgres_rotation_lambda_arn" {
   description = "ARN of the AWS-published RDS-Postgres single-user rotation Lambda (deployed via the Serverless Application Repository), wired to rotate module.postgres's master credential every postgres_rotation_days days."
   value       = aws_serverlessapplicationrepository_cloudformation_stack.postgres_rotation.outputs["RotationLambdaARN"]

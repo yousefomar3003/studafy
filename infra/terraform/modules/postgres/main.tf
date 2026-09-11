@@ -113,9 +113,21 @@ resource "aws_db_instance" "this" {
 # secretsmanager:GetSecretValue rather than assembling a connection string from several
 # Terraform outputs. The master password never appears in a `terraform output`.
 resource "aws_db_instance" "read_replica" {
+  # RDS refuses to create a read replica from a source with automated backups disabled
+  # (InvalidDBInstanceState: "Automated backups are not enabled for this database instance") —
+  # found on this module's first real apply, against an account whose Free Tier restriction forced
+  # backup_retention_days to 0 (see root variables.tf's postgres_backup_retention_days). This isn't
+  # account-specific: RDS enforces it everywhere, so the replica is unconditionally impossible
+  # whenever backups are off, not just on this account. See outputs.tf's read_replica_address for
+  # what callers (module.pgbouncer's read pools) get instead when this is absent.
+  count = var.backup_retention_days > 0 ? 1 : 0
+
   identifier = "${var.name_prefix}-postgres-read"
 
-  replicate_source_db = aws_db_instance.this.identifier
+  # Must be the source instance's ARN, not its identifier, whenever db_subnet_group_name is also
+  # set (AWS RDS API requirement) — found on this module's first real apply, no ambiguity in the
+  # provider error: `"replicate_source_db" must be an ARN when "db_subnet_group_name" is set.`
+  replicate_source_db = aws_db_instance.this.arn
   instance_class      = var.instance_class
   port                = var.port
 

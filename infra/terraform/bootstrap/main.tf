@@ -143,10 +143,15 @@ resource "aws_iam_role" "terraform_apply" {
 
 # PowerUserAccess covers the service resources. The scoped IAM statement below is the minimum
 # additional capability Terraform needs to create Studafy task, deploy, and service roles.
+#
+# for_each is local.environments (the same static set aws_iam_role.terraform_apply itself uses),
+# not aws_iam_role.terraform_apply directly — for_each over a whole for_each'd resource can't be
+# resolved until that resource is fully applied, which breaks `terraform import`/first apply on an
+# empty account: found running the bootstrap stack for real for the first time.
 resource "aws_iam_role_policy_attachment" "terraform_power_user" {
-  for_each = aws_iam_role.terraform_apply
+  for_each = local.environments
 
-  role       = each.value.name
+  role       = aws_iam_role.terraform_apply[each.value].name
   policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
 }
 
@@ -205,10 +210,10 @@ data "aws_iam_policy_document" "terraform_iam" {
 }
 
 resource "aws_iam_role_policy" "terraform_iam" {
-  for_each = aws_iam_role.terraform_apply
+  for_each = local.environments
 
   name   = "studafy-scoped-iam-management"
-  role   = each.value.id
+  role   = aws_iam_role.terraform_apply[each.value].id
   policy = data.aws_iam_policy_document.terraform_iam.json
 }
 

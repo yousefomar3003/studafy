@@ -59,6 +59,23 @@ variable "secrets_service_iam_policy_arns" {
   default     = {}
 }
 
+variable "secrets_service_names" {
+  description = <<-EOT
+    Set of service names present in secrets_service_iam_policy_arns's keys, from
+    module.secrets.service_names — passed separately rather than derived here via
+    `keys(var.secrets_service_iam_policy_arns)` because that map's value is itself
+    `{ for k, v in <a for_each'd resource> : k => v.arn }` in module.secrets: a map built from a
+    resource's attributes loses its statically-known key set once it crosses a module output
+    boundary (Terraform cannot prove the key set at plan time even though it never actually
+    varies), which broke execution_secrets' for_each on this module's first real apply
+    ("var.secrets_service_iam_policy_arns is a map of string, known only after apply"). This set
+    is `keys(var.services)` taken inside module.secrets — a plain variable, not a resource
+    attribute — so it stays statically known across the boundary.
+  EOT
+  type        = set(string)
+  default     = []
+}
+
 variable "app_files_bucket_arn" {
   description = "ARN of the application files bucket used to scope API and worker task-role access."
   type        = string

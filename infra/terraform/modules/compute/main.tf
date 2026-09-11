@@ -66,7 +66,7 @@ resource "aws_iam_role_policy_attachment" "execution_managed" {
 # grants exactly the secretsmanager:GetSecretValue calls needed to resolve whichever ARNs a task
 # definition's `secrets` array references. See variables.tf's secrets_service_iam_policy_arns.
 resource "aws_iam_role_policy_attachment" "execution_secrets" {
-  for_each = { for service, arn in var.secrets_service_iam_policy_arns : service => arn if service != "migrations" }
+  for_each = { for s in var.secrets_service_names : s => var.secrets_service_iam_policy_arns[s] if s != "migrations" }
 
   role       = aws_iam_role.execution.name
   policy_arn = each.value

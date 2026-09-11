@@ -40,9 +40,9 @@ resource "aws_s3_bucket" "this" {
 }
 
 resource "aws_s3_bucket_ownership_controls" "this" {
-  for_each = aws_s3_bucket.this
+  for_each = local.buckets
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.this[each.key].id
 
   rule {
     object_ownership = "BucketOwnerEnforced"
@@ -50,9 +50,9 @@ resource "aws_s3_bucket_ownership_controls" "this" {
 }
 
 resource "aws_s3_bucket_public_access_block" "this" {
-  for_each = aws_s3_bucket.this
+  for_each = local.buckets
 
-  bucket                  = each.value.id
+  bucket                  = aws_s3_bucket.this[each.key].id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -60,9 +60,9 @@ resource "aws_s3_bucket_public_access_block" "this" {
 }
 
 resource "aws_s3_bucket_versioning" "this" {
-  for_each = aws_s3_bucket.this
+  for_each = local.buckets
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.this[each.key].id
 
   versioning_configuration {
     # Object Lock requires versioning on the security bucket; the other two match modules/storage's
@@ -76,9 +76,9 @@ resource "aws_s3_bucket_versioning" "this" {
 # waiver (.trivyignore) if customer-managed keys become a requirement.
 #trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-  for_each = aws_s3_bucket.this
+  for_each = local.buckets
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.this[each.key].id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -91,9 +91,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
 # Belt-and-suspenders alongside the public access block: no object in any of these buckets is ever
 # reachable over plaintext HTTP, even if a future policy change slips.
 resource "aws_s3_bucket_policy" "deny_insecure_transport" {
-  for_each = aws_s3_bucket.this
+  for_each = local.buckets
 
-  bucket = each.value.id
+  bucket = aws_s3_bucket.this[each.key].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -104,8 +104,8 @@ resource "aws_s3_bucket_policy" "deny_insecure_transport" {
         Principal = "*"
         Action    = "s3:*"
         Resource = [
-          each.value.arn,
-          "${each.value.arn}/*",
+          aws_s3_bucket.this[each.key].arn,
+          "${aws_s3_bucket.this[each.key].arn}/*",
         ]
         Condition = {
           Bool = { "aws:SecureTransport" = "false" }

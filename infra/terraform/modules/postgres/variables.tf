@@ -30,9 +30,9 @@ variable "port" {
 }
 
 variable "engine_version" {
-  description = "Postgres engine version. Must be a 16.x release — the module's parameter group family is hardcoded to postgres16."
+  description = "Postgres engine version. Must be a 16.x release — the module's parameter group family is hardcoded to postgres16. 16.4 (this default until this account's first real apply, 2026-09-11) is no longer offered by RDS at all (`InvalidParameterCombination: Cannot find version 16.4 for postgres`) — 16.15 is RDS's newest 16.x release in eu-central-1 as of that date; re-check `aws rds describe-db-engine-versions --engine postgres` before assuming this stays current."
   type        = string
-  default     = "16.4"
+  default     = "16.15"
 
   validation {
     condition     = can(regex("^16\\.", var.engine_version))

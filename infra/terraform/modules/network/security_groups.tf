@@ -543,7 +543,7 @@ resource "aws_vpc_security_group_ingress_rule" "erpnext_from_app" {
 
 resource "aws_vpc_security_group_ingress_rule" "erpnext_nfs_self" {
   security_group_id            = aws_security_group.erpnext.id
-  description                  = "NFS for the shared EFS 'sites' volume, between ERPNext tasks and their EFS mount targets"
+  description                  = "NFS for the shared EFS sites volume, between ERPNext tasks and their EFS mount targets"
   ip_protocol                  = "tcp"
   from_port                    = 2049
   to_port                      = 2049
@@ -552,7 +552,7 @@ resource "aws_vpc_security_group_ingress_rule" "erpnext_nfs_self" {
 
 resource "aws_vpc_security_group_egress_rule" "erpnext_nfs_self" {
   security_group_id            = aws_security_group.erpnext.id
-  description                  = "NFS for the shared EFS 'sites' volume, between ERPNext tasks and their EFS mount targets"
+  description                  = "NFS for the shared EFS sites volume, between ERPNext tasks and their EFS mount targets"
   ip_protocol                  = "tcp"
   from_port                    = 2049
   to_port                      = 2049
@@ -636,7 +636,7 @@ resource "aws_vpc_security_group_ingress_rule" "monitoring_from_app" {
 
 resource "aws_vpc_security_group_ingress_rule" "monitoring_from_bastion" {
   security_group_id            = aws_security_group.monitoring.id
-  description                  = "From the bastion, Grafana dashboards (SSH port-forward — see docs/runbooks/metrics-dashboard-catalog.md)"
+  description                  = "From the bastion, Grafana dashboards (SSH port-forward - see docs/runbooks/metrics-dashboard-catalog.md)"
   ip_protocol                  = "tcp"
   from_port                    = var.grafana_port
   to_port                      = var.grafana_port
@@ -802,7 +802,7 @@ resource "aws_vpc_security_group_egress_rule" "monitoring_dns_udp" {
 # reaches Loki on var.loki_port, which the 443-only monitoring_https rule above does not cover.
 resource "aws_vpc_security_group_egress_rule" "monitoring_to_loki" {
   security_group_id            = aws_security_group.monitoring.id
-  description                  = "To Loki, Grafana's Loki datasource (ST-261)"
+  description                  = "To Loki, the Grafana Loki datasource (ST-261)"
   ip_protocol                  = "tcp"
   from_port                    = var.loki_port
   to_port                      = var.loki_port
@@ -818,7 +818,7 @@ resource "aws_vpc_security_group_egress_rule" "monitoring_to_loki" {
 # nothing else. Vector has no inbound listener at all — it pulls from SQS.
 resource "aws_security_group" "logging" {
   name_prefix = "${var.name_prefix}-logging-"
-  description = "Log-aggregation plane (Vector, Loki): Loki's API reachable only from the bastion, Grafana and Vector; HTTPS egress to AWS APIs only."
+  description = "Log-aggregation plane (Vector, Loki): the Loki API reachable only from the bastion, Grafana and Vector; HTTPS egress to AWS APIs only."
   vpc_id      = aws_vpc.this.id
 
   tags = { Name = "${var.name_prefix}-logging" }
@@ -848,7 +848,7 @@ resource "aws_vpc_security_group_ingress_rule" "logging_from_bastion" {
 
 resource "aws_vpc_security_group_ingress_rule" "logging_from_monitoring" {
   security_group_id            = aws_security_group.logging.id
-  description                  = "From the monitoring plane, Grafana's Loki datasource"
+  description                  = "From the monitoring plane, the Grafana Loki datasource"
   ip_protocol                  = "tcp"
   from_port                    = var.loki_port
   to_port                      = var.loki_port
@@ -976,7 +976,7 @@ resource "aws_vpc_security_group_egress_rule" "bastion_to_mariadb" {
 
 resource "aws_vpc_security_group_egress_rule" "bastion_to_loki" {
   security_group_id            = aws_security_group.bastion.id
-  description                  = "To Loki, for log search (SSH port-forward — logcli / the PII audit script, ST-261)"
+  description                  = "To Loki, for log search (SSH port-forward - logcli / the PII audit script, ST-261)"
   ip_protocol                  = "tcp"
   from_port                    = var.loki_port
   to_port                      = var.loki_port

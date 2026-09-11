@@ -53,9 +53,9 @@ resource "aws_ecr_repository" "this" {
 # existing tag lands as a new, unreferenced digest) and from manifest cleanup — same "versioning
 # without cleanup is unbounded growth" reasoning as modules/storage's noncurrent-version rule.
 resource "aws_ecr_lifecycle_policy" "untagged" {
-  for_each = aws_ecr_repository.this
+  for_each = local.repositories
 
-  repository = each.value.name
+  repository = aws_ecr_repository.this[each.key].name
 
   policy = jsonencode({
     rules = [
@@ -328,8 +328,8 @@ data "aws_iam_policy_document" "repository_policy" {
 }
 
 resource "aws_ecr_repository_policy" "this" {
-  for_each = aws_ecr_repository.this
+  for_each = local.repositories
 
-  repository = each.value.name
+  repository = aws_ecr_repository.this[each.key].name
   policy     = data.aws_iam_policy_document.repository_policy.json
 }
