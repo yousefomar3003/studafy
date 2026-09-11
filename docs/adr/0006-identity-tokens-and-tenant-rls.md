@@ -84,3 +84,10 @@ decisions are recorded here. Roles are already fixed by ADR-0002 (`@studafy/cons
   (ADR-0002): RLS answers "which school's rows", authorization answers "may this role do this".
 - The OAuth-callback lookup by `(provider, subject)` runs in a flow that must establish the
   correct `app.school_id`; wiring that flow is application work outside this migration.
+
+## Related decisions
+
+The tenancy model, the RLS conventions behind `apply_tenant_isolation`, the access-token JWT
+strategy, and the session-channel policy are recorded in [ADR-0008](0008-tenancy-model.md),
+[ADR-0015](0015-rls-conventions.md), [ADR-0014](0014-jwt-strategy.md), and
+[ADR-0016](0016-channel-policy.md).

@@ -15,7 +15,10 @@ The ST-071 ticket cites **SAD section 13** as the source of the session and auth
 requirements. **The SAD is not in this repository.** The design below is taken from the ticket's own
 stated requirements, from the token-family model already committed in `000007` and described in
 [`docs/api/auth-data-model.md`](../api/auth-data-model.md), and from
-[ADR 0006](../adr/0006-identity-tokens-and-tenant-rls.md). **This document does not claim that the
+[ADR 0006](../adr/0006-identity-tokens-and-tenant-rls.md). The access-token JWT strategy, the RLS
+conventions, and the channel policy used throughout this document are recorded in
+[ADR-0014](../adr/0014-jwt-strategy.md), [ADR-0015](../adr/0015-rls-conventions.md), and
+[ADR-0016](../adr/0016-channel-policy.md). **This document does not claim that the
 unavailable SAD text was inspected.** If the SAD later contradicts it, a follow-up ticket reconciles
 the two. `SAD_28_logging_conventions.md`, `000018`, and `docs/api/global-data-erd.md` all record the
 same gap for their own sections.

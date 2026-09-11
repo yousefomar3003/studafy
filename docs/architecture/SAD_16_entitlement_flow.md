@@ -15,6 +15,9 @@ inspected.** If the SAD later contradicts it, a follow-up ticket reconciles the 
 Three parts of the ticket describe a system that did not exist here. Each is called out at the point
 where this implementation diverges, with the reason.
 
+The JWT staleness mechanism and the outbox relay this flow consumes are recorded in
+[ADR-0014](../adr/0014-jwt-strategy.md) and [ADR-0012](../adr/0012-transactional-outbox.md).
+
 ## The problem this closes
 
 `apps/api/src/middleware/tenant-lifecycle.ts` enforces the entire subscription lifecycle state
