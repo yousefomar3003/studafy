@@ -3,6 +3,9 @@ import { Button, Select, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { helpPath } from "../../help/content";
+import { HelpLink } from "../../help/HelpLink";
+
 import { STATUS_LABELS } from "./constants";
 import { CreateVersionModal } from "./CreateVersionModal";
 import { useDeleteVersion, useSubmitVersion } from "./mutations";
@@ -165,6 +168,9 @@ export default function TimetableBuilderPage() {
         <div>
           <h1>Timetable builder</h1>
           <p>Build a weekly schedule, resolve scheduling conflicts, and submit it for review.</p>
+          <p>
+            <HelpLink to={helpPath("timetable")}>Read the guide</HelpLink>
+          </p>
         </div>
       </div>
 

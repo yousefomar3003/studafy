@@ -1,6 +1,8 @@
 import { Button, Card, CardBody, Checkbox, Input } from "@studafy/ui";
 import { useState } from "react";
 
+import { HelpLink } from "../../../features/help/HelpLink";
+import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
 import { fieldErrors, timetableSchema, WEEKDAYS } from "../schema";
 
 import type { TimetableValues } from "../schema";
@@ -82,6 +84,9 @@ export function TimetableStep({
           <p>
             Reserve the weekly structure now — period start and end times can be finalized once you
             add classes, teachers, and rooms.
+          </p>
+          <p>
+            <HelpLink to={onboardingStepHelpPath("timetable")}>Need help with this step?</HelpLink>
           </p>
 
           <Input

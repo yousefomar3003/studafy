@@ -1,6 +1,9 @@
 import { Tabs } from "@studafy/ui";
 import { useState } from "react";
 
+import { helpPath } from "../../help/content";
+import { HelpLink } from "../../help/HelpLink";
+
 import { BulkInviteModal } from "./BulkInviteModal";
 import { BulkInviteProgressPanel } from "./BulkInviteProgressPanel";
 import { BulkInvitesBoard } from "./BulkInvitesBoard";
@@ -38,6 +41,9 @@ export default function InvitationsListPage() {
   return (
     <>
       <h1>Invitations</h1>
+      <p>
+        <HelpLink to={helpPath("invitations")}>Read the guide</HelpLink>
+      </p>
 
       <Tabs defaultValue="invitations">
         <Tabs.List>

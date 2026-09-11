@@ -1,0 +1,289 @@
+/**
+ * Help center. Owns its own stylesheet matching the rest of the app (each feature owns its own
+ * css — see `admin/students/students.css`'s doc comment for the rationale). Uses the shared design
+ * tokens exclusively: no hard-coded colours, sizes, or font choices.
+ */
+
+/* --- Public shell --- */
+
+.help-shell {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: var(--space-24);
+}
+
+.help-shell__header {
+  margin-bottom: var(--space-32);
+}
+
+.help-shell__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  text-decoration: none;
+  color: var(--color-foreground);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.help-shell__brand:hover {
+  text-decoration: underline;
+}
+
+.help-shell__brand-separator {
+  color: var(--color-muted-foreground);
+}
+
+/* --- Home / catalog --- */
+
+.help-home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.help-home__tagline {
+  color: var(--color-muted-foreground);
+  max-width: 60ch;
+}
+
+.help-home__empty {
+  color: var(--color-muted-foreground);
+}
+
+/* --- Search --- */
+
+.help-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  max-width: 400px;
+}
+
+.help-search__label {
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.help-search__input {
+  width: 100%;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.help-search__input:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* --- Category headings and list --- */
+
+.help-category {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.help-category__title {
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted-foreground);
+  margin: 0;
+}
+
+.help-category__list {
+  display: grid;
+  gap: var(--space-8);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.help-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--color-foreground);
+  transition: border-color var(--duration-base) var(--easing-standard);
+}
+
+.help-card:hover {
+  border-color: var(--color-muted-foreground);
+}
+
+.help-card__title {
+  font-weight: var(--font-weight-medium);
+}
+
+.help-card__description {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+  line-height: 1.5;
+}
+
+/* --- Article page --- */
+
+.help-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.help-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.help-breadcrumbs__separator {
+  color: var(--color-muted-foreground);
+}
+
+.help-breadcrumbs__current {
+  color: var(--color-muted-foreground);
+}
+
+.help-article__title {
+  margin: 0;
+}
+
+.help-article__description {
+  margin: 0;
+  color: var(--color-muted-foreground);
+}
+
+/* --- Inline content styles --- */
+
+.help-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  line-height: 1.6;
+}
+
+.help-content > *:first-child {
+  margin-top: 0;
+}
+
+.help-content > *:last-child {
+  margin-bottom: 0;
+}
+
+.help-content h2 {
+  font-size: var(--font-size-xl);
+  margin: var(--space-32) 0 var(--space-8);
+}
+
+.help-content h3 {
+  font-size: var(--font-size-lg);
+  margin: var(--space-24) 0 var(--space-8);
+}
+
+.help-content h4 {
+  font-size: var(--font-size-base);
+  margin: var(--space-24) 0 var(--space-4);
+}
+
+.help-content h2:target,
+.help-content h3:target,
+.help-content h4:target {
+  scroll-margin-top: var(--space-24);
+  border-left: 3px solid var(--color-primary);
+  padding-left: var(--space-8);
+}
+
+.help-content ul,
+.help-content ol {
+  padding-left: var(--space-16);
+}
+
+.help-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.help-content th,
+.help-content td {
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.help-content th {
+  background-color: var(--color-surface);
+  font-weight: var(--font-weight-medium);
+}
+
+.help-content blockquote {
+  margin: var(--space-8) 0;
+  padding: var(--space-12) var(--space-16);
+  border-left: 3px solid var(--color-muted-foreground);
+  background: var(--color-surface);
+  color: var(--color-muted-foreground);
+}
+
+.help-content pre {
+  overflow-x: auto;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-16);
+}
+
+.help-content code {
+  font-size: var(--font-size-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.help-content :not(pre) > code {
+  background: var(--color-surface);
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-md);
+}
+
+.help-content__link {
+  color: var(--color-primary);
+}
+
+.help-content__link:hover {
+  text-decoration: underline;
+}
+
+.help-content__img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+/* --- Inline contextual help link (wizard steps, feature pages) --- */
+
+.help-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+  text-decoration: none;
+}
+
+.help-link:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.help-link__icon {
+  flex-shrink: 0;
+  vertical-align: middle;
+}

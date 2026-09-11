@@ -22,13 +22,14 @@ export function RootLayout() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const isMarketing = MARKETING_PATHS.has(pathname);
+  const isHelp = pathname.startsWith("/help");
 
   return (
     <>
       <a className="skip-link" href="#main">
         {t("shell.skipToContent")}
       </a>
-      {!isMarketing && (
+      {!isMarketing && !isHelp && (
         <header>
           <nav aria-label={t("shell.primaryNavAriaLabel")}>
             <Link to="/">{t("rootNav.home")}</Link>

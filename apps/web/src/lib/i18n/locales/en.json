@@ -21,6 +21,19 @@
     "portal": "Portal",
     "account": "Account"
   },
+  "help": {
+    "title": "Help center",
+    "tagline": "Guides for school administrators: onboarding, invitations, timetable, finance, and subscription management.",
+    "searchLabel": "Search the help center",
+    "searchPlaceholder": "Search help…",
+    "noResults": "No articles match your search.",
+    "backHome": "Back to help center",
+    "articleNotFoundTitle": "Article not found",
+    "articleNotFoundBody": "This article doesn’t exist or was moved.",
+    "open": "Open help center",
+    "needHelpWithStep": "Need help with this step?",
+    "readGuide": "Read the guide"
+  },
   "localeSwitcher": {
     "label": "Language"
   },
