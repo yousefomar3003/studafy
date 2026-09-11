@@ -42,7 +42,7 @@ jobs:
       ERPNEXT_API_URL: ${{ secrets.E2E_ERPNEXT_API_URL }}
       ERPNEXT_API_KEY: ${{ secrets.E2E_ERPNEXT_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-bun-workspace
       - name: Build the workspace packages the API and web app import
         run: bunx turbo run build --filter=@studafy/api^... --filter=@studafy/web^...
