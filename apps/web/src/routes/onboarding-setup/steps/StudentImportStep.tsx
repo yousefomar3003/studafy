@@ -13,6 +13,8 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { HelpLink } from "../../../features/help/HelpLink";
+import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
 import { api } from "../../../lib/api";
 import { buildImportErrorReportCsv, downloadTextFile } from "../../../lib/csv";
 
@@ -121,6 +123,9 @@ export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImpor
     <Card>
       <CardBody>
         <h2>Student import</h2>
+        <p>
+          <HelpLink to={onboardingStepHelpPath("students")}>Need help with this step?</HelpLink>
+        </p>
 
         {banner ? <p role="alert">{banner}</p> : null}
 

@@ -41,3 +41,14 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/**
+ * Raw Markdown articles from the repo-root `docs/help` directory, imported through the `@docs`
+ * Vite alias with `?raw` (see `vite.config.ts` and `src/features/help/articles.ts`). The alias is a
+ * runtime-only Vite construct, so TypeScript resolves the whole specifier to this ambient
+ * declaration instead of doing real path resolution (which `?raw` would break anyway).
+ */
+declare module "@docs/*.md?raw" {
+  const contents: string;
+  export default contents;
+}

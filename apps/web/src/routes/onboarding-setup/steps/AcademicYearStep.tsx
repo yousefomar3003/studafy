@@ -1,6 +1,8 @@
 import { Button, Card, CardBody, Input } from "@studafy/ui";
 import { useState } from "react";
 
+import { HelpLink } from "../../../features/help/HelpLink";
+import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
 import { academicYearSchema, fieldErrors } from "../schema";
 
 import type { AcademicYearValues } from "../schema";
@@ -52,6 +54,11 @@ export function AcademicYearStep({
         <form onSubmit={handleSubmit} noValidate aria-label="Academic year">
           <h2>Academic year</h2>
           <p>This becomes your school's current academic year, with one term spanning it.</p>
+          <p>
+            <HelpLink to={onboardingStepHelpPath("academicYear")}>
+              Need help with this step?
+            </HelpLink>
+          </p>
 
           <Input
             label="Year code"

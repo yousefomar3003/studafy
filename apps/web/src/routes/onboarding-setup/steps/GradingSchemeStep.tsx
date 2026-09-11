@@ -1,6 +1,8 @@
 import { Button, Card, CardBody, Input, Select } from "@studafy/ui";
 import { useState } from "react";
 
+import { HelpLink } from "../../../features/help/HelpLink";
+import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
 import { fieldErrors, GRADING_SCHEME_TYPES, gradingSchemeSchema } from "../schema";
 
 import type { GradeBoundaryRow, GradingSchemeValues } from "../schema";
@@ -122,6 +124,11 @@ export function GradingSchemeStep({
       <CardBody>
         <form onSubmit={handleSubmit} noValidate aria-label="Grading scheme">
           <h2>Grading scheme</h2>
+          <p>
+            <HelpLink to={onboardingStepHelpPath("gradingScheme")}>
+              Need help with this step?
+            </HelpLink>
+          </p>
 
           <Input
             label="Scheme name"

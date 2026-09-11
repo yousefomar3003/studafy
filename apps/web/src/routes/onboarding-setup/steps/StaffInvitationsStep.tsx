@@ -1,6 +1,8 @@
 import { Button, Card, CardBody, Select } from "@studafy/ui";
 import { useState } from "react";
 
+import { HelpLink } from "../../../features/help/HelpLink";
+import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
 import { parseEmailList, staffInviteBatchSchema, STAFF_INVITE_ROLES } from "../schema";
 
 import type { StaffInviteBatch } from "../schema";
@@ -77,6 +79,9 @@ export function StaffInvitationsStep({ onNext, onSkip, submitting }: StaffInvita
         <form onSubmit={handleSubmit} noValidate aria-label="Staff invitations">
           <h2>Staff invitations</h2>
           <p>Invite staff by role. Paste one email per line, or separate them with commas.</p>
+          <p>
+            <HelpLink to={onboardingStepHelpPath("staff")}>Need help with this step?</HelpLink>
+          </p>
 
           {batches.map((batch, index) => (
             <fieldset key={index}>

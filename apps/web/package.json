@@ -12,6 +12,7 @@
     "test": "bun test src",
     "e2e": "playwright test",
     "e2e:a11y": "playwright test --config=playwright.a11y.config.ts",
+    "e2e:help-screenshots": "playwright test --config=playwright.screenshots.config.ts",
     "e2e:critical": "playwright test --config=playwright.critical.config.ts",
     "e2e:critical:flake-check": "bun e2e/critical/support/check-flake-rate.ts",
     "e2e:smoke": "playwright test --config=playwright.smoke.config.ts",
@@ -29,7 +30,9 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-i18next": "15.7.4",
+    "react-markdown": "10.1.0",
     "react-router-dom": "6.30.6",
+    "remark-gfm": "4.0.1",
     "zod": "4.1.12"
   },
   "devDependencies": {

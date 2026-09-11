@@ -2,6 +2,8 @@ import { Button, Card, CardBody, Checkbox, Input, Select } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { HelpLink } from "../../../features/help/HelpLink";
+import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
 import { api } from "../../../lib/api";
 import { fieldErrors, LOCALE_OPTIONS, schoolProfileSchema } from "../schema";
 
@@ -94,6 +96,11 @@ export function SchoolProfileStep({
         <form onSubmit={handleSubmit} noValidate aria-label="School profile">
           <h2>School profile</h2>
           <p>These defaults apply across your school and can be changed later from settings.</p>
+          <p>
+            <HelpLink to={onboardingStepHelpPath("schoolProfile")}>
+              Need help with this step?
+            </HelpLink>
+          </p>
 
           <Select
             label="Default language"

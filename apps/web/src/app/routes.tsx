@@ -3,6 +3,7 @@ import { lazy } from "react";
 
 import { RouteError } from "../components/RouteError";
 import { AccountLayout } from "../layouts/AccountLayout";
+import { HelpLayout } from "../layouts/HelpLayout";
 import { MarketingLayout } from "../layouts/MarketingLayout";
 import { OnboardingLayout } from "../layouts/OnboardingLayout";
 import { PortalLayout } from "../layouts/PortalLayout";
@@ -87,6 +88,8 @@ const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 const AiSubscriptionPurchasePage = lazy(
   () => import("../features/billing/AiSubscriptionPurchasePage"),
 );
+const HelpHomePage = lazy(() => import("../features/help/HelpHomePage"));
+const HelpArticlePage = lazy(() => import("../features/help/HelpArticlePage"));
 
 /**
  * Application route tree, shared by the browser router (`main.tsx`) and the memory router used in
@@ -133,7 +136,6 @@ export const routes: RouteObject[] = [
         children: [{ index: true, element: <OnboardingPage /> }],
       },
       {
-        // Post-activation: the admin is already signed in, unlike the public registration flow above.
         path: "onboarding/setup",
         element: (
           <RequireAuth>
@@ -149,6 +151,15 @@ export const routes: RouteObject[] = [
               </RequirePermission>
             ),
           },
+        ],
+      },
+      {
+        // Public help center, separate from the marketing shell — no `RequireAuth`.
+        path: "help",
+        element: <HelpLayout />,
+        children: [
+          { index: true, element: <HelpHomePage /> },
+          { path: ":slug", element: <HelpArticlePage /> },
         ],
       },
       {

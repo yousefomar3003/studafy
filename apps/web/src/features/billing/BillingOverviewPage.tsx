@@ -3,6 +3,9 @@ import { Button, Card, useToast } from "@studafy/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { helpPath } from "../help/content";
+import { HelpLink } from "../help/HelpLink";
+
 import { CancelSubscriptionModal } from "./CancelSubscriptionModal";
 import { ChangePlanModal } from "./ChangePlanModal";
 import { DunningBanner } from "./DunningBanner";
@@ -71,6 +74,9 @@ export default function BillingOverviewPage() {
     <>
       <h1>Billing</h1>
       <p>Plan, seats, payment method, invoice history, and subscription cancellation.</p>
+      <p>
+        <HelpLink to={helpPath("subscriptions")}>Read the guide</HelpLink>
+      </p>
 
       {overviewQuery.isError ? (
         <p className="billing-overview__notice" role="alert">

@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import { useTranslation } from "../../lib/i18n";
 
 import { LocaleSwitcher } from "./LocaleSwitcher";
@@ -43,6 +45,19 @@ export function PortalHeader({ navId, navOpen, onToggleNav }: PortalHeaderProps)
       <span className="portal-header__brand">Studafy</span>
 
       <div className="portal-header__actions">
+        <Link to="/help" className="portal-icon-button" aria-label={t("help.open")}>
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <path
+              d="M7.8 8a2.4 2.4 0 1 1 3.4 2.2c-.7.4-1.1.8-1.1 1.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            <circle cx="10" cy="14.2" r="1" fill="currentColor" />
+          </svg>
+        </Link>
         <LocaleSwitcher />
         <NotificationBell />
         <UserMenu />

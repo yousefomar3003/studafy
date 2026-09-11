@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
 
+import { helpPath } from "../help/content";
+import { HelpLink } from "../help/HelpLink";
+
 import { AgingBucketsChartTile } from "./tiles/AgingBucketsChartTile";
 import { CollectionsVsDueTile } from "./tiles/CollectionsVsDueTile";
 import { OverdueInstallmentsListTile } from "./tiles/OverdueInstallmentsListTile";
@@ -23,6 +26,9 @@ export default function FinanceDashboardPage() {
       <h1>Finance</h1>
       <p>
         Collections vs due this term, receivables aging, overdue installments, and recent payments.
+      </p>
+      <p>
+        <HelpLink to={helpPath("workflows")}>Read the guide</HelpLink>
       </p>
       <p>
         <Link to="/portal/finance/fees">Fee structure builder</Link>
