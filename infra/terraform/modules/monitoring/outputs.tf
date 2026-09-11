@@ -31,6 +31,18 @@ output "deploys_log_group_name" {
   value       = aws_cloudwatch_log_group.deploys.name
 }
 
+# --- Black-box synthetic availability probes (ST-263) --------------------------------------------
+
+output "synthetics_probe_function_name" {
+  description = "Name of the black-box synthetic probe Lambda — the same name in both var.aws_region and synthetics_dr_region, since Lambda function names are scoped per region — or null when synthetics are disabled."
+  value       = var.synthetics_enabled ? aws_lambda_function.synthetics_probe[0].function_name : null
+}
+
+output "availability_slo_dashboard_name" {
+  description = "CloudWatch dashboard name for the NFR-03 availability SLO (ST-263), or null when synthetics are disabled."
+  value       = var.synthetics_enabled ? aws_cloudwatch_dashboard.availability_slo[0].dashboard_name : null
+}
+
 # --- Prometheus/Grafana metrics stack (ST-259) ---------------------------------------------------
 
 output "metrics_discovery_service_arns" {
