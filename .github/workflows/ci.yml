@@ -727,7 +727,7 @@ jobs:
   alerting:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-bun-workspace
       # Is the PromQL valid, do the durations parse, are the rule groups well-formed. Run from the
       # exact image tag infra/docker/prometheus.Dockerfile builds from, so "valid" here means valid
