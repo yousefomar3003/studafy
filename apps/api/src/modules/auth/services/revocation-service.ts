@@ -60,6 +60,7 @@ export const REVOCATION_REASONS = {
   REVOKE_SESSION: "revoke_session",
   REVOKE_DEVICE: "revoke_device",
   REVOKE_ALL_DEVICES: "revoke_all_devices",
+  REVOKE_OTHERS: "revoke_others",
   ADMIN_REVOKE_DEVICE: "admin_revoke_device",
   ADMIN_REVOKE_ALL_DEVICES: "admin_revoke_all_devices",
 } as const;
@@ -81,8 +82,12 @@ export type RevocationScope =
   | { kind: "session"; sessionId: string }
   /** Every family bound to one device. */
   | { kind: "device"; deviceId: string }
-  /** Every family the user has, on any device. */
-  | { kind: "user" };
+  /**
+   * Every family the user has, on any device. `exceptFamilyId` narrows this to "every session but
+   * one" — the shape self-service "sign out other sessions" needs, so the caller's own request
+   * cannot revoke the credential it is authenticated with.
+   */
+  | { kind: "user"; exceptFamilyId?: string };
 
 export interface RevocationResult {
   /** Refresh-token rows moved to revoked. Zero means nothing matched — see the note on oracles. */
@@ -196,7 +201,9 @@ function revokeScope(
             )`
         : scope.kind === "device"
           ? tx`AND rt.device_id = ${scope.deviceId}`
-          : tx``;
+          : scope.exceptFamilyId !== undefined
+            ? tx`AND rt.family_id != ${scope.exceptFamilyId}`
+            : tx``;
 
   return tx<RevokedRow[]>`
     WITH targeted AS (

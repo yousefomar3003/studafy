@@ -87,6 +87,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
+  // Self-service "sign out other sessions" (ST-280). Revokes every family the caller holds except
+  // the one behind the presented refresh token; audit row written from inside
+  // revokeAndDenylist's transaction, same as the other revocation paths above.
+  "POST /api/auth/sessions/revoke-others",
   "DELETE /api/auth/devices/{deviceId}/sessions",
   // Device token registration (ST-218). Self-service upsert on the caller's own user_devices
   // row; auditAction("register", "user_devices") is declared in session-routes.ts.

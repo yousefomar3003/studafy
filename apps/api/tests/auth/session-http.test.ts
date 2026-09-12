@@ -383,6 +383,78 @@ describe("session management", () => {
     });
     expect(after.status).toBe(401);
   });
+
+  integrationTest("revoke-others keeps the current session and ends the rest", async () => {
+    const user = tenant.users.PARENT;
+    const current = await createRefreshSession(sql, tenant.schoolId, user.id, {
+      channel: "mobile",
+    });
+    const other = await createRefreshSession(sql, tenant.schoolId, user.id, { channel: "mobile" });
+    const elsewhere = await createRefreshSession(sql, tenant.schoolId, user.id, { channel: "web" });
+
+    const bearer = await mintTestToken(keyStore, { schoolId: tenant.schoolId, userId: user.id });
+    const res = await post("/api/auth/sessions/revoke-others", {
+      headers: { Authorization: `Bearer ${bearer}`, "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: current.token }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { revoked: number };
+    expect(body.revoked).toBeGreaterThanOrEqual(2);
+
+    const rows = await sql<{ id: string; revoked_at: Date | null }[]>`
+      SELECT id, revoked_at FROM app.refresh_tokens
+       WHERE id IN (${current.sessionId}, ${other.sessionId}, ${elsewhere.sessionId})
+    `;
+    const revokedAtById = new Map(rows.map((r) => [r.id, r.revoked_at]));
+
+    expect(revokedAtById.get(current.sessionId)).toBeNull();
+    expect(revokedAtById.get(other.sessionId)).not.toBeNull();
+    expect(revokedAtById.get(elsewhere.sessionId)).not.toBeNull();
+
+    // The kept session goes on refreshing normally.
+    const refreshed = await post("/api/auth/refresh", {
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: current.token }),
+    });
+    expect(refreshed.status).toBe(200);
+  });
+
+  integrationTest("revoke-others refuses to guess when no token was presented", async () => {
+    const user = tenant.users.STUDENT;
+    const bearer = await mintTestToken(keyStore, { schoolId: tenant.schoolId, userId: user.id });
+
+    const res = await post("/api/auth/sessions/revoke-others", {
+      headers: { Authorization: `Bearer ${bearer}`, "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    // A 400, matching /api/auth/refresh's own contract for a missing credential — this cannot
+    // fall back to "revoke everything", which would end the very session the request came in on.
+    expect(res.status).toBe(400);
+  });
+
+  integrationTest("revoke-others refuses a token that isn't the caller's own", async () => {
+    const caller = tenant.users.STUDENT;
+    const someoneElse = tenant.users.SUPER_ADMIN;
+    const foreign = await createRefreshSession(sql, tenant.schoolId, someoneElse.id, {
+      channel: "mobile",
+    });
+
+    const bearer = await mintTestToken(keyStore, { schoolId: tenant.schoolId, userId: caller.id });
+    const res = await post("/api/auth/sessions/revoke-others", {
+      headers: { Authorization: `Bearer ${bearer}`, "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: foreign.token }),
+    });
+
+    expect(res.status).toBe(400);
+
+    // And the mismatch changed nothing about the foreign session.
+    const [row] = await sql<{ revoked_at: Date | null }[]>`
+      SELECT revoked_at FROM app.refresh_tokens WHERE id = ${foreign.sessionId}
+    `;
+    expect(row!.revoked_at).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

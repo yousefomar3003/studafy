@@ -49,6 +49,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
+  // Self-service "sign out other sessions" (ST-280). Revokes only the caller's own families.
+  "POST /api/auth/sessions/revoke-others",
   "DELETE /api/auth/devices/{deviceId}/sessions",
   // Device token registration (ST-218). Self-service; RLS-scoped to the caller's own row.
   "POST /api/auth/devices",
@@ -331,6 +333,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
+  // Self-service "sign out other sessions" (ST-280) — caller's own families only.
+  "POST /api/auth/sessions/revoke-others",
   "DELETE /api/auth/devices/{deviceId}/sessions",
   // Device token registration (ST-218). Self-service upsert; caller's own user_devices row.
   "POST /api/auth/devices",

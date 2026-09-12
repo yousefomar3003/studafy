@@ -258,6 +258,7 @@ extending the vocabulary `session-service.ts` already writes:
 | `logout_single`                | `POST /api/auth/logout`                               |
 | `revoke_session`               | `DELETE /api/auth/sessions/{sessionId}`               |
 | `revoke_device`                | Either `/api/auth/devices/…` route                    |
+| `revoke_others`                | `POST /api/auth/sessions/revoke-others` (ST-280)      |
 | `admin_revoke_device`          | `DELETE /api/admin/users/{userId}/devices/{deviceId}` |
 | `admin_revoke_all_devices`     | `DELETE /api/admin/users/{userId}/devices`            |
 | `refresh_token_reuse_detected` | ST-071 reuse detection                                |
