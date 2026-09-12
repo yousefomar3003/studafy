@@ -109,6 +109,7 @@ import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobil
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { privacyRoutes } from "./modules/privacy";
 import { childComparisonRoutes } from "./modules/reports";
+import { searchRoutes } from "./modules/search";
 import { storageRoutes } from "./modules/storage";
 import {
   checkoutRoutes,
@@ -876,6 +877,18 @@ export function createApp({
   // enqueued.
   if (database) {
     app.route("/", materialRoutes(database, storage, redis ?? null));
+  }
+
+  // Global search (ST-278). Role-scoped Postgres full-text search across students, users,
+  // invoices, and materials, grouped per type. Depends on the student records, user, finance, and
+  // materials modules above only for the tables it reads (app.students, app.users,
+  // app.invoice_cache, app.materials) -- it registers its own route and needs nothing from their
+  // route factories. Section visibility is decided per request from the caller's own permissions
+  // (STUDENT_READ / USER_READ / BILLING_READ / MATERIAL_READ); no mount-time guard is possible
+  // since every authenticated caller may call it, just with a different subset of sections
+  // populated.
+  if (database) {
+    app.route("/", searchRoutes(database));
   }
 
   // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm,

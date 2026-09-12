@@ -689,6 +689,9 @@ integrationTest(
         "idx_refresh_tokens_school_user_active",
         // Added by 000030 for ST-072: batch revocation with INCLUDE for access_jti/access_expires_at.
         "idx_refresh_tokens_school_user_device_active",
+        // Added by 000110 for ST-278: GIN index over the GENERATED search_tsv column backing
+        // GET /api/search's full-text lookup by display name / email.
+        "idx_users_search_tsv",
       ]);
 
       // Seed representative refresh-token families so the planner can distinguish the selective
