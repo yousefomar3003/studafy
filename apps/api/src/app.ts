@@ -53,7 +53,6 @@ import {
   aiUsageRoutes,
   createAiTokenMeter,
   createConceptsCache,
-  createDeterministicCrossEncoderReranker,
   createDeterministicQueryEmbedder,
   createSummaryCache,
 } from "./modules/ai";
@@ -141,6 +140,7 @@ import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
 import type { AiModelTier, LlmProvider } from "./modules/ai";
 import type { KeyStore } from "./modules/auth";
+import type { FlagsService } from "./modules/flags";
 import type { MobileReleaseConfig } from "./modules/mobile";
 import type { PaymentProviderPort } from "./modules/subscriptions";
 import type { RedisClient } from "./redis";
@@ -195,12 +195,14 @@ export interface AppOptions {
    */
   docsEnabled?: boolean;
   /**
-   * Cross-encoder re-ranking (ST-163) kill switch. When true, the hybrid-retrieval route mounts with
-   * a re-ranker that re-scores the fused top-20 and returns the top 6. Off by default so an unset
-   * environment deploys the previous RRF-only behavior. Injected rather than read from the
-   * environment in here, so a test can exercise both arms without mutating the environment.
+   * Feature-flag service (ST-277). Evaluates `ai.rerank` and `ai.llm` against deployment defaults
+   * (`AI_RERANK_ENABLED` / `AI_LLM_ENABLED`) plus per-tenant overrides (`app.feature_flags`),
+   * Redis-cached. Null (or absent) when nothing wired the service — the OpenAPI generator, bare
+   * route tests — in which case every flag evaluates to its registry default: re-ranking off, LLM
+   * surfaces 503 AI_LLM_DISABLED. Constructed in src/index.ts, the only place with the environment
+   * and the database together.
    */
-  aiRerankEnabled?: boolean;
+  flags?: FlagsService | null;
   /**
    * LLM provider for the gateway (ST-164). Null (or absent) when the AI_LLM_ENABLED kill switch is
    * off: the generate route still registers — so the published contract does not depend on a
@@ -276,7 +278,7 @@ export function createApp({
   jwtRefreshTtlSeconds = 30 * 24 * 60 * 60,
   securityEventSink,
   docsEnabled = false,
-  aiRerankEnabled = false,
+  flags = null,
   aiLlmProvider = null,
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
@@ -967,15 +969,15 @@ export function createApp({
     // Hybrid retrieval (ST-162). Mounted under the same gate so a search reserves and commits the
     // caller's AI quota, and only when the gate's dependencies (a database for entitlements, Redis
     // for the meter) exist — the retrieval surface must never run un-metered. Cross-encoder
-    // re-ranking (ST-163) rides the AI_RERANK_ENABLED kill switch: off, the route returns the raw
-    // RRF ranking; on, the deterministic re-ranker is constructed here and swapped in at the one
-    // place the route depends on.
+    // re-ranking (ST-163) rides the `ai.rerank` feature flag: off (the default), the route returns
+    // the raw RRF ranking; on, the deterministic re-ranker is constructed inside the route factory
+    // and applied per request, so a flipped per-tenant override lands on the next read.
     app.route(
       "/",
       aiRetrievalRoutes({
         database,
         embedder: createDeterministicQueryEmbedder(),
-        reranker: aiRerankEnabled ? createDeterministicCrossEncoderReranker() : null,
+        flags,
       }),
     );
     // LLM gateway (ST-164). Mounted under the same gate so a generation reserves and commits the
@@ -987,6 +989,7 @@ export function createApp({
       aiGatewayRoutes({
         database,
         provider: aiLlmProvider,
+        flags,
         modelOverrides: aiLlmModelOverrides,
       }),
     );
@@ -999,6 +1002,7 @@ export function createApp({
       aiAskRoutes({
         database,
         provider: aiLlmProvider,
+        flags,
         embedder: createDeterministicQueryEmbedder(),
         modelOverrides: aiLlmModelOverrides,
       }),
@@ -1014,6 +1018,7 @@ export function createApp({
       aiSummaryRoutes({
         database,
         provider: aiLlmProvider,
+        flags,
         cache: createSummaryCache(redis),
         modelOverrides: aiLlmModelOverrides,
       }),
@@ -1029,6 +1034,7 @@ export function createApp({
       aiConceptsRoutes({
         database,
         provider: aiLlmProvider,
+        flags,
         cache: createConceptsCache(redis),
         modelOverrides: aiLlmModelOverrides,
       }),
@@ -1043,6 +1049,7 @@ export function createApp({
       aiExplainRoutes({
         database,
         provider: aiLlmProvider,
+        flags,
         modelOverrides: aiLlmModelOverrides,
       }),
     );
@@ -1055,6 +1062,7 @@ export function createApp({
       aiQuizRoutes({
         database,
         provider: aiLlmProvider,
+        flags,
         modelOverrides: aiLlmModelOverrides,
       }),
     );
@@ -1068,6 +1076,7 @@ export function createApp({
       aiFlashcardRoutes({
         database,
         provider: aiLlmProvider,
+        flags,
         modelOverrides: aiLlmModelOverrides,
       }),
     );

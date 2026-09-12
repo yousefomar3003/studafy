@@ -9,6 +9,7 @@ import { standardResponses } from "../../../openapi/responses";
 import { getAiQuota } from "../gate/entitlement-gate";
 import { estimateQueryTokens } from "../retrieval/embeddings";
 import {
+  createDeterministicCrossEncoderReranker,
   RERANK_CANDIDATE_POOL,
   RERANK_K,
   rerankHits,
@@ -24,6 +25,7 @@ import { recordDurableUsage } from "../usage/durable";
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { FlagsService } from "../../flags";
 import type { QueryEmbedder } from "../retrieval/embeddings";
 import type { Context } from "hono";
 
@@ -37,10 +39,12 @@ import type { Context } from "hono";
  * material title, page number, and section heading — so this endpoint is the retrieval half of a
  * RAG answer, and nothing else.
  *
- * When a re-ranker is wired in (ST-163, gated on the `AI_RERANK_ENABLED` kill switch), the route asks
- * the fusion for a full `RERANK_CANDIDATE_POOL` candidates and cuts the re-scored pool to `RERANK_K`.
- * Both the retrieval surfaces — Ask AI and exam mode — resolve to this endpoint, so one switch flips
- * the re-ranking stage for both.
+ * When the `ai.rerank` feature flag is on (ST-163, per-tenant overridable; its deployment default
+ * is `AI_RERANK_ENABLED`), the route asks the fusion for a full `RERANK_CANDIDATE_POOL` candidates
+ * and cuts the re-scored pool to `RERANK_K`. Both the retrieval surfaces — Ask AI and exam mode —
+ * resolve to this endpoint, so one flag flips the re-ranking stage for both. The flag is evaluated
+ * per request, so a flip propagates within the flag cache TTL (see docs/database/
+ * feature-flags-data-model.md) without a deploy.
  *
  * The route rides the ST-155 AI gate: the gate has already reserved a quota hold when the handler
  * runs, and the handler commits the query's embedding cost (the four-chars-per-token rule) and
@@ -160,12 +164,17 @@ export function aiRetrievalRoutes(deps: {
   database: Database;
   embedder: QueryEmbedder;
   /**
-   * The cross-encoder re-ranker (ST-163). Null (or absent) when the `AI_RERANK_ENABLED` kill switch
-   * is off: the route then returns the fused ranking untouched. `app.ts` owns this decision.
+   * Feature-flag service evaluating `ai.rerank` (ST-163). Off, or null when nothing wired the
+   * service (bare route tests, the OpenAPI generator), the route returns the fused RRF ranking
+   * untouched. Evaluated per request so a flip lands on the next read, not the next deploy; the
+   * deployment default is `AI_RERANK_ENABLED`.
    */
-  reranker?: CrossEncoderReranker | null;
+  flags?: FlagsService | null;
 }): OpenAPIHono<AppEnv> {
-  const { database, embedder, reranker = null } = deps;
+  const { database, embedder, flags = null } = deps;
+  // Deterministic and state-free: construct once per app and reuse across schools. The per-request
+  // _decision_ to apply it is the flag's job, not construction's.
+  const reranker: CrossEncoderReranker = createDeterministicCrossEncoderReranker();
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to declare
@@ -180,6 +189,10 @@ export function aiRetrievalRoutes(deps: {
     const body = c.req.valid("json");
     const quota = getAiQuota(c);
 
+    // Per-request flag evaluation: a flipped `ai.rerank` override lands on this school's next read,
+    // bounded by the flag cache TTL. Without a flags service (no db/redis) the stage stays off.
+    const rerankEnabled = flags ? await flags.get("ai.rerank", { schoolId: auth.schoolId }) : false;
+
     const queryVector = embedder.embed(body.query);
     const tokensUsed = estimateQueryTokens(body.query);
 
@@ -189,7 +202,7 @@ export function aiRetrievalRoutes(deps: {
         queryVector,
         // The re-ranker needs the full fused top-N to choose from; without it, respect the caller's
         // limit as before.
-        limit: reranker ? RERANK_CANDIDATE_POOL : clampLimit(body.limit),
+        limit: rerankEnabled ? RERANK_CANDIDATE_POOL : clampLimit(body.limit),
       });
       await recordDurableUsage(tx, auth.schoolId, studentId, {
         totalTokens: tokensUsed,
@@ -216,7 +229,7 @@ export function aiRetrievalRoutes(deps: {
 
     let hits = result.hits;
     let rerankScores: ReadonlyMap<string, number> = new Map();
-    if (reranker && result.hits.length > 0) {
+    if (rerankEnabled && result.hits.length > 0) {
       const reranked = await rerankHits(body.query, result.hits, reranker);
       hits = reranked.hits;
       rerankScores = reranked.scores;

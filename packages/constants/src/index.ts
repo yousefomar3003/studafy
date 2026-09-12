@@ -32,5 +32,11 @@ export {
 export type { DeadLetterQueueName, JobName, QueueName } from "./queues";
 export { ROLES } from "./roles";
 export type { Role } from "./roles";
+export {
+  FEATURE_FLAGS,
+  flagDefault,
+  type FeatureFlagDefinition,
+  type FlagName,
+} from "./feature-flags";
 export { SUBSCRIPTION_STATUSES } from "./subscription-status";
 export type { SubscriptionStatus } from "./subscription-status";

@@ -237,10 +237,14 @@ fused result cannot contain another school's chunk — asserted in `packages/db/
 ## Cross-encoder re-ranking (ST-163)
 
 RRF fuses _ranks_; it never re-scores. ST-163 adds the second stage that closes that gap: the fused
-top-20 is scored jointly against the query and cut to a re-scored top-6. It is **feature-flagged** — the
-`AI_RERANK_ENABLED` kill switch in the API's environment schema, off by default so an unset environment
-deploys the previous RRF-only behavior, and read at bootstrap the same way every other knob in the
-repository is read.
+top-20 is scored jointly against the query and cut to a re-scored top-6.
+
+The stage is **feature-flagged** (`ai.rerank` in `@studafy/constants`' `FEATURE_FLAGS` registry),
+off by default so an unset environment deploys the previous RRF-only behavior. The flag is
+evaluated by the feature-flag service at `apps/api/src/modules/flags` **per request** — a flipped
+per-tenant override in `app.feature_flags` lands on the next read (bounded by the flag cache TTL),
+not on the next deploy. Its deployment default is the `AI_RERANK_ENABLED` environment variable;
+see `docs/database/feature-flags-data-model.md` for the precedence and the flip workflow.
 
 The repository declares no ML runtime, so the default re-ranker is the same honest deterministic mock
 the embeddings use (`mock-cross-encoder@1`): it scores a (query, chunk) pair by the fraction of the

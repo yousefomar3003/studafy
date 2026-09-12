@@ -15,6 +15,7 @@ import type { Database } from "../../../db/client";
 import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { FlagsService } from "../../flags";
 import type { AiQuotaHandle } from "../gate/entitlement-gate";
 import type { LlmGenerateInput, LlmGeneration, LlmProvider } from "../llm/provider";
 
@@ -102,7 +103,11 @@ function fakeProvider(opts: { error?: unknown; calls?: LlmGenerateInput[] }): Ll
 
 function buildGatewayApp(
   provider: LlmProvider | null,
-  opts: { modelOverrides?: Record<string, string>; handle?: AiQuotaHandle } = {},
+  opts: {
+    modelOverrides?: Record<string, string>;
+    handle?: AiQuotaHandle;
+    flags?: FlagsService | null;
+  } = {},
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
   app.use("*", async (c, next) => {
@@ -116,6 +121,7 @@ function buildGatewayApp(
     aiGatewayRoutes({
       database: fakeDatabase().database,
       provider,
+      flags: opts.flags,
       modelOverrides: opts.modelOverrides,
     }),
   );
@@ -139,6 +145,22 @@ async function postGenerate(
 describe("POST /api/ai/students/{studentId}/generate", () => {
   test("a null provider answers 503 AI_LLM_DISABLED", async () => {
     const app = buildGatewayApp(null);
+
+    const res = await postGenerate(app, { feature: "ask", prompt: "hello" });
+    const body = (await res.json()) as { code: string };
+
+    expect(res.status).toBe(503);
+    expect(body.code).toBe(ERROR_CODES.AI_LLM_DISABLED);
+  });
+
+  test("a provider present with ai.llm off answers 503 AI_LLM_DISABLED", async () => {
+    // The per-tenant kill switch beats the deployment default: the env may be on (the provider was
+    // built), but this school's `feature_flags` row says off. The guard must refuse before the
+    // provider is ever called.
+    const flags: FlagsService = {
+      get: async () => false,
+    };
+    const app = buildGatewayApp(fakeProvider({}), { flags });
 
     const res = await postGenerate(app, { feature: "ask", prompt: "hello" });
     const body = (await res.json()) as { code: string };
