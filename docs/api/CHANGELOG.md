@@ -13,6 +13,13 @@ when it required the `version-bump` label.
 
 ### Added
 
+- `POST /api/announcements` — compose a school/role/class-targeted announcement, published
+  immediately or, when `scheduled_at` is in the future, by the workers' publish sweep.
+  `mandatory: true` sends as the un-optoutable `ADMIN_ANNOUNCEMENT` type; `mandatory: false` as
+  `ANNOUNCEMENT`, which recipients may disable. Callers holding `notification:send` but not
+  `notification:manage` may compose only a non-mandatory notice to a class they teach. ST-194 / ST-238.
+- `GET /api/announcements` — keyset-paginated school announcement history, newest first, with each
+  row's reach snapshot (`recipient_count` / `notified_count`). `notification:manage`. ST-194.
 - `POST /api/privacy/dsr` — file a GDPR export or erasure request for one user
   (`PRIVACY_DSR_MANAGE`). ST-268.
 - `GET /api/privacy/dsr/{requestId}` — read a data subject request's status and, once a completed
