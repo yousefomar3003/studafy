@@ -526,6 +526,9 @@ integrationTest(
         "idx_parent_child_links_school_family_student_parent",
         "idx_parent_child_links_school_student_parent",
         "idx_students_nationality_country_id",
+        // Added by 000110 for ST-278: GIN index over the GENERATED search_tsv column backing
+        // GET /api/search's full-text lookup by name / admission number.
+        "idx_students_search_tsv",
       ]);
       expect(indexes.some((index) => /\(school_id\)$/.test(index.definition))).toBe(false);
 
