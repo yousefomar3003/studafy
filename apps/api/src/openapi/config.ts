@@ -284,5 +284,14 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "add-on active, then quota available -- with a distinct HTTP status per stage (403, 402, " +
         "429). Mounted only when a database, Redis, and the entitlement service are all present.",
     },
+    {
+      name: "Search",
+      description:
+        "Global full-text search across students, users, invoices, and materials, grouped per " +
+        "type. Every caller may call it; which sections come back populated depends on the " +
+        "caller's own STUDENT_READ / USER_READ / BILLING_READ / MATERIAL_READ permissions, and " +
+        "which rows appear within a populated section is enforced by the same row-level security " +
+        "each type's own list endpoint already applies.",
+    },
   ],
 };
