@@ -115,6 +115,15 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
  */
 export const DEFAULT_ROUTE_CLASS: RouteClass = "default";
 
+/**
+ * Paths the rate limiter never touches. The orchestrator and synthetics poll these on a fixed
+ * cadence from shared egress points, so throttling them would both 429 a probe and produce noise
+ * in the buckets it shares with real traffic. Kept here (not in the lowercase middleware) so the
+ * registry and the bypass cannot drift, and so app.test.ts can reuse it instead of hardcoding the
+ * same two strings.
+ */
+export const RATE_LIMIT_EXEMPT_PATHS: readonly string[] = ["/healthz", "/readyz"];
+
 // ---------------------------------------------------------------------------
 // Route-class resolution
 // ---------------------------------------------------------------------------

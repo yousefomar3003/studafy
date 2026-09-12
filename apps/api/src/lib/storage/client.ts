@@ -4,6 +4,7 @@ import {
   CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
@@ -37,6 +38,11 @@ export interface ListedObject {
 
 export interface StorageService {
   readonly ttlSeconds: number;
+  /**
+   * Whether the bucket is reachable and usable. Answers false on any error; used by the readiness
+   * probe (`src/readiness.ts`) with the same null-tolerance contract as checkRedis/checkDatabase.
+   */
+  check(): Promise<boolean>;
   presign(
     key: string,
     method: PresignMethod,
@@ -85,6 +91,15 @@ export function createStorageService(env: Env): StorageService | null {
 
   return {
     ttlSeconds,
+
+    async check() {
+      try {
+        await client.send(new HeadBucketCommand({ Bucket: bucket }));
+        return true;
+      } catch {
+        return false;
+      }
+    },
 
     async presign(key, method, contentType, ttlOverrideSeconds) {
       const expiresIn = ttlOverrideSeconds ?? ttlSeconds;

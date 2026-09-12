@@ -1,7 +1,7 @@
 import { startMetricsServer, startTracing } from "@studafy/observability";
 
 import { createApp } from "./app";
-import { checkDatabase, closeDatabasePools, createDatabase, createReadDatabase } from "./database";
+import { closeDatabasePools, createDatabase, createReadDatabase } from "./database";
 import { loadEnv } from "./env";
 import { RedisCircuitBreaker } from "./lib/circuit-breaker";
 import { createSecurityEventSink } from "./lib/security/securityEventSink";
@@ -18,7 +18,8 @@ import { KeyStore } from "./modules/auth";
 import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
 import { resolveMobileReleaseConfig } from "./modules/mobile";
 import { startEntitlementInvalidationSubscriber, StripeAdapter } from "./modules/subscriptions";
-import { checkRedis, closeRedis, createRedisClient } from "./redis";
+import { createReadinessProbe } from "./readiness";
+import { closeRedis, createRedisClient } from "./redis";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a port.
 const env = loadEnv();
@@ -123,12 +124,20 @@ const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
 });
 await keyStore.init();
 
+// The readiness probe: /readyz's question, composed here rather than in createApp so the app stays
+// dependency-free. The draining flag is synchronous (state.ready flips in the shutdown handler) and
+// short-circuits before any dependency I/O; the probe then races the database/Redis/storage checks
+// against READINESS_TIMEOUT_MS so a hung dependency flips readiness within that bound.
+const readiness = createReadinessProbe({
+  database,
+  readDatabase,
+  redis,
+  storage,
+  timeoutMs: env.READINESS_TIMEOUT_MS,
+});
+
 const app = createApp({
-  isReady: async () =>
-    state.ready &&
-    (await checkDatabase(database)) &&
-    (await checkDatabase(readDatabase)) &&
-    (await checkRedis(redis)),
+  isReady: async () => state.ready && (await readiness()),
   tracker,
   logger,
   redis,

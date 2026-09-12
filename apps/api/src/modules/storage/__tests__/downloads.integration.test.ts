@@ -67,6 +67,7 @@ function fakeStorage(): StorageService & {
   const objects = new Map<string, number>();
   const base: StorageService = {
     ttlSeconds: 900,
+    check: async () => true,
     presign(key, method, contentType, ttlOverrideSeconds): PresignedUrl {
       presignCalls.push({ key, method, contentType, ttl: ttlOverrideSeconds });
       return {

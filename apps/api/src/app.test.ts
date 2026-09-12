@@ -2,7 +2,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { createApp } from "./app";
-import { ROUTE_CLASS_MAP, DEFAULT_ROUTE_CLASS, resolveRouteClass } from "./config/rateLimits";
+import {
+  RATE_LIMIT_EXEMPT_PATHS,
+  ROUTE_CLASS_MAP,
+  DEFAULT_ROUTE_CLASS,
+  resolveRouteClass,
+} from "./config/rateLimits";
 import { createInflightTracker } from "./lifecycle";
 import { createLogger } from "./logger";
 
@@ -27,11 +32,10 @@ describe("security headers", () => {
 describe("rate limiter coverage", () => {
   test("every registered non-health route has a resolvable route class", () => {
     const app = buildApp(() => true);
-    const healthPaths = ["/healthz", "/readyz"];
 
     for (const route of app.routes) {
       const fullPath = (route.basePath + route.path).replace(/\/+/g, "/");
-      if (healthPaths.includes(fullPath)) continue;
+      if (RATE_LIMIT_EXEMPT_PATHS.includes(fullPath)) continue;
 
       const routeClass = resolveRouteClass(fullPath);
       expect(routeClass).toBeDefined();

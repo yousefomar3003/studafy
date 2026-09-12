@@ -28,6 +28,7 @@ function fakeStorage(
 
   const base: StorageService = {
     ttlSeconds: 900,
+    check: async () => true,
     presign(key): PresignedUrl {
       return { url: `https://storage.example/${key}?signed`, expiresAt: new Date(Date.now() + 1) };
     },

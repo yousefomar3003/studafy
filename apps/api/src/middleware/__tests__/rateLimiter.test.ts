@@ -376,6 +376,36 @@ describe("response headers (requires Redis)", () => {
       await client.quit();
     }
   });
+
+  test("health probe paths are exempt: no rate-limit headers, never throttled", async () => {
+    const client = await createTestClient();
+    if (!client) return;
+
+    try {
+      // A 1-token / zero-refill budget would 429 any non-exempt second request — the bypass is
+      // what lets the probes through multiple times with no headers and no bucket consumption.
+      const budget = { maxTokens: 1, refillRate: 0, windowSeconds: 60 };
+      const app = new Hono<AppEnv>();
+      app.use("*", rateLimiterMiddleware({ redis: client, routeClass: "auth", budget }));
+      app.get("/healthz", (c) => c.json({ status: "ok" }));
+      app.get("/readyz", (c) => c.json({ status: "ready" }));
+
+      for (let i = 0; i < 3; i++) {
+        const res = await app.request("/healthz");
+        expect(res.status).toBe(200);
+        expect(res.headers.get("X-RateLimit-Limit")).toBeNull();
+      }
+
+      const ready = await app.request("/readyz");
+      expect(ready.status).toBe(200);
+      expect(ready.headers.get("X-RateLimit-Remaining")).toBeNull();
+    } finally {
+      const window = Math.floor(Date.now() / 1000 / 60);
+      await client.del(`rl:auth:unknown:${window}:tokens`);
+      await client.del(`rl:auth:unknown:${window}:ts`);
+      await client.quit();
+    }
+  });
 });
 
 describe("RFC 9457 compliance on 429 (requires Redis)", () => {
@@ -441,5 +471,39 @@ describe("fail-open behavior", () => {
     const res = await app.request("/test");
     // Should fail open — pass through despite Redis error
     expect(res.status).toBe(200);
+  });
+});
+
+describe("health probe exemption", () => {
+  test("health paths never reach Redis (no script load, no token consumption)", async () => {
+    let scriptCalls = 0;
+    let evalshaCalls = 0;
+    const fakeRedis = {
+      script: async () => {
+        scriptCalls += 1;
+        return "sha";
+      },
+      evalsha: async () => {
+        evalshaCalls += 1;
+        return [10, 1, 0] as [number, number, number];
+      },
+    } as unknown as RedisClient;
+
+    const app = new Hono<AppEnv>();
+    app.use("*", rateLimiterMiddleware({ redis: fakeRedis, routeClass: "auth" }));
+    app.get("/healthz", (c) => c.json({ status: "ok" }));
+    app.get("/readyz", (c) => c.json({ status: "ready" }));
+    app.get("/other", (c) => c.json({ ok: true }));
+
+    await app.request("/healthz");
+    await app.request("/readyz");
+    // The bypass is structural: an exempt path must not consume a token or load the script.
+    expect(scriptCalls).toBe(0);
+    expect(evalshaCalls).toBe(0);
+
+    // Control: a non-exempt path reaches the limiter (whatever script-sha caching earlier tests
+    // left behind, evalsha always fires for a request that is not exempt).
+    await app.request("/other");
+    expect(evalshaCalls).toBe(1);
   });
 });
