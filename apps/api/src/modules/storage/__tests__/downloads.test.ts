@@ -56,6 +56,7 @@ function fakeStorage(): StorageService & { presignCalls: { key: string; ttl?: nu
   return {
     presignCalls,
     ttlSeconds: 900,
+    check: async () => true,
     presign(key, _method, _contentType, ttlOverrideSeconds): PresignedUrl {
       presignCalls.push({ key, ttl: ttlOverrideSeconds });
       return {

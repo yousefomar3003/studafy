@@ -75,6 +75,12 @@ export const envSchema = z
     // @studafy/observability's tracing.ts for why sampling happens at the collector, not here.
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional().or(z.literal("")),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
+    // Upper bound on the /readyz dependency probe (src/readiness.ts). A hung check — a busted pool
+    // slot, an ioredis command retrying in the offline queue — must flip readiness within this
+    // bound, which the acceptance criterion ties to 10 seconds; the cap enforces that contract in
+    // the schema itself. Defaults below the ALB target group's own 5s probe timeout
+    // (infra/terraform/modules/compute/main.tf) so this service answers 503 in time for the edge.
+    READINESS_TIMEOUT_MS: z.coerce.number().int().positive().max(10_000).default(5_000),
     // Derived from the logger's own level names, so an added level cannot drift out of the
     // environment contract. The dependency runs one way: env knows the logger, never the reverse.
     LOG_LEVEL: z.enum(LOG_LEVEL_NAMES).default("info"),

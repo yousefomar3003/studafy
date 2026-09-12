@@ -1,6 +1,11 @@
 import { HTTPException } from "hono/http-exception";
 
-import { RATE_LIMIT_BUDGETS, buildRateLimitKey, resolveRouteClass } from "../config/rateLimits";
+import {
+  RATE_LIMIT_BUDGETS,
+  RATE_LIMIT_EXEMPT_PATHS,
+  buildRateLimitKey,
+  resolveRouteClass,
+} from "../config/rateLimits";
 import { emitRateLimitBlock } from "../modules/auth/auth-anomaly-events";
 
 import type { RouteClass } from "../config/rateLimits";
@@ -181,6 +186,14 @@ export function rateLimiterMiddleware({
   eventSink,
 }: RateLimiterOptions): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
+    // Health probes are exempt by contract (ST-276), not by budget: the orchestrator and synthetics
+    // poll them on a fixed cadence and must never be 429'd or consume a shared bucket. See
+    // config/rateLimits.ts's RATE_LIMIT_EXEMPT_PATHS.
+    if (RATE_LIMIT_EXEMPT_PATHS.includes(c.req.path)) {
+      await next();
+      return;
+    }
+
     if (!redis) {
       await next();
       return;

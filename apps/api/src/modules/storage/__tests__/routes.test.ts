@@ -42,6 +42,7 @@ function fakeStorage(seed: Record<string, number> = {}): StorageService {
   const objects = new Map<string, number>(Object.entries(seed));
   return {
     ttlSeconds: 900,
+    check: async () => true,
     presign(key): PresignedUrl {
       return {
         url: `https://storage.example/${key}?signed`,

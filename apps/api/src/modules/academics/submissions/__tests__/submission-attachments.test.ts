@@ -66,6 +66,7 @@ function fakeStorage(seed: Record<string, number> = {}): StorageService & {
 
   const base: StorageService = {
     ttlSeconds: 900,
+    check: async () => true,
     presign(key): PresignedUrl {
       return {
         url: `https://storage.example/${key}?signed`,

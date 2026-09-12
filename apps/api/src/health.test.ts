@@ -22,6 +22,12 @@ describe("health routes", () => {
     expect(await res.json()).toEqual({ status: "ok" });
   });
 
+  test("GET /healthz returns 200 even when the app is not ready (liveness never consults dependencies)", async () => {
+    const res = await buildApp(() => false).request("/healthz");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok" });
+  });
+
   test("GET /readyz returns 200 ready when the app is ready", async () => {
     const res = await buildApp(() => true).request("/readyz");
     expect(res.status).toBe(200);

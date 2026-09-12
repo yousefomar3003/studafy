@@ -43,6 +43,7 @@ function fakeStorage(
 
   const base: StorageService = {
     ttlSeconds: 900,
+    check: async () => true,
     presign(key): PresignedUrl {
       calls.push(`presign:${key}`);
       return {
