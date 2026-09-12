@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { GlobalSearchTrigger } from "../../features/search/GlobalSearchTrigger";
 import { useTranslation } from "../../lib/i18n";
 
 import { LocaleSwitcher } from "./LocaleSwitcher";
@@ -45,6 +46,7 @@ export function PortalHeader({ navId, navOpen, onToggleNav }: PortalHeaderProps)
       <span className="portal-header__brand">Studafy</span>
 
       <div className="portal-header__actions">
+        <GlobalSearchTrigger />
         <Link to="/help" className="portal-icon-button" aria-label={t("help.open")}>
           <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
             <circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" strokeWidth="1.5" />

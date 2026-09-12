@@ -69,5 +69,27 @@
     "activeSessions_zero": "No active sessions",
     "activeSessions_one": "{{count}} active session",
     "activeSessions_other": "{{count}} active sessions"
+  },
+  "globalSearch": {
+    "triggerLabel": "Search",
+    "title": "Search",
+    "inputLabel": "Search students, users, invoices, and materials",
+    "placeholder": "Search students, users, invoices, materials…",
+    "resultsLabel": "Search results",
+    "groups": {
+      "students": "Students",
+      "users": "Users",
+      "invoices": "Invoices",
+      "materials": "Materials"
+    },
+    "minLengthHint": "Keep typing — search starts at 2 characters.",
+    "loading": "Searching…",
+    "error": "Couldn't run that search. Try again.",
+    "noResults": "No results for “{{query}}”.",
+    "recentHeading": "Recent searches",
+    "recentEmpty": "Your recent searches will show up here.",
+    "clearRecent": "Clear",
+    "noDetailPage": "No detail page for this yet.",
+    "keyboardHint": "↑↓ to navigate · ↵ to open · esc to close"
   }
 }
