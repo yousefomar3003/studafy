@@ -13,6 +13,11 @@ when it required the `version-bump` label.
 
 ### Added
 
+- `POST /api/auth/sessions/revoke-others` — self-service "sign out other sessions": revokes every
+  live token family the caller holds except the one behind the presented refresh token (the cookie
+  for a web caller, `refresh_token` in the body otherwise), and denylists the access tokens they
+  minted. Answers 400 rather than guessing when the current session cannot be identified, since a
+  wrong guess would end the very session the request came in on. ST-280.
 - `POST /api/announcements` — compose a school/role/class-targeted announcement, published
   immediately or, when `scheduled_at` is in the future, by the workers' publish sweep.
   `mandatory: true` sends as the un-optoutable `ADMIN_ANNOUNCEMENT` type; `mandatory: false` as
