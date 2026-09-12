@@ -1,6 +1,7 @@
 import { Button, DataGrid, FilterBar, Select } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { CreateUserModal } from "./CreateUserModal";
 import { DeactivateUserDialog } from "./DeactivateUserDialog";
@@ -44,8 +45,13 @@ function statusToneLabel(status: UserWithRoles["status"]): string {
  * would mean two competing sources of truth for "what page am I on" for no benefit.
  */
 export default function UsersListPage() {
-  const [searchInput, setSearchInput] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Prefills from `?q=` -- the deep-link target the global search palette (`features/search`)
+  // sends a matched user to, since there is no per-user detail route to link straight to a record
+  // (see `result-groups.ts`'s doc comment on why). Read once on mount, not kept in sync afterward:
+  // this is a starting point for the local search box below, not a URL-driven filter.
+  const [searchParams] = useSearchParams();
+  const [searchInput, setSearchInput] = useState(() => searchParams.get("q") ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("q") ?? "");
   const [role, setRole] = useState<UsersFilters["role"]>("");
   const [status, setStatus] = useState<UsersFilters["status"]>("");
   const [dateRange, setDateRange] = useState<DateRangeValue>({});

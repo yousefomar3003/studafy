@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, mock, test } from "bun:test";
+import { MemoryRouter } from "react-router-dom";
 
 import { expectNoA11yViolations } from "../../../lib/test/axe";
 
@@ -45,9 +46,11 @@ function renderInMain(Page: ComponentType) {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <main>
-          <Page />
-        </main>
+        <MemoryRouter>
+          <main>
+            <Page />
+          </main>
+        </MemoryRouter>
       </ToastProvider>
     </QueryClientProvider>,
   );

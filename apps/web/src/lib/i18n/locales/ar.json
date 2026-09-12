@@ -75,5 +75,27 @@
     "activeSessions_few": "{{count}} جلسات نشطة",
     "activeSessions_many": "{{count}} جلسة نشطة",
     "activeSessions_other": "{{count}} جلسة نشطة"
+  },
+  "globalSearch": {
+    "triggerLabel": "بحث",
+    "title": "بحث",
+    "inputLabel": "ابحث في الطلاب والمستخدمين والفواتير والمواد",
+    "placeholder": "ابحث في الطلاب، المستخدمين، الفواتير، المواد…",
+    "resultsLabel": "نتائج البحث",
+    "groups": {
+      "students": "الطلاب",
+      "users": "المستخدمون",
+      "invoices": "الفواتير",
+      "materials": "المواد"
+    },
+    "minLengthHint": "تابع الكتابة — يبدأ البحث بحرفين على الأقل.",
+    "loading": "جارٍ البحث…",
+    "error": "تعذّر تنفيذ البحث. حاول مرة أخرى.",
+    "noResults": "لا توجد نتائج لـ «{{query}}».",
+    "recentHeading": "عمليات بحث حديثة",
+    "recentEmpty": "ستظهر عمليات بحثك الأخيرة هنا.",
+    "clearRecent": "مسح",
+    "noDetailPage": "لا توجد صفحة تفاصيل لهذا بعد.",
+    "keyboardHint": "↑↓ للتنقل · ↵ للفتح · esc للإغلاق"
   }
 }
