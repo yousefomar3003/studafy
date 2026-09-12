@@ -17,6 +17,7 @@ import { recordDurableUsage, splitByTier } from "../usage/durable";
 import type { Database } from "../../../db/client";
 import type { SupportedLocale } from "../../../middleware/locale";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { FlagsService } from "../../flags";
 import type { LlmProvider } from "../llm/provider";
 import type { AiModelTier } from "../llm/routing";
 import type { Context } from "hono";
@@ -164,16 +165,23 @@ export function aiGatewayRoutes(deps: {
   /**
    * The configured LLM provider, or null when the AI_LLM_ENABLED kill switch is off. Null answers
    * 503 AI_LLM_DISABLED at request time; the route still registers so the published contract does
-   * not depend on a deployment's environment (the storage-upload precedent).
+   * not depend on a deployment's environment (the storage-upload precedent). The per-tenant
+   * `ai.llm` feature flag (`flags`) additionally gates the call at request time.
    */
   provider: LlmProvider | null;
+  /**
+   * Feature-flag service evaluating `ai.llm`. Null (bare route tests, the OpenAPI generator) keeps
+   * the gate on the provider alone. A per-tenant override flips this school's surface within the
+   * flag cache TTL without a deploy.
+   */
+  flags?: FlagsService | null;
   /**
    * Environment overrides for the routing table's model ids (`AI_LLM_SMALL_MODEL` /
    * `AI_LLM_LARGE_MODEL`). A partial map leaves the untouched tier on its catalog default.
    */
   modelOverrides?: Partial<Record<AiModelTier, string>>;
 }): OpenAPIHono<AppEnv> {
-  const { database, provider, modelOverrides = {} } = deps;
+  const { database, provider, flags = null, modelOverrides = {} } = deps;
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to declare
@@ -188,7 +196,7 @@ export function aiGatewayRoutes(deps: {
     const body = c.req.valid("json");
     const quota = getAiQuota(c);
 
-    if (!provider) {
+    if (!provider || (flags && !(await flags.get("ai.llm", { schoolId: auth.schoolId })))) {
       throw new CodedHttpException(
         503,
         ERROR_CODES.AI_LLM_DISABLED,

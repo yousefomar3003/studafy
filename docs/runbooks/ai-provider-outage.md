@@ -35,8 +35,8 @@ signals as any other provider outage — the one that arrives first matters:
 | Surface                     | Fail-close behavior                                 | Kill switch                                                  | Failure shape                                                                                                                                           |
 | --------------------------- | --------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Exam generation (worker)    | Session marked `failed`, student sees failure in UI | `ANTHROPIC_API_KEY` absent                                   | Job retried on transient (`timeout`/`network`/5xx/429), 3 attempts then `isFinalAttempt` → `markExamSessionFailed` (no DLQ, the exam row is the record) |
-| LLM gateway (api, generate) | 503 `AI_LLM_UNAVAILABLE` + `Retry-After` header     | `AI_LLM_ENABLED=false` (not constructed → `AI_LLM_DISABLED`) | `LlmProviderError` after 3 attempts (200ms base, 2s cap, full jitter); circuit breaker trips per school, fails fast until 30s cooldown                  |
-| LLM gateway (api, rerank)   | Disabled at the same kill switch                    | `AI_RERANK_ENABLED=false`                                    | Same provider, same circuit breaker path                                                                                                                |
+| LLM gateway (api, generate) | 503 `AI_LLM_UNAVAILABLE` + `Retry-After` header     | `ai.llm` feature flag (`AI_LLM_ENABLED=false` default)       | `LlmProviderError` after 3 attempts (200ms base, 2s cap, full jitter); circuit breaker trips per school, fails fast until 30s cooldown                  |
+| Retrieval re-ranking        | Stage disabled, raw RRF ranking returned            | `ai.rerank` feature flag (`AI_RERANK_ENABLED=false` default) | Not a provider call in the outage path — the mock cross-encoder is deterministic and local                                                              |
 | Rate-limit state cache      | Not affected (Redis, no AI dependency)              | —                                                            | —                                                                                                                                                       |
 | Entitlements cache          | Not affected                                        | —                                                            | —                                                                                                                                                       |
 | Ingestion (parse/OCR/embed) | Not affected (uses mock embedding, not Anthropic)   | —                                                            | —                                                                                                                                                       |
@@ -49,7 +49,12 @@ signals as any other provider outage — the one that arrives first matters:
      fail closed at claim time (`examGenerationWorkerConfig.anthropic === null`).
    - LLM gateway is _api-owned_. `AI_LLM_ENABLED=false` prevents the provider from being
      constructed at all — every request gets `AI_LLM_DISABLED`, which is the correct client-facing
-     error (clients can check for it), not an opaque timeout.
+     error (clients can check for it), not an opaque timeout. Additionally, the `ai.llm` feature
+     flag is evaluated per request, so a school whose `app.feature_flags` row sets it off answers
+     `AI_LLM_DISABLED` even when the provider is constructed.
+   - Retrieval re-ranking is _duration-invisible_: `ai.rerank` never makes a provider call (the
+     mock cross-encoder is deterministic and local), so an outage does not touch it. Flip it only
+     to change the ranking contract, not to shed load.
 2. **Provider is flaky (status page green, but failures visible) → let the existing retry/breaker
    triage it; only kill-switch if the breaker stays open across the fleet.** The retry + breaker is
    designed for exactly this: per-school isolation, transient-in-awareness, non-silencing failures.
@@ -59,6 +64,13 @@ signals as any other provider outage — the one that arrives first matters:
    `AI_LLM_MAX_TOKENS` range validate at config time. Verify the model is enabled on your
    deployment before switching kill switches; the provider rejects an unknown model immediately.
 
+> **Caveat — per-tenant overrides beat the env kill switch.** An `app.feature_flags` row that sets
+> `ai.llm`/`ai.rerank` on for a school outranks the deployment default for that school (migration
+> 000109; see `docs/database/feature-flags-data-model.md`). If such a row exists, the env flip in
+> step 1 does _not_ disable that one surface and it will keep calling the provider. Step 1 therefore
+> includes: list and clear any `ai.llm` override rows (and strip `ai.rerank` too if you need the
+> ranking contract back to RRF-only).
+
 ## Procedure
 
 **1. Stop new calls to the provider (the kill switches).**
@@ -66,7 +78,16 @@ signals as any other provider outage — the one that arrives first matters:
 **LLM gateway** — set `AI_LLM_ENABLED=false` in the API environment variables, deploy (or apply via
 `infra/deploy/scripts/deploy.sh api <env> <new-tag>`). The provider is not constructed, and every
 generate request returns `503 AI_LLM_DISABLED` — a known, typed error clients can route to UI
-fallback.
+fallback. Because a per-tenant override beats the env default, also list and clear any `ai.llm`
+override rows:
+
+```sql
+-- As studafy_admin against the API database (feature-flags docs, 000109):
+SELECT school_id, enabled FROM app.feature_flags WHERE flag_name = 'ai.llm';
+DELETE FROM app.feature_flags WHERE flag_name IN ('ai.llm', 'ai.rerank');
+```
+
+Clearing a row propagates within the flag cache TTL (10s) on the next evaluation — no deploy needed.
 
 **Exam generation** — the API-side kill switch does not cover this surface. The worker's
 `ANTHROPIC_API_KEY` absence is what disables it, so removing the key from the ECS secrets is the

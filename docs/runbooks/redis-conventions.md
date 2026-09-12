@@ -93,10 +93,14 @@ these carry a TTL, per the `noeviction` constraint above.
 | `cb:erpnext:{key}:{f\|o\|p}`     | `apps/api/src/erpnext/circuit-breaker.ts`                           | Varies    | Circuit-breaker state per upstream.                                                                                                                                            |
 | `ent:{schoolId}`                 | `apps/api/src/modules/subscriptions/entitlements/cache.ts` (ST-133) | 300s      | School entitlement. Value is `<version>\|<json>`; a bodyless `<version>\|` is an invalidation floor. Written by compare-and-set Lua.                                           |
 | `ent:ai:{studentId}`             | Same                                                                | 300s      | One student's AI entitlement. Not school-prefixed, so it cannot be `SCAN`-invalidated by a school change — the entry carries a `schoolVersion` the reader revalidates instead. |
+| `sch:{schoolId}:flags:{name}`    | `apps/api/src/modules/flags/service.ts` (ST-277)                    | 10s       | One school's cached verdict for one flag, written via `cacheKey()`. The TTL is the propagation bound for a flipped per-tenant override: <30s without a deploy.                 |
 
 The two `ent:` families are deliberately outside the `sch:` namespace: the ticket specifies those
 key names exactly, and `cacheKey()` cannot produce them. See the header comment in
 `entitlements/cache.ts` for why widening `cacheKey()` was rejected rather than done.
+
+The `flags:` family rides inside `sch:` on purpose: a flag verdict is never meaningful outside its
+school, so the tenant-scoped default (`cacheKey()`) is the correct and only builder.
 
 ## Failover
 

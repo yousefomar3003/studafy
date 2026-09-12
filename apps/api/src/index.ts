@@ -15,6 +15,7 @@ import {
   type LlmProvider,
 } from "./modules/ai";
 import { KeyStore } from "./modules/auth";
+import { createFlagsService } from "./modules/flags";
 import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
 import { resolveMobileReleaseConfig } from "./modules/mobile";
 import { startEntitlementInvalidationSubscriber, StripeAdapter } from "./modules/subscriptions";
@@ -119,6 +120,21 @@ const aiLlmModelOverrides: Partial<Record<AiModelTier, string>> = {
   ...(env.AI_LLM_LARGE_MODEL ? { large: env.AI_LLM_LARGE_MODEL } : {}),
 };
 
+// Feature-flag service (ST-277). The deployment defaults are the two AI kill-switch variables, so
+// flipping a fleet-wide default stays an env change; a per-tenant override in `app.feature_flags`
+// outranks them for its school and propagates within the flag cache TTL (see
+// docs/database/feature-flags-data-model.md). The defaults map is type-checked against the
+// registry, so a mistyped flag name is a build error here, not a runtime miss.
+const flags = createFlagsService({
+  database,
+  redis,
+  logger,
+  defaults: {
+    "ai.llm": env.AI_LLM_ENABLED,
+    "ai.rerank": env.AI_RERANK_ENABLED,
+  },
+});
+
 const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
   logger.info({ kid }, "jwt key rotated");
 });
@@ -154,7 +170,7 @@ const app = createApp({
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",
-  aiRerankEnabled: env.AI_RERANK_ENABLED,
+  flags,
   aiLlmProvider,
   aiLlmModelOverrides,
   // Folds MOBILE_MIN_SUPPORTED_VERSION_* / MOBILE_LATEST_VERSION_* into the shape

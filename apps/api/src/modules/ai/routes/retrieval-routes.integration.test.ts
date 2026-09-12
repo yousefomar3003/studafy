@@ -40,16 +40,13 @@ import {
 import { errorHandlerMiddleware } from "../../../middleware/errorHandler";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import { createFlagsService } from "../../flags";
 import {
   createDeterministicQueryEmbedder,
   estimateQueryTokens,
   RETRIEVAL_EMBEDDING_MODEL,
 } from "../retrieval/embeddings";
-import {
-  createDeterministicCrossEncoderReranker,
-  RERANK_K,
-  RERANK_MODEL,
-} from "../retrieval/rerank";
+import { RERANK_K, RERANK_MODEL } from "../retrieval/rerank";
 import { HYBRID_LEG_LIMIT } from "../retrieval/search";
 
 import { aiRetrievalRoutes } from "./retrieval-routes";
@@ -57,8 +54,8 @@ import { aiRetrievalRoutes } from "./retrieval-routes";
 import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { FlagsService } from "../../flags";
 import type { AiQuotaHandle } from "../gate/entitlement-gate";
-import type { CrossEncoderReranker } from "../retrieval/rerank";
 import type { TransactionSql } from "postgres";
 
 const RETRIEVAL_DIMENSIONS = 1536;
@@ -118,7 +115,7 @@ function quotaHandle(): AiQuotaHandle {
 
 function buildRetrievalApp(
   handle: AiQuotaHandle,
-  reranker?: CrossEncoderReranker | null,
+  flags?: FlagsService | null,
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
   app.use("*", async (c, next) => {
@@ -132,7 +129,7 @@ function buildRetrievalApp(
     aiRetrievalRoutes({
       database: tenantClient!,
       embedder: createDeterministicQueryEmbedder(),
-      reranker,
+      flags,
     }),
   );
   app.onError(errorHandlerMiddleware(silentLogger));
@@ -383,8 +380,25 @@ describeDb("POST /api/ai/students/{studentId}/search", () => {
     expect(blank.status).toBe(400);
   });
 
-  test("re-ranks the fused hits when the cross-encoder stage is wired in", async () => {
-    const rerankedApp = buildRetrievalApp(quotaHandle(), createDeterministicCrossEncoderReranker());
+  test("re-ranks the fused hits when the school's ai.rerank override is on", async () => {
+    // The per-tenant override path, exercised end to end: a `feature_flags` row — the same
+    // studafy_admin write an operator runs (see docs/database/feature-flags-data-model.md) — beats
+    // the registry default (re-ranking off), and the real flags service resolves it through RLS.
+    await asAdmin(tenant.schoolId, async (tx) => {
+      await tx`
+        INSERT INTO app.feature_flags (school_id, flag_name, enabled)
+        VALUES (${tenant.schoolId}, 'ai.rerank', true)
+        ON CONFLICT (school_id, flag_name)
+        DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = now()
+      `;
+    });
+
+    const flags = createFlagsService({
+      database: tenantClient!,
+      redis: null,
+      logger: silentLogger,
+    });
+    const rerankedApp = buildRetrievalApp(quotaHandle(), flags);
     const res = await rerankedApp.request(`/api/ai/students/${tenant.students[0]!.id}/search`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -414,6 +428,12 @@ describeDb("POST /api/ai/students/{studentId}/search", () => {
     // Rerank ordering is score-descending across the response, never an arbitrary shuffle.
     const scores = body.results.map((hit) => hit.rerank_score as number);
     expect(scores).toEqual([...scores].sort((a, b) => b - a));
+
+    // Leave the flag table clean: the first test asserts the flag-off default on this same mount
+    // path, and a leaked row would silently flip its assertion.
+    await asAdmin(tenant.schoolId, async (tx) => {
+      await tx`DELETE FROM app.feature_flags WHERE school_id = ${tenant.schoolId} AND flag_name = 'ai.rerank'`;
+    });
   });
 
   test("fails loud when the route runs without an aiQuota handle", async () => {
