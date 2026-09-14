@@ -63,3 +63,32 @@ describe("GET /api/mobile/config", () => {
     expect(await res.json()).toEqual(SAMPLE);
   });
 });
+
+// ST-283: the same route, served under its canonical name too. Kept as a thin alias of
+// GET /api/mobile/config (see config-routes.ts) rather than a second implementation, so this only
+// has to prove the alias resolves — the config/echo/error behavior is already covered above.
+describe("GET /meta/mobile-versions", () => {
+  test("echoes the same configured floor and latest versions as /api/mobile/config", async () => {
+    const res = await buildApp(SAMPLE).request("/meta/mobile-versions");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(SAMPLE);
+  });
+
+  test("is reachable without a bearer token even with the auth boundary mounted", async () => {
+    const keyStore = new KeyStore(60_000);
+    await keyStore.init();
+    const app = createApp({
+      isReady: () => true,
+      tracker: createInflightTracker(),
+      logger: createLogger({ destination: () => undefined }),
+      keyStore,
+      mobileReleaseConfig: SAMPLE,
+    });
+
+    const res = await app.request("/meta/mobile-versions");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(SAMPLE);
+  });
+});

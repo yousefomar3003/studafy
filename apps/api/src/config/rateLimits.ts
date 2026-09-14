@@ -102,6 +102,8 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   // Generous (default) budget: it is a tiny static read, and throttling it hard would only delay a
   // client learning it must force-update.
   "/api/mobile/config": "default",
+  // Same endpoint, canonical name (ST-283) — see config-routes.ts.
+  "/meta/mobile-versions": "default",
   // AI (metered, tenant+user scoped)
   // "/api/ai/*": "ai",
 };

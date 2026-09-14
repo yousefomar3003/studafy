@@ -133,7 +133,9 @@ must never require an app release.
 ### How it is served
 
 `GET /api/mobile/config` (public, unauthenticated, un-scoped — the app calls it on launch before a
-session exists) returns both platforms:
+session exists) returns both platforms. It is also served, unchanged, at `GET
+/meta/mobile-versions` (ST-283's canonical name for the same data) — the app itself still calls
+`/api/mobile/config`, so that path is not going away:
 
 ```json
 {

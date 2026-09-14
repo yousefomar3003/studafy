@@ -13,6 +13,10 @@ when it required the `version-bump` label.
 
 ### Added
 
+- `GET /meta/mobile-versions` — the forced-update floor endpoint from ST-257
+  (`GET /api/mobile/config`), also served under this canonical name. Same handler, same schema,
+  same unauthenticated posture; `/api/mobile/config` stays mounted unchanged because the released
+  native app already calls it. ST-283.
 - `POST /api/auth/sessions/revoke-others` — self-service "sign out other sessions": revokes every
   live token family the caller holds except the one behind the presented refresh token (the cookie
   for a web caller, `refresh_token` in the body otherwise), and denylists the access tokens they
