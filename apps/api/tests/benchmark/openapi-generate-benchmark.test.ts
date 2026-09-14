@@ -189,6 +189,7 @@ const EXPECTED_PATHS = [
   "/api/lookups/countries",
   "/api/lookups/currencies",
   "/api/mobile/config",
+  "/meta/mobile-versions",
   "/api/schools/current/settings",
   "/api/schools/{schoolId}/provision",
   "/api/schools/{schoolId}/provisioning-status",
