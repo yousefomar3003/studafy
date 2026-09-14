@@ -180,6 +180,8 @@ describe("structure", () => {
         "/api/finance/students/{studentId}/installments",
         // ST-257. Public, un-scoped, mounted unconditionally alongside the health probes.
         "/api/mobile/config",
+        // Same endpoint, canonical name (ST-283).
+        "/meta/mobile-versions",
         "/api/evaluations",
         "/api/evaluations/{evaluationId}",
         "/api/evaluations/{evaluationId}/scores",
