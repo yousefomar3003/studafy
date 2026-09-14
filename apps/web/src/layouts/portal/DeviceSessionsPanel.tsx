@@ -1,14 +1,11 @@
 import { Button, Modal } from "@studafy/ui";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api } from "../../lib/api";
+import { useRemoveDevice, useRevokeSession } from "../../features/account/sessions/mutations";
+import { useDevicesQuery, useSessionsQuery } from "../../features/account/sessions/queries";
 import { useAuth } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
 
 import type { components } from "@studafy/api-client";
-
-const SESSIONS_QUERY_KEY = ["auth-sessions"];
-const DEVICES_QUERY_KEY = ["auth-devices"];
 
 export interface DeviceSessionsPanelProps {
   open: boolean;
@@ -28,50 +25,14 @@ export interface DeviceSessionsPanelProps {
 export function DeviceSessionsPanel({ open, onClose }: DeviceSessionsPanelProps) {
   const { t } = useTranslation();
   const { sessionId: currentSessionId } = useAuth();
-  const queryClient = useQueryClient();
 
-  const sessionsQuery = useQuery({
-    queryKey: SESSIONS_QUERY_KEY,
-    queryFn: async () => {
-      const { data } = await api.GET("/api/auth/sessions");
-      return data;
-    },
-    enabled: open,
-  });
-
-  const devicesQuery = useQuery({
-    queryKey: DEVICES_QUERY_KEY,
-    queryFn: async () => {
-      const { data } = await api.GET("/api/auth/devices");
-      return data;
-    },
-    enabled: open,
-  });
-
-  const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: SESSIONS_QUERY_KEY });
-    void queryClient.invalidateQueries({ queryKey: DEVICES_QUERY_KEY });
-  };
-
-  const revokeSession = useMutation({
-    mutationFn: async (sessionId: string) => {
-      const { data } = await api.DELETE("/api/auth/sessions/{sessionId}", {
-        params: { path: { sessionId } },
-      });
-      return data;
-    },
-    onSuccess: invalidate,
-  });
-
-  const removeDevice = useMutation({
-    mutationFn: async (deviceId: string) => {
-      const { data } = await api.DELETE("/api/auth/devices/{deviceId}", {
-        params: { path: { deviceId } },
-      });
-      return data;
-    },
-    onSuccess: invalidate,
-  });
+  // Shared with the account sessions screen (`features/account/sessions`): both surfaces invalidate
+  // the same `["auth-sessions"]`/`["auth-devices"]` cache, so a revoke made on either one is never
+  // re-shown by the other.
+  const sessionsQuery = useSessionsQuery(open);
+  const devicesQuery = useDevicesQuery(open);
+  const revokeSession = useRevokeSession();
+  const removeDevice = useRemoveDevice();
 
   // `readonly Session[]`/`readonly Device[]` lose their array prototype through the generated
   // response type here — a pre-existing `@studafy/api-client` typing gap, not a shape mismatch.
