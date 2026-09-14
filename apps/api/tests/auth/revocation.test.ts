@@ -314,6 +314,66 @@ describe("denylist propagation", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Self-service "sign out other sessions" (ST-280)
+// ---------------------------------------------------------------------------
+
+describe("POST /api/auth/sessions/revoke-others", () => {
+  integrationTest(
+    "denylists the other sessions' access tokens but not the current one",
+    async () => {
+      const user = tenant.users.STUDENT;
+      const current = await createRefreshSession(sql, tenant.schoolId, user.id, {
+        channel: "mobile",
+      });
+      const other = await createRefreshSession(sql, tenant.schoolId, user.id, {
+        channel: "mobile",
+      });
+
+      const bearer = await mintTestToken(keyStore, { schoolId: tenant.schoolId, userId: user.id });
+      const res = await app.request("/api/auth/sessions/revoke-others", {
+        method: "POST",
+        headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json" },
+        body: JSON.stringify({ refresh_token: current.token }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(await isDenylisted(other.accessJti!)).toBe(true);
+      expect(await isDenylisted(current.accessJti!)).toBe(false);
+    },
+  );
+
+  integrationTest("audits the teardown against the caller, keyed by the kept family", async () => {
+    const user = tenant.users.INSTRUCTOR;
+    const current = await createRefreshSession(sql, tenant.schoolId, user.id, {
+      channel: "mobile",
+    });
+    await createRefreshSession(sql, tenant.schoolId, user.id, { channel: "mobile" });
+
+    const bearer = await mintTestToken(keyStore, { schoolId: tenant.schoolId, userId: user.id });
+    await app.request("/api/auth/sessions/revoke-others", {
+      method: "POST",
+      headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: current.token }),
+    });
+
+    const [entry] = await sql<{ actor_id: string; new_values: Record<string, unknown> }[]>`
+      SELECT actor_id, new_values FROM app.audit_logs
+       WHERE target_table = 'refresh_tokens'
+         AND new_values ->> 'reason' = 'revoke_others'
+         AND new_values ->> 'target_user_id' = ${user.id}
+       ORDER BY created_at DESC
+       LIMIT 1
+    `;
+
+    expect(entry).toBeDefined();
+    expect(entry!.actor_id).toBe(user.id);
+    // The kept family never appears among the ones torn down.
+    const familyIds = entry!.new_values["family_ids"] as string[];
+    expect(familyIds).not.toContain(current.familyId);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Device routes
 // ---------------------------------------------------------------------------
 

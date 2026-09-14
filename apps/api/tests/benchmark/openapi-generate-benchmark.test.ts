@@ -87,6 +87,7 @@ const EXPECTED_PATHS = [
   "/api/auth/oauth/mock/mobile-start",
   "/api/auth/sessions",
   "/api/auth/sessions/{sessionId}",
+  "/api/auth/sessions/revoke-others",
   "/api/auth/devices",
   "/api/auth/devices/{deviceId}",
   "/api/auth/devices/{deviceId}/sessions",

@@ -256,6 +256,34 @@ const revokeDeviceRoute = createRoute({
   ),
 });
 
+const revokeOthersAudit = auditAction("logout", "refresh_tokens");
+
+const revokeOthersRoute = createRoute({
+  method: "post",
+  path: "/api/auth/sessions/revoke-others",
+  tags: ["Auth"],
+  operationId: "revokeOtherSessions",
+  summary: "Terminate every other session",
+  description:
+    "Revokes every live token family the caller holds except the one behind the presented refresh " +
+    "token — the current session survives. The current session is identified the same way `/logout` " +
+    "identifies one: the cookie for a web caller, or `refresh_token` in the body otherwise. Answers " +
+    "400 when no refresh token was presented or it does not belong to the authenticated caller — " +
+    "unlike logout, this route cannot stay silent about that, because guessing wrong would revoke " +
+    "the session the caller meant to keep.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: false,
+      content: { "application/json": { schema: refreshRequestSchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "How many other sessions were revoked.", schema: revocationSchema } },
+    [400, 401, 429, 500],
+  ),
+});
+
 const listDevicesRoute = createRoute({
   method: "get",
   path: "/api/auth/devices",
@@ -370,6 +398,7 @@ export function sessionRoutes(
   routes.use("/api/auth/refresh", refreshAudit);
   routes.use("/api/auth/logout", logoutAudit);
   routes.use("/api/auth/sessions/:sessionId", revokeSessionAudit);
+  routes.use("/api/auth/sessions/revoke-others", revokeOthersAudit);
   routes.use("/api/auth/devices/:deviceId/sessions", revokeDeviceAudit);
   routes.use("/api/auth/devices", registerDeviceAudit);
   routes.use("/api/auth/devices/:deviceId", revokeDeviceEntirelyAudit);
@@ -468,6 +497,40 @@ export function sessionRoutes(
 
     return c.json(
       await revokeForCaller(c, { kind: "session", sessionId }, REVOCATION_REASONS.REVOKE_SESSION),
+      200,
+    );
+  });
+
+  routes.openapi(revokeOthersRoute, async (c) => {
+    const auth = requireAuth(c);
+    const presented = readPresentedToken(c, c.req.valid("json"));
+    if (presented === undefined) {
+      throw new HTTPException(400, {
+        message: "No refresh token was presented to identify the current session",
+      });
+    }
+
+    const current = await resolveFamilyByToken(database, presented, c.get("requestId"));
+    if (
+      current === undefined ||
+      current.userId !== auth.userId ||
+      current.schoolId !== auth.schoolId
+    ) {
+      // Unlike logout, this cannot answer generically: the caller asked to keep one session alive,
+      // and silently falling back to "revoke everything" on an unresolved token would end the very
+      // session the request came in on.
+      throw new HTTPException(400, {
+        message:
+          "The presented refresh token does not identify a session for the authenticated user",
+      });
+    }
+
+    return c.json(
+      await revokeForCaller(
+        c,
+        { kind: "user", exceptFamilyId: current.familyId },
+        REVOCATION_REASONS.REVOKE_OTHERS,
+      ),
       200,
     );
   });

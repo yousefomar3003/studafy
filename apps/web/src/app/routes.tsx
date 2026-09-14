@@ -85,6 +85,7 @@ const ExpenseListPage = lazy(() => import("../features/finance/expenses/ExpenseL
 const NewExpensePage = lazy(() => import("../features/finance/expenses/NewExpensePage"));
 const ExpenseDetailPage = lazy(() => import("../features/finance/expenses/ExpenseDetailPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
+const SessionsPage = lazy(() => import("../features/account/sessions/SessionsPage"));
 const AiSubscriptionPurchasePage = lazy(
   () => import("../features/billing/AiSubscriptionPurchasePage"),
 );
@@ -537,6 +538,14 @@ export const routes: RouteObject[] = [
         ),
         children: [
           { index: true, element: <AccountPage /> },
+          {
+            // Account security: every live session and registered device for the caller, with a
+            // current-device indicator and revoke actions. No `RequirePermission`, same as the rest
+            // of `/account` (STUDENT and PARENT hold no distinct permission set of their own, and
+            // the API's own tenant scoping is what actually restricts a session to its own school).
+            path: "sessions",
+            element: <SessionsPage />,
+          },
           {
             // Deep-link target from the mobile app (ST-208): a parent/student buying the
             // per-student AI add-on. No `RequirePermission` — same as the rest of `/account`,

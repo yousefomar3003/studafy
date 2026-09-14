@@ -192,6 +192,7 @@ through an `APP_ENV` misconfiguration.
 | `POST /api/auth/logout`                        | Refresh token | Always 200, whatever was presented   |
 | `GET /api/auth/sessions`                       | Bearer        | One entry per session, not per token |
 | `DELETE /api/auth/sessions/{sessionId}`        | Bearer        | Revokes the whole family             |
+| `POST /api/auth/sessions/revoke-others`        | Bearer        | Keeps the current session (ST-280)   |
 | `DELETE /api/auth/devices/{deviceId}/sessions` | Bearer        | For a lost device                    |
 
 `/api/*` is deny-by-default under `jwtAuthMiddleware`, so the first two are listed in
