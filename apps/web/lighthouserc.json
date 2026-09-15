@@ -12,9 +12,9 @@
     "assert": {
       "assertions": {
         "categories:performance": ["warn", { "minScore": 0.9 }],
-        "metrics:largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
-        "metrics:interactive": ["error", { "maxNumericValue": 3000 }],
-        "metrics:cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+        "interactive": ["error", { "maxNumericValue": 3000 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
         "resource-summary:script.size": ["warn", { "maxNumericValue": 600000 }]
       }
     }
