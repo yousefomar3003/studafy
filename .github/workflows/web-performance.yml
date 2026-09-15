@@ -1,0 +1,95 @@
+# ST-285: the web performance budget, enforced on every PR. Two mechanisms, deliberately split:
+#
+#   - `perf:bundle` (apps/web/scripts/check-bundle-budget.ts) gates the <300KB-gzip "initial portal
+#     JS" acceptance criterion and the WebP help-media budget. Deterministic and exact — it reads
+#     the built `dist/` and measures gzip directly, which is what nginx actually serves.
+#   - Lighthouse CI times the two routes that boot the real app-shell graph: `/` (marketing home,
+#     LCP < 2.5s) and `/auth/login` (TTI < 3s). The portal route itself is auth-gated, so its TTI
+#     lives here on the shared entry graph — the entire portal shell (PortalLayout, sidebar, search,
+#     auth, realtime, query, i18n) is part of that graph, and the portal-only delta is covered by
+#     the gzip gate above. Mobile-emulated throttling approximates the mid-tier-hardware target.
+#
+# `vite preview` serves assets uncompressed, so Lighthouse transferSize is raw bytes and cannot
+# enforce the <300KB-gzip number — hence the `resource-summary:script` assertion is warn-only and
+# the byte ceiling lives in the script. See apps/web/README.md's "Performance budget" section.
+name: Web performance
+
+on:
+  pull_request:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  web-performance:
+    name: web-performance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-bun-workspace
+      # Exactly the same shape as web-accessibility's first step: `vite build` needs the workspace
+      # packages (ui, api-client, …) built first, and avoids turbo scheduling the web build itself
+      # so the dist outputs land in apps/web/dist where the budget script and preview read them.
+      - name: Build the workspace packages the web app imports
+        run: bunx turbo run build --filter=@studafy/web^...
+      - name: Build the web bundle
+        run: bun run build
+        working-directory: apps/web
+      - name: Bundle + media budget (<300KB gzip portal shell; WebP help-media)
+        run: bun run perf:bundle
+        working-directory: apps/web
+      # Lighthouse needs a Chrome binary; GitHub's ubuntu-latest runner ships none. Playwright's
+      # Chromium doubles as Lighthouse's browser via CHROME_PATH. The three-attempt retry guards the
+      # same flaky CDN the web-accessibility job documents in ci.yml.
+      - name: Install Playwright Chromium
+        run: |
+          for attempt in 1 2 3; do
+            echo "--- Install attempt $attempt/3 ---"
+            if bunx playwright install chromium; then
+              exit 0
+            fi
+            echo "Install failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "Install failed after 3 attempts" >&2
+          exit 1
+        working-directory: apps/web
+      # `vite preview` rather than a plain static file server: it reproduces the production SPA
+      # fallback (/auth/login → index.html) that nginx uses in infra/docker/web/nginx.conf, so the
+      # login route's Lighthouse run boots the real app-shell graph instead of a 404.
+      - name: Start the production preview server
+        working-directory: apps/web
+        run: |
+          # Bind to 127.0.0.1 explicitly: vite preview's default `localhost` host resolves to the
+          # IPv6 loopback (::1) in Node on the ubuntu runner, which the IPv4 readiness probe below
+          # (curl 127.0.0.1) can never reach — the server would start yet fail the check forever.
+          nohup bun run preview -- --host 127.0.0.1 --port 4173 --strictPort > ../../preview-server.log 2>&1 &
+          echo $! > ../../preview-server.pid
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:4173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::vite preview did not become ready within 60s"
+          cat ../../preview-server.log
+          exit 1
+      - name: Resolve the Playwright Chromium path
+        run: |
+          echo "CHROME_PATH=$(find "$HOME/.cache/ms-playwright" -path '*/chrome-linux/chrome' -type f | head -n 1)" >> "$GITHUB_ENV"
+      - name: Lighthouse budgets on the app-shell routes (LCP < 2.5s, TTI < 3s)
+        run: bun run perf:lighthouse
+        working-directory: apps/web
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lighthouse-reports
+          path: apps/web/.lighthouseci/**/*
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Stop the production preview server
+        if: always()
+        run: kill "$(cat preview-server.pid)" 2>/dev/null || true

@@ -37,7 +37,7 @@ settings`). The first admin on the school is the one who activated it.
 
 ## Step 1: School profile
 
-![School profile step](/help-media/screenshots/onboarding-school-profile.png)
+![School profile step](/help-media/screenshots/onboarding-school-profile.webp)
 
 These defaults apply across your whole school and can be changed later from
 settings. Fields:
@@ -56,7 +56,7 @@ Click `Save and continue`, or `Skip for now`.
 
 ## Step 2: Academic year
 
-![Academic year step](/help-media/screenshots/onboarding-academic-year.png)
+![Academic year step](/help-media/screenshots/onboarding-academic-year.webp)
 
 "This becomes your school's current academic year, with one term spanning it."
 
@@ -74,7 +74,7 @@ the same dates. Later steps (grading scheme, timetable) build on that term.
 
 ## Step 3: Grading scheme
 
-![Grading scheme step](/help-media/screenshots/onboarding-grading-scheme.png)
+![Grading scheme step](/help-media/screenshots/onboarding-grading-scheme.webp)
 
 Requires the academic year from step 2. If you skipped it, the wizard points
 you back.
@@ -98,7 +98,7 @@ is required). Saving also records the scheme type on your school settings.
 
 ## Step 4: Timetable periods
 
-![Timetable periods step](/help-media/screenshots/onboarding-timetable.png)
+![Timetable periods step](/help-media/screenshots/onboarding-timetable.webp)
 
 "Reserve the weekly structure now — period start and end times can be finalized
 once you add classes, teachers, and rooms."
@@ -117,7 +117,7 @@ placement are finalised later in the Timetable builder.
 
 ## Step 5: Staff invitations
 
-![Staff invitations step](/help-media/screenshots/onboarding-staff.png)
+![Staff invitations step](/help-media/screenshots/onboarding-staff.webp)
 
 "Invite staff by role. Paste one email per line, or separate them with commas."
 
@@ -137,7 +137,7 @@ article for troubleshooting.
 
 ## Step 6: Student import
 
-![Student import step](/help-media/screenshots/onboarding-student-import.png)
+![Student import step](/help-media/screenshots/onboarding-student-import.webp)
 
 "Upload a CSV of students to validate. Nothing is saved until you confirm."
 

@@ -6,6 +6,8 @@ storybook-static/
 playwright-report/
 test-results/
 coverage/
+# Lighthouse CI local runs — regenerated on demand; CI uploads them as artifacts
+.lighthouseci/
 
 # Terraform — see infra/terraform/README.md
 **/.terraform/*

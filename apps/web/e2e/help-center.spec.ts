@@ -30,7 +30,7 @@ test("documented step screenshots are served and render", async ({ page }) => {
   await page.goto("/help/onboarding-guide");
 
   const firstScreenshot = page.locator(
-    'img[alt^="School profile step"][src="/help-media/screenshots/onboarding-school-profile.png"]',
+    'img[alt^="School profile step"][src="/help-media/screenshots/onboarding-school-profile.webp"]',
   );
   await expect(firstScreenshot).toBeVisible();
   await expect
