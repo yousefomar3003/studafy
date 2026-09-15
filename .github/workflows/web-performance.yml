@@ -62,7 +62,10 @@ jobs:
       - name: Start the production preview server
         working-directory: apps/web
         run: |
-          nohup bun run preview -- --port 4173 --strictPort > ../../preview-server.log 2>&1 &
+          # Bind to 127.0.0.1 explicitly: vite preview's default `localhost` host resolves to the
+          # IPv6 loopback (::1) in Node on the ubuntu runner, which the IPv4 readiness probe below
+          # (curl 127.0.0.1) can never reach — the server would start yet fail the check forever.
+          nohup bun run preview -- --host 127.0.0.1 --port 4173 --strictPort > ../../preview-server.log 2>&1 &
           echo $! > ../../preview-server.pid
           for _ in $(seq 1 60); do
             if curl -sf http://127.0.0.1:4173/ > /dev/null; then
