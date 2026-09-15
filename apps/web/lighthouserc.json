@@ -15,7 +15,7 @@
         "metrics:largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
         "metrics:interactive": ["error", { "maxNumericValue": 3000 }],
         "metrics:cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
-        "resource-summary:script:total:bytes": ["warn", { "maxNumericValue": 600000 }]
+        "resource-summary:script.size": ["warn", { "maxNumericValue": 600000 }]
       }
     }
   }
