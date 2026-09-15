@@ -141,26 +141,32 @@ export async function ensureDraftSubmissions(
   const missingIds = studentIds.filter((id) => !existingStudentIds.has(id));
 
   if (missingIds.length > 0) {
-    for (const studentId of missingIds) {
-      const [created] = await tx<GradeSubmissionRow[]>`
-        INSERT INTO app.grade_submissions (school_id, gradebook_id, student_id)
-        VALUES (${schoolId}::uuid, ${gradebookId}::uuid, ${studentId}::uuid)
-        ON CONFLICT (school_id, gradebook_id, student_id) DO NOTHING
-        RETURNING id, school_id, gradebook_id, student_id,
-                  submitted_by_user_id, decided_by_user_id,
-                  rejection_reason,
-                  status, submitted_at, decided_at,
-                  created_at, updated_at
-      `;
-      if (created) {
-        existing.push(created);
-        await emitAuditLog(tx, {
-          action: "insert",
-          targetTable: "grade_submissions",
-          targetId: created.id,
-          newValues: { gradebook_id: gradebookId, student_id: studentId },
-        });
-      }
+    // One multi-row INSERT for the whole roster gap rather than one round trip per missing
+    // student — a class-opening gradebook can be missing dozens of drafts at once. ON CONFLICT
+    // DO NOTHING still applies per row, so a student who was concurrently drafted by another
+    // request is silently skipped, same as the single-row version this replaced.
+    const created = await tx<GradeSubmissionRow[]>`
+      INSERT INTO app.grade_submissions (school_id, gradebook_id, student_id)
+      SELECT ${schoolId}::uuid, ${gradebookId}::uuid, student_id
+      FROM unnest(${missingIds}::uuid[]) AS student_id
+      ON CONFLICT (school_id, gradebook_id, student_id) DO NOTHING
+      RETURNING id, school_id, gradebook_id, student_id,
+                submitted_by_user_id, decided_by_user_id,
+                rejection_reason,
+                status, submitted_at, decided_at,
+                created_at, updated_at
+    `;
+    if (created.length > 0) {
+      existing.push(...created);
+      // Single audit log for the batch, matching the convention bulkUpdateGrades below already
+      // uses: a lone insert keeps its own row as the audit target (so a submission's audit trail
+      // is findable by its own id), a real batch targets the gradebook instead.
+      await emitAuditLog(tx, {
+        action: "insert",
+        targetTable: "grade_submissions",
+        targetId: created.length === 1 ? created[0]!.id : gradebookId,
+        newValues: { gradebook_id: gradebookId, student_ids: created.map((row) => row.student_id) },
+      });
     }
   }
 
@@ -335,46 +341,67 @@ export async function bulkUpdateGrades(
     }
   }
 
-  // Execute updates with optimistic concurrency guard.
-  const results: GradeRow[] = [];
+  // Execute every score update as one statement instead of one round trip per grade cell -- the
+  // same jsonb_to_recordset shape attendance-session-service.ts uses for its own batch insert,
+  // which sidesteps the postgres.js VALUES-array helper's lack of a null-friendly column type.
+  // The per-row optimistic-concurrency guard (WHERE ... updated_at matches the client's read)
+  // still applies per row via the join, so a stale or missing entry simply comes back unmatched in
+  // RETURNING rather than updated. Schema-level validation (bulkUpdateGradesBodySchema) already
+  // rejects a batch with a repeated id, so each id joins at most one row.
+  const updateRows = entries.map((entry) => ({
+    id: entry.id,
+    score: entry.score,
+    expected_updated_at: entry.updated_at,
+  }));
 
-  for (const entry of entries) {
-    const [updated] = await tx<GradeRow[]>`
-      UPDATE app.grades SET
-        score = ${entry.score != null ? String(entry.score) : null}::numeric(10,2),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${entry.id}::uuid
-        AND school_id = ${schoolId}::uuid
-        AND date_trunc('milliseconds', updated_at)
-          = date_trunc('milliseconds', ${entry.updated_at}::timestamptz)
-      RETURNING id, school_id, grade_submission_id,
-                score, max_score, weight, label,
-                created_at, updated_at
+  const updatedRows =
+    updateRows.length === 0
+      ? []
+      : await tx<GradeRow[]>`
+          UPDATE app.grades AS g SET
+            score = update_data.score::numeric(10,2),
+            updated_at = CURRENT_TIMESTAMP
+          FROM jsonb_to_recordset(${tx.json(updateRows)}::jsonb)
+            AS update_data(id uuid, score numeric, expected_updated_at timestamptz)
+          WHERE g.id = update_data.id
+            AND g.school_id = ${schoolId}::uuid
+            AND date_trunc('milliseconds', g.updated_at)
+              = date_trunc('milliseconds', update_data.expected_updated_at)
+          RETURNING g.id, g.school_id, g.grade_submission_id,
+                    g.score, g.max_score, g.weight, g.label,
+                    g.created_at, g.updated_at
+        `;
+
+  const updatedById = new Map(updatedRows.map((row) => [row.id, row]));
+  const failedIds = entries.map((entry) => entry.id).filter((id) => !updatedById.has(id));
+
+  if (failedIds.length > 0) {
+    // Re-check existence for the entries that didn't update, in one query, rather than per entry.
+    // Only the first failure (in the caller's order) is reported, matching the prior per-row loop,
+    // which threw on the first mismatch instead of collecting every failure in the batch.
+    const stillExisting = await tx<{ id: string }[]>`
+      SELECT id FROM app.grades
+      WHERE school_id = ${schoolId}::uuid AND id = ANY (${failedIds}::uuid[])
     `;
+    const stillExistingIds = new Set(stillExisting.map((row) => row.id));
+    const firstFailedId = failedIds[0]!;
 
-    if (!updated) {
-      const current = await tx<{ updated_at: Date | null }[]>`
-        SELECT updated_at FROM app.grades
-        WHERE id = ${entry.id}::uuid AND school_id = ${schoolId}::uuid
-      `;
-
-      if (current.length > 0) {
-        throw new CodedHttpException(
-          409,
-          ERROR_CODES.GRADE_CONCURRENT_EDIT,
-          `Grade ${entry.id} was modified by another user. Reload and retry.`,
-        );
-      }
-
+    if (stillExistingIds.has(firstFailedId)) {
       throw new CodedHttpException(
-        404,
-        ERROR_CODES.GRADE_SHEET_ITEM_NOT_FOUND,
-        `Grade record ${entry.id} was removed before the update`,
+        409,
+        ERROR_CODES.GRADE_CONCURRENT_EDIT,
+        `Grade ${firstFailedId} was modified by another user. Reload and retry.`,
       );
     }
 
-    results.push(updated);
+    throw new CodedHttpException(
+      404,
+      ERROR_CODES.GRADE_SHEET_ITEM_NOT_FOUND,
+      `Grade record ${firstFailedId} was removed before the update`,
+    );
   }
+
+  const results = entries.map((entry) => updatedById.get(entry.id)!);
 
   await emitAuditLog(tx, {
     action: "update",

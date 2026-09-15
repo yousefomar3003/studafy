@@ -43,15 +43,19 @@ export async function loadQuizMaterials(
   tx: TransactionSql,
   materialIds: readonly string[],
 ): Promise<LoadQuizMaterialsResult> {
+  // One query for every requested material rather than one per id -- the failure check below
+  // still walks materialIds in request order, so "first invalid material" reporting is unchanged.
+  const rows = await tx<{ id: string; title: string | null; ingest_status: string }[]>`
+    SELECT id, title, ingest_status
+    FROM app.materials
+    WHERE id = ANY (${materialIds}::uuid[])
+  `;
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+
   const materials: { id: string; title: string | null }[] = [];
 
   for (const materialId of materialIds) {
-    const rows = await tx<{ id: string; title: string | null; ingest_status: string }[]>`
-      SELECT id, title, ingest_status
-      FROM app.materials
-      WHERE id = ${materialId}::uuid
-    `;
-    const material = rows[0];
+    const material = rowsById.get(materialId);
     if (!material) return { status: "not_found", materialId };
     if (material.ingest_status !== "ready") return { status: "not_ready", materialId };
     materials.push({ id: material.id, title: material.title });
