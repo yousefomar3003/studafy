@@ -7,6 +7,7 @@ import { routes } from "./app/routes";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { initMonitoring, triggerTestErrorFromQueryParam } from "./lib/monitoring";
 
+import "@fontsource-variable/inter";
 import "@studafy/ui/styles.css";
 
 import "./layouts/marketing/marketing-shell.css";

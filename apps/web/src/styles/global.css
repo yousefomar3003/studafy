@@ -1,5 +1,15 @@
 :root {
   color-scheme: light dark;
+
+  /* Inter ships through @fontsource-variable/inter with per-subset unicode-range, so only the
+     subset(s) the rendered page actually uses are downloaded (see tokens.css — the shared token
+     stack names "Inter" but the typeface is intentionally loaded by each consumer). `Inter
+     Variable` is the family @fontsource registers; `Inter` stays in the stack for any stage that
+     consumes the static build before the webfont swaps in. Arabic has no Inter coverage and falls
+     through to the platform sans-serif, which has always been the renderer for Arabic here. */
+  --font-family-sans:
+    "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
 }
 
 *,

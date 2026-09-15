@@ -10,23 +10,24 @@ import type { Page, Route } from "@playwright/test";
  *
  *   Every backend call is stubbed via `page.route()` (same approach as `onboarding-setup.spec.ts`),
  *   and prior steps are marked completed in `localStorage` so each step renders in its
- *   happy-path state without having to click through the whole wizard. The captured PNGs land in
+ *   happy-path state without having to click through the whole wizard. The captured images land in
  *   `apps/web/public/help-media/screenshots/`, where the site serves them at
- *   `/help-media/screenshots/<name>.png`.
+ *   `/help-media/screenshots/<name>.webp`.
  *
- * If a step's markup changes, re-run this spec and commit the new images — do not hand-crop.
+ * If a step's markup changes, re-run this spec and commit the new images — do not hand-crop. WebP
+ * (not PNG) keeps the help article payload small; `docs/help/README.md` documents the same rule.
  */
 
 const STORAGE_KEY = "studafy.onboarding-setup.v1";
 const OUTPUT_DIR = "public/help-media/screenshots";
 
 const STEPS = [
-  { id: "school-profile", title: "School profile", file: "onboarding-school-profile.png" },
-  { id: "academic-year", title: "Academic year", file: "onboarding-academic-year.png" },
-  { id: "grading-scheme", title: "Grading scheme", file: "onboarding-grading-scheme.png" },
-  { id: "timetable", title: "Timetable periods", file: "onboarding-timetable.png" },
-  { id: "staff", title: "Staff invitations", file: "onboarding-staff.png" },
-  { id: "students", title: "Student import", file: "onboarding-student-import.png" },
+  { id: "school-profile", title: "School profile", file: "onboarding-school-profile.webp" },
+  { id: "academic-year", title: "Academic year", file: "onboarding-academic-year.webp" },
+  { id: "grading-scheme", title: "Grading scheme", file: "onboarding-grading-scheme.webp" },
+  { id: "timetable", title: "Timetable periods", file: "onboarding-timetable.webp" },
+  { id: "staff", title: "Staff invitations", file: "onboarding-staff.webp" },
+  { id: "students", title: "Student import", file: "onboarding-student-import.webp" },
 ] as const;
 
 function fakeAccessToken(roles: string[]): string {
@@ -124,6 +125,7 @@ test.describe("help center screenshots", () => {
       await page.screenshot({
         path: `${OUTPUT_DIR}/${step.file}`,
         fullPage: true,
+        quality: 80,
       });
     });
   }

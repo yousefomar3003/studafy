@@ -76,12 +76,17 @@ Images are generated, not hand-staged, so they stay current:
   `apps/web/public/help-media/screenshots/`. No Postgres or `apps/api`
   needed — run it with `bun run e2e:help-screenshots` from `apps/web`.
 - Articles reference them at the web path
-  `/help-media/screenshots/<name>.png` with descriptive alt text.
-- Re-run the spec when a screen changes and commit the new PNGs. Do not paste
-  hand-taken crops. `apps/web/e2e/help-center.spec.ts` fails if a documented
-  screenshot is missing or won't load, so a regenerating-but-committing change
-  cannot silently drift.
+  `/help-media/screenshots/<name>.webp` with descriptive alt text.
+- Re-run the spec when a screen changes and commit the new images. Do not
+  paste hand-taken crops. `apps/web/e2e/help-center.spec.ts` fails if a
+  documented screenshot is missing or won't load, so a regenerating-but-committing
+  change cannot silently drift.
+- Screenshots are committed as **lossy WebP, quality 80** (the spec's
+  `page.screenshot` sets it) — not PNG. PNG is typically ~60% larger for the
+  same UI content, and `apps/web/scripts/check-bundle-budget.ts` fails CI on
+  any non-WebP raster in this directory. Do not change the format or raise the
+  quality without updating that budget in the same change.
 
-The PNGs are checked in, so articles render fully from a fresh checkout. The
-text is still the source of truth — a screenshot that no longer matches the
+The WebP images are checked in, so articles render fully from a fresh checkout.
+The text is still the source of truth — a screenshot that no longer matches the
 copy it sits under is a sign to re-capture, and the spec above is how.

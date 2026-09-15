@@ -85,8 +85,31 @@ next reconnect.
 will be shared as more routes need it. Import the workspace package rather than redefining schema
 primitives locally.
 
-## Build-size expectation
+## Performance budget
 
-The initial route (`/`) must stay **well under 300 KB gzip**. React + React Router + TanStack Query
-core is roughly 70 KB gzip; the onboarding/portal/account groups are separate lazy chunks and do not
-count against the initial route. Keep it that way — prefer lazy route groups and avoid heavy deps.
+Enforced by `.github/workflows/web-performance.yml` on every PR. Two mechanisms, deliberately
+split because they measure different units:
+
+| Budget                                 | Target                           | Enforced by                                              |
+| -------------------------------------- | -------------------------------- | -------------------------------------------------------- |
+| Marketing LCP (`/`)                    | ≤ 2.5 s                          | Lighthouse CI (`lighthouserc.json`)                      |
+| App-shell TTI (`/auth/login`, a proxy) | ≤ 3.0 s                          | Lighthouse CI (`lighthouserc.json`)                      |
+| Initial portal JS                      | < 300 KB gzip                    | `bun run perf:bundle` (`scripts/check-bundle-budget.ts`) |
+| Help-media screenshots                 | ≤ 240 KB, WebP q80, ≤ 60 KB each | `bun run perf:bundle`                                    |
+
+- **The byte gate is the gzip truth.** Lighthouse's `transferSize` counts raw bytes off an
+  uncompressed static server; the < 300 KB-gzip acceptance number is measured by the script, which
+  reads `dist/` and sums gzip sizes of the initial script + module-preload graph and the
+  `PortalPage` chunk.
+- **TTI is measured on `/auth/login`, not `/portal`.** The portal is auth-gated and Lighthouse CI
+  cannot log in. The entire portal shell — `PortalLayout`, sidebar, search palette, auth, realtime,
+  react-query, i18n — lives in the shared entry graph that `/auth/login` and `/portal` both boot,
+  so this is a real measurement of that shell, with the portal-home-only delta covered by the byte
+  gate. Mobile-emulated throttling approximates the mid-tier-hardware target.
+- Local runs: `bun run build && bun run perf:bundle`, then start `vite preview` and run
+  `bun run perf:lighthouse` (Lighthouse needs a Chrome binary — set `CHROME_PATH` or let it
+  auto-discover one).
+
+**Additive rule for contributors:** keep heavy dependencies out of `main.tsx`'s entry graph
+(providers, layouts, shared UI import). Prefer `React.lazy` route groups; a dependency pulled in at
+the root counts against the 300 KB-gzip gate for every route, portal included.
