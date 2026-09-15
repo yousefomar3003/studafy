@@ -137,6 +137,15 @@ jobs:
           SEED_INTEGRATION: "1"
         run: bun test tests/seed.test.ts --timeout 90000
         working-directory: packages/db
+      # ST-284: EXPLAIN (FORMAT JSON) plan-shape check for the top 20 hot query shapes apps/api
+      # issues, with enable_seqscan off so an under-indexed predicate is caught even against the
+      # small demo seed. Its own step/timeout for the same reason as the seed integration test above:
+      # it seeds a full demo tenant before running 20 EXPLAINs.
+      - name: Query plan budget (top 20 hot queries, no Seq Scan)
+        env:
+          QUERY_PLAN_BUDGET: "1"
+        run: bun test tests/query-plan-budget.test.ts --timeout 60000
+        working-directory: packages/db
       - name: Attendance 40-record benchmark
         env:
           ATTENDANCE_BENCHMARK: "1"

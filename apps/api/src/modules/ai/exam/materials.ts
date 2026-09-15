@@ -18,14 +18,19 @@ export async function validateExamMaterials(
   tx: TransactionSql,
   materialIds: readonly string[],
 ): Promise<ValidateExamMaterialsResult> {
+  // One query for every requested material rather than one per id -- the failure check below
+  // still walks materialIds in request order, so "first invalid material" reporting is unchanged.
+  const rows = await tx<{ id: string; ingest_status: string }[]>`
+    SELECT id, ingest_status
+    FROM app.materials
+    WHERE id = ANY (${materialIds}::uuid[])
+  `;
+  const statusById = new Map(rows.map((row) => [row.id, row.ingest_status]));
+
   for (const materialId of materialIds) {
-    const [material] = await tx<{ ingest_status: string }[]>`
-      SELECT ingest_status
-      FROM app.materials
-      WHERE id = ${materialId}::uuid
-    `;
-    if (!material) return { status: "not_found", materialId };
-    if (material.ingest_status !== "ready") return { status: "not_ready", materialId };
+    const status = statusById.get(materialId);
+    if (!status) return { status: "not_found", materialId };
+    if (status !== "ready") return { status: "not_ready", materialId };
   }
   return { status: "ok" };
 }

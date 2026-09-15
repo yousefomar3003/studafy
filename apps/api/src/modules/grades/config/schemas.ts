@@ -416,9 +416,16 @@ export type UpdateGradeEntry = z.infer<typeof updateGradeEntrySchema>;
 
 export const bulkUpdateGradesBodySchema = z
   .object({
-    grades: z.array(updateGradeEntrySchema).min(1).max(100).openapi({
-      description: "Up to 100 grade cells to update atomically.",
-    }),
+    grades: z
+      .array(updateGradeEntrySchema)
+      .min(1)
+      .max(100)
+      .refine((entries) => new Set(entries.map((entry) => entry.id)).size === entries.length, {
+        message: "grades must not repeat the same id",
+      })
+      .openapi({
+        description: "Up to 100 grade cells to update atomically.",
+      }),
   })
   .openapi("BulkUpdateGradesBody");
 

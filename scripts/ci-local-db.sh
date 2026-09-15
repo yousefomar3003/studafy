@@ -33,6 +33,9 @@ echo "==> packages/db unit + integration suite"
 echo "==> seed integration test (demo tenant + index health)"
 (cd packages/db && SEED_INTEGRATION=1 bun test tests/seed.test.ts --timeout 90000) || exit 1
 
+echo "==> query plan budget (top 20 hot queries, no Seq Scan)"
+(cd packages/db && QUERY_PLAN_BUDGET=1 bun test tests/query-plan-budget.test.ts --timeout 60000) || exit 1
+
 echo "==> partition maintenance (attendance + audit logs, idempotency)"
 bun run db:migrate || exit 1
 bun run db:attendance:partitions 12 || exit 1
