@@ -1,0 +1,79 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  // Config is committed, so the onboarding PR the app would otherwise open is skipped.
+  onboarding: false,
+  extends: ["config:recommended"],
+  timezone: "UTC",
+  // Dependabot-style proposals land on dev, the CI integration line (ci.yml pushes here),
+  // and auto-merge only fires once that branch's required checks pass.
+  baseBranchPatterns: ["dev"],
+  // One issue per repo listing every proposed update; majors are flagged there as well as on
+  // their PRs. Can't hurt, kills "where did this PR come from" questions.
+  dependencyDashboard: true,
+  // Supply-chain yank window (2026 posture): non-security updates wait a week past release
+  // before they are proposed, so a malicious publish has time to get yanked upstream. Security
+  // alerts override this to 0 days (see the vulnerabilityAlerts block below).
+  minimumReleaseAge: "7 days",
+  // Flood control for routine updates. Vulnerability-alert branches deliberately ignore these
+  // limits so an advisory is never queued behind them.
+  prHourlyLimit: 2,
+  prConcurrentLimit: 4,
+  labels: ["dependencies"],
+  // Dual advisory source, on purpose: GitHub's native alerts and OSV.dev disagree on a
+  // meaningful share of advisories, so running both is the union, not a redundancy. OSV hits a
+  // public API and needs no GitHub Dependency Graph/Advanced Security -- which this private repo
+  // has not enabled yet (see the dependency-review step in ci.yml) -- so it is the guaranteed
+  // path to <24h security PRs; GitHub-native alerts additionally fire off the advisory event.
+  osvVulnerabilityAlerts: true,
+  vulnerabilityAlerts: {
+    labels: ["dependencies", "security"],
+    // A known CVE in prod beats holding the fix for the release-age yank window. (prPriority
+    // can't live here -- it's a packageRules-only field -- so it rides a packageRule below.)
+    minimumReleaseAge: "0 days",
+  },
+  packageRules: [
+    // GitHub Actions stay with dependabot.yml -- its weekly + 7-day cooldown is a deliberate,
+    // documented supply-chain stance (a fresh action release can be malicious). Renovate has no
+    // faithful equivalent, so the scopes stay disjoint instead of double-PR'd. Removing this
+    // rule without moving the cooldown off dependabot would silently undercut that stance.
+    { matchManagers: ["github-actions"], enabled: false },
+    // Non-security minor+patch: one grouped PR per week instead of a drip of per-package PRs.
+    // isVulnerabilityAlert: false keeps security fixes out of the group and on their own lane.
+    // The schedule lives here, not at the top level, so the bot still runs every day and an
+    // advisory that drops on a Thursday gets a PR that same day (the <24h acceptance).
+    {
+      matchManagers: ["bun", "pub"],
+      matchUpdateTypes: ["minor", "patch", "digest"],
+      isVulnerabilityAlert: false,
+      groupName: "weekly non-major updates",
+      schedule: ["before 06:00 on Monday"],
+    },
+    // Security fixes that aren't a major release: proposed immediately and auto-merged once the
+    // branch's required checks pass (GitHub native auto-merge, "on green"). A broken patch still
+    // gets caught by CI; leaving a known CVE in production for a week is the worse failure mode.
+    // prPriority lives here rather than the vulnerabilityAlerts block because it is a
+    // packageRules-only field -- it jumps queue-ordering in the dependency dashboard.
+    {
+      isVulnerabilityAlert: true,
+      matchUpdateTypes: ["patch", "minor", "digest"],
+      automerge: true,
+      automergeType: "pr",
+      platformAutomerge: true,
+      prPriority: 20,
+    },
+    // Every major bump is flagged for a human: labelled, never auto-merged. This deliberately
+    // includes security fixes that require a major bump -- Renovate cannot be configured to skip
+    // a vulnerability update, so the lever is merge policy, not creation.
+    {
+      matchUpdateTypes: ["major"],
+      labels: ["dependencies", "major"],
+      automerge: false,
+    },
+  ],
+  // Refresh the lockfiles (bun.lock, apps/mobile/pubspec.lock) in their own weekly PR so locked
+  // versions drift toward current even when no manifest version changed.
+  lockFileMaintenance: {
+    enabled: true,
+    schedule: ["before 06:00 on Monday"],
+  },
+}
