@@ -198,8 +198,18 @@ class _InAppPreview extends ConsumerWidget {
                 defaultPage: initialPage == null ? 0 : (initialPage! - 1).clamp(0, 1 << 30),
               ),
             )
-          : Image.file(file, fit: BoxFit.contain),
-    );
+: Image.file(
+              file,
+              fit: BoxFit.contain,
+              // Bound the decode to roughly one screen of pixels (logical width × DPR) rather
+              // than the file's full resolution. A multi-megapixel scan decoded at native size
+              // is the biggest memory/first-frame spike this screen can produce on a low-end
+              // device, and the extra fidelity is never visible inside a BoxFit.contain box.
+              cacheWidth: (MediaQuery.sizeOf(context).width *
+                      MediaQuery.devicePixelRatioOf(context))
+                  .ceil(),
+            ),
+        );
   }
 }
 

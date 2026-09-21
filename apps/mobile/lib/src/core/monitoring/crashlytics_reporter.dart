@@ -16,18 +16,29 @@ class FirebaseCrashlyticsReporter implements CrashReporter {
 
   final PiiScrubber _scrubber;
 
+  // Crashlytics is gated on Firebase being initialized, which happens post-first-frame (deferred
+  // init, see app_bootstrap.dart). Until then `FirebaseCrashlytics.instance` throws, and the first
+  // frame's `identifyUser` (monitoring_providers.dart) would otherwise trip on it. Every call is
+  // a no-op until [initialize] has set this.
+  bool _initialized = false;
+
   FirebaseCrashlytics get _crashlytics => FirebaseCrashlytics.instance;
 
   @override
-  Future<void> initialize() => _crashlytics.setCrashlyticsCollectionEnabled(true);
+  Future<void> initialize() async {
+    await _crashlytics.setCrashlyticsCollectionEnabled(true);
+    _initialized = true;
+  }
 
   @override
   void identifyUser(String? userId) {
+    if (!_initialized) return;
     _crashlytics.setUserIdentifier(userId ?? '');
   }
 
   @override
   void addBreadcrumb(String message, {String category = 'app', Map<String, Object?>? data}) {
+    if (!_initialized) return;
     _crashlytics.log('[$category] ${_scrubber.scrubText(message)}');
   }
 
@@ -38,6 +49,7 @@ class FirebaseCrashlyticsReporter implements CrashReporter {
     bool fatal = false,
     String? reason,
   }) {
+    if (!_initialized) return Future.value();
     return _crashlytics.recordError(
       error,
       stackTrace,
@@ -48,6 +60,7 @@ class FirebaseCrashlyticsReporter implements CrashReporter {
 
   @override
   Future<void> recordFlutterError(FlutterErrorDetails details) {
+    if (!_initialized) return Future.value();
     return _crashlytics.recordFlutterFatalError(details);
   }
 }

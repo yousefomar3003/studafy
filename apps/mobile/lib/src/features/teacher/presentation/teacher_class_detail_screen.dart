@@ -85,44 +85,64 @@ class TeacherClassDetailScreen extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(classRosterProvider(classId)),
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.space16),
-          children: [
-            courseName.maybeWhen(
-              data: (name) => Text(name, style: textTheme.titleMedium),
-              orElse: () => const SizedBox.shrink(),
-            ),
-            const SizedBox(height: AppSpacing.space4),
-            Text(
-              'teacher.class.rosterTitle'.tr(),
-              style: textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(AppSpacing.space16),
+              sliver: SliverList.list(
+                children: [
+                  courseName.maybeWhen(
+                    data: (name) => Text(name, style: textTheme.titleMedium),
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: AppSpacing.space4),
+                  Text(
+                    'teacher.class.rosterTitle'.tr(),
+                    style: textTheme.titleSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.space12),
+                ],
               ),
             ),
-            const SizedBox(height: AppSpacing.space12),
             roster.when(
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.only(top: AppSpacing.space32),
-                  child: CircularProgressIndicator(),
+              loading: () => const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: AppSpacing.space32),
+                    child: CircularProgressIndicator(),
+                  ),
                 ),
               ),
-              error: (error, stackTrace) => const _Message(
-                icon: Icons.error_outline,
-                messageKey: 'teacher.class.rosterError',
+              error: (error, stackTrace) => const SliverToBoxAdapter(
+                child: _Message(
+                  icon: Icons.error_outline,
+                  messageKey: 'teacher.class.rosterError',
+                ),
               ),
               data: (enrollments) {
                 if (enrollments.isEmpty) {
-                  return const _Message(
-                    icon: Icons.group_off_outlined,
-                    messageKey: 'teacher.class.rosterEmpty',
+                  return const SliverToBoxAdapter(
+                    child: _Message(
+                      icon: Icons.group_off_outlined,
+                      messageKey: 'teacher.class.rosterEmpty',
+                    ),
                   );
                 }
-                return Column(
-                  children: [
-                    for (final enrollment in enrollments)
-                      RosterEntryTile(enrollment: enrollment),
-                  ],
+                // Builder (lazily built) so a full class only materialises the rows the
+                // viewport sees — a 60-student roster otherwise builds every tile on each
+                // rebuild of this screen (tab switch, any provider invalidation).
+                return SliverPadding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.space16,
+                  ),
+                  sliver: SliverList.builder(
+                    itemCount: enrollments.length,
+                    itemBuilder: (context, index) =>
+                        RosterEntryTile(enrollment: enrollments[index]),
+                  ),
                 );
               },
             ),

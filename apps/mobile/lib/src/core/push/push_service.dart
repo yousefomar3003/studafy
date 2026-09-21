@@ -33,10 +33,9 @@ String? resolveNotificationTapRoute(Map<String, dynamic> data) {
 /// [pushServiceProvider]'s contract — the surface [StudafyApp] and [PushInitNotifier] depend on.
 ///
 /// A real deployment always gets [FirebasePushService]; widget tests override the provider with a
-/// no-op fake instead (`test/support/fake_push_service.dart`) — [FirebasePushService] touches real
-/// Firebase Cloud Messaging the moment it's constructed (`FirebaseMessaging.instance`), which
-/// throws outside a real app with `Firebase.initializeApp()` already run, so a test can never
-/// construct one directly.
+/// no-op fake instead (`test/support/fake_push_service.dart`) — reaching the Firebase Messaging
+/// platform (`FirebaseMessaging.instance`, `Firebase.initializeApp()`) requires a real app, which
+/// a widget test can never provide, so the service's real code paths stay production-only.
 abstract class PushService {
   /// Stream of messages received while the app is in the foreground.
   Stream<RemoteMessage> get onMessage;
@@ -71,9 +70,14 @@ class FirebasePushService implements PushService {
 
   final TokenProvider _getToken;
   final Dio _dio;
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications =
-      FlutterLocalNotificationsPlugin();
+
+  // Lazily resolved in `_ensureFirebase()` rather than in the constructor so constructing the
+  // service never touches Firebase — the root widget subscribes to push taps on the first frame,
+  // which now runs before `Firebase.initializeApp()` completes (deferred init, see
+  // app_bootstrap.dart). The first Firebase touch is therefore `initialize()`, which is gated on
+  // authentication and can itself await Firebase setup.
+  late final FirebaseMessaging _messaging;
+  late final FlutterLocalNotificationsPlugin _localNotifications;
 
   final _messageController = StreamController<RemoteMessage>.broadcast();
   final _tapController = StreamController<String>.broadcast();
@@ -100,7 +104,7 @@ class FirebasePushService implements PushService {
     if (_initialized) return await _messaging.getToken();
     _initialized = true;
 
-    await Firebase.initializeApp();
+    await _ensureFirebase();
 
     await _initLocalNotifications();
 
@@ -137,6 +141,7 @@ class FirebasePushService implements PushService {
   /// already initialized but had no auth token at the time).
   @override
   Future<void> registerIfAuthenticated() async {
+    await _ensureFirebase();
     final token = await _messaging.getToken();
     if (token != null) {
       await _registerToken(token);
@@ -155,6 +160,15 @@ class FirebasePushService implements PushService {
   }
 
   // -- Internal --------------------------------------------------------------
+
+  /// Resolves the lazily-initialized Firebase-backed members. Idempotent — `Firebase.initializeApp`
+  /// returns the existing default app on repeat calls, so both the deferred bootstrap setup and
+  /// `initialize()` can trigger it without coordination.
+  Future<void> _ensureFirebase() async {
+    await Firebase.initializeApp();
+    _messaging = FirebaseMessaging.instance;
+    _localNotifications = FlutterLocalNotificationsPlugin();
+  }
 
   Future<void> _initLocalNotifications() async {
     const androidSettings = AndroidInitializationSettings(

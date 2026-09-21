@@ -108,6 +108,7 @@ class _AttendanceTakingScreenState extends ConsumerState<AttendanceTakingScreen>
       for (final enrolment in editable)
         _draft[enrolment.studentId] ?? AttendanceMark.present(enrolment.studentId),
     ];
+    final lockedCount = register.lockedRecords.length;
 
     return Column(
       children: [
@@ -115,21 +116,26 @@ class _AttendanceTakingScreenState extends ConsumerState<AttendanceTakingScreen>
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async => ref.invalidate(attendanceRegisterProvider(_scope)),
-            child: ListView(
+            child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
-              children: [
-                for (final record in register.lockedRecords)
-                  _LockedRow(record: record),
-                for (final enrolment in editable)
-                  AttendanceRosterRow(
-                    studentId: enrolment.studentId,
-                    mark: _draft[enrolment.studentId] ??
-                        AttendanceMark.present(enrolment.studentId),
-                    onCycle: () => _cycle(enrolment.studentId),
-                    onMinutesLateChanged: (minutes) =>
-                        _setMinutesLate(enrolment.studentId, minutes),
-                  ),
-              ],
+              // Builder (lazily built) so a full register only materialises the rows in the
+              // viewport. Each row-tap still calls `_cycle` → `setState`, but with a builder
+              // that rebuild only touches visible rows instead of the whole class.
+              itemCount: lockedCount + editable.length,
+              itemBuilder: (context, index) {
+                if (index < lockedCount) {
+                  return _LockedRow(record: register.lockedRecords[index]);
+                }
+                final enrolment = editable[index - lockedCount];
+                return AttendanceRosterRow(
+                  studentId: enrolment.studentId,
+                  mark: _draft[enrolment.studentId] ??
+                      AttendanceMark.present(enrolment.studentId),
+                  onCycle: () => _cycle(enrolment.studentId),
+                  onMinutesLateChanged: (minutes) =>
+                      _setMinutesLate(enrolment.studentId, minutes),
+                );
+              },
             ),
           ),
         ),
@@ -247,15 +253,18 @@ class _AttendanceTakingScreenState extends ConsumerState<AttendanceTakingScreen>
         ),
         Expanded(
           child: register.canCorrect
-              ? ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
-                  children: [
-                    for (final record in register.records!)
-                      _RecordedRow(
-                        record: record,
-                        onTap: () => _openCorrection(record),
-                      ),
-                  ],
+              ? ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.space16,
+                  ),
+                  itemCount: register.records!.length,
+                  itemBuilder: (context, index) {
+                    final record = register.records![index];
+                    return _RecordedRow(
+                      record: record,
+                      onTap: () => _openCorrection(record),
+                    );
+                  },
                 )
               : const _CenteredMessage(
                   icon: Icons.check_circle_outline,
