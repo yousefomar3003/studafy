@@ -149,6 +149,12 @@ class _Report extends StatelessWidget {
     final hasHighlight = report.subjects.any((s) => s.courseId == highlightCourseId);
     if (hasHighlight) onReportBuilt();
 
+    // Eager children rather than a sliver builder, deliberately:
+    // 1. `report.subjects` is bounded by a school term (typically 5-10 courses), so a full build
+    //    is cheap and the list is not a jank risk on its own.
+    // 2. The grade-posted push deep-link scrolls to one highlighted card via
+    //    `Scrollable.ensureVisible` on [_highlightKey] — that needs every card materialised even
+    //    when it is off-screen, which a lazily-built sliver cannot guarantee.
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.space16),
       physics: const AlwaysScrollableScrollPhysics(),

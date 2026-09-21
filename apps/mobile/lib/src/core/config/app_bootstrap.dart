@@ -50,11 +50,6 @@ void bootstrapApp(AppEnvironment environment) {
 
       GoogleFonts.config.allowRuntimeFetching = false;
 
-      // Firebase must be initialized before runApp() so the background message
-      // handler is registered and FCM token acquisition can start immediately.
-      await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
       final appConfig = AppConfig.fromEnvironment(environment);
 
       final packageInfo = await PackageInfo.fromPlatform();
@@ -66,7 +61,6 @@ void bootstrapApp(AppEnvironment environment) {
         SentryCrashReporter(monitoringConfig),
         FirebaseCrashlyticsReporter(),
       ]);
-      await crashReporter!.initialize();
 
       FlutterError.onError = (details) {
         FlutterError.presentError(details);
@@ -100,6 +94,15 @@ void bootstrapApp(AppEnvironment environment) {
           ),
         ),
       );
+
+      // Deferred init — see docs/perf-test-protocol.md. Firebase app setup and both crash
+      // reporters' initialization (Sentry's `SentryFlutter.init` is the slowest single bootstrap
+      // step) are not needed to draw the first frame, so they run after it instead of blocking
+      // the cold-start critical path. `FirebasePushService.initialize()` also awaits
+      // `Firebase.initializeApp()` itself, so push registration (post-auth) cannot race this.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_deferredSetup(crashReporter!));
+      });
     },
     (error, stack) {
       // Catches errors thrown outside any Flutter-owned callback (e.g. from a raw Future chain).
@@ -108,4 +111,17 @@ void bootstrapApp(AppEnvironment environment) {
       crashReporter?.recordError(error, stack, fatal: true);
     },
   );
+}
+
+/// The post-first-frame half of startup: the work that can wait a frame so the app renders
+/// sooner. Dispatched from [bootstrapApp] once the first frame has been drawn.
+Future<void> _deferredSetup(CrashReporter crashReporter) async {
+  // Registering the background handler is a cheap static wiring call, but it needs the Firebase
+  // default app up first. A notification arriving in the brief pre-Firebase window is still
+  // displayed by the OS (the pushed payload always carries notification fields); only a tap in
+  // that sub-second gap would not reach the Dart handler — acceptable and documented.
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  await crashReporter.initialize();
 }

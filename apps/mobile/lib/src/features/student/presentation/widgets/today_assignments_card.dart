@@ -13,8 +13,14 @@ import 'today_skeleton.dart';
 import 'today_state_message.dart';
 
 /// Due-soon assignments, nearest deadline first.
+///
+/// Capped at [maxItems] — the same bound [TodayAnnouncementsCard] applies — so an exam-season
+/// backlog can't turn the today tab's assignments card into an unbounded column inside the
+/// non-virtualized today `ListView`.
 class TodayAssignmentsCard extends ConsumerWidget {
-  const TodayAssignmentsCard({super.key});
+  const TodayAssignmentsCard({this.maxItems = 5, super.key});
+
+  final int maxItems;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,6 +42,7 @@ class TodayAssignmentsCard extends ConsumerWidget {
               icon: Icons.check_circle_outline,
             );
           }
+          final items = cached.data.take(maxItems);
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -43,7 +50,7 @@ class TodayAssignmentsCard extends ConsumerWidget {
                 StalenessBanner(fetchedAt: cached.fetchedAt),
                 const SizedBox(height: AppSpacing.space12),
               ],
-              for (final assignment in cached.data) _AssignmentRow(assignment: assignment),
+              for (final assignment in items) _AssignmentRow(assignment: assignment),
               Align(
                 alignment: AlignmentDirectional.centerEnd,
                 child: TextButton(

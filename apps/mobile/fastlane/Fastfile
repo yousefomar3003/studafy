@@ -20,6 +20,10 @@
 # The version *name* (x.y.z) is pubspec.yaml's single source of truth. The version *code* / build
 # number is the CI run's commit count (MOBILE_BUILD_NUMBER) — monotonic, derivable anywhere, never
 # hand-maintained. Both are passed to `flutter build` as --build-name / --build-number.
+#
+# ── Size budget ───────────────────────────────────────────────────────────────────────────────
+# Every store-distributing lane enforces SIZE_BUDGET_MB: Android gates the largest per-ABI split
+# APK (what a device downloads), iOS gates the .ipa. Definition + levers: docs/perf-pass-report.md.
 
 require "base64"
 require "shellwords"
@@ -31,6 +35,11 @@ MOBILE_DIR = File.expand_path("..", __dir__)                    # → apps/mobil
 PUBSPEC    = File.join(MOBILE_DIR, "pubspec.yaml")
 FLAVOR     = "prod"                                             # the only store-distributed flavour
 ENTRYPOINT = "lib/main_prod.dart"
+
+# Size budget for the perf pass (docs/perf-pass-report.md): the largest per-ABI Android split APK
+# and the iOS .ipa must stay under this. Android's universal AAB deliberately contains every ABI,
+# so the gate measures the artifact a user actually installs, not the all-ABI bundle.
+SIZE_BUDGET_MB = 40
 
 # ── Helpers ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -94,8 +103,10 @@ def build_ios_ipa
     "--build-number=#{resolved_build_number}",
     "--export-method=app-store",
   )
-  Dir.glob(File.join(MOBILE_DIR, "build/ios/ipa/*.ipa")).first ||
+  ipa = Dir.glob(File.join(MOBILE_DIR, "build/ios/ipa/*.ipa")).first ||
     UI.user_error!("flutter build ipa produced no .ipa under build/ios/ipa/")
+  enforce_size_budget!([ipa], "iOS release")
+  ipa
 end
 
 def build_android_aab
@@ -108,6 +119,44 @@ def build_android_aab
   )
   path = File.join(MOBILE_DIR, "build/app/outputs/bundle/#{FLAVOR}Release/app-#{FLAVOR}-release.aab")
   File.exist?(path) ? path : UI.user_error!("no app bundle at #{path}")
+end
+
+# Builds the per-ABI APK splits and enforces the size budget on them. The upload artifact is the
+# universal AAB ([build_android_aab]); the splits are what a device actually downloads from Play,
+# so that is what the gate measures ([SIZE_BUDGET_MB]).
+def enforce_android_size_budget!
+  flutter(
+    "build", "apk", "--release", "--split-per-abi",
+    "--flavor", FLAVOR, "-t", ENTRYPOINT,
+    "--build-name=#{pubspec_version_name}",
+    "--build-number=#{resolved_build_number}",
+  )
+  apks = Dir.glob(File.join(MOBILE_DIR, "build/app/outputs/apk/#{FLAVOR}Release/*.apk"))
+  UI.user_error!("flutter build apk --split-per-abi produced no APKs") if apks.empty?
+  enforce_size_budget!(apks, "Android release (largest per-ABI APK)")
+end
+
+# Fails the lane when any artifact in `paths` is over [SIZE_BUDGET_MB]. Prints a table and, in CI,
+# mirrors it to the step summary. The budget and levers are documented in docs/perf-pass-report.md.
+def enforce_size_budget!(paths, label)
+  rows = paths.map { |path| [path, (File.size(path).to_f / (1024 * 1024)).round(2)] }
+  rows.each { |path, size| UI.message(format("%-100s %8.2f MB", path, size)) }
+  worst = rows.max_by { |_, size| size }
+
+  # GITHUB_OUTPUT is a file path when set, so mirror the summary to GITHUB_STEP_SUMMARY only.
+  if ENV["GITHUB_STEP_SUMMARY"]
+    File.open(ENV["GITHUB_STEP_SUMMARY"], "a") do |f|
+      f.puts("### #{label} size")
+      rows.each { |path, size| f.puts("- `#{path}`: **#{size} MB**") }
+      f.puts("\nBudget: #{SIZE_BUDGET_MB} MB")
+    end
+  end
+
+  return unless worst[1] > SIZE_BUDGET_MB
+  UI.user_error!(
+    "#{label} budget exceeded: #{worst[0]} is #{worst[1]} MB (> #{SIZE_BUDGET_MB} MB). " \
+    "See docs/perf-pass-report.md for the budget definition and available levers."
+  )
 end
 
 # ── iOS ─────────────────────────────────────────────────────────────────────────────────────────
@@ -176,9 +225,11 @@ platform :android do
   desc "Build an app bundle and upload it to the Play internal track. Runs on every merge to main."
   lane :internal do
     signing
+    aab = build_android_aab
+    enforce_android_size_budget!   # gate: largest per-ABI APK ≤ SIZE_BUDGET_MB
     upload_to_play_store(
       track:                   "internal",
-      aab:                     build_android_aab,
+      aab:                     aab,
       release_status:          "completed",
       skip_upload_apk:         true,
       skip_upload_metadata:    true,
@@ -192,9 +243,11 @@ platform :android do
   lane :release do
     ensure_tag_matches_pubspec!
     signing
+    aab = build_android_aab
+    enforce_android_size_budget!   # gate: largest per-ABI APK ≤ SIZE_BUDGET_MB
     upload_to_play_store(
       track:                   "production",
-      aab:                     build_android_aab,
+      aab:                     aab,
       rollout:                 "0.1",          # 10% — the staged-rollout floor
       release_status:          "inProgress",
       skip_upload_apk:         true,
