@@ -7,6 +7,11 @@ containers and Postgres rotation; [`infra/terraform/modules/postgres`](../../inf
 [`infra/terraform/modules/pgbouncer`](../../infra/terraform/modules/pgbouncer) for the data-tier
 secrets `modules/secrets` composes read access to but does not own.
 
+**Operational rotation procedures live in `security/`** — one runbook per secret class plus the
+quarterly schedule and drill ([`security/README.md`](security/README.md),
+[`security/rotation-schedule.md`](security/rotation-schedule.md)). This file is the inventory and
+the wiring conventions; it deliberately does not duplicate the procedures.
+
 ## Secrets inventory
 
 Every Secrets Manager secret this infrastructure creates, in one place — the individual modules'
@@ -111,33 +116,13 @@ the provider's own default of the same value). In dev, that first `terraform app
 resource is itself the acceptance criterion's "DB credential rotation runbook executed once in
 dev" — there is no separate manual trigger needed the first time.
 
-### Running the rotation drill again (dev)
+### Running the rotation drill
 
-To exercise rotation a second time (or verify the schedule is live) without waiting for
-`postgres_rotation_days`:
-
-```bash
-aws secretsmanager rotate-secret \
-  --secret-id "$(terraform output -raw postgres_connection_secret_arn)"
-
-# Poll until rotation finishes — RotationEnabled true and no in-progress AWSPENDING version:
-aws secretsmanager describe-secret \
-  --secret-id "$(terraform output -raw postgres_connection_secret_arn)" \
-  --query '{RotationEnabled: RotationEnabled, LastRotatedDate: LastRotatedDate, VersionIdsToStages: VersionIdsToStages}'
-
-# Confirm the new password actually works, from the bastion:
-pg_secret=$(aws secretsmanager get-secret-value \
-  --secret-id "$(terraform output -raw postgres_connection_secret_arn)" \
-  --query SecretString --output text)
-PGPASSWORD=$(echo "$pg_secret" | jq -r .password) \
-  psql "host=$(echo "$pg_secret" | jq -r .host) port=$(echo "$pg_secret" | jq -r .port) \
-        dbname=$(echo "$pg_secret" | jq -r .dbname) user=$(echo "$pg_secret" | jq -r .username) \
-        sslmode=require" -c 'select now();'
-```
-
-If rotation fails, check the Lambda's own CloudWatch Logs group
-(`/aws/lambda/<name_prefix>-postgres-rotation`) first — the four-step `createSecret` /
-`setSecret` / `testSecret` / `finishSecret` state machine logs which step failed and why.
+The operational procedure — on-demand `rotate-secret`, verification, the zero-downtime gate, and
+failure triage (`/aws/lambda/<name_prefix>-postgres-rotation`'s CloudWatch Logs) — is
+[`security/rotation-db.md`](security/rotation-db.md), under the quarterly schedule in
+[`security/rotation-schedule.md`](security/rotation-schedule.md). This file keeps the wiring
+conventions below; the drill no longer lives here.
 
 ### Why `modules/postgres` carries a `lifecycle.ignore_changes`
 
