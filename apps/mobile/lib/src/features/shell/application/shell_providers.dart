@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/auth_state.dart';
+import '../../../core/di/app_providers.dart';
+import '../domain/account_delete_link.dart';
 import '../domain/shell_role.dart';
 
 /// The current session's role claims, or empty when not authenticated.
@@ -18,4 +20,9 @@ final sessionRolesProvider = Provider<List<String>>((ref) {
 /// The shell the current session resolves to. See [resolveShellRole].
 final shellRoleProvider = Provider<ShellRole>((ref) {
   return resolveShellRole(ref.watch(sessionRolesProvider));
+});
+
+/// The external-browser link for account deletion. See [buildAccountDeleteUrl].
+final accountDeleteUrlProvider = Provider<Uri>((ref) {
+  return buildAccountDeleteUrl(webBaseUrl: ref.watch(appConfigProvider).webBaseUrl);
 });

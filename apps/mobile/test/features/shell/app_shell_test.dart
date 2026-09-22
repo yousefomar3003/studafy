@@ -20,6 +20,10 @@ void main() {
       expect(find.text('AI'), findsWidgets);
       expect(find.text('Profile'), findsWidgets);
       expect(find.byType(FloatingActionButton), findsOneWidget);
+      // The Profile tab's account-deletion action — every tab is mounted in the shell's
+      // IndexedStack (see the tab-switch test below), so this is findable without switching to
+      // it. See ProfileTabScreen's doc comment for why this exists at all.
+      expect(find.text('Delete my account'), findsOneWidget);
     });
 
     testWidgets('instructor gets Home, Classes, Profile — and a mutation FAB', (tester) async {

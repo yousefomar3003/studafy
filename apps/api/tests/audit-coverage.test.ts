@@ -309,6 +309,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // Data subject requests (ST-268). Filing inserts app.data_subject_requests inside a tenant
   // transaction — see modules/privacy/routes.ts.
   "POST /api/privacy/dsr",
+  // Self-service account deletion/export. Same insert, filed by the caller about themselves —
+  // see modules/privacy/routes.ts.
+  "POST /api/privacy/me/dsr",
   // Notification preferences (ST-143). Audit rows are written from inside
   // notification-preferences-service.ts's updatePreferences, alongside the preference writes — see
   // routes/notification-preferences-routes.ts.

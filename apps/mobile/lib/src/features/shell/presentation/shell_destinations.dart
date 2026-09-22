@@ -9,6 +9,7 @@ import '../../teacher/presentation/teacher_class_list_screen.dart';
 import '../../teacher/presentation/teacher_home_screen.dart';
 import '../../viewer/presentation/viewer_home_screen.dart';
 import '../domain/shell_role.dart';
+import 'profile_tab_screen.dart';
 import 'shell_tab_placeholder.dart';
 
 /// One entry in a shell's bottom navigation: its translated label, icon, and tab body.
@@ -37,7 +38,7 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
   const profile = ShellDestination(
     labelKey: 'shell.tabs.profile',
     icon: Icons.person_outline,
-    body: ShellTabPlaceholder(titleKey: 'shell.tabs.profile'),
+    body: ProfileTabScreen(),
   );
 
   switch (role) {
