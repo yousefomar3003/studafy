@@ -33,6 +33,11 @@ when it required the `version-bump` label.
   (`PRIVACY_DSR_MANAGE`). ST-268.
 - `GET /api/privacy/dsr/{requestId}` — read a data subject request's status and, once a completed
   export, a short-lived download URL. ST-268.
+- `POST /api/privacy/me/dsr` — self-service: file a GDPR export or erasure request for the
+  caller's own account. Bearer-authenticated only, no permission gate — the subject is always the
+  caller, never a body parameter. Backs the mobile app store's account-deletion requirement (Apple
+  5.1.1(v) / Google Play Data Safety); see `apps/mobile/store/review-checklist.md`.
+- `GET /api/privacy/me/dsr` — the caller's own data subject request history, most recent first.
 - `GET /api/ai/health` — unauthenticated black-box check reporting whether the `AI_LLM_ENABLED`
   kill switch is on. Backs the public status page's `ai` component
   (`infra/terraform/modules/monitoring`); deliberately does not call the Anthropic provider. ST-264.
