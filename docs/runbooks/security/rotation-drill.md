@@ -12,7 +12,7 @@ the run week is the first full working week of the quarter (`Asia/Amman`).
       `.github/workflows/secrets-rotation-schedule.yml`; dispatch manually if it didn't fire).
 - [ ] Staging is deployed and healthy: `curl -sf https://staging-api.studafy.com/healthz` answers
       200, `aws ecs describe-services --cluster <staging cluster> --services \
-    <name_prefix>-{api,realtime,workers}` each show `RUNNING`.
+<name_prefix>-{api,realtime,workers}` each show `RUNNING`.
 - [ ] Executor has the environment's apply exports:
       `TF_VAR_bastion_allowed_ssh_cidrs`, `TF_VAR_bastion_key_name`, and, for the app-secret
       steps, access to the per-service Secrets Manager ARNs (`secretsmanager:GetSecretValue` on
