@@ -304,6 +304,9 @@ describe("structure", () => {
         // request for one user, PRIVACY_DSR_MANAGE-gated.
         "/api/privacy/dsr",
         "/api/privacy/dsr/{requestId}",
+        // Self-service account deletion/export (ST-268 extension). Bearer-authenticated only --
+        // the caller may only ever act on their own account.
+        "/api/privacy/me/dsr",
         // Parent child comparison reports (ST-177). PARENT-role-gated metrics over linked children.
         "/api/reports/children/comparison",
         "/api/reports/children/{studentId}/breakdown",
@@ -618,6 +621,8 @@ describe("security", () => {
         "GET /api/notification-preferences",
         // Data subject requests (ST-268). Bearer-authenticated, then PRIVACY_DSR_MANAGE-gated.
         "GET /api/privacy/dsr/{requestId}",
+        // Self-service account deletion/export history. Bearer-authenticated only.
+        "GET /api/privacy/me/dsr",
         // Parent child comparison reports (ST-177). Bearer-authenticated, then PARENT-role-gated.
         "GET /api/reports/children/comparison",
         "GET /api/reports/children/{studentId}/breakdown",
@@ -755,6 +760,8 @@ describe("security", () => {
         "POST /api/notifications/read-all",
         // Data subject requests (ST-268). Bearer-authenticated, then PRIVACY_DSR_MANAGE-gated.
         "POST /api/privacy/dsr",
+        // Self-service account deletion/export. Bearer-authenticated only.
+        "POST /api/privacy/me/dsr",
         "POST /api/storage/uploads/confirm",
         "POST /api/storage/uploads/request-upload",
         "POST /api/students",

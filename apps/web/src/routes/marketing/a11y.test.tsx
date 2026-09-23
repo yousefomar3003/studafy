@@ -36,6 +36,10 @@ const loadFeaturesPage = async (): Promise<ComponentType> =>
   (await import("./FeaturesPage")).default;
 const loadPricingPage = async (): Promise<ComponentType> => (await import("./PricingPage")).default;
 const loadAboutPage = async (): Promise<ComponentType> => (await import("./AboutPage")).default;
+const loadPrivacyPolicyPage = async (): Promise<ComponentType> =>
+  (await import("../legal/PrivacyPolicyPage")).default;
+const loadDeleteAccountInfoPage = async (): Promise<ComponentType> =>
+  (await import("../legal/DeleteAccountInfoPage")).default;
 
 function renderPage(Page: ComponentType) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -78,6 +82,16 @@ describe("marketing site accessibility", () => {
 
   test("about page", async () => {
     const { container } = renderPage(await loadAboutPage());
+    await expectNoA11yViolations(container);
+  });
+
+  test("privacy policy page", async () => {
+    const { container } = renderPage(await loadPrivacyPolicyPage());
+    await expectNoA11yViolations(container);
+  });
+
+  test("delete-account info page", async () => {
+    const { container } = renderPage(await loadDeleteAccountInfoPage());
     await expectNoA11yViolations(container);
   });
 });

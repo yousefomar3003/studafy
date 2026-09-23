@@ -86,6 +86,25 @@
     "loadError": "Unable to load your devices and sessions. Try reloading the page.",
     "tryAgain": "Please try again."
   },
+  "accountDeletion": {
+    "title": "Delete account",
+    "description": "Request permanent deletion of your Studafy account and its data.",
+    "heading": "Delete your account",
+    "loading": "Loading…",
+    "pending": "A deletion request is already in progress (filed {{date}}). We'll process it within 30 days.",
+    "consequenceIntro": "Deleting your account will:",
+    "consequenceProfile": "Remove your profile and sign-in access permanently.",
+    "consequenceAcademic": "Remove your education records — timetable, grades, attendance, and materials — from Studafy.",
+    "consequenceRetained": "Keep only what your school is legally required to retain (for example, financial records), for as long as the law requires.",
+    "previousFailed": "Your last deletion request couldn't be completed. Please try again or contact your school.",
+    "deleteButton": "Delete my account",
+    "confirmTitle": "Delete your account?",
+    "confirmBody": "This permanently deletes your profile and education records. It can't be undone, and processing can take up to 30 days.",
+    "confirmButton": "Delete account",
+    "requestedToast": "Deletion requested",
+    "requestError": "Couldn't request deletion",
+    "tryAgain": "Please try again."
+  },
   "globalSearch": {
     "triggerLabel": "Search",
     "title": "Search",

@@ -38,3 +38,15 @@ export const dsrResponseSchema = z
     failure_message: z.string().nullable(),
   })
   .openapi("DataSubjectRequest");
+
+/** Self-service filing: no `subject_user_id` field -- the caller is always the subject. */
+export const createSelfDsrBodySchema = z
+  .object({
+    request_type: dsrRequestTypeSchema.openapi({
+      description:
+        "'export' (GDPR Art. 15) or 'erasure' (GDPR Art. 17), filed by the caller about their own account.",
+    }),
+  })
+  .openapi("CreateSelfDataSubjectRequestBody");
+
+export const dsrListResponseSchema = z.array(dsrResponseSchema).openapi("DataSubjectRequestList");

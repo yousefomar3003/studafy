@@ -86,6 +86,9 @@ const NewExpensePage = lazy(() => import("../features/finance/expenses/NewExpens
 const ExpenseDetailPage = lazy(() => import("../features/finance/expenses/ExpenseDetailPage"));
 const AccountPage = lazy(() => import("../routes/account/AccountPage"));
 const SessionsPage = lazy(() => import("../features/account/sessions/SessionsPage"));
+const DeleteAccountPage = lazy(() => import("../features/account/privacy/DeleteAccountPage"));
+const PrivacyPolicyPage = lazy(() => import("../routes/legal/PrivacyPolicyPage"));
+const DeleteAccountInfoPage = lazy(() => import("../routes/legal/DeleteAccountInfoPage"));
 const AiSubscriptionPurchasePage = lazy(
   () => import("../features/billing/AiSubscriptionPurchasePage"),
 );
@@ -110,6 +113,10 @@ export const routes: RouteObject[] = [
           { path: "features", element: <FeaturesPage /> },
           { path: "pricing", element: <PricingPage /> },
           { path: "about", element: <AboutPage /> },
+          // Public: both app stores' listing forms require these to be reachable without an
+          // account. See apps/mobile/store/review-checklist.md and privacy-labels.md.
+          { path: "privacy", element: <PrivacyPolicyPage /> },
+          { path: "legal/delete-account", element: <DeleteAccountInfoPage /> },
         ],
       },
       {
@@ -545,6 +552,14 @@ export const routes: RouteObject[] = [
             // the API's own tenant scoping is what actually restricts a session to its own school).
             path: "sessions",
             element: <SessionsPage />,
+          },
+          {
+            // Self-service account deletion — no `RequirePermission`, same posture as the rest of
+            // `/account`: the caller can only ever act on their own account, enforced by the API
+            // (`POST /api/privacy/me/dsr` is bearer-authenticated only, the subject is always the
+            // caller, never a body parameter).
+            path: "delete",
+            element: <DeleteAccountPage />,
           },
           {
             // Deep-link target from the mobile app (ST-208): a parent/student buying the

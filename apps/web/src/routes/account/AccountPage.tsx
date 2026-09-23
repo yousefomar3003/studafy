@@ -10,6 +10,9 @@ export default function AccountPage() {
         <li>
           <Link to="/account/sessions">Devices &amp; sessions</Link>
         </li>
+        <li>
+          <Link to="/account/delete">Delete account</Link>
+        </li>
       </ul>
     </>
   );

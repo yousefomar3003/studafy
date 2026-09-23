@@ -20,6 +20,17 @@ void main() {
       expect(find.text('AI'), findsWidgets);
       expect(find.text('Profile'), findsWidgets);
       expect(find.byType(FloatingActionButton), findsOneWidget);
+
+      // The Profile tab's account-deletion action. IndexedStack keeps every tab's *state* alive,
+      // but a non-selected tab's content is still offstage — `find.text()` defaults to
+      // `skipOffstage: true`, so this needs an actual tab switch first, same as the "tapping a
+      // destination switches..." test below. See ProfileTabScreen's doc comment for why this
+      // action exists at all.
+      await tester.tap(
+        find.descendant(of: find.byType(NavigationBar), matching: find.text('Profile')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Delete my account'), findsOneWidget);
     });
 
     testWidgets('instructor gets Home, Classes, Profile — and a mutation FAB', (tester) async {

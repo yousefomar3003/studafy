@@ -109,3 +109,23 @@ export async function getDsrRequest(
   `;
   return row ? parseRow(row) : undefined;
 }
+
+/**
+ * A subject's own request history, most recent first -- the self-service read
+ * (`GET /api/privacy/dsr/me`) that lets a caller check whether they already have a request in
+ * flight without needing to have kept the id from when they filed it.
+ */
+export async function listDsrRequestsForSubject(
+  tx: TransactionSql,
+  schoolId: string,
+  subjectUserId: string,
+): Promise<DataSubjectRequestRow[]> {
+  const rows = await tx<Record<string, unknown>[]>`
+    SELECT ${tx.unsafe(ROW_COLUMNS)}
+    FROM app.data_subject_requests
+    WHERE school_id = ${schoolId}::uuid AND subject_user_id = ${subjectUserId}::uuid
+    ORDER BY created_at DESC
+    LIMIT 20
+  `;
+  return rows.map(parseRow);
+}
