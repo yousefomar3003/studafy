@@ -216,20 +216,24 @@ GitHub-issue loop, which does not scale to every school and was never meant to.
 
 **Status: Open — workflow now documented, intake channel not yet live.**
 
-[`support-workflow.md`](../support-workflow.md) now defines the intake channel
-(`support@send.studafy.com`, the same verified SES domain the status page already uses), the
-severity/SLA table (reusing `alert-catalog.md`'s `critical`/`warning`/`info` vocabulary, not a
-second scale), the triage disposition loop (generalizing the pilot's own `backlog`/`sev`/`wontfix`/
-`training` dispositions), and the escalation path into `on-call-rotation.md`'s existing `critical`
-page — no separate support-incident process invented. What's still open, per that document's own
-"Known gaps": `VITE_MARKETING_CONTACT_EMAIL` is unset in every environment
-(`apps/web/src/lib/config.ts` — the About/Contact page currently reads "Contact address not yet
-configured"), the mailbox itself is unprovisioned, and the workflow has never carried a real
-request end to end.
+[`support/README.md`](../support/README.md) now defines the intake channels
+(`support@send.studafy.com`, the same verified SES domain the status page already uses, plus the
+in-app help center linking out to it — a dedicated help widget is deliberately deferred, see that
+file's "Help widget" section), the severity/SLA table (reusing `alert-catalog.md`'s
+`critical`/`warning`/`info` vocabulary, not a second scale), the triage disposition loop
+(generalizing the pilot's own `backlog`/`sev`/`wontfix`/`training` dispositions), a macro library
+covering the top 10 predicted issues ([`support/macro-library.md`](../support/macro-library.md)),
+and the escalation path into `on-call-rotation.md`'s existing `critical` page — no separate
+support-incident process invented. What's still open, per that directory's own "Known gaps":
+`VITE_MARKETING_CONTACT_EMAIL` is unset in every environment (`apps/web/src/lib/config.ts` — the
+About/Contact page currently reads "Contact address not yet configured"), the mailbox itself is
+unprovisioned, and [`support/drill.md`](../support/drill.md) — the intake→triage→resolution and
+SEV→on-call-page test script — has never been run.
 
 **Evidence path once closed:** `VITE_MARKETING_CONTACT_EMAIL` set and deployed, the mailbox
-receiving mail, and at least one real support request carried through triage to a disposition as
-evidence the path in `support-workflow.md` actually works, not just reads as though it would.
+receiving mail, and [`support/drill.md`](../support/drill.md) run once for real (its own
+post-drill record filled in) as evidence the path in `support/README.md` actually works, not just
+reads as though it would.
 
 ## Go/no-go review
 
@@ -298,7 +302,7 @@ start/end, incidents (none / list with follow-up links).
 
 ## Known gaps
 
-Item 8 (support workflow) is now documented (`support-workflow.md`) — pure writing, no external
+Item 8 (support workflow) is now documented (`support/README.md`) — pure writing, no external
 account needed, so it moved first. The remaining seven items each need something this repo cannot
 produce on its own: an applied AWS account, a contracted pentest vendor, live App Store/Play
 accounts, a live Stripe account, and a confirmed on-call roster. Closing any of them is a
