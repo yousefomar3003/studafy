@@ -16,7 +16,8 @@ class LoginScreen extends ConsumerWidget {
     // (VITE_ENABLE_MOCK_AUTH): the mock provider 404s outside dev/test regardless, this just keeps
     // the affordance itself out of the staging/prod app bundles. Lets the Flutter integration_test
     // suite drive the real login screen instead of reaching around it.
-    final showMockLogin = ref.watch(appConfigProvider).environment == AppEnvironment.dev;
+    final showMockLogin =
+        ref.watch(appConfigProvider).environment == AppEnvironment.dev;
 
     ref.listen<AuthStatus>(authNotifierProvider, (prev, next) {
       if (next == AuthStatus.unauthenticated && prev == AuthStatus.loading) {
@@ -30,7 +31,7 @@ class LoginScreen extends ConsumerWidget {
       body: SafeArea(
         child: Center(
           child: status == AuthStatus.loading
-              ? const CircularProgressIndicator()
+              ? const CircularProgressIndicator(semanticsLabel: 'Signing in')
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -40,15 +41,17 @@ class LoginScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 48),
                     FilledButton.icon(
-                      onPressed: () =>
-                          ref.read(authNotifierProvider.notifier).login('microsoft'),
+                      onPressed: () => ref
+                          .read(authNotifierProvider.notifier)
+                          .login('microsoft'),
                       icon: const Icon(Icons.login),
                       label: const Text('Sign in with Microsoft'),
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
-                      onPressed: () =>
-                          ref.read(authNotifierProvider.notifier).login('google'),
+                      onPressed: () => ref
+                          .read(authNotifierProvider.notifier)
+                          .login('google'),
                       icon: const Icon(Icons.login),
                       label: const Text('Sign in with Google'),
                     ),
@@ -58,7 +61,10 @@ class LoginScreen extends ConsumerWidget {
                         key: const Key('mockLoginButton'),
                         onPressed: () => ref
                             .read(authNotifierProvider.notifier)
-                            .login('mock', loginHint: ref.read(mockLoginHintProvider)),
+                            .login(
+                              'mock',
+                              loginHint: ref.read(mockLoginHintProvider),
+                            ),
                         child: const Text('Continue with Mock'),
                       ),
                     ],
