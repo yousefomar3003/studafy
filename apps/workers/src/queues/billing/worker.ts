@@ -1,9 +1,12 @@
+import { CloudWatchClient } from "@aws-sdk/client-cloudwatch";
 import { JOB_NAMES } from "@studafy/constants";
 import postgres from "postgres";
+import Stripe from "stripe";
 
 import { workerLogger } from "../../log";
 
 import { processStripeBillingEvent } from "./billing-event.service";
+import { COST_METRIC_NAMESPACE, runCostReport } from "./cost-report";
 import { runDunningSweep } from "./dunning-sweep";
 import { generateInvoice, generateBatchInvoices } from "./invoice.service";
 import {
@@ -89,6 +92,15 @@ export async function processBillingJob(
     return processStorageQuotaReconciliation(databaseUrl, storageOptions);
   }
 
+  // Cost & budget reporting sweep (ST-293). Same no-payload-but-mode shape as the sweeps above,
+  // except a missing STRIPE_SECRET_KEY is a soft skip (logged, AI metrics still publish) rather
+  // than a thrown error — unlike seat reconciliation this job never moves money, so a report
+  // missing one cost line is not worth failing the whole sweep over. See cost-report.ts's header.
+  if (job.name === JOB_NAMES.RUN_COST_REPORT) {
+    const mode = (job.data as { mode?: unknown })?.mode === "monthly" ? "monthly" : "daily";
+    return processCostReport(databaseUrl, mode);
+  }
+
   return { processed: false, reason: "unknown billing job" };
 }
 
@@ -106,6 +118,34 @@ async function processSeatReconciliation(databaseUrl: string): Promise<unknown> 
       new StripeSeatSubscriptionProvider(secretKey),
       new Date(),
       workerLogger,
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function processCostReport(databaseUrl: string, mode: "daily" | "monthly"): Promise<unknown> {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const stripe = secretKey ? new Stripe(secretKey, { apiVersion: "2026-07-29.dahlia" }) : undefined;
+  const cloudwatch = new CloudWatchClient({});
+  const monthlyBudgetUsd = process.env.AI_MONTHLY_SPEND_BUDGET_USD
+    ? Number(process.env.AI_MONTHLY_SPEND_BUDGET_USD)
+    : undefined;
+
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    return await runCostReport(
+      {
+        sql,
+        cloudwatch,
+        stripe,
+        log: workerLogger,
+        monthlyBudgetUsd,
+        metricNamespace: COST_METRIC_NAMESPACE,
+      },
+      mode,
+      new Date(),
     );
   } finally {
     await sql.end({ timeout: 5 });

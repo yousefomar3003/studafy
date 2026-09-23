@@ -798,3 +798,48 @@ in **us-east-1** — CloudFront accepts no other region.
 
 **Escalate.** Immediately, any hour. Seven days is less runway than it sounds once a holiday or a
 person's time off is in the way.
+
+### AiSpendBudgetHigh
+
+**Means.** Platform-wide estimated AI provider spend (Anthropic inference, summed across every
+tenant, not per-school — `infra/terraform/modules/monitoring/variables.tf`'s
+`ai_monthly_spend_budget_usd`) has exceeded the configured monthly budget. Published daily at 06:15
+UTC by `apps/workers`' cost-report sweep
+(`apps/workers/src/queues/billing/cost-report.ts`'s `runCostReport`) as the `AiEstimatedSpendUsd`
+CloudWatch metric; this is the platform total, not any one school's bill.
+
+**Confirm.** The `<prefix>-cost` CloudWatch dashboard's AI spend widget, and per-tenant attribution
+at `GET /api/ai/admin/metrics` (ST-155, SUPER_ADMIN) to see which schools are driving it — that
+endpoint is the source of truth for "which tenant", this alarm only answers "in aggregate, over
+budget". The dashboard's "Monthly cost reports" widget also carries the last several months' full
+margin breakdown (Logs Insights over `apps/workers`' own ECS service log group).
+
+**Act.** A small number of tenants in `negativeMargin: true` at `/api/ai/admin/metrics` is the usual
+cause — the per-tenant admin-metrics endpoint flags exactly this. This is a budget/finance signal,
+not an incident: nothing is down. Either the monthly budget genuinely needs raising (update
+`ai_monthly_spend_budget_usd` in the environment's `.tfvars`) or a tenant's usage needs following up
+on — heavy exam-generation/ask-AI usage is typically the most token-expensive feature mix.
+
+**Escalate.** No — file it as work for whoever owns AI unit economics. Not a page-worthy event.
+
+### AwsEstimatedChargesHigh
+
+**Means.** AWS's own `AWS/Billing` `EstimatedCharges` metric (us-east-1 only, regardless of
+`var.aws_region` — same regional quirk as the CDN certificate above) has exceeded the configured
+monthly AWS infrastructure budget (`aws_monthly_budget_usd`).
+
+**Requires a one-time manual step.** This metric is not published at all until "Receive Billing
+Alerts" is turned on once, by hand, in the account's Billing preferences (Billing console → Billing
+preferences — there is no Terraform-managed API for this account setting). Until that is done, this
+alarm sits at `INSUFFICIENT_DATA` forever (`treat_missing_data = "missing"`), which is the honest
+state — it does not falsely page.
+
+**Confirm.** AWS Cost Explorer → the current month's spend by service — `EstimatedCharges` only
+tells you the total crossed the line, not which service.
+
+**Act.** Identify the driving service in Cost Explorer. A step change with no corresponding traffic
+or feature change usually means a resource left running (a forgotten load test's Fargate tasks, an
+oversized RDS instance from a scaling test) rather than organic growth.
+
+**Escalate.** No, unless the trajectory suggests the budget will be blown many times over before
+the next billing cycle — then treat it as a finance conversation, not an on-call one.

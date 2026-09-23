@@ -158,6 +158,14 @@ export const JOB_NAMES = {
   // One data subject request, erasure half (ST-268). Same payload shape as the export job above;
   // dispatched to a different processor because an erasure has no artifact to render and upload.
   RUN_DATA_SUBJECT_ERASURE: "run-data-subject-erasure",
+  // Cost & budget reporting sweep (ST-293). Carries `{ mode: "daily" | "monthly" }`: "daily"
+  // publishes today's AI-spend/Stripe-fee CloudWatch metrics so the budget alarms
+  // (infra/terraform/modules/monitoring/alerts.tf) stay current; "monthly" additionally logs the
+  // full structured cost report (AI margin, Stripe fees, budget verdict) the `<prefix>-cost`
+  // CloudWatch dashboard's Logs Insights widget reads (infra/terraform/modules/monitoring/cost.tf).
+  // No other payload: both modes read every school's AI usage straight from the database.
+  // Registered on the billing queue via Job Scheduler.
+  RUN_COST_REPORT: "run-cost-report",
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

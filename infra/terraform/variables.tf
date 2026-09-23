@@ -367,6 +367,12 @@ variable "alertmanager_port" {
   }
 }
 
+variable "cost_metric_namespace" {
+  description = "CloudWatch namespace the cost-report sweep's metrics land under (ST-293). Shared between module.compute (the workers task role's PutMetricData grant) and module.monitoring (the AiSpendBudgetHigh alarm), plus apps/workers/src/queues/billing/cost-report.ts's own COST_METRIC_NAMESPACE constant, for the same never-drift reason as grafana_port/metrics_port above."
+  type        = string
+  default     = "Studafy/Cost"
+}
+
 variable "loki_port" {
   description = "TCP port Loki serves its HTTP API on (ST-261). Shared between module.network (security group rules), module.logging (task definition + Vector sink URL) and — as a static value — infra/docker/grafana/provisioning/datasources/datasources.yml.tpl's Loki datasource, so all four can never drift apart. Same convention as grafana_port/metrics_port above."
   type        = number

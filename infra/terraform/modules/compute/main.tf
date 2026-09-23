@@ -128,6 +128,33 @@ resource "aws_iam_role_policy" "workers_reports" {
   policy = data.aws_iam_policy_document.workers_reports.json
 }
 
+# Cost & budget reporting sweep (ST-293): apps/workers/src/queues/billing/cost-report.ts publishes
+# AiEstimatedSpendUsd/StripeFeesUsd once a day. Scoped to exactly the namespace it writes to (the
+# cloudwatch:namespace condition), the same "grant the namespace, not the API" shape
+# modules/monitoring's own probe/synthetics Lambdas use for their PutMetricData grants — this task
+# role cannot publish, read, or affect any other CloudWatch metric.
+data "aws_iam_policy_document" "workers_cost_metrics" {
+  statement {
+    effect  = "Allow"
+    actions = ["cloudwatch:PutMetricData"]
+    # var.cost_metric_namespace's default ("Studafy/Cost") must match apps/workers' own
+    # COST_METRIC_NAMESPACE constant and modules/monitoring's var.cost_metric_namespace default —
+    # three copies of one string, kept in sync by hand until a shared constants source exists.
+    resources = ["arn:aws:cloudwatch:*:*:namespace/${var.cost_metric_namespace}"]
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = [var.cost_metric_namespace]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "workers_cost_metrics" {
+  name   = "${var.name_prefix}-workers-cost-metrics"
+  role   = aws_iam_role.workers_task.id
+  policy = data.aws_iam_policy_document.workers_cost_metrics.json
+}
+
 # The one-off migration task can resolve only the direct PostgreSQL credential. Keeping it off the
 # shared application execution role prevents a migration task definition from selecting unrelated
 # application, Redis, PgBouncer, or ERPNext secrets.

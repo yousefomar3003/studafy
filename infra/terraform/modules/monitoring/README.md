@@ -363,84 +363,137 @@ states` for depth plus `queues × outcomes` for throughput (a dozen queues × ~7
 set per DB exporter — none of it scales with tenant count, user count, or traffic volume the way a
 per-user or per-school label would.
 
+## Cost monitoring and budgets (ST-293)
+
+Three cost dimensions the acceptance criteria name — infra, LLM/embedding spend, Stripe fees — plus
+a monthly report and budget alerts, all reading from the `<prefix>-cost` CloudWatch dashboard
+(`cost.tf`):
+
+- **AI/embedding spend** (`AiEstimatedSpendUsd`, `Studafy/Cost`) and **Stripe processing fees**
+  (`StripeFeesUsd`, same namespace) are published daily by `apps/workers`' cost-report sweep
+  (`apps/workers/src/queues/billing/cost-report.ts`, BullMQ Job Scheduler on the `billing` queue —
+  see that file's own header). Both are **platform totals, not per-school** — same cardinality-
+  budget discipline as the section above; **per-tenant AI cost attribution is
+  `GET /api/ai/admin/metrics`** (ST-155, SUPER_ADMIN-only, already reconciling within ~1% of
+  provider billing, tighter than the ±5% acceptance criterion asks), which this ticket does not
+  recompute or duplicate.
+- **AWS infrastructure spend** reuses AWS's own legacy `AWS/Billing` `EstimatedCharges` metric
+  (`alerts.tf`'s `billing_alarms_us_east_1`, us-east-1 only regardless of `var.aws_region` — a
+  region quirk this metric shares with the CDN certificate's `DaysToExpiry`) rather than a bespoke
+  Cost Explorer integration: it is the one cost signal that needs zero application code, at the cost
+  of a one-time manual account setting (below).
+- **Budget alerts** are two ordinary entries in `alerts.tf`'s existing alarm catalog —
+  `AiSpendBudgetHigh` (regional, `local.cost_alarms`) and `AwsEstimatedChargesHigh` (us-east-1,
+  `local.billing_alarms_us_east_1`) — so they get a severity, a bridge into Alertmanager and a
+  runbook section (`docs/runbooks/alert-catalog.md`) exactly like every other alarm here, checked by
+  the same `scripts/check-alert-rules.ts` CI gate. Both thresholds
+  (`ai_monthly_spend_budget_usd`/`aws_monthly_budget_usd`) are conventional placeholders, not real
+  finance numbers this repo has anywhere to transcribe — same honesty gap
+  `synthetics_availability_slo_percent` already documents; whoever owns the real budgets should
+  override them per environment.
+- **The monthly report** is the sweep's 1st-of-month run, which logs one structured line (schools
+  with active AI subscriptions, tokens, AI cost/revenue/margin, Stripe fees, budget verdict) into
+  `apps/workers`' own ECS service log group — no separate log group or email pipeline, the same
+  "queryable log line, not an email" choice `aws_cloudwatch_log_group.deploys` already made for
+  deploy annotations above. The `<prefix>-cost` dashboard's Logs Insights widget is that report,
+  rendered as a table of the last 12 months.
+- **`evaluateBudgetBreach`** (`cost-report.ts`) is the one piece of "budget breach alerts fire in
+  test" a unit test can prove directly — see
+  `apps/workers/src/queues/billing/__tests__/cost-report.test.ts`. The alarms themselves are cloud
+  resources, exactly as untestable in isolation as every other alarm in this file; proving they
+  _route_ correctly once fired is `scripts/check-alert-rules.ts` plus the existing test-fire drill
+  (`docs/runbooks/alert-catalog.md#test-firing-an-alert`), not something new here.
+
+**Known one-time manual step**, same shape as `postgres-conventions.md`'s "Monitoring role"
+bootstrap: `AWS/Billing`'s `EstimatedCharges` metric is not published at all until "Receive Billing
+Alerts" is turned on once, by hand, in the account's Billing preferences — there is no
+Terraform-managed API for this account-level setting. Until it is enabled,
+`AwsEstimatedChargesHigh` sits at `INSUFFICIENT_DATA` (`treat_missing_data = "missing"`), which is
+the honest state, not a false negative dressed up as "OK".
+
 ## Inputs
 
-| Name                                  | Type           | Default              | Description                                                                                                                           |
-| ------------------------------------- | -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `name_prefix`                         | `string`       | —                    | Resource name prefix, from `module.naming.name_prefix`.                                                                               |
-| `aws_region`                          | `string`       | —                    | Dashboard widget region.                                                                                                              |
-| `postgres_instance_id`                | `string`       | —                    | Primary RDS instance identifier.                                                                                                      |
-| `postgres_read_replica_instance_id`   | `string`       | —                    | Read-replica identifier (lag alarm + widget).                                                                                         |
-| `mariadb_instance_id`                 | `string`       | `null`               | Optional MariaDB instance identifier.                                                                                                 |
-| `redis_replication_group_id`          | `string`       | —                    | ElastiCache replication group id (CPU/connections/evictions widget).                                                                  |
-| `ecs_cluster_name`                    | `string`       | —                    | ECS cluster containing api/realtime/workers.                                                                                          |
-| `probe_enabled`                       | `bool`         | `false`              | Provision the synthetic realtime probe. Dev omits it; staging/prod pass `true`.                                                       |
-| `realtime_ws_url`                     | `string`       | —                    | Public `wss://…/ws` handshake URL the probe connects to.                                                                              |
-| `realtime_jwt_secret_arn`             | `string`       | —                    | ARN of the secret holding `WS_JWT_SECRET` (for the probe's handshake token).                                                          |
-| `redis_auth_secret_arn`               | `string`       | —                    | ARN of the Redis connection secret; the probe reads `pubsub_url`.                                                                     |
-| `probe_subnet_ids`                    | `list(string)` | —                    | Private app-tier subnets for the probe Lambda.                                                                                        |
-| `probe_security_group_ids`            | `list(string)` | —                    | App security group: egress covers Redis/HTTPS/DNS; nothing connects in.                                                               |
-| `log_retention_days`                  | `number`       | `30`                 | Probe Lambda log retention.                                                                                                           |
-| `probe_metric_namespace`              | `string`       | `Studafy/Realtime`   | CloudWatch namespace for `RealtimeProbeLatency` (`Studafy/<component>` convention).                                                   |
-| `probe_slo_ms`                        | `number`       | `2000`               | Propagation SLO in ms; the probe alarm threshold.                                                                                     |
-| `monitoring_enabled`                  | `bool`         | `false`              | Provision Prometheus/Grafana/the exporters. Dev omits it; staging/prod pass `true`.                                                   |
-| `vpc_id`                              | `string`       | —                    | VPC the Cloud Map private DNS namespace is created in.                                                                                |
-| `cluster_arn`                         | `string`       | —                    | ECS cluster ARN the metrics stack's own services run in.                                                                              |
-| `execution_role_arn`                  | `string`       | —                    | Shared ECS execution role (`module.compute`), reused rather than a new one.                                                           |
-| `private_app_subnet_ids`              | `list(string)` | —                    | Private app-tier subnets for the metrics stack's Fargate tasks.                                                                       |
-| `monitoring_security_group_id`        | `string`       | —                    | Security group for the metrics stack (`module.network`'s `monitoring` group).                                                         |
-| `metrics_port`                        | `number`       | `9464`               | Port apps/api, apps/realtime, apps/workers expose `/metrics` on.                                                                      |
-| `grafana_port`                        | `number`       | `3000`               | Port Grafana listens on.                                                                                                              |
-| `monitoring_secret_arn`               | `string`       | —                    | ARN of the `monitoring` app-secrets container (exporter DSNs, Grafana password).                                                      |
-| `mariadb_exporter_enabled`            | `bool`         | `false`              | Provision `mysqld_exporter`. Should match `local.erpnext_plane_enabled`.                                                              |
-| `prometheus_image`                    | `string`       | —                    | Full image reference for this repo's Prometheus image.                                                                                |
-| `grafana_image`                       | `string`       | —                    | Full image reference for this repo's Grafana image.                                                                                   |
-| `prometheus_retention`                | `string`       | `"15d"`              | Prometheus `--storage.tsdb.retention.time` value.                                                                                     |
-| `prometheus_storage_gb`               | `number`       | `30`                 | Fargate ephemeral storage (GiB) for the Prometheus task.                                                                              |
-| `prometheus_cpu` / `_memory`          | `number`       | `512` / `1024`       | Fargate sizing for the Prometheus task.                                                                                               |
-| `grafana_cpu` / `_memory`             | `number`       | `256` / `512`        | Fargate sizing for the Grafana task.                                                                                                  |
-| `exporter_cpu` / `_memory`            | `number`       | `256` / `512`        | Fargate sizing for each DB exporter task.                                                                                             |
-| `otel_collector_port`                 | `number`       | `4318`               | OTLP/HTTP port, shared by the collector's receiver and Tempo's own OTLP receiver.                                                     |
-| `otel_collector_image`                | `string`       | —                    | Full image reference for this repo's OTel collector image.                                                                            |
-| `tempo_image`                         | `string`       | —                    | Full image reference for this repo's Tempo image.                                                                                     |
-| `otel_collector_cpu` / `_memory`      | `number`       | `256` / `512`        | Fargate sizing for the OTel collector task.                                                                                           |
-| `tempo_cpu` / `_memory`               | `number`       | `512` / `1024`       | Fargate sizing for the Tempo task.                                                                                                    |
-| `tempo_storage_gb`                    | `number`       | `21`                 | Fargate ephemeral storage (GiB) for the Tempo task.                                                                                   |
-| `alertmanager_image`                  | `string`       | —                    | Full image reference for this repo's Alertmanager image.                                                                              |
-| `alertmanager_port`                   | `number`       | `9093`               | Port Alertmanager serves its API/UI on.                                                                                               |
-| `alertmanager_cpu` / `_memory`        | `number`       | `256` / `512`        | Fargate sizing for the Alertmanager task.                                                                                             |
-| `edge_certificate_arn`                | `string`       | —                    | `module.edge`'s ACM certificate, watched for expiry.                                                                                  |
-| `cdn_certificate_arn`                 | `string`       | `null`               | `module.cdn`'s us-east-1 ACM certificate; `null` where there is no CDN.                                                               |
-| `synthetics_enabled`                  | `bool`         | `false`              | Provision the black-box synthetic probes. Dev omits it; staging/prod pass `true`.                                                     |
-| `web_origin`                          | `string`       | —                    | apps/web origin; builds the `login-page`/`checkout-page` probe URLs.                                                                  |
-| `api_origin`                          | `string`       | —                    | apps/api origin; builds the `healthz`/`oauth-start`/`invitation-verify` probe URLs.                                                   |
-| `synthetics_dr_region`                | `string`       | —                    | Second probing region (root passes `var.backup_dr_region`).                                                                           |
-| `synthetics_metric_namespace`         | `string`       | `Studafy/Synthetics` | CloudWatch namespace for the probe's metrics.                                                                                         |
-| `synthetics_availability_slo_percent` | `number`       | `99.9`               | Proposed per-check NFR-03 availability SLO, as a percent (see honesty note above).                                                    |
-| `status_page_enabled`                 | `bool`         | `false`              | Provision the self-hosted status page (S3+CloudFront+status-page-sync). Should track `monitoring_enabled`/`synthetics_enabled`.       |
-| `status_page_force_destroy_bucket`    | `bool`         | `false`              | Allow the two status-page buckets to be destroyed while non-empty. `false` in every real environment.                                 |
-| `ses_domain_identity_arn`             | `string`       | `null`               | `module.dns`'s verified SES identity ARN. `null` where that environment has none — gates the incident/subscribe/subscription Lambdas. |
-| `status_page_from_address`            | `string`       | `null`               | The `From:` address the status page's emails send as. Only read when `ses_domain_identity_arn` is set.                                |
+| Name                                  | Type           | Default              | Description                                                                                                                              |
+| ------------------------------------- | -------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `name_prefix`                         | `string`       | —                    | Resource name prefix, from `module.naming.name_prefix`.                                                                                  |
+| `aws_region`                          | `string`       | —                    | Dashboard widget region.                                                                                                                 |
+| `postgres_instance_id`                | `string`       | —                    | Primary RDS instance identifier.                                                                                                         |
+| `postgres_read_replica_instance_id`   | `string`       | —                    | Read-replica identifier (lag alarm + widget).                                                                                            |
+| `mariadb_instance_id`                 | `string`       | `null`               | Optional MariaDB instance identifier.                                                                                                    |
+| `redis_replication_group_id`          | `string`       | —                    | ElastiCache replication group id (CPU/connections/evictions widget).                                                                     |
+| `ecs_cluster_name`                    | `string`       | —                    | ECS cluster containing api/realtime/workers.                                                                                             |
+| `probe_enabled`                       | `bool`         | `false`              | Provision the synthetic realtime probe. Dev omits it; staging/prod pass `true`.                                                          |
+| `realtime_ws_url`                     | `string`       | —                    | Public `wss://…/ws` handshake URL the probe connects to.                                                                                 |
+| `realtime_jwt_secret_arn`             | `string`       | —                    | ARN of the secret holding `WS_JWT_SECRET` (for the probe's handshake token).                                                             |
+| `redis_auth_secret_arn`               | `string`       | —                    | ARN of the Redis connection secret; the probe reads `pubsub_url`.                                                                        |
+| `probe_subnet_ids`                    | `list(string)` | —                    | Private app-tier subnets for the probe Lambda.                                                                                           |
+| `probe_security_group_ids`            | `list(string)` | —                    | App security group: egress covers Redis/HTTPS/DNS; nothing connects in.                                                                  |
+| `log_retention_days`                  | `number`       | `30`                 | Probe Lambda log retention.                                                                                                              |
+| `probe_metric_namespace`              | `string`       | `Studafy/Realtime`   | CloudWatch namespace for `RealtimeProbeLatency` (`Studafy/<component>` convention).                                                      |
+| `probe_slo_ms`                        | `number`       | `2000`               | Propagation SLO in ms; the probe alarm threshold.                                                                                        |
+| `monitoring_enabled`                  | `bool`         | `false`              | Provision Prometheus/Grafana/the exporters. Dev omits it; staging/prod pass `true`.                                                      |
+| `vpc_id`                              | `string`       | —                    | VPC the Cloud Map private DNS namespace is created in.                                                                                   |
+| `cluster_arn`                         | `string`       | —                    | ECS cluster ARN the metrics stack's own services run in.                                                                                 |
+| `execution_role_arn`                  | `string`       | —                    | Shared ECS execution role (`module.compute`), reused rather than a new one.                                                              |
+| `private_app_subnet_ids`              | `list(string)` | —                    | Private app-tier subnets for the metrics stack's Fargate tasks.                                                                          |
+| `monitoring_security_group_id`        | `string`       | —                    | Security group for the metrics stack (`module.network`'s `monitoring` group).                                                            |
+| `metrics_port`                        | `number`       | `9464`               | Port apps/api, apps/realtime, apps/workers expose `/metrics` on.                                                                         |
+| `grafana_port`                        | `number`       | `3000`               | Port Grafana listens on.                                                                                                                 |
+| `monitoring_secret_arn`               | `string`       | —                    | ARN of the `monitoring` app-secrets container (exporter DSNs, Grafana password).                                                         |
+| `mariadb_exporter_enabled`            | `bool`         | `false`              | Provision `mysqld_exporter`. Should match `local.erpnext_plane_enabled`.                                                                 |
+| `prometheus_image`                    | `string`       | —                    | Full image reference for this repo's Prometheus image.                                                                                   |
+| `grafana_image`                       | `string`       | —                    | Full image reference for this repo's Grafana image.                                                                                      |
+| `prometheus_retention`                | `string`       | `"15d"`              | Prometheus `--storage.tsdb.retention.time` value.                                                                                        |
+| `prometheus_storage_gb`               | `number`       | `30`                 | Fargate ephemeral storage (GiB) for the Prometheus task.                                                                                 |
+| `prometheus_cpu` / `_memory`          | `number`       | `512` / `1024`       | Fargate sizing for the Prometheus task.                                                                                                  |
+| `grafana_cpu` / `_memory`             | `number`       | `256` / `512`        | Fargate sizing for the Grafana task.                                                                                                     |
+| `exporter_cpu` / `_memory`            | `number`       | `256` / `512`        | Fargate sizing for each DB exporter task.                                                                                                |
+| `otel_collector_port`                 | `number`       | `4318`               | OTLP/HTTP port, shared by the collector's receiver and Tempo's own OTLP receiver.                                                        |
+| `otel_collector_image`                | `string`       | —                    | Full image reference for this repo's OTel collector image.                                                                               |
+| `tempo_image`                         | `string`       | —                    | Full image reference for this repo's Tempo image.                                                                                        |
+| `otel_collector_cpu` / `_memory`      | `number`       | `256` / `512`        | Fargate sizing for the OTel collector task.                                                                                              |
+| `tempo_cpu` / `_memory`               | `number`       | `512` / `1024`       | Fargate sizing for the Tempo task.                                                                                                       |
+| `tempo_storage_gb`                    | `number`       | `21`                 | Fargate ephemeral storage (GiB) for the Tempo task.                                                                                      |
+| `alertmanager_image`                  | `string`       | —                    | Full image reference for this repo's Alertmanager image.                                                                                 |
+| `alertmanager_port`                   | `number`       | `9093`               | Port Alertmanager serves its API/UI on.                                                                                                  |
+| `alertmanager_cpu` / `_memory`        | `number`       | `256` / `512`        | Fargate sizing for the Alertmanager task.                                                                                                |
+| `edge_certificate_arn`                | `string`       | —                    | `module.edge`'s ACM certificate, watched for expiry.                                                                                     |
+| `cdn_certificate_arn`                 | `string`       | `null`               | `module.cdn`'s us-east-1 ACM certificate; `null` where there is no CDN.                                                                  |
+| `synthetics_enabled`                  | `bool`         | `false`              | Provision the black-box synthetic probes. Dev omits it; staging/prod pass `true`.                                                        |
+| `web_origin`                          | `string`       | —                    | apps/web origin; builds the `login-page`/`checkout-page` probe URLs.                                                                     |
+| `api_origin`                          | `string`       | —                    | apps/api origin; builds the `healthz`/`oauth-start`/`invitation-verify` probe URLs.                                                      |
+| `synthetics_dr_region`                | `string`       | —                    | Second probing region (root passes `var.backup_dr_region`).                                                                              |
+| `synthetics_metric_namespace`         | `string`       | `Studafy/Synthetics` | CloudWatch namespace for the probe's metrics.                                                                                            |
+| `synthetics_availability_slo_percent` | `number`       | `99.9`               | Proposed per-check NFR-03 availability SLO, as a percent (see honesty note above).                                                       |
+| `status_page_enabled`                 | `bool`         | `false`              | Provision the self-hosted status page (S3+CloudFront+status-page-sync). Should track `monitoring_enabled`/`synthetics_enabled`.          |
+| `status_page_force_destroy_bucket`    | `bool`         | `false`              | Allow the two status-page buckets to be destroyed while non-empty. `false` in every real environment.                                    |
+| `ses_domain_identity_arn`             | `string`       | `null`               | `module.dns`'s verified SES identity ARN. `null` where that environment has none — gates the incident/subscribe/subscription Lambdas.    |
+| `status_page_from_address`            | `string`       | `null`               | The `From:` address the status page's emails send as. Only read when `ses_domain_identity_arn` is set.                                   |
+| `cost_metric_namespace`               | `string`       | `Studafy/Cost`       | CloudWatch namespace for `AiEstimatedSpendUsd`/`StripeFeesUsd`. Must match apps/workers' own constant and module.compute's IAM grant.    |
+| `ai_monthly_spend_budget_usd`         | `number`       | `500`                | Platform-wide (not per-tenant) monthly AI spend budget, USD. `AiSpendBudgetHigh`'s threshold. Placeholder — see "Cost monitoring" above. |
+| `aws_monthly_budget_usd`              | `number`       | `1000`               | Monthly AWS infrastructure spend budget, USD. `AwsEstimatedChargesHigh`'s threshold. Placeholder — see "Cost monitoring" above.          |
+| `workers_log_group_name`              | `string`       | —                    | `module.compute.log_group_names["workers"]` — the Cost dashboard's Logs Insights widget reads the monthly report from it.                |
 
 ## Outputs
 
-| Name                                | Description                                                                                         |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `dashboard_name`                    | Operations dashboard name.                                                                          |
-| `alarm_arns`                        | Every CloudWatch alarm ARN this module creates, both regions.                                       |
-| `realtime_probe_function_name`      | Probe Lambda name, or `null` when the probe is disabled.                                            |
-| `deploys_log_group_name`            | CloudWatch Logs group the staging deploy pipeline annotates.                                        |
-| `metrics_discovery_service_arns`    | Map of `{api, realtime, workers}` -> Cloud Map registry ARN — see `infra/deploy/scripts/render.sh`. |
-| `grafana_access_hint`               | Reminder of the SSH port-forward command to reach Grafana.                                          |
-| `alert_topic_arn`                   | SNS topic in-region alarms publish to, bridged into Alertmanager. `null` in dev.                    |
-| `alert_bridge_function_name`        | The bridge Lambda; its log group is where an undelivered alarm notification is diagnosed.           |
-| `synthetics_probe_function_name`    | Synthetic probe Lambda name (same in both regions), or `null` when disabled.                        |
-| `availability_slo_dashboard_name`   | NFR-03 availability SLO dashboard name, or `null` when synthetics are disabled.                     |
-| `status_page_url`                   | Public HTTPS URL of the status page, or `null` when disabled.                                       |
-| `status_page_sync_function_name`    | Status-page sync Lambda name, or `null` when disabled.                                              |
-| `status_page_incident_function_url` | Function URL for posting a manual incident update, or `null` where SES isn't provisioned.           |
-| `status_page_site_bucket_name`      | Bucket serving the page's public content, or `null` when disabled.                                  |
-| `status_page_data_bucket_name`      | Bucket holding `subscribers.json` (private), or `null` when disabled.                               |
+| Name                                | Description                                                                                           |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `dashboard_name`                    | Operations dashboard name.                                                                            |
+| `alarm_arns`                        | Every CloudWatch alarm ARN this module creates, both regions.                                         |
+| `realtime_probe_function_name`      | Probe Lambda name, or `null` when the probe is disabled.                                              |
+| `deploys_log_group_name`            | CloudWatch Logs group the staging deploy pipeline annotates.                                          |
+| `metrics_discovery_service_arns`    | Map of `{api, realtime, workers}` -> Cloud Map registry ARN — see `infra/deploy/scripts/render.sh`.   |
+| `grafana_access_hint`               | Reminder of the SSH port-forward command to reach Grafana.                                            |
+| `alert_topic_arn`                   | SNS topic in-region alarms publish to, bridged into Alertmanager. `null` in dev.                      |
+| `alert_bridge_function_name`        | The bridge Lambda; its log group is where an undelivered alarm notification is diagnosed.             |
+| `synthetics_probe_function_name`    | Synthetic probe Lambda name (same in both regions), or `null` when disabled.                          |
+| `availability_slo_dashboard_name`   | NFR-03 availability SLO dashboard name, or `null` when synthetics are disabled.                       |
+| `status_page_url`                   | Public HTTPS URL of the status page, or `null` when disabled.                                         |
+| `status_page_sync_function_name`    | Status-page sync Lambda name, or `null` when disabled.                                                |
+| `status_page_incident_function_url` | Function URL for posting a manual incident update, or `null` where SES isn't provisioned.             |
+| `status_page_site_bucket_name`      | Bucket serving the page's public content, or `null` when disabled.                                    |
+| `status_page_data_bucket_name`      | Bucket holding `subscribers.json` (private), or `null` when disabled.                                 |
+| `cost_dashboard_name`               | CloudWatch dashboard name for AI spend, Stripe fees, AWS spend and the monthly report. Unconditional. |
 
 ## What this module does not do
 
@@ -539,3 +592,33 @@ per-user or per-school label would.
   `dns_create_email_records`/`dns_ses_domain` set in their own `.tfvars` first.
 - **`incidents.json` is capped at the most recent 25 incidents**, not a full archive — proportionate
   to what a status page needs to show. This repo does not mirror incident history anywhere else.
+- **AWS infrastructure spend has no per-service breakdown here.** `AwsEstimatedChargesHigh` answers
+  "did the account cross its budget", not "which service" — that needs Cost Explorer
+  (`ce:GetCostAndUsage`), which nothing in this repo calls. The alert catalog's own runbook entry
+  sends whoever is paged to Cost Explorer by hand for that breakdown, rather than this module
+  reimplementing a billing dashboard AWS already provides.
+- **There is no Stripe-fee budget alarm**, only a dashboard widget. Stripe's own cut scales with
+  revenue rather than representing a controllable spend the way AI inference or AWS resources do, so
+  a "fees exceeded $X" alarm would mostly fire on legitimate growth — it is reported for visibility
+  and the monthly report, not alarmed on.
+- **The cost-report sweep authenticates to Stripe with the same `STRIPE_SECRET_KEY` apps/workers
+  already uses for seat reconciliation and dunning**, not a separate read-only restricted key. A
+  Stripe key scoped to `Balance: Read` only would be tighter least-privilege for a job that never
+  needs to write; not done here because it would be a second Stripe credential to provision and
+  rotate for one job, and every other Stripe-calling job in this codebase already holds the same
+  broader key.
+- **Discovered, not caused, by this ticket: `infra/deploy/ecs/workers/task-definition.json.tpl`
+  never wired `STRIPE_SECRET_KEY` (or `CLAMAV_HOST`, unrelated to cost monitoring) into the
+  container's `secrets`/`environment` arrays, even though `apps/workers/src/env.ts` has required
+  `STRIPE_SECRET_KEY` in production since ST-136 and required `CLAMAV_HOST` since malware scanning
+  shipped — either would crash-loop a deployed worker task at boot (`loadEnv()`'s fail-fast) if
+  `TF_VAR_secrets_app_secret_values.workers` was never given that key by hand. This ticket adds
+  `STRIPE_SECRET_KEY` (needed for its own Stripe-fee reporting) and `AWS_REGION` (needed for the
+  CloudWatch SDK client to resolve a region — `S3_REGION` existed but nothing set the SDK's own
+  default env var) to that template. `CLAMAV_HOST` is left exactly as found — a pre-existing gap
+  outside this ticket's scope, not swept in silently.
+- **A missing `STRIPE_SECRET_KEY` is a soft skip for this job, unlike seat reconciliation's hard
+  failure.** apps/workers/src/queues/billing/worker.ts's own comment explains why: this job never
+  moves money, so a report missing one cost line is not worth failing the whole sweep over — but it
+  does mean a misconfigured environment silently reports `stripeFeesUsd: null` forever rather than
+  erroring loudly. The daily log line's own `stripeFeesUsd` field is the tell.
