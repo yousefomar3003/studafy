@@ -42,6 +42,14 @@ export default defineConfig([
     },
     settings: {
       "import-x/resolver-next": [createTypeScriptImportResolver(), createNodeResolver()],
+      "import-x/core-modules": [
+        "bun:test",
+        "bun",
+        "bun:sqlite",
+        "bun:ffi",
+        "bun:jsc",
+        "bun:sqlstring",
+      ],
     },
     plugins: {
       studafy: studafyPlugin,
