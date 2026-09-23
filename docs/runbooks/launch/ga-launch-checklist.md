@@ -90,6 +90,18 @@ against a real (not local-Docker) environment confirming it, or an explicit acce
 **Evidence path once closed:** `docs/testing/load-test-scenarios.md` run output against staging or
 prod, plus a real NFR-01/NFR-02 document replacing the proposed defaults.
 
+**Compiled evidence pack (ST-295):**
+[`nfr-verification-evidence-pack.md`](nfr-verification-evidence-pack.md) — the formal verification
+run this item asks for. It found the same thing this section already says (no staging run exists),
+plus a finding this section didn't have yet: this repo has no `SAD §5` and only five NFR IDs are
+referenced anywhere in it (NFR-01/02/03/05/11), not fifteen. Verdicts every one of those five, plus
+the security/DR/load-test/accessibility/locale/query-performance evidence this repo has under other
+names, against a gap register with owner and remediation target per gap — nine gaps remain open,
+two were closed while compiling the pack (a missing NFR-11 doc, authored and run; a believed
+CI-wiring gap that further checking showed was never real). Status stays **Open** — closing two
+items doesn't change that NFR-01/02/03 have no real target and no staging exists to measure
+against; the pack documents the real state, it does not manufacture GA readiness.
+
 ### 2. Security pass + pen test closure
 
 **Closes when:** the internal pass has zero open critical/high, **and** an external pen test has
