@@ -33,7 +33,9 @@ class TimetableWeekNavigator extends ConsumerWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.colorScheme.outlineVariant)),
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -55,10 +57,14 @@ class TimetableWeekNavigator extends ConsumerWidget {
                   if (!isCurrentWeek)
                     TextButton(
                       onPressed: notifier.thisWeek,
+                      // No `minimumSize`/`tapTargetSize` override here (the previous
+                      // shrink-wrapped tap target was ~24px tall, under the 44-48px touch-target
+                      // floor) — falls back to `AppButtonTheme`'s own padded default instead
+                      // (ST-294 a11y audit).
                       style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 0),
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space8),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.space8,
+                        ),
                       ),
                       child: Text('timetable.thisWeek'.tr()),
                     ),

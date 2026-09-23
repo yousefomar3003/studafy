@@ -507,6 +507,7 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
               title: Text(file.name),
               trailing: IconButton(
                 icon: const Icon(Icons.close),
+                tooltip: 'Remove attachment',
                 onPressed: _saving
                     ? null
                     : () => setState(() => _attachments.remove(file)),

@@ -59,6 +59,10 @@ class _AppShellScaffoldState extends State<_AppShellScaffold> {
       ),
       floatingActionButton: widget.shellRole.canMutate
           ? FloatingActionButton(
+              // Not yet wired to a real action (tracked separately from the ST-294 a11y audit,
+              // which only adds the tooltip a screen reader needs to announce the button at
+              // all — see the audit report's ticketed findings).
+              tooltip: 'Add',
               onPressed: () {},
               child: const Icon(Icons.add),
             )

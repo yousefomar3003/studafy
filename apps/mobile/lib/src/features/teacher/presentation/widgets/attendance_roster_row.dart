@@ -30,7 +30,10 @@ class AttendanceRosterRow extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final name = ref.watch(rosterStudentNameProvider(studentId));
     final title =
-        name ?? 'teacher.class.unknownStudent'.tr(namedArgs: {'id': _shortId(studentId)});
+        name ??
+        'teacher.class.unknownStudent'.tr(
+          namedArgs: {'id': _shortId(studentId)},
+        );
 
     return InkWell(
       onTap: onCycle,
@@ -47,7 +50,9 @@ class AttendanceRosterRow extends ConsumerWidget {
               foregroundColor: colorScheme.onSecondaryContainer,
               child: Text(
                 _initial(name),
-                style: textTheme.labelLarge?.copyWith(color: colorScheme.onSecondaryContainer),
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onSecondaryContainer,
+                ),
               ),
             ),
             const SizedBox(width: AppSpacing.space12),
@@ -74,7 +79,8 @@ class AttendanceRosterRow extends ConsumerWidget {
     );
   }
 
-  String _shortId(String id) => id.length <= 6 ? id : id.substring(id.length - 6);
+  String _shortId(String id) =>
+      id.length <= 6 ? id : id.substring(id.length - 6);
 
   String _initial(String? name) {
     if (name == null || name.trim().isEmpty) return '#';
@@ -101,15 +107,22 @@ class _MinutesLateStepper extends StatelessWidget {
       children: [
         _StepButton(
           icon: Icons.remove,
-          onPressed: minutes > kMinMinutesLate ? () => onChanged(minutes - 1) : null,
+          onPressed: minutes > kMinMinutesLate
+              ? () => onChanged(minutes - 1)
+              : null,
           semanticLabel: 'teacher.attendance.minutesLateDecrease'.tr(),
         ),
         SizedBox(
-          width: 28,
+          width: 32,
           child: Text(
             '$minutes',
             textAlign: TextAlign.center,
             style: textTheme.labelLarge,
+            // Not clipped at 130%+ system font scale: a 3-digit value (max 240) can outgrow this
+            // box once scaled, and painting past it beats silently truncating the number
+            // (ST-294 a11y audit — dynamic type).
+            softWrap: false,
+            overflow: TextOverflow.visible,
           ),
         ),
         _StepButton(
@@ -123,7 +136,11 @@ class _MinutesLateStepper extends StatelessWidget {
 }
 
 class _StepButton extends StatelessWidget {
-  const _StepButton({required this.icon, required this.onPressed, required this.semanticLabel});
+  const _StepButton({
+    required this.icon,
+    required this.onPressed,
+    required this.semanticLabel,
+  });
 
   final IconData icon;
   final VoidCallback? onPressed;
@@ -134,9 +151,10 @@ class _StepButton extends StatelessWidget {
     return IconButton(
       icon: Icon(icon, size: 18),
       onPressed: onPressed,
-      visualDensity: VisualDensity.compact,
       tooltip: semanticLabel,
-      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+      // 48x48 (not the previous 32x32): Android's Material tap-target floor, and above iOS
+      // HIG's 44x44 too (ST-294 a11y audit — see accessibility_guidelines_test.dart).
+      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
       padding: EdgeInsets.zero,
     );
   }

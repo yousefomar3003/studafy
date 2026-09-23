@@ -40,53 +40,69 @@ class GradeEntryRow extends StatelessWidget {
     final locked = status.isLocked;
     final maxLabel = _trimNumber(maxScore);
 
-    return InkWell(
-      onTap: locked ? null : onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.space12,
-          horizontal: AppSpacing.space4,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(studentLabel, style: theme.textTheme.bodyMedium, maxLines: 1),
-                  if (isOutOfRange)
+    // `isFocused` is otherwise conveyed only by the score box's border/fill color (see
+    // `_ScoreBox`) — `selected` gives TalkBack/VoiceOver users the same "this is the row the
+    // docked keypad is bound to" signal sighted users get from the highlight (ST-294 a11y audit).
+    return Semantics(
+      selected: isFocused,
+      child: InkWell(
+        onTap: locked ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.space12,
+            horizontal: AppSpacing.space4,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      'teacher.grades.entry.overMax'.tr(namedArgs: {'max': maxLabel}),
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-                    )
-                  else if (status.isRejected)
-                    Text(
-                      'teacher.grades.entry.rejectedHint'.tr(),
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      studentLabel,
+                      style: theme.textTheme.bodyMedium,
+                      maxLines: 1,
                     ),
-                ],
+                    if (isOutOfRange)
+                      Text(
+                        'teacher.grades.entry.overMax'.tr(
+                          namedArgs: {'max': maxLabel},
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      )
+                    else if (status.isRejected)
+                      Text(
+                        'teacher.grades.entry.rejectedHint'.tr(),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.space12),
-            if (locked)
-              GradeStatusChip(status: status)
-            else
-              _ScoreBox(
-                text: scoreText,
-                maxLabel: maxLabel,
-                isFocused: isFocused,
-                isOutOfRange: isOutOfRange,
-                isDirty: isDirty,
-              ),
-          ],
+              const SizedBox(width: AppSpacing.space12),
+              if (locked)
+                GradeStatusChip(status: status)
+              else
+                _ScoreBox(
+                  text: scoreText,
+                  maxLabel: maxLabel,
+                  isFocused: isFocused,
+                  isOutOfRange: isOutOfRange,
+                  isDirty: isDirty,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  static String _trimNumber(double value) =>
-      value == value.roundToDouble() ? value.toInt().toString() : value.toString();
+  static String _trimNumber(double value) => value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toString();
 }
 
 class _ScoreBox extends StatelessWidget {
@@ -124,8 +140,13 @@ class _ScoreBox extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         borderRadius: AppRadius.mdRadius,
-        border: Border.all(color: border, width: isFocused || isOutOfRange ? 2 : 1),
-        color: isFocused ? theme.colorScheme.primaryContainer.withValues(alpha: 0.25) : null,
+        border: Border.all(
+          color: border,
+          width: isFocused || isOutOfRange ? 2 : 1,
+        ),
+        color: isFocused
+            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.25)
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -139,7 +160,9 @@ class _ScoreBox extends StatelessWidget {
           ),
           Text(
             ' / $maxLabel',
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
