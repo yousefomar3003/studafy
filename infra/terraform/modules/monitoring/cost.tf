@@ -61,7 +61,7 @@ locals {
       width  = 8
       height = 6
       properties = {
-        title  = "AWS estimated charges (budget ${var.aws_monthly_budget_usd})"
+        title = "AWS estimated charges (budget ${var.aws_monthly_budget_usd})"
         # AWS/Billing's EstimatedCharges is a us-east-1-only metric regardless of var.aws_region —
         # same quirk alerts.tf's billing_alarms_us_east_1 documents. A dashboard widget's own
         # `region` property overrides the dashboard-level default per-widget, so this is the one
