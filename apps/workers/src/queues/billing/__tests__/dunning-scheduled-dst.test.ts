@@ -12,9 +12,9 @@
  * flip lives at the absolute deadline instant - (end,end) is expired, (end, end-1s) is not.
  */
 
-import { describe, expect, test } from "bun:test";
-
 import { GRACE_PERIOD_DAYS } from "@studafy/billing";
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
+import { describe, expect, test } from "bun:test";
 
 import {
   DUNNING_EMAIL_DAYS,

@@ -18,8 +18,8 @@
  * integration suite in apps/api/tests.
  */
 
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-
 import postgres from "postgres";
 
 import type { Sql } from "postgres";

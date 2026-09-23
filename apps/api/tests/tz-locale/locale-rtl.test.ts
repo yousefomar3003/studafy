@@ -13,6 +13,7 @@
  * Pure: no DB, no wall clock. Runs in the normal api test command.
  */
 
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 import { describe, expect, test } from "bun:test";
 
 import { reportEnvelope } from "../../src/modules/finance/reports/service";
