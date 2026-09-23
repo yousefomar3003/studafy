@@ -11,8 +11,7 @@
  * transition). Whole-day offsets {0, 3, 7} from start map to stage indexes {0, 1, 2}; the expiry
  * flip lives at the absolute deadline instant - (end,end) is expired, (end, end-1s) is not.
  */
- 
- 
+
 import { describe, expect, test } from "bun:test";
 
 import { GRACE_PERIOD_DAYS } from "@studafy/billing";
@@ -25,7 +24,6 @@ import {
 } from "../dunning-schedule";
 
 import type { SubscriptionKind } from "@studafy/billing";
-
 
 const KIND: SubscriptionKind = "school";
 const DAY_MS = 86_400_000;

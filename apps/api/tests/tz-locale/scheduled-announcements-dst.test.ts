@@ -17,8 +17,7 @@
  * Requires a live Postgres: skipped unless TEST_DATABASE_URL is set, exactly like every other
  * integration suite in apps/api/tests.
  */
- 
- 
+
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import postgres from "postgres";

@@ -15,8 +15,7 @@
  *
  * DB-gated exactly like every other integration suite in apps/api/tests.
  */
- 
- 
+
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import postgres from "postgres";

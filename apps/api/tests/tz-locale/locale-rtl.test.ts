@@ -12,8 +12,7 @@
  *
  * Pure: no DB, no wall clock. Runs in the normal api test command.
  */
- 
- 
+
 import { describe, expect, test } from "bun:test";
 
 import { reportEnvelope } from "../../src/modules/finance/reports/service";
