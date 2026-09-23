@@ -367,3 +367,38 @@ variable "status_page_from_address" {
   default     = null
   nullable    = true
 }
+
+# --- Cost monitoring and budgets (ST-293) -------------------------------------------------------
+
+variable "cost_metric_namespace" {
+  description = "CloudWatch namespace the workers process's cost-report sweep publishes AiEstimatedSpendUsd/StripeFeesUsd under (apps/workers/src/queues/billing/cost-report.ts's COST_METRIC_NAMESPACE constant — the two must match by hand, same as module.compute's own copy of this value for the IAM grant). Same Studafy/<component> convention as probe_metric_namespace/synthetics_metric_namespace."
+  type        = string
+  default     = "Studafy/Cost"
+}
+
+variable "ai_monthly_spend_budget_usd" {
+  description = "Platform-wide monthly AI provider-cost budget, in USD, across every tenant combined (not per-tenant — per-tenant attribution is GET /api/ai/admin/metrics, ST-155). The AiSpendBudgetHigh alarm fires when apps/workers' cost-report sweep publishes an AiEstimatedSpendUsd above this. No real finance number exists in this repo to transcribe (same honesty gap synthetics_availability_slo_percent already documents) — 500 is a conventional placeholder; whoever owns the real AI budget should override it per environment."
+  type        = number
+  default     = 500
+
+  validation {
+    condition     = var.ai_monthly_spend_budget_usd > 0
+    error_message = "ai_monthly_spend_budget_usd must be a positive number of dollars."
+  }
+}
+
+variable "workers_log_group_name" {
+  description = "Name of module.compute's workers ECS log group (module.compute.log_group_names[\"workers\"]). The cost-report sweep (apps/workers/src/queues/billing/cost-report.ts) logs into it like every other workers log line; the Cost dashboard's Logs Insights widget filters this group for its structured \"cost-report:\" lines rather than needing a dedicated log group of its own."
+  type        = string
+}
+
+variable "aws_monthly_budget_usd" {
+  description = "Monthly AWS infrastructure-spend budget, in USD, for the AwsEstimatedChargesHigh alarm on the legacy AWS/Billing EstimatedCharges metric (us-east-1 only — see alerts.tf's own comment on why that metric lives there and why it needs a one-time account-level opt-in). No real finance number exists in this repo to transcribe; 1000 is a conventional placeholder."
+  type        = number
+  default     = 1000
+
+  validation {
+    condition     = var.aws_monthly_budget_usd > 0
+    error_message = "aws_monthly_budget_usd must be a positive number of dollars."
+  }
+}

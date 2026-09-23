@@ -22,3 +22,16 @@ export { runStorageQuotaReconciliation } from "./storage-quota-reconciliation";
 export type { StorageQuotaReconciliationResult } from "./storage-quota-reconciliation";
 export { createStorageQuotaS3 } from "./storage-quota-s3";
 export type { StorageQuotaS3Client } from "./storage-quota-s3";
+export {
+  scheduleCostReportJobs,
+  COST_REPORT_DAILY_CRON_PATTERN,
+  COST_REPORT_MONTHLY_CRON_PATTERN,
+} from "./cost-report-scheduler";
+export {
+  runCostReport,
+  evaluateBudgetBreach,
+  computeAiCostTotals,
+  computeStripeFeesUsd,
+  COST_METRIC_NAMESPACE,
+} from "./cost-report";
+export type { CostReportResult, BudgetVerdict, AiCostTotals } from "./cost-report";

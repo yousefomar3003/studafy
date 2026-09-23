@@ -285,6 +285,10 @@ module "compute" {
 
   secrets_service_iam_policy_arns = module.secrets.service_iam_policy_arns
   secrets_service_names           = module.secrets.service_names
+
+  # Cost & budget reporting sweep (ST-293): the workers task role's PutMetricData grant, scoped to
+  # this exact namespace — see module.monitoring's own cost_metric_namespace for the matching alarm.
+  cost_metric_namespace = var.cost_metric_namespace
 }
 
 module "monitoring" {
@@ -380,6 +384,13 @@ module "monitoring" {
   status_page_enabled      = var.environment != "dev"
   ses_domain_identity_arn  = module.dns.ses_domain_identity_arn
   status_page_from_address = var.dns_create_email_records ? "status@${var.dns_ses_domain}" : null
+
+  # Cost monitoring and budgets (ST-293). ai_monthly_spend_budget_usd/aws_monthly_budget_usd are
+  # left at the module's own conventional-placeholder defaults, not overridden here — same "no real
+  # finance number exists in this repo" honesty gap synthetics_availability_slo_percent above
+  # already leaves at its module default for the identical reason.
+  cost_metric_namespace  = var.cost_metric_namespace
+  workers_log_group_name = module.compute.log_group_names["workers"]
 }
 
 # Vector + Loki log-aggregation pipeline (ST-261). staging/prod only — see local.logging_enabled.

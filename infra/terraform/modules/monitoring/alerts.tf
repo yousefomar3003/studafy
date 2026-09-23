@@ -197,6 +197,33 @@ locals {
     }
   } : {}
 
+  # --- Cost monitoring and budgets (ST-293) ------------------------------------------------------
+  #
+  # AiEstimatedSpendUsd is published daily by apps/workers' cost-report sweep
+  # (apps/workers/src/queues/billing/cost-report.ts), summed across every tenant — deliberately not
+  # per-school-dimensioned, for the same cardinality-budget reason this module's README gives for
+  # every other metric here. Per-tenant attribution stays GET /api/ai/admin/metrics (ST-155).
+  # `treat_missing_data = "notBreaching"`: unlike the probe/synthetic alarms above, no data here
+  # means "the sweep has not run yet today" (e.g. a fresh environment before its first 06:15 UTC
+  # run), not a failure — there is nothing to page on until there is a real number to compare.
+  cost_alarms = {
+    "ai-spend-budget-high" = {
+      alertname           = "AiSpendBudgetHigh"
+      severity            = "warning"
+      service             = "ai-cost"
+      description         = "Platform-wide AI provider spend has exceeded the ${var.ai_monthly_spend_budget_usd} USD monthly budget."
+      namespace           = var.cost_metric_namespace
+      metric_name         = "AiEstimatedSpendUsd"
+      statistic           = "Maximum"
+      period              = 86400
+      evaluation_periods  = 1
+      threshold           = var.ai_monthly_spend_budget_usd
+      comparison_operator = "GreaterThanThreshold"
+      treat_missing_data  = "notBreaching"
+      dimensions          = {}
+    }
+  }
+
   # --- Certificate expiry -----------------------------------------------------------------------
   #
   # Both ACM certificates are DNS-validated against Route 53 records Terraform itself creates, so
@@ -259,6 +286,38 @@ locals {
     }
   }
 
+  # --- AWS infrastructure spend (ST-293) ----------------------------------------------------------
+  #
+  # `AWS/Billing` `EstimatedCharges` is the one CloudWatch metric AWS publishes for account-wide
+  # spend, and — like the CDN certificate above — it exists only in us-east-1 regardless of which
+  # region the account's resources run in, so this is a separate map and a separate
+  # `provider = aws.us_east_1` resource for the identical structural reason
+  # certificate_alarms_us_east_1 is. Statistic period is 21600s (6h): EstimatedCharges updates a few
+  # times a day, not every minute, so a 5-minute period would mostly evaluate on stale/missing data.
+  #
+  # Known one-time manual step, same shape as postgres-conventions.md's "Monitoring role" bootstrap:
+  # this metric is not published at all until "Receive Billing Alerts" is turned on once, by hand,
+  # in the account's Billing preferences (console only — there is no Terraform-managed API for this
+  # account setting). Until that is done, `treat_missing_data = "missing"` means this alarm
+  # evaluates to INSUFFICIENT_DATA forever rather than falsely paging — see the runbook entry.
+  billing_alarms_us_east_1 = {
+    "aws-estimated-charges-high" = {
+      alertname           = "AwsEstimatedChargesHigh"
+      severity            = "warning"
+      service             = "aws-billing"
+      description         = "AWS estimated month-to-date charges have exceeded the ${var.aws_monthly_budget_usd} USD monthly budget."
+      namespace           = "AWS/Billing"
+      metric_name         = "EstimatedCharges"
+      statistic           = "Maximum"
+      period              = 21600
+      evaluation_periods  = 1
+      threshold           = var.aws_monthly_budget_usd
+      comparison_operator = "GreaterThanThreshold"
+      treat_missing_data  = "missing"
+      dimensions          = { Currency = "USD" }
+    }
+  }
+
   # --- Synthetic black-box probes (ST-263) ---------------------------------------------------
   #
   # Same "critical, user-facing objective" tier as probe_alarms above, one alarm per check per
@@ -318,13 +377,19 @@ locals {
     local.probe_alarms,
     local.synthetic_alarms,
     local.certificate_alarms,
+    local.cost_alarms,
   )
 
   # What the bridge needs and nothing more: the summary comes from the alarm's own description in
   # the notification, and the runbook URL is derived. Every region's alarms, since one Lambda
   # serves every topic.
   alarm_catalog = {
-    for key, alarm in merge(local.cloudwatch_alarms, local.certificate_alarms_us_east_1, local.synthetic_alarms_dr) :
+    for key, alarm in merge(
+      local.cloudwatch_alarms,
+      local.certificate_alarms_us_east_1,
+      local.synthetic_alarms_dr,
+      local.billing_alarms_us_east_1,
+    ) :
     "${var.name_prefix}-${key}" => {
       alertname = alarm.alertname
       severity  = alarm.severity
@@ -365,7 +430,11 @@ resource "aws_cloudwatch_metric_alarm" "this" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "us_east_1" {
-  for_each = local.certificate_alarms_us_east_1
+  # Merged with billing_alarms_us_east_1 (ST-293) for the same reason certificate_alarms_us_east_1
+  # lives here in the first place: a CloudWatch alarm can only be created in the region its metric
+  # was published to, and both AWS/CertificateManager's DaysToExpiry (CDN cert) and AWS/Billing's
+  # EstimatedCharges are us-east-1-only metrics regardless of var.aws_region.
+  for_each = merge(local.certificate_alarms_us_east_1, local.billing_alarms_us_east_1)
   provider = aws.us_east_1
 
   alarm_name          = "${var.name_prefix}-${each.key}"

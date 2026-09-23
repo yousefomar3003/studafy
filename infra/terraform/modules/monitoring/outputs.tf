@@ -31,6 +31,13 @@ output "deploys_log_group_name" {
   value       = aws_cloudwatch_log_group.deploys.name
 }
 
+# --- Cost monitoring and budgets (ST-293) -------------------------------------------------------
+
+output "cost_dashboard_name" {
+  description = "CloudWatch dashboard name for AI spend, Stripe fees, AWS infrastructure spend and the monthly cost report (ST-293). Unconditional, unlike availability_slo_dashboard_name — apps/workers' cost-report sweep runs in every environment."
+  value       = aws_cloudwatch_dashboard.cost.dashboard_name
+}
+
 # --- Black-box synthetic availability probes (ST-263) --------------------------------------------
 
 output "synthetics_probe_function_name" {

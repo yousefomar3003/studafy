@@ -24,13 +24,15 @@
         { "name": "READ_DATABASE_PORT", "value": "6432" },
         { "name": "READ_DATABASE_NAME", "value": "workers_read" },
         { "name": "S3_REGION", "value": "${AWS_REGION}" },
-        { "name": "S3_APP_FILES_BUCKET", "value": "${S3_APP_FILES_BUCKET}" }
+        { "name": "S3_APP_FILES_BUCKET", "value": "${S3_APP_FILES_BUCKET}" },
+        { "name": "AWS_REGION", "value": "${AWS_REGION}" }
       ],
       "secrets": [
         { "name": "REDIS_URL", "valueFrom": "${REDIS_SECRET_ARN}:queue_url::" },
         { "name": "DATABASE_USER", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_username::" },
         { "name": "DATABASE_PASSWORD", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_password::" },
-        { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" }
+        { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" },
+        { "name": "STRIPE_SECRET_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:STRIPE_SECRET_KEY::" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "bun healthcheck.ts"],
