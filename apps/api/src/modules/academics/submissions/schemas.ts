@@ -6,6 +6,8 @@ import {
   uuidSchema,
 } from "@studafy/shared-schemas";
 
+import { sanitizedTextSchema } from "../../../lib/sanitize";
+
 /**
  * Request and response schemas for the submissions API (ST-104).
  *
@@ -231,7 +233,7 @@ const SCORE_CEILING = 10_000;
 
 export const createSubmissionBodySchema = z
   .object({
-    content: z.string().trim().min(1).max(CONTENT_MAX_LENGTH).optional().openapi({
+    content: sanitizedTextSchema({ min: 1, max: CONTENT_MAX_LENGTH }).optional().openapi({
       description: "Free-text answer. Omit for an attachments-only hand-in.",
       example: "My answer to question 1 is...",
     }),
@@ -247,7 +249,7 @@ export const gradeSubmissionBodySchema = z
         "Points awarded. Two decimal places. Must not exceed the assignment's max_score.",
       example: 87.5,
     }),
-    feedback: z.string().trim().min(1).max(10_000).nullish().openapi({
+    feedback: sanitizedTextSchema({ min: 1, max: 10_000 }).nullish().openapi({
       description: "Comments for the student. Pass null to clear.",
     }),
     publish: z

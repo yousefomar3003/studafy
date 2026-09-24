@@ -232,7 +232,12 @@ const documentXml = (body: string): string =>
   <w:body>${body}<w:sectPr/></w:body>
 </w:document>`;
 
-async function buildDocx(
+/**
+ * Exported (beyond this generator script's own use) so `worker.sanitization.test.ts` can build an
+ * ad-hoc DOCX carrying a stored-XSS probe without a new binary fixture committed to the repo — the
+ * probe is data for one test, not part of the reviewable fixture corpus `specs.ts` documents.
+ */
+export async function buildDocx(
   title: string,
   intro: string[],
   sections: { heading: string; level: number; lines: string[] }[],
@@ -1017,4 +1022,9 @@ async function main(): Promise<void> {
   console.log(`generated ${FIXTURES.length} fixtures in ${FILES_DIR}`);
 }
 
-await main();
+// Guarded so this module can be imported for its builders (ST-296:
+// worker.sanitization.test.ts imports `buildDocx`) without re-running the whole corpus generation
+// as a side effect. `bun run generate:fixtures` still executes it directly, where this is true.
+if (import.meta.main) {
+  await main();
+}

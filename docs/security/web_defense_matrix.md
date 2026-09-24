@@ -3,6 +3,12 @@
 The browser-facing defenses `apps/api` applies to every request: the response header matrix, the
 CORS origin allowlist, and CSRF protection. Delivered by ST-067.
 
+Content sanitization — neutralizing stored XSS in announcements, comments, and AI turns, plus the
+render guards that keep both clients escape-by-default — is a separate, complementary defense
+covered in [content_sanitization_policy.md](./content_sanitization_policy.md) (ST-296). The CSP
+`script-src` directive below is what stops an unescaped payload from executing even if a future bug
+reintroduced one; the sanitizer is what stops the payload from ever reaching storage.
+
 Three middlewares, registered in this order in [`apps/api/src/app.ts`](../../apps/api/src/app.ts):
 
 | Order | Middleware                                                                      | Scope    | Job                                               |
