@@ -67,16 +67,19 @@ interface AnnouncementResponse {
 
 /**
  * CI hit a 500 here that never reproduced locally against a real Postgres instance (same image,
- * same frozen lockfile, repeated runs). `expect(res.status).toBe(201)` alone only ever surfaces the
- * status code in a CI annotation, not the RFC 9457 problem+json body errorHandlerMiddleware attaches
- * to it — which is the one piece of information that would actually diagnose this. Throwing the body
- * text on a non-201 turns the next CI failure into an actionable one instead of a second blind guess.
+ * same frozen lockfile, repeated runs). A plain `expect(res.status).toBe(201)` only ever surfaces
+ * the status code in a CI annotation, not the RFC 9457 problem+json body errorHandlerMiddleware
+ * attaches to it — the one thing that would actually diagnose this. A `throw new Error(...)` was
+ * tried first and made it worse: GitHub's log-to-annotation extraction visibly mangled the custom
+ * message down to a few words, dropping the body entirely (confirmed by re-reading the annotation
+ * after that attempt). `expect(x).toBe("201")` failures, by contrast, come through with their full
+ * "Expected/Received" diff intact — verified from the very first failure this suite hit. Routing
+ * the diagnostic through that same mechanism, as the "received" side of a string comparison, is the
+ * one path proven to survive GitHub's extraction undamaged.
  */
 async function expectCreated(res: Response): Promise<AnnouncementResponse> {
   const text = await res.text();
-  if (res.status !== 201) {
-    throw new Error(`expected 201, got ${res.status}: ${text}`);
-  }
+  expect(res.status === 201 ? "201" : `status=${res.status} body=${text}`).toBe("201");
   return JSON.parse(text) as AnnouncementResponse;
 }
 
