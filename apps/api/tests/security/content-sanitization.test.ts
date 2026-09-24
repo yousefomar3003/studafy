@@ -65,6 +65,21 @@ interface AnnouncementResponse {
   body: string;
 }
 
+/**
+ * CI hit a 500 here that never reproduced locally against a real Postgres instance (same image,
+ * same frozen lockfile, repeated runs). `expect(res.status).toBe(201)` alone only ever surfaces the
+ * status code in a CI annotation, not the RFC 9457 problem+json body errorHandlerMiddleware attaches
+ * to it — which is the one piece of information that would actually diagnose this. Throwing the body
+ * text on a non-201 turns the next CI failure into an actionable one instead of a second blind guess.
+ */
+async function expectCreated(res: Response): Promise<AnnouncementResponse> {
+  const text = await res.text();
+  if (res.status !== 201) {
+    throw new Error(`expected 201, got ${res.status}: ${text}`);
+  }
+  return JSON.parse(text) as AnnouncementResponse;
+}
+
 describeDb("stored-XSS neutralization", () => {
   test("an announcement carrying script/img/onerror payloads is neutralized end to end", async () => {
     const fixture = await createFullTenant(database!.sql);
@@ -87,8 +102,7 @@ describeDb("stored-XSS neutralization", () => {
       }),
     );
 
-    expect(res.status).toBe(201);
-    const created = (await res.json()) as AnnouncementResponse;
+    const created = await expectCreated(res);
 
     expectNeutralized(created.title, ["Assembly", "notice"]);
     expectNeutralized(created.body, ["Meet in the gym.", "Bring your permission slip."]);
@@ -124,8 +138,7 @@ describeDb("stored-XSS neutralization", () => {
       }),
     );
 
-    expect(res.status).toBe(201);
-    const created = (await res.json()) as AnnouncementResponse;
+    const created = await expectCreated(res);
     expect(created.body).not.toMatch(/<svg/i);
     expect(created.body).not.toMatch(/onload\s*=/i);
     expect(created.body).not.toContain("<a ");
