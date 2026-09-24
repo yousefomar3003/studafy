@@ -1,5 +1,6 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { NOTIFICATION_TYPES } from "@studafy/constants";
+import { sanitizePlainText } from "@studafy/sanitize";
 import postgres from "postgres";
 
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -306,6 +307,16 @@ async function fetchFromS3(
   }
 }
 
+/**
+ * `content` and `section_title` are extracted straight from an uploaded PDF/DOCX/PPTX (ST-296): the
+ * `apps/workers/src/queues/ai-ingestion/parsers` walk document text nodes, not markup, so nothing
+ * upstream of this insert ever interprets the bytes as HTML — but that also means an uploaded file
+ * can carry a literal `<script>...</script>` straight into storage unless something neutralizes it
+ * here, the same way a request body is sanitized at the API's write boundary
+ * (docs/security/content_sanitization_policy.md). Sanitizing at the insert — after chunking and
+ * embedding, not before — keeps `buildIngestChunks` a pure, fixture-testable pipeline over the
+ * document's real extracted text.
+ */
 function insertChunks(
   tx: TransactionSql,
   schoolId: string,
@@ -320,9 +331,9 @@ function insertChunks(
         school_id: schoolId,
         material_id: materialId,
         chunk_index: chunk.chunkIndex,
-        content: chunk.content,
+        content: sanitizePlainText(chunk.content),
         page_number: chunk.pageNumber,
-        section_title: chunk.sectionTitle,
+        section_title: chunk.sectionTitle === null ? null : sanitizePlainText(chunk.sectionTitle),
         embedding: chunk.embedding,
         embedding_model: chunk.embeddingModel,
       })),

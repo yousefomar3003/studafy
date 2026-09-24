@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { dateTimeSchema, paginationQuerySchema, uuidSchema } from "@studafy/shared-schemas";
 
+import { sanitizedTextSchema } from "../../lib/sanitize";
 import { roleSchema } from "../users/schemas";
 
 // ---------------------------------------------------------------------------
@@ -31,8 +32,8 @@ export const announcementStatusSchema = z.enum(["scheduled", "published"]).opena
  */
 export const createAnnouncementBodySchema = z
   .object({
-    title: z.string().trim().min(1, "Title is required").max(200),
-    body: z.string().trim().min(1, "Message is required").max(5000),
+    title: sanitizedTextSchema({ min: 1, minMessage: "Title is required", max: 200 }),
+    body: sanitizedTextSchema({ min: 1, minMessage: "Message is required", max: 5000 }),
     mandatory: z.boolean().openapi({
       description:
         "True sends as the platform's un-optoutable ADMIN_ANNOUNCEMENT type; false sends as " +

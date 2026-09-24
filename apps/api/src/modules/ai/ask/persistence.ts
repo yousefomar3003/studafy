@@ -1,6 +1,7 @@
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { sanitizePlainText } from "../../../lib/sanitize";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { AI_ASK_MESSAGE_RETENTION_DAYS } from "../config";
 
@@ -91,6 +92,14 @@ export interface PersistAskMessageInput {
  * vanished between retrieval and persistence fails the insert and rolls the message back with it —
  * the database half of the citation validator.
  *
+ * `question` and `answer` are run through {@link sanitizePlainText} before the insert (ST-296): the
+ * question is student-authored, the answer is model-authored but grounded on retrieved document
+ * text the student's own materials supplied, so neither is trusted markup by the time it reaches
+ * storage. This runs after the turn has already streamed to the caller as SSE deltas — sanitizing
+ * mid-stream would mean re-writing bytes the client already rendered as plain text — so it protects
+ * every *later* read of this row (conversation history, transcript export) rather than the live
+ * stream, which is safe by construction because nothing on the wire is ever parsed as HTML.
+ *
  * @returns the new `app.ai_messages.id`.
  */
 export async function persistAskMessage(
@@ -98,6 +107,8 @@ export async function persistAskMessage(
   input: PersistAskMessageInput,
 ): Promise<string> {
   const expiresAt = new Date(Date.now() + AI_ASK_MESSAGE_RETENTION_DAYS * 86_400_000);
+  const question = sanitizePlainText(input.question);
+  const answer = sanitizePlainText(input.answer);
   const [message] = await tx<{ id: string }[]>`
     INSERT INTO app.ai_messages (
       school_id, conversation_id, question, answer,
@@ -105,8 +116,8 @@ export async function persistAskMessage(
     ) VALUES (
       ${input.schoolId}::uuid,
       ${input.conversationId}::uuid,
-      ${input.question},
-      ${input.answer},
+      ${question},
+      ${answer},
       ${input.promptTokens},
       ${input.completionTokens},
       ${input.totalTokens},

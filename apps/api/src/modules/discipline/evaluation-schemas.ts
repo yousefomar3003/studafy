@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 import { uuidSchema, dateTimeSchema } from "@studafy/shared-schemas";
 
+import { sanitizedTextSchema } from "../../lib/sanitize";
+
 export const evaluationTypeSchema = z
   .enum([
     "formal_observation",
@@ -101,10 +103,14 @@ export const createEvaluationBodySchema = z
     evaluation_type: evaluationTypeSchema,
     class_id: uuidSchema.optional().openapi({ description: "Associated class, if any." }),
     rating: evaluationRatingSchema.optional().openapi({ description: "Overall rating." }),
-    strengths: z.string().optional().openapi({ description: "Identified strengths." }),
-    areas_for_improvement: z.string().optional().openapi({ description: "Growth areas." }),
-    comments: z.string().optional().openapi({ description: "General comments." }),
-    narrative: z.string().optional().openapi({ description: "Free-text evaluation narrative." }),
+    strengths: sanitizedTextSchema().optional().openapi({ description: "Identified strengths." }),
+    areas_for_improvement: sanitizedTextSchema()
+      .optional()
+      .openapi({ description: "Growth areas." }),
+    comments: sanitizedTextSchema().optional().openapi({ description: "General comments." }),
+    narrative: sanitizedTextSchema()
+      .optional()
+      .openapi({ description: "Free-text evaluation narrative." }),
     evaluated_at: z.string().datetime().openapi({ description: "When the evaluation took place." }),
   })
   .openapi("CreateEvaluationBody");
@@ -114,10 +120,10 @@ export type CreateEvaluationBody = z.infer<typeof createEvaluationBodySchema>;
 export const updateEvaluationBodySchema = z
   .object({
     rating: evaluationRatingSchema.optional(),
-    strengths: z.string().optional(),
-    areas_for_improvement: z.string().optional(),
-    comments: z.string().optional(),
-    narrative: z.string().optional(),
+    strengths: sanitizedTextSchema().optional(),
+    areas_for_improvement: sanitizedTextSchema().optional(),
+    comments: sanitizedTextSchema().optional(),
+    narrative: sanitizedTextSchema().optional(),
     class_id: uuidSchema.nullable().optional(),
   })
   .openapi("UpdateEvaluationBody");

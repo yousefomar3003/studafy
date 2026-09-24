@@ -9,9 +9,14 @@ import tseslint from "typescript-eslint";
 
 import noAnalyticsPii from "./rules/no-analytics-pii.js";
 import noSessionSet from "./rules/no-session-set.js";
+import noUnsafeHtmlRender from "./rules/no-unsafe-html-render.js";
 
 const studafyPlugin = {
-  rules: { "no-session-set": noSessionSet, "no-analytics-pii": noAnalyticsPii },
+  rules: {
+    "no-session-set": noSessionSet,
+    "no-analytics-pii": noAnalyticsPii,
+    "no-unsafe-html-render": noUnsafeHtmlRender,
+  },
 };
 
 export default defineConfig([
@@ -49,6 +54,7 @@ export default defineConfig([
     rules: {
       "studafy/no-session-set": "error",
       "studafy/no-analytics-pii": "error",
+      "studafy/no-unsafe-html-render": "error",
       eqeqeq: ["error", "smart"],
       "no-var": "error",
       "prefer-const": "error",

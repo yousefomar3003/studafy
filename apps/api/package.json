@@ -32,6 +32,7 @@
     "@studafy/grades-reporting": "workspace:*",
     "@studafy/notification-templates": "workspace:*",
     "@studafy/observability": "workspace:*",
+    "@studafy/sanitize": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
     "bullmq": "5.79.3",
     "hono": "4.12.34",
