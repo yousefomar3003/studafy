@@ -95,13 +95,17 @@ describeDb("stored-XSS neutralization", () => {
       jsonBody({
         title: "Assembly <script>alert(document.cookie)</script> notice",
         body: "Meet in the gym. <img src=x onerror=alert(1)> Bring your permission slip.",
-        // `mandatory: true` matches the school-wide-audience combination
-        // announcements-http.test.ts's "school-wide mandatory" case already exercises —
-        // sanitization is a property of title/body, independent of mandatory/audience_type, so
-        // there's no coverage lost by reusing the combination the rest of the suite already
-        // proves stable rather than the untested mandatory:false + audience_type:"school" pairing.
+        // A role-targeted audience (~1 recipient, matching announcements-http.test.ts's
+        // "role-targeted" case) rather than "school" (~10 recipients, the heaviest audience:
+        // resolveAnnouncementRecipientIds' broadest query plus a 10-way pipelined bulk insert in
+        // publishAnnouncement). Sanitization is a property of title/body alone, independent of
+        // audience size, so this loses no coverage while minimizing this test's DB write volume —
+        // relevant because tests/security/ runs several other fixture-heavy suites concurrently in
+        // the same CI job, and CI (not local, even under repeated stress) intermittently hit a
+        // transient 500 here at the heavier "school" audience.
         mandatory: true,
-        audience_type: "school",
+        audience_type: "role",
+        audience_role: "INSTRUCTOR",
       }),
     );
 
@@ -137,7 +141,8 @@ describeDb("stored-XSS neutralization", () => {
         title: "Field trip",
         body: '<svg/onload=alert(1)> Click <a href="javascript:alert(1)">here</a> to confirm attendance.',
         mandatory: true,
-        audience_type: "school",
+        audience_type: "role",
+        audience_role: "INSTRUCTOR",
       }),
     );
 
