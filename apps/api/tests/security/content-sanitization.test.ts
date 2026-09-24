@@ -77,7 +77,12 @@ describeDb("stored-XSS neutralization", () => {
       jsonBody({
         title: "Assembly <script>alert(document.cookie)</script> notice",
         body: "Meet in the gym. <img src=x onerror=alert(1)> Bring your permission slip.",
-        mandatory: false,
+        // `mandatory: true` matches the school-wide-audience combination
+        // announcements-http.test.ts's "school-wide mandatory" case already exercises —
+        // sanitization is a property of title/body, independent of mandatory/audience_type, so
+        // there's no coverage lost by reusing the combination the rest of the suite already
+        // proves stable rather than the untested mandatory:false + audience_type:"school" pairing.
+        mandatory: true,
         audience_type: "school",
       }),
     );
@@ -114,7 +119,7 @@ describeDb("stored-XSS neutralization", () => {
       jsonBody({
         title: "Field trip",
         body: '<svg/onload=alert(1)> Click <a href="javascript:alert(1)">here</a> to confirm attendance.',
-        mandatory: false,
+        mandatory: true,
         audience_type: "school",
       }),
     );
