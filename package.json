@@ -52,6 +52,7 @@
     "typescript": "^5.9.3"
   },
   "overrides": {
-    "@xmldom/xmldom": "0.8.15"
+    "@xmldom/xmldom": "0.8.15",
+    "postcss": "8.5.28"
   }
 }
