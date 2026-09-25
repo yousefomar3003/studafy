@@ -21,4 +21,16 @@ export default [
       "import-x/no-unresolved": ["error", { ignore: ["^k6($|/)"] }],
     },
   },
+  // ST-297: every SQL string apps/api sends must be static; runtime values travel as bound
+  // parameters. Scoped to the API's shipped source (request-reachable code), not its tests: test
+  // suites build DDL and DO-block fixtures (CREATE DATABASE "<name>", per-table RLS probes) from
+  // test-owned identifiers and statements, which Postgres cannot bind as parameters anyway.
+  // See CONTRIBUTING.md › SQL safety.
+  {
+    files: ["apps/api/src/**/*.ts"],
+    ignores: ["**/*.test.ts", "**/__tests__/**"],
+    rules: {
+      "studafy/no-interpolated-sql": "error",
+    },
+  },
 ];

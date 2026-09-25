@@ -8,6 +8,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 import noAnalyticsPii from "./rules/no-analytics-pii.js";
+import noInterpolatedSql from "./rules/no-interpolated-sql.js";
 import noSessionSet from "./rules/no-session-set.js";
 import noUnsafeHtmlRender from "./rules/no-unsafe-html-render.js";
 
@@ -16,6 +17,7 @@ const studafyPlugin = {
     "no-session-set": noSessionSet,
     "no-analytics-pii": noAnalyticsPii,
     "no-unsafe-html-render": noUnsafeHtmlRender,
+    "no-interpolated-sql": noInterpolatedSql,
   },
 };
 
