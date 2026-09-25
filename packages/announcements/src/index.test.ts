@@ -176,6 +176,32 @@ describe("resolveAnnouncementRecipientIds", () => {
 });
 
 describe("publishAnnouncement", () => {
+  dbTest(
+    "publishes in the creating transaction when the caller's clock lags the database's",
+    async () => {
+      const fixture = await seedFixture();
+      // `created_at` is the database clock; `now` is the caller's. A caller a few seconds behind
+      // (container clock drift, or a Date taken before a pipelined BEGIN reaches the server) must
+      // still publish: `updated_at` has to come from the same clock as `created_at` to satisfy
+      // ck_announcements_timestamps (updated_at >= created_at).
+      const laggingNow = new Date(Date.now() - 5_000);
+
+      const result = await db!.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${fixture.schoolId}, true)`;
+        const id = await insertScheduledAnnouncement(
+          tx,
+          fixture.schoolId,
+          fixture.activeInstructorId,
+          laggingNow,
+        );
+        return publishAnnouncement(tx, fixture.schoolId, id, laggingNow);
+      });
+
+      expect(result.published).toBe(true);
+    },
+  );
+
   dbTest("claims a due row exactly once; a second call is a no-op", async () => {
     const fixture = await seedFixture();
     const now = new Date();
@@ -186,10 +212,7 @@ describe("publishAnnouncement", () => {
       return insertScheduledAnnouncement(tx, fixture.schoolId, fixture.activeInstructorId, now);
     });
 
-    // Captured after the insert, not reused from `now` above: `ck_announcements_timestamps`
-    // requires `updated_at >= created_at`, and `created_at` is the database's own clock at insert
-    // time, not the JS `Date` captured before the round trip.
-    const publishedAt = new Date();
+    const publishedAt = now;
 
     const first = await db!.begin(async (tx) => {
       await tx.unsafe("SET LOCAL ROLE studafy_admin");

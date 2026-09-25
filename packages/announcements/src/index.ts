@@ -213,7 +213,7 @@ export async function publishAnnouncement(
 ): Promise<PublishAnnouncementResult> {
   const [claimed] = await tx<AnnouncementRow[]>`
     UPDATE app.announcements
-    SET status = 'published', published_at = ${now}::timestamptz, updated_at = ${now}::timestamptz
+    SET status = 'published', published_at = ${now}::timestamptz, updated_at = CURRENT_TIMESTAMP
     WHERE id = ${announcementId}::uuid
       AND school_id = ${schoolId}::uuid
       AND status = 'scheduled'

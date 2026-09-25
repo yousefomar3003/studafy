@@ -80,7 +80,8 @@ interface RawHit {
 function setHnswSettings(tx: TransactionSql, efSearch: number): Promise<unknown> {
   return Promise.all([
     tx.unsafe(`SET LOCAL hnsw.iterative_scan = '${HYBRID_ITERATIVE_SCAN}'`),
-    tx.unsafe(`SET LOCAL hnsw.ef_search = ${efSearch}`),
+    // set_config(…, true) is SET LOCAL with a bindable value; SET itself cannot take parameters.
+    tx`SELECT set_config('hnsw.ef_search', ${String(efSearch)}, true)`,
   ]);
 }
 

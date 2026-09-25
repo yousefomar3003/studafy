@@ -136,6 +136,7 @@ export async function openTenantTx<T>(
       if (closed) return;
       closed = true;
       try {
+        // eslint-disable-next-line studafy/no-interpolated-sql -- `command` is typed "COMMIT" | "ROLLBACK"; no caller input reaches it
         await reserved.unsafe(command);
       } finally {
         reserved.release();
