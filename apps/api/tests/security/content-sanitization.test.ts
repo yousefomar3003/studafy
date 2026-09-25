@@ -95,14 +95,10 @@ describeDb("stored-XSS neutralization", () => {
       jsonBody({
         title: "Assembly <script>alert(document.cookie)</script> notice",
         body: "Meet in the gym. <img src=x onerror=alert(1)> Bring your permission slip.",
-        // A role-targeted audience (~1 recipient, matching announcements-http.test.ts's
-        // "role-targeted" case) rather than "school" (~10 recipients, the heaviest audience:
-        // resolveAnnouncementRecipientIds' broadest query plus a 10-way pipelined bulk insert in
-        // publishAnnouncement). Sanitization is a property of title/body alone, independent of
-        // audience size, so this loses no coverage while minimizing this test's DB write volume —
-        // relevant because tests/security/ runs several other fixture-heavy suites concurrently in
-        // the same CI job, and CI (not local, even under repeated stress) intermittently hit a
-        // transient 500 here at the heavier "school" audience.
+        // Sanitization is a property of title/body alone, so the smallest audience is enough. (The
+        // intermittent CI 500 this suite once hit was not load: publishAnnouncement stamped
+        // updated_at from the API clock against a database-clock created_at — see the regression
+        // test in packages/announcements/src/index.test.ts.)
         mandatory: true,
         audience_type: "role",
         audience_role: "INSTRUCTOR",
