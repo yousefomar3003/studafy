@@ -80,10 +80,14 @@ CREATE TABLE app.tap_renewal_attempts (
 
 CREATE INDEX idx_tap_renewal_attempts_school ON app.tap_renewal_attempts (school_id);
 
--- Written only by the renewal worker, which runs as studafy_admin.
+-- Written only by the renewal worker, which runs as studafy_admin, so the runtime role gets no
+-- write privilege. It keeps SELECT, like every tenant table: reads stay scoped by tenant_isolation,
+-- and the NFR-05 cross-tenant probe proves that scoping on every tenant table as studafy_app.
 REVOKE ALL PRIVILEGES ON TABLE app.tap_renewal_attempts FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON TABLE app.tap_renewal_attempts FROM studafy_app;
+GRANT SELECT ON TABLE app.tap_renewal_attempts TO studafy_app;
 REVOKE ALL ON TYPE app.tap_renewal_status FROM PUBLIC;
+GRANT USAGE ON TYPE app.tap_renewal_status TO studafy_app;
 
 SELECT app.apply_tenant_isolation('app', 'tap_renewal_attempts');
 
