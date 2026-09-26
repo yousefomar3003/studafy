@@ -9,6 +9,7 @@ import { scheduleAnnouncementPublishJob } from "./queues/announcements";
 import {
   scheduleCostReportJobs,
   scheduleDunningJob,
+  scheduleTapRenewalJob,
   scheduleSeatReconciliationJob,
   scheduleStorageQuotaReconciliationJob,
 } from "./queues/billing";
@@ -157,6 +158,11 @@ void scheduleNotificationDigestJob(notificationDigestRedis).then(() =>
 // Dunning scheduler: idempotently register the daily 04:00 grace-period sweep on the billing queue.
 const dunningRedis = createRedisConnection(env);
 void scheduleDunningJob(dunningRedis).then(() => dunningRedis.disconnect());
+
+// Tap renewal scheduler (ST-298): idempotently register the daily 03:00 renewal run, an hour before
+// the dunning sweep so tonight's exhausted renewals are already in grace when it runs.
+const tapRenewalRedis = createRedisConnection(env);
+void scheduleTapRenewalJob(tapRenewalRedis).then(() => tapRenewalRedis.disconnect());
 
 // Seat-reconciliation scheduler (ST-136): idempotently register the daily 05:00 seat sweep on the
 // billing queue, an hour after the dunning sweep so a school suspended overnight is no longer

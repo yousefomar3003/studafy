@@ -35,9 +35,9 @@ export const generateBatchInvoicesSchema = z.object({
 export type GenerateBatchInvoicesJobData = z.infer<typeof generateBatchInvoicesSchema>;
 
 /**
- * Stripe webhook retry (ST-132).
+ * Billing webhook retry (ST-132; `provider` added for Tap in ST-298).
  *
- * The provider event id and nothing else. The verified payload is already in `app.billing_events`,
+ * The ledger key -- `(provider, provider_event_id)` -- and nothing else. The verified payload is already in `app.billing_events`,
  * written by the claim in the transaction that later failed; a job carrying its own copy could
  * disagree with the row and there would be no way to say which was right.
  *
@@ -46,6 +46,9 @@ export type GenerateBatchInvoicesJobData = z.infer<typeof generateBatchInvoicesS
  */
 export const processBillingEventSchema = z.object({
   version: z.literal(1),
+  // Defaulted rather than required: jobs enqueued before ST-298 carry no provider, and every one of
+  // them is a Stripe event. Still version 1 because the shape only grew an optional field.
+  provider: z.enum(["stripe", "tap"]).default("stripe"),
   providerEventId: z.string().min(1),
 });
 

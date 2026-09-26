@@ -1,11 +1,12 @@
 import { CloudWatchClient } from "@aws-sdk/client-cloudwatch";
 import { JOB_NAMES } from "@studafy/constants";
+import { TapClient } from "@studafy/tap-payments";
 import postgres from "postgres";
 import Stripe from "stripe";
 
 import { workerLogger } from "../../log";
 
-import { processStripeBillingEvent } from "./billing-event.service";
+import { retryBillingEvent } from "./billing-event.service";
 import { COST_METRIC_NAMESPACE, runCostReport } from "./cost-report";
 import { runDunningSweep } from "./dunning-sweep";
 import { generateInvoice, generateBatchInvoices } from "./invoice.service";
@@ -18,6 +19,7 @@ import { runSeatReconciliation } from "./seat-reconciliation";
 import { runStorageQuotaReconciliation } from "./storage-quota-reconciliation";
 import { createStorageQuotaS3 } from "./storage-quota-s3";
 import { StripeSeatSubscriptionProvider } from "./stripe-seat-provider";
+import { runTapRenewals } from "./tap-renewal";
 
 import type {
   BillingJobData,
@@ -56,7 +58,7 @@ export async function processBillingJob(
     return processBatchInvoices(parsed.data, databaseUrl, job);
   }
 
-  // Stripe webhook retry (ST-132). Shares this queue because it is billing work and the queue is
+  // Payment-provider webhook retry (ST-132). Shares this queue because it is billing work and the queue is
   // named for what it carries, not for which provider it talks to; it shares nothing else with the
   // ERPNext invoice jobs above, which are untouched by it.
   if (job.name === JOB_NAMES.PROCESS_BILLING_EVENT) {
@@ -64,7 +66,7 @@ export async function processBillingJob(
     if (!parsed.success) {
       return { processed: false, reason: "invalid job data", errors: parsed.error.issues };
     }
-    return processStripeBillingEvent(parsed.data, databaseUrl, workerLogger);
+    return retryBillingEvent(parsed.data, databaseUrl, workerLogger);
   }
 
   // Daily grace-period sweep (ST-134). Carries no payload -- the scheduler registers it with no
@@ -73,6 +75,14 @@ export async function processBillingJob(
   // tenant transactions and each school commits on its own.
   if (job.name === JOB_NAMES.RUN_DUNNING) {
     return processDunningSweep(databaseUrl);
+  }
+
+  // Daily Tap renewals (ST-298). Same no-payload shape as the sweeps. A deployment with no Tap
+  // credentials has no Tap-billed subscriptions to renew, so an absent key is a logged skip -- but a
+  // key without a webhook URL is a thrown error, because a renewal nobody hears about never
+  // advances the period it paid for.
+  if (job.name === JOB_NAMES.RUN_TAP_RENEWALS) {
+    return processTapRenewals(databaseUrl);
   }
 
   // Nightly seat reconciliation (ST-136). Same shape as the dunning sweep: no payload, its own
@@ -102,6 +112,32 @@ export async function processBillingJob(
   }
 
   return { processed: false, reason: "unknown billing job" };
+}
+
+async function processTapRenewals(databaseUrl: string): Promise<unknown> {
+  const secretKey = process.env.TAP_SECRET_KEY;
+  const webhookUrl = process.env.TAP_WEBHOOK_URL;
+  if (!secretKey) {
+    workerLogger.info({}, "TAP_SECRET_KEY not set; no Tap renewals to run");
+    return { processed: false, reason: "tap not configured" };
+  }
+  if (!webhookUrl) {
+    throw new Error("TAP_WEBHOOK_URL is required to run Tap renewals");
+  }
+
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    return await runTapRenewals(
+      sql,
+      new TapClient({ secretKey }),
+      webhookUrl,
+      new Date(),
+      workerLogger,
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }
 
 async function processSeatReconciliation(databaseUrl: string): Promise<unknown> {

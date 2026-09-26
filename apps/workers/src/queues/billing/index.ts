@@ -2,10 +2,13 @@ export { processBillingJob } from "./worker";
 export type { StorageReconciliationOptions } from "./worker";
 export {
   billingDeadLetterListener,
-  deadLetterStripeBillingEvent,
-  processStripeBillingEvent,
+  deadLetterBillingEvent,
+  retryBillingEvent,
 } from "./billing-event.service";
 export { scheduleDunningJob, DUNNING_CRON_PATTERN } from "./dunning-scheduler";
+export { scheduleTapRenewalJob, TAP_RENEWAL_CRON_PATTERN } from "./tap-renewal-scheduler";
+export { runTapRenewals, TAP_RENEWAL_MAX_ATTEMPTS, TAP_RENEWAL_RETRY_DAYS } from "./tap-renewal";
+export type { TapRenewalCharger, TapRenewalResult } from "./tap-renewal";
 export { runDunningSweep } from "./dunning-sweep";
 export type { DunningSweepResult } from "./dunning-sweep";
 export {
