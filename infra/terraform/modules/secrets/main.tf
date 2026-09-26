@@ -28,9 +28,17 @@ resource "aws_secretsmanager_secret" "app" {
 # application secrets, only for the Postgres master credential — so Terraform remains the sole
 # source of truth. An operator updates a value by re-supplying TF_VAR_secrets_app_secret_values
 # and re-applying, not by calling `aws secretsmanager put-secret-value` out of band.
+#
+# var.app_secret_defaults is merged underneath, per service: a key an operator supplies wins, and a
+# key they leave out still exists (as the default). That is what lets a task definition reference an
+# optional secret key -- ECS refuses to start a task whose `valueFrom` names a JSON key the secret
+# does not hold, so an optional integration's key must always be present, empty when unused.
 resource "aws_secretsmanager_secret_version" "app" {
   for_each = var.services
 
-  secret_id     = aws_secretsmanager_secret.app[each.key].id
-  secret_string = jsonencode(lookup(var.app_secret_values, each.key, {}))
+  secret_id = aws_secretsmanager_secret.app[each.key].id
+  secret_string = jsonencode(merge(
+    lookup(var.app_secret_defaults, each.key, {}),
+    lookup(var.app_secret_values, each.key, {}),
+  ))
 }

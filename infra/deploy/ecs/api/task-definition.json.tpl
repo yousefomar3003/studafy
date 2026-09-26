@@ -38,7 +38,9 @@
         { "name": "DATABASE_USER", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_username::" },
         { "name": "DATABASE_PASSWORD", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_password::" },
         { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" },
-        { "name": "REDIS_URL", "valueFrom": "${REDIS_SECRET_ARN}:queue_url::" }
+        { "name": "REDIS_URL", "valueFrom": "${REDIS_SECRET_ARN}:queue_url::" },
+        { "name": "TAP_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:TAP_SECRET_KEY::" },
+        { "name": "TAP_WEBHOOK_URL", "valueFrom": "${API_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" }
       ],
       "healthCheck": {
         "command": [

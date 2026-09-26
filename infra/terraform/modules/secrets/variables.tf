@@ -36,6 +36,18 @@ variable "app_secret_values" {
   sensitive   = true
 }
 
+variable "app_secret_defaults" {
+  description = <<-EOT
+    Per-service keys that must always exist in the service's app-secrets JSON, with the value used
+    when var.app_secret_values does not supply one -- e.g. { api = { TAP_SECRET_KEY = "" } }. For
+    optional integrations whose task definitions reference the key unconditionally; the app treats
+    the empty default as "not configured". Merged per service underneath var.app_secret_values
+    (main.tf), so a supplied value always wins. Never put a real secret here: this is not sensitive.
+  EOT
+  type        = map(map(string))
+  default     = {}
+}
+
 variable "postgres_connection_secret_arn" {
   description = "ARN of module.postgres's connection secret (host/port/dbname/username/password/sslmode). Rotation is attached to this exact secret — see rotation.tf."
   type        = string
