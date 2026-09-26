@@ -5,7 +5,7 @@
  * rows, the version counters, and the atomicity that ties both to the status change. The consumer
  * side is covered by tests/entitlements/propagation.test.ts and the workers invalidator suite.
  *
- * Driven through `handleStripeWebhook` with the shared provider stub, so the whole real pipeline runs
+ * Driven through `handleBillingWebhook` with the shared provider stub, so the whole real pipeline runs
  * — claim, attribute, fold, apply, audit, bump, emit — inside one real transaction under real RLS.
  */
 
@@ -18,7 +18,7 @@ import postgres from "postgres";
 import { integrationEnabled } from "../../../../tests/harness";
 import { withSystemTx } from "../../../db/tenant-tx";
 import { publishEntitlementChange } from "../entitlements/entitlement-change-publisher";
-import { handleStripeWebhook } from "../stripe/webhook-processor";
+import { handleBillingWebhook } from "../webhooks/webhook-processor";
 
 import {
   createBillingDatabase,
@@ -56,8 +56,8 @@ async function setup(): Promise<BillingFixture> {
 
 async function deliver(fixture: BillingFixture, event: StubEventInput): Promise<void> {
   const provider = createProviderStub();
-  await handleStripeWebhook(
-    { database: fixture.db.sql, provider, logger: silentLogger },
+  await handleBillingWebhook(
+    { database: fixture.db.sql, providerName: "stripe", provider, logger: silentLogger },
     encodeEvent(event),
     "sig",
     { path: "/api/subscriptions/webhook/stripe" },
@@ -249,6 +249,7 @@ describe("entitlement events", () => {
           processBillingEvent(
             tx,
             {
+              provider: "stripe",
               id: "evt_ent_publish_fail",
               type: "customer.subscription.updated",
               effectiveAt: new Date(1_700_000_500 * 1000),

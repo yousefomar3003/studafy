@@ -64,7 +64,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /erpnext/webhooks",
   // Stripe billing webhook (ST-132). Global, pre-tenant surface authenticated by signature.
   // auditAction declares the mutation; the app.audit_logs rows are written from inside the
-  // processor's own transaction — see src/modules/subscriptions/stripe/webhook-processor.ts — so a
+  // processor's own transaction — see src/modules/subscriptions/webhooks/webhook-processor.ts — so a
   // status transition and its record commit or roll back together. Declared against `subscriptions`
   // although the same processor also writes `ai_subscriptions` rows via the school→AI cascade; the
   // service emits the action that actually occurred, as the submissions routes below already do.
@@ -76,6 +76,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // both do — is what puts a route in front of the gate. Bringing the rest into coverage means
   // renaming them and deciding an audit action for each, which is its own change.
   "POST /api/subscriptions/webhook/stripe",
+  // Tap billing webhook (ST-298). Same processor, same in-transaction audit rows as Stripe above;
+  // authenticated by the `hashstring` HMAC.
+  "POST /api/subscriptions/webhook/tap",
   // SES → SNS email-event webhook (deliverability R-08). Global, pre-tenant surface: auditAction
   // declares the intent, but no app.audit_logs row is written because the ledger insert into
   // app.email_events *is* the audit record — see src/email/webhook.ts.
@@ -268,6 +271,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // ST-121. auditAction("insert", "payment_cache") declares the intent; emitAuditLog writes the row
   // inside the forwarder's own transaction so it commits with the payment or not at all.
   "POST /api/finance/payments",
+  // Online fee collection (ST-298). auditAction("insert", "online_fee_payments") declares the
+  // intent; emitAuditLog writes the row inside startOnlineFeePayment's transaction.
+  "POST /api/finance/online-payments",
   // Batch invoice generation (ST-202). auditAction("insert", "invoice_batches") declares the
   // intent; emitAuditLog writes the row inside the batch-creation transaction in
   // finance/invoices/routes.ts.

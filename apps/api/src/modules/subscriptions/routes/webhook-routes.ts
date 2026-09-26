@@ -1,27 +1,29 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ERROR_CODES, JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
+import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 import { Queue } from "bullmq";
 import { z } from "zod";
 
-import { CodedHttpException } from "../../../coded-http-exception";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { extractClientIp } from "../../../middleware/rateLimiter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
-import { handleStripeWebhook } from "../stripe/webhook-processor";
+import { requirePaymentProvider } from "../payment-provider-routing";
+import { handleBillingWebhook } from "../webhooks/webhook-processor";
 
 import type { Database } from "../../../db";
 import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { RedisClient } from "../../../redis";
-import type { PaymentProviderPort } from "../ports/payment-provider";
-import type { BillingEventRetryEnqueuer } from "../stripe/webhook-processor";
+import type { PaymentProviderRegistry } from "../payment-provider-routing";
+import type { BillingEventRetryEnqueuer, FeePaymentSettler } from "../webhooks/webhook-processor";
+import type { BillingProvider } from "@studafy/billing";
+import type { Context } from "hono";
 
 /**
  * The response body is deliberately thin.
  *
- * Stripe reads the status code and nothing else, and the endpoint is unauthenticated -- so anything
+ * The provider reads the status code and nothing else, and the endpoint is unauthenticated -- so anything
  * richer would be a free oracle telling an unauthenticated caller whether a given event id had been
  * seen, or which school a customer maps to. `outcome` is safe because it describes what *this*
  * request did, and a caller who cannot forge a signature never gets one.
@@ -31,18 +33,7 @@ const WebhookResponseSchema = z.object({
   outcome: z.enum(["duplicate", "processed", "parked"]),
 });
 
-function requireProvider(provider: PaymentProviderPort | null): PaymentProviderPort {
-  if (!provider) {
-    throw new CodedHttpException(
-      503,
-      ERROR_CODES.STRIPE_NOT_CONFIGURED,
-      "Stripe billing is not configured for this deployment",
-    );
-  }
-  return provider;
-}
-
-const webhookRoute = createRoute({
+const stripeWebhookRoute = createRoute({
   method: "post",
   // Written as a literal, not a constant: the ST-065 CI gate (tests/audit-coverage.test.ts) reads
   // this file as text and matches `path: "/…"` against a string literal, so a constant here would
@@ -66,6 +57,44 @@ const webhookRoute = createRoute({
   ),
 });
 
+const tapWebhookRoute = createRoute({
+  method: "post",
+  // A literal for the same ST-065 gate reason as the Stripe route above.
+  path: "/api/subscriptions/webhook/tap",
+  tags: ["Subscriptions"],
+  operationId: "receiveTapWebhook",
+  summary: "Receive Tap Payments charge webhooks",
+  description:
+    "Ingests Tap charge status posts, normalizes them to the same billing events as Stripe, and " +
+    "applies the resulting subscription state transitions. Authenticated by the hashstring " +
+    "header (HMAC-SHA256 keyed with the Tap secret key); the charge is then re-read from Tap so " +
+    "fields the hash does not cover are never trusted from the body. Deduplicated on charge id " +
+    "and status, so a redelivery is a no-op. Unusable events are parked and still answer 200.",
+  security: [],
+  request: {},
+  responses: standardResponses(
+    { 200: { description: "Webhook accepted", schema: WebhookResponseSchema } },
+    [400, 503],
+  ),
+});
+
+/** The header each provider carries its signature in. */
+const SIGNATURE_HEADERS: Readonly<Record<BillingProvider, string>> = {
+  stripe: "stripe-signature",
+  tap: "hashstring",
+};
+
+/**
+ * The BullMQ job id for one event's retry chain.
+ *
+ * BullMQ rejects a custom id containing ':' unless it splits into exactly three parts ("Custom Id
+ * cannot contain :"), so the separator is '-' and any ':' inside the event id -- every Tap id has
+ * one -- is replaced too. The id only has to be stable per event; nothing parses it back.
+ */
+export function retryJobId(provider: BillingProvider, providerEventId: string): string {
+  return `${provider}-${providerEventId.replaceAll(":", "-")}`;
+}
+
 /**
  * Retry options for a transiently failed event.
  *
@@ -85,20 +114,22 @@ export interface WebhookRoutesOptions {
   redis?: RedisClient | null;
   /** Overrides the Redis-backed producer. Tests pass a spy; production leaves it unset. */
   enqueueRetry?: BillingEventRetryEnqueuer;
+  /** Settles one-time fee payments (ST-298). Wired by the app from the finance module. */
+  settleFeePayment?: FeePaymentSettler;
 }
 
 export function webhookRoutes(
   database: Database,
-  provider: PaymentProviderPort | null,
+  providers: PaymentProviderRegistry,
   logger: Logger,
   options: WebhookRoutesOptions = {},
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // Constructed once per app rather than per request: a Queue holds a Redis connection, and one per
-  // webhook delivery would exhaust the connection limit under Stripe's ordinary traffic. Null when
+  // webhook delivery would exhaust the connection limit under ordinary provider traffic. Null when
   // Redis is absent, in which case a transient failure is still recorded on the billing_events row
-  // (status 'failed') and picked up by Stripe's own redelivery — degraded, not silent.
+  // (status 'failed') and picked up by the provider's own redelivery — degraded, not silent.
   const retryQueue = options.redis
     ? new Queue(QUEUE_NAMES.BILLING, { connection: options.redis as never })
     : null;
@@ -106,41 +137,44 @@ export function webhookRoutes(
   const enqueueRetry: BillingEventRetryEnqueuer | undefined =
     options.enqueueRetry ??
     (retryQueue
-      ? async ({ providerEventId }) => {
+      ? async ({ provider, providerEventId }) => {
           await retryQueue.add(
             JOB_NAMES.PROCESS_BILLING_EVENT,
-            { version: 1, providerEventId },
+            { version: 1, provider, providerEventId },
             // The job id makes re-enqueueing the same event idempotent: BullMQ refuses a duplicate,
             // so a burst of redeliveries that all fail produces one retry chain, not one per
             // delivery.
-            { ...RETRY_JOB_OPTIONS, jobId: `stripe:${providerEventId}` },
+            { ...RETRY_JOB_OPTIONS, jobId: retryJobId(provider, providerEventId) },
           );
         }
       : undefined);
 
   // Declares the mutation for the ST-065 CI gate. The rows themselves are written by
-  // stripe/webhook-processor.ts from inside the transaction that changes the status, so a
+  // webhooks/webhook-processor.ts from inside the transaction that changes the status, so a
   // transition and its audit record commit or roll back together.
   routes.use("/api/subscriptions/webhook/stripe", auditAction("update", "subscriptions"));
+  routes.use("/api/subscriptions/webhook/tap", auditAction("update", "subscriptions"));
 
-  routes.openapi(webhookRoute, async (c) => {
-    const active = requireProvider(provider);
+  const receive = async (c: Context<AppEnv>, providerName: BillingProvider) => {
+    const { port } = requirePaymentProvider(providers, providerName);
 
-    // arrayBuffer(), never text(): the signature covers the exact bytes Stripe sent, and decoding to
-    // a string and re-encoding is not guaranteed to reproduce them. Hono caches the parsed body, so
-    // reading it here does not consume it for anyone downstream.
+    // arrayBuffer(), never text(): Stripe's signature covers the exact bytes it sent, and decoding
+    // to a string and re-encoding is not guaranteed to reproduce them. Hono caches the parsed body,
+    // so reading it here does not consume it for anyone downstream.
     const payload = Buffer.from(await c.req.arrayBuffer());
 
-    const result = await handleStripeWebhook(
+    const result = await handleBillingWebhook(
       {
         database,
-        provider: active,
+        providerName,
+        provider: port,
         logger,
         eventSink: options.eventSink,
         enqueueRetry,
+        settleFeePayment: options.settleFeePayment,
       },
       payload,
-      c.req.header("stripe-signature") ?? null,
+      c.req.header(SIGNATURE_HEADERS[providerName]) ?? null,
       {
         path: c.req.path,
         clientIp: extractClientIp(c),
@@ -150,7 +184,10 @@ export function webhookRoutes(
     );
 
     return c.json({ received: result.received, outcome: result.outcome } as const, 200);
-  });
+  };
+
+  routes.openapi(stripeWebhookRoute, (c) => receive(c, "stripe"));
+  routes.openapi(tapWebhookRoute, (c) => receive(c, "tap"));
 
   return routes;
 }

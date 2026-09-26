@@ -51,6 +51,8 @@ const STATUS_TITLES = new Map<number, string>([
   [422, "Unprocessable Content"],
   [429, "Too Many Requests"],
   [500, "Internal Server Error"],
+  [501, "Not Implemented"],
+  [502, "Bad Gateway"],
   [503, "Service Unavailable"],
 ]);
 

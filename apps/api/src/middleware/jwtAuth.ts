@@ -101,6 +101,7 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/lookups/countries",
   "/api/lookups/currencies",
   "/api/subscriptions/webhook/stripe",
+  "/api/subscriptions/webhook/tap",
   // Plan/price listing is pre-signup content (the marketing pricing page reads it anonymously) and
   // the query is not school-scoped — see getActivePlans in subscription-service.ts.
   "/api/subscriptions/plans",

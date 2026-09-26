@@ -12,19 +12,8 @@ import { reverseCancellation, scheduleCancellation } from "../services/cancellat
 
 import type { Database } from "../../../db";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { PaymentProviderPort } from "../ports/payment-provider";
+import type { PaymentProviderRegistry } from "../payment-provider-routing";
 import type { SchoolSubscription } from "../services/subscription-service";
-
-function requireProvider(provider: PaymentProviderPort | null): PaymentProviderPort {
-  if (!provider) {
-    throw new CodedHttpException(
-      503,
-      ERROR_CODES.STRIPE_NOT_CONFIGURED,
-      "Stripe billing is not configured for this deployment",
-    );
-  }
-  return provider;
-}
 
 const CancelRequestSchema = z.object({
   reason: z.string().max(1000).optional(),
@@ -110,7 +99,7 @@ const reverseCancelRoute = createRoute({
  */
 export function cancellationRoutes(
   database: Database,
-  provider: PaymentProviderPort | null,
+  providers: PaymentProviderRegistry,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>();
 
@@ -129,12 +118,11 @@ export function cancellationRoutes(
   routes.use("/api/subscriptions/current/cancel/reverse", auditAction("update", "subscriptions"));
 
   routes.openapi(cancelRoute, async (c) => {
-    const active = requireProvider(provider);
     const auth = requireAuth(c);
     const body = c.req.valid("json");
     const requestId = c.get("requestId");
 
-    const sub = await scheduleCancellation(database, active, {
+    const sub = await scheduleCancellation(database, providers, {
       schoolId: auth.schoolId,
       reason: body.reason,
       retentionOfferShown: body.retentionOfferShown,
@@ -145,11 +133,10 @@ export function cancellationRoutes(
   });
 
   routes.openapi(reverseCancelRoute, async (c) => {
-    const active = requireProvider(provider);
     const auth = requireAuth(c);
     const requestId = c.get("requestId");
 
-    const sub = await reverseCancellation(database, active, {
+    const sub = await reverseCancellation(database, providers, {
       schoolId: auth.schoolId,
       tenantContext: { schoolId: auth.schoolId, userId: auth.userId, requestId },
     });

@@ -15,10 +15,18 @@
  * @see db/migrations/000079_add_stripe_webhook_security_event.sql
  */
 
-import type { SecurityEventSink } from "../../lib/security/securityEventSink";
+import type { SecurityEventSink, SecurityEventType } from "../../lib/security/securityEventSink";
 import type { Logger } from "../../logger";
+import type { BillingProvider } from "@studafy/billing";
+
+const SIGNATURE_FAILURE_EVENT_TYPES: Readonly<Record<BillingProvider, SecurityEventType>> = {
+  stripe: "stripe_webhook_signature_invalid",
+  tap: "tap_webhook_signature_invalid",
+};
 
 export interface WebhookSignatureFailureEvent {
+  /** Whose signature failed -- a rotated Stripe secret and a rotated Tap key page different people. */
+  provider: BillingProvider;
   /** The request path that was rejected. */
   path: string;
   /** Why verification failed, as far as we can say without trusting the body. */
@@ -46,19 +54,21 @@ export function emitWebhookSignatureFailure(
   eventSink: SecurityEventSink | null | undefined,
   event: WebhookSignatureFailureEvent,
 ): void {
+  const eventType = SIGNATURE_FAILURE_EVENT_TYPES[event.provider];
+
   log?.error(
     {
-      event: "stripe_webhook_signature_invalid",
+      event: eventType,
       path: event.path,
       reason: event.reason,
       client_ip: event.clientIp,
       request_id: event.requestId,
     },
-    "stripe webhook signature verification failed",
+    `${event.provider} webhook signature verification failed`,
   );
 
   eventSink?.record({
-    eventType: "stripe_webhook_signature_invalid",
+    eventType,
     path: event.path,
     method: "POST",
     clientIp: event.clientIp,

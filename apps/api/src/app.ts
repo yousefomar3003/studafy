@@ -90,12 +90,14 @@ import {
   financeInvoiceRoutes,
   financeReportRoutes,
   installmentRoutes,
+  onlineFeePaymentRoutes,
   paymentRoutes,
   paymentWebhookRoutes,
   reconciliationRoutes,
   refundRoutes,
   refundWebhookRoutes,
   scholarshipDiscountRoutes,
+  settleOnlineFeePayment,
   TenantErpNextFactory,
 } from "./modules/finance";
 import {
@@ -245,6 +247,12 @@ export interface AppOptions {
    */
   stripeProvider?: PaymentProviderPort | null;
   /**
+   * Tap Payments billing adapter (ST-298), used for schools in Tap's MENA countries (see
+   * modules/subscriptions/payment-provider-routing.ts). Nullable on the same terms as
+   * `stripeProvider`: a Tap-region checkout or a Tap webhook answers 503 when it is absent.
+   */
+  tapProvider?: PaymentProviderPort | null;
+  /**
    * Mobile release floor / latest versions served at `GET /api/mobile/config` (ST-257).
    *
    * Threaded from this service's environment by src/index.ts (`resolveMobileReleaseConfig`), so
@@ -285,6 +293,7 @@ export function createApp({
   microsoftIdentityVerifier,
   storage = null,
   stripeProvider = null,
+  tapProvider = null,
   mobileReleaseConfig = EMPTY_MOBILE_RELEASE_CONFIG,
 }: AppOptions): OpenAPIHono<AppEnv> {
   const eventSink = securityEventSink ?? createNoopSecurityEventSink();
@@ -459,26 +468,36 @@ export function createApp({
     app.route("/", emailVerificationRoutes(database, logger, erpNextClient));
   }
 
+  // Both payment adapters, one slot per provider. Subscription checkout and online fee collection
+  // pick between them by the school's region (ST-298); each provider's webhook has its own path.
+  const paymentProviders = { stripe: stripeProvider, tap: tapProvider };
+
   // Finance gateway (ST-119). A pass-through to each school's ERPNext site: ERPNext owns fee
   // validation, currency rules and totals, and this only routes, crosswalks ids, and maintains the
   // read model. The Host header selects the tenant's Frappe site, so the client is built per
-  // school rather than shared. Idempotency on /api/finance/* is already wired above.
-  if (database) {
-    const erpnextFactory = new TenantErpNextFactory({
-      resolver: new EnvCredentialResolver({
-        baseUrl: process.env.ERPNEXT_API_URL,
-        apiKey: process.env.ERPNEXT_API_KEY,
-      }),
-      logger,
-      redis,
-    });
+  // school rather than shared. Idempotency on /api/finance/* is already wired above. Built outside
+  // the block below because the billing webhook also records settled online fee payments in ERPNext.
+  const erpnextFactory = database
+    ? new TenantErpNextFactory({
+        resolver: new EnvCredentialResolver({
+          baseUrl: process.env.ERPNEXT_API_URL,
+          apiKey: process.env.ERPNEXT_API_KEY,
+        }),
+        logger,
+        redis,
+      })
+    : null;
 
+  if (database && erpnextFactory) {
     app.route("/", feeStructureRoutes(database, erpnextFactory));
     app.route("/", financeInvoiceRoutes(database, redis ?? null));
     app.route("/", financeReportRoutes(database, erpnextFactory, redis ?? null, storage));
     app.route("/", familyFinancialViewRoutes(database, process.env.PAYMENT_REDIRECT_BASE_URL));
     app.route("/", expenseRoutes(database, erpnextFactory, storage));
     app.route("/", paymentRoutes(database, erpnextFactory));
+    // Online fee collection (ST-298): hosted payment for an outstanding invoice, settled by the
+    // provider webhook below and recorded in ERPNext through the payment forwarder above.
+    app.route("/", onlineFeePaymentRoutes(database, paymentProviders));
     app.route("/", scholarshipDiscountRoutes(database, erpnextFactory));
     app.route("/", refundRoutes(database, erpnextFactory));
     app.route("/", installmentRoutes(database, erpnextFactory));
@@ -911,19 +930,29 @@ export function createApp({
   // is stable; they answer 503 at request time when the provider is absent.
   if (database) {
     app.route("/", planRoutes(database));
-    app.route("/", checkoutRoutes(database, stripeProvider));
-    app.route("/", schoolCheckoutRoutes(database, stripeProvider));
-    app.route("/", aiCheckoutRoutes(database, stripeProvider));
+    app.route("/", checkoutRoutes(database, paymentProviders));
+    app.route("/", schoolCheckoutRoutes(database, paymentProviders));
+    app.route("/", aiCheckoutRoutes(database, paymentProviders));
     // The event sink is threaded in so a rejected webhook signature rides the same ST-082 alerting
     // path as a CSRF or rate-limit rejection, rather than a second one invented for billing.
-    app.route("/", webhookRoutes(database, stripeProvider, logger, { eventSink, redis }));
+    app.route(
+      "/",
+      webhookRoutes(database, paymentProviders, logger, {
+        eventSink,
+        redis,
+        settleFeePayment: erpnextFactory
+          ? (provider, event) =>
+              settleOnlineFeePayment(database, erpnextFactory, logger, provider, event)
+          : undefined,
+      }),
+    );
     app.route("/", adminSubscriptionRoutes(database, stripeProvider, logger));
     // School billing portal (ST-137): current plan/seats/cancellation overview, invoices read
     // through to the provider, and end-of-period cancellation. The payment-method portal session
     // link already exists at POST /api/subscriptions/portal (checkoutRoutes above).
     app.route("/", billingOverviewRoutes(database));
-    app.route("/", invoiceRoutes(database, stripeProvider));
-    app.route("/", cancellationRoutes(database, stripeProvider));
+    app.route("/", invoiceRoutes(database, paymentProviders));
+    app.route("/", cancellationRoutes(database, paymentProviders));
   }
 
   // AI entitlement & quota gate (ST-155). Mounted only when both a database (to resolve

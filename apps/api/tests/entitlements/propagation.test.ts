@@ -29,8 +29,8 @@ import {
   invalidateEntitlementEntry,
 } from "../../src/modules/subscriptions/entitlements/cache";
 import { createEntitlementService } from "../../src/modules/subscriptions/entitlements/service";
-import { handleStripeWebhook } from "../../src/modules/subscriptions/stripe/webhook-processor";
 import { startEntitlementInvalidationSubscriber } from "../../src/modules/subscriptions/subscribers/entitlement-invalidation.subscriber";
+import { handleBillingWebhook } from "../../src/modules/subscriptions/webhooks/webhook-processor";
 import { createRedisClient } from "../../src/redis";
 import { createTestDatabase, integrationEnabled, migrateDatabase } from "../harness";
 
@@ -89,8 +89,13 @@ async function pollUntil<T>(
 }
 
 async function deliverCancellation(fixture: BillingFixture, eventId: string): Promise<void> {
-  await handleStripeWebhook(
-    { database: fixture.db.sql, provider: createProviderStub(), logger: silentLogger },
+  await handleBillingWebhook(
+    {
+      database: fixture.db.sql,
+      providerName: "stripe",
+      provider: createProviderStub(),
+      logger: silentLogger,
+    },
     encodeEvent({
       id: eventId,
       type: "customer.subscription.deleted",

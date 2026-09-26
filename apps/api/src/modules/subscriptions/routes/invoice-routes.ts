@@ -11,18 +11,7 @@ import { listSchoolInvoices } from "../services/invoice-service";
 
 import type { Database } from "../../../db";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { PaymentProviderPort } from "../ports/payment-provider";
-
-function requireProvider(provider: PaymentProviderPort | null): PaymentProviderPort {
-  if (!provider) {
-    throw new CodedHttpException(
-      503,
-      ERROR_CODES.STRIPE_NOT_CONFIGURED,
-      "Stripe billing is not configured for this deployment",
-    );
-  }
-  return provider;
-}
+import type { PaymentProviderRegistry } from "../payment-provider-routing";
 
 const InvoiceSchema = z.object({
   id: z.string(),
@@ -62,13 +51,13 @@ const listInvoicesRoute = createRoute({
   },
   responses: standardResponses(
     { 200: { description: "Invoice page.", schema: InvoiceListResponseSchema } },
-    [401, 403, 404, 429, 500, 503],
+    [401, 403, 404, 429, 500, 502, 503],
   ),
 });
 
 export function invoiceRoutes(
   database: Database,
-  provider: PaymentProviderPort | null,
+  providers: PaymentProviderRegistry,
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
   const basePath = "/api/subscriptions/current/invoices";
@@ -77,12 +66,11 @@ export function invoiceRoutes(
   app.use(basePath, requirePermission(PERMISSIONS.ORGANIZATION_MANAGE_BILLING));
 
   app.openapi(listInvoicesRoute, async (c) => {
-    const active = requireProvider(provider);
     const auth = requireAuth(c);
     const requestId = c.get("requestId");
     const { limit, startingAfter } = c.req.valid("query");
 
-    const result = await listSchoolInvoices(database, active, {
+    const result = await listSchoolInvoices(database, providers, {
       schoolId: auth.schoolId,
       limit,
       startingAfter,

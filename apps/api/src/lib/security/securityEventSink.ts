@@ -28,7 +28,8 @@ export type SecurityEventType =
   | "cors_origin_rejected"
   | "auth_rate_limit_block"
   | "auth_token_reuse_detected"
-  | "stripe_webhook_signature_invalid";
+  | "stripe_webhook_signature_invalid"
+  | "tap_webhook_signature_invalid";
 
 /** One boundary rejection, as the middleware observed it. */
 export interface SecurityEvent {

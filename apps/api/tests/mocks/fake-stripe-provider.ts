@@ -7,6 +7,8 @@ import type {
   CreateCheckoutSessionResult,
   CreateCustomerInput,
   CreateCustomerResult,
+  CreatePaymentSessionInput,
+  CreatePaymentSessionResult,
   ListInvoicesInput,
   ListInvoicesResult,
   LookupPriceResult,
@@ -48,6 +50,10 @@ export class FakeStripeProvider implements PaymentProviderPort {
   >();
   readonly products = new Map<string, SyncProductInput & { id: string }>();
   readonly prices = new Map<string, SyncPriceInput & { id: string }>();
+  readonly paymentSessions = new Map<
+    string,
+    CreatePaymentSessionInput & { id: string; url: string }
+  >();
 
   async createCustomer(input: CreateCustomerInput): Promise<CreateCustomerResult> {
     const id = `cus_fake_${randomUUID()}`;
@@ -68,6 +74,15 @@ export class FakeStripeProvider implements PaymentProviderPort {
     // the journey catalog) — this URL is never treated as proof of payment on its own.
     const url = `${input.successUrl}${input.successUrl.includes("?") ? "&" : "?"}session_id=${id}`;
     this.checkoutSessions.set(id, { ...input, id, url });
+    return { url, sessionId: id };
+  }
+
+  async createPaymentSession(
+    input: CreatePaymentSessionInput,
+  ): Promise<CreatePaymentSessionResult> {
+    const id = `cs_fake_${randomUUID()}`;
+    const url = `${input.successUrl}${input.successUrl.includes("?") ? "&" : "?"}session_id=${id}`;
+    this.paymentSessions.set(id, { ...input, id, url });
     return { url, sessionId: id };
   }
 

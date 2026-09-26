@@ -1,13 +1,13 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
+import { PERMISSIONS } from "@studafy/constants";
 import { z } from "zod";
 
-import { CodedHttpException } from "../../../coded-http-exception";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import { requirePaymentProvider } from "../payment-provider-routing";
 import {
   createSchoolCheckoutSession,
   createBillingPortalSession,
@@ -15,18 +15,7 @@ import {
 
 import type { Database } from "../../../db";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { PaymentProviderPort } from "../ports/payment-provider";
-
-function requireProvider(provider: PaymentProviderPort | null): PaymentProviderPort {
-  if (!provider) {
-    throw new CodedHttpException(
-      503,
-      ERROR_CODES.STRIPE_NOT_CONFIGURED,
-      "Stripe billing is not configured for this deployment",
-    );
-  }
-  return provider;
-}
+import type { PaymentProviderRegistry } from "../payment-provider-routing";
 
 const CheckoutRequestSchema = z.object({
   priceId: z.string().uuid(),
@@ -63,7 +52,7 @@ const checkoutRoute = createRoute({
     {
       200: { description: "Checkout session created", schema: CheckoutResponseSchema },
     },
-    [400, 401, 403, 404, 503],
+    [400, 401, 403, 404, 502, 503],
   ),
 });
 
@@ -90,7 +79,7 @@ const portalRoute = createRoute({
 
 export function checkoutRoutes(
   database: Database,
-  provider: PaymentProviderPort | null,
+  providers: PaymentProviderRegistry,
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 
@@ -100,12 +89,11 @@ export function checkoutRoutes(
   app.use("/api/subscriptions/portal", requirePermission(PERMISSIONS.ORGANIZATION_MANAGE_BILLING));
 
   app.openapi(checkoutRoute, async (c) => {
-    const active = requireProvider(provider);
     const auth = requireAuth(c);
     const body = c.req.valid("json");
     const requestId = c.get("requestId");
 
-    const result = await createSchoolCheckoutSession(database, active, {
+    const result = await createSchoolCheckoutSession(database, providers, {
       schoolId: auth.schoolId,
       priceId: body.priceId,
       successUrl: body.successUrl,
@@ -117,7 +105,8 @@ export function checkoutRoutes(
   });
 
   app.openapi(portalRoute, async (c) => {
-    const active = requireProvider(provider);
+    // Stripe only: Tap has no customer billing portal.
+    const { port: active } = requirePaymentProvider(providers, "stripe");
     const auth = requireAuth(c);
     const body = c.req.valid("json");
     const requestId = c.get("requestId");

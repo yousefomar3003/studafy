@@ -9,13 +9,23 @@ export { invoiceRoutes } from "./routes/invoice-routes";
 export { cancellationRoutes } from "./routes/cancellation-routes";
 export { StripeAdapter } from "./stripe/adapter";
 export type { StripeAdapterOptions } from "./stripe/adapter";
-export { handleStripeWebhook } from "./stripe/webhook-processor";
+export { TapAdapter } from "./tap/adapter";
+export type { TapAdapterOptions } from "./tap/adapter";
+export {
+  requirePaymentProvider,
+  resolveProviderForCountry,
+  selectPaymentProvider,
+  selectPaymentProviderForSchool,
+  TAP_COUNTRY_CODES,
+} from "./payment-provider-routing";
+export type { PaymentProviderRegistry, SelectedPaymentProvider } from "./payment-provider-routing";
+export { handleBillingWebhook } from "./webhooks/webhook-processor";
 export type {
   BillingEventRetryEnqueuer,
   WebhookOutcome,
   WebhookProcessorDeps,
   WebhookRequestContext,
-} from "./stripe/webhook-processor";
+} from "./webhooks/webhook-processor";
 export { emitWebhookSignatureFailure } from "./billing-anomaly-events";
 // The state machine, the fold and the transition tables live in @studafy/billing: apps/workers
 // re-applies the same events on a retry and the two processes must not be able to disagree about

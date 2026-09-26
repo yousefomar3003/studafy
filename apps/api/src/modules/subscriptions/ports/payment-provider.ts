@@ -1,10 +1,20 @@
-export class PaymentProviderError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly code: string,
-    message: string,
-  ) {
-    super(message);
+import { CodedHttpException } from "../../../coded-http-exception";
+
+import type { ErrorCode } from "@studafy/constants";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+
+/**
+ * A failure an adapter reports through the port.
+ *
+ * A coded HTTP exception, so the error handler answers it with its own status and code: a 400 for
+ * input the provider cannot take, a 501 for an operation the provider has no equivalent for, a 502
+ * when the provider itself failed. Adapters map provider-side failures to 502 rather than passing
+ * the provider's status through -- the provider answering 401 means our key is wrong, not the
+ * caller's session.
+ */
+export class PaymentProviderError extends CodedHttpException {
+  constructor(status: ContentfulStatusCode, code: ErrorCode, message: string) {
+    super(status, code, message);
     this.name = "PaymentProviderError";
   }
 }
@@ -21,7 +31,17 @@ export interface CreateCustomerResult {
 
 export interface CreateCheckoutSessionInput {
   customerId: string;
+  /** The provider's price id (Stripe), or `app.plan_prices.id` for a provider with no catalog (Tap). */
   priceId: string;
+  /**
+   * The unit price in minor units and its ISO 4217 code, as `app.plan_prices` records them.
+   *
+   * Required because Tap has no price catalog: a Tap charge carries its amount, so without these it
+   * cannot be created at all. Stripe charges the catalog price behind `priceId`, which price sync
+   * created from these same columns, and does not read them.
+   */
+  amountMinor: number;
+  currency: string;
   quantity?: number;
   successUrl: string;
   cancelUrl: string;
@@ -29,6 +49,28 @@ export interface CreateCheckoutSessionInput {
 }
 
 export interface CreateCheckoutSessionResult {
+  url: string;
+  sessionId: string;
+}
+
+/**
+ * A one-time hosted payment, not a subscription: online fee collection (ST-298).
+ *
+ * The amount is charged exactly as given. `metadata` must identify the local payment record so the
+ * provider's webhook can settle it; nothing in it may be a subscription `billing_reason`, or the
+ * billing state machine would read a fee as a subscription payment.
+ */
+export interface CreatePaymentSessionInput {
+  customerId: string;
+  amountMinor: number;
+  currency: string;
+  description: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}
+
+export interface CreatePaymentSessionResult {
   url: string;
   sessionId: string;
 }
@@ -146,6 +188,8 @@ export interface ListInvoicesResult {
 export interface PaymentProviderPort {
   createCustomer(input: CreateCustomerInput): Promise<CreateCustomerResult>;
   createCheckoutSession(input: CreateCheckoutSessionInput): Promise<CreateCheckoutSessionResult>;
+  /** A one-time hosted payment (fees). See `CreatePaymentSessionInput`. */
+  createPaymentSession(input: CreatePaymentSessionInput): Promise<CreatePaymentSessionResult>;
   createBillingPortalSession(
     input: CreateBillingPortalSessionInput,
   ): Promise<CreateBillingPortalSessionResult>;
