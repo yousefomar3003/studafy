@@ -46,6 +46,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /erpnext/webhooks",
   "POST /email/webhooks/sns",
   "POST /api/subscriptions/webhook/stripe",
+  "POST /api/subscriptions/webhook/tap",
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
   "DELETE /api/auth/sessions/{sessionId}",
@@ -206,6 +207,8 @@ const EXPECTED_MUTATING_ROUTES = [
   // ST-121. Guarded by billing:update. The payment-confirmed webhook is not listed here because it
   // carries no requirePermission — it authenticates by HMAC over the raw body, not by a bearer token.
   "POST /api/finance/payments",
+  // ST-298. Online fee collection; authorized in the service (linked parent or billing:update).
+  "POST /api/finance/online-payments",
   // ST-202. GET and POST /api/finance/invoices/batches share one path with different required
   // permissions per verb, so each handler asserts its own via requirePermissionIn() rather than a
   // path-mounted requirePermission() (see finance/invoices/routes.ts).
@@ -351,6 +354,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // request body, not by a bearer token. Stripe holds no Studafy identity and no permission could
   // be checked against one, so this is the same exemption the two webhooks above take.
   "POST /api/subscriptions/webhook/stripe",
+  // Tap billing webhook (ST-298) — the same exemption: authenticated by the `hashstring` HMAC
+  // keyed with the Tap secret key, and Tap holds no Studafy identity to check a permission against.
+  "POST /api/subscriptions/webhook/tap",
   // Daily reconciliation (ST-122) — API-key-authenticated, not bearer; no JWT to check.
   "POST /api/finance/reconciliation/run",
   // Account activation (ST-078) — public self-service onboarding. Authorized by the invitation
@@ -448,6 +454,11 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // caller still cannot reach a class's upload without holding that class's permission.
   "POST /api/storage/uploads/request-upload",
   "POST /api/storage/uploads/confirm",
+  // Online fee collection (ST-298) — authorized in startOnlineFeePayment: the caller must be a
+  // parent linked to the named student (app.parent_child_links) or hold billing:update. "Parent of
+  // this student" depends on the request body, so no route-time permission can express it; a
+  // path-mounted billing:update would lock out exactly the parents the endpoint exists for.
+  "POST /api/finance/online-payments",
   // Hybrid retrieval (ST-162) — the ST-155 AI entitlement gate (school active -> AI add-on active ->
   // quota available; 403/402/429), not the permission matrix, is the authorization surface for every
   // /api/ai/* route. The search reads only the school's own corpus under forced RLS, and its one
