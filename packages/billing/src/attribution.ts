@@ -18,6 +18,7 @@
 
 import { extractStudentIdHint, extractSubscriptionId } from "./event-mapping";
 
+import type { BillingProvider } from "./billing-event-store";
 import type { SubscriptionKind } from "./state-machine";
 import type { SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -59,13 +60,12 @@ export interface AttributionTarget {
  */
 export async function resolveSchoolId(
   tx: TransactionSql,
+  provider: BillingProvider,
   customerId: string | null,
   schoolIdHint: string | null,
 ): Promise<string | null> {
   if (customerId) {
-    const rows = await tx<{ id: string }[]>`
-      SELECT id FROM app.schools WHERE stripe_customer_id = ${customerId} LIMIT 1
-    `;
+    const rows = await findSchoolByCustomerId(tx, provider, customerId);
     if (rows.length > 0) return rows[0]!.id;
   }
 
@@ -81,6 +81,26 @@ export async function resolveSchoolId(
   }
 
   return null;
+}
+
+/**
+ * Each provider's customer id lives in its own column, so a Tap `cus_...` can never match a Stripe
+ * `cus_...` that happens to share the string. Two literal statements rather than one with an
+ * interpolated column name: identifiers are not parameters, and the SQL-safety lint rightly refuses
+ * to let one be built from a string.
+ */
+async function findSchoolByCustomerId(
+  tx: TransactionSql,
+  provider: BillingProvider,
+  customerId: string,
+): Promise<readonly { id: string }[]> {
+  return provider === "tap"
+    ? tx<{ id: string }[]>`
+        SELECT id FROM app.schools WHERE tap_customer_id = ${customerId} LIMIT 1
+      `
+    : tx<{ id: string }[]>`
+        SELECT id FROM app.schools WHERE stripe_customer_id = ${customerId} LIMIT 1
+      `;
 }
 
 /**

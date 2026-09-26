@@ -18,7 +18,14 @@ export function truncateError(value: string): string {
     : `${value.slice(0, MAX_LAST_ERROR_LENGTH - 1)}…`;
 }
 
+/**
+ * The payment providers whose events share this ledger, as written to `app.billing_events.provider`.
+ * `(provider, provider_event_id)` is the idempotency key, so two providers cannot collide on an id.
+ */
+export type BillingProvider = "stripe" | "tap";
+
 export interface ClaimInput {
+  provider: BillingProvider;
   providerEventId: string;
   eventType: string;
   effectiveAt: Date;
@@ -52,7 +59,7 @@ export async function claimEvent(tx: TransactionSql, input: ClaimInput): Promise
     INSERT INTO app.billing_events (
       provider, provider_event_id, event_type, effective_at, payload, status, attempt_count
     ) VALUES (
-      'stripe',
+      ${input.provider},
       ${input.providerEventId},
       ${input.eventType},
       ${input.effectiveAt},
@@ -125,6 +132,7 @@ export async function markDeadLettered(
  */
 export async function markFailed(
   tx: TransactionSql,
+  provider: BillingProvider,
   providerEventId: string,
   reason: string,
 ): Promise<void> {
@@ -134,7 +142,7 @@ export async function markFailed(
         last_error = ${truncateError(reason)},
         attempt_count = attempt_count + 1,
         updated_at = CURRENT_TIMESTAMP
-    WHERE provider = 'stripe' AND provider_event_id = ${providerEventId}
+    WHERE provider = ${provider} AND provider_event_id = ${providerEventId}
   `;
 }
 
