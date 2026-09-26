@@ -112,10 +112,10 @@ async function seedImport(
     await tx`
       INSERT INTO app.student_imports (
         school_id, uploaded_by, status, file_name, row_count, valid_rows, error_rows,
-        rows_data, errors, created_at, updated_at
+        errors, created_at, updated_at
       ) VALUES (
         ${schoolId}::uuid, ${userId}::uuid, ${status}::app.import_status, 'students.csv',
-        1, 1, 0, '[]'::jsonb, '[]'::jsonb, ${createdAt}, ${createdAt}
+        1, 1, 0, '[]'::jsonb, ${createdAt}, ${createdAt}
       )
     `;
   });

@@ -1,333 +1,469 @@
+/**
+ * Staging-to-target migration for confirmed student imports (ST-097, ST-299).
+ *
+ * The API stages every CSV line in app.student_import_rows, mapped and validated. This job moves the
+ * valid ones into app.users / app.students / app.parent_child_links.
+ *
+ * Atomic: the whole import is one transaction. The plan, every write, every audit row and the
+ * `completed` status commit together or not at all, so a failure part-way leaves no half-imported
+ * school behind. The import is marked `failed` in a separate transaction afterwards.
+ *
+ * Idempotent on retry: nothing is written outside that transaction, and the plan is recomputed from
+ * live data each attempt (never from an earlier dry run). A retry after a failure therefore starts
+ * clean; a retry after success sees `completed` under the row lock and returns the stored summary.
+ *
+ * Runs as a system tenant transaction (studafy_admin, tenant isolation still armed). It must: the
+ * restrictive role_scope_visibility policy on app.students is granted to studafy_app and resolves
+ * the acting user, so an unattended studafy_app transaction can neither see students nor INSERT ...
+ * RETURNING one. `app.user_id` is still set to whoever confirmed the import, so each audit row names
+ * the admin who asked for the change.
+ */
+
+import { normalizeEmail, planStudentImport } from "@studafy/student-import";
 import postgres from "postgres";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import { emitAuditLogs } from "../../db/audit";
+import { withSystemTenantTx } from "../../db/tenant-tx";
 
-interface ImportRow {
-  admission_number: string;
-  email: string;
-  first_name: string;
-  middle_name: string | null;
-  last_name: string;
-  preferred_name: string | null;
-  date_of_birth: string | null;
-  status: string;
-  parent_email: string | null;
-  parent_relationship: string | null;
-}
+import type { WorkerAuditEntry } from "../../db/audit";
+import type {
+  PlannedRow,
+  StagedRecord,
+  StudentImportPlan,
+  StudentImportRecord,
+} from "@studafy/student-import";
+import type { Sql, TransactionSql } from "postgres";
 
-interface ImportSummary {
-  students_created: number;
-  students_skipped: number;
-  parents_created: number;
-  parents_linked: number;
-}
-
-interface ImportJobData {
+export interface StudentImportJobData {
   importId: string;
   schoolId: string;
 }
 
-const BATCH_SIZE = 100;
+export interface StudentImportSummary {
+  students_created: number;
+  students_updated: number;
+  /** Rows not written: already up to date, or in conflict. */
+  students_skipped: number;
+  conflicts: number;
+  parents_created: number;
+  /** Parent-student links created. */
+  parents_linked: number;
+}
 
-// ---------------------------------------------------------------------------
-// Processor
-// ---------------------------------------------------------------------------
+/** Statuses a migration may start from. `processing` is a previous attempt that died mid-run; its
+ * transaction rolled back, so it is as safe to resume as `failed`. */
+const MIGRATABLE_STATUSES = ["confirmed", "processing", "failed"];
 
-/**
- * Process a confirmed student import job.
- *
- * Called by the BullMQ IMPORTS worker. Reads rows from student_imports.rows_data,
- * creates users + students + parent links in batches, and writes the summary back.
- *
- * Idempotency: existing emails and admission numbers are skipped (not errored),
- * so re-running a completed import is a safe no-op.
- */
 export async function processStudentImport(
-  data: ImportJobData,
+  data: StudentImportJobData,
   databaseUrl: string,
-): Promise<ImportSummary> {
-  const sql = postgres(databaseUrl, { max: 4, idle_timeout: 20, prepare: false });
-
+): Promise<StudentImportSummary> {
+  const sql = postgres(databaseUrl, { max: 2, idle_timeout: 20, prepare: false });
   try {
-    // Mark as processing.
-    await sql`
-      UPDATE app.student_imports
-      SET status = 'processing'::app.import_status, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${data.importId}::uuid AND school_id = ${data.schoolId}
-    `;
-
-    // Fetch the rows data.
-    const [importRow] = await sql<{ rows_data: ImportRow[] }[]>`
-      SELECT rows_data FROM app.student_imports
-      WHERE id = ${data.importId}::uuid AND school_id = ${data.schoolId}
-    `;
-
-    if (!importRow) {
-      throw new Error(`Import ${data.importId} not found`);
-    }
-
-    const rows = importRow.rows_data;
-    const summary: ImportSummary = {
-      students_created: 0,
-      students_skipped: 0,
-      parents_created: 0,
-      parents_linked: 0,
-    };
-
-    // Process in batches within separate transactions.
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE);
-      await processBatch(sql, data.schoolId, batch, summary);
-    }
-
-    // Write summary and mark completed.
-    await sql`
-      UPDATE app.student_imports
-      SET status = 'completed'::app.import_status,
-          summary = ${JSON.stringify(summary)}::jsonb,
-          completed_at = CURRENT_TIMESTAMP,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${data.importId}::uuid AND school_id = ${data.schoolId}
-    `;
-
-    return summary;
-  } catch (error) {
-    // Mark as failed.
-    await sql`
-      UPDATE app.student_imports
-      SET status = 'failed'::app.import_status, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${data.importId}::uuid AND school_id = ${data.schoolId}
-    `.catch(() => {
-      // Best-effort status update on failure; ignore errors from the status write itself.
-    });
-
-    throw error;
+    return await migrateStagedImport(sql, data);
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
 
-// ---------------------------------------------------------------------------
-// Batch processing
-// ---------------------------------------------------------------------------
+export async function migrateStagedImport(
+  sql: Sql,
+  { importId, schoolId }: StudentImportJobData,
+): Promise<StudentImportSummary> {
+  // Visible progress for the import page's poll. Committed on its own, ahead of the migration.
+  await withSystemTenantTx(sql, { schoolId }, (tx) =>
+    setStatus(tx, importId, "processing", ["confirmed", "failed"]),
+  );
 
-async function processBatch(
-  sql: postgres.Sql,
-  schoolId: string,
-  rows: ImportRow[],
-  summary: ImportSummary,
-): Promise<void> {
-  await sql.begin(async (tx) => {
-    await tx`
-      SELECT set_config('role', 'studafy_app', true),
-             set_config('app.school_id', ${schoolId}, true)
-    `;
-
-    for (const row of rows) {
-      await processRow(tx, schoolId, row, summary);
-    }
-  });
+  try {
+    return await withSystemTenantTx(sql, { schoolId }, (tx) => migrate(tx, schoolId, importId));
+  } catch (error) {
+    await withSystemTenantTx(sql, { schoolId }, (tx) =>
+      setStatus(tx, importId, "failed", ["processing"]),
+    ).catch(() => {
+      // Best effort: the job's own failure is the error worth surfacing, not this one.
+    });
+    throw error;
+  }
 }
 
-async function processRow(
-  tx: postgres.TransactionSql,
+async function migrate(
+  tx: TransactionSql,
   schoolId: string,
-  row: ImportRow,
-  summary: ImportSummary,
+  importId: string,
+): Promise<StudentImportSummary> {
+  // The row lock serializes attempts at this import: a second worker waits here, then sees the
+  // first one's `completed`.
+  const [target] = await tx<
+    { status: string; summary: StudentImportSummary | null; confirmed_by: string | null }[]
+  >`
+    SELECT status, summary, confirmed_by
+    FROM app.student_imports
+    WHERE id = ${importId}::uuid AND school_id = ${schoolId}::uuid
+    FOR UPDATE
+  `;
+  if (!target) throw new Error(`Import ${importId} not found`);
+  if (target.status === "completed" && target.summary) return target.summary;
+  if (!MIGRATABLE_STATUSES.includes(target.status)) {
+    throw new Error(`Import ${importId} is ${target.status}, not confirmed`);
+  }
+
+  // Serializes imports within a school, so two imports never plan against each other's
+  // uncommitted rows and then collide on a unique key.
+  await tx`SELECT pg_advisory_xact_lock(hashtextextended(${`student-import:${schoolId}`}, 0))`;
+  if (target.confirmed_by) {
+    await tx`SELECT set_config('app.user_id', ${target.confirmed_by}, true)`;
+  }
+
+  const staged = await tx<{ line_number: number; record: StudentImportRecord }[]>`
+    SELECT line_number, record
+    FROM app.student_import_rows
+    WHERE school_id = ${schoolId}::uuid AND import_id = ${importId}::uuid AND record IS NOT NULL
+    ORDER BY line_number
+  `;
+  // Rows staged before ST-299 (backfilled from rows_data) have no parent_name key.
+  const records: StagedRecord[] = staged.map((row) => ({
+    line_number: row.line_number,
+    record: { ...row.record, parent_name: row.record.parent_name ?? null },
+  }));
+
+  const plan = await planStudentImport(tx, schoolId, records);
+  const { summary, audit } = await applyPlan(tx, schoolId, importId, plan);
+
+  await tx`
+    UPDATE app.student_imports
+    SET status = 'completed'::app.import_status,
+        summary = ${tx.json({ ...summary })}::jsonb,
+        completed_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${importId}::uuid AND school_id = ${schoolId}::uuid
+  `;
+  audit.push({
+    action: "update",
+    targetTable: "student_imports",
+    targetId: importId,
+    oldValues: { status: target.status },
+    newValues: { status: "completed", summary },
+  });
+  await emitAuditLogs(tx, audit);
+
+  return summary;
+}
+
+async function setStatus(
+  tx: TransactionSql,
+  importId: string,
+  status: "processing" | "failed",
+  from: string[],
 ): Promise<void> {
-  const normalizedEmail = row.email.toLowerCase().trim();
-  const normalizedAdmission = row.admission_number.toLowerCase().trim();
-
-  // Check if student already exists (idempotency).
-  const [existingStudent] = await tx<{ id: string }[]>`
-    SELECT id FROM app.students
-    WHERE school_id = ${schoolId}
-      AND normalized_admission_number = ${normalizedAdmission}
-    LIMIT 1
+  await tx`
+    UPDATE app.student_imports
+    SET status = ${status}::app.import_status, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${importId}::uuid
+      AND school_id = current_setting('app.school_id')::uuid
+      AND status::text = ANY(${tx.array(from)}::text[])
   `;
+}
 
-  if (existingStudent) {
-    summary.students_skipped++;
-    // Still try to link parent if needed.
-    if (row.parent_email && row.parent_relationship) {
-      await linkParentByEmail(
-        tx,
-        schoolId,
-        existingStudent.id,
-        row.parent_email,
-        row.parent_relationship,
-        summary,
-      );
+// ---------------------------------------------------------------------------
+// Applying the plan
+// ---------------------------------------------------------------------------
+
+interface ApplyContext {
+  tx: TransactionSql;
+  schoolId: string;
+  importId: string;
+  audit: WorkerAuditEntry[];
+  /** Parent accounts created earlier in this run, by normalized email. */
+  parentsByEmail: Map<string, string>;
+  /** Each parent's household, once looked up or created in this run. */
+  familiesByParent: Map<string, string>;
+}
+
+async function applyPlan(
+  tx: TransactionSql,
+  schoolId: string,
+  importId: string,
+  plan: StudentImportPlan,
+): Promise<{ summary: StudentImportSummary; audit: WorkerAuditEntry[] }> {
+  const ctx: ApplyContext = {
+    tx,
+    schoolId,
+    importId,
+    audit: [],
+    parentsByEmail: new Map(),
+    familiesByParent: new Map(),
+  };
+  const summary: StudentImportSummary = {
+    students_created: 0,
+    students_updated: 0,
+    students_skipped: 0,
+    conflicts: 0,
+    parents_created: 0,
+    parents_linked: 0,
+  };
+
+  for (const row of plan.rows) {
+    if (row.action === "conflict" || row.action === "unchanged") {
+      summary.students_skipped++;
+      if (row.action === "conflict") summary.conflicts++;
+      continue;
     }
-    return;
+
+    let studentId: string;
+    if (row.action === "create") {
+      studentId = await createStudent(ctx, row);
+      summary.students_created++;
+    } else {
+      studentId = row.student_id!;
+      await updateStudent(ctx, studentId, row);
+      summary.students_updated++;
+    }
+
+    if (row.link === "create" || row.link === "update") {
+      const { parentUserId, created } = await resolveParent(ctx, row);
+      if (created) summary.parents_created++;
+      if (row.link === "create") {
+        await createLink(ctx, parentUserId, studentId, row.record);
+        summary.parents_linked++;
+      } else {
+        await updateLinkRelationship(ctx, parentUserId, studentId, row.record);
+      }
+    }
   }
 
-  // Check if user with this email already exists.
-  const [existingUser] = await tx<{ id: string }[]>`
-    SELECT id FROM app.users
-    WHERE school_id = ${schoolId} AND normalized_email = ${normalizedEmail}
-    LIMIT 1
-  `;
+  return { summary, audit: ctx.audit };
+}
 
-  let userId: string;
+async function createStudent(ctx: ApplyContext, row: PlannedRow): Promise<string> {
+  const { tx, schoolId } = ctx;
+  const record = row.record;
+  const userId =
+    row.user_id ??
+    (await createUser(ctx, record.email, `${record.first_name} ${record.last_name}`));
+  await grantRole(ctx, userId, "STUDENT");
 
-  if (existingUser) {
-    userId = existingUser.id;
-  } else {
-    // Create user.
-    const [newUser] = await tx<{ id: string }[]>`
-      INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
-      VALUES (
-        ${schoolId},
-        ${row.email},
-        ${normalizedEmail},
-        ${row.first_name || row.last_name},
-        'active'::app.user_status
-      )
-      ON CONFLICT (school_id, normalized_email) DO UPDATE SET
-        display_name = EXCLUDED.display_name
-      RETURNING id
-    `;
-    userId = newUser!.id;
-
-    // Assign STUDENT role.
-    await tx`
-      INSERT INTO app.user_roles (school_id, user_id, role)
-      VALUES (${schoolId}, ${userId}, 'STUDENT'::app.user_role)
-      ON CONFLICT (school_id, user_id, role) DO NOTHING
-    `;
-  }
-
-  // Create student profile.
   const [student] = await tx<{ id: string }[]>`
     INSERT INTO app.students (
       school_id, user_id, admission_number, first_name, middle_name,
       last_name, preferred_name, date_of_birth, admission_date, status
     ) VALUES (
-      ${schoolId},
-      ${userId},
-      ${row.admission_number},
-      ${row.first_name},
-      ${row.middle_name ?? null},
-      ${row.last_name},
-      ${row.preferred_name ?? null},
-      ${row.date_of_birth ?? null}::date,
-      CURRENT_DATE,
-      ${row.status}::app.student_status
+      ${schoolId}::uuid, ${userId}::uuid, ${record.admission_number}, ${record.first_name},
+      ${record.middle_name}, ${record.last_name}, ${record.preferred_name},
+      ${record.date_of_birth}::date, CURRENT_DATE,
+      ${record.status ?? "applicant"}::app.student_status
     )
-    ON CONFLICT (school_id, normalized_admission_number) DO NOTHING
     RETURNING id
   `;
+  ctx.audit.push({
+    action: "insert",
+    targetTable: "students",
+    targetId: student!.id,
+    oldValues: null,
+    newValues: {
+      import_id: ctx.importId,
+      user_id: userId,
+      admission_number: record.admission_number,
+      first_name: record.first_name,
+      middle_name: record.middle_name,
+      last_name: record.last_name,
+      preferred_name: record.preferred_name,
+      date_of_birth: record.date_of_birth,
+      status: record.status ?? "applicant",
+    },
+  });
+  return student!.id;
+}
 
-  if (!student) {
-    // Race condition: another row or concurrent import created this student.
-    summary.students_skipped++;
-    return;
+async function updateStudent(ctx: ApplyContext, studentId: string, row: PlannedRow): Promise<void> {
+  const fields = Object.keys(row.changes) as (keyof PlannedRow["changes"])[];
+  if (fields.length === 0) return; // Only the parent link changes.
+
+  const next = (field: keyof PlannedRow["changes"]): string | null =>
+    row.changes[field]?.to ?? null;
+  await ctx.tx`
+    UPDATE app.students
+    SET first_name = COALESCE(${next("first_name")}, first_name),
+        middle_name = COALESCE(${next("middle_name")}, middle_name),
+        last_name = COALESCE(${next("last_name")}, last_name),
+        preferred_name = COALESCE(${next("preferred_name")}, preferred_name),
+        date_of_birth = COALESCE(${next("date_of_birth")}::date, date_of_birth),
+        status = COALESCE(${next("status")}::app.student_status, status),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${studentId}::uuid AND school_id = ${ctx.schoolId}::uuid
+  `;
+  ctx.audit.push({
+    action: "update",
+    targetTable: "students",
+    targetId: studentId,
+    oldValues: Object.fromEntries(fields.map((field) => [field, row.changes[field]!.from])),
+    newValues: {
+      import_id: ctx.importId,
+      ...Object.fromEntries(fields.map((field) => [field, row.changes[field]!.to])),
+    },
+  });
+}
+
+async function resolveParent(
+  ctx: ApplyContext,
+  row: PlannedRow,
+): Promise<{ parentUserId: string; created: boolean }> {
+  const email = row.record.parent_email!;
+  const normalized = normalizeEmail(email);
+  const known = row.parent_user_id ?? ctx.parentsByEmail.get(normalized);
+  if (known) {
+    await grantRole(ctx, known, "PARENT");
+    return { parentUserId: known, created: false };
   }
 
-  summary.students_created++;
+  const parentUserId = await createUser(ctx, email, row.record.parent_name ?? email);
+  await grantRole(ctx, parentUserId, "PARENT");
+  ctx.parentsByEmail.set(normalized, parentUserId);
+  return { parentUserId, created: true };
+}
 
-  // Link parent if provided.
-  if (row.parent_email && row.parent_relationship) {
-    await linkParentByEmail(
-      tx,
-      schoolId,
-      student.id,
-      row.parent_email,
-      row.parent_relationship,
-      summary,
-    );
+async function createUser(ctx: ApplyContext, email: string, displayName: string): Promise<string> {
+  const normalizedEmail = normalizeEmail(email);
+  const [user] = await ctx.tx<{ id: string }[]>`
+    INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+    VALUES (
+      ${ctx.schoolId}::uuid, ${email}, ${normalizedEmail}, ${displayName}, 'active'::app.user_status
+    )
+    RETURNING id
+  `;
+  ctx.audit.push({
+    action: "insert",
+    targetTable: "users",
+    targetId: user!.id,
+    oldValues: null,
+    newValues: { import_id: ctx.importId, email, display_name: displayName, status: "active" },
+  });
+  return user!.id;
+}
+
+async function grantRole(
+  ctx: ApplyContext,
+  userId: string,
+  role: "STUDENT" | "PARENT",
+): Promise<void> {
+  const granted = await ctx.tx`
+    INSERT INTO app.user_roles (school_id, user_id, role)
+    VALUES (${ctx.schoolId}::uuid, ${userId}::uuid, ${role}::app.user_role)
+    ON CONFLICT (school_id, user_id, role) DO NOTHING
+    RETURNING user_id
+  `;
+  if (granted.length > 0) {
+    ctx.audit.push({
+      action: "insert",
+      targetTable: "user_roles",
+      targetId: userId,
+      oldValues: null,
+      newValues: { import_id: ctx.importId, role },
+    });
   }
 }
 
-async function linkParentByEmail(
-  tx: postgres.TransactionSql,
-  schoolId: string,
+async function createLink(
+  ctx: ApplyContext,
+  parentUserId: string,
   studentId: string,
-  parentEmail: string,
-  relationship: string,
-  summary: ImportSummary,
+  record: StudentImportRecord,
 ): Promise<void> {
-  const normalizedParentEmail = parentEmail.toLowerCase().trim();
-
-  // Find or create parent user.
-  const [existingParent] = await tx<{ id: string }[]>`
-    SELECT id FROM app.users
-    WHERE school_id = ${schoolId} AND normalized_email = ${normalizedParentEmail}
-    LIMIT 1
+  const familyId = await resolveFamily(ctx, parentUserId, record);
+  await ctx.tx`
+    INSERT INTO app.parent_child_links
+      (school_id, family_id, parent_user_id, student_id, relationship)
+    VALUES (
+      ${ctx.schoolId}::uuid, ${familyId}::uuid, ${parentUserId}::uuid, ${studentId}::uuid,
+      ${record.parent_relationship}::app.parent_relationship
+    )
   `;
+  ctx.audit.push({
+    action: "insert",
+    targetTable: "parent_child_links",
+    targetId: studentId,
+    oldValues: null,
+    newValues: {
+      import_id: ctx.importId,
+      family_id: familyId,
+      parent_user_id: parentUserId,
+      relationship: record.parent_relationship,
+    },
+  });
+}
 
-  let parentUserId: string;
-
-  if (existingParent) {
-    parentUserId = existingParent.id;
-  } else {
-    const [newParent] = await tx<{ id: string }[]>`
-      INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
-      VALUES (
-        ${schoolId},
-        ${parentEmail},
-        ${normalizedParentEmail},
-        ${parentEmail},
-        'active'::app.user_status
-      )
-      ON CONFLICT (school_id, normalized_email) DO UPDATE SET
-        display_name = EXCLUDED.display_name
-      RETURNING id
-    `;
-    parentUserId = newParent!.id;
-    summary.parents_created++;
-
-    // Assign PARENT role.
-    await tx`
-      INSERT INTO app.user_roles (school_id, user_id, role)
-      VALUES (${schoolId}, ${parentUserId}, 'PARENT'::app.user_role)
-      ON CONFLICT (school_id, user_id, role) DO NOTHING
-    `;
-  }
-
-  // Create parent-child link (idempotent).
-  const [existingLink] = await tx<{ parent_user_id: string }[]>`
-    SELECT parent_user_id FROM app.parent_child_links
-    WHERE school_id = ${schoolId}
+async function updateLinkRelationship(
+  ctx: ApplyContext,
+  parentUserId: string,
+  studentId: string,
+  record: StudentImportRecord,
+): Promise<void> {
+  const [previous] = await ctx.tx<{ relationship: string }[]>`
+    SELECT relationship::text AS relationship
+    FROM app.parent_child_links
+    WHERE school_id = ${ctx.schoolId}::uuid
       AND parent_user_id = ${parentUserId}::uuid
       AND student_id = ${studentId}::uuid
+    FOR UPDATE
+  `;
+  await ctx.tx`
+    UPDATE app.parent_child_links
+    SET relationship = ${record.parent_relationship}::app.parent_relationship,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE school_id = ${ctx.schoolId}::uuid
+      AND parent_user_id = ${parentUserId}::uuid
+      AND student_id = ${studentId}::uuid
+  `;
+  ctx.audit.push({
+    action: "update",
+    targetTable: "parent_child_links",
+    targetId: studentId,
+    oldValues: { parent_user_id: parentUserId, relationship: previous!.relationship },
+    newValues: {
+      import_id: ctx.importId,
+      parent_user_id: parentUserId,
+      relationship: record.parent_relationship,
+    },
+  });
+}
+
+/** The parent's earliest household, or a new one named after them — the rule the families
+ * migration (000072) used to backfill, and the one the pre-ST-299 import applied. */
+async function resolveFamily(
+  ctx: ApplyContext,
+  parentUserId: string,
+  record: StudentImportRecord,
+): Promise<string> {
+  const cached = ctx.familiesByParent.get(parentUserId);
+  if (cached) return cached;
+
+  const [existing] = await ctx.tx<{ id: string }[]>`
+    SELECT id FROM app.families
+    WHERE school_id = ${ctx.schoolId}::uuid AND primary_parent_user_id = ${parentUserId}::uuid
+    ORDER BY created_at, id
     LIMIT 1
   `;
-
-  if (!existingLink) {
-    const [existingFamily] = await tx<{ id: string }[]>`
-      SELECT id
-      FROM app.families
-      WHERE school_id = ${schoolId}
-        AND primary_parent_user_id = ${parentUserId}::uuid
-      ORDER BY created_at, id
-      LIMIT 1
+  let familyId = existing?.id;
+  if (!familyId) {
+    const displayName = (record.parent_name ?? record.parent_email!).slice(0, 200).trim();
+    const [family] = await ctx.tx<{ id: string }[]>`
+      INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+      VALUES (${ctx.schoolId}::uuid, ${displayName}, ${parentUserId}::uuid)
+      RETURNING id
     `;
-    const familyId =
-      existingFamily?.id ??
-      (
-        await tx<{ id: string }[]>`
-          INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
-          VALUES (${schoolId}, left(${parentEmail}, 200), ${parentUserId}::uuid)
-          RETURNING id
-        `
-      )[0]!.id;
-
-    await tx`
-      INSERT INTO app.parent_child_links
-        (school_id, family_id, parent_user_id, student_id, relationship)
-      VALUES (
-        ${schoolId},
-        ${familyId}::uuid,
-        ${parentUserId}::uuid,
-        ${studentId}::uuid,
-        ${relationship}::app.parent_relationship
-      )
-      ON CONFLICT (school_id, parent_user_id, student_id) DO NOTHING
-    `;
-    summary.parents_linked++;
+    familyId = family!.id;
+    ctx.audit.push({
+      action: "insert",
+      targetTable: "families",
+      targetId: familyId,
+      oldValues: null,
+      newValues: {
+        import_id: ctx.importId,
+        display_name: displayName,
+        primary_parent_user_id: parentUserId,
+      },
+    });
   }
+  ctx.familiesByParent.set(parentUserId, familyId);
+  return familyId;
 }
