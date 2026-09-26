@@ -112,6 +112,11 @@ const EXPECTED_MUTATING_ROUTES = [
   // Student CSV imports. Upload and confirm are mutating; guarded by STUDENT_IMPORT permission.
   "POST /api/imports/students/upload",
   "POST /api/imports/students/{importId}/confirm",
+  // ST-299: re-map a staged import, and saved-mapping CRUD. Guarded by STUDENT_IMPORT.
+  "PUT /api/imports/students/{importId}/mapping",
+  "POST /api/imports/students/mappings",
+  "PATCH /api/imports/students/mappings/{mappingId}",
+  "DELETE /api/imports/students/mappings/{mappingId}",
   // Bulk invitations. Admin dispatches invitations in batches; guarded by USER_INVITE permission.
   "POST /api/invitations/bulk",
   "POST /api/invitations/bulk/{bulkInviteId}/retry",

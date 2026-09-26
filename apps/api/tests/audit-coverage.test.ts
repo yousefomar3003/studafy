@@ -159,6 +159,12 @@ const EXPECTED_MUTATING_ROUTES = [
   // Student CSV imports. Upload and confirm are mutating; audit rows written from the route.
   "POST /api/imports/students/upload",
   "POST /api/imports/students/{importId}/confirm",
+  // ST-299: re-map a staged import, and saved-mapping CRUD. Audit rows written from inside the
+  // service transactions (import-service.ts).
+  "PUT /api/imports/students/{importId}/mapping",
+  "POST /api/imports/students/mappings",
+  "PATCH /api/imports/students/mappings/{mappingId}",
+  "DELETE /api/imports/students/mappings/{mappingId}",
   // Bulk invitations. Admin dispatches invitations in batches; audit rows written by
   // auditAction middleware in bulk-invite-routes.ts.
   "POST /api/invitations/bulk",

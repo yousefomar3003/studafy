@@ -700,6 +700,18 @@ const GUARD_CASES: GuardCase[] = [
   },
   {
     method: "GET",
+    path: "/api/imports/students/mappings",
+    permission: "student:import",
+    source: "imports/routes/import-routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/imports/students/{importId}/diff",
+    permission: "student:import",
+    source: "imports/routes/import-routes.ts",
+  },
+  {
+    method: "GET",
     path: "/api/imports/students/template",
     permission: "student:read",
     source: "imports/routes/import-routes.ts",
