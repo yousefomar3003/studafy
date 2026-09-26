@@ -103,9 +103,16 @@ approved_flexible_columns(table_name, column_name) AS (
     ('audit_export_jobs', 'parameters'),
     -- R-08: the raw, externally-defined SES SNS event payload is audited verbatim in email_events.
     ('email_events', 'payload'),
-    ('student_imports', 'rows_data'),
     ('student_imports', 'errors'),
     ('student_imports', 'summary'),
+    -- ST-299: a CSV's header row and the field -> header map it was staged with. The field set is
+    -- closed and validated in packages/student-import; the headers are the school's own file.
+    ('student_imports', 'source_headers'),
+    ('student_imports', 'column_mapping'),
+    ('student_import_mappings', 'column_mapping'),
+    -- ST-299 staging: raw cells keyed by an arbitrary school-defined header, and the mapped record.
+    ('student_import_rows', 'source'),
+    ('student_import_rows', 'record'),
     -- ST-268: an erasure's outcome is one entry per table it actually touched -- a variable-length,
     -- worker-produced audit detail (which tables, which columns, how many rows), not a relational
     -- fact with a fixed shape. The stable relational fields (tenant, subject, reason, status and

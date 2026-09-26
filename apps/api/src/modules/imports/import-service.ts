@@ -1,40 +1,43 @@
 import { ERROR_CODES } from "@studafy/constants";
+import {
+  planStudentImport,
+  readCsvSource,
+  REQUIRED_STUDENT_IMPORT_FIELDS,
+  stageRows,
+  suggestColumnMapping,
+} from "@studafy/student-import";
 
 import { CodedHttpException } from "../../coded-http-exception";
+import { emitAuditLog } from "../../middleware/auditEmitter";
 
-import { csvStudentRowSchema } from "./schemas";
-
-import type { ImportRowError, ImportStatus, ImportSummary } from "./schemas";
+import type { ImportDiffResponse, ImportRowError, ImportStatus, ImportSummary } from "./schemas";
+import type {
+  ColumnMapping,
+  CsvSource,
+  StagedRow,
+  StudentImportAction,
+  StudentImportRecord,
+} from "@studafy/student-import";
 import type { JSONValue, TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export interface ImportRow {
-  admission_number: string;
-  email: string;
-  first_name: string;
-  middle_name: string | null;
-  last_name: string;
-  preferred_name: string | null;
-  date_of_birth: string | null;
-  status: string;
-  parent_email: string | null;
-  parent_relationship: string | null;
-}
-
 export interface ImportRecord {
   id: string;
   school_id: string;
   uploaded_by: string;
+  confirmed_by: string | null;
   status: ImportStatus;
   file_name: string;
   idempotency_key: string | null;
   row_count: number;
   valid_rows: number;
   error_rows: number;
-  rows_data: ImportRow[];
+  header_line: number;
+  source_headers: string[];
+  column_mapping: ColumnMapping;
   errors: ImportRowError[];
   summary: ImportSummary | null;
   created_at: Date;
@@ -43,176 +46,42 @@ export interface ImportRecord {
   completed_at: Date | null;
 }
 
-// ---------------------------------------------------------------------------
-// CSV parsing — hand-rolled, zero-dependency
-// ---------------------------------------------------------------------------
-
-/**
- * Parse a CSV string into rows of string arrays.
- * Handles quoted fields, escaped quotes (""). Does not handle multiline fields
- * (which are invalid for our template anyway).
- *
- * Line numbers are 1-based, skipping the header row.
- */
-export function parseCsvRows(raw: string): { headers: string[]; rows: string[][] } {
-  const lines = splitCsvLines(raw);
-  if (lines.length === 0) {
-    return { headers: [], rows: [] };
-  }
-
-  const headers = parseCsvLine(lines[0]!);
-  const rows: string[][] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]!;
-    if (line.trim() === "") continue;
-    rows.push(parseCsvLine(line));
-  }
-
-  return { headers, rows };
+export interface StudentImportMapping {
+  id: string;
+  name: string;
+  column_mapping: ColumnMapping;
+  created_by: string;
+  created_at: Date;
+  updated_at: Date;
 }
-
-function splitCsvLines(raw: string): string[] {
-  const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  return normalized.split("\n");
-}
-
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = "";
-  let inQuotes = false;
-  let i = 0;
-
-  while (i < line.length) {
-    const ch = line[i]!;
-
-    if (inQuotes) {
-      if (ch === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') {
-          current += '"';
-          i += 2;
-        } else {
-          inQuotes = false;
-          i++;
-        }
-      } else {
-        current += ch;
-        i++;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-        i++;
-      } else if (ch === ",") {
-        fields.push(current);
-        current = "";
-        i++;
-      } else {
-        current += ch;
-        i++;
-      }
-    }
-  }
-
-  fields.push(current);
-  return fields;
-}
-
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
 
 const MAX_ROWS = 10_000;
 
-const REQUIRED_HEADERS = ["admission_number", "email", "first_name", "last_name"] as const;
+/** Staging rows per statement. A 10,000-row upload is five round trips, not ten thousand. */
+const STAGING_BATCH_SIZE = 2_000;
 
-type HeaderMap = Record<string, number>;
+/** Only an unconfirmed import may be re-mapped; once confirmed, the worker owns its staging rows. */
+const REMAPPABLE_STATUSES: readonly ImportStatus[] = ["uploaded", "validated"];
 
-function buildHeaderMap(headers: string[]): HeaderMap {
-  const map: HeaderMap = {};
-  for (let i = 0; i < headers.length; i++) {
-    map[headers[i]!.trim().toLowerCase()] = i;
-  }
-  return map;
+function importColumns(tx: TransactionSql) {
+  return tx`
+    id, school_id, uploaded_by, confirmed_by, status, file_name, idempotency_key,
+    row_count, valid_rows, error_rows, header_line, source_headers, column_mapping,
+    errors, summary, created_at, updated_at, confirmed_at, completed_at
+  `;
 }
 
-/**
- * Validate a parsed CSV and return row-level errors.
- * Returns structured rows for valid data alongside error descriptors.
- */
-export function validateCsv(
-  headers: string[],
-  rows: string[][],
-): { validRows: ImportRow[]; errors: ImportRowError[] } {
-  const errors: ImportRowError[] = [];
-  const validRows: ImportRow[] = [];
-
-  const headerMap = buildHeaderMap(headers);
-
-  // Check required headers are present.
-  for (const required of REQUIRED_HEADERS) {
-    if (headerMap[required] === undefined) {
-      errors.push({ line: 1, field: required, message: `Missing required column "${required}".` });
-    }
-  }
-
-  // If required columns are missing, still process rows to surface individual errors.
-  for (let i = 0; i < rows.length; i++) {
-    const lineNum = i + 2; // 1-based, +1 for header
-    const csvRow = rows[i]!;
-    const record: Record<string, string> = {};
-
-    for (const [header, idx] of Object.entries(headerMap)) {
-      record[header] = csvRow[idx]?.trim() ?? "";
-    }
-
-    // Validate via Zod — safeParse collects the first error per field.
-    const parsed = csvStudentRowSchema.safeParse({
-      admission_number: record.admission_number || undefined,
-      email: record.email || undefined,
-      first_name: record.first_name || undefined,
-      middle_name: record.middle_name || undefined,
-      last_name: record.last_name || undefined,
-      preferred_name: record.preferred_name || undefined,
-      date_of_birth: record.date_of_birth || undefined,
-      status: record.status || "applicant",
-      parent_email: record.parent_email || undefined,
-      parent_relationship: record.parent_relationship || undefined,
-    });
-
-    if (!parsed.success) {
-      for (const issue of parsed.error.issues) {
-        const field = issue.path.join(".") || "row";
-        errors.push({ line: lineNum, field, message: issue.message });
-      }
-      continue;
-    }
-
-    const data = parsed.data;
-    validRows.push({
-      admission_number: data.admission_number,
-      email: data.email,
-      first_name: data.first_name,
-      middle_name: data.middle_name ?? null,
-      last_name: data.last_name,
-      preferred_name: data.preferred_name ?? null,
-      date_of_birth: data.date_of_birth ?? null,
-      status: data.status,
-      parent_email: data.parent_email ?? null,
-      parent_relationship: data.parent_relationship ?? null,
-    });
-  }
-
-  return { validRows, errors };
+function mappingColumns(tx: TransactionSql) {
+  return tx`id, name, column_mapping, created_by, created_at, updated_at`;
 }
 
 // ---------------------------------------------------------------------------
-// Service functions
+// Upload, re-map, confirm
 // ---------------------------------------------------------------------------
 
 /**
- * Upload and validate a CSV. Stores the import record in `uploaded` status.
- * Returns the import record with row-level validation errors.
+ * Parse a CSV, detect its header row, map it (a saved mapping, or one suggested from the headers)
+ * and stage every data line. Stored as `validated` when every line is valid, `uploaded` otherwise.
  */
 export async function uploadImport(
   tx: TransactionSql,
@@ -220,86 +89,208 @@ export async function uploadImport(
   uploadedBy: string,
   fileName: string,
   rawCsv: string,
+  mappingId?: string,
 ): Promise<ImportRecord> {
-  const { headers, rows } = parseCsvRows(rawCsv);
+  const source = readCsvSource(rawCsv);
 
-  if (rows.length > MAX_ROWS) {
+  if (source.rows.length > MAX_ROWS) {
     throw new CodedHttpException(
       400,
       ERROR_CODES.IMPORT_ROWS_EXCEED_LIMIT,
-      `CSV exceeds the maximum of ${MAX_ROWS} rows (found ${rows.length}).`,
+      `CSV exceeds the maximum of ${MAX_ROWS} rows (found ${source.rows.length}).`,
     );
   }
 
-  const { validRows, errors } = validateCsv(headers, rows);
-  const hasErrors = errors.length > 0;
-  const status: ImportStatus = hasErrors ? "uploaded" : "validated";
+  const mapping = mappingId
+    ? (await getMapping(tx, schoolId, mappingId)).column_mapping
+    : suggestColumnMapping(source.headers);
+  const staged = stageRows(source, mapping);
+  const validRows = countValid(staged.rows);
 
-  const [record] = await tx<ImportRecord[]>`
+  const [created] = await tx<ImportRecord[]>`
     INSERT INTO app.student_imports (
-      school_id, uploaded_by, status, file_name,
-      row_count, valid_rows, error_rows,
-      rows_data, errors
+      school_id, uploaded_by, status, file_name, row_count, valid_rows, error_rows,
+      header_line, source_headers, column_mapping, errors
     ) VALUES (
       ${schoolId},
       ${uploadedBy},
-      ${status}::app.import_status,
+      ${statusFor(staged.issues)}::app.import_status,
       ${fileName},
-      ${rows.length},
-      ${validRows.length},
-      ${errors.length > 0 ? rows.length - validRows.length : rows.length},
-      ${tx.json(validRows as unknown as JSONValue)}::jsonb,
-      ${tx.json(errors as unknown as JSONValue)}::jsonb
+      ${staged.rows.length},
+      ${validRows},
+      ${staged.rows.length - validRows},
+      ${source.header_line},
+      ${tx.json(source.headers)}::jsonb,
+      ${tx.json(mapping as JSONValue)}::jsonb,
+      ${tx.json(staged.issues as unknown as JSONValue)}::jsonb
     )
-    RETURNING id, school_id, uploaded_by, status, file_name, idempotency_key,
-              row_count, valid_rows, error_rows, rows_data, errors, summary,
-              created_at, updated_at, confirmed_at, completed_at
+    RETURNING ${importColumns(tx)}
   `;
+  const record = deserializeRecord(created!);
 
-  return deserializeRecord(record!);
+  for (let i = 0; i < staged.rows.length; i += STAGING_BATCH_SIZE) {
+    const chunk = staged.rows.slice(i, i + STAGING_BATCH_SIZE);
+    await tx`
+      INSERT INTO app.student_import_rows (school_id, import_id, line_number, source, record)
+      SELECT ${schoolId}::uuid, ${record.id}::uuid, row.line_number, row.source, row.record
+      FROM jsonb_to_recordset(${tx.json(chunk as unknown as JSONValue)}::jsonb)
+        AS row (line_number int, source jsonb, record jsonb)
+    `;
+  }
+
+  await emitAuditLog(tx, {
+    action: "insert",
+    targetTable: "student_imports",
+    targetId: record.id,
+    newValues: {
+      file_name: fileName,
+      mapping_id: mappingId ?? null,
+      column_mapping: mapping,
+      row_count: record.row_count,
+      valid_rows: record.valid_rows,
+      error_rows: record.error_rows,
+    },
+  });
+
+  return record;
 }
 
 /**
- * Confirm a validated import. Transitions status to `confirmed` and records the idempotency key.
- * If an idempotency key is provided and already exists, returns the existing import.
+ * Re-apply a new column mapping to an unconfirmed import's staged rows, without a re-upload, and
+ * optionally save the mapping for the school.
+ */
+export async function updateImportMapping(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  importId: string,
+  mapping: ColumnMapping,
+  saveAs?: string,
+): Promise<ImportRecord> {
+  const [locked] = await tx<ImportRecord[]>`
+    SELECT ${importColumns(tx)}
+    FROM app.student_imports
+    WHERE id = ${importId}::uuid AND school_id = ${schoolId}
+    FOR UPDATE
+  `;
+  if (!locked) {
+    throw new CodedHttpException(404, ERROR_CODES.IMPORT_NOT_FOUND, "Import not found.");
+  }
+  const current = deserializeRecord(locked);
+  if (!REMAPPABLE_STATUSES.includes(current.status)) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.IMPORT_INVALID_STATE,
+      `Import is ${current.status}; only an unconfirmed import can be re-mapped.`,
+    );
+  }
+
+  const sourceRows = await tx<{ line_number: number; source: Record<string, string> }[]>`
+    SELECT line_number, source
+    FROM app.student_import_rows
+    WHERE school_id = ${schoolId} AND import_id = ${importId}::uuid
+    ORDER BY line_number
+  `;
+  const source: CsvSource = {
+    header_line: current.header_line,
+    headers: current.source_headers,
+    rows: sourceRows.map((row) => ({ line_number: row.line_number, source: row.source })),
+  };
+  const staged = stageRows(source, mapping);
+  const validRows = countValid(staged.rows);
+
+  for (let i = 0; i < staged.rows.length; i += STAGING_BATCH_SIZE) {
+    const chunk = staged.rows
+      .slice(i, i + STAGING_BATCH_SIZE)
+      .map((row) => ({ line_number: row.line_number, record: row.record }));
+    await tx`
+      UPDATE app.student_import_rows AS staged
+      SET record = next.record
+      FROM jsonb_to_recordset(${tx.json(chunk as unknown as JSONValue)}::jsonb)
+        AS next (line_number int, record jsonb)
+      WHERE staged.school_id = ${schoolId}
+        AND staged.import_id = ${importId}::uuid
+        AND staged.line_number = next.line_number
+    `;
+  }
+
+  const [updated] = await tx<ImportRecord[]>`
+    UPDATE app.student_imports
+    SET status = ${statusFor(staged.issues)}::app.import_status,
+        column_mapping = ${tx.json(mapping as JSONValue)}::jsonb,
+        valid_rows = ${validRows},
+        error_rows = ${staged.rows.length - validRows},
+        errors = ${tx.json(staged.issues as unknown as JSONValue)}::jsonb,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${importId}::uuid AND school_id = ${schoolId}
+    RETURNING ${importColumns(tx)}
+  `;
+  const record = deserializeRecord(updated!);
+
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "student_imports",
+    targetId: importId,
+    oldValues: {
+      status: current.status,
+      column_mapping: current.column_mapping,
+      valid_rows: current.valid_rows,
+      error_rows: current.error_rows,
+    },
+    newValues: {
+      status: record.status,
+      column_mapping: mapping,
+      valid_rows: record.valid_rows,
+      error_rows: record.error_rows,
+    },
+  });
+
+  if (saveAs !== undefined) await createMapping(tx, schoolId, userId, saveAs, mapping);
+
+  return record;
+}
+
+/**
+ * Confirm a staged import. Transitions status to `confirmed` and records who confirmed it and the
+ * idempotency key. If the key already exists, returns that import instead.
  */
 export async function confirmImport(
   tx: TransactionSql,
   schoolId: string,
+  userId: string,
   importId: string,
   idempotencyKey?: string,
 ): Promise<ImportRecord> {
-  // Check for existing import with this idempotency key.
   if (idempotencyKey) {
     const [existing] = await tx<ImportRecord[]>`
-      SELECT id, school_id, uploaded_by, status, file_name, idempotency_key,
-             row_count, valid_rows, error_rows, rows_data, errors, summary,
-             created_at, updated_at, confirmed_at, completed_at
+      SELECT ${importColumns(tx)}
       FROM app.student_imports
       WHERE school_id = ${schoolId} AND idempotency_key = ${idempotencyKey}
       LIMIT 1
     `;
-
-    if (existing) {
-      return deserializeRecord(existing);
-    }
+    if (existing) return deserializeRecord(existing);
   }
 
-  const [record] = await tx<ImportRecord[]>`
+  const [previous] = await tx<{ status: ImportStatus }[]>`
+    SELECT status FROM app.student_imports
+    WHERE id = ${importId}::uuid AND school_id = ${schoolId}
+    FOR UPDATE
+  `;
+
+  const [confirmed] = await tx<ImportRecord[]>`
     UPDATE app.student_imports
     SET status = 'confirmed'::app.import_status,
         idempotency_key = ${idempotencyKey ?? null},
+        confirmed_by = ${userId}::uuid,
         confirmed_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${importId}::uuid
       AND school_id = ${schoolId}
       AND status IN ('uploaded', 'validated')
-    RETURNING id, school_id, uploaded_by, status, file_name, idempotency_key,
-              row_count, valid_rows, error_rows, rows_data, errors, summary,
-              created_at, updated_at, confirmed_at, completed_at
+    RETURNING ${importColumns(tx)}
   `;
 
-  if (!record) {
+  if (!confirmed) {
     throw new CodedHttpException(
       404,
       ERROR_CODES.IMPORT_NOT_FOUND,
@@ -307,21 +298,28 @@ export async function confirmImport(
     );
   }
 
-  return deserializeRecord(record);
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "student_imports",
+    targetId: importId,
+    oldValues: { status: previous!.status },
+    newValues: { status: "confirmed", idempotency_key: idempotencyKey ?? null },
+  });
+
+  return deserializeRecord(confirmed);
 }
 
-/**
- * Get import status and summary.
- */
+// ---------------------------------------------------------------------------
+// Reads
+// ---------------------------------------------------------------------------
+
 export async function getImport(
   tx: TransactionSql,
   schoolId: string,
   importId: string,
 ): Promise<ImportRecord> {
   const [record] = await tx<ImportRecord[]>`
-    SELECT id, school_id, uploaded_by, status, file_name, idempotency_key,
-           row_count, valid_rows, error_rows, rows_data, errors, summary,
-           created_at, updated_at, confirmed_at, completed_at
+    SELECT ${importColumns(tx)}
     FROM app.student_imports
     WHERE id = ${importId}::uuid AND school_id = ${schoolId}
   `;
@@ -333,17 +331,13 @@ export async function getImport(
   return deserializeRecord(record);
 }
 
-/**
- * List imports with cursor-based pagination.
- */
+/** List imports with keyset pagination on (created_at, id). */
 export async function listImports(
   tx: TransactionSql,
   schoolId: string,
   params: { limit: number; cursor?: string; status?: ImportStatus },
 ): Promise<{ rows: ImportRecord[]; next_cursor: string | null }> {
   const statusFilter = params.status ? tx` AND status = ${params.status}::app.import_status` : tx``;
-
-  const limit = params.limit + 1;
 
   // Cursor is "timestamp:id" — decode and use for keyset pagination.
   const cursorFilter = params.cursor
@@ -355,40 +349,235 @@ export async function listImports(
       })()
     : tx``;
 
+  // One row beyond the page, so its presence says whether another page exists.
   const rows = await tx<ImportRecord[]>`
-    SELECT id, school_id, uploaded_by, status, file_name, idempotency_key,
-           row_count, valid_rows, error_rows, rows_data, errors, summary,
-           created_at, updated_at, confirmed_at, completed_at
+    SELECT ${importColumns(tx)}
     FROM app.student_imports
     WHERE school_id = ${schoolId}
       ${statusFilter}
       ${cursorFilter}
     ORDER BY created_at DESC, id DESC
-    LIMIT ${limit}
+    LIMIT ${params.limit + 1}
   `;
 
-  const hasMore = rows.length > limit;
-  const sliced = hasMore ? rows.slice(0, params.limit) : rows;
-  const lastRow = sliced[sliced.length - 1];
+  const hasMore = rows.length > params.limit;
+  const page = hasMore ? rows.slice(0, params.limit) : rows;
+  const lastRow = page[page.length - 1];
   const next_cursor =
     hasMore && lastRow ? `${lastRow.created_at.toISOString()}:${lastRow.id}` : null;
 
+  return { rows: page.map(deserializeRecord), next_cursor };
+}
+
+/**
+ * The dry-run diff: what migrating this import would do to live data right now. Read-only; the
+ * worker recomputes the same plan inside its migration transaction, so this is a preview, not a
+ * reservation.
+ */
+export async function getImportDiff(
+  tx: TransactionSql,
+  schoolId: string,
+  importId: string,
+  action?: StudentImportAction,
+): Promise<ImportDiffResponse> {
+  await getImport(tx, schoolId, importId);
+
+  const staged = await tx<{ line_number: number; record: StudentImportRecord }[]>`
+    SELECT line_number, record
+    FROM app.student_import_rows
+    WHERE school_id = ${schoolId} AND import_id = ${importId}::uuid AND record IS NOT NULL
+    ORDER BY line_number
+  `;
+  const plan = await planStudentImport(
+    tx,
+    schoolId,
+    staged.map((row) => ({
+      line_number: row.line_number,
+      // Rows staged before ST-299 (backfilled from rows_data) have no parent_name key.
+      record: { ...row.record, parent_name: row.record.parent_name ?? null },
+    })),
+  );
+
   return {
-    rows: sliced.map(deserializeRecord),
-    next_cursor,
+    import_id: importId,
+    totals: plan.totals,
+    rows: plan.rows
+      .filter((row) => action === undefined || row.action === action)
+      .map((row) => ({
+        line_number: row.line_number,
+        admission_number: row.record.admission_number,
+        action: row.action,
+        conflict: row.conflict,
+        changes: row.changes,
+        parent: row.parent,
+        link: row.link,
+      })),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Saved mappings
+// ---------------------------------------------------------------------------
+
+export async function listMappings(
+  tx: TransactionSql,
+  schoolId: string,
+): Promise<StudentImportMapping[]> {
+  return tx<StudentImportMapping[]>`
+    SELECT ${mappingColumns(tx)}
+    FROM app.student_import_mappings
+    WHERE school_id = ${schoolId}
+    ORDER BY normalized_name
+  `;
+}
+
+export async function getMapping(
+  tx: TransactionSql,
+  schoolId: string,
+  mappingId: string,
+): Promise<StudentImportMapping> {
+  const [mapping] = await tx<StudentImportMapping[]>`
+    SELECT ${mappingColumns(tx)}
+    FROM app.student_import_mappings
+    WHERE id = ${mappingId}::uuid AND school_id = ${schoolId}
+  `;
+  if (!mapping) {
+    throw new CodedHttpException(
+      404,
+      ERROR_CODES.IMPORT_MAPPING_NOT_FOUND,
+      "Saved column mapping not found.",
+    );
+  }
+  return mapping;
+}
+
+export async function createMapping(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  name: string,
+  columnMapping: ColumnMapping,
+): Promise<StudentImportMapping> {
+  assertCompleteMapping(columnMapping);
+
+  // ON CONFLICT turns a duplicate name into a 409 with its own code, rather than a raw unique
+  // violation surfacing as a 500.
+  const [created] = await tx<StudentImportMapping[]>`
+    INSERT INTO app.student_import_mappings (school_id, name, column_mapping, created_by)
+    VALUES (${schoolId}, ${name}, ${tx.json(columnMapping as JSONValue)}::jsonb, ${userId}::uuid)
+    ON CONFLICT (school_id, normalized_name) DO NOTHING
+    RETURNING ${mappingColumns(tx)}
+  `;
+  if (!created) throw nameExists(name);
+
+  await emitAuditLog(tx, {
+    action: "insert",
+    targetTable: "student_import_mappings",
+    targetId: created.id,
+    newValues: { name, column_mapping: columnMapping },
+  });
+
+  return created;
+}
+
+export async function updateMapping(
+  tx: TransactionSql,
+  schoolId: string,
+  mappingId: string,
+  changes: { name?: string; column_mapping?: ColumnMapping },
+): Promise<StudentImportMapping> {
+  const current = await getMapping(tx, schoolId, mappingId);
+  if (changes.column_mapping) assertCompleteMapping(changes.column_mapping);
+
+  if (changes.name !== undefined) {
+    const [taken] = await tx<{ id: string }[]>`
+      SELECT id FROM app.student_import_mappings
+      WHERE school_id = ${schoolId}
+        AND normalized_name = lower(btrim(${changes.name}))
+        AND id <> ${mappingId}::uuid
+    `;
+    if (taken) throw nameExists(changes.name);
+  }
+
+  const name = changes.name ?? current.name;
+  const columnMapping = changes.column_mapping ?? current.column_mapping;
+  const [updated] = await tx<StudentImportMapping[]>`
+    UPDATE app.student_import_mappings
+    SET name = ${name},
+        column_mapping = ${tx.json(columnMapping as JSONValue)}::jsonb,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${mappingId}::uuid AND school_id = ${schoolId}
+    RETURNING ${mappingColumns(tx)}
+  `;
+
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "student_import_mappings",
+    targetId: mappingId,
+    oldValues: { name: current.name, column_mapping: current.column_mapping },
+    newValues: { name, column_mapping: columnMapping },
+  });
+
+  return updated!;
+}
+
+/** Deleting a saved mapping never affects an import staged with it: imports keep a snapshot. */
+export async function deleteMapping(
+  tx: TransactionSql,
+  schoolId: string,
+  mappingId: string,
+): Promise<void> {
+  const current = await getMapping(tx, schoolId, mappingId);
+  await tx`
+    DELETE FROM app.student_import_mappings
+    WHERE id = ${mappingId}::uuid AND school_id = ${schoolId}
+  `;
+  await emitAuditLog(tx, {
+    action: "delete",
+    targetTable: "student_import_mappings",
+    targetId: mappingId,
+    oldValues: { name: current.name, column_mapping: current.column_mapping },
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/** A saved mapping is only reusable if it maps every required field. */
+function assertCompleteMapping(mapping: ColumnMapping): void {
+  const missing = REQUIRED_STUDENT_IMPORT_FIELDS.filter((field) => mapping[field] === undefined);
+  if (missing.length > 0) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.IMPORT_MAPPING_INVALID,
+      `The mapping does not map required fields: ${missing.join(", ")}.`,
+    );
+  }
+}
+
+function nameExists(name: string): CodedHttpException {
+  return new CodedHttpException(
+    409,
+    ERROR_CODES.IMPORT_MAPPING_NAME_EXISTS,
+    `A saved column mapping named "${name}" already exists.`,
+  );
+}
+
+function statusFor(issues: readonly unknown[]): ImportStatus {
+  return issues.length > 0 ? "uploaded" : "validated";
+}
+
+function countValid(rows: readonly StagedRow[]): number {
+  return rows.filter((row) => row.record !== null).length;
+}
+
 function deserializeRecord(row: ImportRecord): ImportRecord {
   return {
     ...row,
-    status: row.status as ImportStatus,
-    rows_data: Array.isArray(row.rows_data) ? (row.rows_data as unknown as ImportRow[]) : [],
-    errors: Array.isArray(row.errors) ? (row.errors as unknown as ImportRowError[]) : [],
-    summary: (row.summary as unknown as ImportSummary) ?? null,
+    source_headers: Array.isArray(row.source_headers) ? row.source_headers : [],
+    column_mapping: row.column_mapping ?? {},
+    errors: Array.isArray(row.errors) ? row.errors : [],
+    summary: row.summary ?? null,
   };
 }

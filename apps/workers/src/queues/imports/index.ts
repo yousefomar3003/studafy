@@ -1,4 +1,5 @@
-export { processStudentImport } from "./worker";
+export { migrateStagedImport, processStudentImport } from "./worker";
+export type { StudentImportJobData, StudentImportSummary } from "./worker";
 export {
   ABANDONED_IMPORT_RETENTION_HOURS,
   purgeAbandonedStudentImports,

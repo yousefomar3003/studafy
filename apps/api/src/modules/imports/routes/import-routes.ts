@@ -9,22 +9,42 @@ import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { openApiValidationHook } from "../../../openapi/hook";
-import { standardResponses } from "../../../openapi/responses";
+import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
-import { confirmImport, getImport, listImports, uploadImport } from "../import-service";
+import {
+  confirmImport,
+  createMapping,
+  deleteMapping,
+  getImport,
+  getImportDiff,
+  listImports,
+  listMappings,
+  updateImportMapping,
+  updateMapping,
+  uploadImport,
+} from "../import-service";
 import {
   confirmImportBodySchema,
+  createStudentImportMappingBodySchema,
+  importDiffQuerySchema,
+  importDiffSchema,
   importIdParamSchema,
   importListQuerySchema,
   importListSchema,
   importRecordSchema,
+  mappingIdParamSchema,
+  studentImportMappingListSchema,
+  studentImportMappingSchema,
+  updateImportMappingBodySchema,
+  updateStudentImportMappingBodySchema,
+  uploadImportQuerySchema,
 } from "../schemas";
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { RedisClient } from "../../../redis";
-import type { ImportRecord } from "../import-service";
-import type { ImportRecordResponse } from "../schemas";
+import type { ImportRecord, StudentImportMapping } from "../import-service";
+import type { ImportRecordResponse, StudentImportMappingResponse } from "../schemas";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -45,17 +65,32 @@ function toResponse(record: ImportRecord): ImportRecordResponse {
     id: record.id,
     school_id: record.school_id,
     uploaded_by: record.uploaded_by,
+    confirmed_by: record.confirmed_by,
     status: record.status,
     file_name: record.file_name,
     row_count: record.row_count,
     valid_rows: record.valid_rows,
     error_rows: record.error_rows,
+    header_line: record.header_line,
+    source_headers: record.source_headers,
+    column_mapping: record.column_mapping,
     errors: record.errors,
     summary: record.summary,
     created_at: record.created_at.toISOString(),
     updated_at: record.updated_at.toISOString(),
     confirmed_at: record.confirmed_at?.toISOString() ?? null,
     completed_at: record.completed_at?.toISOString() ?? null,
+  };
+}
+
+function toMappingResponse(mapping: StudentImportMapping): StudentImportMappingResponse {
+  return {
+    id: mapping.id,
+    name: mapping.name,
+    column_mapping: mapping.column_mapping,
+    created_by: mapping.created_by,
+    created_at: mapping.created_at.toISOString(),
+    updated_at: mapping.updated_at.toISOString(),
   };
 }
 
@@ -70,10 +105,13 @@ const uploadStudentCsvRoute = createRoute({
   operationId: "uploadStudentCsv",
   summary: "Upload student CSV for validation",
   description:
-    "Uploads a CSV file of students. Validates every row and returns a report with line-level " +
-    "errors. The CSV data is stored server-side for later confirmation. Max 10,000 rows.",
+    "Uploads a CSV file of students, in the template layout or any other. The header row is " +
+    "detected (title lines above it are skipped) and mapped with the saved mapping named by " +
+    "mapping_id, or with one suggested from the headers. Every data line is staged and validated; " +
+    "the report carries line-level errors. Max 10,000 rows.",
   security: [{ bearerAuth: [] }],
   request: {
+    query: uploadImportQuerySchema,
     body: {
       required: true,
       content: { "text/csv": { schema: { type: "string" } } },
@@ -86,7 +124,7 @@ const uploadStudentCsvRoute = createRoute({
         schema: importRecordSchema,
       },
     },
-    [400, 401, 403, 429, 500],
+    [400, 401, 403, 404, 429, 500],
   ),
 });
 
@@ -235,6 +273,123 @@ const downloadTemplateRoute = createRoute({
   },
 });
 
+const updateStudentImportMappingRoute = createRoute({
+  method: "put",
+  path: "/api/imports/students/{importId}/mapping",
+  tags: ["Imports"],
+  operationId: "updateStudentImportMapping",
+  summary: "Re-map an unconfirmed import",
+  description:
+    "Applies a new column mapping to the import's staged rows and re-validates them, without a " +
+    "re-upload. With save_as, the mapping is also saved for the school. Only an uploaded or " +
+    "validated import can be re-mapped.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: importIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: updateImportMappingBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    {
+      200: { description: "Import re-validated with the new mapping.", schema: importRecordSchema },
+    },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const getStudentImportDiffRoute = createRoute({
+  method: "get",
+  path: "/api/imports/students/{importId}/diff",
+  tags: ["Imports"],
+  operationId: "getStudentImportDiff",
+  summary: "Dry-run diff against live data",
+  description:
+    "Classifies every valid staged row as create, update, unchanged or conflict against the " +
+    "school's live students, parents and links, with the field changes each update makes. " +
+    "Read-only. The migration recomputes this plan when it runs, so it reflects live data then.",
+  security: [{ bearerAuth: [] }],
+  request: { params: importIdParamSchema, query: importDiffQuerySchema },
+  responses: standardResponses(
+    { 200: { description: "The dry-run diff.", schema: importDiffSchema } },
+    [400, 401, 403, 404, 500],
+  ),
+});
+
+const listStudentImportMappingsRoute = createRoute({
+  method: "get",
+  path: "/api/imports/students/mappings",
+  tags: ["Imports"],
+  operationId: "listStudentImportMappings",
+  summary: "List saved column mappings",
+  description: "The school's saved CSV column mappings, by name.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "Saved mappings.", schema: studentImportMappingListSchema } },
+    [401, 403, 500],
+  ),
+});
+
+const createStudentImportMappingRoute = createRoute({
+  method: "post",
+  path: "/api/imports/students/mappings",
+  tags: ["Imports"],
+  operationId: "createStudentImportMapping",
+  summary: "Save a column mapping",
+  description:
+    "Saves a column mapping for reuse on later uploads. It must map every required field. " +
+    "Names are unique per school, case-insensitively.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: createStudentImportMappingBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 201: { description: "The saved mapping.", schema: studentImportMappingSchema } },
+    [400, 401, 403, 409, 500],
+  ),
+});
+
+const updateSavedStudentImportMappingRoute = createRoute({
+  method: "patch",
+  path: "/api/imports/students/mappings/{mappingId}",
+  tags: ["Imports"],
+  operationId: "updateSavedStudentImportMapping",
+  summary: "Rename or change a saved column mapping",
+  description:
+    "Changes a saved mapping. Imports already staged with it keep the mapping they were staged with.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: mappingIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: updateStudentImportMappingBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "The updated mapping.", schema: studentImportMappingSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const deleteStudentImportMappingRoute = createRoute({
+  method: "delete",
+  path: "/api/imports/students/mappings/{mappingId}",
+  tags: ["Imports"],
+  operationId: "deleteStudentImportMapping",
+  summary: "Delete a saved column mapping",
+  description: "Deletes a saved mapping. Imports already staged with it are unaffected.",
+  security: [{ bearerAuth: [] }],
+  request: { params: mappingIdParamSchema },
+  responses: {
+    204: { description: "Mapping deleted.", headers: requestIdHeaders },
+    ...standardResponses({}, [401, 403, 404, 500]),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Template
 // ---------------------------------------------------------------------------
@@ -266,6 +421,16 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
   // --- Audit declarations ---
   routes.use("/api/imports/students/upload", auditAction("insert", "student_imports"));
   routes.use("/api/imports/students/:importId/confirm", auditAction("update", "student_imports"));
+  routes.use("/api/imports/students/:importId/mapping", auditAction("update", "student_imports"));
+  routes.use("/api/imports/students/mappings", async (c, next) =>
+    c.req.method === "POST" ? auditAction("insert", "student_import_mappings")(c, next) : next(),
+  );
+  routes.use("/api/imports/students/mappings/:mappingId", async (c, next) =>
+    auditAction(c.req.method === "DELETE" ? "delete" : "update", "student_import_mappings")(
+      c,
+      next,
+    ),
+  );
 
   // --- Handlers ---
 
@@ -280,9 +445,10 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
     }
 
     const fileName = c.req.header("X-File-Name") ?? "students.csv";
+    const { mapping_id } = c.req.valid("query");
 
     const record = await withTenantTx(database, tenantFrom(c), (tx) =>
-      uploadImport(tx, auth.schoolId, auth.userId, fileName, rawCsv),
+      uploadImport(tx, auth.schoolId, auth.userId, fileName, rawCsv, mapping_id),
     );
 
     return c.json(toResponse(record), 201);
@@ -294,7 +460,7 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
     const body = c.req.valid("json");
 
     const record = await withTenantTx(database, tenantFrom(c), (tx) =>
-      confirmImport(tx, auth.schoolId, importId, body.idempotency_key),
+      confirmImport(tx, auth.schoolId, auth.userId, importId, body.idempotency_key),
     );
 
     // Dispatch async processing to the IMPORTS queue.
@@ -327,6 +493,71 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
         "Content-Disposition": 'attachment; filename="student-import-template.csv"',
       },
     });
+  });
+
+  // Registered ahead of getStudentImportRoute for the same reason as the template route above:
+  // "/api/imports/students/mappings" also matches its "{importId}" pattern.
+  routes.openapi(listStudentImportMappingsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const mappings = await withTenantTx(database, tenantFrom(c), (tx) =>
+      listMappings(tx, auth.schoolId),
+    );
+    return c.json({ mappings: mappings.map(toMappingResponse) }, 200);
+  });
+
+  routes.openapi(createStudentImportMappingRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+    const mapping = await withTenantTx(database, tenantFrom(c), (tx) =>
+      createMapping(tx, auth.schoolId, auth.userId, body.name, body.column_mapping),
+    );
+    return c.json(toMappingResponse(mapping), 201);
+  });
+
+  routes.openapi(updateSavedStudentImportMappingRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { mappingId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const mapping = await withTenantTx(database, tenantFrom(c), (tx) =>
+      updateMapping(tx, auth.schoolId, mappingId, body),
+    );
+    return c.json(toMappingResponse(mapping), 200);
+  });
+
+  routes.openapi(deleteStudentImportMappingRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { mappingId } = c.req.valid("param");
+    await withTenantTx(database, tenantFrom(c), (tx) =>
+      deleteMapping(tx, auth.schoolId, mappingId),
+    );
+    return new Response(null, { status: 204 });
+  });
+
+  routes.openapi(updateStudentImportMappingRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { importId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const record = await withTenantTx(database, tenantFrom(c), (tx) =>
+      updateImportMapping(
+        tx,
+        auth.schoolId,
+        auth.userId,
+        importId,
+        body.column_mapping,
+        body.save_as,
+      ),
+    );
+    return c.json(toResponse(record), 200);
+  });
+
+  routes.openapi(getStudentImportDiffRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { importId } = c.req.valid("param");
+    const { action } = c.req.valid("query");
+    const diff = await withTenantTx(database, tenantFrom(c), (tx) =>
+      getImportDiff(tx, auth.schoolId, importId, action),
+    );
+    return c.json(diff, 200);
   });
 
   routes.openapi(getStudentImportRoute, async (c) => {
