@@ -78,9 +78,12 @@ describe("standardResponses", () => {
 
 describe("PROBLEM_STATUSES", () => {
   // Mirrors STATUS_TITLES/STATUS_ERROR_CODES in middleware/errorHandler.ts, plus the 500 that
-  // mapError falls back to. If a status is added there, it belongs here; if one is documented that
-  // the handler cannot produce, the document is lying.
+  // mapError falls back to, plus the 501/502 payment-provider errors raise as CodedHttpExceptions.
+  // If a status is added there, it belongs here; if one is documented that the handler cannot
+  // produce, the document is lying.
   test("is exactly the set errorHandlerMiddleware can emit", () => {
-    expect([...PROBLEM_STATUSES]).toEqual([400, 401, 402, 403, 404, 409, 410, 422, 429, 500, 503]);
+    expect([...PROBLEM_STATUSES]).toEqual([
+      400, 401, 402, 403, 404, 409, 410, 422, 429, 500, 501, 502, 503,
+    ]);
   });
 });

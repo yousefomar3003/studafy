@@ -44,6 +44,14 @@ export function isAbsoluteOrigin(value: string): boolean {
  * Environment configuration for the API. It is parsed and validated once at bootstrap so that an
  * invalid environment fails fast — before the server binds a port — with a named, readable error.
  */
+/**
+ * An empty environment variable is an unset one: it is present only because a deployment template
+ * always injects the key.
+ */
+function emptyAsUnset(value: unknown): unknown {
+  return value === "" ? undefined : value;
+}
+
 export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -167,6 +175,12 @@ export const envSchema = z
     // Stripe billing integration. All optional — activates only when both are set.
     STRIPE_SECRET_KEY: z.string().min(1).optional(),
     STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    // Tap Payments (ST-298), for schools in Tap's MENA countries. Optional; activates only when both
+    // are set. TAP_WEBHOOK_URL is the public URL of POST /api/subscriptions/webhook/tap. An empty
+    // string means unset: the ECS task definition always injects both keys, and Terraform defaults
+    // them to "" where Tap is off (module.secrets' app_secret_defaults).
+    TAP_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().startsWith("sk_").optional()),
+    TAP_WEBHOOK_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
     // Cross-encoder re-ranking (ST-163) kill switch. Off by default: an unset or "false" value leaves
     // the retrieval route on the raw RRF ranking with zero re-ranking cost. Validated as an explicit
     // two-value string so a typo ("yes") fails bootstrap instead of silently flipping the feature on.
@@ -392,6 +406,15 @@ export const envSchema = z
         code: "custom",
         path: ["STRIPE_SECRET_KEY"],
         message: "STRIPE_SECRET_KEY is required when STRIPE_WEBHOOK_SECRET is set",
+      });
+    }
+
+    // Tap: same both-or-neither rule as Stripe.
+    if ((env.TAP_SECRET_KEY === undefined) !== (env.TAP_WEBHOOK_URL === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: [env.TAP_SECRET_KEY === undefined ? "TAP_SECRET_KEY" : "TAP_WEBHOOK_URL"],
+        message: "TAP_SECRET_KEY and TAP_WEBHOOK_URL must be set together",
       });
     }
 

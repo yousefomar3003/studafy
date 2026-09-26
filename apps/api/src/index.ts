@@ -18,7 +18,11 @@ import { KeyStore } from "./modules/auth";
 import { createFlagsService } from "./modules/flags";
 import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
 import { resolveMobileReleaseConfig } from "./modules/mobile";
-import { startEntitlementInvalidationSubscriber, StripeAdapter } from "./modules/subscriptions";
+import {
+  startEntitlementInvalidationSubscriber,
+  StripeAdapter,
+  TapAdapter,
+} from "./modules/subscriptions";
 import { createReadinessProbe } from "./readiness";
 import { closeRedis, createRedisClient } from "./redis";
 
@@ -89,6 +93,14 @@ const stripeProvider =
         secretKey: env.STRIPE_SECRET_KEY,
         webhookSecret: env.STRIPE_WEBHOOK_SECRET,
       })
+    : null;
+
+// Tap Payments adapter (ST-298) for MENA-region schools. Null unless both variables are set; env.ts
+// refuses one without the other. Tap signs webhooks with the secret key itself, so there is no
+// separate webhook secret -- the URL is needed because Tap takes it per charge, not per account.
+const tapProvider =
+  env.TAP_SECRET_KEY && env.TAP_WEBHOOK_URL
+    ? new TapAdapter({ secretKey: env.TAP_SECRET_KEY, webhookUrl: env.TAP_WEBHOOK_URL })
     : null;
 
 // LLM gateway (ST-164). The provider is built here — the only place with the environment, the
@@ -167,6 +179,7 @@ const app = createApp({
   securityEventSink,
   storage,
   stripeProvider,
+  tapProvider,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",

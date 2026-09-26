@@ -160,6 +160,15 @@ module "secrets" {
     } : {}
   )
 
+  # Tap Payments (ST-298) is optional per environment, but its keys are referenced unconditionally by
+  # the api and workers task definitions, so they must exist in both secrets. Empty means "Tap off"
+  # (apps/api/src/env.ts, apps/workers' tap renewal job); supply real values through
+  # TF_VAR_secrets_app_secret_values to turn Tap on. See docs/runbooks/tap-payments-setup.md.
+  app_secret_defaults = {
+    api     = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "" }
+    workers = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "" }
+  }
+
   postgres_connection_secret_arn = module.postgres.connection_secret_arn
   postgres_rotation_days         = var.postgres_rotation_days
 

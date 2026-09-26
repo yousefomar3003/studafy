@@ -8,7 +8,9 @@
  *
  * Provider-agnostic in the parts that can be: the state machine, the fold, and the transition tables
  * describe Studafy's lifecycle. `event-mapping` and the event names in `state-machine` are Stripe's
- * vocabulary and are the seam a second provider would extend.
+ * vocabulary. A second provider (Tap) normalizes its events *into* that vocabulary at the adapter,
+ * so the state machine has one dialect to read; only the ledger key and the customer-id column are
+ * provider-aware.
  */
 
 export {
@@ -21,7 +23,10 @@ export {
   MAX_LAST_ERROR_LENGTH,
   truncateError,
 } from "./billing-event-store";
-export type { ClaimInput, HistoricalEvent } from "./billing-event-store";
+export type { BillingProvider, ClaimInput, HistoricalEvent } from "./billing-event-store";
+
+export { addBillingInterval, isBillingInterval } from "./billing-period";
+export type { BillingInterval } from "./billing-period";
 
 export { resolveSchoolId, resolveTarget } from "./attribution";
 export type { AttributionTarget } from "./attribution";

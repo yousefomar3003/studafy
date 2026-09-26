@@ -36,6 +36,7 @@
         "@studafy/observability": "workspace:*",
         "@studafy/sanitize": "workspace:*",
         "@studafy/shared-schemas": "workspace:*",
+        "@studafy/tap-payments": "workspace:*",
         "bullmq": "5.79.3",
         "hono": "4.12.34",
         "ioredis": "5.10.1",
@@ -151,6 +152,7 @@
         "@studafy/observability": "workspace:*",
         "@studafy/progress-reporting": "workspace:*",
         "@studafy/sanitize": "workspace:*",
+        "@studafy/tap-payments": "workspace:*",
         "@xmldom/xmldom": "0.8.15",
         "bidi-js": "1.0.3",
         "bullmq": "5.79.3",
@@ -385,6 +387,16 @@
         "@studafy/constants": "workspace:*",
         "zod": "4.1.12",
       },
+      "devDependencies": {
+        "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
+        "@types/bun": "1.3.14",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/tap-payments": {
+      "name": "@studafy/tap-payments",
+      "version": "0.0.0",
       "devDependencies": {
         "@studafy/config": "workspace:*",
         "@studafy/tsconfig": "workspace:*",
@@ -995,6 +1007,8 @@
     "@studafy/sanitize": ["@studafy/sanitize@workspace:packages/sanitize"],
 
     "@studafy/shared-schemas": ["@studafy/shared-schemas@workspace:packages/shared-schemas"],
+
+    "@studafy/tap-payments": ["@studafy/tap-payments@workspace:packages/tap-payments"],
 
     "@studafy/tsconfig": ["@studafy/tsconfig@workspace:packages/tsconfig"],
 

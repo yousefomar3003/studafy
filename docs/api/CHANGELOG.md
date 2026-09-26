@@ -13,6 +13,19 @@ when it required the `version-bump` label.
 
 ### Added
 
+- `POST /api/subscriptions/webhook/tap` — Tap Payments charge webhooks. Authenticated by the
+  `hashstring` HMAC (keyed with the Tap secret key), not a bearer token; the charge is re-read from
+  Tap before use. Normalized to the same billing events as the Stripe webhook. ST-298.
+- `POST /api/finance/online-payments` — start a hosted online payment for an invoice's full
+  outstanding balance, at the payment provider for the school's region (Tap Payments in AE, BH,
+  EG, JO, KW, OM, QA, SA; Stripe elsewhere). Open to a parent linked to the student and to staff
+  with `billing:update`. ST-298.
+- `GET /api/finance/online-payments/{paymentId}` — an online fee payment's status; visible to the
+  payer and to staff with `billing:read`. ST-298.
+- `501` and `502` problem responses. A `502` on the checkout routes and
+  `GET /api/subscriptions/current/invoices` means the payment provider failed; a `501` means the
+  school's provider has no equivalent for the operation. ST-298.
+
 - `GET /meta/mobile-versions` — the forced-update floor endpoint from ST-257
   (`GET /api/mobile/config`), also served under this canonical name. Same handler, same schema,
   same unauthenticated posture; `/api/mobile/config` stays mounted unchanged because the released

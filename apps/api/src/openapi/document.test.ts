@@ -153,6 +153,8 @@ describe("structure", () => {
         "/api/finance/expenses/{expenseId}/attachments",
         "/api/finance/payments",
         "/api/finance/payments/{paymentId}",
+        "/api/finance/online-payments",
+        "/api/finance/online-payments/{paymentId}",
         // Refund processing (ST-124). Maker-checker workflow with ERPNext Credit Notes.
         "/api/finance/refunds",
         "/api/finance/refunds/{refundId}",
@@ -334,6 +336,7 @@ describe("structure", () => {
         "/api/subscriptions/portal",
         "/api/subscriptions/school/checkout",
         "/api/subscriptions/webhook/stripe",
+        "/api/subscriptions/webhook/tap",
         "/api/teachers",
 
         "/api/approvals/bulk-decision",
@@ -544,6 +547,7 @@ describe("security", () => {
         "GET /api/finance/expenses/{expenseId}",
         "GET /api/finance/payments",
         "GET /api/finance/payments/{paymentId}",
+        "GET /api/finance/online-payments/{paymentId}",
         "GET /api/finance/scholarship-discounts",
         "GET /api/finance/scholarship-discounts/awards",
         "GET /api/finance/refunds",
@@ -737,6 +741,7 @@ describe("security", () => {
         "POST /api/finance/expenses/upload-url",
         "POST /api/finance/expenses/{expenseId}/attachments",
         "POST /api/finance/payments",
+        "POST /api/finance/online-payments",
         "POST /api/finance/reports/export",
         "POST /api/finance/refunds/initiate",
         "POST /api/finance/refunds/{refundId}/approve",

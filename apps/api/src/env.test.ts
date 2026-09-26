@@ -259,3 +259,34 @@ describe("loadEnv", () => {
     );
   });
 });
+
+describe("Tap Payments configuration (ST-298)", () => {
+  const key = "sk_test_abc";
+  const url = "https://api.studafy.test/api/subscriptions/webhook/tap";
+
+  test("both set turns Tap on", () => {
+    const env = loadEnv({ TAP_SECRET_KEY: key, TAP_WEBHOOK_URL: url });
+    expect(env.TAP_SECRET_KEY).toBe(key);
+    expect(env.TAP_WEBHOOK_URL).toBe(url);
+  });
+
+  // The ECS task definitions always inject both keys; Terraform defaults them to "" where Tap is
+  // off. That must boot, with Tap off -- not fail on an empty "sk_" prefix check.
+  test("both present but empty means Tap is off", () => {
+    const env = loadEnv({ TAP_SECRET_KEY: "", TAP_WEBHOOK_URL: "" });
+    expect(env.TAP_SECRET_KEY).toBeUndefined();
+    expect(env.TAP_WEBHOOK_URL).toBeUndefined();
+  });
+
+  test("one without the other is refused, whether the other is absent or empty", () => {
+    expect(() => loadEnv({ TAP_SECRET_KEY: key })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ TAP_SECRET_KEY: key, TAP_WEBHOOK_URL: "" })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ TAP_SECRET_KEY: "", TAP_WEBHOOK_URL: url })).toThrow(EnvValidationError);
+  });
+
+  test("a key that is not a Tap secret key is refused", () => {
+    expect(() => loadEnv({ TAP_SECRET_KEY: "pk_test_abc", TAP_WEBHOOK_URL: url })).toThrow(
+      EnvValidationError,
+    );
+  });
+});

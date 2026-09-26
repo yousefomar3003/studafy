@@ -3,13 +3,15 @@ import { ERROR_CODES } from "@studafy/constants";
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
+import { requirePaymentProvider } from "../payment-provider-routing";
 
 import { requireSchoolSubscription } from "./subscription-service";
 
 import type { SchoolSubscription } from "./subscription-service";
 import type { Database } from "../../../db";
 import type { TenantContext } from "../../../db/tenant-tx";
-import type { PaymentProviderPort } from "../ports/payment-provider";
+import type { PaymentProviderRegistry } from "../payment-provider-routing";
+import type { TransactionSql } from "postgres";
 
 export interface ScheduleCancellationParams {
   schoolId: string;
@@ -27,13 +29,14 @@ export interface ReverseCancellationParams {
  * Schedule a school's subscription to cancel at the end of its current billing period.
  *
  * The subscription stays `active` (or whatever live status it holds) and keeps its access until
- * the period ends; `cancel_at_period_end` records the intent so the portal can show it, and Stripe's
- * own `customer.subscription.deleted` webhook is what eventually moves `status` to `canceled`
- * through the existing state machine. This function never writes `status` itself.
+ * the period ends; `cancel_at_period_end` records the intent so the portal can show it. What eventually moves `status` to `canceled` depends on who bills the
+ * subscription: for Stripe, its `customer.subscription.deleted` webhook through the state machine;
+ * for Tap, the renewal worker, which reads this flag at period end and applies the `canceled`
+ * system transition instead of charging. This function never writes `status` itself.
  */
 export async function scheduleCancellation(
   database: Database,
-  provider: PaymentProviderPort,
+  providers: PaymentProviderRegistry,
   params: ScheduleCancellationParams,
 ): Promise<SchoolSubscription> {
   const { schoolId, reason, retentionOfferShown, tenantContext } = params;
@@ -49,15 +52,12 @@ export async function scheduleCancellation(
       );
     }
 
-    if (!before.stripeSubscriptionId) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.SUBSCRIPTION_NOT_LINKED_TO_PROVIDER,
-        "Subscription has no payment-provider record to cancel",
-      );
+    const billing = await billingFor(tx, before.id, before.stripeSubscriptionId, "cancel");
+    if (billing.kind === "stripe") {
+      await requirePaymentProvider(providers, "stripe").port.scheduleCancellation({
+        providerSubscriptionId: billing.providerSubscriptionId,
+      });
     }
-
-    await provider.scheduleCancellation({ providerSubscriptionId: before.stripeSubscriptionId });
 
     const retentionState = retentionOfferShown ? "offer_shown" : "none";
 
@@ -103,7 +103,7 @@ export async function scheduleCancellation(
 /** Undo a pending end-of-period cancellation. Marks the retention state as won-back. */
 export async function reverseCancellation(
   database: Database,
-  provider: PaymentProviderPort,
+  providers: PaymentProviderRegistry,
   params: ReverseCancellationParams,
 ): Promise<SchoolSubscription> {
   const { schoolId, tenantContext } = params;
@@ -119,15 +119,12 @@ export async function reverseCancellation(
       );
     }
 
-    if (!before.stripeSubscriptionId) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.SUBSCRIPTION_NOT_LINKED_TO_PROVIDER,
-        "Subscription has no payment-provider record to update",
-      );
+    const billing = await billingFor(tx, before.id, before.stripeSubscriptionId, "update");
+    if (billing.kind === "stripe") {
+      await requirePaymentProvider(providers, "stripe").port.reverseCancellation({
+        providerSubscriptionId: billing.providerSubscriptionId,
+      });
     }
-
-    await provider.reverseCancellation({ providerSubscriptionId: before.stripeSubscriptionId });
 
     const [after] = await tx<SchoolSubscription[]>`
       UPDATE app.subscriptions SET
@@ -165,4 +162,33 @@ export async function reverseCancellation(
 
     return after!;
   });
+}
+
+/**
+ * Who bills this subscription, as far as cancellation is concerned.
+ *
+ * A Stripe subscription id means Stripe renews it and must be told. A saved Tap card means Studafy's
+ * renewal worker renews it and reads `cancel_at_period_end` itself, so the local flag is the whole
+ * change. Neither means nothing has been paid through a provider yet, and there is nothing to cancel.
+ */
+async function billingFor(
+  tx: TransactionSql,
+  subscriptionId: string,
+  stripeSubscriptionId: string | null,
+  verb: "cancel" | "update",
+): Promise<{ kind: "stripe"; providerSubscriptionId: string } | { kind: "tap" }> {
+  if (stripeSubscriptionId) return { kind: "stripe", providerSubscriptionId: stripeSubscriptionId };
+
+  const [row] = await tx<{ tap_billed: boolean }[]>`
+    SELECT tap_card_id IS NOT NULL AS tap_billed
+    FROM app.subscriptions
+    WHERE id = ${subscriptionId}::uuid
+  `;
+  if (row?.tap_billed) return { kind: "tap" };
+
+  throw new CodedHttpException(
+    400,
+    ERROR_CODES.SUBSCRIPTION_NOT_LINKED_TO_PROVIDER,
+    `Subscription has no payment-provider record to ${verb}`,
+  );
 }

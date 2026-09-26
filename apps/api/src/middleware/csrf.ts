@@ -107,6 +107,8 @@ const EXEMPT_PATHS = [
   // Stripe delivery with 403 missing_token before the handler runs: Stripe sends no session cookie
   // and no Authorization header, so neither the exemption list nor the Bearer exemption covered it.
   "/api/subscriptions/webhook/stripe",
+  // Tap billing webhook (ST-298). Same posture: authenticated by the `hashstring` HMAC, no cookie.
+  "/api/subscriptions/webhook/tap",
   // School self-registration (ST-184), same posture as /api/auth/login above: no ambient authority
   // (cookie or Bearer header) a cross-site page could forge — a forged POST here accomplishes
   // nothing an attacker could not already do by calling the endpoint directly. Without this entry a

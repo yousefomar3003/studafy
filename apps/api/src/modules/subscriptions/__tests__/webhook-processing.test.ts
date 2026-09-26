@@ -6,7 +6,7 @@
  * illegal-transition parking behaviour. The fourth (signature failure returns 400 and alerts) needs
  * the HTTP stack and lives in webhook-signature.test.ts.
  *
- * These drive `handleStripeWebhook` directly rather than through Hono. The route is one `await` and
+ * These drive `handleBillingWebhook` directly rather than through Hono. The route is one `await` and
  * a `c.json`; what is worth exercising here is the transaction, the RLS-forced tables and the audit
  * writes, and going through HTTP would only add a token-minting step to every case.
  */
@@ -19,7 +19,7 @@ import postgres from "postgres";
 import { integrationEnabled } from "../../../../tests/harness";
 import { withSystemTx } from "../../../db/tenant-tx";
 import { publishEntitlementChange } from "../entitlements/entitlement-change-publisher";
-import { handleStripeWebhook } from "../stripe/webhook-processor";
+import { handleBillingWebhook } from "../webhooks/webhook-processor";
 
 import {
   createBillingDatabase,
@@ -63,8 +63,13 @@ function setup(): Promise<BillingFixture> {
 }
 
 function deliver(f: BillingFixture, event: StubEventInput) {
-  return handleStripeWebhook(
-    { database: f.db.sql, provider: createProviderStub(), logger: silentLogger },
+  return handleBillingWebhook(
+    {
+      database: f.db.sql,
+      providerName: "stripe",
+      provider: createProviderStub(),
+      logger: silentLogger,
+    },
     encodeEvent(event),
     "t=1,v1=stub",
     CONTEXT,
@@ -234,7 +239,7 @@ describe("audit", () => {
   // The coupling ST-132 requires: if the audit write fails, the transition must not survive it.
   //
   // Asserted against `processBillingEvent` with a throwing audit writer rather than against
-  // `handleStripeWebhook` with a raising database trigger. The coupling *is* the shared core's
+  // `handleBillingWebhook` with a raising database trigger. The coupling *is* the shared core's
   // transaction, and injecting the failure at the audit port tests exactly that, with no dependence
   // on DDL or on how the API layer records a transient failure afterwards. It also states the
   // guarantee in the terms the port defines it — "must throw on failure" — rather than in terms of
@@ -254,6 +259,7 @@ describe("audit", () => {
           processBillingEvent(
             tx,
             {
+              provider: "stripe",
               id: "evt_audit_fail",
               type: "customer.subscription.updated",
               effectiveAt: new Date(1_700_000_100 * 1000),

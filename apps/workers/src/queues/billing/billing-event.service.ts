@@ -1,5 +1,5 @@
 /**
- * Retrying a Stripe webhook that failed transiently, and dead-lettering it when it will not (ST-132).
+ * Retrying a payment-provider webhook that failed transiently, and dead-lettering it when it will not (ST-132).
  *
  * ## Why the job carries only an id
  *
@@ -33,7 +33,7 @@ import { describeError, isTerminalFailure } from "../notifications/dead-letter";
 import { publishEntitlementChange } from "./entitlement-change-publisher";
 
 import type { DeadLetterLogger, FailedHandler } from "../notifications/dead-letter";
-import type { BillingLogger, ProcessOutcome } from "@studafy/billing";
+import type { BillingLogger, BillingProvider, ProcessOutcome } from "@studafy/billing";
 
 /** The subset of the row a retry needs to reconstruct the event. */
 interface StoredEvent {
@@ -59,8 +59,8 @@ export interface ProcessBillingEventResult {
  * including "already processed", which is the ordinary result of a retry racing a redelivery that
  * succeeded first.
  */
-export async function processStripeBillingEvent(
-  data: { providerEventId: string },
+export async function retryBillingEvent(
+  data: { provider: BillingProvider; providerEventId: string },
   databaseUrl: string,
   log: BillingLogger,
 ): Promise<ProcessBillingEventResult> {
@@ -73,14 +73,14 @@ export async function processStripeBillingEvent(
       const rows = await tx<StoredEvent[]>`
         SELECT id, provider_event_id, event_type, effective_at, payload, status::text AS status
         FROM app.billing_events
-        WHERE provider = 'stripe' AND provider_event_id = ${data.providerEventId}
+        WHERE provider = ${data.provider} AND provider_event_id = ${data.providerEventId}
         FOR UPDATE
       `;
 
       const row = rows[0];
       if (!row) {
         // The claim rolled back with the failed transaction, so there is nothing to retry and the
-        // event was never applied. Stripe's own redelivery is the recovery path here, not this job.
+        // event was never applied. The provider's own redelivery is the recovery path, not this job.
         return { processed: false, reason: "no billing_events row for this provider event id" };
       }
 
@@ -98,6 +98,7 @@ export async function processStripeBillingEvent(
         tx,
         row.id,
         {
+          provider: data.provider,
           id: row.provider_event_id,
           type: row.event_type,
           effectiveAt: row.effective_at,
@@ -125,7 +126,8 @@ export async function processStripeBillingEvent(
  * Runs on its own connection because the job's transaction is long gone by the time BullMQ decides
  * a failure was terminal.
  */
-export async function deadLetterStripeBillingEvent(
+export async function deadLetterBillingEvent(
+  provider: BillingProvider,
   providerEventId: string,
   reason: string,
   databaseUrl: string,
@@ -139,7 +141,7 @@ export async function deadLetterStripeBillingEvent(
         SET status = 'dlq',
             last_error = ${truncateError(reason)},
             updated_at = CURRENT_TIMESTAMP
-        WHERE provider = 'stripe'
+        WHERE provider = ${provider}
           AND provider_event_id = ${providerEventId}
           AND status IN ('pending', 'failed')
       `;
@@ -171,7 +173,10 @@ export function billingDeadLetterListener(
   return (job, error) => {
     if (!isTerminalFailure(job) || job.name !== JOB_NAMES.PROCESS_BILLING_EVENT) return;
 
-    const providerEventId = (job.data as { providerEventId?: unknown } | null)?.providerEventId;
+    const jobData = job.data as { provider?: unknown; providerEventId?: unknown } | null;
+    const providerEventId = jobData?.providerEventId;
+    // Same default the job schema applies: a job enqueued before ST-298 is a Stripe event.
+    const provider: BillingProvider = jobData?.provider === "tap" ? "tap" : "stripe";
     const { errorClass, message } = describeError(error);
 
     // Unconditional and first: it is the only alert path that does not depend on the database being
@@ -179,12 +184,13 @@ export function billingDeadLetterListener(
     log.error(
       {
         event: "billing_event_dead_lettered",
+        provider,
         provider_event_id: providerEventId ?? null,
         job_id: job.id ?? null,
         attempts_made: job.attemptsMade,
         err: { type: errorClass, message: error.message, stack: error.stack },
       },
-      "stripe billing event exhausted its retries",
+      "billing event exhausted its retries",
     );
 
     // Unconditional and beside the log line, for the identical reason -- see
@@ -203,7 +209,8 @@ export function billingDeadLetterListener(
       return;
     }
 
-    void deadLetterStripeBillingEvent(
+    void deadLetterBillingEvent(
+      provider,
       providerEventId,
       `Retries exhausted after ${job.attemptsMade} attempts: ${errorClass}: ${message}`,
       databaseUrl,
@@ -214,7 +221,7 @@ export function billingDeadLetterListener(
           provider_event_id: providerEventId,
           err: writeError,
         },
-        "could not park a dead-lettered stripe billing event",
+        "could not park a dead-lettered billing event",
       );
     });
   };

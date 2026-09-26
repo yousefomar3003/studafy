@@ -15,7 +15,7 @@
  *
  * ## System-initiated, therefore `studafy_admin`
  *
- * This runs under `withSystemTx` + `setTenantScope`, the same pairing `handleStripeWebhook` uses --
+ * This runs under `withSystemTx` + `setTenantScope`, the same pairing `handleBillingWebhook` uses --
  * not `withTenantTx`, which assumes an acting `studafy_app` user. There is no acting user here (a
  * school suspension is a platform decision, not a click), and just as importantly `app.students`
  * carries a second, role-scoped RLS policy beyond plain tenant isolation (`app.can_read_student`),

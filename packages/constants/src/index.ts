@@ -38,5 +38,7 @@ export {
   type FeatureFlagDefinition,
   type FlagName,
 } from "./feature-flags";
+export { PAYMENT_PURPOSES } from "./payment-purposes";
+export type { PaymentPurpose } from "./payment-purposes";
 export { SUBSCRIPTION_STATUSES } from "./subscription-status";
 export type { SubscriptionStatus } from "./subscription-status";

@@ -41,6 +41,11 @@ export const LEGAL_HOLD_TABLES: ReadonlySet<string> = new Set([
   "subscriptions",
   "ai_subscriptions",
   "entitlement_versions",
+  // Tap renewal charges, online fee payments and the payer's provider customer (ST-298): each is
+  // the local half of a money movement at a payment provider.
+  "tap_renewal_attempts",
+  "online_fee_payments",
+  "payment_provider_customers",
   // ERPNext-synced finance records and their caches (docs/database/finance-data-model.md).
   "invoice_batches",
   "invoice_batch_items",

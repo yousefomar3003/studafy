@@ -79,7 +79,7 @@ export async function requireSchoolSubscription(
 // a `currentStatus` argument and never read it -- it applied whatever status it was handed, which is
 // precisely the unguarded transition this module now refuses to perform. Both were only ever called
 // by the old webhook handler; the status change, the period write and the audit row are now one
-// statement in stripe/webhook-processor.ts, guarded by the state machine, so leaving these behind
+// statement in webhooks/webhook-processor.ts, guarded by the state machine, so leaving these behind
 // would leave a second, unguarded way to move a subscription.
 
 export async function getActivePlans(database: import("postgres").Sql): Promise<PlanWithPrices[]> {

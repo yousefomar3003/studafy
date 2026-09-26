@@ -5,6 +5,8 @@ import type {
   CreateCheckoutSessionResult,
   CreateCustomerInput,
   CreateCustomerResult,
+  CreatePaymentSessionInput,
+  CreatePaymentSessionResult,
   PaymentProviderPort,
   PauseSubscriptionInput,
   ResumeSubscriptionInput,
@@ -61,6 +63,39 @@ export class StripeAdapter implements PaymentProviderPort {
       subscription_data: {
         metadata: input.metadata,
       },
+    });
+
+    if (!session.url) {
+      throw new Error("Stripe Checkout session returned no URL");
+    }
+
+    return { url: session.url, sessionId: session.id };
+  }
+
+  /**
+   * A one-time Checkout payment (fees). `price_data` rather than a catalog price: a fee amount is
+   * whatever the invoice owes, not a product. Metadata goes on the session, which is the object the
+   * `checkout.session.*` webhooks carry back.
+   */
+  async createPaymentSession(
+    input: CreatePaymentSessionInput,
+  ): Promise<CreatePaymentSessionResult> {
+    const session = await this.stripe.checkout.sessions.create({
+      customer: input.customerId,
+      mode: "payment",
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: input.currency.toLowerCase(),
+            unit_amount: input.amountMinor,
+            product_data: { name: input.description },
+          },
+        },
+      ],
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+      metadata: input.metadata,
     });
 
     if (!session.url) {

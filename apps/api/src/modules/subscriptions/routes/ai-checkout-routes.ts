@@ -1,8 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ERROR_CODES } from "@studafy/constants";
 import { z } from "zod";
 
-import { CodedHttpException } from "../../../coded-http-exception";
 import { requireAuth } from "../../../middleware/authContext";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { standardResponses } from "../../../openapi/responses";
@@ -11,18 +9,7 @@ import { createAiCheckoutSession } from "../services/checkout-service";
 
 import type { Database } from "../../../db";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { PaymentProviderPort } from "../ports/payment-provider";
-
-function requireProvider(provider: PaymentProviderPort | null): PaymentProviderPort {
-  if (!provider) {
-    throw new CodedHttpException(
-      503,
-      ERROR_CODES.STRIPE_NOT_CONFIGURED,
-      "Stripe billing is not configured for this deployment",
-    );
-  }
-  return provider;
-}
+import type { PaymentProviderRegistry } from "../payment-provider-routing";
 
 const AiCheckoutRequestSchema = z.object({
   priceId: z.string().uuid(),
@@ -56,25 +43,24 @@ const aiCheckoutRoute = createRoute({
         schema: AiCheckoutResponseSchema,
       },
     },
-    [400, 401, 403, 404, 503],
+    [400, 401, 403, 404, 502, 503],
   ),
 });
 
 export function aiCheckoutRoutes(
   database: Database,
-  provider: PaymentProviderPort | null,
+  providers: PaymentProviderRegistry,
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 
   app.use("/api/subscriptions/ai/checkout", requireChannel(AUTH_CHANNELS.WEB));
 
   app.openapi(aiCheckoutRoute, async (c) => {
-    const active = requireProvider(provider);
     const auth = requireAuth(c);
     const body = c.req.valid("json");
     const requestId = c.get("requestId");
 
-    const result = await createAiCheckoutSession(database, active, {
+    const result = await createAiCheckoutSession(database, providers, {
       schoolId: auth.schoolId,
       priceId: body.priceId,
       studentId: body.studentId,

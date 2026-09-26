@@ -72,6 +72,7 @@ export function createProviderStub(): ProviderStub {
 
     createCustomer: unsupported,
     createCheckoutSession: unsupported,
+    createPaymentSession: unsupported,
     createBillingPortalSession: unsupported,
     syncProduct: unsupported,
     syncPrice: unsupported,
@@ -114,6 +115,8 @@ export interface BillingFixture {
   subscriptionId: string;
   stripeCustomerId: string;
   stripeSubscriptionId: string;
+  /** The same school's customer at Tap (ST-298). Shaped like Stripe's on purpose: both are `cus_`. */
+  tapCustomerId: string;
 }
 
 /**
@@ -127,6 +130,7 @@ export interface BillingFixture {
 export async function createBillingFixture(db: TestDatabase): Promise<BillingFixture> {
   const stripeCustomerId = `cus_${crypto.randomUUID().replaceAll("-", "").slice(0, 14)}`;
   const stripeSubscriptionId = `sub_${crypto.randomUUID().replaceAll("-", "").slice(0, 14)}`;
+  const tapCustomerId = `cus_TS${crypto.randomUUID().replaceAll("-", "").slice(0, 14)}`;
 
   const seeded = await db.sql.begin(async (tx) => {
     await tx.unsafe("SET LOCAL ROLE studafy_admin");
@@ -139,10 +143,10 @@ export async function createBillingFixture(db: TestDatabase): Promise<BillingFix
 
     const slug = `billing-${crypto.randomUUID().slice(0, 8)}`;
     const [school] = await tx<{ id: string }[]>`
-      INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id, stripe_customer_id)
+      INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id, stripe_customer_id, tap_customer_id)
       VALUES (
         ${slug}, ${`Billing School ${slug}`}, ${`${slug}@admin.local`}, ${`${slug}@admin.local`},
-        ${reference!.country}, ${reference!.currency}, ${stripeCustomerId}
+        ${reference!.country}, ${reference!.currency}, ${stripeCustomerId}, ${tapCustomerId}
       )
       RETURNING id
     `;
@@ -187,7 +191,7 @@ export async function createBillingFixture(db: TestDatabase): Promise<BillingFix
     return { schoolId, subscriptionId: subscription!.id, studentId: student!.id };
   });
 
-  return { db, ...seeded, stripeCustomerId, stripeSubscriptionId };
+  return { db, ...seeded, stripeCustomerId, stripeSubscriptionId, tapCustomerId };
 }
 
 /**

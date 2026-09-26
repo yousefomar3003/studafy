@@ -8,6 +8,8 @@ import type {
   CreateCustomerResult,
   CreateCheckoutSessionInput,
   CreateCheckoutSessionResult,
+  CreatePaymentSessionInput,
+  CreatePaymentSessionResult,
   CreateBillingPortalSessionInput,
   CreateBillingPortalSessionResult,
   SyncProductInput,
@@ -36,6 +38,7 @@ export function contractTests(name: string, createAdapter: AdapterFactory): void
       expect(adapter).toBeDefined();
       expect(typeof adapter.createCustomer).toBe("function");
       expect(typeof adapter.createCheckoutSession).toBe("function");
+      expect(typeof adapter.createPaymentSession).toBe("function");
       expect(typeof adapter.createBillingPortalSession).toBe("function");
       expect(typeof adapter.syncProduct).toBe("function");
       expect(typeof adapter.syncPrice).toBe("function");
@@ -60,11 +63,28 @@ export function contractTests(name: string, createAdapter: AdapterFactory): void
       const input: CreateCheckoutSessionInput = {
         customerId: "",
         priceId: "price_mock",
+        amountMinor: 15000,
+        currency: "JOD",
         successUrl: "https://example.com/success",
         cancelUrl: "https://example.com/cancel",
         metadata: {},
       };
       await expect(adapter.createCheckoutSession(input)).rejects.toThrow(PaymentProviderError);
+    });
+
+    test("createPaymentSession rejects empty customerId with PaymentProviderError", async () => {
+      const adapter = createAdapter();
+      await expect(
+        adapter.createPaymentSession({
+          customerId: "",
+          amountMinor: 15_000,
+          currency: "JOD",
+          description: "Tuition",
+          successUrl: "https://example.com/success",
+          cancelUrl: "https://example.com/cancel",
+          metadata: {},
+        }),
+      ).rejects.toThrow(PaymentProviderError);
     });
 
     test("createBillingPortalSession rejects empty customerId with PaymentProviderError", async () => {
@@ -151,6 +171,8 @@ export function contractTests(name: string, createAdapter: AdapterFactory): void
             adapter.createCheckoutSession({
               customerId: "",
               priceId: "",
+              amountMinor: 0,
+              currency: "",
               successUrl: "",
               cancelUrl: "",
               metadata: {},
@@ -222,6 +244,18 @@ class MockAdapter implements PaymentProviderPort {
       throw new PaymentProviderError(400, "VALIDATION_FAILED" as never, "customerId is required");
     }
     return { url: `https://checkout.example.com/${input.customerId}`, sessionId: "cs_mock" };
+  }
+
+  async createPaymentSession(
+    input: CreatePaymentSessionInput,
+  ): Promise<CreatePaymentSessionResult> {
+    if (!input.customerId) {
+      throw new PaymentProviderError(400, "VALIDATION_FAILED" as never, "customerId is required");
+    }
+    return {
+      url: `https://checkout.example.com/pay/${input.customerId}`,
+      sessionId: "cs_pay_mock",
+    };
   }
 
   async createBillingPortalSession(

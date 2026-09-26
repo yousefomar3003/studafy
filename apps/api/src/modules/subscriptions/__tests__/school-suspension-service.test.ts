@@ -63,6 +63,7 @@ function createProviderSpy(): PaymentProviderPort & {
     resumed,
     createCustomer: unsupported,
     createCheckoutSession: unsupported,
+    createPaymentSession: unsupported,
     createBillingPortalSession: unsupported,
     syncProduct: unsupported,
     syncPrice: unsupported,

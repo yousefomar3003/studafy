@@ -22,10 +22,14 @@ type ResponseConfig = Exclude<RouteConfig["responses"][string], { $ref: string }
 
 /**
  * Exactly the statuses errorHandlerMiddleware can emit: the intersection of its STATUS_TITLES and
- * STATUS_ERROR_CODES maps, plus the 500 that mapError falls back to for unknown errors. Declaring a
- * problem response outside this set would document a response no code path can produce.
+ * STATUS_ERROR_CODES maps, plus the 500 that mapError falls back to for unknown errors, plus 501 and
+ * 502, which only a CodedHttpException raises: a payment provider with no equivalent for an operation
+ * (501) or a payment provider that failed (502). Declaring a problem response outside this set
+ * would document a response no code path can produce.
  */
-export const PROBLEM_STATUSES = [400, 401, 402, 403, 404, 409, 410, 422, 429, 500, 503] as const;
+export const PROBLEM_STATUSES = [
+  400, 401, 402, 403, 404, 409, 410, 422, 429, 500, 501, 502, 503,
+] as const;
 export type ProblemStatus = (typeof PROBLEM_STATUSES)[number];
 
 /**
@@ -79,6 +83,8 @@ const PROBLEM_DESCRIPTIONS: Record<ProblemStatus, string> = {
   422: "The resource is valid JSON but lacks required domain data.",
   429: "Rate limit exceeded. Back off and retry.",
   500: "Unexpected server error. The body carries no detail; correlate via request_id.",
+  501: "The school's payment provider has no equivalent for this operation.",
+  502: "The payment provider failed. Retry later; the body carries no provider detail.",
   503: "A required service dependency is unavailable.",
 };
 

@@ -44,6 +44,7 @@ import {
 import { deriveIntent, foldStatus, LIVE_STATUSES, resolveAiCascade } from "./state-machine";
 
 import type { AttributionTarget } from "./attribution";
+import type { BillingProvider } from "./billing-event-store";
 import type { SubscriptionKind } from "./state-machine";
 import type { SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -136,6 +137,8 @@ export interface BillingLogger {
 
 /** One verified provider event, envelope included. Mirrors `ParsedWebhookEvent` in apps/api's port. */
 export interface VerifiedBillingEvent {
+  /** Which provider signed it. Half of the idempotency key, and selects the customer-id column. */
+  provider: BillingProvider;
   id: string;
   type: string;
   effectiveAt: Date;
@@ -173,6 +176,7 @@ export async function processBillingEvent(
   options: ProcessOptions,
 ): Promise<ProcessOutcome> {
   const rowId = await claimEvent(tx, {
+    provider: event.provider,
     providerEventId: event.id,
     eventType: event.type,
     effectiveAt: event.effectiveAt,
@@ -234,18 +238,23 @@ async function applyClaimedEvent(
   // yet. Running it through attribution would park it for "no subscription to apply this to", which
   // would fill the dead-letter queue with events behaving exactly as intended.
   if (resolution.kind === "ignored") {
-    await applyCustomerSideEffects(tx, event.type, event.data);
+    if (event.provider === "stripe") {
+      await applyCustomerSideEffects(tx, event.type, event.data);
+    }
     await markProcessed(tx, rowId);
     return { outcome: "processed", transitioned: false };
   }
 
   const schoolId = await resolveSchoolId(
     tx,
+    event.provider,
     extractCustomerId(event.data),
     extractSchoolIdHint(event.data),
   );
   if (schoolId === null) {
-    return park("Could not attribute the event to a school by stripe_customer_id or metadata");
+    return park(
+      `Could not attribute the event to a school by ${event.provider} customer id or metadata`,
+    );
   }
 
   // From here on the transaction is tenant-scoped: app.subscriptions, app.ai_subscriptions and
@@ -268,6 +277,10 @@ async function applyClaimedEvent(
       `Illegal transition: ${rejected.from} + ${rejected.intent} (${event.type}) has no target ` +
         `for a ${target.kind} subscription`,
     );
+  }
+
+  if (event.provider === "tap") {
+    await saveTapPaymentMethod(tx, target, event.data);
   }
 
   await applyTransition(tx, options, target, fold.status, event.data);
@@ -338,6 +351,51 @@ async function applyCustomerSideEffects(
     UPDATE app.schools
     SET stripe_customer_id = ${customerId}, updated_at = CURRENT_TIMESTAMP
     WHERE id = ${schoolId}::uuid AND stripe_customer_id IS NULL
+  `;
+}
+
+/**
+ * Store the card a Tap subscription charge saved, on the subscription it paid for.
+ *
+ * Tap has no subscription object; Studafy renews by charging this card under this agreement (the
+ * renewal worker in apps/workers). The Tap normalizer puts `payment_method` on the event only for a
+ * captured subscription charge made with `save_card`, so an event without it leaves the stored card
+ * alone. Per subscription row, not per customer: the school plan and a student's AI add-on can be
+ * bought with different cards, and each renewal must charge the card that bought it.
+ *
+ * Runs after attribution and before the status write, in the same transaction: a card that was
+ * saved but not stored would leave an active subscription that can never renew.
+ */
+async function saveTapPaymentMethod(
+  tx: TransactionSql,
+  target: AttributionTarget,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const method = payload.payment_method;
+  if (typeof method !== "object" || method === null) return;
+
+  const { tap_card_id: cardId, tap_payment_agreement_id: agreementId } = method as Record<
+    string,
+    unknown
+  >;
+  if (typeof cardId !== "string" || cardId === "") return;
+  if (typeof agreementId !== "string" || agreementId === "") return;
+
+  if (target.kind === "school") {
+    await tx`
+      UPDATE app.subscriptions
+      SET tap_card_id = ${cardId}, tap_payment_agreement_id = ${agreementId},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${target.id}::uuid
+    `;
+    return;
+  }
+
+  await tx`
+    UPDATE app.ai_subscriptions
+    SET tap_card_id = ${cardId}, tap_payment_agreement_id = ${agreementId},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${target.id}::uuid
   `;
 }
 

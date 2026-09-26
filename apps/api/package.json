@@ -27,6 +27,7 @@
     "@studafy/attendance-reporting": "workspace:*",
     "@studafy/audit-reporting": "workspace:*",
     "@studafy/billing": "workspace:*",
+    "@studafy/tap-payments": "workspace:*",
     "@studafy/constants": "workspace:*",
     "@studafy/finance-reporting": "workspace:*",
     "@studafy/grades-reporting": "workspace:*",

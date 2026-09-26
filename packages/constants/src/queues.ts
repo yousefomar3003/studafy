@@ -98,6 +98,11 @@ export const JOB_NAMES = {
   // subscriptions whose grace window has elapsed, and stamps nothing itself — the deadline is set
   // by the state machine when a subscription enters `grace_period`. Carries no payload.
   RUN_DUNNING: "run-dunning",
+  // Tap subscription renewals (ST-298). Scheduled job: charges the saved card of each Tap-billed
+  // subscription whose period has ended, retries declines, and ends or hands to grace the ones
+  // that cannot renew. Carries no payload. Tap has no subscriptions of its own, so this is the
+  // Tap counterpart of Stripe Billing's automatic renewal.
+  RUN_TAP_RENEWALS: "run-tap-renewals",
   // Nightly seat reconciliation (ST-136). Scheduled job: reconciles each active subscription's
   // enrolled-student count against the billed Stripe seat quantity — prorated upgrade on drift up,
   // next-cycle downgrade on drift down, and a drift report to the school's ORG_ADMINs. Carries no
