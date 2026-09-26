@@ -13,6 +13,22 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Student CSV column mapping and staging (ST-299; see
+  [`docs/modules/student-import-mapping-guide.md`](../modules/student-import-mapping-guide.md)):
+  - `PUT /api/imports/students/{importId}/mapping` re-maps an unconfirmed import's staged rows,
+    with an optional `save_as`.
+  - `GET /api/imports/students/{importId}/diff` is the dry-run diff (create / update / unchanged /
+    conflict) against live data.
+  - `GET|POST /api/imports/students/mappings` and
+    `PATCH|DELETE /api/imports/students/mappings/{mappingId}` manage per-school saved column
+    mappings.
+  - `POST /api/imports/students/upload` takes an optional `mapping_id` query parameter and accepts
+    any CSV layout (header row detection, `,`/`;`/tab delimiters).
+  - `ImportRecord` gains `confirmed_by`, `header_line`, `source_headers` and `column_mapping`.
+  - `ImportSummary` gains optional `students_updated` and `conflicts`.
+  - Error codes `IMPORT_MAPPING_NOT_FOUND`, `IMPORT_MAPPING_NAME_EXISTS` and
+    `IMPORT_MAPPING_INVALID`.
+
 - `POST /api/subscriptions/webhook/tap` — Tap Payments charge webhooks. Authenticated by the
   `hashstring` HMAC (keyed with the Tap secret key), not a bearer token; the charge is re-read from
   Tap before use. Normalized to the same billing events as the Stripe webhook. ST-298.
@@ -59,3 +75,8 @@ when it required the `version-bump` label.
   read permission (`STUDENT_READ` / `USER_READ` / `BILLING_READ` / `MATERIAL_READ`); row-level
   security within a populated section matches that type's own list endpoint. Every call is
   recorded as a `read` audit entry against `global_search`. ST-278.
+
+### Fixed
+
+- `GET /api/imports/students` never returned a `next_cursor`: it fetched one row past the page and
+  then compared the row count against that same inflated limit. It now pages. ST-299.
