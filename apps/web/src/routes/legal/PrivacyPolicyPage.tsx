@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useSeo } from "../../components/Seo";
 import { MARKETING_CONTACT_EMAIL } from "../../lib/config";
 
-const LAST_UPDATED = "2026-09-22";
+const LAST_UPDATED = "2026-09-27";
 
 /**
  * Public privacy policy (`/privacy`) — required by both app stores' listing forms
@@ -87,15 +87,19 @@ export default function PrivacyPolicyPage() {
             Signed in, from <Link to="/account/delete">Account settings</Link>.
           </li>
           <li>
-            Otherwise, by contacting your school, or by emailing us directly — see Contact below.
+            Without signing in or installing the app, request deletion on the{" "}
+            <Link to="/legal/delete-account">delete your account</Link> page: we email a link to the
+            account&rsquo;s address, and the deletion happens once you confirm it.
           </li>
+          <li>For a copy of your data, contact your school, or email us — see Contact below.</li>
         </ul>
         <p>
           Deleting your account signs you out everywhere, removes you from your school and stops any
           AI subscription from renewing immediately; erasing your personal data follows within 30
           days. Your school keeps only records it is legally required to retain — grades and
           attendance without your name or contact details, financial records, and its audit log —
-          and the confirmation screen lists them, so nothing is silently kept back.
+          and the confirmation screen and confirmation email list them, so nothing is silently kept
+          back.
         </p>
 
         <h2>Contact</h2>

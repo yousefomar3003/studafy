@@ -4,7 +4,10 @@ import { MARKETING_NAV_ITEMS } from "./nav-items";
 
 const YEAR = new Date().getFullYear();
 
-/** Public site footer: sitemap and the same two entry points as the header, no social/legal links that don't exist yet. */
+/**
+ * Public site footer: sitemap, the same two entry points as the header, and the two legal pages
+ * both app stores require to be reachable from the website.
+ */
 export function MarketingFooter() {
   return (
     <footer className="marketing-footer">
@@ -21,6 +24,8 @@ export function MarketingFooter() {
             </Link>
           ))}
           <Link to="/auth/login">Sign in</Link>
+          <Link to="/privacy">Privacy policy</Link>
+          <Link to="/legal/delete-account">Delete your account</Link>
         </nav>
       </div>
 

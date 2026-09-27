@@ -89,6 +89,7 @@ const SessionsPage = lazy(() => import("../features/account/sessions/SessionsPag
 const DeleteAccountPage = lazy(() => import("../features/account/privacy/DeleteAccountPage"));
 const PrivacyPolicyPage = lazy(() => import("../routes/legal/PrivacyPolicyPage"));
 const DeleteAccountInfoPage = lazy(() => import("../routes/legal/DeleteAccountInfoPage"));
+const ConfirmAccountDeletionPage = lazy(() => import("../routes/legal/ConfirmAccountDeletionPage"));
 const AiSubscriptionPurchasePage = lazy(
   () => import("../features/billing/AiSubscriptionPurchasePage"),
 );
@@ -117,6 +118,8 @@ export const routes: RouteObject[] = [
           // account. See apps/mobile/store/review-checklist.md and privacy-labels.md.
           { path: "privacy", element: <PrivacyPolicyPage /> },
           { path: "legal/delete-account", element: <DeleteAccountInfoPage /> },
+          // Where the emailed deletion link lands (ST-302).
+          { path: "legal/delete-account/confirm", element: <ConfirmAccountDeletionPage /> },
         ],
       },
       {
