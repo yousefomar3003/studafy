@@ -91,10 +91,11 @@ export default function PrivacyPolicyPage() {
           </li>
         </ul>
         <p>
-          Deletion is a request, not an instant action: it is queued and processed within 30 days.
-          Some records (for example, financial records your school is legally required to retain)
-          may be kept past that point where the law requires it; anything retained this way is
-          disclosed in the request&rsquo;s own result, not silently kept back.
+          Deleting your account signs you out everywhere, removes you from your school and stops any
+          AI subscription from renewing immediately; erasing your personal data follows within 30
+          days. Your school keeps only records it is legally required to retain — grades and
+          attendance without your name or contact details, financial records, and its audit log —
+          and the confirmation screen lists them, so nothing is silently kept back.
         </p>
 
         <h2>Contact</h2>
