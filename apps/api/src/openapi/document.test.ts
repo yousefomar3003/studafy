@@ -315,6 +315,9 @@ describe("structure", () => {
         "/api/privacy/me/dsr",
         // Self-service account deletion. Bearer-authenticated only; the caller is the subject.
         "/api/account/deletion",
+        // Public account deletion (ST-302). Unauthenticated: captcha, then an emailed token.
+        "/api/account/deletion-requests",
+        "/api/account/deletion-requests/confirm",
         // Parent child comparison reports (ST-177). PARENT-role-gated metrics over linked children.
         "/api/reports/children/comparison",
         "/api/reports/children/{studentId}/breakdown",

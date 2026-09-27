@@ -83,6 +83,9 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/schools/register": "auth-strict",
   "/api/schools/verify-email/*": "auth-strict",
   "/api/schools/resend-verification": "auth-strict",
+  // Public account deletion (ST-302) — sends email / consumes a bearer token, IP-scoped.
+  "/api/account/deletion-requests": "auth-strict",
+  "/api/account/deletion-requests/confirm": "auth-strict",
   "/api/auth/oauth/google/start": "auth-strict",
   "/api/auth/oauth/google/callback": "auth-strict",
   // "/api/auth/login": "auth",

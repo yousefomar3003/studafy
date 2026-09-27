@@ -96,6 +96,9 @@ const DEFAULT_PUBLIC_PATHS = [
   // anonymously; verify-email 401'd and resend-verification never got this far (see csrf.ts).
   "/api/schools/verify-email",
   "/api/schools/resend-verification",
+  // Public account deletion (ST-302): Google Play requires it to work without the app or a session.
+  // The request is captcha-gated; its /confirm child authenticates with the emailed token.
+  "/api/account/deletion-requests",
   // Reference-data lookups (ST-184): public, read-only, feed the registration form's country/
   // currency selectors before a school (and therefore a token) exists.
   "/api/lookups/countries",

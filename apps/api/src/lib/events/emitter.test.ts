@@ -157,6 +157,17 @@ describe("emit", () => {
           email: "test@example.com",
           role: "STUDENT",
         },
+        [DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED]: {
+          email: "test@example.com",
+          expiresAt: new Date().toISOString(),
+          schoolNames: ["Test School"],
+          token: "tok_abc123",
+        },
+        [DOMAIN_EVENTS.ACCOUNT_DELETED]: {
+          userId: uid,
+          email: "test@example.com",
+          completesBy: new Date().toISOString(),
+        },
         [DOMAIN_EVENTS.SCHOOL_REGISTERED]: {
           schoolId: uid,
           adminUserId: uid,

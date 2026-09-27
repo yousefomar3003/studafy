@@ -9,6 +9,8 @@
 import { DOMAIN_EVENTS } from "@studafy/constants";
 
 import {
+  renderAccountDeletionConfirmationEmail,
+  renderAccountDeletionVerificationEmail,
   renderAiSubscriptionPausedEmail,
   renderAiSubscriptionResumedEmail,
   renderDigestEmail,
@@ -37,6 +39,9 @@ export interface ResolvedEmail {
 
 const INVITATION_ACTION_PATH = "/api/auth/invitations/{token}/activate";
 const VERIFICATION_ACTION_PATH = "/api/schools/verify-email/{token}";
+// A page, not an API path: the link must not delete anything on a GET, which mail scanners issue
+// on their own. The token rides in the fragment, which browsers never send to a server.
+const ACCOUNT_DELETION_ACTION_PATH = "/legal/delete-account/confirm#token={token}";
 
 interface InvitationPayload {
   email: string;
@@ -48,6 +53,18 @@ interface VerificationPayload {
   email: string;
   token: string;
   expiresAt: string;
+}
+
+interface AccountDeletionRequestedPayload {
+  email: string;
+  token: string;
+  expiresAt: string;
+  schoolNames: string[];
+}
+
+interface AccountDeletedPayload {
+  email: string;
+  completesBy: string;
 }
 
 interface DigestPayload {
@@ -215,6 +232,29 @@ export function resolveEmail(
         content: renderAiSubscriptionResumedEmail({ schoolName: context.schoolName }),
       };
     }
+    case DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED: {
+      const payload = row.payload as unknown as AccountDeletionRequestedPayload;
+      return {
+        template: "account-deletion-verification",
+        recipient: payload.email,
+        content: renderAccountDeletionVerificationEmail({
+          schoolNames: payload.schoolNames,
+          actionUrl: `${context.frontendUrl}${ACCOUNT_DELETION_ACTION_PATH.replace("{token}", payload.token)}`,
+          expiresAt: payload.expiresAt,
+        }),
+      };
+    }
+    case DOMAIN_EVENTS.ACCOUNT_DELETED: {
+      const payload = row.payload as unknown as AccountDeletedPayload;
+      return {
+        template: "account-deletion-confirmation",
+        recipient: payload.email,
+        content: renderAccountDeletionConfirmationEmail({
+          schoolName: context.schoolName,
+          completesBy: payload.completesBy,
+        }),
+      };
+    }
     default:
       throw new Error(`no email template for outbox event ${row.event_name}`);
   }
@@ -230,4 +270,6 @@ export const EMAIL_EVENT_NAMES: readonly string[] = [
   DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED,
   DOMAIN_EVENTS.AI_SUBSCRIPTION_PAUSED,
   DOMAIN_EVENTS.AI_SUBSCRIPTION_RESUMED,
+  DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED,
+  DOMAIN_EVENTS.ACCOUNT_DELETED,
 ];

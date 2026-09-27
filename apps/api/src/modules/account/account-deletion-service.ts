@@ -10,7 +10,7 @@
  *        renewal worker has nothing to charge),
  *      - detach from the school: status `archived`, roles, sign-in identities and parent links
  *        removed — with no oauth_identities row, no login path can resolve this account again,
- *      - file the erasure request and write the audit entry,
+ *      - file the erasure request, write the audit entry and queue the confirmation email,
  *      - enqueue the erasure job, last, so a queue failure rolls all of the above back and the
  *      still-signed-in user can simply retry.
  *    Then, after commit, every session is revoked and its access tokens denylisted.
@@ -24,10 +24,11 @@
  * exhausts its retries against a row that never existed and changes nothing.
  */
 
-import { ERROR_CODES } from "@studafy/constants";
+import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { withTenantTx } from "../../db/tenant-tx";
+import { emit } from "../../lib/events/emitter";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { REVOCATION_REASONS, revokeAndDenylist } from "../auth/services/revocation-service";
 import { addDsrJob } from "../privacy/dsr-queue";
@@ -61,9 +62,14 @@ export interface AccountDeletionDeps {
   siwa: SiwaTokenRevocation | null;
 }
 
+/** Where the deletion was asked for. Recorded on the audit entry. */
+export type AccountDeletionSource = "account_settings" | "web_request";
+
 export interface AccountDeletionParams {
   schoolId: string;
   userId: string;
+  /** Defaults to "account_settings", the signed-in path. */
+  source?: AccountDeletionSource;
   requestId?: string;
   log?: Logger;
   userAgent?: string | null;
@@ -102,7 +108,7 @@ export async function deleteAccount(
         deps.paymentProviders,
         userId,
       );
-      await detachFromSchool(tx, userId);
+      const email = await detachFromSchool(tx, userId);
 
       const request = await createDsrRequest(tx, schoolId, userId, userId, "erasure");
       await emitAuditLog(tx, {
@@ -112,6 +118,7 @@ export async function deleteAccount(
         oldValues: null,
         newValues: {
           reason: "account_deletion",
+          source: params.source ?? "account_settings",
           status: "archived",
           data_subject_request_id: request.id,
           erasure_due_at: request.slaDueAt.toISOString(),
@@ -121,6 +128,12 @@ export async function deleteAccount(
         },
         clientIp: params.clientIp ?? null,
         userAgent: params.userAgent ?? null,
+      });
+
+      await emit(tx, DOMAIN_EVENTS.ACCOUNT_DELETED, {
+        userId,
+        email,
+        completesBy: request.slaDueAt.toISOString(),
       });
 
       await addDsrJob(deps.maintenanceQueue, request, schoolId);
@@ -179,13 +192,16 @@ async function cancelAiSubscriptions(
   return canceled;
 }
 
-/** Ends the user's membership of the school: archived, no roles, no sign-in identities, no parent links. */
-async function detachFromSchool(tx: TransactionSql, userId: string): Promise<void> {
-  const [updated] = await tx`
+/**
+ * Ends the user's membership of the school: archived, no roles, no sign-in identities, no parent
+ * links. Returns the account's email address, for the confirmation email.
+ */
+async function detachFromSchool(tx: TransactionSql, userId: string): Promise<string> {
+  const [updated] = await tx<{ email: string }[]>`
     UPDATE app.users
     SET status = 'archived'::app.user_status, updated_at = CURRENT_TIMESTAMP
     WHERE id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
-    RETURNING id
+    RETURNING email
   `;
   if (!updated)
     throw new CodedHttpException(404, ERROR_CODES.DSR_SUBJECT_NOT_FOUND, "Account not found");
@@ -202,6 +218,7 @@ async function detachFromSchool(tx: TransactionSql, userId: string): Promise<voi
     DELETE FROM app.user_roles
     WHERE user_id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
   `;
+  return updated.email;
 }
 
 /**

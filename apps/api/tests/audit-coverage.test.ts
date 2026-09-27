@@ -327,6 +327,11 @@ const EXPECTED_MUTATING_ROUTES = [
   // Self-service account deletion. The 'delete' audit row on app.users is written inside the
   // deletion transaction — see modules/account/account-deletion-service.ts.
   "POST /api/account/deletion",
+  // Public account deletion (ST-302). The request writes no audit row (it is anonymous until the
+  // emailed link is used); confirm runs deleteAccount, whose 'delete' row carries
+  // source: "web_request" — see modules/account/deletion-request-service.ts.
+  "POST /api/account/deletion-requests",
+  "POST /api/account/deletion-requests/confirm",
   // Notification preferences (ST-143). Audit rows are written from inside
   // notification-preferences-service.ts's updatePreferences, alongside the preference writes — see
   // routes/notification-preferences-routes.ts.

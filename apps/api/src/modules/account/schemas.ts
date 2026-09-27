@@ -13,6 +13,52 @@ export const retainedRecordSchema = z
   })
   .openapi("RetainedRecord");
 
+export const accountDeletionRequestBodySchema = z
+  .object({
+    email: z.string().email().max(320).openapi({
+      description: "Email address of the account(s) to delete.",
+      example: "parent@example.com",
+    }),
+    captcha_token: z.string().min(1).openapi({ description: "Cloudflare Turnstile token." }),
+  })
+  .openapi("AccountDeletionRequest");
+
+export const accountDeletionRequestResponseSchema = z
+  .object({
+    message: z.string().openapi({
+      description: "Identical whether or not the address has an account, to prevent enumeration.",
+    }),
+  })
+  .openapi("AccountDeletionRequestAccepted");
+
+export const accountDeletionConfirmBodySchema = z
+  .object({
+    // Format is checked in the service, not here, so a malformed token and an unknown one produce
+    // the same error and neither is echoed into validation logs.
+    token: z.string().max(256).openapi({ description: "The token from the emailed link." }),
+  })
+  .openapi("AccountDeletionConfirm");
+
+export const accountDeletionConfirmResponseSchema = z
+  .object({
+    accounts: z
+      .array(
+        z.object({
+          school_name: z.string(),
+          request_id: uuidSchema,
+          completes_by: dateTimeSchema.openapi({
+            description: "Latest time by which this account's personal data will have been erased.",
+          }),
+        }),
+      )
+      .openapi({
+        description:
+          "One entry per account deleted. Empty when the address no longer has an active account.",
+      }),
+    retained_records: z.array(retainedRecordSchema),
+  })
+  .openapi("AccountDeletionConfirmed");
+
 export const accountDeletionResponseSchema = z
   .object({
     request_id: uuidSchema.openapi({
