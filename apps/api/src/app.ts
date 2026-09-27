@@ -35,6 +35,7 @@ import {
 } from "./modules/academics";
 import { assignmentRoutes } from "./modules/academics/assignments";
 import { submissionRoutes } from "./modules/academics/submissions";
+import { accountRoutes } from "./modules/account";
 import {
   AI_EXAM_MAX_RESERVE_TOKENS,
   AI_LLM_MAX_RESERVE_TOKENS,
@@ -867,6 +868,14 @@ export function createApp({
   // Gated on PRIVACY_DSR_MANAGE (ORG_ADMIN/SUPER_ADMIN only).
   if (database) {
     app.route("/", privacyRoutes(database, redis ?? null, storage));
+  }
+
+  // Self-service account deletion (App Store 5.1.1(v), Play data deletion). Authentication only —
+  // the caller is always the subject. Signs out, detaches from the school, stops AI billing and
+  // files the erasure the maintenance worker drains. SIWA revocation is null until Sign in with
+  // Apple exists and stores tokens (see modules/account/apple-token-revoker.ts).
+  if (database) {
+    app.route("/", accountRoutes(database, redis ?? null, jtiDenylist, paymentProviders, null));
   }
 
   // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with

@@ -68,6 +68,7 @@ const EXPECTED_PATHS = [
   "/api/privacy/dsr",
   "/api/privacy/dsr/{requestId}",
   "/api/privacy/me/dsr",
+  "/api/account/deletion",
   "/api/announcements",
   "/api/auth/refresh",
   "/api/auth/logout",

@@ -24,6 +24,9 @@ Now:
   — bearer-authenticated only, no permission gate, files/lists a GDPR export or erasure request for
   the caller's own account. Reuses the same worker-drained queue an admin-filed request already
   used, so there's one erasure pipeline, not two.
+- `POST /api/account/deletion` (`apps/api/src/modules/account`, ST-301) — what the in-app action
+  calls: signs out everywhere, detaches from the school, stops AI billing, files the erasure and
+  returns the completion date and retained-record list. See `docs/modules/account-deletion.md`.
 - `/account/delete` (`apps/web/src/features/account/privacy/DeleteAccountPage.tsx`) — the in-app
   action: explains the consequences, confirms, files the erasure request, shows a pending request
   if one already exists instead of allowing a duplicate.
@@ -35,7 +38,7 @@ Now:
   add-on checkout (`docs/ai_store_compliance.md`'s R-07), for the same reason: no in-app webview.
 
 Re-check before every submission: the Profile tab link still resolves, `/account/delete` and
-`/legal/delete-account` are still reachable, and `POST /api/privacy/me/dsr` still requires only
+`/legal/delete-account` are still reachable, and `POST /api/account/deletion` still requires only
 authentication (a permission added here by mistake would silently break self-service deletion for
 every role at once).
 

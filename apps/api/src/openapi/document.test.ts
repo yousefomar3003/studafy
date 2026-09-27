@@ -313,6 +313,8 @@ describe("structure", () => {
         // Self-service account deletion/export (ST-268 extension). Bearer-authenticated only --
         // the caller may only ever act on their own account.
         "/api/privacy/me/dsr",
+        // Self-service account deletion. Bearer-authenticated only; the caller is the subject.
+        "/api/account/deletion",
         // Parent child comparison reports (ST-177). PARENT-role-gated metrics over linked children.
         "/api/reports/children/comparison",
         "/api/reports/children/{studentId}/breakdown",
@@ -777,6 +779,8 @@ describe("security", () => {
         "POST /api/privacy/dsr",
         // Self-service account deletion/export. Bearer-authenticated only.
         "POST /api/privacy/me/dsr",
+        // Self-service account deletion. Bearer-authenticated only.
+        "POST /api/account/deletion",
         "POST /api/storage/uploads/confirm",
         "POST /api/storage/uploads/request-upload",
         "POST /api/students",

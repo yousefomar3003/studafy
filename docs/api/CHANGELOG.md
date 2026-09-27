@@ -13,6 +13,13 @@ when it required the `version-bump` label.
 
 ### Added
 
+- `POST /api/account/deletion` — self-service account deletion (ST-301; see
+  [`docs/modules/account-deletion.md`](../modules/account-deletion.md)). Bearer-authenticated
+  only; the caller is the subject. Signs out every session, detaches the account from the school,
+  stops AI add-on billing and files an erasure request, answering `202` with an `AccountDeletion`
+  body: `request_id`, `status`, `requested_at`, `completes_by`, `ai_subscriptions_canceled` and
+  `retained_records` (`RetainedRecord`: `category`, `description`, `legal_basis`). New `Account`
+  tag and error code `APPLE_TOKEN_REVOCATION_FAILED`.
 - Student CSV column mapping and staging (ST-299; see
   [`docs/modules/student-import-mapping-guide.md`](../modules/student-import-mapping-guide.md)):
   - `PUT /api/imports/students/{importId}/mapping` re-maps an unconfirmed import's staged rows,

@@ -1,29 +1,23 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
 
-import { SELF_DSR_QUERY_KEY } from "./queries";
-
 import type { components } from "@studafy/api-client";
 
-type DsrRequestType = components["schemas"]["CreateSelfDataSubjectRequestBody"]["request_type"];
+export type AccountDeletion = components["schemas"]["AccountDeletion"];
 
 /**
- * Files a self-service GDPR export or erasure request (`POST /api/privacy/me/dsr`) — the caller is
- * always the subject; there is no id to pass. Used by `DeleteAccountPage` for account deletion, and
- * reusable for a "download my data" export action without any new plumbing.
+ * Deletes the caller's own account (`POST /api/account/deletion`). The server signs the caller out
+ * everywhere as part of this, so nothing is invalidated on success: the response is the last thing
+ * this session can read, and the page shows it before signing out locally.
  */
-export function useFileSelfDsrRequest() {
-  const queryClient = useQueryClient();
+export function useDeleteAccount() {
   return useMutation({
-    mutationFn: async (requestType: DsrRequestType) => {
-      const { data } = await api.POST("/api/privacy/me/dsr", {
-        body: { request_type: requestType },
-      });
-      return data;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: SELF_DSR_QUERY_KEY });
+    mutationFn: async () => {
+      const { data } = await api.POST("/api/account/deletion", {});
+      // Nested arrays lose their array type through the generated client (the gap queries.ts
+      // documents), so the schema type is asserted explicitly.
+      return data as AccountDeletion | undefined;
     },
   });
 }

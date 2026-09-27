@@ -31,8 +31,8 @@ export default function DeleteAccountInfoPage() {
         <h2>If you can sign in</h2>
         <p>
           Go to <Link to="/account/delete">Account settings &rsaquo; Delete account</Link> in the
-          Studafy web app (or the equivalent screen in the mobile app) and confirm. This files the
-          request immediately under your own account — no one else needs to act on it.
+          Studafy web app (or the equivalent screen in the mobile app) and confirm. It takes effect
+          immediately — no one else needs to act on it.
         </p>
 
         <h2>If you can&rsquo;t sign in</h2>
@@ -47,13 +47,17 @@ export default function DeleteAccountInfoPage() {
           ) : null}
         </p>
 
-        <h2>What gets deleted</h2>
+        <h2>What happens</h2>
         <p>
-          Your profile and account identifiers, education records, uploaded content, and crash
-          diagnostics tied to your account. Records your school is legally required to retain (for
-          example, financial records) are kept only as long as the law requires, and that is
-          disclosed in the request&rsquo;s own result — see the{" "}
-          <Link to="/privacy">privacy policy</Link> for detail.
+          Straight away, you are signed out on every device, your account is removed from your
+          school, and any AI subscription is cancelled so it does not renew. Within 30 days, your
+          name, contact details and profile are erased.
+        </p>
+        <p>
+          Your school keeps only the records it is legally required to: your grades and attendance
+          (without your name or contact details), financial records, and its audit log. The
+          confirmation screen lists these — see the <Link to="/privacy">privacy policy</Link> for
+          detail.
         </p>
       </div>
     </section>
