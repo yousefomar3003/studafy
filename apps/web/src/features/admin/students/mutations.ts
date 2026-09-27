@@ -3,12 +3,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../lib/api";
 
 import {
+  STUDENT_IMPORT_MAPPINGS_KEY,
   STUDENTS_LIST_KEY,
   studentGuardiansQueryKey,
   studentQueryKey,
   uploadStudentImportCsv,
 } from "./queries";
 
+import type { ColumnMapping } from "./columnMapping";
 import type { GuardianContact, StudentImport, StudentProfile, UploadProgress } from "./queries";
 import type { CreateStudentValues, LinkGuardianValues } from "./schema";
 import type { components } from "@studafy/api-client";
@@ -255,6 +257,36 @@ export function useConfirmStudentImport() {
       });
       if (!data) throw new Error("Import confirmation returned no data.");
       return data as StudentImport;
+    },
+  });
+}
+
+export interface UpdateStudentImportMappingVariables {
+  importId: string;
+  columnMapping: ColumnMapping;
+  /** Also save the mapping for the school under this name. A taken name fails the whole request
+   * (409), re-map included: the API does both in one transaction. */
+  saveAs?: string;
+}
+
+/** Re-maps an unconfirmed import's staged rows and re-validates them, without a re-upload. */
+export function useUpdateStudentImportMapping() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      importId,
+      columnMapping,
+      saveAs,
+    }: UpdateStudentImportMappingVariables) => {
+      const { data } = await api.PUT("/api/imports/students/{importId}/mapping", {
+        params: { path: { importId } },
+        body: { column_mapping: columnMapping, save_as: saveAs },
+      });
+      if (!data) throw new Error("Import re-mapping returned no data.");
+      return data as StudentImport;
+    },
+    onSuccess: (_data, { saveAs }) => {
+      if (saveAs) void queryClient.invalidateQueries({ queryKey: STUDENT_IMPORT_MAPPINGS_KEY });
     },
   });
 }

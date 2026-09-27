@@ -6,7 +6,14 @@ import { Link } from "react-router-dom";
 
 import { buildImportErrorReportCsv, downloadTextFile } from "../../../lib/csv";
 
-import { useConfirmStudentImport, useUploadStudentImport } from "./mutations";
+import { confirmBlocker, withPartialSuggestions } from "./columnMapping";
+import { ColumnMappingPanel } from "./ColumnMappingPanel";
+import { ImportDiffPanel } from "./ImportDiffPanel";
+import {
+  useConfirmStudentImport,
+  useUpdateStudentImportMapping,
+  useUploadStudentImport,
+} from "./mutations";
 import {
   fetchStudentImport,
   fetchStudentImportTemplate,
@@ -16,6 +23,7 @@ import {
 
 import "./students.css";
 
+import type { ColumnMapping } from "./columnMapping";
 import type { StudentImport, UploadProgress } from "./queries";
 import type { components } from "@studafy/api-client";
 import type { ChangeEvent } from "react";
@@ -53,8 +61,9 @@ function apiErrorMessage(error: unknown, fallback: string): string {
 }
 
 /**
- * Student CSV import (ST-190): template download, dry-run upload with progress, a row-level
- * validation report, an explicit confirm step, and progress/summary while the confirmed import
+ * Student CSV import (ST-190): template download, dry-run upload with progress, column mapping
+ * (ST-300, see `ColumnMappingPanel`), a row-level validation report, a dry-run diff of what
+ * confirming would change (`ImportDiffPanel`), an explicit confirm step, and progress/summary while the confirmed import
  * processes in the background (`POST /api/imports/students/upload` → `.../confirm`, then polling
  * `GET /api/imports/students/{importId}` — see `apps/api/src/modules/imports`).
  *
@@ -75,8 +84,12 @@ export default function ImportStudentsPage() {
   const [record, setRecord] = useState<StudentImport | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  // The mapping the panel shows. It equals `record.column_mapping` until the admin edits it, apart
+  // from the partial-name suggestions a fresh upload adds for fields the server left unmapped.
+  const [mappingDraft, setMappingDraft] = useState<ColumnMapping>({});
 
   const uploadImport = useUploadStudentImport();
+  const updateMapping = useUpdateStudentImportMapping();
   const confirmImport = useConfirmStudentImport();
 
   const step = stepFor(record);
@@ -112,6 +125,7 @@ export default function ImportStudentsPage() {
 
   function reset() {
     setRecord(null);
+    setMappingDraft({});
     setUploadProgress(null);
     setBanner(null);
     notifiedCompletionRef.current = false;
@@ -136,13 +150,34 @@ export default function ImportStudentsPage() {
     uploadImport.mutate(
       { file, onProgress: setUploadProgress },
       {
-        onSuccess: (data) => setRecord(data),
+        onSuccess: (data) => {
+          setRecord(data);
+          setMappingDraft(withPartialSuggestions(data.column_mapping, data.source_headers));
+        },
         onError: (error) => {
           setUploadProgress(null);
           setBanner(apiErrorMessage(error, "Couldn't validate that file. Please try again."));
         },
       },
     );
+  }
+
+  async function handleApplyMapping(mapping: ColumnMapping, saveAs?: string): Promise<boolean> {
+    if (!record) return false;
+    setBanner(null);
+    try {
+      const data = await updateMapping.mutateAsync({
+        importId: record.id,
+        columnMapping: mapping,
+        saveAs,
+      });
+      setRecord(data);
+      setMappingDraft(data.column_mapping);
+      return true;
+    } catch (error) {
+      setBanner(apiErrorMessage(error, "Couldn't apply the mapping. Please try again."));
+      return false;
+    }
   }
 
   function handleConfirm() {
@@ -208,8 +243,12 @@ export default function ImportStudentsPage() {
       ) : null}
 
       {step === "review" && record ? (
-        <ReviewPanel
+        <ReviewStep
           record={record}
+          mappingDraft={mappingDraft}
+          onMappingDraftChange={setMappingDraft}
+          applyingMapping={updateMapping.isPending}
+          onApplyMapping={handleApplyMapping}
           confirming={confirmImport.isPending}
           onConfirm={handleConfirm}
           onDownloadErrorReport={handleDownloadErrorReport}
@@ -226,23 +265,64 @@ export default function ImportStudentsPage() {
   );
 }
 
-interface ReviewPanelProps {
+interface ReviewStepProps {
   record: StudentImport;
+  mappingDraft: ColumnMapping;
+  onMappingDraftChange: (draft: ColumnMapping) => void;
+  applyingMapping: boolean;
+  onApplyMapping: (mapping: ColumnMapping, saveAs?: string) => Promise<boolean>;
   confirming: boolean;
   onConfirm: () => void;
   onDownloadErrorReport: () => void;
   onReset: () => void;
 }
 
-/** The dry-run report: row counts plus one actionable line per error, all resolved in the same
- * upload response — nothing further to fetch. */
-function ReviewPanel({
+/** Everything between upload and confirm: mapping, validation report, preview, then confirm. The
+ * preview is only fetched once confirm is possible; before that it would describe a mapping the
+ * admin is still changing, or one that stages no records at all. */
+function ReviewStep({
   record,
+  mappingDraft,
+  onMappingDraftChange,
+  applyingMapping,
+  onApplyMapping,
   confirming,
   onConfirm,
   onDownloadErrorReport,
   onReset,
-}: ReviewPanelProps) {
+}: ReviewStepProps) {
+  const blocker = confirmBlocker(mappingDraft, record.column_mapping, record.valid_rows);
+
+  return (
+    <div className="students-import__review">
+      <ColumnMappingPanel
+        record={record}
+        draft={mappingDraft}
+        onDraftChange={onMappingDraftChange}
+        applying={applyingMapping}
+        onApply={onApplyMapping}
+      />
+      <ReviewPanel record={record} onDownloadErrorReport={onDownloadErrorReport} />
+      {blocker === null ? <ImportDiffPanel record={record} /> : null}
+      <ConfirmBar
+        validRows={record.valid_rows}
+        blocker={blocker}
+        confirming={confirming}
+        onConfirm={onConfirm}
+        onReset={onReset}
+      />
+    </div>
+  );
+}
+
+interface ReviewPanelProps {
+  record: StudentImport;
+  onDownloadErrorReport: () => void;
+}
+
+/** The dry-run report: row counts plus one actionable line per error, all resolved in the same
+ * upload response — nothing further to fetch. */
+function ReviewPanel({ record, onDownloadErrorReport }: ReviewPanelProps) {
   const errorRows = toErrorRows(record.errors);
 
   return (
@@ -287,23 +367,44 @@ function ReviewPanel({
             </Button>
           </>
         ) : null}
-
-        <div className="students-import__actions">
-          <Button
-            type="button"
-            onClick={onConfirm}
-            loading={confirming}
-            disabled={record.valid_rows === 0}
-          >
-            Confirm import ({record.valid_rows} student
-            {record.valid_rows === 1 ? "" : "s"})
-          </Button>
-          <Button type="button" variant="tertiary" onClick={onReset}>
-            Upload a different file
-          </Button>
-        </div>
       </Card.Body>
     </Card>
+  );
+}
+
+const CONFIRM_BLOCKER_ID = "students-import-confirm-blocker";
+
+interface ConfirmBarProps {
+  validRows: number;
+  blocker: string | null;
+  confirming: boolean;
+  onConfirm: () => void;
+  onReset: () => void;
+}
+
+function ConfirmBar({ validRows, blocker, confirming, onConfirm, onReset }: ConfirmBarProps) {
+  return (
+    <div className="students-import__confirm">
+      {blocker ? (
+        <p id={CONFIRM_BLOCKER_ID} className="students-import__warning" role="status">
+          {blocker}
+        </p>
+      ) : null}
+      <div className="students-import__actions">
+        <Button
+          type="button"
+          onClick={onConfirm}
+          loading={confirming}
+          disabled={blocker !== null}
+          aria-describedby={blocker ? CONFIRM_BLOCKER_ID : undefined}
+        >
+          Confirm import ({validRows} student{validRows === 1 ? "" : "s"})
+        </Button>
+        <Button type="button" variant="tertiary" onClick={onReset}>
+          Upload a different file
+        </Button>
+      </div>
+    </div>
   );
 }
 

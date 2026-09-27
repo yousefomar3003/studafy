@@ -5,6 +5,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { expectNoA11yViolations } from "../../../lib/test/axe";
+
 import type { ComponentType } from "react";
 
 interface RequestInit {
@@ -13,6 +15,14 @@ interface RequestInit {
 }
 
 const IMPORT_ID = "import-1";
+
+const TEMPLATE_HEADERS = ["admission_number", "email", "first_name", "last_name"];
+const TEMPLATE_MAPPING = {
+  admission_number: "admission_number",
+  email: "email",
+  first_name: "first_name",
+  last_name: "last_name",
+};
 
 function importRecord(overrides: Record<string, unknown> = {}) {
   return {
@@ -30,21 +40,76 @@ function importRecord(overrides: Record<string, unknown> = {}) {
     updated_at: "2026-08-01T00:00:00.000Z",
     confirmed_at: null,
     completed_at: null,
+    confirmed_by: null,
+    header_line: 1,
+    source_headers: TEMPLATE_HEADERS,
+    column_mapping: TEMPLATE_MAPPING,
     ...overrides,
   };
 }
 
-const getMock = mock((path: string, _init?: RequestInit) => {
+function importDiff() {
+  return {
+    import_id: IMPORT_ID,
+    totals: {
+      create: 1,
+      update: 1,
+      unchanged: 0,
+      conflict: 0,
+      parents_created: 0,
+      links_created: 0,
+      links_updated: 0,
+    },
+    rows: [
+      {
+        line_number: 2,
+        admission_number: "ADM-1",
+        action: "create",
+        changes: {},
+        conflict: null,
+        parent: null,
+        link: null,
+      },
+      {
+        line_number: 3,
+        admission_number: "ADM-2",
+        action: "update",
+        changes: { first_name: { from: "Sam", to: "Samuel" } },
+        conflict: null,
+        parent: null,
+        link: null,
+      },
+    ],
+  };
+}
+
+let savedMappings: unknown[] = [];
+
+/** The GET routes every review-step render hits, shared so a test overriding one path keeps the
+ * others working. */
+function defaultGet(path: string): Promise<unknown> {
   if (path === "/api/imports/students/template") {
-    return Promise.resolve<unknown>({ data: "admission_number,email\n" });
+    return Promise.resolve({ data: "admission_number,email\n" });
   }
-  return Promise.resolve<unknown>({ data: importRecord({ status: "completed" }) });
-});
+  if (path === "/api/imports/students/mappings") {
+    return Promise.resolve({ data: { mappings: savedMappings } });
+  }
+  if (path === "/api/imports/students/{importId}/diff") {
+    return Promise.resolve({ data: importDiff() });
+  }
+  return Promise.resolve({ data: importRecord({ status: "completed" }) });
+}
+
+const getMock = mock((path: string, _init?: RequestInit) => defaultGet(path));
 const postMock = mock((_path: string, _init?: RequestInit) =>
   Promise.resolve<unknown>({ data: importRecord({ status: "processing", confirmed_at: "now" }) }),
 );
 
-mock.module("../../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }));
+const putMock = mock((_path: string, _init?: RequestInit) =>
+  Promise.resolve<unknown>({ data: importRecord() }),
+);
+
+mock.module("../../../lib/api", () => ({ api: { GET: getMock, POST: postMock, PUT: putMock } }));
 mock.module("../../../lib/auth", () => ({
   sessionStore: { getToken: async () => "test-token" },
 }));
@@ -117,10 +182,19 @@ function uploadFile() {
   fireEvent.change(input, { target: { files: [file] } });
 }
 
+/** Picks `option` in the custom `Select` labelled `label` (a combobox button plus a listbox). */
+function choose(label: string, option: string) {
+  fireEvent.click(screen.getByRole("combobox", { name: new RegExp(`^${label}`) }));
+  fireEvent.click(screen.getByRole("option", { name: option }));
+}
+
 afterEach(() => {
   cleanup();
   getMock.mockClear();
+  getMock.mockImplementation((path: string) => defaultGet(path));
   postMock.mockClear();
+  putMock.mockClear();
+  savedMappings = [];
   FakeXhr.nextStatus = 201;
   FakeXhr.nextResponseBody = importRecord();
 });
@@ -148,7 +222,7 @@ describe("ImportStudentsPage", () => {
 
     const report = within(await screen.findByRole("region", { name: "Validation report" }));
     expect(report.getByText("Rows in file")).toBeTruthy();
-    expect(report.getByRole("button", { name: "Confirm import (2 students)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Confirm import (2 students)" })).toBeTruthy();
   });
 
   test("renders one actionable row per validation error, downloadable as a report", async () => {
@@ -192,9 +266,7 @@ describe("ImportStudentsPage", () => {
   test("confirming a validated import polls through to a completed summary", async () => {
     FakeXhr.nextResponseBody = importRecord({ status: "validated", valid_rows: 2, error_rows: 0 });
     getMock.mockImplementation((path: string) => {
-      if (path === "/api/imports/students/template") {
-        return Promise.resolve<unknown>({ data: "admission_number,email\n" });
-      }
+      if (path !== "/api/imports/students/{importId}") return defaultGet(path);
       return Promise.resolve<unknown>({
         data: importRecord({
           status: "completed",
@@ -244,5 +316,153 @@ describe("ImportStudentsPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Start a new import" }));
     expect(await screen.findByLabelText("Student CSV file")).toBeTruthy();
+  });
+
+  test("maps a non-template CSV end to end: suggest, fix, apply, preview, confirm", async () => {
+    FakeXhr.nextResponseBody = importRecord({
+      status: "uploaded",
+      valid_rows: 0,
+      error_rows: 2,
+      header_line: 3,
+      source_headers: ["Student ID", "Given Name", "Surname", "Contact"],
+      // What the server suggests from its alias list: everything but the email.
+      column_mapping: {
+        admission_number: "Student ID",
+        first_name: "Given Name",
+        last_name: "Surname",
+      },
+      errors: [{ line: 3, field: "email", message: 'Map a column to "email".' }],
+    });
+    putMock.mockImplementation((_path: string, init?: RequestInit) =>
+      Promise.resolve<unknown>({
+        data: importRecord({
+          status: "validated",
+          header_line: 3,
+          source_headers: ["Student ID", "Given Name", "Surname", "Contact"],
+          column_mapping: (init?.body as { column_mapping: unknown }).column_mapping,
+          updated_at: "2026-08-01T00:01:00.000Z",
+        }),
+      }),
+    );
+
+    await renderPage(await loadImportStudentsPage());
+    uploadFile();
+
+    const mapping = within(await screen.findByRole("region", { name: "Column mapping" }));
+    expect(
+      mapping.getByText("4 columns found on line 3 of students.csv.", { exact: false }),
+    ).toBeTruthy();
+    // "Given Name" and "Surname" are aliases the server matched; "Student ID" too.
+    expect(mapping.getAllByText("High: known alternative name")).toHaveLength(3);
+    expect(
+      mapping.getByText("3 of 4 required fields mapped. Missing: Student email."),
+    ).toBeTruthy();
+
+    const confirm = screen.getByRole("button", { name: /^Confirm import/ });
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    expect(
+      screen.getByText(
+        "Map a column to every required field before confirming. Missing: Student email.",
+      ),
+    ).toBeTruthy();
+    // No preview for a mapping that stages no records.
+    expect(screen.queryByRole("region", { name: "Import preview" })).toBeNull();
+
+    choose("Student email", "Contact");
+    expect(mapping.getByText("4 of 4 required fields mapped.")).toBeTruthy();
+    expect(mapping.getByText("Chosen manually")).toBeTruthy();
+    expect(
+      screen.getByText("You changed the mapping. Apply it to re-check the file before confirming."),
+    ).toBeTruthy();
+
+    fireEvent.click(mapping.getByRole("button", { name: "Apply mapping" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [path, init] = putMock.mock.calls[0]!;
+    expect(path).toBe("/api/imports/students/{importId}/mapping");
+    expect(init?.body).toEqual({
+      column_mapping: {
+        admission_number: "Student ID",
+        email: "Contact",
+        first_name: "Given Name",
+        last_name: "Surname",
+      },
+      save_as: undefined,
+    });
+
+    const preview = within(await screen.findByRole("region", { name: "Import preview" }));
+    expect(await preview.findByText("New students")).toBeTruthy();
+    expect(preview.getByText("First name: Sam → Samuel")).toBeTruthy();
+
+    const enabledConfirm = screen.getByRole("button", { name: "Confirm import (2 students)" });
+    expect(enabledConfirm.hasAttribute("disabled")).toBe(false);
+  });
+
+  test("applies a saved mapping in one click and hides ones that don't fit the file", async () => {
+    savedMappings = [
+      {
+        id: "mapping-1",
+        name: "SIS export",
+        column_mapping: TEMPLATE_MAPPING,
+        created_by: "user-1",
+        created_at: "2026-08-01T00:00:00.000Z",
+        updated_at: "2026-08-01T00:00:00.000Z",
+      },
+      {
+        id: "mapping-2",
+        name: "Old export",
+        column_mapping: { ...TEMPLATE_MAPPING, status: "Enrolment" },
+        created_by: "user-1",
+        created_at: "2026-08-01T00:00:00.000Z",
+        updated_at: "2026-08-01T00:00:00.000Z",
+      },
+    ];
+    FakeXhr.nextResponseBody = importRecord({ column_mapping: {} });
+
+    await renderPage(await loadImportStudentsPage());
+    uploadFile();
+    await screen.findByRole("region", { name: "Column mapping" });
+
+    fireEvent.click(await screen.findByRole("combobox", { name: /^Use a saved mapping/ }));
+    const unfit = screen.getByRole("option", { name: "Old export (columns not in this file)" });
+    expect(unfit.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(screen.getByRole("option", { name: "SIS export" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    expect(putMock.mock.calls[0]![1]?.body).toEqual({
+      column_mapping: TEMPLATE_MAPPING,
+      save_as: undefined,
+    });
+  });
+
+  test("saves the mapping under a name, and keeps the name when the server refuses it", async () => {
+    putMock.mockImplementation(() =>
+      Promise.reject(Object.assign(new Error("Conflict"), { status: 409 })),
+    );
+
+    await renderPage(await loadImportStudentsPage());
+    uploadFile();
+    const mapping = within(await screen.findByRole("region", { name: "Column mapping" }));
+
+    const name = mapping.getByLabelText("Save as (optional)") as HTMLInputElement;
+    fireEvent.change(name, { target: { value: "SIS export" } });
+    fireEvent.click(mapping.getByRole("button", { name: "Save mapping" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    expect(putMock.mock.calls[0]![1]?.body).toEqual({
+      column_mapping: TEMPLATE_MAPPING,
+      save_as: "SIS export",
+    });
+    expect(await screen.findByText("Couldn't apply the mapping. Please try again.")).toBeTruthy();
+    expect(name.value).toBe("SIS export");
+  });
+
+  test("the mapping step has no accessibility violations", async () => {
+    const { container } = await renderPage(await loadImportStudentsPage());
+    uploadFile();
+    await screen.findByRole("region", { name: "Import preview" });
+    await screen.findByText("New students");
+
+    await expectNoA11yViolations(container);
   });
 });

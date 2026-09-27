@@ -27,6 +27,7 @@
     "@studafy/constants": "workspace:*",
     "@studafy/notification-templates": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
+    "@studafy/student-import": "workspace:*",
     "@studafy/ui": "workspace:*",
     "@tanstack/react-query": "5.101.2",
     "i18next": "23.16.8",

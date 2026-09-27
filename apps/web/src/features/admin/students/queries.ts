@@ -13,6 +13,9 @@ export type Enrollment = components["schemas"]["Enrollment"];
 export type Class = components["schemas"]["Class"];
 export type UserWithRoles = components["schemas"]["UserWithRoles"];
 export type StudentImport = components["schemas"]["ImportRecord"];
+export type StudentImportDiff = components["schemas"]["ImportDiff"];
+export type StudentImportDiffRow = components["schemas"]["ImportDiffRow"];
+export type StudentImportMapping = components["schemas"]["StudentImportMapping"];
 
 export interface StudentsFilters {
   search: string;
@@ -319,6 +322,30 @@ export async function fetchStudentImport(importId: string): Promise<StudentImpor
   });
   if (!data) throw new Error("Import not found.");
   return data as StudentImport;
+}
+
+/** Keyed by `updated_at` as well as the id: a re-map bumps it, and the diff of the previous mapping
+ * must never be shown for the new one. */
+export function studentImportDiffQueryKey(record: StudentImport) {
+  return [...studentImportQueryKey(record.id), "diff", record.updated_at] as const;
+}
+
+/** `GET /api/imports/students/{importId}/diff` — every valid staged row classified against live
+ * data. Unfiltered: the panel filters client-side, and `totals` always covers every row anyway. */
+export async function fetchStudentImportDiff(importId: string): Promise<StudentImportDiff> {
+  const { data } = await api.GET("/api/imports/students/{importId}/diff", {
+    params: { path: { importId } },
+  });
+  if (!data) throw new Error("Import diff returned no data.");
+  return data as StudentImportDiff;
+}
+
+export const STUDENT_IMPORT_MAPPINGS_KEY = ["students", "import-mappings"] as const;
+
+/** `GET /api/imports/students/mappings` — the school's saved column mappings. */
+export async function fetchStudentImportMappings(): Promise<StudentImportMapping[]> {
+  const { data } = await api.GET("/api/imports/students/mappings");
+  return (data?.mappings ?? []) as StudentImportMapping[];
 }
 
 export interface UploadProgress {
