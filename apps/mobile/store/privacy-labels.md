@@ -67,7 +67,7 @@ overstate the scrubbing's scope when filling out either form.
 ## Data retention / deletion tie-in
 
 Both forms ask how long data is retained and whether users can request deletion. Answer "Yes" —
-self-service deletion exists (`POST /api/privacy/me/dsr`, the mobile Profile tab, and
+self-service deletion exists (`POST /api/account/deletion`, the mobile Profile tab, and
 `/account/delete` / `/legal/delete-account` on the web; see `review-checklist.md`'s resolved
 account-deletion item). Requests are processed within 30 days
 (`app.data_subject_requests.sla_due_at`); anything retained past that under a legal hold is
