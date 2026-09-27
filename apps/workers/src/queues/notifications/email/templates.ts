@@ -17,7 +17,9 @@ export type EmailTemplate =
   | "alert"
   | "seat-drift"
   | "ai-subscription-paused"
-  | "ai-subscription-resumed";
+  | "ai-subscription-resumed"
+  | "account-deletion-verification"
+  | "account-deletion-confirmation";
 
 export interface RenderedEmail {
   subject: string;
@@ -96,6 +98,23 @@ export interface SeatDriftEmailData {
  */
 export interface AiSubscriptionPauseResumeEmailData {
   schoolName: string;
+}
+
+/**
+ * The one-time link from the public deletion page (ST-302). One link can cover accounts in several
+ * schools, so the email names every one of them rather than carrying one school's header.
+ */
+export interface AccountDeletionVerificationEmailData {
+  schoolNames: string[];
+  actionUrl: string;
+  expiresAt: string;
+}
+
+/** Sent once a deletion is accepted, from either entry point (account settings or the web page). */
+export interface AccountDeletionConfirmationEmailData {
+  schoolName: string;
+  /** ISO datetime by which personal data will have been erased. */
+  completesBy: string;
 }
 
 export interface DigestItem {
@@ -263,6 +282,33 @@ export function renderAiSubscriptionResumedEmail(
   const bodyHtml = `<p>Good news: <strong>${escapeHtml(data.schoolName)}</strong> has been reactivated, and your AI study assistant on Studafy is available again.</p>`;
   return {
     subject: "Your Studafy AI access has resumed",
+    text,
+    html: shell(data.schoolName, bodyHtml),
+  };
+}
+
+export function renderAccountDeletionVerificationEmail(
+  data: AccountDeletionVerificationEmailData,
+): RenderedEmail {
+  const schools = data.schoolNames.join(", ");
+  const expires = formatDateLabel(data.expiresAt);
+  const text = `We received a request to delete the Studafy account registered to this email address at: ${schools}.\n\nTo delete it, open this link and confirm: ${data.actionUrl}\n\nDeleting signs you out everywhere and cannot be undone. The link expires on ${expires}.\n\nIf you did not ask for this, ignore this email. Nothing changes unless the link is used.`;
+  const bodyHtml = `<p>We received a request to delete the Studafy account registered to this email address at: <strong>${escapeHtml(schools)}</strong>.</p>${button(data.actionUrl, "Review and delete")}<p>If the button does not work, open this link in your browser: <a href="${escapeHtml(data.actionUrl)}">${escapeHtml(data.actionUrl)}</a></p><p>Deleting signs you out everywhere and cannot be undone. The link expires on ${expires}.</p><p>If you did not ask for this, ignore this email. Nothing changes unless the link is used.</p>`;
+  return {
+    subject: "Confirm deletion of your Studafy account",
+    text,
+    html: shell("Studafy", bodyHtml),
+  };
+}
+
+export function renderAccountDeletionConfirmationEmail(
+  data: AccountDeletionConfirmationEmailData,
+): RenderedEmail {
+  const completesBy = formatDateLabel(data.completesBy);
+  const text = `Your Studafy account at ${data.schoolName} has been deleted. You have been signed out on every device.\n\nYour name, contact details and profile will be erased by ${completesBy}. ${data.schoolName} keeps only the records it is legally required to: grades and attendance without your name or contact details, financial records, and its audit log.\n\nIf you did not ask for this, contact ${data.schoolName} straight away.`;
+  const bodyHtml = `<p>Your Studafy account at <strong>${escapeHtml(data.schoolName)}</strong> has been deleted. You have been signed out on every device.</p><p>Your name, contact details and profile will be erased by <strong>${completesBy}</strong>. ${escapeHtml(data.schoolName)} keeps only the records it is legally required to: grades and attendance without your name or contact details, financial records, and its audit log.</p><p>If you did not ask for this, contact ${escapeHtml(data.schoolName)} straight away.</p>`;
+  return {
+    subject: "Your Studafy account has been deleted",
     text,
     html: shell(data.schoolName, bodyHtml),
   };

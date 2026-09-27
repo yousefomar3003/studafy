@@ -31,7 +31,11 @@ Now:
   action: explains the consequences, confirms, files the erasure request, shows a pending request
   if one already exists instead of allowing a duplicate.
 - `/legal/delete-account` (`apps/web/src/routes/legal/DeleteAccountInfoPage.tsx`) — public, no
-  sign-in required, for Google Play's Data Safety URL field and for anyone who can't sign in.
+  sign-in or app required, for Google Play's Data Safety URL field. Since ST-302 it performs the
+  deletion itself: the visitor enters the account's email, gets a one-time link
+  (`POST /api/account/deletion-requests`), and confirming on `/legal/delete-account/confirm` runs
+  the same `POST /api/account/deletion` pipeline for every account on that address. Linked from the
+  site footer and the privacy policy. See `docs/modules/account-deletion.md`.
 - The mobile app's Profile tab (`apps/mobile/lib/src/features/shell/presentation/profile_tab_screen.dart`,
   every role) now carries a "Delete my account" action, opened in the system browser at
   `/account/delete` — the same external-browser pattern `AiUpsellCard` already uses for the AI
@@ -40,7 +44,9 @@ Now:
 Re-check before every submission: the Profile tab link still resolves, `/account/delete` and
 `/legal/delete-account` are still reachable, and `POST /api/account/deletion` still requires only
 authentication (a permission added here by mistake would silently break self-service deletion for
-every role at once).
+every role at once). `POST /api/account/deletion-requests` (and `/confirm`) must stay
+unauthenticated — `deletion-request-routes.test.ts` pins that — and a request must actually deliver
+the email in the target environment (SES out of sandbox, `FRONTEND_URL` set on the workers).
 
 ### 2. Privacy policy page (was: didn't exist)
 

@@ -13,6 +13,18 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Public account deletion without the app or a session (ST-302; see
+  [`docs/modules/account-deletion.md`](../modules/account-deletion.md#web-deletion-flow-no-sign-in)).
+  Both unauthenticated (`security: []`), CSRF-exempt and `auth-strict` rate-limited:
+  - `POST /api/account/deletion-requests` (`AccountDeletionRequest`: `email`, `captcha_token`)
+    emails a one-hour, single-use deletion link if the address has accounts. Always `202` with the
+    same `AccountDeletionRequestAccepted` body, so it does not disclose whether an address is
+    registered. `400 CAPTCHA_INVALID` on a failed Turnstile check.
+  - `POST /api/account/deletion-requests/confirm` (`AccountDeletionConfirm`: `token`) deletes every
+    active account under that address through the same pipeline as `POST /api/account/deletion`,
+    answering `202` with `AccountDeletionConfirmed`: `accounts[]` (`school_name`, `request_id`,
+    `completes_by`) and `retained_records`. `400 VERIFICATION_TOKEN_INVALID` for an unknown,
+    expired or used token.
 - `POST /api/account/deletion` — self-service account deletion (ST-301; see
   [`docs/modules/account-deletion.md`](../modules/account-deletion.md)). Bearer-authenticated
   only; the caller is the subject. Signs out every session, detaches the account from the school,
@@ -82,6 +94,12 @@ when it required the `version-bump` label.
   read permission (`STUDENT_READ` / `USER_READ` / `BILLING_READ` / `MATERIAL_READ`); row-level
   security within a populated section matches that type's own list endpoint. Every call is
   recorded as a `read` audit entry against `global_search`. ST-278.
+
+### Changed
+
+- `POST /api/account/deletion` now also emails the account a confirmation (`account.deleted`
+  outbox event), and its audit entry records `source: "account_settings"` (`"web_request"` for the
+  public flow above). No change to the HTTP contract. ST-302.
 
 ### Fixed
 

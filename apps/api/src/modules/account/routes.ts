@@ -5,6 +5,10 @@
  * Bearer-authenticated only, no permission gate: the subject is always the caller, never a
  * parameter, so there is no other user a permission check would protect (same rationale as
  * `POST /api/privacy/me/dsr`). See account-deletion-service.ts for what happens and in what order.
+ *
+ * `POST /api/account/deletion-requests` and `.../confirm` — the same deletion, requested from the
+ * public page at /legal/delete-account without the app or a session (ST-302). Unauthenticated;
+ * the emailed one-time token is the credential. See deletion-request-service.ts.
  */
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
@@ -19,8 +23,15 @@ import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
 
 import { deleteAccount } from "./account-deletion-service";
+import { confirmAccountDeletion, requestAccountDeletion } from "./deletion-request-service";
 import { RETAINED_RECORD_CATEGORIES } from "./retention-policy";
-import { accountDeletionResponseSchema } from "./schemas";
+import {
+  accountDeletionConfirmBodySchema,
+  accountDeletionConfirmResponseSchema,
+  accountDeletionRequestBodySchema,
+  accountDeletionRequestResponseSchema,
+  accountDeletionResponseSchema,
+} from "./schemas";
 
 import type { SiwaTokenRevocation } from "./account-deletion-service";
 import type { Database } from "../../db/client";
@@ -46,6 +57,51 @@ const deleteAccountRoute = createRoute({
   ),
 });
 
+const requestDeletionRoute = createRoute({
+  method: "post",
+  path: "/api/account/deletion-requests",
+  tags: ["Account"],
+  operationId: "requestAccountDeletion",
+  summary: "Email a one-time account deletion link",
+  description:
+    "Public. If the address has any Studafy accounts, emails a link (valid one hour) that deletes " +
+    "them. The response is identical whether or not it does, and at most one email is sent per " +
+    "address every five minutes. Protected by Turnstile and rate limiting.",
+  security: [],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: accountDeletionRequestBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 202: { description: "Request accepted.", schema: accountDeletionRequestResponseSchema } },
+    [400, 429, 503, 500],
+  ),
+});
+
+const confirmDeletionRoute = createRoute({
+  method: "post",
+  path: "/api/account/deletion-requests/confirm",
+  tags: ["Account"],
+  operationId: "confirmAccountDeletion",
+  summary: "Delete the accounts an emailed link was issued for",
+  description:
+    "Public; the token from the emailed link is the credential. Deletes every active account under " +
+    "that address exactly as `POST /api/account/deletion` does, and consumes the token.",
+  security: [],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: accountDeletionConfirmBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 202: { description: "Deletion accepted.", schema: accountDeletionConfirmResponseSchema } },
+    [400, 409, 429, 502, 503, 500],
+  ),
+});
+
 const retainedRecords = RETAINED_RECORD_CATEGORIES.map((c) => ({
   category: c.category,
   description: c.description,
@@ -65,28 +121,81 @@ export function accountRoutes(
     : null;
 
   routes.use("/api/account/deletion", auditAction("delete", "users"));
+  // The request writes no audit row (see deletion-request-service.ts); the deletion it leads to is
+  // audited on confirm, inside deleteAccount's transaction.
+  routes.use("/api/account/deletion-requests", auditAction("delete", "users"));
+  routes.use("/api/account/deletion-requests/confirm", auditAction("delete", "users"));
 
-  routes.openapi(deleteAccountRoute, async (c) => {
-    const auth = requireAuth(c);
-    if (!maintenanceQueue) {
+  const requireDeletionDeps = () => {
+    if (!redis || !maintenanceQueue) {
       throw new CodedHttpException(
         503,
         ERROR_CODES.DSR_UNAVAILABLE,
         "Account deletion is not available on this deployment",
       );
     }
+    return {
+      database,
+      denylist,
+      paymentProviders,
+      maintenanceQueue,
+      siwa,
+      redis,
+      captchaSecretKey: process.env.TURNSTILE_SECRET_KEY,
+    };
+  };
 
-    const result = await deleteAccount(
-      { database, denylist, paymentProviders, maintenanceQueue, siwa },
+  routes.openapi(requestDeletionRoute, async (c) => {
+    const body = c.req.valid("json");
+    await requestAccountDeletion(requireDeletionDeps(), {
+      email: body.email,
+      captchaToken: body.captcha_token,
+      clientIp: clientIpFrom(c),
+      requestId: c.get("requestId"),
+      log: c.get("log"),
+    });
+    return c.json(
       {
-        schoolId: auth.schoolId,
-        userId: auth.userId,
-        requestId: c.get("requestId"),
-        log: c.get("log"),
-        userAgent: c.req.header("User-Agent") ?? null,
-        clientIp: clientIpFrom(c),
+        message:
+          "If this address has a Studafy account, we have sent it a link to confirm the deletion.",
       },
+      202,
     );
+  });
+
+  routes.openapi(confirmDeletionRoute, async (c) => {
+    const body = c.req.valid("json");
+    const confirmed = await confirmAccountDeletion(requireDeletionDeps(), {
+      token: body.token,
+      clientIp: clientIpFrom(c),
+      userAgent: c.req.header("User-Agent") ?? null,
+      requestId: c.get("requestId"),
+      log: c.get("log"),
+    });
+    return c.json(
+      {
+        accounts: confirmed.map((a) => ({
+          school_name: a.schoolName,
+          request_id: a.requestId,
+          completes_by: a.completesBy.toISOString(),
+        })),
+        retained_records: retainedRecords,
+      },
+      202,
+    );
+  });
+
+  routes.openapi(deleteAccountRoute, async (c) => {
+    const auth = requireAuth(c);
+
+    const result = await deleteAccount(requireDeletionDeps(), {
+      schoolId: auth.schoolId,
+      userId: auth.userId,
+      requestId: c.get("requestId"),
+      log: c.get("log"),
+      userAgent: c.req.header("User-Agent") ?? null,
+      clientIp: clientIpFrom(c),
+    });
 
     return c.json(
       {
