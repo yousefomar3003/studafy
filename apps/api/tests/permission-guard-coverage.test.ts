@@ -275,6 +275,8 @@ const EXPECTED_MUTATING_ROUTES = [
   // parameter), so there is no other user's data this could reach — same rationale as the
   // notification-preferences and device-registration self-service routes below.
   "POST /api/privacy/me/dsr",
+  // Self-service account deletion — the caller is always the subject (never a parameter).
+  "POST /api/account/deletion",
   // Notification preferences (ST-143). Self-service on the caller's own rows; the mandatory-type
   // and digest-eligibility rules are enforced in the handler and, redundantly, by CHECK constraints
   // in migration 000083 — there is no other user's row this could reach.
@@ -452,6 +454,7 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Self-service account deletion/export — the subject is always the caller (never a body
   // parameter), so there is no other user's data to protect.
   "POST /api/privacy/me/dsr",
+  "POST /api/account/deletion",
   // Generic object storage gateway (SAD §22) — authorized per content class. The class (and thus
   // the required permission) is in the request body, so it is asserted in the handler via
   // requirePermissionIn() rather than mounted at route time — the same per-method pattern the

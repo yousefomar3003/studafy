@@ -230,6 +230,10 @@ export const ERROR_CODES = {
   DSR_ALREADY_PENDING: "DSR_ALREADY_PENDING",
   DSR_SUBJECT_NOT_FOUND: "DSR_SUBJECT_NOT_FOUND",
 
+  // Self-service account deletion. Apple's /auth/revoke rejected or could not be reached; the
+  // deletion is rolled back so the user can retry rather than end up deleted with a live Apple grant.
+  APPLE_TOKEN_REVOCATION_FAILED: "APPLE_TOKEN_REVOCATION_FAILED",
+
   // Announcement management (ST-194). The audience class named at compose time doesn't exist in
   // this school.
   ANNOUNCEMENT_CLASS_NOT_FOUND: "ANNOUNCEMENT_CLASS_NOT_FOUND",

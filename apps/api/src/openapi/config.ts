@@ -178,6 +178,12 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "reports its status; apps/workers/src/queues/maintenance drains the queue this enqueues onto.",
     },
     {
+      name: "Account",
+      description:
+        "The caller's own account. Self-service deletion signs out everywhere, detaches the account " +
+        "from the school, stops AI add-on billing and files the erasure request.",
+    },
+    {
       name: "Announcements",
       description:
         "Compose and publish school/role/class-targeted announcements, with an optional mandatory " +
