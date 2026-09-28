@@ -28,7 +28,7 @@ class AiHubSchoolInactive extends AiHubStatus {
   const AiHubSchoolInactive();
 }
 
-/// No active AI add-on for this student (`402 AI_SUBSCRIPTION_INACTIVE`) — the upsell state.
+/// No active AI add-on for this student (`402 AI_SUBSCRIPTION_INACTIVE`) — the not-active state.
 class AiHubUnsubscribed extends AiHubStatus {
   const AiHubUnsubscribed();
 }

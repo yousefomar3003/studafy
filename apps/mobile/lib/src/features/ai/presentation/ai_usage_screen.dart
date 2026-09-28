@@ -7,9 +7,9 @@ import '../application/ai_hub_providers.dart';
 import '../domain/ai_hub_status.dart';
 import '../domain/ai_usage.dart';
 import 'widgets/ai_hub_message.dart';
+import 'widgets/ai_not_active_card.dart';
 import 'widgets/ai_school_inactive_notice.dart';
 import 'widgets/ai_state_page.dart';
-import 'widgets/ai_upsell_card.dart';
 import 'widgets/ai_usage_meter.dart';
 import 'widgets/ai_usage_warning_banner.dart';
 
@@ -27,7 +27,7 @@ import 'widgets/ai_usage_warning_banner.dart';
 /// column on the ledger, plus every AI route tagging its own writes), not a mobile-only one.
 ///
 /// Reuses [aiHubStatusProvider] rather than re-fetching: it's the same quota snapshot the hub
-/// screen just loaded. Rendering the school-inactive/upsell/unavailable cases with the hub's own
+/// screen just loaded. Rendering the school-inactive/not-active/unavailable cases with the hub's own
 /// widgets (instead of assuming only [AiHubSubscribed] can reach this screen) covers the
 /// entitlement lapsing while this screen happens to be open.
 class AiUsageScreen extends ConsumerWidget {
@@ -61,7 +61,7 @@ class AiUsageScreen extends ConsumerWidget {
               icon: Icons.info_outline,
             ),
             AiHubSchoolInactive() => const AiStatePage(child: AiSchoolInactiveNotice()),
-            AiHubUnsubscribed() => const AiStatePage(child: AiUpsellCard()),
+            AiHubUnsubscribed() => const AiStatePage(child: AiNotActiveCard()),
             AiHubSubscribed(:final usage) => AiStatePage(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

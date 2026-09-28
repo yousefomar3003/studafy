@@ -48,15 +48,15 @@ class IntegrationTestApp {
   final dynamic _extraOverrides;
 
   /// The [FakePushService] instance backing `pushServiceProvider` for this run — exposed so a
-  /// journey with no other in-app deep-link trigger (`ai_upsell_deep_link_test.dart`'s return
-  /// trip) can call [FakePushService.simulateNotificationTap], exactly the seam
+  /// journey with no other in-app deep-link trigger (`ai_not_active_round_trip_test.dart`'s
+  /// return trip) can call [FakePushService.simulateNotificationTap], exactly the seam
   /// [FirebasePushService] itself feeds from a real tap.
   final FakePushService pushService;
 
   /// [extraOverrides] is for provider seams a specific journey needs beyond the baseline every
-  /// journey shares — e.g. `ai_upsell_deep_link_test.dart` overriding `currentStudentIdProvider`
-  /// (a documented, test-sanctioned gap — see that provider's own doc comment) to reach the
-  /// upsell state at all.
+  /// journey shares — e.g. `grade_publish_realtime_test.dart` overriding
+  /// `currentStudentIdProvider` (a documented, test-sanctioned gap — see that provider's own doc
+  /// comment).
   static Future<IntegrationTestApp> pump(
     WidgetTester tester, {
     String? mockLoginHint,

@@ -10,18 +10,18 @@ import '../domain/ai_hub_status.dart';
 import 'widgets/ai_feature_grid.dart';
 import 'widgets/ai_hub_message.dart';
 import 'widgets/ai_school_inactive_notice.dart';
+import 'widgets/ai_not_active_card.dart';
 import 'widgets/ai_state_page.dart';
-import 'widgets/ai_upsell_card.dart';
 import 'widgets/ai_usage_meter.dart';
 
-/// The AI tab: subscribed feature hub, unsubscribed value explainer + external-browser checkout
-/// link, or school-inactive messaging — see [AiHubStatus] for the state each renders and
-/// `apps/mobile/docs/ai_store_compliance.md` (R-07) for why purchasing never happens in this app.
+/// The AI tab: subscribed feature hub, a neutral "not active" notice, or school-inactive messaging
+/// — see [AiHubStatus] for the state each renders and `apps/mobile/docs/store_payment_routing.md`
+/// for why this app never links to, or mentions, a way to buy the add-on.
 ///
-/// Re-checks entitlement on every app resume (not just first load): a checkout finished in the
-/// external browser has no way to call back into this app, so "return -> entitlement reflected
-/// without reinstall" (the ticket's acceptance criterion) depends on this screen noticing the app
-/// came back to the foreground on its own, rather than the student having to force a refresh.
+/// Re-checks entitlement on every app resume (not just first load): an add-on activated outside
+/// the app has no way to call back into it, so "entitlement reflected without reinstall" depends
+/// on this screen noticing the app came back to the foreground on its own, rather than the student
+/// having to force a refresh.
 /// Pull-to-refresh covers the same case manually, and for a transient fetch error.
 class AiHubScreen extends ConsumerStatefulWidget {
   const AiHubScreen({super.key});
@@ -78,7 +78,7 @@ class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingOb
               icon: Icons.info_outline,
             ),
             AiHubSchoolInactive() => const AiStatePage(child: AiSchoolInactiveNotice()),
-            AiHubUnsubscribed() => const AiStatePage(child: AiUpsellCard()),
+            AiHubUnsubscribed() => const AiStatePage(child: AiNotActiveCard()),
             AiHubSubscribed(:final usage) => AiStatePage(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

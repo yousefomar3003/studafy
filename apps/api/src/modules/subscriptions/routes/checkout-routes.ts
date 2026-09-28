@@ -43,7 +43,8 @@ const checkoutRoute = createRoute({
   operationId: "createCheckoutSession",
   summary: "Create a Stripe Checkout session",
   description:
-    "Creates a Stripe Checkout session for the authenticated school. Requires Stripe to be configured.",
+    "Creates a Stripe Checkout session for the authenticated school. Requires Stripe to be configured. " +
+    "Web-origin only.",
   security: [{ bearerAuth: [] }],
   request: {
     body: { content: { "application/json": { schema: CheckoutRequestSchema } } },
@@ -83,8 +84,12 @@ export function checkoutRoutes(
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 
+  // Starting a checkout sells a digital subscription, which the app stores only allow through their
+  // own in-app purchase — so, like every other purchase route, it is refused to mobile sessions
+  // outright (ST-304; see apps/mobile/docs/store_payment_routing.md).
+  app.use("/api/subscriptions/checkout", requireChannel(AUTH_CHANNELS.WEB));
   // Portal-session, specifically: managing the payment method on file is an admin action, unlike
-  // starting a checkout, which any authenticated staff session may do today.
+  // starting a checkout, which any authenticated web staff session may do today.
   app.use("/api/subscriptions/portal", requireChannel(AUTH_CHANNELS.WEB));
   app.use("/api/subscriptions/portal", requirePermission(PERMISSIONS.ORGANIZATION_MANAGE_BILLING));
 

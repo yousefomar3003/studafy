@@ -6,9 +6,7 @@ import '../../../core/api/auth_interceptor.dart';
 import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/di/app_providers.dart';
-import '../../student/application/student_context_providers.dart';
 import '../data/ai_hub_client.dart';
-import '../domain/ai_checkout_link.dart';
 import '../domain/ai_hub_status.dart';
 
 /// [AiHubClient] on its own [Dio], wired identically to `askAiClientProvider` /
@@ -34,11 +32,11 @@ final aiHubClientProvider = Provider<AiHubClient>((ref) {
 /// Unlike most student-scoped reads in this app, `GET /api/ai/usage` takes no studentId — it
 /// resolves the caller's own AI entitlement from the session's auth context server-side
 /// (`usage-routes.ts`) — so this provider does not gate on `currentStudentIdProvider` the way
-/// `todayGradesProvider` does. That gap only blocks the checkout link below, not this read.
+/// `todayGradesProvider` does.
 ///
 /// `.autoDispose`, not kept alive: [AiHubScreen] re-reads it on every app resume (see that
-/// screen's `WidgetsBindingObserver`) so a checkout finished in the external browser is reflected
-/// without the student having to force-quit and reopen the app.
+/// screen's `WidgetsBindingObserver`) so an add-on activated outside the app is reflected without
+/// the student having to force-quit and reopen the app.
 final aiHubStatusProvider = FutureProvider.autoDispose<AiHubStatus>((ref) async {
   final client = ref.watch(aiHubClientProvider);
 
@@ -49,19 +47,4 @@ final aiHubStatusProvider = FutureProvider.autoDispose<AiHubStatus>((ref) async 
     if (status == null) rethrow;
     return status;
   }
-});
-
-/// The external-browser checkout link for the AI add-on, or `null` when either input it needs
-/// isn't available yet — see [buildAiCheckoutUrl]'s doc comment for the two reasons that happens.
-/// [AiHubScreen]'s upsell state disables its "Continue on the website" action while this is null
-/// rather than launching a link the destination page would reject.
-final aiCheckoutUrlProvider = Provider.autoDispose<Uri?>((ref) {
-  final config = ref.watch(appConfigProvider);
-  final studentId = ref.watch(currentStudentIdProvider);
-
-  return buildAiCheckoutUrl(
-    webBaseUrl: config.webBaseUrl,
-    studentId: studentId,
-    aiAddonPriceId: config.aiAddonPriceId,
-  );
 });

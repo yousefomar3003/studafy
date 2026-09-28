@@ -4,7 +4,7 @@ import '../../../../design/tokens/app_spacing_tokens.dart';
 
 /// Common scroll shell for the AI tab's non-loading, non-error states with real content to show --
 /// always scrollable so pull-to-refresh keeps working even when [child] is short enough to fit one
-/// screen. Shared by `AiHubScreen` and `AiUsageScreen` so both render the school-inactive, upsell,
+/// screen. Shared by `AiHubScreen` and `AiUsageScreen` so both render the school-inactive, not-active,
 /// and subscribed states identically.
 class AiStatePage extends StatelessWidget {
   const AiStatePage({required this.child, super.key});
