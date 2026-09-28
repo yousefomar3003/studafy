@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
-// The unified demo-tenant seed entrypoint: `bun run db:seed`.
+// The unified demo-tenant seed entrypoint: `bun run db:seed`. Also exports seedTenant, the shared
+// envelope review-tenant.ts runs for the App Store / Play reviewer tenant.
 //
-// Envelope (mirrors packages/db/src/partitions.ts): production guard -> connect with the administrative
-// identity -> reserve one connection -> take the shared migration advisory lock -> abort if the demo
+// Envelope (mirrors packages/db/src/partitions.ts): caller's guard -> connect with the administrative
+// identity -> reserve one connection -> take the shared migration advisory lock -> abort if the
 // tenant already exists -> one transaction that runs as studafy_admin with app.school_id set and calls
-// every data module in dependency order -> COMMIT -> post-seed index health check. The lock and
-// connection are always released in finally.
+// every data module in dependency order -> COMMIT. The lock and connection are always released in
+// finally. The local demo entrypoint then runs the post-seed index health check.
 //
 // The whole dataset is written in a single transaction, so a failure anywhere leaves the database
 // exactly as it was. Re-running against an already-seeded database is a clean, explicit no-op.
@@ -17,17 +18,19 @@ import { ADVISORY_LOCK_KEY } from "../../packages/db/src/runner";
 import { seedAcademics } from "./data/academics";
 import { seedAi } from "./data/ai";
 import { seedAssessments } from "./data/assessments";
-import { seedEngagement } from "./data/engagement";
+import { seedEngagement, seedLocalFixtures } from "./data/engagement";
 import { seedFinance } from "./data/finance";
 import { seedMaterials } from "./data/materials";
-import { seedPeople } from "./data/people";
-import { DEMO_SCHOOL_NAME, DEMO_SCHOOL_SLUG, seedSchool } from "./data/school";
+import { seedPeople, suppressTenantEmail } from "./data/people";
+import { seedSchool } from "./data/school";
 import { seedTimetableAndAttendance } from "./data/timetable";
 import { assertSeedAllowed, SeedSafetyError } from "./guard";
 import { checkIndexHealth, formatIndexHealthReport } from "./index-health";
+import { DEMO_TENANT } from "./tenants";
 
-import type { FullCtx } from "./support";
+import type { FullCtx, TenantProfile } from "./support";
 import type { ReservedSql } from "../../packages/db/src/client";
+import type { MigrationConfig } from "../../packages/db/src/config";
 
 // Tenant + global tables reported in the post-seed summary. Counting runs inside the transaction with
 // app.school_id set, so tenant tables report the demo school's own rows.
@@ -92,6 +95,9 @@ export interface SeedOptions {
   readonly env?: Record<string, string | undefined>;
 }
 
+// Throws SeedSafetyError when this tenant must not be seeded against this target.
+export type SeedGuard = (env: Record<string, string | undefined>, config: MigrationConfig) => void;
+
 async function tableCounts(sql: ReservedSql): Promise<TableCount[]> {
   // SUMMARY_TABLES is a closed, in-repo constant list, never caller input.
   const query =
@@ -101,10 +107,18 @@ async function tableCounts(sql: ReservedSql): Promise<TableCount[]> {
   return (await sql.unsafe(query)) as unknown as TableCount[];
 }
 
-export async function seedDemoTenant(options: SeedOptions = {}): Promise<SeedResult> {
+export function seedDemoTenant(options: SeedOptions = {}): Promise<SeedResult> {
+  return seedTenant(DEMO_TENANT, assertSeedAllowed, options);
+}
+
+export async function seedTenant(
+  tenant: TenantProfile,
+  guard: SeedGuard,
+  options: SeedOptions = {},
+): Promise<SeedResult> {
   const env = options.env ?? process.env;
   const config = loadMigrationConfig(env);
-  assertSeedAllowed(env, config);
+  guard(env, config);
 
   const client = createClient(config, "studafy-seed");
   let reserved: ReservedSql | undefined;
@@ -122,7 +136,7 @@ export async function seedDemoTenant(options: SeedOptions = {}): Promise<SeedRes
     locked = true;
 
     const [existing] = await reserved<{ one: number }[]>`
-      SELECT 1 AS one FROM app.schools WHERE slug = ${DEMO_SCHOOL_SLUG}
+      SELECT 1 AS one FROM app.schools WHERE slug = ${tenant.slug}
     `;
     if (existing) return { seeded: false };
 
@@ -133,9 +147,9 @@ export async function seedDemoTenant(options: SeedOptions = {}): Promise<SeedRes
       await reserved.unsafe("BEGIN");
       await reserved.unsafe("SET LOCAL ROLE studafy_admin");
 
-      const school = await seedSchool(reserved);
+      const school = await seedSchool(reserved, tenant);
       schoolId = school.schoolId;
-      const people = await seedPeople(reserved, school);
+      const people = await seedPeople(reserved, school, tenant);
       const academics = await seedAcademics(reserved, { ...school, ...people });
       const ctx: FullCtx = { ...school, ...people, ...academics };
 
@@ -145,6 +159,8 @@ export async function seedDemoTenant(options: SeedOptions = {}): Promise<SeedRes
       await seedFinance(reserved, ctx);
       await seedAi(reserved, ctx, materials);
       await seedEngagement(reserved, ctx);
+      if (tenant.localFixtures) await seedLocalFixtures(reserved, ctx);
+      if (tenant.isReviewTenant) await suppressTenantEmail(reserved, tenant);
 
       counts = await tableCounts(reserved);
       await reserved.unsafe("COMMIT");
@@ -170,29 +186,31 @@ export async function seedDemoTenant(options: SeedOptions = {}): Promise<SeedRes
   }
 }
 
-export async function main(): Promise<number> {
+// Runs a seed for the CLI and prints its outcome. Returns the result, or null when the seed failed
+// (the error has already been printed).
+export async function runSeedCli(
+  tenant: TenantProfile,
+  run: () => Promise<SeedResult>,
+): Promise<SeedResult | null> {
   let result: SeedResult;
   try {
-    result = await seedDemoTenant();
+    result = await run();
   } catch (error) {
     if (error instanceof SeedSafetyError) {
       console.error(error.message);
-      return 1;
+      return null;
     }
     console.error(`SeedExecutionError: ${error instanceof Error ? error.message : "seed failed"}`);
-    return 1;
+    return null;
   }
 
   if (!result.seeded) {
-    console.error(
-      `Seed skipped: demo tenant '${DEMO_SCHOOL_SLUG}' already exists. ` +
-        "Recreate or re-migrate a fresh database to reseed.",
-    );
-    return 1;
+    console.error(`Seed skipped: tenant '${tenant.slug}' already exists.`);
+    return result;
   }
 
   const totalRows = (result.counts ?? []).reduce((sum, row) => sum + row.row_count, 0);
-  console.log(`Seeded '${DEMO_SCHOOL_NAME}' (${DEMO_SCHOOL_SLUG}):`);
+  console.log(`Seeded '${tenant.name}' (${tenant.slug}):`);
   for (const row of result.counts ?? []) {
     console.log(`  ${row.table_name.padEnd(26)} ${String(row.row_count).padStart(5)}`);
   }
@@ -200,6 +218,15 @@ export async function main(): Promise<number> {
     `Total ${totalRows} rows across ${result.counts?.length ?? 0} tables in ` +
       `${Math.round(result.elapsedMs ?? 0)}ms.`,
   );
+  return result;
+}
+
+export async function main(): Promise<number> {
+  const result = await runSeedCli(DEMO_TENANT, () => seedDemoTenant());
+  if (!result?.seeded) {
+    if (result) console.error("Recreate or re-migrate a fresh database to reseed.");
+    return 1;
+  }
 
   // Post-seed index health, using the freshly seeded rows.
   try {

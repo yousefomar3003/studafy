@@ -1,5 +1,5 @@
-// Engagement + operational tables: in-app notifications, push-device registrations, the domain-event
-// outbox, and append-only audit logs. Tables carrying a JSONB payload (notifications.metadata,
+// Engagement + operational tables: in-app notifications and append-only audit logs, plus the local-only
+// push-device registrations and domain-event outbox (seedLocalFixtures). Tables carrying a JSONB payload (notifications.metadata,
 // outbox_events.payload, audit_logs.new_values) are inserted with explicit VALUES and sql.json so the
 // payload is bound as jsonb. audit_logs is append-only and partitioned by created_at (2026-07 window).
 // notification_preferences are NOT seeded here — the 000017 trigger populated them when each user was
@@ -35,6 +35,32 @@ export async function seedEngagement(sql: Sql, ctx: FullCtx): Promise<void> {
       ${sql.json({ deepLink: "/assignments" })}, ${seedDate(-1)}
     )
   `;
+
+  // Append-only audit log (INSERT only; new_values is jsonb for the 'insert' action).
+  await sql`
+    INSERT INTO app.audit_logs
+      (id, school_id, actor_id, action, target_table, target_id, new_values, client_ip, created_at)
+    VALUES (
+      ${uuid()}, ${schoolId}, ${orgAdmin.userId}, 'insert', 'schools', ${schoolId},
+      ${sql.json({ slug: ctx.schoolSlug, status: "active" })}, '203.0.113.10', ${seedDate(-3)}
+    )
+  `;
+  await sql`
+    INSERT INTO app.audit_logs
+      (id, school_id, actor_id, action, target_table, target_id, client_ip, created_at)
+    VALUES (
+      ${uuid()}, ${schoolId}, ${orgAdmin.userId}, 'login', 'users', ${orgAdmin.userId},
+      '203.0.113.10', ${seedDate(-1)}
+    )
+  `;
+}
+
+// Push-device registrations with fake FCM tokens and not-yet-relayed domain events. Local only
+// (TenantProfile.localFixtures): in a deployed environment the push sender would call FCM with these
+// tokens and the outbox relay would publish these events.
+export async function seedLocalFixtures(sql: Sql, ctx: FullCtx): Promise<void> {
+  const { schoolId, students, orgAdmin } = ctx;
+  const notifiedStudents = students.slice(0, 4);
 
   // Push-device registrations.
   await sql`
@@ -80,22 +106,4 @@ export async function seedEngagement(sql: Sql, ctx: FullCtx): Promise<void> {
       VALUES (${schoolId}, ${event.name}, ${sql.json(event.payload)}, ${seedDate(-1)})
     `;
   }
-
-  // Append-only audit log (INSERT only; new_values is jsonb for the 'insert' action).
-  await sql`
-    INSERT INTO app.audit_logs
-      (id, school_id, actor_id, action, target_table, target_id, new_values, client_ip, created_at)
-    VALUES (
-      ${uuid()}, ${schoolId}, ${orgAdmin.userId}, 'insert', 'schools', ${schoolId},
-      ${sql.json({ slug: ctx.schoolSlug, status: "active" })}, '203.0.113.10', ${seedDate(-3)}
-    )
-  `;
-  await sql`
-    INSERT INTO app.audit_logs
-      (id, school_id, actor_id, action, target_table, target_id, client_ip, created_at)
-    VALUES (
-      ${uuid()}, ${schoolId}, ${orgAdmin.userId}, 'login', 'users', ${orgAdmin.userId},
-      '203.0.113.10', ${seedDate(-1)}
-    )
-  `;
 }

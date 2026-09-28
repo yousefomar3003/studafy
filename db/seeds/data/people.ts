@@ -1,9 +1,9 @@
-// Users, their roles, mock OAuth identities, and the student/teacher/parent profiles. Driven entirely
-// by MOCK_PERSONAS so the seeded logins are exactly the ones the seeding guide documents. Inserting a
+// Users, their roles, login identities, and the student/teacher/parent profiles. Driven entirely by the
+// tenant profile's persona list so the seeded logins are exactly the ones its guide documents. Inserting a
 // user with status 'active' fires the 000017 trigger that seeds that user's full notification-preference
 // matrix, so this module never writes app.notification_preferences directly.
-import { MOCK_OAUTH_PROVIDER, MOCK_PERSONAS, displayName, mockSubject } from "../mock-credentials";
-import { seedDate, uuid } from "../support";
+import { displayName } from "../mock-credentials";
+import { schoolContactEmail, seedDate, uuid } from "../support";
 
 import type { MockPersona } from "../mock-credentials";
 import type {
@@ -13,19 +13,25 @@ import type {
   SeededStudent,
   SeededTeacher,
   Sql,
+  TenantProfile,
 } from "../support";
 
 const USERS_CREATED_AT = seedDate(-40, 8);
 const USERS_VERIFIED_AT = seedDate(-40, 10);
 
-export async function seedPeople(sql: Sql, school: SchoolCtx): Promise<PeopleCtx> {
+export async function seedPeople(
+  sql: Sql,
+  school: SchoolCtx,
+  tenant: TenantProfile,
+): Promise<PeopleCtx> {
   const { schoolId, countryId } = school;
+  const personas = tenant.personas;
 
   // Assign a deterministic userId to every persona up front so profiles and relationships can be wired
   // without re-querying.
-  const userIdByKey = new Map<string, string>(MOCK_PERSONAS.map((p) => [p.key, uuid()]));
+  const userIdByKey = new Map<string, string>(personas.map((p) => [p.key, uuid()]));
 
-  const userRows = MOCK_PERSONAS.map((persona) => ({
+  const userRows = personas.map((persona) => ({
     id: userIdByKey.get(persona.key)!,
     school_id: schoolId,
     email: persona.email,
@@ -49,23 +55,24 @@ export async function seedPeople(sql: Sql, school: SchoolCtx): Promise<PeopleCtx
     )}
   `;
 
-  const roleRows = MOCK_PERSONAS.map((persona) => ({
+  const roleRows = personas.map((persona) => ({
     school_id: schoolId,
     user_id: userIdByKey.get(persona.key)!,
     role: persona.role,
   }));
   await sql`INSERT INTO app.user_roles ${sql(roleRows, "school_id", "user_id", "role")}`;
 
-  const oauthRows = MOCK_PERSONAS.map((persona) => ({
-    id: uuid(),
-    school_id: schoolId,
-    user_id: userIdByKey.get(persona.key)!,
-    provider: MOCK_OAUTH_PROVIDER,
-    subject: mockSubject(persona),
-  }));
-  await sql`
-    INSERT INTO app.oauth_identities ${sql(oauthRows, "id", "school_id", "user_id", "provider", "subject")}
-  `;
+  const oauthRows = personas.flatMap((persona) => {
+    const identity = tenant.loginIdentity(persona);
+    return identity
+      ? [{ id: uuid(), school_id: schoolId, user_id: userIdByKey.get(persona.key)!, ...identity }]
+      : [];
+  });
+  if (oauthRows.length > 0) {
+    await sql`
+      INSERT INTO app.oauth_identities ${sql(oauthRows, "id", "school_id", "user_id", "provider", "subject")}
+    `;
+  }
 
   const toPerson = (persona: MockPersona): SeededPerson => ({
     key: persona.key,
@@ -75,7 +82,7 @@ export async function seedPeople(sql: Sql, school: SchoolCtx): Promise<PeopleCtx
   });
 
   // Teacher profiles.
-  const teacherPersonas = MOCK_PERSONAS.filter((p) => p.group === "teacher");
+  const teacherPersonas = personas.filter((p) => p.group === "teacher");
   const teachers: SeededTeacher[] = teacherPersonas.map((persona) => ({
     ...toPerson(persona),
     teacherId: uuid(),
@@ -101,7 +108,7 @@ export async function seedPeople(sql: Sql, school: SchoolCtx): Promise<PeopleCtx
   `;
 
   // Student profiles.
-  const studentPersonas = MOCK_PERSONAS.filter((p) => p.group === "student");
+  const studentPersonas = personas.filter((p) => p.group === "student");
   const students: SeededStudent[] = studentPersonas.map((persona, index) => ({
     ...toPerson(persona),
     studentId: uuid(),
@@ -137,10 +144,10 @@ export async function seedPeople(sql: Sql, school: SchoolCtx): Promise<PeopleCtx
     )}
   `;
 
-  const parents: SeededPerson[] = MOCK_PERSONAS.filter((p) => p.group === "parent").map(toPerson);
+  const parents: SeededPerson[] = personas.filter((p) => p.group === "parent").map(toPerson);
 
-  // Parent -> child links. Parents carry the GUEST role; the relationship lives here (ST-052 decision).
-  const parentPersonas = MOCK_PERSONAS.filter((persona) => persona.group === "parent");
+  // Parent -> child links. The relationship lives here whichever role the parent carries (ST-052).
+  const parentPersonas = personas.filter((persona) => persona.group === "parent");
   const familyIdByParentKey = new Map<string, string>(
     parentPersonas.map((persona) => [persona.key, uuid()]),
   );
@@ -165,7 +172,7 @@ export async function seedPeople(sql: Sql, school: SchoolCtx): Promise<PeopleCtx
   const studentIdByKey = new Map<string, string>(
     studentPersonas.map((persona, index) => [persona.key, students[index]!.studentId]),
   );
-  const linkRows = MOCK_PERSONAS.flatMap((persona) =>
+  const linkRows = personas.flatMap((persona) =>
     (persona.children ?? []).map((child) => ({
       school_id: schoolId,
       family_id: familyIdByParentKey.get(persona.key)!,
@@ -187,8 +194,26 @@ export async function seedPeople(sql: Sql, school: SchoolCtx): Promise<PeopleCtx
     `;
   }
 
-  const superAdmin = toPerson(MOCK_PERSONAS.find((p) => p.role === "SUPER_ADMIN")!);
-  const orgAdmin = toPerson(MOCK_PERSONAS.find((p) => p.role === "ORG_ADMIN")!);
+  const orgAdmin = toPerson(personas.find((p) => p.role === "ORG_ADMIN")!);
 
-  return { superAdmin, orgAdmin, teachers, students, parents };
+  return { orgAdmin, teachers, students, parents };
+}
+
+// Adds every address the tenant owns (each persona and the school contact) to the global
+// app.email_suppressions list with reason 'review_tenant' (migration 000115). The email dispatcher
+// checks that list before every send and records a suppressed delivery instead of handing an
+// undeliverable address to SES, where the bounce would count against the sender reputation.
+export async function suppressTenantEmail(sql: Sql, tenant: TenantProfile): Promise<void> {
+  const addresses = [
+    ...tenant.personas.map((persona) => persona.email.toLowerCase()),
+    schoolContactEmail(tenant.slug),
+  ];
+  await sql`
+    INSERT INTO app.email_suppressions ${sql(
+      addresses.map((address) => ({ address, reason: "review_tenant" })),
+      "address",
+      "reason",
+    )}
+    ON CONFLICT (address) DO NOTHING
+  `;
 }

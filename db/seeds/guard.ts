@@ -89,3 +89,22 @@ export function assertSeedAllowed(env: GuardEnv, config: MigrationConfig): void 
     );
   }
 }
+
+export interface ReviewGuardEnv {
+  // Must equal the review tenant's slug. An explicit, per-invocation statement of intent: the review
+  // seed is the one seed meant to run against production, so it cannot rely on the host checks above.
+  readonly REVIEW_TENANT_SEED_CONFIRM?: string;
+}
+
+// Guard for db/seeds/review-tenant.ts. Deliberately independent of assertSeedAllowed: that guard
+// exists to keep fabricated local data out of shared databases, while the reviewer tenant must be
+// provisioned in production. What keeps the reviewer tenant from being used as a real one is its
+// profile (no SUPER_ADMIN, no billable plan, is_review_tenant) and migration 000115, not the host.
+export function assertReviewSeedAllowed(env: ReviewGuardEnv, expectedSlug: string): void {
+  if (env.REVIEW_TENANT_SEED_CONFIRM !== expectedSlug) {
+    throw new SeedSafetyError(
+      `Refusing to seed the reviewer tenant: set REVIEW_TENANT_SEED_CONFIRM=${expectedSlug} ` +
+        "to confirm the target database.",
+    );
+  }
+}
