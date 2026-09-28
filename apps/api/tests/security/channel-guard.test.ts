@@ -197,3 +197,32 @@ describe("admin provider unlink — channel guard", () => {
     expect(res.status).not.toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Teacher routes — the `:teacherId` guards must not capture `/api/teachers/me`
+// ---------------------------------------------------------------------------
+
+describe("teacher routes — channel guard", () => {
+  integrationTest("an instructor's mobile token can read /api/teachers/me", async () => {
+    const teacher = tenant.teachers[0]!;
+    const token = await mintTestToken(keyStore, {
+      schoolId: tenant.schoolId,
+      userId: teacher.userId,
+      roles: ["INSTRUCTOR"],
+      channel: "mobile",
+    });
+    const res = await app.request("/api/teachers/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { id: string }).id).toBe(teacher.id);
+  });
+
+  integrationTest("mobile token is still rejected on GET /api/teachers/{teacherId}", async () => {
+    const token = await adminToken("mobile");
+    const res = await app.request(`/api/teachers/${tenant.teachers[0]!.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    await expectChannelDenied(res);
+  });
+});
