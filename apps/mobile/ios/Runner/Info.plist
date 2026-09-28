@@ -10,6 +10,8 @@
 	<string>$(APP_DISPLAY_NAME)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Studafy uses the camera to add teaching materials.</string>
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<false/>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
