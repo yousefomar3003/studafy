@@ -185,7 +185,7 @@ integrationTest(
       `;
       expect(plan).toEqual({ is_active: false, prices: 0 });
 
-      // Migration 000115 invariants: no billing customer, and no second review tenant.
+      // Migration 000116 invariants: no billing customer, and no second review tenant.
       await expectViolation(
         sql`UPDATE app.schools SET stripe_customer_id = 'cus_review' WHERE id = ${schoolId}::uuid`,
         "ck_schools_review_tenant_unbillable",

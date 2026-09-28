@@ -30,7 +30,7 @@ export const DEMO_TENANT: TenantProfile = {
 
 // App Store / Play reviewer tenant, provisioned in production. Its plan is inactive and unpriced, so
 // it is never offered at checkout or synced as a sellable price, and the school is flagged
-// is_review_tenant, which the API and migration 000115 treat as non-billable.
+// is_review_tenant, which the API and migration 000116 treat as non-billable.
 export const REVIEW_TENANT: TenantProfile = {
   slug: REVIEW_TENANT_SLUG,
   name: REVIEW_TENANT_NAME,

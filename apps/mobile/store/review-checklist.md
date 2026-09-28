@@ -112,6 +112,9 @@ checklist specifically whenever `features/ai` changes.
 - [ ] Age rating / content rating questionnaire answers match the recommendation and reasoning in
       `listing-metadata.md`, and have been confirmed by whoever owns compliance sign-off, not
       assumed from this document alone.
+- [ ] Reviewer demo accounts provisioned and all four logins verified against the production API,
+      and their App Review Notes / Play App-access entries filled in — see
+      `docs/runbooks/app-review-access.md` (ST-303).
 - [ ] Support URL and privacy-policy URL both resolve (load in a browser, return 200) before
       submission — a broken URL in either field is an automatic rejection on both stores.
 

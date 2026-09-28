@@ -3,7 +3,7 @@
  *
  * Every real account signs in through an external OAuth provider. Apple and Google reviewers cannot
  * be expected to hold a Microsoft or Google account the school invited, so exactly one tenant -- the
- * school flagged `is_review_tenant` (migration 000115) -- carries identities under the `review`
+ * school flagged `is_review_tenant` (migration 000116) -- carries identities under the `review`
  * provider, whose subject is the account's normalized email. This module authenticates those
  * identities, and only those, with one shared password held in the deployment's secret manager
  * (`REVIEW_LOGIN_PASSWORD`).

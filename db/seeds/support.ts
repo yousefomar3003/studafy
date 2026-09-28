@@ -17,7 +17,7 @@ export type Sql = ReservedSql;
 export interface TenantProfile {
   readonly slug: string;
   readonly name: string;
-  // Sets app.schools.is_review_tenant (migration 000115): non-billable, and the only school the
+  // Sets app.schools.is_review_tenant (migration 000116): non-billable, and the only school the
   // review email/password login accepts.
   readonly isReviewTenant: boolean;
   readonly plan: {

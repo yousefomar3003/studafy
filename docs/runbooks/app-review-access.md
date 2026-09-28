@@ -9,7 +9,7 @@ email and password rather than a Microsoft or Google account. Those accounts bel
   [`db/seeds/review-credentials.ts`](../../db/seeds/review-credentials.ts)
 - Login: `POST /api/auth/login/review`
   ([`review-login-service.ts`](../../apps/api/src/modules/auth/services/review-login-service.ts))
-- Schema: [`db/migrations/000115_add_review_tenant.sql`](../../db/migrations/000115_add_review_tenant.sql)
+- Schema: [`db/migrations/000116_add_review_tenant.sql`](../../db/migrations/000116_add_review_tenant.sql)
 
 ## Accounts
 
@@ -47,7 +47,7 @@ Everything is dated in the 2025–26 academic year (July 2026). See Known limita
 
 ## Provisioning (once per environment)
 
-1. **Apply migrations.** `000115_add_review_tenant.sql` must be applied (`bun run db:migrate`).
+1. **Apply migrations.** `000116_add_review_tenant.sql` must be applied (`bun run db:migrate`).
 2. **Set the password.** Generate a value of at least 16 characters (use 24 or more; the API refuses
    to boot with a shorter one) and add it to the API's application secrets as
    `REVIEW_LOGIN_PASSWORD`. Follow

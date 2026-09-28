@@ -99,7 +99,7 @@ export interface ReviewGuardEnv {
 // Guard for db/seeds/review-tenant.ts. Deliberately independent of assertSeedAllowed: that guard
 // exists to keep fabricated local data out of shared databases, while the reviewer tenant must be
 // provisioned in production. What keeps the reviewer tenant from being used as a real one is its
-// profile (no SUPER_ADMIN, no billable plan, is_review_tenant) and migration 000115, not the host.
+// profile (no SUPER_ADMIN, no billable plan, is_review_tenant) and migration 000116, not the host.
 export function assertReviewSeedAllowed(env: ReviewGuardEnv, expectedSlug: string): void {
   if (env.REVIEW_TENANT_SEED_CONFIRM !== expectedSlug) {
     throw new SeedSafetyError(

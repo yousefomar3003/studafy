@@ -200,7 +200,7 @@ export async function seedPeople(
 }
 
 // Adds every address the tenant owns (each persona and the school contact) to the global
-// app.email_suppressions list with reason 'review_tenant' (migration 000115). The email dispatcher
+// app.email_suppressions list with reason 'review_tenant' (migration 000116). The email dispatcher
 // checks that list before every send and records a suppressed delivery instead of handing an
 // undeliverable address to SES, where the bounce would count against the sender reputation.
 export async function suppressTenantEmail(sql: Sql, tenant: TenantProfile): Promise<void> {

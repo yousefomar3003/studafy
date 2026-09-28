@@ -84,7 +84,7 @@ export function selectPaymentProvider(
  * the school id itself.
  *
  * Every school-scoped checkout (subscription and online fee payment) passes through here, so this is
- * where the reviewer demo tenant (ST-303) is refused before any provider is called. Migration 000115
+ * where the reviewer demo tenant (ST-303) is refused before any provider is called. Migration 000116
  * backs it with a CHECK that the tenant can never hold a provider customer id.
  */
 export async function selectPaymentProviderForSchool(
