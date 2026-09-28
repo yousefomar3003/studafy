@@ -22,6 +22,12 @@ Three destinations, and only three — there is no analytics SDK, ad SDK, or dat
 3. **Sentry** (`sentry_flutter`) — for crash/performance diagnostics, DSN-configured per
    environment (`MonitoringConfig.fromEnvironment`, empty/disabled in local dev).
 
+Beyond the device, the API itself forwards **AI inputs** — typed questions, study-material text,
+and an opaque user id — to **Anthropic**, the AI model provider, but only after the user has
+consented in-app (ST-305, `../docs/ai_data_sharing_consent.md`; enforced server-side). Anthropic
+processes them on Studafy's behalf to answer the request; declare it on both forms as a service
+provider receiving User Content ("Other User Content") for App Functionality.
+
 Firebase and Sentry are both **diagnostic/functionality vendors**, not ad or tracking networks —
 neither receives data used to serve ads or is used to correlate the user across other companies'
 apps/sites. Both stores' "tracking" questions (Apple's App Tracking Transparency category; Play's

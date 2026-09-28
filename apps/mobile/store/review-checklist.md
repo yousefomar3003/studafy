@@ -78,6 +78,14 @@ route to mobile sessions; the only payment hand-off is the school-fee invoice li
 service both stores exempt. Enforced by `test/store_compliance/payment_routing_test.dart` and the
 API's `store-payment-channel.test.ts`.
 
+## Third-party AI data sharing (Apple 5.1.2(i))
+
+Covered by `docs/ai_data_sharing_consent.md` (ST-305). Every AI feature screen is behind a consent
+modal naming Anthropic and each data category; the API refuses every model call without a recorded
+consent (`403 AI_CONSENT_REQUIRED`); consent is withdrawn from AI tab → AI data sharing. Re-check the
+modal copy against `apps/api/src/modules/ai/consent/disclosure.ts` whenever the provider or the data
+sent changes (that change must also bump the disclosure version).
+
 ## Privacy label accuracy
 
 - [ ] `privacy-labels.md` in this directory has been re-checked against the current `pubspec.yaml`
