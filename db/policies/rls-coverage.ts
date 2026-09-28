@@ -118,7 +118,12 @@ approved_flexible_columns(table_name, column_name) AS (
     -- fact with a fixed shape. The stable relational fields (tenant, subject, reason, status and
     -- timestamps) remain normalized and constrained.
     ('data_subject_requests', 'redacted_tables'),
-    ('data_subject_requests', 'retained_tables')
+    ('data_subject_requests', 'retained_tables'),
+    -- ST-305: a verbatim snapshot of the data categories the consent disclosure listed when the user
+    -- agreed -- write-once audit evidence of what was disclosed, never joined or filtered on. A new
+    -- disclosure supersedes the row rather than editing it. The stable relational fields (tenant,
+    -- user, disclosure version, provider and timestamps) remain normalized and constrained.
+    ('ai_data_sharing_consents', 'data_categories')
 ),
 relations AS (
   SELECT
