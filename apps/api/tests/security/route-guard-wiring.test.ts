@@ -80,7 +80,10 @@ function findUseCallPaths(files: string[]): UseCall[] {
 describe("route guard wiring — .use() path shape", () => {
   test("no .use() path uses createRoute's {param} syntax (use :param instead)", () => {
     const calls = findUseCallPaths(collectSourceFiles(SRC_DIR));
-    const offenders = calls.filter((c) => c.path.includes("{"));
+    // Hono's own constrained param, `:name{regex}` (e.g. a UUID-only `:teacherId` that must not
+    // match a sibling literal like `/me`), is matched by `.use()` and is not an offender. The
+    // constraint never contains "/", so stripping `:name{...}` segments leaves only stray braces.
+    const offenders = calls.filter((c) => c.path.replace(/:\w+\{[^/]*\}/g, "").includes("{"));
 
     if (offenders.length > 0) {
       const detail = offenders.map((c) => `  ${c.file}:${c.line}  "${c.path}"`).join("\n");

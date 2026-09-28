@@ -96,6 +96,17 @@ describe("selectPaymentProviderForSchool", () => {
     expect(error).toBeInstanceOf(CodedHttpException);
     expect((error as CodedHttpException).status).toBe(404);
   });
+
+  test("the reviewer demo tenant is refused before any provider is selected", async () => {
+    const error: unknown = await selectPaymentProviderForSchool(
+      txReturning([{ alpha2_code: "AE", is_review_tenant: true }]),
+      both,
+      "review-school",
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CodedHttpException);
+    expect((error as CodedHttpException).status).toBe(403);
+    expect((error as CodedHttpException).code).toBe("REVIEW_TENANT_BILLING_DISABLED");
+  });
 });
 
 describe("retryJobId", () => {

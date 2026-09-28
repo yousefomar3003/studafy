@@ -169,6 +169,7 @@
   "STRIPE_LIVE_KEY_IN_DEV": "لا يمكن استخدام مفتاح Stripe الحي في بيئة التطوير",
   "TAP_NOT_CONFIGURED": "لم يتم إعداد الفوترة عبر Tap Payments",
   "TAP_API_ERROR": "فشل الطلب إلى Tap Payments",
+  "REVIEW_TENANT_BILLING_DISABLED": "الفوترة معطّلة للمدرسة التجريبية",
   "TAP_WEBHOOK_INVALID": "حمولة أو توقيع webhook من Tap Payments غير صالح",
   "PAYMENT_PROVIDER_OPERATION_UNSUPPORTED": "هذه العملية غير مدعومة من مزوّد الدفع الخاص بالمدرسة",
   "SUBSCRIPTION_NOT_FOUND": "لم يتم العثور على اشتراك نشط لهذه المدرسة",

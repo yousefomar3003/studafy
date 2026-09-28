@@ -17,6 +17,15 @@ bun run db:seed
 bun packages/db/src/cli.ts seed
 ```
 
+## Reviewer tenant (production)
+
+`bun run db:seed:review` provisions the App Store / Play reviewer tenant (`studafy-review-academy`)
+from the same data modules, and is meant to run in production. It needs
+`REVIEW_TENANT_SEED_CONFIRM=studafy-review-academy`, and it writes nothing if the tenant already
+exists. Roster: `review-credentials.ts`; profiles: `tenants.ts`. For credentials and provisioning,
+see [`docs/runbooks/app-review-access.md`](../../docs/runbooks/app-review-access.md). The local
+`db:seed` below never creates it.
+
 ## Safety
 
 - **Idempotent**: Every INSERT uses `ON CONFLICT DO NOTHING`. Safe to re-run.

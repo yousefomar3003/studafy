@@ -78,6 +78,7 @@ import {
   mockOAuthRoutes,
   providerLinkRoutes,
   returningUserLoginRoutes,
+  reviewLoginRoutes,
   sessionRoutes,
 } from "./modules/auth";
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
@@ -232,6 +233,11 @@ export interface AppOptions {
     nonce: string,
   ) => Promise<{ subject: string; email: string }>;
   /**
+   * Shared password for the reviewer demo tenant's email/password login (ST-303), threaded from
+   * env.REVIEW_LOGIN_PASSWORD. Absent keeps POST /api/auth/login/review registered but answering 404.
+   */
+  reviewLoginPassword?: string;
+  /**
    * S3-compatible object storage for assignment attachments (ST-103).
    *
    * Nullable and defaulted to null, like `redis`: dev, test, and the OpenAPI generator all run
@@ -292,6 +298,7 @@ export function createApp({
   aiLlmProvider = null,
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
+  reviewLoginPassword,
   storage = null,
   stripeProvider = null,
   tapProvider = null,
@@ -671,6 +678,25 @@ export function createApp({
         },
         logger,
         microsoftIdentityVerifier ? { verifyMicrosoftIdentity: microsoftIdentityVerifier } : {},
+      ),
+    );
+  }
+
+  // Reviewer demo tenant login (ST-303). Email + shared password, only for the school flagged
+  // is_review_tenant; delegates to the same post-authentication path as the OAuth login above.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      reviewLoginRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        reviewLoginPassword,
       ),
     );
   }

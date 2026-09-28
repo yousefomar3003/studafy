@@ -192,22 +192,32 @@ const updateTeacherRoute = createRoute({
 export function teacherRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
+  // `:teacherId` is constrained to a UUID in every guard below so none of them match
+  // `/api/teachers/me`, which is open on every channel and to an INSTRUCTOR without TEACHER_READ
+  // (see getTeacherMeRoute) and is what the mobile teacher home loads first.
+
   // --- Channel guard: mutations restricted to web sessions ---
   const channelGuard = requireChannel(AUTH_CHANNELS.WEB);
   routes.use("/api/teachers", channelGuard);
-  routes.use("/api/teachers/:teacherId", channelGuard);
+  routes.use("/api/teachers/:teacherId{[0-9a-fA-F-]{36}}", channelGuard);
 
   // --- Permission guards ---
   // /api/teachers (list + create) — list requires READ, create requires CREATE
   routes.use("/api/teachers", requirePermission(PERMISSIONS.TEACHER_READ));
   routes.use("/api/teachers", requirePermission(PERMISSIONS.TEACHER_CREATE));
   // /api/teachers/{teacherId} (get + update) — get requires READ, update requires UPDATE
-  routes.use("/api/teachers/:teacherId", requirePermission(PERMISSIONS.TEACHER_READ));
-  routes.use("/api/teachers/:teacherId", requirePermission(PERMISSIONS.TEACHER_UPDATE));
+  routes.use(
+    "/api/teachers/:teacherId{[0-9a-fA-F-]{36}}",
+    requirePermission(PERMISSIONS.TEACHER_READ),
+  );
+  routes.use(
+    "/api/teachers/:teacherId{[0-9a-fA-F-]{36}}",
+    requirePermission(PERMISSIONS.TEACHER_UPDATE),
+  );
 
   // --- Audit declarations ---
   routes.use("/api/teachers", auditAction("insert", "teachers"));
-  routes.use("/api/teachers/:teacherId", auditAction("update", "teachers"));
+  routes.use("/api/teachers/:teacherId{[0-9a-fA-F-]{36}}", auditAction("update", "teachers"));
 
   // --- Handlers ---
 

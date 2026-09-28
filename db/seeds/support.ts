@@ -4,11 +4,39 @@
 // pieces earlier stages have already produced, and no field is read before it is assigned.
 import { randomUUID } from "node:crypto";
 
+import type { MockPersona } from "./mock-credentials";
 import type { ReservedSql } from "../../packages/db/src/client";
 
 // The seed runs on a single reserved connection inside one transaction (see seed.ts). Every data
 // module receives this same handle.
 export type Sql = ReservedSql;
+
+// Everything that differs between the tenants this directory can seed: the local demo tenant
+// (seed.ts) and the App Store / Play reviewer tenant (review-tenant.ts). The data modules are shared;
+// only this profile changes.
+export interface TenantProfile {
+  readonly slug: string;
+  readonly name: string;
+  // Sets app.schools.is_review_tenant (migration 000116): non-billable, and the only school the
+  // review email/password login accepts.
+  readonly isReviewTenant: boolean;
+  readonly plan: {
+    readonly code: string;
+    readonly displayName: string;
+    readonly description: string;
+    // An inactive plan is never offered at checkout or listed to schools.
+    readonly isActive: boolean;
+    // Monthly price in minor units, or null for a plan with no price row.
+    readonly monthlyAmountMinor: number | null;
+  };
+  readonly personas: readonly MockPersona[];
+  // The (provider, subject) a persona signs in with, or null for a roster-only account that has no
+  // login at all.
+  readonly loginIdentity: (persona: MockPersona) => { provider: string; subject: string } | null;
+  // Push-device registrations with fake FCM tokens and pending outbox events. Local only: in a
+  // deployed environment the push sender and outbox relay would act on them.
+  readonly localFixtures: boolean;
+}
 
 export interface SeededPerson {
   readonly key: string;
@@ -69,7 +97,6 @@ export interface SchoolCtx {
 }
 
 export interface PeopleCtx {
-  readonly superAdmin: SeededPerson;
   readonly orgAdmin: SeededPerson;
   readonly teachers: readonly SeededTeacher[];
   readonly students: readonly SeededStudent[];
@@ -96,6 +123,11 @@ export type FullCtx = SchoolCtx & PeopleCtx & AcademicsCtx;
 export interface MaterialsCtx {
   // (chunkId, schoolId is implicit) captured so the AI module can cite real chunks.
   readonly chunkIds: readonly string[];
+}
+
+// The seeded school's contact address (app.schools.email).
+export function schoolContactEmail(slug: string): string {
+  return `${slug}@admin.local`;
 }
 
 export function uuid(): string {

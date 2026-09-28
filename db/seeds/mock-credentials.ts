@@ -9,7 +9,13 @@
 // to their children through app.parent_child_links (ST-052 decision).
 
 export type MockRole =
-  "SUPER_ADMIN" | "ORG_ADMIN" | "INSTRUCTOR" | "TEACHING_ASSISTANT" | "STUDENT" | "GUEST";
+  | "SUPER_ADMIN"
+  | "ORG_ADMIN"
+  | "INSTRUCTOR"
+  | "TEACHING_ASSISTANT"
+  | "STUDENT"
+  | "PARENT"
+  | "GUEST";
 
 export type MockPersonaGroup = "admin" | "teacher" | "student" | "parent";
 
