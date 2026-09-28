@@ -83,6 +83,7 @@ const EXPECTED_PATHS = [
   "/api/auth/invitations/{token}/oauth/mock/mobile-exchange",
   "/api/auth/invitations/{token}/oauth/mock/mobile-start",
   "/api/auth/login/oauth",
+  "/api/auth/login/review",
   "/api/auth/oauth/google/mobile-exchange",
   "/api/auth/oauth/google/mobile-start",
   "/api/auth/oauth/microsoft/mobile-exchange",
