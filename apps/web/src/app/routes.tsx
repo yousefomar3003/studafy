@@ -565,8 +565,9 @@ export const routes: RouteObject[] = [
             element: <DeleteAccountPage />,
           },
           {
-            // Deep-link target from the mobile app (ST-208): a parent/student buying the
-            // per-student AI add-on. No `RequirePermission` — same as the rest of `/account`,
+            // A parent/student buying the per-student AI add-on (ST-208). Web only: the mobile app
+            // never links here, since the stores forbid steering to an outside purchase of a
+            // digital good (ST-304, apps/mobile/docs/store_payment_routing.md). No `RequirePermission` — same as the rest of `/account`,
             // since STUDENT and PARENT hold no distinct permission set of their own, and the API's
             // own tenant scoping (`GET /api/students/{studentId}`, `POST
             // /api/subscriptions/ai/checkout`) is what actually restricts a session to its own

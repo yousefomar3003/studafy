@@ -78,19 +78,18 @@ by root cause, as of 2026-09-05:
   to. Marked `skip: kGoldenRenderDiffSkipReason` (`test/support/golden_test_skip.dart`) rather than
   left failing, so `mobile-unit-coverage`'s "fail on any failing test" gate can catch a genuinely
   *new* regression again instead of being permanently red.
-- **3 skipped, still failing** -- feature-level assertion failures that reproduce in isolation and
+- **2 skipped, still failing** -- feature-level assertion failures that reproduce in isolation and
   are unrelated to push/Firebase:
   `test/features/ai/application/flashcard_controller_test.dart` ("a sync failure keeps the card
-  revealed for retry, without advancing"),
-  `test/features/ai/presentation/ai_usage_screen_test.dart` ("unsubscribed state shows the upsell
-  card, not the meter" -- a *different* `ProviderException` than the push one, thrown building
-  `AiUpsellCard`), and
+  revealed for retry, without advancing") and
   `test/features/student/presentation/grades_screen_test.dart` ("deep link shows a dismissible
   publish banner and highlights the course" -- `GradesPublishBanner` not found). Marked
-  `skip: kKnownPreExistingFailureSkipReason` (same file). Root cause not yet investigated for any
-  of these three.
+  `skip: kKnownPreExistingFailureSkipReason` (same file). Root cause not yet investigated for
+  either. A third, `ai_usage_screen_test.dart`'s unsubscribed-state case, threw building
+  `AiUpsellCard`'s checkout-link provider; ST-304 removed that card and provider
+  (`AiNotActiveCard` reads no providers) and un-skipped the test.
 
-Fixing the remaining 17 (regenerating goldens against the real CI runner, and the three feature
+Fixing the remaining 16 (regenerating goldens against the real CI runner, and the two feature
 bugs) is tracked as separate follow-up work, same as ST-245 originally deferred all 11.
 
 ## Running locally
