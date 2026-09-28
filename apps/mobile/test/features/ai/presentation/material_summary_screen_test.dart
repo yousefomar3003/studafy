@@ -104,6 +104,8 @@ void main() {
 
     expect(find.text('This is the standard summary.'), findsOneWidget);
     expect(find.textContaining('AI tokens used this month'), findsOneWidget);
+    // ST-306: every AI output exposes a Report action.
+    expect(find.byIcon(Icons.outlined_flag), findsOneWidget);
   });
 
   testWidgets('switching the length preset re-renders the summary', (tester) async {
@@ -143,6 +145,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('The AI assistant is currently switched off.'), findsOneWidget);
+    expect(find.byIcon(Icons.outlined_flag), findsNothing);
   });
 
   testWidgets('shows the signed-out view with no session', (tester) async {

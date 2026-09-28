@@ -290,10 +290,12 @@ export { MODERATION_CATEGORIES, type ModerationCategory } from "./moderation/pol
 
 export {
   persistModerationDecision,
-  persistAnswerReport,
+  type ModerationSurface,
   type PersistModerationDecisionInput,
-  type PersistAnswerReportInput,
 } from "./moderation/persistence";
 
+export { assertGeneratedContentSafe, recordBlockedContent } from "./moderation/enforce";
+
 export { aiReportRoutes } from "./routes/report-routes";
+export { aiModerationRoutes } from "./routes/moderation-routes";
 export { aiMetricsRoutes } from "./routes/metrics-routes";

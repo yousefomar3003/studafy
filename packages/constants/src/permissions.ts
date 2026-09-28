@@ -136,6 +136,11 @@ export const PERMISSIONS = {
   MATERIAL_UPDATE: "material:update",
   MATERIAL_DELETE: "material:delete",
   MATERIAL_MANAGE_AI: "material:manageAi",
+  // Working the AI content moderation queue (ST-306): reading reported and filter-escalated AI
+  // output and resolving it. Withheld from INSTRUCTOR/TEACHING_ASSISTANT on purpose -- the queue
+  // spans the whole school and can hold child-safety escalations, which belong to the school's
+  // designated safeguarding lead (an ORG_ADMIN), not to every teacher.
+  AI_CONTENT_MODERATE: "aiContent:moderate",
 
   ATTENDANCE_RECORD_CREATE: "attendance:record:create",
   ATTENDANCE_RECORD_READ: "attendance:record:read",

@@ -148,6 +148,11 @@ function fakeDatabase(
 
     if (sql.includes("FROM app.ai_subscriptions")) {
       rows = [{ id: "sub-1" }];
+    } else if (
+      sql.includes("INSERT INTO app.ai_moderation_decisions") ||
+      sql.includes("INSERT INTO app.ai_content_reports")
+    ) {
+      rows = [{ id: "40000000-0000-4000-8000-000000000001" }];
     } else if (sql.includes("INSERT INTO app.quizzes")) {
       rows = [{ id: QUIZ_ID }];
     } else if (sql.includes("INSERT INTO app.quiz_questions")) {
@@ -453,6 +458,58 @@ describe("POST /api/ai/students/{studentId}/quizzes", () => {
     expect(body.code).toBe(ERROR_CODES.AI_QUIZ_GENERATION_FAILED);
     expect(res.headers.get("Retry-After")).toBe("30");
     expect(handle.commits).toEqual([]);
+  });
+
+  test("unsafe model output is blocked with 422, never persisted, and commits no tokens", async () => {
+    const handle = quotaHandle();
+    const { database, queries } = fakeDatabase({
+      materials: { [MATERIAL_ID]: readyMaterial },
+      chunksByMaterial: { [MATERIAL_ID]: readyChunks() },
+    });
+    const unsafeQuiz = JSON.stringify([
+      {
+        type: "short_answer",
+        prompt: "How to make a bomb at home?",
+        source_id: 1,
+        correct_answer: "Do not",
+      },
+    ]);
+    const app = buildQuizApp({ provider: fakeProvider({ content: unsafeQuiz }), database, handle });
+
+    const res = await postJson(app, generateUrl, { materialIds: [MATERIAL_ID] });
+    const body = (await res.json()) as { code: string };
+
+    expect(res.status).toBe(422);
+    expect(body.code).toBe(ERROR_CODES.AI_MODERATION_OUTPUT_BLOCKED);
+    expect(handle.commits).toEqual([]);
+    expect(queries.some((sql) => sql.includes("INSERT INTO app.ai_moderation_decisions"))).toBe(
+      true,
+    );
+    expect(queries.some((sql) => sql.includes("INSERT INTO app.quizzes"))).toBe(false);
+    // Violence blocks but does not escalate; only child-safety reaches the queue on its own.
+    expect(queries.some((sql) => sql.includes("INSERT INTO app.ai_content_reports"))).toBe(false);
+  });
+
+  test("child-safety output is blocked and escalated into the moderation queue", async () => {
+    const { database, queries } = fakeDatabase({
+      materials: { [MATERIAL_ID]: readyMaterial },
+      chunksByMaterial: { [MATERIAL_ID]: readyChunks() },
+    });
+    const unsafeQuiz = JSON.stringify([
+      {
+        type: "short_answer",
+        prompt: "Describe nude photos of children.",
+        source_id: 1,
+        correct_answer: "No",
+      },
+    ]);
+    const app = buildQuizApp({ provider: fakeProvider({ content: unsafeQuiz }), database });
+
+    const res = await postJson(app, generateUrl, { materialIds: [MATERIAL_ID] });
+
+    expect(res.status).toBe(422);
+    expect(queries.some((sql) => sql.includes("INSERT INTO app.ai_content_reports"))).toBe(true);
+    expect(queries.some((sql) => sql.includes("INSERT INTO app.quizzes"))).toBe(false);
   });
 
   test("a question citing a source_id outside the given sources answers 503 AI_QUIZ_GENERATION_FAILED", async () => {

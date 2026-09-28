@@ -5,8 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/ask_ai_controller.dart';
 import '../application/ask_ai_providers.dart';
-import '../data/ask_ai_client.dart';
+import '../domain/ai_content_report.dart';
 import '../domain/ask_ai_conversation.dart';
+import 'widgets/ai_report_button.dart';
 import 'widgets/ask_ai_composer.dart';
 import 'widgets/ask_ai_turn_view.dart';
 
@@ -62,26 +63,8 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
     super.dispose();
   }
 
-  Future<void> _reportAnswer(String messageId) async {
-    final controller = _controller;
-    if (controller == null) return;
-
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (context) => const _ReportDialog(),
-    );
-    if (reason == null || reason.trim().isEmpty || !mounted) return;
-
-    final outcome = await controller.reportAnswer(messageId: messageId, reason: reason.trim());
-    if (!mounted) return;
-
-    final messageKey = switch (outcome) {
-      AskAiReportOutcome.filed => 'askAi.report.filed',
-      AskAiReportOutcome.alreadyFiled => 'askAi.report.alreadyFiled',
-      AskAiReportOutcome.failed => 'askAi.report.failed',
-    };
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(messageKey.tr())));
-  }
+  Future<void> _reportAnswer(String messageId) =>
+      showAiReportFlow(context, ref, AiReportTarget.askAnswer(messageId));
 
   @override
   Widget build(BuildContext context) {
@@ -268,52 +251,4 @@ class _SendErrorBanner extends StatelessWidget {
     AskAiSendError.network => 'askAi.sendError.network',
     AskAiSendError.unknown => 'askAi.sendError.unknown',
   };
-}
-
-class _ReportDialog extends StatefulWidget {
-  const _ReportDialog();
-
-  @override
-  State<_ReportDialog> createState() => _ReportDialogState();
-}
-
-class _ReportDialogState extends State<_ReportDialog> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('askAi.report.dialogTitle'.tr()),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        minLines: 2,
-        maxLines: 4,
-        maxLength: 1000,
-        onChanged: (_) => setState(() {}),
-        decoration: InputDecoration(
-          hintText: 'askAi.report.dialogHint'.tr(),
-          border: const OutlineInputBorder(),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('askAi.report.cancel'.tr()),
-        ),
-        FilledButton(
-          onPressed: _controller.text.trim().isEmpty
-              ? null
-              : () => Navigator.of(context).pop(_controller.text),
-          child: Text('askAi.report.submit'.tr()),
-        ),
-      ],
-    );
-  }
 }

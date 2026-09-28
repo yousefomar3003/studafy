@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/ask_ai_providers.dart';
 import '../application/flashcard_controller.dart';
 import '../application/flashcard_providers.dart';
+import '../domain/ai_content_report.dart';
 import '../domain/flashcard_state.dart';
+import 'widgets/ai_report_button.dart';
 import 'widgets/flashcard_generate_sheet.dart';
 import 'widgets/flashcard_library_view.dart';
 import 'widgets/flashcard_review_card.dart';
@@ -100,6 +102,7 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
       appBar: AppBar(
         title: Text('flashcards.title'.tr()),
         actions: [
+          if (_reportTarget(controller?.state) case final target?) AiReportButton(target: target),
           Builder(
             builder: (context) {
               final libraryState = controller?.state;
@@ -124,6 +127,13 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
     );
   }
 }
+
+/// The deck on screen, if any — what the app bar's Report action flags.
+AiReportTarget? _reportTarget(FlashcardScreenState? state) => switch (state) {
+  FlashcardReviewSession(:final deckId) ||
+  FlashcardSessionComplete(:final deckId) => AiReportTarget.flashcardDeck(deckId),
+  _ => null,
+};
 
 class _Body extends StatelessWidget {
   const _Body({required this.controller, required this.onStudy});

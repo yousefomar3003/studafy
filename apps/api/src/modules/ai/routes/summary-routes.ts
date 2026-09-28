@@ -13,6 +13,7 @@ import { AI_SUMMARY_DEFAULT_LENGTH, AI_SUMMARY_LENGTHS } from "../config";
 import { getAiQuota } from "../gate/entitlement-gate";
 import { throwLlmError } from "../llm/errors";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
+import { assertGeneratedContentSafe } from "../moderation/enforce";
 import {
   summaryCacheKey,
   summaryFingerprint,
@@ -295,6 +296,21 @@ export function aiSummaryRoutes(deps: {
         userId: auth.userId,
         circuitKey: auth.schoolId,
       });
+
+      // Generation-side safety filter (ST-306): a blocked summary is neither cached nor returned.
+      await assertGeneratedContentSafe(
+        database,
+        tenantFrom(c),
+        {
+          schoolId: auth.schoolId,
+          studentId,
+          surface: "summary",
+          contentType: "summary",
+          texts: [generation.content],
+          locale: (c.get("locale") ?? "en") as SupportedLocale,
+        },
+        c.get("log"),
+      );
 
       // The provider call deliberately happened outside the transaction above; this short write is
       // all the transaction holds.

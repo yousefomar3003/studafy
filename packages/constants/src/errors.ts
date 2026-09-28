@@ -399,12 +399,15 @@ export const ERROR_CODES = {
   // AI_MODERATION_OUTPUT_BLOCKED is the generation-side guard: the model's answer violated the
   // same policy and was withheld from the student. Both carry a category key (profanity,
   // hate_speech, self_harm, sexual_content, violence, pii_sharing) so the client can show
-  // the matching guidance. AI_ANSWER_REPORTED is the confirmation a student's report landed;
-  // AI_REPORT_NOT_FOUND covers a lookup on the teacher review surface.
+  // the matching guidance. AI_ANSWER_REPORTED is the confirmation a student's report landed (and
+  // the 409 when they already reported that item); AI_REPORT_NOT_FOUND covers a lookup on the
+  // moderation queue (ST-306); AI_REPORT_INVALID_TRANSITION is a queue status change the review
+  // workflow does not allow (e.g. reopening a closed report).
   AI_MODERATION_INPUT_BLOCKED: "AI_MODERATION_INPUT_BLOCKED",
   AI_MODERATION_OUTPUT_BLOCKED: "AI_MODERATION_OUTPUT_BLOCKED",
   AI_ANSWER_REPORTED: "AI_ANSWER_REPORTED",
   AI_REPORT_NOT_FOUND: "AI_REPORT_NOT_FOUND",
+  AI_REPORT_INVALID_TRANSITION: "AI_REPORT_INVALID_TRANSITION",
 
   // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
   // other because a client acts differently -- one means "nothing to do", the other "cancel first".

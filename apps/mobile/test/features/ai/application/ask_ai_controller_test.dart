@@ -23,9 +23,6 @@ class _FakeAskAiClient implements AskAiClient {
   final List<String?> conversationIdsSeen = [];
   int askCalls = 0;
 
-  AskAiReportOutcome reportOutcome = AskAiReportOutcome.filed;
-  int reportCalls = 0;
-
   @override
   Stream<AskAiEvent> ask({
     required String studentId,
@@ -36,16 +33,6 @@ class _FakeAskAiClient implements AskAiClient {
     askCalls++;
     conversationIdsSeen.add(conversationId);
     return _events();
-  }
-
-  @override
-  Future<AskAiReportOutcome> report({
-    required String studentId,
-    required String messageId,
-    required String reason,
-  }) async {
-    reportCalls++;
-    return reportOutcome;
   }
 }
 
@@ -224,16 +211,5 @@ void main() {
       expect(client.askCalls, 0);
       expect(controller.state.turns, isEmpty);
     });
-  });
-
-  test('reportAnswer forwards the outcome from the client', () async {
-    final client = _FakeAskAiClient(() => const Stream.empty())
-      ..reportOutcome = AskAiReportOutcome.alreadyFiled;
-    final controller = _controllerFor(client);
-
-    final outcome = await controller.reportAnswer(messageId: 'msg-1', reason: 'wrong');
-
-    expect(outcome, AskAiReportOutcome.alreadyFiled);
-    expect(client.reportCalls, 1);
   });
 }

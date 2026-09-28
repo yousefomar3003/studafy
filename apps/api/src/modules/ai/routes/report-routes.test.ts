@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { errorHandlerMiddleware } from "../../../middleware/errorHandler";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import { summaryCacheKey, summaryFingerprint, type SummaryCache } from "../summary/cache";
 
 import { aiReportRoutes } from "./report-routes";
 
@@ -17,8 +18,12 @@ import type { TransactionSql } from "postgres";
 
 const SCHOOL_ID = "00000000-0000-4000-8000-000000000001";
 const STUDENT_ID = "00000000-0000-4000-8000-000000000002";
-const USER_ID = STUDENT_ID;
+const OTHER_STUDENT_ID = "00000000-0000-4000-8000-000000000003";
 const MESSAGE_ID = "00000000-0000-4000-8000-000000000021";
+const QUIZ_ID = "00000000-0000-4000-8000-000000000022";
+const DECK_ID = "00000000-0000-4000-8000-000000000023";
+const MATERIAL_ID = "00000000-0000-4000-8000-000000000024";
+const CHUNK_ID = "00000000-0000-4000-8000-000000000025";
 const REPORT_ID = "00000000-0000-4000-8000-000000000031";
 
 const silentLogger: Logger = {
@@ -33,7 +38,7 @@ const silentLogger: Logger = {
 };
 
 const auth: AuthContext = {
-  userId: USER_ID,
+  userId: STUDENT_ID,
   schoolId: SCHOOL_ID,
   roles: [ROLES.STUDENT],
   channel: AUTH_CHANNELS.API,
@@ -42,31 +47,64 @@ const auth: AuthContext = {
   subscriptionStatus: "active",
 };
 
-function fakeDatabase(opts: { messageExists?: boolean; duplicateReport?: boolean } = {}) {
-  const queries: string[] = [];
-  const messageExists = opts.messageExists ?? true;
-  const duplicateReport = opts.duplicateReport ?? false;
+interface Insert {
+  sql: string;
+  values: unknown[];
+}
 
-  const tx = ((strings: TemplateStringsArray) => {
-    const sql = strings.join("\u0000");
-    queries.push(sql);
+function fakeDatabase(opts: { contentExists?: boolean; duplicateReport?: boolean } = {}) {
+  const contentExists = opts.contentExists ?? true;
+  const inserts: Insert[] = [];
 
-    if (sql.includes("FROM app.ai_messages")) {
-      return Object.assign(Promise.resolve(messageExists ? [{ id: MESSAGE_ID }] : []), {
-        execute: () => Promise.resolve(),
-      });
-    }
-    if (sql.includes("INSERT INTO app.ai_answer_reports")) {
-      if (duplicateReport) {
-        const err = new Error("duplicate key") as Error & { code: string };
-        err.code = "23505";
+  const result = (rows: unknown[]) =>
+    Object.assign(Promise.resolve(rows), { execute: () => Promise.resolve() });
+
+  const tx = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    const sql = strings.join("?");
+    if (sql.includes("INSERT INTO app.ai_content_reports")) {
+      inserts.push({ sql, values });
+      if (opts.duplicateReport) {
+        const err = Object.assign(new Error("duplicate key"), { code: "23505" });
         return Object.assign(Promise.reject(err), { execute: () => Promise.resolve() });
       }
-      return Object.assign(Promise.resolve([{ id: REPORT_ID }]), {
-        execute: () => Promise.resolve(),
-      });
+      return result([{ id: REPORT_ID }]);
     }
-    return Object.assign(Promise.resolve([]), { execute: () => Promise.resolve() });
+    if (!contentExists) return result([]);
+    if (sql.includes("FROM app.ai_messages")) {
+      return result([{ question: "What is osmosis?", answer: "Osmosis is diffusion of water." }]);
+    }
+    if (sql.includes("FROM app.quizzes")) {
+      return result([
+        {
+          question_order: 1,
+          prompt: "Which gas do plants absorb?",
+          correct_answer: null,
+          correct_option_id: "b",
+          option_key: "a",
+          option_text: "Oxygen",
+        },
+        {
+          question_order: 1,
+          prompt: "Which gas do plants absorb?",
+          correct_answer: null,
+          correct_option_id: "b",
+          option_key: "b",
+          option_text: "Carbon dioxide",
+        },
+      ]);
+    }
+    if (sql.includes("FROM app.flashcard_decks")) {
+      return result([{ card_order: 1, front: "Mitosis", back: "Cell division" }]);
+    }
+    if (sql.includes("FROM app.materials")) {
+      return result([{ id: MATERIAL_ID, title: "Cells", ingest_status: "ready" }]);
+    }
+    if (sql.includes("FROM app.material_chunks")) {
+      return result([
+        { id: CHUNK_ID, chunk_index: 0, page_number: 1, section_title: null, content: "Cells." },
+      ]);
+    }
+    return result([]);
   }) as unknown as TransactionSql;
 
   (tx as unknown as { unsafe: unknown }).unsafe = async () => undefined;
@@ -77,74 +115,224 @@ function fakeDatabase(opts: { messageExists?: boolean; duplicateReport?: boolean
     },
   });
 
-  return { database, queries };
+  return { database, inserts };
 }
 
-function buildReportApp(database: Database): OpenAPIHono<AppEnv> {
+function fakeSummaryCache(summary: string | null): SummaryCache {
+  const fingerprint = summaryFingerprint(MATERIAL_ID, [
+    { id: CHUNK_ID, chunkIndex: 0, pageNumber: 1, sectionTitle: null, content: "Cells." },
+  ] as never);
+  const key = summaryCacheKey(STUDENT_ID, MATERIAL_ID, "standard", fingerprint);
+  return {
+    get: async (requested) =>
+      summary !== null && requested === key
+        ? { summary, model: "m", tier: "small", length: "standard", sources: [] }
+        : null,
+    set: async () => undefined,
+  };
+}
+
+function buildApp(database: Database, summaryCache = fakeSummaryCache(null)) {
   const app = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
   app.use("*", async (c, next) => {
     c.set("auth", auth);
     c.set("locale", "en");
     await next();
   });
-  app.route("/", aiReportRoutes({ database }));
+  app.route("/", aiReportRoutes({ database, summaryCache }));
   app.onError(errorHandlerMiddleware(silentLogger));
   return app;
 }
 
-const reportUrl = `/api/ai/students/${STUDENT_ID}/messages/${MESSAGE_ID}/report`;
-
-async function postReport(
-  app: OpenAPIHono<AppEnv>,
-  body: Record<string, unknown>,
-): Promise<Response> {
-  return app.request(reportUrl, {
+function post(app: OpenAPIHono<AppEnv>, url: string, body: Record<string, unknown>) {
+  return app.request(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
 }
 
-describe("POST /api/ai/students/{studentId}/messages/{messageId}/report", () => {
-  test("stores a report flag for teacher review and returns 201", async () => {
-    const { database } = fakeDatabase();
-    const app = buildReportApp(database);
+const reportsUrl = `/api/ai/students/${STUDENT_ID}/reports`;
 
-    const res = await postReport(app, { reason: "This answer is incorrect" });
-    const body = (await res.json()) as { report_id: string; message: string };
+/** The snapshot and priority an insert carried, read off its bound values by column position. */
+function insertedValues(insert: Insert) {
+  const [, , contentType, contentId, snapshot, , reasonCategory, reason, priority] = insert.values;
+  return { contentType, contentId, snapshot, reasonCategory, reason, priority };
+}
+
+describe("POST /api/ai/students/{studentId}/reports", () => {
+  test("files a quiz report with a server-read snapshot, marking the correct option", async () => {
+    const { database, inserts } = fakeDatabase();
+    const res = await post(buildApp(database), reportsUrl, {
+      content_type: "quiz",
+      content_id: QUIZ_ID,
+      reason_category: "inaccurate",
+    });
+    const body = (await res.json()) as { report_id: string; priority: string; respond_by: string };
 
     expect(res.status).toBe(201);
     expect(body.report_id).toBe(REPORT_ID);
-    expect(body.message).toContain("reported");
+    expect(body.priority).toBe("normal");
+    expect(new Date(body.respond_by).getTime()).toBeGreaterThan(Date.now());
+    const values = insertedValues(inserts[0]!);
+    expect(values.contentType).toBe("quiz");
+    expect(values.snapshot).toContain("Q1. Which gas do plants absorb?");
+    expect(values.snapshot).toContain("b) Carbon dioxide (correct)");
   });
 
-  test("returns 404 when the message does not exist", async () => {
-    const { database } = fakeDatabase({ messageExists: false });
-    const app = buildReportApp(database);
+  test("files a flashcard deck report", async () => {
+    const { database, inserts } = fakeDatabase();
+    const res = await post(buildApp(database), reportsUrl, {
+      content_type: "flashcard_deck",
+      content_id: DECK_ID,
+      reason_category: "inappropriate",
+      reason: "Card 1 is rude",
+    });
 
-    const res = await postReport(app, { reason: "Bad answer" });
+    expect(res.status).toBe(201);
+    const values = insertedValues(inserts[0]!);
+    expect(values.snapshot).toContain("Front: Mitosis");
+    expect(values.reason).toBe("Card 1 is rude");
+    expect(values.priority).toBe("high");
+  });
+
+  test("a child-safety report is urgent", async () => {
+    const { database } = fakeDatabase();
+    const res = await post(buildApp(database), reportsUrl, {
+      content_type: "ask_answer",
+      content_id: MESSAGE_ID,
+      reason_category: "child_safety",
+    });
+    const body = (await res.json()) as { priority: string };
+
+    expect(res.status).toBe(201);
+    expect(body.priority).toBe("urgent");
+  });
+
+  test("files a summary report from the cached summary the student was served", async () => {
+    const { database, inserts } = fakeDatabase();
+    const res = await post(buildApp(database, fakeSummaryCache("Cells are small.")), reportsUrl, {
+      content_type: "summary",
+      content_id: MATERIAL_ID,
+      summary_length: "standard",
+      reason_category: "other",
+    });
+
+    expect(res.status).toBe(201);
+    expect(insertedValues(inserts[0]!).snapshot).toBe("Cells are small.");
+  });
+
+  test("404 when the summary is no longer cached -- client text is never trusted", async () => {
+    const { database, inserts } = fakeDatabase();
+    const res = await post(buildApp(database), reportsUrl, {
+      content_type: "summary",
+      content_id: MATERIAL_ID,
+      summary_length: "standard",
+      reason_category: "other",
+    });
+
+    expect(res.status).toBe(404);
+    expect(inserts).toHaveLength(0);
+  });
+
+  test("400 when a summary report omits its length preset", async () => {
+    const { database } = fakeDatabase();
+    const res = await post(buildApp(database), reportsUrl, {
+      content_type: "summary",
+      content_id: MATERIAL_ID,
+      reason_category: "other",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("404 when the item does not exist for this student", async () => {
+    const { database } = fakeDatabase({ contentExists: false });
+    const res = await post(buildApp(database), reportsUrl, {
+      content_type: "quiz",
+      content_id: QUIZ_ID,
+      reason_category: "other",
+    });
     const body = (await res.json()) as { code: string };
 
     expect(res.status).toBe(404);
     expect(body.code).toBe(ERROR_CODES.RESOURCE_NOT_FOUND);
   });
 
-  test("returns 409 on duplicate report", async () => {
+  test("409 when this student already reported the item", async () => {
     const { database } = fakeDatabase({ duplicateReport: true });
-    const app = buildReportApp(database);
-
-    const res = await postReport(app, { reason: "Already reported this" });
+    const res = await post(buildApp(database), reportsUrl, {
+      content_type: "quiz",
+      content_id: QUIZ_ID,
+      reason_category: "other",
+    });
     const body = (await res.json()) as { code: string };
 
     expect(res.status).toBe(409);
     expect(body.code).toBe(ERROR_CODES.AI_ANSWER_REPORTED);
   });
 
-  test("returns 400 on empty reason", async () => {
-    const { database } = fakeDatabase();
-    const app = buildReportApp(database);
+  test("403 when reporting on behalf of another student", async () => {
+    const { database, inserts } = fakeDatabase();
+    const res = await post(buildApp(database), `/api/ai/students/${OTHER_STUDENT_ID}/reports`, {
+      content_type: "quiz",
+      content_id: QUIZ_ID,
+      reason_category: "other",
+    });
 
-    const res = await postReport(app, { reason: "   " });
+    expect(res.status).toBe(403);
+    expect(inserts).toHaveLength(0);
+  });
+
+  test("400 on a content type students cannot report", async () => {
+    const { database } = fakeDatabase();
+    const res = await post(buildApp(database), reportsUrl, {
+      content_type: "ask_question",
+      content_id: MESSAGE_ID,
+      reason_category: "other",
+    });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/ai/students/{studentId}/messages/{messageId}/report (legacy)", () => {
+  const legacyUrl = `/api/ai/students/${STUDENT_ID}/messages/${MESSAGE_ID}/report`;
+
+  test("files an ask_answer report with reason category other", async () => {
+    const { database, inserts } = fakeDatabase();
+    const res = await post(buildApp(database), legacyUrl, { reason: "This answer is incorrect" });
+    const body = (await res.json()) as { report_id: string; message: string };
+
+    expect(res.status).toBe(201);
+    expect(body.report_id).toBe(REPORT_ID);
+    expect(body.message).toContain("reported");
+    const values = insertedValues(inserts[0]!);
+    expect(values.contentType).toBe("ask_answer");
+    expect(values.contentId).toBe(MESSAGE_ID);
+    expect(values.reasonCategory).toBe("other");
+    expect(values.snapshot).toContain("Answer: Osmosis is diffusion of water.");
+  });
+
+  test("404 when the message does not exist", async () => {
+    const { database } = fakeDatabase({ contentExists: false });
+    const res = await post(buildApp(database), legacyUrl, { reason: "Bad answer" });
+
+    expect(res.status).toBe(404);
+  });
+
+  test("409 on duplicate report", async () => {
+    const { database } = fakeDatabase({ duplicateReport: true });
+    const res = await post(buildApp(database), legacyUrl, { reason: "Already reported this" });
+    const body = (await res.json()) as { code: string };
+
+    expect(res.status).toBe(409);
+    expect(body.code).toBe(ERROR_CODES.AI_ANSWER_REPORTED);
+  });
+
+  test("400 on empty reason", async () => {
+    const { database } = fakeDatabase();
+    const res = await post(buildApp(database), legacyUrl, { reason: "   " });
 
     expect(res.status).toBe(400);
   });

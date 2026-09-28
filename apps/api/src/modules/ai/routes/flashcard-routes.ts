@@ -34,6 +34,7 @@ import { FLASHCARD_TYPES } from "../flashcards/schema";
 import { getAiQuota } from "../gate/entitlement-gate";
 import { throwLlmError } from "../llm/errors";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
+import { assertGeneratedContentSafe } from "../moderation/enforce";
 import { loadQuizMaterials } from "../quiz/materials";
 import { recordDurableUsage, splitByTier } from "../usage/durable";
 
@@ -462,6 +463,21 @@ export function aiFlashcardRoutes(deps: {
       // Malformed model output is rejected here, before anything is persisted or any tokens are
       // committed -- see config.ts for why this does not retry server-side.
       const cards = parseFlashcardGeneration(generation.content, sources.length);
+
+      // Generation-side safety filter (ST-306): nothing unsafe is persisted or shown.
+      await assertGeneratedContentSafe(
+        database,
+        tenantFrom(c),
+        {
+          schoolId: auth.schoolId,
+          studentId,
+          surface: "flashcards",
+          contentType: "flashcard_deck",
+          texts: cards.flatMap((card) => [card.front, card.back]),
+          locale,
+        },
+        c.get("log"),
+      );
 
       // The provider call deliberately happened outside the transaction above; this short write is
       // all the transaction holds.
