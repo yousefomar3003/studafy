@@ -126,6 +126,20 @@ class MobileAuthClient {
     return MobileTokenResponse.fromJson(response.data!);
   }
 
+  /// Email/password sign-in for the App Store / Play reviewer demo accounts (ST-303). The server
+  /// accepts only the reviewer tenant's accounts here; every real account signs in through
+  /// [startOAuth]/[exchangeCode]. See `review-login-routes.ts`.
+  Future<MobileTokenResponse> loginWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/api/auth/login/review',
+      data: {'email': email, 'password': password, 'channel': 'mobile'},
+    );
+    return MobileTokenResponse.fromJson(response.data!);
+  }
+
   /// Rotate a refresh token. Returns the new token pair.
   Future<MobileTokenResponse> refreshSession(String refreshToken) async {
     final response = await _dio.post<Map<String, dynamic>>(
