@@ -5,29 +5,18 @@ import 'package:dio/dio.dart';
 import '../../../core/api/api_exception.dart';
 import 'ask_ai_events.dart';
 
-/// The outcome of flagging an answer for teacher review.
-enum AskAiReportOutcome {
-  /// The report was stored (`201`).
-  filed,
-
-  /// This student already reported this message (`409 AI_ANSWER_REPORTED`).
-  alreadyFiled,
-
-  /// The report couldn't be filed (network, `404`, anything else).
-  failed,
-}
-
 /// Client for the Ask AI surface — not generated, for the same reason as
 /// `StorageDownloadClient`: the streaming answer endpoint is `text/event-stream`, which a
 /// Retrofit-style typed client can't model (it only types a single decoded 2xx body). That
 /// mismatch is why the whole `AI` tag is excluded from codegen (see `pubspec.yaml`'s
 /// `swagger_parser.exclude_tags` and `core/api/README.md`), so every `/api/ai/` surface is a
-/// hand-written client like this one. Hand-calls the two paths and hand-parses their responses,
-/// whose shapes are stable and documented in `ask-routes.ts` / `report-routes.ts`.
+/// hand-written client like this one. Hand-calls the streaming path and hand-parses its events,
+/// whose shapes are stable and documented in `ask-routes.ts`. Reporting an answer goes through
+/// `AiContentReportClient`, shared with every other AI surface.
 ///
 /// Concrete rather than an interface so it matches `StorageDownloadClient`; tests substitute it
-/// by `implements AskAiClient` (its one field is private, so the interface is just the two
-/// methods), overridden through `askAiClientProvider`.
+/// by `implements AskAiClient` (its one field is private, so the interface is just [ask]),
+/// overridden through `askAiClientProvider`.
 class AskAiClient {
   AskAiClient(this._dio);
 
@@ -74,24 +63,6 @@ class AskAiClient {
     await for (final frame in parseSseFrames(body.stream)) {
       final event = decodeAskAiEvent(frame.event, frame.data);
       if (event != null) yield event;
-    }
-  }
-
-  /// Flags [messageId] for teacher review with the student's stated [reason].
-  Future<AskAiReportOutcome> report({
-    required String studentId,
-    required String messageId,
-    required String reason,
-  }) async {
-    try {
-      await _dio.post<Map<String, Object?>>(
-        '/api/ai/students/$studentId/messages/$messageId/report',
-        data: {'reason': reason},
-      );
-      return AskAiReportOutcome.filed;
-    } on DioException catch (error) {
-      if (error.apiError?.status == 409) return AskAiReportOutcome.alreadyFiled;
-      return AskAiReportOutcome.failed;
     }
   }
 

@@ -8,9 +8,11 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/ai_study_providers.dart';
 import '../application/ask_ai_providers.dart';
 import '../application/material_summary_controller.dart';
+import '../domain/ai_content_report.dart';
 import '../domain/ai_study.dart';
 import 'widgets/ai_error_view.dart';
 import 'widgets/ai_quota_meter.dart';
+import 'widgets/ai_report_button.dart';
 import 'widgets/ai_source_anchor_chip.dart';
 
 /// Per-material AI summary with brief / standard / detailed length presets. Switching to a preset
@@ -72,6 +74,12 @@ class _MaterialSummaryScreenState extends ConsumerState<MaterialSummaryScreen> {
           title: widget.material.title,
           subtitle: 'aiStudy.summary.subtitle'.tr(),
         ),
+        actions: [
+          if (controller?.current != null)
+            AiReportButton(
+              target: AiReportTarget.summary(widget.material.id, controller!.selected),
+            ),
+        ],
       ),
       body: controller == null
           ? const AiSignedOutView()

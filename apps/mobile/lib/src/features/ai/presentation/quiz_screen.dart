@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/ask_ai_providers.dart';
 import '../application/quiz_controller.dart';
 import '../application/quiz_providers.dart';
+import '../domain/ai_content_report.dart';
 import '../domain/quiz_state.dart';
+import 'widgets/ai_report_button.dart';
 import 'widgets/quiz_question_view.dart';
 import 'widgets/quiz_results_view.dart';
 import 'widgets/quiz_setup_view.dart';
@@ -88,6 +90,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       appBar: AppBar(
         title: Text('quiz.title'.tr()),
         actions: [
+          if (_reportTarget(controller?.state) case final target?) AiReportButton(target: target),
           if (controller != null)
             IconButton(
               onPressed: () => _confirmNewQuiz(controller),
@@ -100,6 +103,12 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     );
   }
 }
+
+/// The quiz on screen, if any — what the app bar's Report action flags.
+AiReportTarget? _reportTarget(QuizState? state) => switch (state) {
+  QuizInProgress(:final quiz) || QuizRoundResults(:final quiz) => AiReportTarget.quiz(quiz.quizId),
+  _ => null,
+};
 
 class _Body extends StatelessWidget {
   const _Body({required this.controller});

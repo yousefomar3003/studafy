@@ -13,7 +13,7 @@ import '../domain/ask_ai_conversation.dart';
 const int askAiQuestionMaxChars = 2000;
 
 /// Drives one Ask AI conversation: sends a question, folds the answer's SSE events into the
-/// [AskAiConversation] snapshot the screen renders, and files report actions.
+/// [AskAiConversation] snapshot the screen renders.
 ///
 /// A plain [ChangeNotifier], not a Riverpod provider — same call as [SubmissionFormController]:
 /// this state belongs to exactly one screen for the life of one chat and is read nowhere else.
@@ -195,15 +195,6 @@ class AskAiController extends ChangeNotifier {
     'AI_LLM_REQUEST_REJECTED' => 'aiLlmRequestRejected',
     _ => 'aiLlmUnavailable',
   };
-
-  /// Files a report against a completed answer. Surfaces the outcome to the caller (the screen
-  /// shows a snackbar); does not mutate conversation state.
-  Future<AskAiReportOutcome> reportAnswer({
-    required String messageId,
-    required String reason,
-  }) {
-    return _client.report(studentId: _studentId, messageId: messageId, reason: reason);
-  }
 
   /// Clears the send-error banner (e.g. the user dismissed it).
   void dismissSendError() {

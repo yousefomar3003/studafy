@@ -320,14 +320,7 @@
       "retry": "Try again"
     },
     "report": {
-      "action": "Report answer",
-      "dialogTitle": "Report this answer",
-      "dialogHint": "What's wrong with it?",
-      "cancel": "Cancel",
-      "submit": "Report",
-      "filed": "Reported to your teacher.",
-      "alreadyFiled": "You've already reported this answer.",
-      "failed": "Couldn't send the report. Try again."
+      "action": "Report answer"
     },
     "sendError": {
       "quotaExceeded": "You've used up this month's AI questions.",
@@ -993,6 +986,23 @@
           "unknown": "Unknown"
         }
       }
+    }
+  },
+  "aiReport": {
+    "action": "Report",
+    "dialogTitle": "Report this content",
+    "detailsHint": "Anything else we should know? (optional)",
+    "cancel": "Cancel",
+    "submit": "Report",
+    "filed": "Thanks — your school will review this.",
+    "alreadyFiled": "You've already reported this.",
+    "failed": "Couldn't send the report. Try again.",
+    "reason": {
+      "childSafety": "Sexual content involving a child",
+      "unsafe": "Harmful or dangerous",
+      "inappropriate": "Offensive or inappropriate",
+      "inaccurate": "Wrong or misleading",
+      "other": "Something else"
     }
   }
 }

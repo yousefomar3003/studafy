@@ -25,13 +25,6 @@ class _FakeAskAiClient implements AskAiClient {
     String? conversationId,
     String level = 'high',
   }) => _events();
-
-  @override
-  Future<AskAiReportOutcome> report({
-    required String studentId,
-    required String messageId,
-    required String reason,
-  }) async => AskAiReportOutcome.filed;
 }
 
 Widget _screen({required AskAiClient client, String? studentId = 'student-1'}) {

@@ -86,6 +86,15 @@ consent (`403 AI_CONSENT_REQUIRED`); consent is withdrawn from AI tab → AI dat
 modal copy against `apps/api/src/modules/ai/consent/disclosure.ts` whenever the provider or the data
 sent changes (that change must also bump the disclosure version).
 
+## Reporting and moderation of AI content (Apple 1.2, Play generative-AI policy)
+
+Covered by `docs/runbooks/ai-content-moderation.md` (ST-306). Every Ask AI answer, quiz, flashcard
+deck, and summary has an in-app Report (flag) action; reports land in the school's moderation queue
+with 24 h / 48 h / 5 day response targets; a generation-side filter blocks prohibited output and
+escalates child-safety matches to a human. The runbook's "Known gaps" section lists what is not
+covered yet (key concepts, explanations, exam mode; non-English text) — re-read it before
+answering a reviewer's question about moderation.
+
 ## Privacy label accuracy
 
 - [ ] `privacy-labels.md` in this directory has been re-checked against the current `pubspec.yaml`
