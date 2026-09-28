@@ -27,6 +27,8 @@ neither receives data used to serve ads or is used to correlate the user across 
 apps/sites. Both stores' "tracking" questions (Apple's App Tracking Transparency category; Play's
 "Is this data shared for tracking purposes") should be answered **No** on that basis. `pubspec.yaml`
 has no `app_tracking_transparency` dependency and no IDFA usage — no ATT prompt is needed at all.
+On Android the manifest strips the `AD_ID` permission, so the advertising ID reads as all zeros.
+`docs/sdk_compliance_inventory.md` is the per-SDK Families audit behind these answers (ST-307).
 
 ## What's collected, by category
 
