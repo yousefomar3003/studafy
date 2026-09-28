@@ -6,9 +6,8 @@ import '../../../../design/tokens/app_spacing_tokens.dart';
 
 /// The school-inactive state: the school's own Studafy subscription has lapsed, so the AI add-on
 /// is refused regardless of whether this student ever purchased one (see `AiHubSchoolInactive`'s
-/// doc comment). Nothing this app or its checkout link can fix — the school's own subscription is
-/// reactivated by the school, not a parent or student — so this is messaging only, with no action
-/// button, unlike [AiUpsellCard].
+/// doc comment). The school's own subscription is reactivated by the school, not a parent or
+/// student, so this is messaging only, with no action button — the same as `AiNotActiveCard`.
 class AiSchoolInactiveNotice extends StatelessWidget {
   const AiSchoolInactiveNotice({super.key});
 

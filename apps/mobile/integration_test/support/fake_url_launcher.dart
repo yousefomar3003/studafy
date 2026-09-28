@@ -3,12 +3,12 @@ import 'package:url_launcher_platform_interface/url_launcher_platform_interface.
 
 /// Records every `launchUrl` call instead of actually opening a browser.
 ///
-/// [AiUpsellCard] calls the top-level `launchUrl` function, which delegates to
-/// `UrlLauncherPlatform.instance` — the one platform-channel seam `url_launcher` exposes for
-/// exactly this kind of substitution, the same technique the package's own tests use. This lets
-/// the AI-upsell journey assert on the real widget's real button real tapping through to a real
-/// `Uri` without an actual system browser popping up mid-suite (which would strand the test with
-/// no way to bring the app back to the foreground).
+/// The top-level `launchUrl` function delegates to `UrlLauncherPlatform.instance` — the one
+/// platform-channel seam `url_launcher` exposes for exactly this kind of substitution, the same
+/// technique the package's own tests use. This lets the AI not-active journey prove that nothing on
+/// that screen launches anything (a purchase link there would be a store rejection) without an
+/// actual system browser popping up mid-suite (which would strand the test with no way to bring the
+/// app back to the foreground).
 class FakeUrlLauncher extends UrlLauncherPlatform {
   final launches = <String>[];
 

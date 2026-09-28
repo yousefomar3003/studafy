@@ -25,10 +25,9 @@ import 'support/test_app.dart';
 /// sequence below (submit -> approve -> publish) already exercises the rest of the journey and
 /// needs no changes.
 ///
-/// Also overrides `currentStudentIdProvider` to the resolved student's real id — like
-/// `ai_upsell_deep_link_test.dart`, this is the documented, test-sanctioned seam for a *separate*
-/// currently-unfillable gap (no self-resolving `/students/me`), not related to why this test is
-/// skipped.
+/// Also overrides `currentStudentIdProvider` to the resolved student's real id — the documented,
+/// test-sanctioned seam for a *separate* currently-unfillable gap (no self-resolving
+/// `/students/me`), not related to why this test is skipped.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
