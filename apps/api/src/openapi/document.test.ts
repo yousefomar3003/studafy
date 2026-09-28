@@ -103,6 +103,7 @@ describe("structure", () => {
         // document until OpenAPI generation started passing a real (if inert) Redis placeholder
         // instead of null. See redis-unusable.ts.
         "/api/ai/admin/metrics",
+        "/api/ai/consent",
         "/api/ai/health",
         "/api/ai/students/{studentId}/ask",
         "/api/ai/students/{studentId}/concepts",
@@ -515,6 +516,10 @@ describe("security", () => {
         "GET /api/admin/users/{userId}/devices",
         "GET /api/admin/users/{userId}/sessions",
         "GET /api/ai/admin/metrics",
+        // AI data-sharing consent (ST-305). Self-service on the caller's own consent record.
+        "GET /api/ai/consent",
+        "PUT /api/ai/consent",
+        "DELETE /api/ai/consent",
         "GET /api/ai/students/{studentId}/decks/{deckId}/review",
         "GET /api/ai/students/{studentId}/exams/{examId}",
         "GET /api/ai/usage",

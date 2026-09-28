@@ -41,6 +41,8 @@ import {
   AI_LLM_MAX_RESERVE_TOKENS,
   aiAskRoutes,
   aiConceptsRoutes,
+  aiConsentGate,
+  aiConsentRoutes,
   aiEntitlementGate,
   aiExamRoutes,
   aiExplainRoutes,
@@ -56,6 +58,7 @@ import {
   createConceptsCache,
   createDeterministicQueryEmbedder,
   createSummaryCache,
+  isAiModelCallPath,
 } from "./modules/ai";
 import { announcementRoutes } from "./modules/announcements";
 import {
@@ -971,6 +974,9 @@ export function createApp({
   // that predate this gate are likewise absent until both dependencies exist.
   if (database && redis && entitlements) {
     const aiMeter = createAiTokenMeter({ redis });
+    // Third-party data-sharing consent (ST-305). Registered first so a route that would send user
+    // data to the model provider is refused before quota is reserved or a prompt is built.
+    app.use("/api/ai/*", aiConsentGate({ database }));
     app.use(
       "/api/ai/*",
       aiEntitlementGate({
@@ -1004,19 +1010,14 @@ export function createApp({
         // stay on the default hold, the same posture quiz grading takes.
         resolveReserveTokens: (c) => {
           if (c.req.path.endsWith("/exams")) return AI_EXAM_MAX_RESERVE_TOKENS;
-          return c.req.path.endsWith("/generate") ||
-            c.req.path.endsWith("/ask") ||
-            c.req.path.endsWith("/summarize") ||
-            c.req.path.endsWith("/concepts") ||
-            c.req.path.endsWith("/explain") ||
-            c.req.path.endsWith("/quizzes") ||
-            c.req.path.endsWith("/decks")
-            ? AI_LLM_MAX_RESERVE_TOKENS
-            : undefined;
+          return isAiModelCallPath(c.req.path) ? AI_LLM_MAX_RESERVE_TOKENS : undefined;
         },
       }),
     );
     app.route("/", aiUsageRoutes({ entitlements, meter: aiMeter }));
+    // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Passed through by
+    // both gates -- it never reaches the provider, and withdrawal must work without an add-on.
+    app.route("/", aiConsentRoutes({ database }));
     // Hybrid retrieval (ST-162). Mounted under the same gate so a search reserves and commits the
     // caller's AI quota, and only when the gate's dependencies (a database for entitlements, Redis
     // for the meter) exist — the retrieval surface must never run un-metered. Cross-encoder

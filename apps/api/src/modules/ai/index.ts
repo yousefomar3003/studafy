@@ -35,6 +35,14 @@ export {
   type AiQuotaHandle,
 } from "./gate/entitlement-gate";
 export { aiUsageRoutes } from "./routes/usage-routes";
+export { aiConsentGate } from "./gate/consent-gate";
+export { aiConsentRoutes } from "./routes/consent-routes";
+export {
+  AI_DATA_CATEGORIES,
+  AI_DATA_SHARING_DISCLOSURE,
+  isAiModelCallPath,
+  type AiDataCategory,
+} from "./consent/disclosure";
 export { aiRetrievalRoutes } from "./routes/retrieval-routes";
 export { aiGatewayRoutes } from "./routes/gateway-routes";
 export { aiAskRoutes } from "./routes/ask-routes";

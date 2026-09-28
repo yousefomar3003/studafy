@@ -386,6 +386,11 @@ const EXPECTED_MUTATING_ROUTES = [
   // Answer report (ST-172). Student flags their own AI answer for teacher review; self-service on
   // the caller's own message. Audit row written by auditAction middleware on the route.
   "POST /api/ai/students/{studentId}/messages/{messageId}/report",
+  // AI data-sharing consent (ST-305). Grant inserts an app.ai_data_sharing_consents row, withdrawal
+  // stamps its withdrawn_at; both write their app.audit_logs row inside the same transaction —
+  // see modules/ai/consent/persistence.ts.
+  "PUT /api/ai/consent",
+  "DELETE /api/ai/consent",
 ];
 
 function collectSourceFiles(dir: string): string[] {
