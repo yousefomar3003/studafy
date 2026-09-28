@@ -16,7 +16,7 @@ abstract final class Personas {
 
   /// STUDENT with no AI subscription (`db/seeds/data/ai.ts` only pre-subscribes the first four
   /// students — see `db/seeds/mock-credentials.ts`'s `STUDENT_KEYS` order; this one is the fifth)
-  /// — the AI hub resolves them to the unsubscribed/upsell state that journey needs.
+  /// — the AI hub resolves them to the unsubscribed/not-active state that journey needs.
   static const unsubscribedAiStudent = 'lina.haddad@$mockEmailDomain';
 }
 

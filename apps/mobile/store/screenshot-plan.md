@@ -42,9 +42,8 @@ the tablet/iPad screenshot sets rather than stretching phone captures.
    status.
 4. `AiHubScreen` in its **subscribed** state — the feature grid (Ask AI, Exam mode, Summaries, Key
    concepts, Flashcards, Quizzes; see `ai/presentation/widgets/ai_feature_grid.dart`). Do **not**
-   capture the unsubscribed state (`AiUpsellCard`) for the listing — it's an upsell surface, not a
-   feature showcase, and its own copy is deliberately price-free; a screenshot of it adds nothing
-   the description text doesn't already say better.
+   capture the unsubscribed state (`AiNotActiveCard`) for the listing — it's a notice, not a
+   feature showcase, and adds nothing the description text doesn't already say better.
 5. `GradesScreen` — grades list.
 6. Optional: `AttendanceScreen`.
 

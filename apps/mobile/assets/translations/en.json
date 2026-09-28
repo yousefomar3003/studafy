@@ -227,16 +227,14 @@
         "exhausted": "You've used this month's AI budget. It resets on the date below."
       }
     },
-    "upsell": {
-      "title": "Get the AI Study Assistant",
-      "body": "A personal AI tutor for homework help, practice, and study-material summaries. Billed separately from your school's Studafy subscription, per student.",
+    "notActive": {
+      "title": "The AI Study Assistant isn't active",
+      "body": "The AI Study Assistant isn't active for this account. Once it is, its tools appear here on their own — no app update needed.",
       "points": {
         "ask": "Ask questions and get grounded answers from your own class materials",
         "quizzesAndFlashcards": "Practice with generated quizzes and flashcards",
         "summaries": "Get quick summaries and key concepts from your materials"
-      },
-      "continueOnWebsite": "Continue on the website",
-      "continueUnavailable": "Checkout isn't available right now. Please try again later."
+      }
     },
     "schoolInactive": {
       "title": "AI features are paused",

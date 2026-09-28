@@ -106,6 +106,11 @@ when it required the `version-bump` label.
 - `POST /api/account/deletion` now also emails the account a confirmation (`account.deleted`
   outbox event), and its audit entry records `source: "account_settings"` (`"web_request"` for the
   public flow above). No change to the HTTP contract. ST-302.
+- `POST /api/subscriptions/checkout` is now web-origin only, like every other subscription purchase
+  route: a `mobile` or `api` session gets `403 CHANNEL_NOT_AUTHORIZED` (already a documented
+  response). The app stores forbid a native app from starting an outside purchase of a digital
+  good; no client called it from mobile. ST-304 (see
+  [`apps/mobile/docs/store_payment_routing.md`](../../apps/mobile/docs/store_payment_routing.md)).
 
 ### Fixed
 

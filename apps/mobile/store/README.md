@@ -41,7 +41,7 @@ reviewed independently of that, but the actual "first submission" can't happen u
 
 ## Related
 
-- `docs/ai_store_compliance.md` — the external-purchase compliance review this ticket's
-  "external-purchase compliance review for AI upsell copy" acceptance item points at. Not
+- `docs/store_payment_routing.md` — which payments the app may hand off to the browser (school
+  fees) and which it must not route to at all (the AI add-on and every other digital good). Not
   duplicated here; `review-checklist.md` links to it.
 - `docs/runbooks/mobile-release.md` — the release mechanics (lanes, signing, forced-update floor).

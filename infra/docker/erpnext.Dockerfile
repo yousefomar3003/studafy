@@ -45,8 +45,15 @@ WORKDIR /home/frappe/frappe-bench
 # compiles its front-end assets. frappe/education dropped the plain "version-15" branch in favor
 # of per-minor branches, so we pin to the latest v15 line (version-15.2) to stay on the same major
 # line as the base image without drifting onto an incompatible Frappe framework version.
+# line as ERPNEXT_VERSION without drifting onto an incompatible Frappe framework version.
+#
+# The trailing rm drops what only the build needed — the pip/yarn/npm download caches and the
+# app's git history (frappe_docker's own images strip apps' .git the same way). It has to be in
+# this same RUN: deleting them in a later layer would still ship them in this one. Keeps the image
+# under containers.yml's size budget, which the floating base tag above slowly grows into.
 RUN bench get-app education --branch version-15.2 https://github.com/frappe/education && \
-    bench build --app education
+    bench build --app education && \
+    rm -rf /home/frappe/.cache /home/frappe/.npm apps/education/.git
 
 # infra/deploy/scripts/erpnext-new-site.sh's --seed flag runs `bench --site <hostname> execute
 # erpnext_seed.load_fixtures` against whichever role picks up the run-task override — placed on

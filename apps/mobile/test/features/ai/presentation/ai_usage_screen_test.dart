@@ -8,8 +8,8 @@ import 'package:studafy_mobile/src/features/ai/domain/ai_hub_status.dart';
 import 'package:studafy_mobile/src/features/ai/domain/ai_usage.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/ai_usage_screen.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_hub_message.dart';
+import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_not_active_card.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_school_inactive_notice.dart';
-import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_upsell_card.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_usage_meter.dart';
 
 import '../../../support/wrap_with_localization.dart';
@@ -116,7 +116,7 @@ void main() {
   });
 
   testWidgets(
-    'unsubscribed state shows the upsell card, not the meter',
+    'unsubscribed state shows the not-active card, not the meter',
     (tester) async {
       await _pump(
         tester,
@@ -130,11 +130,9 @@ void main() {
         ),
       );
 
-      expect(find.byType(AiUpsellCard), findsOneWidget);
+      expect(find.byType(AiNotActiveCard), findsOneWidget);
       expect(find.byType(AiUsageMeter), findsNothing);
     },
-    // See kKnownPreExistingFailureSkipReason's doc comment (golden_test_skip.dart) for why.
-    skip: true,
   );
 
   testWidgets('school-inactive state shows the notice, not the meter', (

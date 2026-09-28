@@ -8,9 +8,9 @@ import '../application/shell_providers.dart';
 
 /// The Profile tab, every role's shell. Still a placeholder for profile content itself (no
 /// account/profile feature has shipped yet), but carries one real action: requesting account
-/// deletion, opened in the system browser at `/account/delete` — the same external-browser
-/// pattern `AiUpsellCard` uses for the AI add-on checkout, and for the same reason (see
-/// `docs/ai_store_compliance.md`'s R-07: no in-app webview, just a system-browser hand-off).
+/// deletion, opened in the system browser at `/account/delete` — a system-browser hand-off, never
+/// an in-app webview (see `docs/store_payment_routing.md` for the reviewed list of outbound
+/// launches).
 ///
 /// Before this, the app had no account-deletion path anywhere — see
 /// `apps/mobile/store/review-checklist.md`'s blocking item on this. `/account/delete` requires a

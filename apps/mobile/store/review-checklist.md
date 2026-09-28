@@ -38,8 +38,8 @@ Now:
   site footer and the privacy policy. See `docs/modules/account-deletion.md`.
 - The mobile app's Profile tab (`apps/mobile/lib/src/features/shell/presentation/profile_tab_screen.dart`,
   every role) now carries a "Delete my account" action, opened in the system browser at
-  `/account/delete` — the same external-browser pattern `AiUpsellCard` already uses for the AI
-  add-on checkout (`docs/ai_store_compliance.md`'s R-07), for the same reason: no in-app webview.
+  `/account/delete` — a system-browser hand-off, never an in-app webview (it's on
+  `docs/store_payment_routing.md`'s reviewed list of outbound launches).
 
 Re-check before every submission: the Profile tab link still resolves, `/account/delete` and
 `/legal/delete-account` are still reachable, and `POST /api/account/deletion` still requires only
@@ -68,13 +68,15 @@ this directory can be finalized independently of this, but nothing can actually 
 until those exist and the first manual upload happens. Don't read a finished checklist here as "the
 listing is live" — it means "the content is ready for whoever does that setup."
 
-## External-purchase compliance (AI upsell)
+## Payment routing (digital vs. real-world)
 
-Fully covered by `docs/ai_store_compliance.md` (R-07) — don't duplicate its checklist here, use it
-directly. Summary of what it guarantees: no price shown anywhere in `features/ai`, no
-subscribe/buy/pay affordance, the only outbound action is a system-browser launch (never an in-app
-webview), no payment-credential collection, and no in-app-purchase plugin dependency. Re-run that
-checklist specifically whenever `features/ai` changes.
+Fully covered by `docs/store_payment_routing.md` (ST-304, which superseded the earlier R-07 review)
+— don't duplicate its checklist here, use it directly. Summary: nothing digital (the AI add-on, the
+school's Studafy plan) is sold in or linked to from the app — the unsubscribed AI state is a notice
+with no button, link, price or "get it on the website" copy, and the server refuses every purchase
+route to mobile sessions; the only payment hand-off is the school-fee invoice link, a real-world
+service both stores exempt. Enforced by `test/store_compliance/payment_routing_test.dart` and the
+API's `store-payment-channel.test.ts`.
 
 ## Privacy label accuracy
 
@@ -123,10 +125,11 @@ checklist specifically whenever `features/ai` changes.
 Specific things reviewers on both platforms commonly flag on education apps with a paid add-on,
 worth a deliberate look rather than assuming they're fine:
 
-- **Apple 3.1.1/3.1.3 (external purchase)** — covered above; this is the single most common
-  rejection reason for an app in this shape, and it's already been designed around deliberately.
-  Still worth a reviewer re-reading `docs/ai_store_compliance.md`'s checklist item-by-item against
-  the actual build being submitted, not just trusting it hasn't regressed.
+- **Apple 3.1.1/3.1.3, Google Play Payments (external purchase)** — covered above; this is the
+  single most common rejection reason for an app in this shape. The first design (R-07) still
+  linked to the web checkout and would have been rejected; ST-304 removed the link. Still worth a
+  reviewer re-reading `docs/store_payment_routing.md`'s checklist item-by-item against the actual
+  build being submitted, not just trusting the tests.
 - **Sign in with a third-party IdP only (Microsoft/Google), no Apple option** — Apple's guideline
   4.8 requires offering Sign in with Apple *if* the app offers any other third-party login option
   and doesn't rely solely on the platform's own account system. `login_screen.dart` currently offers

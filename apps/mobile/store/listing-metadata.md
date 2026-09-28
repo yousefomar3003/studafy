@@ -8,8 +8,8 @@ Grounded in what the app actually does today: `apps/mobile/lib/src/features/shel
 defines the four role shells (student, teacher, parent, and a read-only "viewer" shell that
 super-admin/org-admin/finance/support-agent sessions land on — see `shell_role.dart`), and
 `assets/translations/en.json` is the source of truth for in-app copy this listing text should stay
-consistent with. Nothing below mentions a price — see `docs/ai_store_compliance.md` for why the AI
-add-on specifically must never show one, in-app or in store copy.
+consistent with. Nothing below mentions a price or where the AI add-on is bought — see
+`docs/store_payment_routing.md` for why store copy must not steer to an outside purchase either.
 
 ## App name
 
@@ -46,8 +46,8 @@ per-role since the app itself branches that way — each paragraph should map to
 > messages in one place, with attendance-alert notifications when a threshold you set is crossed.
 >
 > **AI study tools (student accounts):** ask questions grounded in your own class materials,
-> generate practice quizzes and flashcards, and get summaries and key concepts — an optional add-on
-> billed and managed on studafy's website, not in this app.
+> generate practice quizzes and flashcards, and get summaries and key concepts — available on
+> accounts with the AI add-on active.
 >
 > Studafy requires an active account with a participating school. It is not a public sign-up app.
 

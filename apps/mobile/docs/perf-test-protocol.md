@@ -12,7 +12,7 @@ criterion is an Android-device criterion.
 
 Pinned to a generic low-end spec so results are honest for the weakest devices we claim to support.
 This is the budget-device class a student in a low-bandwidth market actually buys (Studafy is built
-for low-end Android first — see `docs/ai_store_compliance.md`).
+for low-end Android first).
 
 | Property | Reference spec |
 | --- | --- |

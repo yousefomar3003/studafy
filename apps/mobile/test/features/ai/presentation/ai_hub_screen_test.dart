@@ -9,8 +9,8 @@ import 'package:studafy_mobile/src/features/ai/domain/ai_usage.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/ai_hub_screen.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_feature_grid.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_hub_message.dart';
+import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_not_active_card.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_school_inactive_notice.dart';
-import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_upsell_card.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_usage_meter.dart';
 
 import '../../../support/wrap_with_localization.dart';
@@ -57,49 +57,29 @@ void main() {
 
     expect(find.byType(AiUsageMeter), findsOneWidget);
     expect(find.byType(AiFeatureGrid), findsOneWidget);
-    expect(find.byType(AiUpsellCard), findsNothing);
+    expect(find.byType(AiNotActiveCard), findsNothing);
     expect(find.byType(AiSchoolInactiveNotice), findsNothing);
   });
 
-  testWidgets('unsubscribed state shows the upsell card with no price anywhere', (tester) async {
+  testWidgets('unsubscribed state is a notice with no purchase route of any kind', (tester) async {
     await _pump(
       tester,
       ProviderScope(
-        overrides: [
-          aiHubStatusProvider.overrideWith((ref) async => const AiHubUnsubscribed()),
-          aiCheckoutUrlProvider.overrideWithValue(Uri.parse('https://app.studafy.com/account/ai')),
-        ],
+        overrides: [aiHubStatusProvider.overrideWith((ref) async => const AiHubUnsubscribed())],
         child: _screenApp(),
       ),
     );
 
-    expect(find.byType(AiUpsellCard), findsOneWidget);
-    expect(find.text('Continue on the website'), findsOneWidget);
-    // R-07: this app never shows a price or a purchase control of its own.
-    expect(find.textContaining(r'$'), findsNothing);
-    expect(find.textContaining('Subscribe'), findsNothing);
+    expect(find.byType(AiNotActiveCard), findsOneWidget);
+    // ST-304: a digital add-on sold on the web only — no control, link, price or steering copy.
+    expect(find.byType(ButtonStyleButton), findsNothing);
+    expect(find.byType(InkWell), findsNothing);
+    for (final steering in [r'$', 'Subscribe', 'Buy', 'Upgrade', 'website', 'Billed']) {
+      expect(find.textContaining(steering), findsNothing, reason: steering);
+    }
   });
 
-  testWidgets(
-    "unsubscribed state disables the website action when checkout isn't configured",
-    (tester) async {
-      await _pump(
-        tester,
-        ProviderScope(
-          overrides: [
-            aiHubStatusProvider.overrideWith((ref) async => const AiHubUnsubscribed()),
-            aiCheckoutUrlProvider.overrideWithValue(null),
-          ],
-          child: _screenApp(),
-        ),
-      );
-
-      final button = tester.widget<FilledButton>(find.byType(FilledButton));
-      expect(button.onPressed, isNull);
-    },
-  );
-
-  testWidgets('school-inactive state shows the notice, not the upsell card', (tester) async {
+  testWidgets('school-inactive state shows the notice, not the not-active card', (tester) async {
     await _pump(
       tester,
       ProviderScope(
@@ -109,7 +89,7 @@ void main() {
     );
 
     expect(find.byType(AiSchoolInactiveNotice), findsOneWidget);
-    expect(find.byType(AiUpsellCard), findsNothing);
+    expect(find.byType(AiNotActiveCard), findsNothing);
   });
 
   testWidgets('unavailable state shows the unavailable message', (tester) async {

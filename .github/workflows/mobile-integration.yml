@@ -43,12 +43,6 @@ env:
   REDIS_URL: redis://127.0.0.1:6390
   API_PORT: "38090"
   REALTIME_PORT: "38091"
-  # `buildAiCheckoutUrl` (ai_checkout_link.dart) only checks this is non-empty before putting it in
-  # the outbound URL as an opaque query param — the AI-upsell journey never calls
-  # `POST /api/subscriptions/ai/checkout` (that endpoint validates a real, Stripe-synced
-  # `plan_prices` row, which this suite doesn't seed and doesn't need to: it asserts on the URL the
-  # app builds, not on a live Stripe checkout). Any non-empty string is a faithful value here.
-  AI_ADDON_PRICE_ID: integration-test-ai-price
 
 jobs:
   android-emulator:
@@ -141,8 +135,7 @@ jobs:
             flutter test integration_test/ \
               --dart-define=API_BASE_URL=http://10.0.2.2:${{ env.API_PORT }} \
               --dart-define=REALTIME_BASE_URL=ws://10.0.2.2:${{ env.REALTIME_PORT }} \
-              --dart-define=WEB_BASE_URL=http://10.0.2.2:4174 \
-              --dart-define=AI_ADDON_PRICE_ID=${{ env.AI_ADDON_PRICE_ID }}
+              --dart-define=WEB_BASE_URL=http://10.0.2.2:4174
 
       - name: Stop the API and realtime gateway
         if: always()
@@ -271,8 +264,7 @@ jobs:
         run: |
           flutter build apk --debug --dart-define=API_BASE_URL="$API_PUBLIC_URL" \
             --dart-define=REALTIME_BASE_URL="$REALTIME_PUBLIC_URL" \
-            --dart-define=WEB_BASE_URL="$API_PUBLIC_URL" \
-            --dart-define=AI_ADDON_PRICE_ID=${{ env.AI_ADDON_PRICE_ID }}
+            --dart-define=WEB_BASE_URL="$API_PUBLIC_URL"
           for f in integration_test/*_test.dart; do
             echo "::group::$f"
             (cd android && ./gradlew app:assembleDebugAndroidTest -Ptarget="$f")
