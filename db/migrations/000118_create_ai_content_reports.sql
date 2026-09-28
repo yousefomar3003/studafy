@@ -118,6 +118,18 @@ CREATE INDEX idx_ai_content_reports_school_status_respond_by
 -- 'actioned' (the reviewer looked and closed it). Every carried row is 'other'/'normal': the old
 -- form never asked for a category.
 
+-- Every table read below is tenant-isolated with FORCE ROW LEVEL SECURITY, and a migration session
+-- has no tenant: the policies' current_setting('app.school_id')::uuid fails on the unset/empty GUC
+-- ("invalid input syntax for type uuid"). Setting a GUC instead would only show one school's rows.
+-- So RLS is disabled for this transaction, exactly as 000029/000030 do: ALTER TABLE holds ACCESS
+-- EXCLUSIVE until commit, so no other session reads through the window, and a failure rolls the
+-- flag back. ai_moderation_decisions is included because section 3 re-validates a CHECK over it.
+-- Restored and asserted at the end of this file.
+ALTER TABLE app.ai_answer_reports DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app.ai_messages DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app.students DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app.ai_moderation_decisions DISABLE ROW LEVEL SECURITY;
+
 INSERT INTO app.ai_content_reports (
   id, school_id, student_id, content_type, content_id, content_snapshot, source, reporter_id,
   reason_category, reason, priority, respond_by, status, reviewed_by, reviewed_at, created_at,
@@ -164,5 +176,38 @@ ALTER TABLE app.ai_moderation_decisions
   ADD CONSTRAINT ck_ai_moderation_decisions_category CHECK (category IN (
     'csam', 'self_harm', 'hate_speech', 'sexual_content', 'violence', 'profanity', 'pii_sharing'
   ));
+
+-- ---------------------------------------------------------------------------------------------------
+-- 4. Restore row-level security on the tables disabled in section 2
+-- ---------------------------------------------------------------------------------------------------
+--
+-- Leaving any of these without RLS or FORCE would exempt studafy_admin from tenant_isolation
+-- permanently with nothing in the application to reveal it, so the migration proves it before it
+-- commits.
+
+ALTER TABLE app.ai_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.ai_messages FORCE ROW LEVEL SECURITY;
+ALTER TABLE app.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.students FORCE ROW LEVEL SECURITY;
+ALTER TABLE app.ai_moderation_decisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.ai_moderation_decisions FORCE ROW LEVEL SECURITY;
+
+DO $assert_forced$
+DECLARE
+  relation text;
+BEGIN
+  FOREACH relation IN ARRAY ARRAY[
+    'app.ai_messages', 'app.students', 'app.ai_moderation_decisions', 'app.ai_content_reports'
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class
+      WHERE oid = relation::regclass AND relrowsecurity AND relforcerowsecurity
+    ) THEN
+      RAISE EXCEPTION '% must leave this migration with ROW LEVEL SECURITY enabled and forced',
+        relation USING ERRCODE = '42501';
+    END IF;
+  END LOOP;
+END
+$assert_forced$;
 
 RESET ROLE;
