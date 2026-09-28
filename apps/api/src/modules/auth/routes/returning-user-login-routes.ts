@@ -82,7 +82,7 @@ const loginBodySchema = z
   })
   .openapi("ReturningUserLoginRequest");
 
-const loginResponseSchema = z
+export const loginResponseSchema = z
   .object({
     access_token: z.string().openapi({ description: "Signed JWT access token." }),
     token_type: z.literal("Bearer"),

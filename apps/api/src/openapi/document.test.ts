@@ -263,6 +263,7 @@ describe("structure", () => {
         "/api/auth/invitations/{token}/oauth/mock/mobile-start",
         "/api/auth/invitations/{token}/oauth/mock/mobile-exchange",
         "/api/auth/login/oauth",
+        "/api/auth/login/review",
         "/api/auth/logout",
         "/api/auth/oauth/google/mobile-start",
         "/api/auth/oauth/google/mobile-exchange",

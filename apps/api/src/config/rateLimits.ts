@@ -71,6 +71,7 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   // Auth — unauthenticated, IP-scoped, brute-force targets (strictest budget)
   "/api/auth/refresh": "auth-strict",
   "/api/auth/logout": "auth-strict",
+  "/api/auth/login/review": "auth-strict",
   // Auth — authenticated, IP-scoped, sensitive mutations
   "/api/auth/sessions": "auth",
   "/api/auth/sessions/*": "auth",

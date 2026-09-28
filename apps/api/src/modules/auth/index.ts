@@ -100,6 +100,13 @@ export {
 } from "./auth-anomaly-events";
 export { adminDeviceRoutes } from "./routes/admin-device-routes";
 export { returningUserLoginRoutes } from "./routes/returning-user-login-routes";
+export { reviewLoginRoutes } from "./routes/review-login-routes";
+export {
+  loginReviewUser,
+  REVIEW_LOGIN_PROVIDER,
+  type ReviewLoginParams,
+  type ReviewLoginResult,
+} from "./services/review-login-service";
 export {
   loginReturningUser,
   type ReturningUserLoginParams,

@@ -69,7 +69,7 @@ const ADMINISTRATIVE_ROLES: ReadonlySet<Role> = new Set([ROLES.SUPER_ADMIN, ROLE
 // Identity resolution
 // ---------------------------------------------------------------------------
 
-interface ResolvedIdentity {
+export interface ResolvedIdentity {
   userId: string;
   schoolId: string;
   identityId: string;
@@ -88,7 +88,7 @@ interface ResolvedIdentity {
  * Returns undefined when no identity matches. Does NOT throw for a miss — callers branch on undefined
  * rather than catching, which keeps the NO_ACCOUNT path cheap and explicit.
  */
-async function findOAuthIdentity(
+export async function findOAuthIdentity(
   db: Database,
   provider: string,
   subject: string,

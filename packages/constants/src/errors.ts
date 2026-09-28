@@ -303,6 +303,9 @@ export const ERROR_CODES = {
   TAP_API_ERROR: "TAP_API_ERROR",
   TAP_WEBHOOK_INVALID: "TAP_WEBHOOK_INVALID",
 
+  // The App Store / Play reviewer demo tenant (ST-303) is never billable; checkout is refused.
+  REVIEW_TENANT_BILLING_DISABLED: "REVIEW_TENANT_BILLING_DISABLED",
+
   // A PaymentProviderPort operation the selected provider has no equivalent for.
   PAYMENT_PROVIDER_OPERATION_UNSUPPORTED: "PAYMENT_PROVIDER_OPERATION_UNSUPPORTED",
 

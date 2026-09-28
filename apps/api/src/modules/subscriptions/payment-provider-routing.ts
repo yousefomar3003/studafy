@@ -82,14 +82,18 @@ export function selectPaymentProvider(
  *
  * `app.schools` and `app.countries` are both global tables, so this needs no tenant predicate beyond
  * the school id itself.
+ *
+ * Every school-scoped checkout (subscription and online fee payment) passes through here, so this is
+ * where the reviewer demo tenant (ST-303) is refused before any provider is called. Migration 000115
+ * backs it with a CHECK that the tenant can never hold a provider customer id.
  */
 export async function selectPaymentProviderForSchool(
   tx: TransactionSql,
   registry: PaymentProviderRegistry,
   schoolId: string,
 ): Promise<SelectedPaymentProvider> {
-  const [row] = await tx<{ alpha2_code: string }[]>`
-    SELECT c.alpha2_code
+  const [row] = await tx<{ alpha2_code: string; is_review_tenant: boolean }[]>`
+    SELECT c.alpha2_code, s.is_review_tenant
     FROM app.schools s
     JOIN app.countries c ON c.id = s.country_id
     WHERE s.id = ${schoolId}::uuid
@@ -98,6 +102,14 @@ export async function selectPaymentProviderForSchool(
 
   if (!row) {
     throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "School not found");
+  }
+
+  if (row.is_review_tenant) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.REVIEW_TENANT_BILLING_DISABLED,
+      "Billing is disabled for the demo school",
+    );
   }
 
   return selectPaymentProvider(registry, row.alpha2_code);
