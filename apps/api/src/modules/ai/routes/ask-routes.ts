@@ -18,8 +18,8 @@ import { AI_ASK_QUESTION_MAX_CHARS, AI_ASK_SOURCE_LIMIT, AI_EXPLAIN_LEVELS } fro
 import { getAiQuota } from "../gate/entitlement-gate";
 import { LlmProviderError } from "../llm/provider";
 import { AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
-import { moderateInput, moderateOutput, textHash, type AgeLevel } from "../moderation/moderate";
-import { persistModerationDecision } from "../moderation/persistence";
+import { recordBlockedContent } from "../moderation/enforce";
+import { moderateInput, moderateOutput, type AgeLevel } from "../moderation/moderate";
 import { hybridSearch } from "../retrieval/search";
 import { recordDurableUsage, splitByTier } from "../usage/durable";
 
@@ -361,17 +361,20 @@ export function aiAskRoutes(deps: {
     // response — no LLM call, no message persisted.
     const inputModeration = moderateInput(body.question, body.level as AgeLevel);
     if (inputModeration.blocked) {
-      await withTenantTx(database, tenantFrom(c), async (tx) => {
-        await persistModerationDecision(tx, {
+      await recordBlockedContent(
+        database,
+        tenantFrom(c),
+        {
           schoolId: auth.schoolId,
           studentId,
-          messageId: null,
+          surface: "ask",
           phase: "input",
-          textHash: textHash(body.question),
-          blocked: true,
-          category: inputModeration.category ?? null,
-        });
-      });
+          contentType: "ask_question",
+          text: body.question,
+          result: inputModeration,
+        },
+        c.get("log"),
+      );
       throw new CodedHttpException(
         400,
         ERROR_CODES.AI_MODERATION_INPUT_BLOCKED,
@@ -470,17 +473,20 @@ export function aiAskRoutes(deps: {
           // should clear any rendered content upon receiving this event.
           const outputModeration = moderateOutput(text, body.level as AgeLevel);
           if (outputModeration.blocked) {
-            await withTenantTx(database, tenantFrom(c), async (tx) => {
-              await persistModerationDecision(tx, {
+            await recordBlockedContent(
+              database,
+              tenantFrom(c),
+              {
                 schoolId: auth.schoolId,
                 studentId,
-                messageId: null,
+                surface: "ask",
                 phase: "output",
-                textHash: textHash(text),
-                blocked: true,
-                category: outputModeration.category ?? null,
-              });
-            });
+                contentType: "ask_answer",
+                text,
+                result: outputModeration,
+              },
+              c.get("log"),
+            );
             await stream.writeSSE({
               event: "moderation_blocked",
               data: JSON.stringify({

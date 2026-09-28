@@ -1,7 +1,7 @@
 /**
  * Content moderation policy for AI surfaces.
  *
- * Defines the six content categories the pattern-based moderator checks, the regex patterns that
+ * Defines the seven content categories the pattern-based moderator checks, the regex patterns that
  * detect each category, the per-age-level severity thresholds that decide whether a match blocks,
  * and the guidance messages shown to students when their content is blocked.
  *
@@ -16,7 +16,7 @@ import { AI_EXPLAIN_LEVELS } from "../config";
 export type AgeLevel = (typeof AI_EXPLAIN_LEVELS)[number];
 
 /**
- * The six moderation categories. Each maps to a set of word-boundary-anchored regex patterns and
+ * The seven moderation categories. Each maps to a set of word-boundary-anchored regex patterns and
  * an age-level severity threshold (the minimum level at which a match blocks).
  *
  * Severity ordering for thresholds: elementary < middle < high. A threshold of `"high"` means
@@ -38,7 +38,20 @@ export interface ModerationCategory {
   blockThreshold: AgeLevel;
   /** Age-appropriate guidance shown to the student on block. Keyed by age level. */
   guidance: Record<AgeLevel, string>;
+  /**
+   * True when a block must also reach a human: the blocked text is filed into the moderation queue
+   * as an urgent safety-filter report (see `moderation/enforce.ts`) instead of only being logged.
+   */
+  escalate: boolean;
 }
+
+// Child-safety detection (ST-306). A minor reference and an explicit-sexual term in the same
+// sentence, in either order, plus unambiguous CSAM vocabulary. "Sexual abuse", "puberty", and
+// "reproduction" are deliberately absent from the explicit list: safeguarding and biology lessons
+// use them, and this pattern must not escalate a health class.
+const MINOR_TERM = String.raw`(?:child(?:ren)?|kids?|minors?|under[- ]?aged?|pre[- ]?teens?|little\s+(?:girls?|boys?)|(?:[1-9]|1[0-7])[- ]?(?:yo|y/o|years?[- ]old))`;
+const EXPLICIT_TERM = String.raw`(?:nudes?|naked|nudity|porn\w*|sexy|sexual(?:ly)?\s+explicit|erotic\w*|sexting|lewd|xxx|sex\s+(?:with|acts?|videos?|pics?|photos?|images?))`;
+const SAME_SENTENCE = String.raw`[^.!?\n]{0,60}`;
 
 const LEVEL_RANK: Record<AgeLevel, number> = { elementary: 0, middle: 1, high: 2 };
 
@@ -55,6 +68,26 @@ function levelBlocked(studentLevel: AgeLevel, threshold: AgeLevel): boolean {
  */
 export const MODERATION_CATEGORIES: readonly ModerationCategory[] = [
   {
+    key: "csam",
+    label: "Child sexual exploitation",
+    patterns: [
+      // eslint-disable-next-line security/detect-non-literal-regexp -- built once from this module's own constants, never from input
+      new RegExp(String.raw`\b${MINOR_TERM}\b${SAME_SENTENCE}\b${EXPLICIT_TERM}\b`, "i"),
+      // eslint-disable-next-line security/detect-non-literal-regexp -- built once from this module's own constants, never from input
+      new RegExp(String.raw`\b${EXPLICIT_TERM}\b${SAME_SENTENCE}\b${MINOR_TERM}\b`, "i"),
+      /\b(?:child\s+porn\w*|kiddie\s+porn\w*|csam|jailbait|lolicon|shotacon|pedo(?:phile)?\s+(?:content|pics?|videos?|images?))\b/i,
+    ],
+    blockThreshold: "high",
+    guidance: {
+      elementary:
+        "This isn't something we can help with. If someone is making you feel unsafe, please tell a trusted adult or your school counselor right away.",
+      middle:
+        "This content isn't allowed. If anyone is asking you for pictures or making you feel unsafe, please tell a trusted adult or your school counselor.",
+      high: "This content isn't allowed and has been flagged for review. If anyone is pressuring you or making you feel unsafe, please talk to a trusted adult or your school counselor.",
+    },
+    escalate: true,
+  },
+  {
     key: "self_harm",
     label: "Self-harm",
     patterns: [
@@ -70,6 +103,7 @@ export const MODERATION_CATEGORIES: readonly ModerationCategory[] = [
         "If you're struggling, please reach out to a trusted adult or your school counselor. Help is available.",
       high: "If you're struggling with thoughts of self-harm, please reach out to a trusted adult or counselor. You don't have to face this alone.",
     },
+    escalate: false,
   },
   {
     key: "hate_speech",
@@ -86,6 +120,7 @@ export const MODERATION_CATEGORIES: readonly ModerationCategory[] = [
       middle: "This language is hurtful and not allowed. Please rephrase respectfully.",
       high: "Hate speech is not acceptable. Please keep your language respectful.",
     },
+    escalate: false,
   },
   {
     key: "sexual_content",
@@ -105,6 +140,7 @@ export const MODERATION_CATEGORIES: readonly ModerationCategory[] = [
         "This content isn't appropriate here. Please keep your questions focused on learning.",
       high: "This content isn't appropriate for our learning space. Please refocus on your studies.",
     },
+    escalate: false,
   },
   {
     key: "violence",
@@ -124,6 +160,7 @@ export const MODERATION_CATEGORIES: readonly ModerationCategory[] = [
         "Threats of violence are taken seriously. Please rephrase your question appropriately.",
       high: "Threats of violence are not acceptable and may be reported. Please rephrase your question.",
     },
+    escalate: false,
   },
   {
     key: "profanity",
@@ -138,6 +175,7 @@ export const MODERATION_CATEGORIES: readonly ModerationCategory[] = [
       middle: "Please use school-appropriate language.",
       high: "Please use appropriate language in your questions.",
     },
+    escalate: false,
   },
   {
     key: "pii_sharing",
@@ -156,6 +194,7 @@ export const MODERATION_CATEGORIES: readonly ModerationCategory[] = [
         "Please don't share personal information like phone numbers, addresses, or email addresses.",
       high: "Please don't share personal information in your questions for your own safety.",
     },
+    escalate: false,
   },
 ] as const;
 

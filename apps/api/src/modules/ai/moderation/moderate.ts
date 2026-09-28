@@ -12,8 +12,8 @@
  * without changing any call site. The default `PatternModerationProvider` is the only concrete
  * implementation shipped here.
  *
- * All moderation decisions (blocked and allowed) are logged to `app.ai_moderation_decisions` via
- * the persistence layer — see `moderation/persistence.ts`.
+ * Blocked decisions are logged to `app.ai_moderation_decisions`, and escalating categories are
+ * filed into the moderation queue, by `moderation/enforce.ts`.
  */
 
 import { createHash } from "crypto";
@@ -36,6 +36,8 @@ export interface ModerationResult {
   blocked: boolean;
   category?: string;
   guidance?: string;
+  /** True when the matched category must reach a human (see `ModerationCategory.escalate`). */
+  escalate?: boolean;
 }
 
 /**
@@ -78,8 +80,8 @@ export interface ModerationProvider {
 /**
  * Pattern-based moderation provider. Synchronous, zero-cost, fully deterministic.
  *
- * Iterates the moderation categories in severity order (self_harm → hate_speech → sexual_content
- * → violence → profanity → pii_sharing) and returns the first match that blocks at the student's
+ * Iterates the moderation categories in severity order (csam → self_harm → hate_speech →
+ * sexual_content → violence → profanity → pii_sharing) and returns the first match that blocks at the student's
  * age level. If no category blocks, the content is allowed.
  */
 export class PatternModerationProvider implements ModerationProvider {
@@ -96,6 +98,7 @@ function checkText(text: string, level: AgeLevel): ModerationResult {
         blocked: true,
         category: category.key,
         guidance: category.guidance[level],
+        escalate: category.escalate,
       };
     }
   }

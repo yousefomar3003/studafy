@@ -114,8 +114,10 @@ export interface AiQuotaGateOptions {
   resolveStudentId?: (c: Context<AppEnv>) => string | null | undefined;
   /**
    * Whether this request should consume quota. Defaults to all `/api/ai/*` paths except the usage
-   * endpoint, which reads quota without drawing on it, the metrics endpoint, and the consent
-   * endpoint (ST-305), which must stay reachable -- to withdraw -- without an active add-on.
+   * endpoint, which reads quota without drawing on it, the metrics endpoint, the consent
+   * endpoint (ST-305), which must stay reachable -- to withdraw -- without an active add-on, and
+   * the reporting and moderation-queue endpoints (ST-306): a student must be able to report what
+   * they were shown after their add-on lapses, and moderators hold no add-on at all.
    * Pass-through requests skip the gate entirely, so a route that wants the gate's entitlement
    * verdict must assert it itself.
    */
@@ -131,10 +133,14 @@ function defaultResolveStudentId(c: Context<AppEnv>): string | undefined {
 }
 
 function defaultReserveQuota(c: Context<AppEnv>): boolean {
+  const path = c.req.path;
   return (
-    !c.req.path.endsWith("/usage") &&
-    !c.req.path.endsWith("/admin/metrics") &&
-    !c.req.path.endsWith("/consent")
+    !path.endsWith("/usage") &&
+    !path.endsWith("/admin/metrics") &&
+    !path.endsWith("/consent") &&
+    !path.endsWith("/report") &&
+    !path.endsWith("/reports") &&
+    !path.startsWith("/api/ai/moderation/")
   );
 }
 

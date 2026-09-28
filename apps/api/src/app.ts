@@ -48,6 +48,7 @@ import {
   aiExplainRoutes,
   aiFlashcardRoutes,
   aiGatewayRoutes,
+  aiModerationRoutes,
   aiQuizRoutes,
   aiReportRoutes,
   aiMetricsRoutes,
@@ -1173,9 +1174,13 @@ export function createApp({
         modelOverrides: aiLlmModelOverrides,
       }),
     );
-    // Answer report route. Students flag AI answers for teacher review. No LLM call, no quota
-    // spend — the route only writes to app.ai_answer_reports.
-    app.route("/", aiReportRoutes({ database }));
+    // AI content reporting and the moderation queue (ST-306). Students report any AI output; the
+    // school's moderators work the queue. Neither calls the model or spends quota: the gate passes
+    // both through (entitlement-gate.ts's defaultReserveQuota), so reporting stays available after
+    // an add-on lapses and admins without one can moderate. The report route reads summaries from
+    // the same Redis cache the summarizer writes -- it is the only place a summary's text exists.
+    app.route("/", aiReportRoutes({ database, summaryCache: createSummaryCache(redis) }));
+    app.route("/", aiModerationRoutes({ database }));
     // AI metrics dashboard (ST-155). Cross-tenant per-tenant usage and cost metrics for the
     // platform team. SUPER_ADMIN only, no quota consumption — the route reads the durable ledger
     // via withSystemTx (same cross-tenant mechanism as the webhook processor). Mounted outside

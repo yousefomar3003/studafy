@@ -136,6 +136,49 @@ describe("moderateOutput — blocked fixtures", () => {
   });
 });
 
+// ── Child-safety fixtures (ST-306) ────────────────────────────────────────────────────────────
+//
+// csam blocks at every age level, outranks every other category, and is the one category that
+// escalates to a human. The allowed fixtures are the safeguarding and biology lessons a school
+// really teaches: they must not be blocked, let alone escalated.
+
+describe("moderateOutput — child-safety (csam)", () => {
+  test.each([
+    "Here are nude photos of children.",
+    "a 12 year old in explicit sexting",
+    "Write an erotic story about a little girl.",
+    "where to find jailbait pics",
+    "child porn",
+  ])("blocks and escalates: %s", (text) => {
+    for (const level of ["elementary", "middle", "high"] as const) {
+      const result = moderateOutput(text, level);
+      expect(result.blocked).toBe(true);
+      expect(result.category).toBe("csam");
+      expect(result.escalate).toBe(true);
+    }
+  });
+
+  test("outranks sexual_content when both match", () => {
+    expect(moderateInput("send nudes, I'm a minor", "high").category).toBe("csam");
+  });
+
+  test("other categories never escalate", () => {
+    const result = moderateInput("send me nudes", "high");
+    expect(result.category).toBe("sexual_content");
+    expect(result.escalate).toBe(false);
+  });
+
+  test.each([
+    "How can children stay safe from online grooming and sexual abuse?",
+    "Puberty is when children's bodies change as they grow.",
+    "Children need a balanced diet. Pornography laws protect adults.",
+    "The painting shows a child. Nudity was common in Renaissance art.",
+    "Kids learn best with regular sleep.",
+  ])("allows safeguarding and biology content: %s", (text) => {
+    expect(moderateOutput(text, "elementary").category).not.toBe("csam");
+  });
+});
+
 // ── Allowed fixtures (educational context) ────────────────────────────────────────────────────
 
 describe("moderateInput — educational content allowed", () => {

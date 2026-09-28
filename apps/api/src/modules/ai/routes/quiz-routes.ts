@@ -23,6 +23,7 @@ import {
 import { getAiQuota } from "../gate/entitlement-gate";
 import { throwLlmError } from "../llm/errors";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
+import { assertGeneratedContentSafe } from "../moderation/enforce";
 import { gradeQuiz } from "../quiz/grading";
 import { loadQuizMaterials } from "../quiz/materials";
 import { parseQuizGeneration, QuizGenerationInvalidError } from "../quiz/parser";
@@ -418,6 +419,25 @@ export function aiQuizRoutes(deps: {
       // Malformed model output is rejected here, before anything is persisted or any tokens are
       // committed -- see config.ts for why this does not retry server-side.
       const questions = parseQuizGeneration(generation.content, sources.length);
+
+      // Generation-side safety filter (ST-306): nothing unsafe is persisted or shown.
+      await assertGeneratedContentSafe(
+        database,
+        tenantFrom(c),
+        {
+          schoolId: auth.schoolId,
+          studentId,
+          surface: "quiz",
+          contentType: "quiz",
+          texts: questions.flatMap((question) =>
+            question.type === "mcq"
+              ? [question.prompt, ...question.options.map((option) => option.text)]
+              : [question.prompt, question.correct_answer],
+          ),
+          locale,
+        },
+        c.get("log"),
+      );
 
       // The provider call deliberately happened outside the transaction above; this short write is
       // all the transaction holds.

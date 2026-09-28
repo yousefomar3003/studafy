@@ -332,6 +332,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // Answer report (ST-172). Self-service: student reports their own AI answer; caller's identity
   // is sufficient authorization — no cross-user row-level permission.
   "POST /api/ai/students/{studentId}/messages/{messageId}/report",
+  // AI content reports (ST-306). Self-service: a student reports their own AI output. The review
+  // PATCH is guarded by aiContent:moderate.
+  "POST /api/ai/students/{studentId}/reports",
+  "PATCH /api/ai/moderation/reports/{reportId}",
   // AI data-sharing consent (ST-305). Self-service on the caller's own consent record.
   "PUT /api/ai/consent",
   "DELETE /api/ai/consent",
@@ -519,6 +523,10 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Answer report (ST-172) — same gate, same RLS. Writes the student's own report row;
   // self-service: the reporter must be the authenticated student (auth.userId === studentId check).
   "POST /api/ai/students/{studentId}/messages/{messageId}/report",
+  // AI content report (ST-306) — same gate pass-through, same RLS, same self-service rule as the
+  // answer report above (auth.userId === studentId), and every content read is scoped to that
+  // student (moderation/snapshots.ts).
+  "POST /api/ai/students/{studentId}/reports",
   // AI data-sharing consent (ST-305) — self-service: the subject is always the caller
   // (auth.userId, never a path or body parameter), so there is no other user's record to reach.
   "PUT /api/ai/consent",
