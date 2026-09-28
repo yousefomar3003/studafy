@@ -16,7 +16,7 @@
  */
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ERROR_CODES, JOB_NAMES, PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
+import { ERROR_CODES, PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
 import { Queue } from "bullmq";
 
 import { CodedHttpException } from "../../coded-http-exception";
@@ -28,6 +28,7 @@ import { requirePermission } from "../../middleware/authz";
 import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
 
+import { addDsrJob } from "./dsr-queue";
 import {
   createDsrBodySchema,
   createSelfDsrBodySchema,
@@ -67,22 +68,8 @@ async function enqueueDsrJob(
   tenant: { schoolId: string; userId: string },
   row: DataSubjectRequestRow,
 ): Promise<void> {
-  const jobName =
-    row.requestType === "export"
-      ? JOB_NAMES.RUN_DATA_SUBJECT_EXPORT
-      : JOB_NAMES.RUN_DATA_SUBJECT_ERASURE;
   try {
-    await maintenanceQueue.add(
-      jobName,
-      { requestId: row.id, schoolId: tenant.schoolId },
-      {
-        jobId: row.id,
-        attempts: 3,
-        backoff: { type: "exponential", delay: 5_000 },
-        removeOnComplete: { age: 30 * 24 * 60 * 60 },
-        removeOnFail: { age: 30 * 24 * 60 * 60 },
-      },
-    );
+    await addDsrJob(maintenanceQueue, row, tenant.schoolId);
   } catch {
     // Best-effort: mark the row failed so it does not sit `queued` forever with nothing to
     // process it. The maintenance queue's own claim/fail lifecycle owns every other failure path;

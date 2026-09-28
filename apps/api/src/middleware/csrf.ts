@@ -119,6 +119,12 @@ const EXEMPT_PATHS = [
   // the email is registered or not — see resend-verification's schema), so a forged call can cause
   // an extra email at most, never a state change or a disclosure.
   "/api/schools/resend-verification",
+  // Public account deletion (ST-302), same posture as the two entries above. The request is
+  // enumeration-safe and captcha-gated, so a forged call can cause one email to the address's owner
+  // at most. Its /confirm child authenticates with the emailed token in the body, like invitation
+  // activation — no ambient cookie or header a cross-site page could ride on. Prefix match, so
+  // this does not cover the Bearer-authenticated /api/account/deletion.
+  "/api/account/deletion-requests",
 ];
 
 type CsrfFailureReason = "missing_token" | "token_mismatch";

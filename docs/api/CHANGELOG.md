@@ -13,13 +13,31 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Public account deletion without the app or a session (ST-302; see
+  [`docs/modules/account-deletion.md`](../modules/account-deletion.md#web-deletion-flow-no-sign-in)).
+  Both unauthenticated (`security: []`), CSRF-exempt and `auth-strict` rate-limited:
+  - `POST /api/account/deletion-requests` (`AccountDeletionRequest`: `email`, `captcha_token`)
+    emails a one-hour, single-use deletion link if the address has accounts. Always `202` with the
+    same `AccountDeletionRequestAccepted` body, so it does not disclose whether an address is
+    registered. `400 CAPTCHA_INVALID` on a failed Turnstile check.
+  - `POST /api/account/deletion-requests/confirm` (`AccountDeletionConfirm`: `token`) deletes every
+    active account under that address through the same pipeline as `POST /api/account/deletion`,
+    answering `202` with `AccountDeletionConfirmed`: `accounts[]` (`school_name`, `request_id`,
+    `completes_by`) and `retained_records`. `400 VERIFICATION_TOKEN_INVALID` for an unknown,
+    expired or used token.
+- `POST /api/account/deletion` — self-service account deletion (ST-301; see
+  [`docs/modules/account-deletion.md`](../modules/account-deletion.md)). Bearer-authenticated
+  only; the caller is the subject. Signs out every session, detaches the account from the school,
+  stops AI add-on billing and files an erasure request, answering `202` with an `AccountDeletion`
+  body: `request_id`, `status`, `requested_at`, `completes_by`, `ai_subscriptions_canceled` and
+  `retained_records` (`RetainedRecord`: `category`, `description`, `legal_basis`). New `Account`
+  tag and error code `APPLE_TOKEN_REVOCATION_FAILED`.
 - `POST /api/auth/login/review`: email/password login for the App Store / Play reviewer demo
   tenant only (ST-303; see [`docs/runbooks/app-review-access.md`](../runbooks/app-review-access.md)).
   Public, rate-limited `auth-strict`, and answers 404 unless `REVIEW_LOGIN_PASSWORD` is configured.
   Returns the same token pair as `POST /api/auth/login/oauth`, whose response schema it reuses.
 - Error code `REVIEW_TENANT_BILLING_DISABLED` (403), returned by school checkout and online fee
   payment for the reviewer demo tenant.
-
 - Student CSV column mapping and staging (ST-299; see
   [`docs/modules/student-import-mapping-guide.md`](../modules/student-import-mapping-guide.md)):
   - `PUT /api/imports/students/{importId}/mapping` re-maps an unconfirmed import's staged rows,
@@ -82,6 +100,12 @@ when it required the `version-bump` label.
   read permission (`STUDENT_READ` / `USER_READ` / `BILLING_READ` / `MATERIAL_READ`); row-level
   security within a populated section matches that type's own list endpoint. Every call is
   recorded as a `read` audit entry against `global_search`. ST-278.
+
+### Changed
+
+- `POST /api/account/deletion` now also emails the account a confirmation (`account.deleted`
+  outbox event), and its audit entry records `source: "account_settings"` (`"web_request"` for the
+  public flow above). No change to the HTTP contract. ST-302.
 
 ### Fixed
 

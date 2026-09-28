@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, mock, test } from "bun:test";
+import { forwardRef } from "react";
 import { MemoryRouter } from "react-router-dom";
 
 import { MarketingFooter } from "../../layouts/marketing/MarketingFooter";
@@ -30,6 +31,12 @@ const PLAN = {
 
 const getMock = mock((_path: string) => Promise.resolve<unknown>({ data: [PLAN] }));
 mock.module("../../lib/api", () => ({ api: { GET: getMock } }));
+// Cloudflare's script does not load in happy-dom; the delete-account form renders the widget.
+mock.module("../../components/TurnstileWidget", () => ({
+  TurnstileWidget: forwardRef(function MockTurnstileWidget() {
+    return null;
+  }),
+}));
 
 const loadHomePage = async (): Promise<ComponentType> => (await import("./HomePage")).default;
 const loadFeaturesPage = async (): Promise<ComponentType> =>
@@ -40,6 +47,8 @@ const loadPrivacyPolicyPage = async (): Promise<ComponentType> =>
   (await import("../legal/PrivacyPolicyPage")).default;
 const loadDeleteAccountInfoPage = async (): Promise<ComponentType> =>
   (await import("../legal/DeleteAccountInfoPage")).default;
+const loadConfirmAccountDeletionPage = async (): Promise<ComponentType> =>
+  (await import("../legal/ConfirmAccountDeletionPage")).default;
 
 function renderPage(Page: ComponentType) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -92,6 +101,11 @@ describe("marketing site accessibility", () => {
 
   test("delete-account info page", async () => {
     const { container } = renderPage(await loadDeleteAccountInfoPage());
+    await expectNoA11yViolations(container);
+  });
+
+  test("delete-account confirm page", async () => {
+    const { container } = renderPage(await loadConfirmAccountDeletionPage());
     await expectNoA11yViolations(container);
   });
 });

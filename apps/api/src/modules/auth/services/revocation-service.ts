@@ -63,6 +63,7 @@ export const REVOCATION_REASONS = {
   REVOKE_OTHERS: "revoke_others",
   ADMIN_REVOKE_DEVICE: "admin_revoke_device",
   ADMIN_REVOKE_ALL_DEVICES: "admin_revoke_all_devices",
+  ACCOUNT_DELETION: "account_deletion",
 } as const;
 
 export type RevocationReason = (typeof REVOCATION_REASONS)[keyof typeof REVOCATION_REASONS];

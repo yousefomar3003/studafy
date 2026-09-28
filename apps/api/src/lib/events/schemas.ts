@@ -14,6 +14,27 @@ export const eventPayloadSchemas = {
   [DOMAIN_EVENTS.USER_SUSPENDED]: z.object({ userId: uid }),
   [DOMAIN_EVENTS.USER_INVITED]: z.object({ userId: uid }),
 
+  // ── Account ──────────────────────────────────────────────────────────
+  [DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED]: z.object({
+    // Not .email(), for the reason ACCOUNT_DELETED gives below — and here a stored address failing
+    // the check would also turn the enumeration-safe 202 into a 500 for addresses that exist.
+    email: z.string().min(1),
+    expiresAt: z.string().datetime(),
+    // Every school the confirmed request will delete an account in, so the email says exactly
+    // what the link does.
+    schoolNames: z.array(z.string().min(1)).min(1),
+    // The one-time confirmation token, for the same reason INVITATION_SENT carries its token: the
+    // email is sent asynchronously from this row.
+    token: z.string().min(1),
+  }),
+  [DOMAIN_EVENTS.ACCOUNT_DELETED]: z.object({
+    userId: uid,
+    // Not .email(): this is emitted inside the deletion transaction, and a stored address that
+    // fails Zod's format check must not be able to block a deletion. SES rejects it instead.
+    email: z.string().min(1),
+    completesBy: z.string().datetime(),
+  }),
+
   // ── School ───────────────────────────────────────────────────────────
   [DOMAIN_EVENTS.SCHOOL_REGISTERED]: z.object({
     schoolId: uid,

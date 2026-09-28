@@ -190,11 +190,13 @@ integrationTest(
 
       // A permissive policy widens access rather than narrowing it, so every one that is not
       // tenant_isolation is pinned by shape here instead of being waved through by the filter above.
-      // Two exist, both SECURITY DEFINER read seams that let a global lookup see a single row while the
-      // table stays FORCE ROW LEVEL SECURITY:
+      // Three exist, all SECURITY DEFINER read seams that let a global lookup see only the rows it
+      // names while the table stays FORCE ROW LEVEL SECURITY:
       //   - invitation_token_verification (000031), behind GET /api/auth/invitations/{token}/verify.
       //   - oauth_identity_login_lookup (000034), behind POST /api/auth/login/oauth — the returning-user
       //     login resolves the globally unique (provider, subject) pair before any tenant is known.
+      //   - user_deletion_request_lookup (000115), behind POST /api/account/deletion-requests — the
+      //     public deletion request resolves one email address to its accounts across schools.
       // What keeps each seam closed is the role and the predicate: both are granted to studafy_admin
       // only — never PUBLIC, and never studafy_app, which is the role ordinary request handlers run as —
       // and each USING clause pins the lookup to the exact value(s) the function places in a
@@ -206,6 +208,7 @@ integrationTest(
       expect(seamPolicies.map((policy) => `${policy.table_name}.${policy.name}`)).toEqual([
         "invitations.invitation_token_verification",
         "oauth_identities.oauth_identity_login_lookup",
+        "users.user_deletion_request_lookup",
       ]);
       const [adminRole] = await database.sql<{ oid: number }[]>`
         SELECT oid::integer AS oid FROM pg_roles WHERE rolname = 'studafy_admin'
@@ -228,6 +231,11 @@ integrationTest(
       );
       expect(oauthSeam?.using_expression).toContain("app.oauth_login_provider");
       expect(oauthSeam?.using_expression).toContain("app.oauth_login_subject");
+      const deletionSeam = seamPolicies.find(
+        (policy) => policy.name === "user_deletion_request_lookup",
+      );
+      expect(deletionSeam?.using_expression).toContain("app.deletion_request_email");
+      expect(deletionSeam?.using_expression).toContain("normalized_email");
 
       // Restrictive policies AND with the permissive one, so they can only ever narrow access —
       // which is why they are filtered out above rather than folded into the same assertion. Exactly
@@ -689,6 +697,9 @@ integrationTest(
         "idx_refresh_tokens_school_user_active",
         // Added by 000030 for ST-072: batch revocation with INCLUDE for access_jti/access_expires_at.
         "idx_refresh_tokens_school_user_device_active",
+        // Added by 000115 for ST-302: the public deletion request resolves an address to its
+        // accounts across schools, which the (school_id, normalized_email) unique index can't serve.
+        "idx_users_normalized_email",
         // Added by 000110 for ST-278: GIN index over the GENERATED search_tsv column backing
         // GET /api/search's full-text lookup by display name / email.
         "idx_users_search_tsv",

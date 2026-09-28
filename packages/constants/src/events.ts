@@ -11,6 +11,12 @@ export const DOMAIN_EVENTS = {
   INVITATION_SENT: "invitation.sent",
   INVITATION_REVOKED: "invitation.revoked",
 
+  // Account deletion (ST-301/ST-302). DELETION_REQUESTED carries the one-time link for a deletion
+  // requested from the public web page; DELETED is raised in the deletion transaction itself, from
+  // either entry point, and drives the confirmation email.
+  ACCOUNT_DELETION_REQUESTED: "account.deletionRequested",
+  ACCOUNT_DELETED: "account.deleted",
+
   SCHOOL_REGISTERED: "school.registered",
   SCHOOL_VERIFICATION_EMAIL_SENT: "school.verificationEmailSent",
   SCHOOL_EMAIL_VERIFIED: "school.emailVerified",

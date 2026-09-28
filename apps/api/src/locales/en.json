@@ -137,6 +137,7 @@
   "DSR_UNAVAILABLE": "The data subject request service is temporarily unavailable. Please try again later.",
   "DSR_ALREADY_PENDING": "A request of this type is already queued or processing for this user",
   "DSR_SUBJECT_NOT_FOUND": "This user does not belong to your school",
+  "APPLE_TOKEN_REVOCATION_FAILED": "Your Sign in with Apple access could not be revoked, so your account was not deleted. Please try again.",
   "ANNOUNCEMENT_CLASS_NOT_FOUND": "Class not found",
   "ANNOUNCEMENT_SCOPE_FORBIDDEN": "You can only send a non-mandatory announcement to a class you teach",
   "INVALID_GRADEBOOK_WEIGHT_TOTAL": "Assessment category weights must sum to exactly 100%",
