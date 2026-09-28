@@ -6,7 +6,7 @@ import type { TransactionSql } from "postgres";
 
 /**
  * Consent store for third-party AI data sharing (ST-305), over app.ai_data_sharing_consents
- * (migration 000116). Every function runs inside the caller's tenant transaction, so RLS scopes it
+ * (migration 000117). Every function runs inside the caller's tenant transaction, so RLS scopes it
  * to the school and each write's audit row commits or rolls back with it.
  */
 

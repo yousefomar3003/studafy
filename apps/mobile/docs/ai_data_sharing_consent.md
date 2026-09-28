@@ -50,7 +50,7 @@ re-prompts every user.
 
 ## Storage and audit
 
-`app.ai_data_sharing_consents` (migration `000116`): one row per grant with the disclosure
+`app.ai_data_sharing_consents` (migration `000117`): one row per grant with the disclosure
 snapshot (`disclosure_version`, `provider`, `data_categories`), `granted_at`, and `withdrawn_at`.
 Withdrawal stamps the row instead of deleting it (the app role has no `DELETE`), so the table is the
 user's full consent history; a partial unique index allows one live row per user. Every grant and
