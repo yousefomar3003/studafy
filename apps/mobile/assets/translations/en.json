@@ -239,6 +239,40 @@
     "schoolInactive": {
       "title": "AI features are paused",
       "body": "Your school's Studafy subscription isn't active right now, so AI features are paused for everyone at your school. Contact your school to have it reactivated."
+    },
+    "consent": {
+      "title": "Share your data with {provider}?",
+      "intro": "Studafy's AI features are powered by {provider}, a third-party AI provider. When you use them, the following is sent to {provider}:",
+      "categories": {
+        "questions": "Your questions and prompts — the text you type into AI features.",
+        "studyMaterials": "Study material content — the title and text of the materials you use AI on, including any names or personal details written in them.",
+        "accountIdentifier": "A random account ID — not your name or email — that the provider uses for abuse monitoring."
+      },
+      "control": "Nothing is sent until you allow it. You can withdraw at any time from the AI tab's data sharing page.",
+      "privacyPolicy": "{provider} privacy policy",
+      "allow": "Allow",
+      "decline": "Don't allow",
+      "saveError": "Couldn't save your choice. Please try again.",
+      "loadError": "Couldn't check your AI data-sharing choice.",
+      "locked": {
+        "title": "AI features are off",
+        "message": "This feature sends data to {provider}. Allow data sharing to use it.",
+        "review": "Review and allow"
+      }
+    },
+    "dataSharing": {
+      "title": "AI data sharing",
+      "granted": "You allowed data sharing on {date}.",
+      "notGranted": "Data sharing is not allowed, so AI features are off.",
+      "allow": "Allow data sharing",
+      "withdraw": "Withdraw consent",
+      "withdrawError": "Couldn't withdraw consent. Please try again.",
+      "withdrawConfirm": {
+        "title": "Withdraw consent?",
+        "message": "AI features will stop working and nothing more will be sent to {provider}. Data already sent can't be recalled.",
+        "confirm": "Withdraw",
+        "cancel": "Cancel"
+      }
     }
   },
   "exams": {

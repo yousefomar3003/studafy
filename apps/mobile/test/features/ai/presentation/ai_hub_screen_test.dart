@@ -71,9 +71,11 @@ void main() {
     );
 
     expect(find.byType(AiNotActiveCard), findsOneWidget);
-    // ST-304: a digital add-on sold on the web only — no control, link, price or steering copy.
-    expect(find.byType(ButtonStyleButton), findsNothing);
-    expect(find.byType(InkWell), findsNothing);
+    // ST-304: a digital add-on sold on the web only — no control, link, price or steering copy in
+    // the body. (The app bar's one control is the ST-305 data-sharing page.)
+    final body = find.byType(RefreshIndicator);
+    expect(find.descendant(of: body, matching: find.byType(ButtonStyleButton)), findsNothing);
+    expect(find.descendant(of: body, matching: find.byType(InkWell)), findsNothing);
     for (final steering in [r'$', 'Subscribe', 'Buy', 'Upgrade', 'website', 'Billed']) {
       expect(find.textContaining(steering), findsNothing, reason: steering);
     }
