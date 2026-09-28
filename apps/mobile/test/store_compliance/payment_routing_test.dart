@@ -51,6 +51,8 @@ void main() {
     const allowed = {
       'lib/src/core/auth/oauth_browser.dart': 'sign-in',
       'lib/src/core/update/forced_update_screen.dart': 'store listing',
+      'lib/src/features/ai/presentation/widgets/ai_consent_disclosure.dart':
+          "AI provider's privacy policy — informational, nothing sold",
       'lib/src/features/parent/presentation/widgets/finance_invoice_tile.dart':
           'school fees — a real-world service, exempt from in-app purchase',
       'lib/src/features/shell/presentation/profile_tab_screen.dart': 'account deletion',

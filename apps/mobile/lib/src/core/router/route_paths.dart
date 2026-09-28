@@ -32,6 +32,10 @@ abstract final class RoutePaths {
   /// the AI hub.
   static const aiUsage = '/me/ai/usage';
 
+  /// The signed-in user's AI data-sharing consent: what is shared with the third-party model
+  /// provider, and where consent is withdrawn (or granted). Reached from the AI hub's app bar.
+  static const aiDataSharing = '/me/ai/data-sharing';
+
   /// The signed-in parent's attendance-alert center (opened on its Alerts tab). Not one of the
   /// server-templated deep links below — an `ATTENDANCE_ALERT` push carries no resolvable route
   /// of its own yet (its template is the course-scoped `/courses/{courseId}/attendance`, but the

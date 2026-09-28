@@ -55,7 +55,17 @@ class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingOb
     final status = ref.watch(aiHubStatusProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text('ai.hub.title'.tr())),
+      appBar: AppBar(
+        title: Text('ai.hub.title'.tr()),
+        actions: [
+          // In every hub state, so consent can be withdrawn without an active add-on (ST-305).
+          IconButton(
+            tooltip: 'ai.dataSharing.title'.tr(),
+            icon: const Icon(Icons.privacy_tip_outlined),
+            onPressed: () => GoRouter.of(context).push(RoutePaths.aiDataSharing),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(aiHubStatusProvider.future),
         child: status.when(

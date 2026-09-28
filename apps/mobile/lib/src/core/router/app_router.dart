@@ -2,11 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/ai/presentation/ai_data_sharing_screen.dart';
 import '../../features/ai/presentation/ai_usage_screen.dart';
 import '../../features/ai/presentation/ask_ai_screen.dart';
 import '../../features/ai/presentation/exam_screen.dart';
 import '../../features/ai/presentation/flashcards_screen.dart';
 import '../../features/ai/presentation/quiz_screen.dart';
+import '../../features/ai/presentation/widgets/ai_consent_gate.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
 import '../../features/notifications/presentation/notification_destination_screen.dart';
@@ -63,34 +65,43 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
         builder: (context, state) => const StudentExamsScreen(),
       ),
 
+      // The AI feature screens below send the student's inputs to the third-party model provider,
+      // so each sits behind AiConsentGate (ST-305) and is only built once consent is recorded.
+
       // The signed-in student's Ask AI chat.
       GoRoute(
         path: RoutePaths.askAi,
-        builder: (context, state) => const AskAiScreen(),
+        builder: (context, state) => const AiConsentGate(child: AskAiScreen()),
       ),
 
       // The signed-in student's quiz player.
       GoRoute(
         path: RoutePaths.quiz,
-        builder: (context, state) => const QuizScreen(),
+        builder: (context, state) => const AiConsentGate(child: QuizScreen()),
       ),
 
       // The signed-in student's timed mock-exam experience.
       GoRoute(
         path: RoutePaths.examMode,
-        builder: (context, state) => const ExamScreen(),
+        builder: (context, state) => const AiConsentGate(child: ExamScreen()),
       ),
 
       // The signed-in student's flashcard deck browser and spaced-repetition review flow.
       GoRoute(
         path: RoutePaths.flashcards,
-        builder: (context, state) => const FlashcardsScreen(),
+        builder: (context, state) => const AiConsentGate(child: FlashcardsScreen()),
       ),
 
       // The signed-in student's AI usage meter.
       GoRoute(
         path: RoutePaths.aiUsage,
         builder: (context, state) => const AiUsageScreen(),
+      ),
+
+      // The signed-in user's AI data-sharing consent and its withdrawal (ST-305).
+      GoRoute(
+        path: RoutePaths.aiDataSharing,
+        builder: (context, state) => const AiDataSharingScreen(),
       ),
 
       // The signed-in parent's attendance-alert center, opened on its Alerts tab. Deep-linked

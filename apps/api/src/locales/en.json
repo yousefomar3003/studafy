@@ -179,6 +179,8 @@
   "AI_SUBSCRIPTION_INACTIVE": "AI access is not active for this student",
   "AI_QUOTA_EXCEEDED": "The AI monthly token budget is exhausted",
   "AI_QUOTA_UNAVAILABLE": "AI quota could not be checked right now",
+  "AI_CONSENT_REQUIRED": "Consent to share your AI inputs with the AI provider is required before using AI features",
+  "AI_CONSENT_DISCLOSURE_OUTDATED": "The AI data-sharing disclosure has changed; review it and consent again",
   "AI_LLM_DISABLED": "AI generation is currently disabled",
   "AI_LLM_UNAVAILABLE": "The AI provider is temporarily unavailable",
   "AI_LLM_REQUEST_REJECTED": "The AI provider declined this request",

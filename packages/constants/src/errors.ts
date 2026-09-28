@@ -328,6 +328,13 @@ export const ERROR_CODES = {
   AI_QUOTA_EXCEEDED: "AI_QUOTA_EXCEEDED",
   AI_QUOTA_UNAVAILABLE: "AI_QUOTA_UNAVAILABLE",
 
+  // Third-party AI data-sharing consent (ST-305). AI_CONSENT_REQUIRED is the consent gate's refusal:
+  // the caller has no live consent for the current disclosure, so nothing was sent to the model
+  // provider -- show the consent modal. AI_CONSENT_DISCLOSURE_OUTDATED is a grant that named a
+  // disclosure version other than the one currently served -- refetch it and ask again.
+  AI_CONSENT_REQUIRED: "AI_CONSENT_REQUIRED",
+  AI_CONSENT_DISCLOSURE_OUTDATED: "AI_CONSENT_DISCLOSURE_OUTDATED",
+
   // LLM gateway (ST-164). The generate route answers with one of three provider-stage codes:
   // AI_LLM_DISABLED when the kill switch is off (the feature is deliberately absent, not broken);
   // AI_LLM_UNAVAILABLE when the provider or the network around it is failing (transient -- retry,
