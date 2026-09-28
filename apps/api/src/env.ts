@@ -150,6 +150,12 @@ export const envSchema = z
     // misconfiguration is a loud failure to start rather than a quietly-inert route.
     MOCK_OAUTH_ISSUER_URL: z.string().url().optional(),
     MOCK_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // Shared password for the App Store / Play reviewer demo tenant (ST-303,
+    // review-login-service.ts). Unset means POST /api/auth/login/review is not mounted at all. Allowed
+    // in production by design -- that is where reviewers sign in -- and only ever authenticates the
+    // 'review' identities of the single school flagged is_review_tenant. Held in the secret manager,
+    // never in the repository (docs/runbooks/app-review-access.md).
+    REVIEW_LOGIN_PASSWORD: z.string().min(16).optional(),
     // Where to redirect after a successful OAuth callback. Not setting it disables the redirect.
     FRONTEND_URL: z.string().url().optional(),
     // Base URL for the pay-online redirect entry point served on outstanding invoices in the family

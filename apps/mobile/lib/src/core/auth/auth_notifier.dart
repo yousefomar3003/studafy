@@ -98,17 +98,37 @@ class AuthNotifier extends Notifier<AuthStatus> {
         nonce: start.nonce,
       );
 
-      await _session.saveTokens(
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken ?? '',
-        sessionId: tokens.sessionId,
-        expiresIn: tokens.expiresIn,
-      );
-
-      state = AuthStatus.authenticated;
+      await _completeLogin(tokens);
     } catch (_) {
       state = AuthStatus.unauthenticated;
     }
+  }
+
+  /// Email/password sign-in for the App Store / Play reviewer demo accounts (ST-303).
+  ///
+  /// Unlike [login], this does not pass through [AuthStatus.loading] or swallow failures: the
+  /// caller (the login screen's email form) owns its own progress state and turns the thrown
+  /// error into a specific message, rather than the generic "cancelled or failed" snackbar that
+  /// fits a browser flow the user can abandon.
+  Future<void> loginWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final tokens = await _authClient.loginWithEmail(
+      email: email,
+      password: password,
+    );
+    await _completeLogin(tokens);
+  }
+
+  Future<void> _completeLogin(MobileTokenResponse tokens) async {
+    await _session.saveTokens(
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken ?? '',
+      sessionId: tokens.sessionId,
+      expiresIn: tokens.expiresIn,
+    );
+    state = AuthStatus.authenticated;
   }
 
   Future<void> logout() async {

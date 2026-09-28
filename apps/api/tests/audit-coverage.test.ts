@@ -462,9 +462,14 @@ interface MutatingRoute {
  */
 function hasAuditActionForPath(lines: readonly string[], path: string): boolean {
   const colonPath = path.replace(/\{([^}]+)\}/g, ":$1");
+  // Hono's constrained form, `:param{regex}` (e.g. a UUID-only `:teacherId` that must not match
+  // a sibling literal like `/me`), is the same route and must count too.
+  const escapedPath = colonPath.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+  const constrainedPath = new RegExp(`"${escapedPath.replace(/:(\w+)/g, ':$1(?:\\{[^"]*\\})?')}"`);
 
   for (let i = 0; i < lines.length; i++) {
-    if (!lines[i]!.includes(`"${path}"`) && !lines[i]!.includes(`"${colonPath}"`)) continue;
+    const line = lines[i]!;
+    if (!line.includes(`"${path}"`) && !constrainedPath.test(line)) continue;
 
     const window = lines.slice(Math.max(0, i - 15), Math.min(lines.length, i + 16)).join("\n");
     if (/\bauditAction\s*\(/.test(window)) return true;

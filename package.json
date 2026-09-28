@@ -27,6 +27,7 @@
     "db:audit:partitions": "bun packages/db/src/cli.ts audit-partitions",
     "db:test:rls-coverage": "bun packages/db/src/cli.ts rls-coverage",
     "db:seed": "bun db/seeds/seed.ts",
+    "db:seed:review": "bun db/seeds/review-tenant.ts",
     "db:seed:index-check": "bun db/seeds/index-health.ts",
     "test:security": "bun run --cwd apps/api test:security",
     "check:alerts": "bun run scripts/check-alert-rules.ts",

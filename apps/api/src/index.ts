@@ -176,6 +176,7 @@ const app = createApp({
   jwtAudience: env.JWT_AUDIENCE,
   jwtAccessTtlSeconds: env.JWT_ACCESS_TTL_SECONDS,
   jwtRefreshTtlSeconds: env.JWT_REFRESH_TTL_SECONDS,
+  reviewLoginPassword: env.REVIEW_LOGIN_PASSWORD,
   securityEventSink,
   storage,
   stripeProvider,

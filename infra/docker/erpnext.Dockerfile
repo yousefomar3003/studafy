@@ -17,9 +17,11 @@
 # `bench get-app` layers a Python/Node app onto it in place, and every role that uses this image
 # needs the full bench, not a trimmed subset of it.
 
-ARG ERPNEXT_VERSION=version-15
-
-FROM frappe/erpnext:${ERPNEXT_VERSION}
+# Pinned by digest, not just the version-15 tag: upstream republishes that tag in place, and a
+# republish on 2026-09-28 grew the base enough to break this image's 3072MB CI size budget with no
+# change on our side. The digest makes builds reproducible; Renovate proposes each new upstream
+# digest as its own PR, where the size budget and scan run before it can merge.
+FROM frappe/erpnext:version-15@sha256:de8e0068467b4ea5a9d1b0a7c07e37b1ed8d2ea8d2f9d02c316bfd4d5a80f5f3
 
 # The backup/restore-drill ECS tasks (infra/terraform/modules/backup, ST-265) reuse this same bench
 # image to run `bench backup`/`bench restore`/`bench doctor` against a real Frappe site — no separate
@@ -42,6 +44,7 @@ WORKDIR /home/frappe/frappe-bench
 # source and installs its Python requirements into the bench's shared virtualenv; `build --app`
 # compiles its front-end assets. frappe/education dropped the plain "version-15" branch in favor
 # of per-minor branches, so we pin to the latest v15 line (version-15.2) to stay on the same major
+# line as the base image without drifting onto an incompatible Frappe framework version.
 # line as ERPNEXT_VERSION without drifting onto an incompatible Frappe framework version.
 #
 # The trailing rm drops what only the build needed — the pip/yarn/npm download caches and the

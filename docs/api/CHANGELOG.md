@@ -32,6 +32,12 @@ when it required the `version-bump` label.
   body: `request_id`, `status`, `requested_at`, `completes_by`, `ai_subscriptions_canceled` and
   `retained_records` (`RetainedRecord`: `category`, `description`, `legal_basis`). New `Account`
   tag and error code `APPLE_TOKEN_REVOCATION_FAILED`.
+- `POST /api/auth/login/review`: email/password login for the App Store / Play reviewer demo
+  tenant only (ST-303; see [`docs/runbooks/app-review-access.md`](../runbooks/app-review-access.md)).
+  Public, rate-limited `auth-strict`, and answers 404 unless `REVIEW_LOGIN_PASSWORD` is configured.
+  Returns the same token pair as `POST /api/auth/login/oauth`, whose response schema it reuses.
+- Error code `REVIEW_TENANT_BILLING_DISABLED` (403), returned by school checkout and online fee
+  payment for the reviewer demo tenant.
 - Student CSV column mapping and staging (ST-299; see
   [`docs/modules/student-import-mapping-guide.md`](../modules/student-import-mapping-guide.md)):
   - `PUT /api/imports/students/{importId}/mapping` re-maps an unconfirmed import's staged rows,
@@ -108,5 +114,8 @@ when it required the `version-bump` label.
 
 ### Fixed
 
+- `GET /api/teachers/me` answered `403 CHANNEL_NOT_AUTHORIZED` to mobile sessions (and required
+  `TEACHER_READ`), because the web-only `/api/teachers/{teacherId}` guards matched `me` as an id.
+  The id is now constrained to a UUID; `/me` is reachable from every channel as documented. ST-303.
 - `GET /api/imports/students` never returned a `next_cursor`: it fetched one row past the page and
   then compared the row count against that same inflated limit. It now pages. ST-299.
