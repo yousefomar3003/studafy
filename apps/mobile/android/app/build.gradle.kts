@@ -109,4 +109,7 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    // ST-307: lets ChildDirectedComplianceTest read the AAID the way an ads SDK would. Test APK
+    // only — its AD_ID permission merges into the androidTest manifest, never the app's.
+    androidTestImplementation("com.google.android.gms:play-services-ads-identifier:18.3.0")
 }
