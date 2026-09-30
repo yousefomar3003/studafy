@@ -76,9 +76,19 @@ jobs:
           echo "::error::vite preview did not become ready within 60s"
           cat ../../preview-server.log
           exit 1
+      # Ask Playwright for the binary instead of globbing its cache: the folder layout changes between
+      # releases (1.62 unpacks to chrome-linux64/, which a `*/chrome-linux/chrome` glob silently
+      # missed), and an empty CHROME_PATH makes Lighthouse fall back to whatever Chrome the runner
+      # image happens to ship — or fail outright when there is none.
       - name: Resolve the Playwright Chromium path
+        working-directory: apps/web
         run: |
-          echo "CHROME_PATH=$(find "$HOME/.cache/ms-playwright" -path '*/chrome-linux/chrome' -type f | head -n 1)" >> "$GITHUB_ENV"
+          chrome_path="$(bun -e "import { chromium } from '@playwright/test'; console.log(chromium.executablePath())")"
+          if [ ! -x "$chrome_path" ]; then
+            echo "::error::Playwright Chromium not found at '$chrome_path'"
+            exit 1
+          fi
+          echo "CHROME_PATH=$chrome_path" >> "$GITHUB_ENV"
       - name: Lighthouse budgets on the app-shell routes (LCP < 2.5s, TTI < 3s)
         run: bun run perf:lighthouse
         working-directory: apps/web
