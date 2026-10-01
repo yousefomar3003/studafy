@@ -16,7 +16,8 @@
       "profile": "Profile"
     },
     "profile": {
-      "deleteAccount": "Delete my account"
+      "deleteAccount": "Delete my account",
+      "privacyPolicy": "Privacy policy"
     }
   },
   "offline": {

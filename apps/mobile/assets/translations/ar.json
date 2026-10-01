@@ -16,7 +16,8 @@
       "profile": "الملف الشخصي"
     },
     "profile": {
-      "deleteAccount": "حذف حسابي"
+      "deleteAccount": "حذف حسابي",
+      "privacyPolicy": "سياسة الخصوصية"
     }
   },
   "offline": {

@@ -31,6 +31,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Delete my account'), findsOneWidget);
+      expect(find.text('Privacy policy'), findsOneWidget);
     });
 
     testWidgets('instructor gets Home, Classes, Profile — and a mutation FAB', (tester) async {
