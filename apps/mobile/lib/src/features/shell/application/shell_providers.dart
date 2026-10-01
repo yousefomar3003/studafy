@@ -2,8 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/auth_state.dart';
+import '../../../core/config/legal_links.dart';
 import '../../../core/di/app_providers.dart';
-import '../domain/account_delete_link.dart';
 import '../domain/shell_role.dart';
 
 /// The current session's role claims, or empty when not authenticated.

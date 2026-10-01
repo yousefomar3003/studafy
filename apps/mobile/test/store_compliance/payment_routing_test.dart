@@ -50,12 +50,14 @@ void main() {
     // is a rejection, whatever the button says.
     const allowed = {
       'lib/src/core/auth/oauth_browser.dart': 'sign-in',
+      'lib/src/features/auth/presentation/login_screen.dart': 'privacy policy',
       'lib/src/core/update/forced_update_screen.dart': 'store listing',
       'lib/src/features/ai/presentation/widgets/ai_consent_disclosure.dart':
           "AI provider's privacy policy — informational, nothing sold",
       'lib/src/features/parent/presentation/widgets/finance_invoice_tile.dart':
           'school fees — a real-world service, exempt from in-app purchase',
-      'lib/src/features/shell/presentation/profile_tab_screen.dart': 'account deletion',
+      'lib/src/features/shell/presentation/profile_tab_screen.dart':
+          'account deletion, privacy policy',
       'lib/src/features/student/presentation/material_viewer_screen.dart': 'file download',
       'lib/src/features/student/presentation/widgets/attachment_download_tile.dart':
           'file download',

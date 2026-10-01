@@ -4,12 +4,18 @@ import 'package:go_router/go_router.dart';
 
 import '../auth/auth_providers.dart';
 import '../config/app_config.dart';
+import '../config/legal_links.dart';
 import '../network/network_config.dart';
 import '../router/app_router.dart';
 import '../update/update_providers.dart';
 
 final appConfigProvider = Provider<AppConfig>((ref) {
   throw StateError('AppConfig must be provided during app bootstrap.');
+});
+
+/// The public privacy policy, opened in the system browser. See [buildPrivacyPolicyUrl].
+final privacyPolicyUrlProvider = Provider<Uri>((ref) {
+  return buildPrivacyPolicyUrl(webBaseUrl: ref.watch(appConfigProvider).webBaseUrl);
 });
 
 final networkConfigProvider = Provider<NetworkConfig>((ref) {

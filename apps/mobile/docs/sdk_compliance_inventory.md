@@ -86,8 +86,10 @@ Status values:
 | `mime` | 2.0.0 | MIME detection | None | Eligible, on-device only |
 | `flutter_pdfview` | 1.4.5 | PDF rendering (`AndroidPdfViewer` / PDFKit) | None | Eligible, on-device only |
 
-Dev dependencies such as `integration_test` and `shared_preferences` are not in this table.
-Flutter leaves dev-dependency plugins out of release builds.
+Dev dependencies such as `integration_test` are not in this table. Flutter leaves dev-dependency
+plugins out of release builds. `shared_preferences` is a dev dependency too, but `easy_localization`
+also depends on it to store the chosen locale, so it ships in release. It stores data on the device
+only.
 
 ## Native Android libraries
 
@@ -122,6 +124,10 @@ restricted identifier.
 The pods mirror the plugins above. No `FirebaseAnalytics` pod and no `AdSupport` or
 `AppTrackingTransparency` usage means no IDFA. `Info.plist` sets
 `FirebaseMessagingAutoInitEnabled` to `false`. `NSUserTrackingUsageDescription` must stay absent.
+
+`ios/Podfile` compiles out `file_picker`'s media and audio pickers. Without that, the build would
+also contain DKImagePickerController, DKPhotoGallery, SDWebImage and SwiftyGif. The privacy
+manifests for every pod are inventoried in `store/privacy-labels.md` (ST-308).
 
 ## Verification
 

@@ -34,7 +34,8 @@ reviewed independently of that, but the actual "first submission" can't happen u
 - [`screenshot-plan.md`](screenshot-plan.md) — the shot list per role journey, required sizes, and
   the rule against real student data in captures.
 - [`privacy-labels.md`](privacy-labels.md) — Apple App Privacy and Google Play Data Safety answers,
-  mapped from the actual SDKs and permissions in this app, not a generic template.
+  the iOS privacy manifest inventory, the deletion routes and policy URL, each mapped to the code it
+  comes from.
 - [`review-checklist.md`](review-checklist.md) — the pre-submission checklist, including one
   **blocking** open item (account deletion) that has to be resolved before either store submission,
   not just before this checklist is signed off.

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/auth/auth_notifier.dart';
@@ -93,6 +94,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             child: const Text('Continue with Mock'),
                           ),
                         ],
+                        const SizedBox(height: 24),
+                        TextButton(
+                          onPressed: () => launchUrl(
+                            ref.read(privacyPolicyUrlProvider),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          child: const Text('Privacy policy'),
+                        ),
                       ],
                     ),
                   ),

@@ -97,17 +97,22 @@ answering a reviewer's question about moderation.
 
 ## Privacy label accuracy
 
-- [ ] `privacy-labels.md` in this directory has been re-checked against the current `pubspec.yaml`
-      and current permission declarations (`AndroidManifest.xml`, `Info.plist`) — not just copied
-      from a prior submission.
-- [ ] Every data type declared in the App Privacy / Data Safety forms traces to an actual SDK or API
-      call in the codebase, not a guess. (`privacy-labels.md`'s table is the source for this.)
-- [ ] The tracking question is answered "No" on both forms, consistent with there being no ad/data-
-      broker SDK in `pubspec.yaml`.
-- [ ] The deletion-request question on both forms is answered "Yes" — self-service deletion now
-      exists in-app (mobile Profile tab -> web `/account/delete`) and via a public web page
-      (`/legal/delete-account`) — with the URL field pointed at `/legal/delete-account`, not
-      `/account/delete` (Play's reviewer won't have a session to reach the authenticated one).
+`privacy-labels.md` holds the answers for both forms, the manifest inventory, and the open items.
+`test/store_compliance/privacy_declarations_test.dart` keeps the manifest, the mapping and the URLs
+in sync. Before each submission:
+
+- [ ] `privacy-labels.md` has been re-derived from the current `pubspec.lock`, permissions and
+      API calls, not copied from a prior submission. App Privacy and Data safety in both consoles
+      match it field for field.
+- [ ] Xcode → Product → Archive → Generate Privacy Report has been run on the build being
+      submitted. Its contents match the App Privacy answers, and no SDK is listed with a
+      required-reason API that nothing declares.
+- [ ] Tracking is "No" on both forms.
+- [ ] Deletion is "Yes" on both forms, with the Play URL set to
+      `https://app.studafy.com/legal/delete-account`, not `/account/delete` (Play's reviewer has
+      no session to reach the authenticated page).
+- [ ] The privacy policy URL in both consoles is `https://app.studafy.com/privacy`, the same page
+      the app opens from the login screen and the Profile tab.
 
 ## Permissions sanity check
 
@@ -119,8 +124,10 @@ answering a reviewer's question about moderation.
       `NSPhotoLibraryUsageDescription` must be added in the same change, or the build will crash on
       first gallery access on iOS — a common late-cycle rejection cause.
 - [ ] `file_picker`'s document-picker flow needs no additional iOS usage-description string (it
-      uses `UIDocumentPickerViewController`, not photo-library APIs) — verify this hasn't changed if
-      the dependency is upgraded across a major version.
+      uses `UIDocumentPickerViewController`). `ios/Podfile` sets `Pod::PICKER_MEDIA = false` and
+      `Pod::PICKER_AUDIO = false`, so the photo-library and music-library pickers, and their
+      purpose-string requirements, are not compiled in. If a screen ever passes a `FileType` other
+      than `any`, remove the matching flag and add its usage string in the same change.
 
 ## Metadata and screenshots
 

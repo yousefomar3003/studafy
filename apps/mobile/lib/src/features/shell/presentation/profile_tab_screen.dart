@@ -3,14 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/di/app_providers.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/shell_providers.dart';
 
 /// The Profile tab, every role's shell. Still a placeholder for profile content itself (no
-/// account/profile feature has shipped yet), but carries one real action: requesting account
-/// deletion, opened in the system browser at `/account/delete` — a system-browser hand-off, never
-/// an in-app webview (see `docs/store_payment_routing.md` for the reviewed list of outbound
-/// launches).
+/// account/profile feature has shipped yet), but carries two real actions: requesting account
+/// deletion at `/account/delete` and reading the privacy policy at `/privacy`. Both open in the
+/// system browser, never an in-app webview (see `docs/store_payment_routing.md` for the reviewed
+/// list of outbound launches).
 ///
 /// Before this, the app had no account-deletion path anywhere — see
 /// `apps/mobile/store/review-checklist.md`'s blocking item on this. `/account/delete` requires a
@@ -25,6 +26,7 @@ class ProfileTabScreen extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final deleteUrl = ref.watch(accountDeleteUrlProvider);
+    final privacyPolicyUrl = ref.watch(privacyPolicyUrlProvider);
 
     return Center(
       child: Padding(
@@ -44,6 +46,10 @@ class ProfileTabScreen extends ConsumerWidget {
               onPressed: () => launchUrl(deleteUrl, mode: LaunchMode.externalApplication),
               icon: const Icon(Icons.open_in_new),
               label: Text('shell.profile.deleteAccount'.tr()),
+            ),
+            TextButton(
+              onPressed: () => launchUrl(privacyPolicyUrl, mode: LaunchMode.externalApplication),
+              child: Text('shell.profile.privacyPolicy'.tr()),
             ),
           ],
         ),

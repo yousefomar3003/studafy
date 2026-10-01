@@ -69,9 +69,10 @@ description above, so nothing further is needed there.
 
 ## Age rating / content rating
 
-Recommend **4+ (App Store) / Everyone (Play, PEGI 3)** and **not** enrolled in Apple's Kids
-Category or Google Play's Designed for Families program — same positioning as comparable
-school-management apps (Google Classroom, Seesaw): accounts are provisioned by the school
+Recommend **4+ (App Store) / Everyone (Play, PEGI 3)**, not in Apple's Kids Category. On Play,
+ST-307 (`docs/sdk_compliance_inventory.md`) concluded the Families policy applies because a user's
+age is unknown until sign-in, so the target audience includes the under-13 groups. The rest of the
+positioning matches comparable school-management apps (Google Classroom, Seesaw): accounts are provisioned by the school
 (`apps/api/src/modules/auth/invitation`), not created by a child signing up directly, there are no
 ads, no in-app purchases, and no open social features (parent "Messages"/"Alerts" in
 `parent_communication_screen.dart` are one-directional school-to-parent, not peer messaging).
@@ -87,8 +88,11 @@ age-rating questionnaire, both of which ask this directly.
 | ---------------------- | ---------------------------------------------------------------------- |
 | Support URL             | `https://studafy.com/support` — confirm this path exists before submission; not verified as part of this ticket. |
 | Marketing URL (optional) | `https://studafy.com`                                                |
-| Privacy policy URL      | `https://studafy.com/privacy` (`PrivacyPolicyPage.tsx`) — a working draft, legal-reviewed sign-off still recommended before relying on it as final; see `review-checklist.md`. |
-| Account deletion URL (Play Data Safety) | `https://studafy.com/legal/delete-account` — public, no sign-in required. |
+| Privacy policy URL      | `https://app.studafy.com/privacy` (`PrivacyPolicyPage.tsx`) — the same URL the app opens from the login screen and Profile tab (`legal_links.dart`). Legal sign-off still recommended; see `review-checklist.md`. |
+| Account deletion URL (Play Data Safety) | `https://app.studafy.com/legal/delete-account` — public, no sign-in required. |
+
+Both pages are served by `apps/web` at `app.studafy.com`, which had no DNS record on 2026-10-01;
+`studafy.com` is a separate site. See `privacy-labels.md`'s open items before entering either URL.
 
 ## Localization
 

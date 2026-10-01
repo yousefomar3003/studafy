@@ -9,5 +9,6 @@ void main() {
     expect(find.text('Studafy'), findsOneWidget);
     expect(find.text('Sign in with Microsoft'), findsOneWidget);
     expect(find.text('Sign in with Google'), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
   });
 }
