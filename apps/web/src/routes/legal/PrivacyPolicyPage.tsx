@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useSeo } from "../../components/Seo";
 import { MARKETING_CONTACT_EMAIL } from "../../lib/config";
 
-const LAST_UPDATED = "2026-09-27";
+const LAST_UPDATED = "2026-10-01";
 
 /**
  * Public privacy policy (`/privacy`) — required by both app stores' listing forms
@@ -74,10 +74,17 @@ export default function PrivacyPolicyPage() {
             through Studafy: invoice amounts and payment status. Card details are entered on our
             payment processor&rsquo;s own page, never stored by Studafy.
           </li>
+          <li>
+            <strong>Questions to the AI study tools</strong> (students), only after you agree to the
+            in-app notice: your question and the related study material are sent to our AI provider,
+            Anthropic, which processes them on our behalf to answer you.
+          </li>
         </ul>
         <p>
-          We do not collect your name, email address, or phone number directly — those are held by
-          your school and your identity provider, not typed into a Studafy form.
+          Your name and email address come from your school, which sets up your account, and from
+          your identity provider when you sign in. We use your email address to recognise your
+          account at sign-in and to send account messages, such as a deletion confirmation. We do
+          not collect your phone number.
         </p>
 
         <h2>Your rights</h2>
