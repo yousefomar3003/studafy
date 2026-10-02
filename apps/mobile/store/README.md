@@ -46,3 +46,6 @@ reviewed independently of that, but the actual "first submission" can't happen u
   fees) and which it must not route to at all (the AI add-on and every other digital good). Not
   duplicated here; `review-checklist.md` links to it.
 - `docs/runbooks/mobile-release.md` — the release mechanics (lanes, signing, forced-update floor).
+- `docs/compliance/store-audience-and-age-ratings.md` — Target audience, Ads, IARC and Apple Age
+  Rating answers. `docs/compliance/childrens-data-dossier.md` — the children's-data basis,
+  retention and age-screen decision behind them (ST-309).

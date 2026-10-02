@@ -63,8 +63,9 @@ other `app.*` table.
 - **Withdrawal is not retroactive.** Inputs already sent to Anthropic are not recalled, and Ask AI
   history Studafy stores itself (`app.ai_messages`, 90-day retention) is not deleted on withdrawal.
   The withdrawal dialog says the first; deleting stored history is the DSR/account-deletion path.
-- **Consent is per user, given by that user.** There is no parental-consent step for minors; if a
-  school's jurisdiction requires one, it is a separate ticket.
+- **Consent is per user, given by that user.** There is no parental-consent step for minors. Whether
+  the school's authorization covers AI processing for children is an open question for counsel in
+  `docs/compliance/childrens-data-dossier.md` (ST-309).
 - **Mid-session withdrawal on another device.** An open AI screen on this device keeps its state
   until its next request, which the API refuses (`403 AI_CONSENT_REQUIRED`, shown as a generic
   error by the feature screens); the gate reflects it the next time `aiConsentProvider` reloads.
