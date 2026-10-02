@@ -2,7 +2,9 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- No CAMERA permission: image_picker hands capture to the system camera app, which needs
+         none. Declaring CAMERA would make image_picker ask for it at runtime for no benefit. See
+         docs/permission_purpose_strings.md. -->
     <!-- ST-307: children use this app, so it must never read the advertising ID (Play Families
          policy). No current dependency declares AD_ID; this strips it if a future one does. Without
          the permission, apps targeting API 33+ get an all-zeros AAID. See docs/sdk_compliance_inventory.md. -->

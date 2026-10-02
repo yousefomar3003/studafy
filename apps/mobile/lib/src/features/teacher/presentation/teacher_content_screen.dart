@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
@@ -567,8 +568,19 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
   }
 
   Future<void> _takePhoto() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.camera);
-    if (image != null) {
+    final XFile? photo;
+    try {
+      photo = await ImagePicker().pickImage(source: ImageSource.camera);
+    } on PlatformException catch (error) {
+      // iOS doesn't show the camera prompt again once it's been declined; image_picker throws.
+      setState(
+        () => _error = error.code == 'camera_access_denied'
+            ? 'Camera access is off. Turn it on in Settings > Studafy > Camera to take a photo.'
+            : 'Could not open the camera.',
+      );
+      return;
+    }
+    if (photo case final image?) {
       final size = await File(image.path).length();
       setState(() {
         _file = _LocalFile(image.path, image.name, size);
