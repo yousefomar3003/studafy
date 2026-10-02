@@ -16,6 +16,17 @@ disclosure this ticket's privacy review exists to prevent. Use a dedicated demo/
 fabricated names, or the seed data `db/seeds/seed.ts` already produces for local dev, whichever is
 already staging-realistic.
 
+## Capture state
+
+- Answer the notification prompt before capturing. Until it's answered, every shell shows the
+  notification explanation banner (`push_permission_banner.dart`) at the top, which is not what a
+  settled user sees.
+- The reviewer tenant (`docs/runbooks/app-review-access.md`) is fabricated data and is the
+  simplest source. Its dates are fixed in July 2026, so due dates and "today" will read as past;
+  re-date the seed or pick screens where that doesn't show.
+- The student shot of `AiHubScreen` needs a student with the AI add-on active. Confirm the account
+  you capture with is subscribed; the reviewer student's entitlement was not checked here.
+
 ## Required sizes
 
 Both stores accept a device-independent capture set as long as it covers each required display
@@ -38,14 +49,14 @@ the tablet/iPad screenshot sets rather than stretching phone captures.
 1. `TodayScreen` — today's timetable + due-soon assignments + new grades (the home tab; the single
    best "what does this app do" first impression).
 2. `TimetableScreen` — the week view.
-3. `ExamsScreen` or `AssignmentDetailScreen` — one concrete assignment/exam, showing due date and
-   status.
+3. `StudentExamsScreen` or `AssignmentDetailScreen` — one concrete assignment/exam, showing due
+   date and status.
 4. `AiHubScreen` in its **subscribed** state — the feature grid (Ask AI, Exam mode, Summaries, Key
    concepts, Flashcards, Quizzes; see `ai/presentation/widgets/ai_feature_grid.dart`). Do **not**
    capture the unsubscribed state (`AiNotActiveCard`) for the listing — it's a notice, not a
    feature showcase, and adds nothing the description text doesn't already say better.
 5. `GradesScreen` — grades list.
-6. Optional: `AttendanceScreen`.
+6. Optional: `StudentAttendanceScreen`.
 
 ### Teacher journey (4–5 shots)
 
@@ -59,7 +70,7 @@ the tablet/iPad screenshot sets rather than stretching phone captures.
 
 1. `ParentHomeScreen` — the overview, showing the per-child selector.
 2. `ChildDetailScreen` — one child's timetable/grades/attendance.
-3. `ComparisonScreen` — the across-children comparison view, if a demo account has 2+ children
+3. `ChildComparisonScreen` — the across-children comparison view, if a demo account has 2+ children
    seeded (this is a genuinely distinctive feature worth a shot).
 4. `ParentCommunicationScreen` — the Messages/Alerts tabs (school announcements +
    attendance-alert notifications).
@@ -85,6 +96,11 @@ Capture the `en` set first. Whether an `ar` capture set is worth producing depen
 require localized screenshots for a localized listing, not just localized text; recapture the same
 shot list with the device locale set to `ar` and RTL layout, rather than reusing the `en` images
 under an `ar` listing (both stores' review guidelines flag that mismatch).
+
+Two screens ignore the device locale and render English only: the login screen
+(`login_screen.dart`) and the teacher's assignment/material composer
+(`teacher_content_screen.dart`). Neither is in the shot list above, so the `ar` set is unaffected,
+but don't add them to an `ar` capture until they are translated.
 
 ## How to capture
 

@@ -116,18 +116,20 @@ in sync. Before each submission:
 
 ## Permissions sanity check
 
-- [ ] `AndroidManifest.xml` requests exactly: `INTERNET`, `RECEIVE_BOOT_COMPLETED` (push
-      re-registration after reboot), `CAMERA`. No permission is requested that the app doesn't use.
-- [ ] `Info.plist` declares `NSCameraUsageDescription` and nothing else — correct, since
-      `image_picker` is used with `ImageSource.camera` only, never `ImageSource.gallery`
-      (confirmed: no other `ImagePicker` call site in `lib/`). If gallery picking is ever added,
-      `NSPhotoLibraryUsageDescription` must be added in the same change, or the build will crash on
-      first gallery access on iOS — a common late-cycle rejection cause.
-- [ ] `file_picker`'s document-picker flow needs no additional iOS usage-description string (it
-      uses `UIDocumentPickerViewController`). `ios/Podfile` sets `Pod::PICKER_MEDIA = false` and
-      `Pod::PICKER_AUDIO = false`, so the photo-library and music-library pickers, and their
-      purpose-string requirements, are not compiled in. If a screen ever passes a `FileType` other
-      than `any`, remove the matching flag and add its usage string in the same change.
+Full detail, strings and evidence: `docs/permission_purpose_strings.md` (ST-310). Pinned by
+`test/store_compliance/permission_purpose_strings_test.dart`.
+
+- [ ] `Info.plist` declares exactly `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`
+      and `NSAppleMusicUsageDescription`. Only the camera string is ever shown. The other two are
+      required because `image_picker_ios` links `PHPhotoLibrary`, and under Swift Package Manager
+      (Flutter's default since 3.44) `file_picker` compiles in its photo and audio pickers whatever
+      `ios/Podfile` says. Without them App Store Connect refuses the upload (ITMS-90683).
+- [ ] `AndroidManifest.xml` declares `INTERNET` and `RECEIVE_BOOT_COMPLETED`, and no `CAMERA` or
+      storage/media permission. The only runtime prompt in the merged APK is `POST_NOTIFICATIONS`.
+- [ ] The notification prompt is shown only after the in-app explanation banner's **Continue**, and
+      never before sign-in.
+- [ ] Sign-in opens in `SFSafariViewController` on iOS, never Mobile Safari (guideline 4.0).
+- [ ] `store/reviewer-walkthrough.md` signed off for both platforms on the build being submitted.
 
 ## Metadata and screenshots
 

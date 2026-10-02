@@ -36,11 +36,16 @@ reviewed independently of that, but the actual "first submission" can't happen u
 - [`privacy-labels.md`](privacy-labels.md) — Apple App Privacy and Google Play Data Safety answers,
   the iOS privacy manifest inventory, the deletion routes and policy URL, each mapped to the code it
   comes from.
-- [`review-checklist.md`](review-checklist.md) — the pre-submission checklist, including one
-  **blocking** open item (account deletion) that has to be resolved before either store submission,
-  not just before this checklist is signed off.
+- [`review-checklist.md`](review-checklist.md) — the pre-submission checklist: forms, policies and
+  the review risks this app carries.
+- [`reviewer-walkthrough.md`](reviewer-walkthrough.md) — the clean-device run-through of the
+  submitted build (sign-in, core path, push, AI consent, fees, no IAP, privacy policy, deletion),
+  with the per-platform sign-off.
 
 ## Related
+
+- `docs/permission_purpose_strings.md` — every permission's purpose string, where it is asked, and
+  the sign-in browser (ST-310).
 
 - `docs/store_payment_routing.md` — which payments the app may hand off to the browser (school
   fees) and which it must not route to at all (the AI add-on and every other digital good). Not

@@ -31,9 +31,10 @@ human submits.
 ## Verdict
 
 - **No ads, analytics, attribution or sign-in SDK is present.** No package is removed or replaced.
-- **Sign-in uses no SDK.** It is OAuth in the system browser (`lib/src/core/auth/oauth_browser.dart`),
-  built from `url_launcher` and `app_links`. That means Custom Tabs on Android and
-  ASWebAuthenticationSession on iOS. No `google_sign_in`, Facebook or other identity SDK controls
+- **Sign-in uses no SDK.** It is OAuth in a system browser (`lib/src/core/auth/oauth_browser.dart`),
+  built from `url_launcher` and `app_links`: `SFSafariViewController` on iOS and the default
+  browser app on Android (ST-310; this line previously said ASWebAuthenticationSession and Custom
+  Tabs, which the code never used). No `google_sign_in`, Facebook or other identity SDK controls
   access to the app.
 - **AAID.** None of the 43 Google and Sentry Maven artifacts the app resolves declares `AD_ID`, and
   `play-services-ads-identifier` is not among them. The app's manifest also strips the permission
@@ -116,7 +117,8 @@ Every permission the plugins and AARs declare:
 - `VIBRATE`
 - `com.google.android.c2dm.permission.RECEIVE`
 
-The app adds `CAMERA` and `RECEIVE_BOOT_COMPLETED` itself. None of these permissions exposes a
+The app adds `RECEIVE_BOOT_COMPLETED` itself. It no longer declares `CAMERA` (ST-310): camera
+capture goes through the system camera app, which needs no permission. None of these permissions exposes a
 restricted identifier.
 
 ## iOS
@@ -125,9 +127,12 @@ The pods mirror the plugins above. No `FirebaseAnalytics` pod and no `AdSupport`
 `AppTrackingTransparency` usage means no IDFA. `Info.plist` sets
 `FirebaseMessagingAutoInitEnabled` to `false`. `NSUserTrackingUsageDescription` must stay absent.
 
-`ios/Podfile` compiles out `file_picker`'s media and audio pickers. Without that, the build would
-also contain DKImagePickerController, DKPhotoGallery, SDWebImage and SwiftyGif. The privacy
-manifests for every pod are inventoried in `store/privacy-labels.md` (ST-308).
+`ios/Podfile` compiles out `file_picker`'s media and audio pickers, but only in a CocoaPods build.
+The release build uses Swift Package Manager, where `file_picker`'s `Package.swift` always includes
+them, so the build also contains DKImagePickerController, DKPhotoGallery, SDWebImage and SwiftyGif.
+None of them handles identifiers or ads; they are image-gallery UI that the app never opens. The
+privacy manifests for every plugin are inventoried in `store/privacy-labels.md` (ST-308); see
+`docs/permission_purpose_strings.md` (ST-310) for the SwiftPM finding.
 
 ## Verification
 
