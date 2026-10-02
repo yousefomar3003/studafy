@@ -1,7 +1,8 @@
 /**
- * Job dispatch for the `maintenance` queue (ST-268): the scheduled tenant-closure sweep and every
- * data subject request (export or erasure) it and the DSR API file. Mirrors the reports queue's
- * report-registry.ts dispatch shape -- one function the queue's Worker hands every job to.
+ * Job dispatch for the `maintenance` queue (ST-268): the scheduled tenant-closure sweep, every data
+ * subject request (export or erasure) it and the DSR API file, and the scheduled Ask AI message
+ * retention purge (ST-309). Mirrors the reports queue's report-registry.ts dispatch shape -- one
+ * function the queue's Worker hands every job to.
  */
 
 import { JOB_NAMES } from "@studafy/constants";
@@ -9,12 +10,14 @@ import postgres from "postgres";
 
 import { workerLogger } from "../../log";
 
+import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
 import { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 import { processDsrJob } from "./dsr-processor";
 
 import type { EnqueueDsrJob } from "./closure-sweep";
 import type { MaintenanceRunnerConfig } from "./dsr-processor";
 import type { Job } from "bullmq";
+import type { Sql } from "postgres";
 
 export { CLOSURE_ERASURE_RETENTION_HOLD_DAYS };
 
@@ -29,8 +32,15 @@ export async function processMaintenanceJob(
   enqueue: EnqueueDsrJob,
 ): Promise<MaintenanceJobResult> {
   if (job.name === JOB_NAMES.RUN_TENANT_CLOSURE_SWEEP) {
-    await runClosureSweep(config, enqueue);
+    await withPrimarySql(config, (sql) =>
+      runTenantClosureSweep(sql, new Date(), enqueue, workerLogger),
+    );
     return { processed: true };
+  }
+
+  if (job.name === JOB_NAMES.PURGE_EXPIRED_AI_MESSAGES) {
+    const result = await withPrimarySql(config, (sql) => purgeExpiredAiMessages(sql, workerLogger));
+    return { processed: true, ...result };
   }
 
   if (
@@ -43,10 +53,10 @@ export async function processMaintenanceJob(
   return { processed: false, reason: "unknown maintenance job" };
 }
 
-async function runClosureSweep(
+async function withPrimarySql<T>(
   config: MaintenanceRunnerConfig,
-  enqueue: EnqueueDsrJob,
-): Promise<void> {
+  fn: (sql: Sql) => Promise<T>,
+): Promise<T> {
   const sql = postgres(config.primaryDatabaseUrl, {
     max: 2,
     idle_timeout: 20,
@@ -56,7 +66,7 @@ async function runClosureSweep(
       : {}),
   });
   try {
-    await runTenantClosureSweep(sql, new Date(), enqueue, workerLogger);
+    return await fn(sql);
   } finally {
     await sql.end({ timeout: 5 });
   }

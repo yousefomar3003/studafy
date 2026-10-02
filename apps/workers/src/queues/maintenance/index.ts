@@ -1,3 +1,9 @@
+export { AI_MESSAGE_PURGE_BATCH_SIZE, purgeExpiredAiMessages } from "./ai-message-retention-sweep";
+export type { PurgeExpiredAiMessagesResult } from "./ai-message-retention-sweep";
+export {
+  AI_MESSAGE_RETENTION_SWEEP_CRON_PATTERN,
+  scheduleAiMessageRetentionSweepJob,
+} from "./ai-message-retention-sweep-scheduler";
 export { resolveAdminActor, armAdminActor, NoAdminActorError } from "./admin-actor";
 export { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 export type { ClosureSweepResult, EnqueueDsrJob } from "./closure-sweep";
