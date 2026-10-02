@@ -15,7 +15,7 @@ import {
 } from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
 import { scheduleAbandonedImportSweepJob } from "./queues/imports";
-import { scheduleClosureSweepJob } from "./queues/maintenance";
+import { scheduleAiMessageRetentionSweepJob, scheduleClosureSweepJob } from "./queues/maintenance";
 import {
   createSesSender,
   scheduleDigestJob,
@@ -212,6 +212,13 @@ void scheduleAnnouncementPublishJob(announcementPublishRedis).then(() =>
 // already `closed` before this sweep looks for it.
 const closureSweepRedis = createRedisConnection(env);
 void scheduleClosureSweepJob(closureSweepRedis).then(() => closureSweepRedis.disconnect());
+
+// Ask AI message retention scheduler (ST-309): idempotently register the daily 08:45 purge of
+// app.ai_messages rows past their 90-day `expires_at` on the maintenance queue.
+const aiMessageRetentionRedis = createRedisConnection(env);
+void scheduleAiMessageRetentionSweepJob(aiMessageRetentionRedis).then(() =>
+  aiMessageRetentionRedis.disconnect(),
+);
 
 console.log(
   `Workers started for queues: ${QUEUE_REGISTRY.map((definition) => definition.name).join(", ")} (${env.NODE_ENV})`,

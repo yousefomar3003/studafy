@@ -135,9 +135,10 @@ in sync. Before each submission:
       don't trust the counts in that file blindly after edits).
 - [ ] Screenshot set captured per `screenshot-plan.md`, from seeded/demo data only — confirm no real
       student, grade, attendance, or financial data appears in any captured image before upload.
-- [ ] Age rating / content rating questionnaire answers match the recommendation and reasoning in
-      `listing-metadata.md`, and have been confirmed by whoever owns compliance sign-off, not
-      assumed from this document alone.
+- [ ] Target audience, Ads, IARC and Apple Age Rating answers match
+      `docs/compliance/store-audience-and-age-ratings.md`, and its submission record is filled in.
+      `docs/compliance/childrens-data-dossier.md` has a signed counsel row for every operating
+      country.
 - [ ] Reviewer demo accounts provisioned and all four logins verified against the production API,
       and their App Review Notes / Play App-access entries filled in — see
       `docs/runbooks/app-review-access.md` (ST-303).
@@ -162,6 +163,6 @@ worth a deliberate look rather than assuming they're fine:
   students authenticating with that organization's existing account, which 4.8 does carve out) —
   don't submit assuming this is fine without checking it against the current guideline text at
   submission time, since Apple has changed this rule's exact wording before.
-- **Minors as end users** — see `listing-metadata.md`'s age-rating section; the Data Safety /
-  App Privacy forms both ask direct questions about data from users under 13/16/18 that should be
-  answered consistent with whatever that policy decision turns out to be.
+- **Minors as end users** — see `docs/compliance/childrens-data-dossier.md` (ST-309) for the
+  lawful basis, retention and age-screen decision, and its open items for what still blocks a
+  truthful submission.

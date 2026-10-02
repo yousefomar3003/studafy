@@ -69,18 +69,11 @@ description above, so nothing further is needed there.
 
 ## Age rating / content rating
 
-Recommend **4+ (App Store) / Everyone (Play, PEGI 3)**, not in Apple's Kids Category. On Play,
-ST-307 (`docs/sdk_compliance_inventory.md`) concluded the Families policy applies because a user's
-age is unknown until sign-in, so the target audience includes the under-13 groups. The rest of the
-positioning matches comparable school-management apps (Google Classroom, Seesaw): accounts are provisioned by the school
-(`apps/api/src/modules/auth/invitation`), not created by a child signing up directly, there are no
-ads, no in-app purchases, and no open social features (parent "Messages"/"Alerts" in
-`parent_communication_screen.dart` are one-directional school-to-parent, not peer messaging).
-
-This is a policy call with legal/compliance weight (COPPA in the US, and each store's own kids-app
-rules), not something to finalize from reading the code alone — confirm with whoever owns
-compliance sign-off before submitting Play's Data Safety / content rating questionnaire or Apple's
-age-rating questionnaire, both of which ask this directly.
+Expected **4+ (App Store) / Everyone (Play, PEGI 3)**, not in Apple's Kids Category, with the
+under-13 groups selected on Play. The question-by-question answers, and the record of what each
+console actually issued, are in `docs/compliance/store-audience-and-age-ratings.md` (ST-309). The
+children's-data basis behind them, which counsel must confirm before submission, is in
+`docs/compliance/childrens-data-dossier.md`.
 
 ## URLs
 

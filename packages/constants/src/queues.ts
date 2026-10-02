@@ -163,6 +163,10 @@ export const JOB_NAMES = {
   // One data subject request, erasure half (ST-268). Same payload shape as the export job above;
   // dispatched to a different processor because an erasure has no artifact to render and upload.
   RUN_DATA_SUBJECT_ERASURE: "run-data-subject-erasure",
+  // Scheduled purge of Ask AI messages past their 90-day `expires_at` (ST-309). Carries no payload:
+  // the sweep runs app.delete_expired_ai_messages() per school until a batch comes back short.
+  // Registered on the maintenance queue via Job Scheduler.
+  PURGE_EXPIRED_AI_MESSAGES: "purge-expired-ai-messages",
   // Cost & budget reporting sweep (ST-293). Carries `{ mode: "daily" | "monthly" }`: "daily"
   // publishes today's AI-spend/Stripe-fee CloudWatch metrics so the budget alarms
   // (infra/terraform/modules/monitoring/alerts.tf) stay current; "monthly" additionally logs the

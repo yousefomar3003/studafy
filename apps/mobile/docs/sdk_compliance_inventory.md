@@ -157,7 +157,7 @@ the app's UID, so the zeros check sees the app's permissions, not the test APK's
 
 1. **Play Console declarations.** Target audience must include the under-13 age groups. The Data
    safety answers must match `store/privacy-labels.md`. Families policy acceptance is a console
-   step.
+   step. The answers are in `docs/compliance/store-audience-and-age-ratings.md` (ST-309).
 2. **Sentry stores the client IP.** Sentry's server records the sender's IP address even with
    `sendDefaultPii = false`. Enable *Project Settings → Security & Privacy → Prevent Storing of IP
    Addresses* in each environment's Sentry project. Firebase has no equivalent setting to review.

@@ -105,8 +105,9 @@ Anthropic receives AI inputs as a service provider, so this is not sharing on Pl
 consent screen is the disclosure Apple 5.1.2(i) needs.
 
 **Target audience.** ST-307 concluded that Play's Families policy applies, because users' ages are
-unknown until sign-in. Select the under-13 age groups under Target audience and content, and keep
-these answers consistent with that.
+unknown until sign-in. The Target audience and content answers are in
+`docs/compliance/store-audience-and-age-ratings.md` (ST-309). Keep these answers consistent with
+them.
 
 ## Deletion routes (ST-301 / ST-302)
 
