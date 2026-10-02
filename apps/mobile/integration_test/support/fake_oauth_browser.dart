@@ -5,7 +5,7 @@ import 'mock_idp.dart';
 
 /// Drives the real mock OAuth round trip over plain HTTP instead of opening a system browser.
 ///
-/// [OAuthBrowser.authorize] launches `ASWebAuthenticationSession`/Custom Tabs and waits on an
+/// [OAuthBrowser.authorize] launches `SFSafariViewController`/the browser app and waits on an
 /// `app_links` deep-link callback — there is no way for an instrumented test to drive that UI
 /// chrome, and no need to: the mock IdP issues its authorization code immediately with no consent
 /// screen (see `resolveMockAuthorizationCode`'s doc comment). Everything downstream of this

@@ -43,7 +43,9 @@ Nothing is sold with an in-app purchase, so there is no store product to keep in
     `/api/subscriptions`) or a call to a generated `SubscriptionsClient` purchase method;
   - a `launchUrl` call site not on its reviewed allowlist (sign-in, store listing, school fees,
     account deletion, file downloads) — adding one means checking it isn't a purchase link first;
-  - an in-app-purchase or in-app webview dependency, or `LaunchMode.inAppWebView`/`inAppBrowserView`;
+  - an in-app-purchase or in-app webview dependency, `LaunchMode.inAppWebView` anywhere, or
+    `LaunchMode.inAppBrowserView` outside sign-in (`oauth_browser.dart` uses it on iOS so login
+    doesn't leave for Safari; ST-310);
   - currency or purchase-steering words ("subscribe", "buy", "website", "billed", …) in the `ai`
     translation copy.
 - **Widget and integration tests:** `ai_hub_screen_test.dart` asserts the unsubscribed state renders

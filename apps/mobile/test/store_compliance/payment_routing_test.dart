@@ -89,7 +89,11 @@ void main() {
     for (final file in handWritten) {
       final source = file.readAsStringSync();
       expect(source.contains('LaunchMode.inAppWebView'), isFalse, reason: file.path);
-      expect(source.contains('LaunchMode.inAppBrowserView'), isFalse, reason: file.path);
+      // Sign-in alone opens in SFSafariViewController on iOS (App Review 4.0 rejects a hand-off
+      // to Safari for login). Every other launch, payments included, leaves the app.
+      if (_normalize(file.path) != 'lib/src/core/auth/oauth_browser.dart') {
+        expect(source.contains('LaunchMode.inAppBrowserView'), isFalse, reason: file.path);
+      }
     }
   });
 
