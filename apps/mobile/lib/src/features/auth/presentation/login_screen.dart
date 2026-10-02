@@ -41,7 +41,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: status == AuthStatus.loading
-              ? const CircularProgressIndicator(semanticsLabel: 'Signing in')
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(semanticsLabel: 'Signing in'),
+                    const SizedBox(height: 24),
+                    // Closing the sign-in browser sends no callback, so without this the
+                    // spinner would never end.
+                    TextButton(
+                      key: const Key('cancelSignIn'),
+                      onPressed: () =>
+                          ref.read(authNotifierProvider.notifier).cancelLogin(),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                )
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
                   child: ConstrainedBox(

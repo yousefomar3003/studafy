@@ -5,6 +5,10 @@
   "shell": {
     "switchLanguage": "Switch language",
     "viewOnlyBanner": "View only — this account can’t make changes on Studafy Mobile.",
+    "pushPermission": {
+      "body": "Get a notification when a grade is posted, an assignment is due soon, or your school sends an announcement or attendance alert. Your phone will ask for permission next.",
+      "continue": "Continue"
+    },
     "placeholderBody": "This section is coming soon.",
     "tabs": {
       "home": "Home",

@@ -9,7 +9,11 @@
 	<key>CFBundleDisplayName</key>
 	<string>$(APP_DISPLAY_NAME)</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Studafy uses the camera to add teaching materials.</string>
+	<string>Take a photo of a worksheet, whiteboard or handout and upload it to your class as course material.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Studafy only opens a photo you choose to upload to your class as course material.</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Studafy only opens an audio file you choose to upload to your class as course material.</string>
 	<key>FirebaseMessagingAutoInitEnabled</key>
 	<false/>
 	<key>CFBundleExecutable</key>

@@ -2,9 +2,11 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/push/push_providers.dart';
 import '../application/shell_providers.dart';
 import '../domain/shell_role.dart';
 import 'locale_toggle_button.dart';
+import 'push_permission_banner.dart';
 import 'shell_destinations.dart';
 import 'view_only_banner.dart';
 
@@ -23,21 +25,22 @@ class AppShell extends ConsumerWidget {
   }
 }
 
-class _AppShellScaffold extends StatefulWidget {
+class _AppShellScaffold extends ConsumerStatefulWidget {
   const _AppShellScaffold({super.key, required this.shellRole});
 
   final ShellRole shellRole;
 
   @override
-  State<_AppShellScaffold> createState() => _AppShellScaffoldState();
+  ConsumerState<_AppShellScaffold> createState() => _AppShellScaffoldState();
 }
 
-class _AppShellScaffoldState extends State<_AppShellScaffold> {
+class _AppShellScaffoldState extends ConsumerState<_AppShellScaffold> {
   int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     final destinations = shellDestinationsFor(widget.shellRole);
+    final pushSetup = ref.watch(pushSetupProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -47,6 +50,7 @@ class _AppShellScaffoldState extends State<_AppShellScaffold> {
       body: Column(
         children: [
           if (widget.shellRole == ShellRole.viewer) const ViewOnlyBanner(),
+          if (pushSetup == PushSetup.needsPermission) const PushPermissionBanner(),
           Expanded(
             // IndexedStack keeps every tab mounted, so switching tabs preserves each tab's
             // own state (scroll position, in-progress input) instead of rebuilding it.

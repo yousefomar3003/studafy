@@ -43,16 +43,6 @@ void main() {
     expect(manifest, contains('E174.1'));
   });
 
-  test("file_picker's media and audio pickers stay out of the iOS build", () {
-    final podfile = _read('ios/Podfile');
-    final infoPlist = _read('ios/Runner/Info.plist');
-
-    expect(podfile, contains('Pod::PICKER_MEDIA = false'));
-    expect(podfile, contains('Pod::PICKER_AUDIO = false'));
-    expect(infoPlist, isNot(contains('NSPhotoLibraryUsageDescription')));
-    expect(infoPlist, isNot(contains('NSAppleMusicUsageDescription')));
-  });
-
   test('every iOS plugin in the release build has a manifest row', () {
     final dependencies = File('.flutter-plugins-dependencies');
     if (!dependencies.existsSync()) {

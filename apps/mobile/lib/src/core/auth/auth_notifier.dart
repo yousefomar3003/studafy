@@ -104,6 +104,10 @@ class AuthNotifier extends Notifier<AuthStatus> {
     }
   }
 
+  /// Abandon an in-progress [login] — the user closed the browser without signing in, which sends
+  /// the app no callback. [login] then settles as a failed sign-in.
+  void cancelLogin() => ref.read(oAuthBrowserProvider).cancel();
+
   /// Email/password sign-in for the App Store / Play reviewer demo accounts (ST-303).
   ///
   /// Unlike [login], this does not pass through [AuthStatus.loading] or swallow failures: the

@@ -17,14 +17,18 @@ consistent with. Nothing below mentions a price or where the AI add-on is bought
 no truncation risk. Matches `android/app/build.gradle.kts`'s release `app_name` string resource and
 `ios/Runner/Info.plist`'s `$(APP_DISPLAY_NAME)`.
 
-## Subtitle (App Store, 30 chars) / short description (Play, 80 chars)
+## Subtitle (App Store, 30 chars)
 
-> School, timetable, and grades in one app
+> Timetable, grades & attendance
 
-29 characters — fits the App Store subtitle field with no room to spare; if it needs to change,
-recount it. For Play's 80-character short description, the fuller version fits:
+30 characters, exactly the limit. App Store search indexes the app name, subtitle and keyword
+field together, so the keywords below don't repeat these three words.
 
-> Timetable, grades, attendance, and school messages for students, parents, and teachers
+## Short description (Play, 80 chars)
+
+> Timetable, grades, attendance and messages for students, parents and teachers
+
+77 characters.
 
 ## Full description (App Store: 4000 chars, no keyword stuffing rule enforced but reviewed; Play: 4000 chars)
 
@@ -36,8 +40,9 @@ per-role since the app itself branches that way — each paragraph should map to
 > your school sends you — Studafy accounts are set up by your school, not by signing up in the app.
 >
 > **For students:** see today's timetable, upcoming assignments and their due dates, new grades,
-> attendance, course materials, and exam schedules — all pulled live from your school's Studafy
-> account, and still readable offline from the last time you opened the app.
+> attendance, course materials, and exam schedules, all pulled live from your school's Studafy
+> account. Your timetable, grades and course materials stay readable offline, as of the last time
+> you opened them.
 >
 > **For teachers:** take attendance, enter grades, post class announcements, upload materials, and
 > file incident reports for your classes, from your phone.
@@ -51,15 +56,22 @@ per-role since the app itself branches that way — each paragraph should map to
 >
 > Studafy requires an active account with a participating school. It is not a public sign-up app.
 
-Length: ~1,050 characters — well inside both stores' 4,000-character limit, leaving room to add a
-release-specific paragraph later without restructuring.
+About 1,100 characters, well inside both stores' 4,000-character limit. Every claim maps to a
+shipped screen; the offline sentence is limited to what `docs/offline-strategy.md` actually caches
+(timetable, published grades, materials, announcements), not assignments, attendance or exams.
 
 ## Keywords (App Store keyword field, 100 chars, comma-separated, no spaces after commas)
 
-> school,student,timetable,grades,attendance,parent,teacher,classroom,assignments,gradebook
+> school,student,parent,teacher,classroom,assignments,gradebook,homework,exams,schedule,quiz
 
-99 characters. Play has no separate keyword field — its search indexing runs off the title and
-description above, so nothing further is needed there.
+90 characters. Each term maps to a shipped screen: assignments and homework
+(`AssignmentDetailScreen`), gradebook (`GradeEntryScreen`), exams (`StudentExamsScreen`), schedule
+(`TimetableScreen`), quiz (`QuizScreen`, AI add-on). Play has no separate keyword field; its search
+indexing runs off the title and description.
+
+The lengths in this file are pinned by `test/store_compliance/listing_metadata_test.dart`. An earlier
+draft claimed the subtitle was 29 characters and the short description fit in 80; they were 40 and
+86, and both consoles would have refused them.
 
 ## Category
 

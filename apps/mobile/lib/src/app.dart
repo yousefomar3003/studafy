@@ -21,21 +21,19 @@ class StudafyApp extends ConsumerStatefulWidget {
 
 class _StudafyAppState extends ConsumerState<StudafyApp> {
   StreamSubscription<String>? _tapSub;
-  bool _pushInitialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _subscribeToPushTaps();
-    // Deferred to a microtask: `_initPushOnAuth` writes `AsyncLoading` to `pushInitProvider`'s
+    // Deferred to a microtask: `_initPushOnAuth` writes `pushSetupProvider`'s
     // state, and Riverpod disallows modifying a provider from inside a widget life-cycle method
     // (didChangeDependencies included) — "Tried to modify a provider while the widget tree was
     // building." A microtask runs once this frame's build has finished, which is Riverpod's own
     // recommended fix for exactly this shape of mount-time kickoff.
     Future.microtask(_initPushOnAuth);
     // Activates the auth-status listener that keeps the crash reporter's identified user in
-    // sync — see `crashReportingUserSyncProvider`. Reading it is idempotent, so no init flag is
-    // needed the way `_initPushOnAuth` needs `_pushInitialized`.
+    // sync — see `crashReportingUserSyncProvider`. Reading it is idempotent.
     ref.read(crashReportingUserSyncProvider);
   }
 
@@ -56,21 +54,26 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
     });
   }
 
-  /// Initialize push when the user becomes authenticated.
+  /// Initialize push if the session is already authenticated when the app mounts (a restored
+  /// session). A sign-in during this run is handled by the listener in [build].
+  /// [PushSetupNotifier.initialize] is a no-op after its first call.
   void _initPushOnAuth() {
     // Runs after a microtask hop (see the call site in didChangeDependencies) — the widget can
     // have been disposed by then (a fast navigation away, or a test tearing down immediately).
     if (!mounted) return;
-    final status = ref.read(authStatusProvider);
-    if (status == AuthStatus.authenticated && !_pushInitialized) {
-      _pushInitialized = true;
-      ref.read(pushInitProvider.notifier).initialize();
+    if (ref.read(authStatusProvider) == AuthStatus.authenticated) {
+      ref.read(pushSetupProvider.notifier).initialize();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    ref.listen<AuthStatus>(authStatusProvider, (_, next) {
+      if (next == AuthStatus.authenticated) {
+        ref.read(pushSetupProvider.notifier).initialize();
+      }
+    });
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,

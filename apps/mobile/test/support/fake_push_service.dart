@@ -12,6 +12,15 @@ import 'package:studafy_mobile/src/core/push/push_service.dart';
 /// widget tree (which reads `pushServiceProvider` in `didChangeDependencies`) without a platform
 /// push stack at all, the same way it already fakes `AuthSession` and the crash reporter.
 class FakePushService implements PushService {
+  /// [canRequestPermission]'s answer: whether the OS prompt is still unanswered. Defaults to false,
+  /// so the shell shows no permission banner unless a test asks for one.
+  FakePushService({this.permissionUnanswered = false});
+
+  final bool permissionUnanswered;
+
+  /// How many times [requestPermission] ran — i.e. the OS prompt would have been shown.
+  int permissionRequests = 0;
+
   final _messageController = StreamController<RemoteMessage>.broadcast();
   final _tapController = StreamController<String>.broadcast();
 
@@ -23,6 +32,15 @@ class FakePushService implements PushService {
 
   @override
   Future<String?> initialize() async => null;
+
+  @override
+  Future<bool> canRequestPermission() async => permissionUnanswered;
+
+  @override
+  Future<String?> requestPermission() async {
+    permissionRequests++;
+    return null;
+  }
 
   @override
   Future<void> registerIfAuthenticated() async {}

@@ -12,8 +12,8 @@ import 'support/test_app.dart';
 /// Real device, real backend, real mock-OAuth PKCE round trip: the app opens on the login screen
 /// unauthenticated, "Continue with Mock" drives the actual `AuthNotifier.login('mock')` flow
 /// against the real API (only the system-browser hop is swapped for `FakeOAuthBrowser` — see that
-/// class's doc comment for why an instrumented test cannot drive `ASWebAuthenticationSession`/
-/// Custom Tabs chrome), and the router's real `authGuard` redirect lands on the real [AppShell].
+/// class's doc comment for why an instrumented test cannot drive `SFSafariViewController`/
+/// browser-app chrome), and the router's real `authGuard` redirect lands on the real [AppShell].
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 

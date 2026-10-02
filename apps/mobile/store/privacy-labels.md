@@ -57,7 +57,8 @@ used for tracking**. The only purpose is **App Functionality**. The manifest key
   app (`docs/store_payment_routing.md`). Displaying data the server already holds is not collection
   under either store's definition.
 - **Location, Contacts, Health, Sensitive Info, Browsing or Search History, Audio.** There is no
-  code path or permission for any of them. `file_picker`'s audio picker is compiled out (see
+  code path or permission for any of them. `file_picker`'s audio picker is compiled into a
+  SwiftPM build but never shown: the app only opens the document picker (see
   [Native build](#native-build)).
 - **Usage Data (Product Interaction, Advertising Data).** There is no analytics SDK. Firebase's
   own manifests list "Other Data" and "Other Diagnostic Data" for analytics. That is Google's
@@ -214,10 +215,15 @@ things:
 
 - **Sets `Pod::PICKER_MEDIA = false` and `Pod::PICKER_AUDIO = false`.** The app only calls
   `FilePicker.pickFiles` with the default `FileType.any`, which on iOS is the system document
-  picker. Without these flags the build pulls in DKImagePickerController, DKPhotoGallery,
-  SDWebImage and SwiftyGif. It would also reference Photos and MediaPlayer APIs, which need
-  `NSPhotoLibraryUsageDescription` and `NSAppleMusicUsageDescription`, strings this app does not
-  and should not declare.
+  picker. The flags keep the media and audio pickers out of a **CocoaPods** build. The release
+  build uses **Swift Package Manager** (the Xcode project links `FlutterGeneratedPluginSwiftPackage`,
+  and SwiftPM is the default on stable since Flutter 3.44.0; CI uses 3.44.8). There,
+  `file_picker`'s `Package.swift` always defines `PICKER_MEDIA` and `PICKER_AUDIO` and depends on
+  DKImagePickerController, so DKImagePickerController, DKPhotoGallery, SDWebImage and SwiftyGif
+  are linked, and the Photos and MediaPlayer APIs are referenced. `Info.plist` therefore declares
+  `NSPhotoLibraryUsageDescription` and `NSAppleMusicUsageDescription` (ST-310,
+  `docs/permission_purpose_strings.md`). `image_picker_ios` needs the photo-library key on its
+  own anyway. No user ever sees either prompt, and no photo-library or media data is collected.
 - **Maps the dev, staging and prod build configurations to debug or release.** Without the
   mapping, CocoaPods treats every unknown configuration as release.
 
@@ -228,7 +234,10 @@ Android has no manifest equivalent. Its declarations are the Data safety form ab
 
 1. **iOS has not been built with these changes.** The audit machine runs Windows, with no Xcode or
    CocoaPods. The first macOS build has to run `pod install`, archive, and generate the privacy
-   report before submission.
+   report before submission. The report will include the SwiftPM-linked DKImagePickerController,
+   DKPhotoGallery, SDWebImage and SwiftyGif (see [Native build](#native-build)), which the plugin
+   table above doesn't list because they aren't Flutter plugins. SDWebImage is on Apple's list of
+   SDKs that must ship a privacy manifest; confirm the report shows one for it.
 2. **No URL in this mapping resolves yet.** On 2026-10-01, `app.studafy.com` had no DNS record.
    `studafy.com/privacy` redirects to `www.studafy.com`, a site that is not built from this repo:
    it returns HTTP 200 and the same landing page for any path, including made-up ones. Deploy

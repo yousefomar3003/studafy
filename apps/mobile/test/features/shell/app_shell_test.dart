@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:studafy_mobile/src/core/push/push_providers.dart';
+import 'package:studafy_mobile/src/features/shell/presentation/app_shell.dart';
 
+import '../../support/fake_push_service.dart';
 import '../../support/pump_app_shell.dart';
 import '../../support/pump_studafy_app.dart';
 
@@ -142,5 +146,50 @@ void main() {
 
     expect(stack().index, 0);
     expect(navBar().selectedIndex, 0);
+  });
+
+  group('notification permission banner', () {
+    Future<FakePushService> pumpAndInitPush(
+      WidgetTester tester, {
+      required bool permissionUnanswered,
+    }) async {
+      final push = FakePushService(permissionUnanswered: permissionUnanswered);
+      addTearDown(push.dispose);
+      await pumpAppShell(
+        tester,
+        session: await fakeAuthenticatedSession(roles: const ['STUDENT']),
+        overrides: [pushServiceProvider.overrideWithValue(push)],
+      );
+      final container = ProviderScope.containerOf(tester.element(find.byType(AppShell)));
+      await container.read(pushSetupProvider.notifier).initialize();
+      await tester.pumpAndSettle();
+      return push;
+    }
+
+    const body =
+        'Get a notification when a grade is posted, an assignment is due soon, or your school '
+        'sends an announcement or attendance alert. Your phone will ask for permission next.';
+
+    testWidgets('explains notifications first, and only Continue shows the OS prompt', (
+      tester,
+    ) async {
+      final push = await pumpAndInitPush(tester, permissionUnanswered: true);
+
+      expect(find.text(body), findsOneWidget);
+      expect(push.permissionRequests, 0);
+
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+
+      expect(push.permissionRequests, 1);
+      expect(find.text(body), findsNothing);
+    });
+
+    testWidgets('is absent once the OS prompt has been answered', (tester) async {
+      final push = await pumpAndInitPush(tester, permissionUnanswered: false);
+
+      expect(find.text(body), findsNothing);
+      expect(push.permissionRequests, 0);
+    });
   });
 }

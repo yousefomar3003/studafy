@@ -4,9 +4,10 @@ platform :ios, '13.0'
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 # file_picker is only ever called with FileType.any, which on iOS is the system document picker.
-# Its media and audio pickers stay out of the build: media pulls in DKImagePickerController,
-# DKPhotoGallery, SDWebImage and SwiftyGif, and both reference Photos / MediaPlayer APIs whose
-# purpose strings this app does not declare. See store/privacy-labels.md.
+# These flags keep its media and audio pickers out of a CocoaPods build. They do nothing under
+# Swift Package Manager (Flutter's default since 3.44): file_picker's Package.swift always defines
+# PICKER_MEDIA and PICKER_AUDIO. That is why Info.plist declares the photo-library and music-library
+# purpose strings anyway. See docs/permission_purpose_strings.md.
 Pod::PICKER_MEDIA = false
 Pod::PICKER_AUDIO = false
 

@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
 import 'package:studafy_mobile/src/core/auth/auth_session.dart';
@@ -21,6 +22,7 @@ Future<void> pumpAppShell(
   WidgetTester tester, {
   required AuthSession session,
   Locale startLocale = AppLocales.fallback,
+  List<Override> overrides = const [],
 }) async {
   await tester.pumpWidget(
     KeyedSubtree(
@@ -34,6 +36,7 @@ Future<void> pumpAppShell(
             // for its base URL since ST-247's fix to that hardcoded-localhost bug, so this needs
             // a value the same way `pumpStudafyApp` already provides one.
             appConfigProvider.overrideWithValue(AppConfig.fromEnvironment(AppEnvironment.dev)),
+            ...overrides,
           ],
           child: Builder(
             builder: (context) {
