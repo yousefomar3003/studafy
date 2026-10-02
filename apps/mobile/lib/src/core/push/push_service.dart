@@ -6,12 +6,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../api/auth_interceptor.dart';
 import '../router/route_paths.dart';
 
 const _androidChannelId = 'studafy_push';
 const _androidChannelName = 'Push Notifications';
+const _permissionRequestedKey = 'push_permission_requested';
 
 /// The route to deep-link to for a tapped notification's FCM `data` payload, or null to navigate
 /// nowhere.
@@ -30,7 +32,7 @@ String? resolveNotificationTapRoute(Map<String, dynamic> data) {
   return route is String && route.isNotEmpty ? route : null;
 }
 
-/// [pushServiceProvider]'s contract — the surface [StudafyApp] and [PushInitNotifier] depend on.
+/// [pushServiceProvider]'s contract — the surface [StudafyApp] and [PushSetupNotifier] depend on.
 ///
 /// A real deployment always gets [FirebasePushService]; widget tests override the provider with a
 /// no-op fake instead (`test/support/fake_push_service.dart`) — reaching the Firebase Messaging
@@ -43,10 +45,18 @@ abstract class PushService {
   /// Stream of deep-link routes extracted from notification taps.
   Stream<String> get onNotificationTap;
 
-  /// Initialize Firebase, request permission, get token, register with API.
+  /// Initialize Firebase and, if notification permission is already granted, get the token and
+  /// register it with the API. Never shows the OS permission prompt — see [requestPermission].
   ///
-  /// Returns the FCM token on success, null if permission denied or init failed.
+  /// Returns the FCM token on success, null if permission isn't granted or init failed.
   Future<String?> initialize();
+
+  /// Whether the OS notification prompt is still unanswered, so [requestPermission] would show it.
+  /// The app explains what notifications are for before it calls [requestPermission].
+  Future<bool> canRequestPermission();
+
+  /// Show the OS notification permission prompt and, if granted, register as [initialize] does.
+  Future<String?> requestPermission();
 
   /// Manually trigger registration (e.g. after login when the service was
   /// already initialized but had no auth token at the time).
@@ -65,11 +75,14 @@ class FirebasePushService implements PushService {
   FirebasePushService({
     required Uri apiBaseUrl,
     required TokenProvider getToken,
+    FlutterSecureStorage? storage,
   }) : _getToken = getToken,
-       _dio = Dio(BaseOptions(baseUrl: apiBaseUrl.toString()));
+       _dio = Dio(BaseOptions(baseUrl: apiBaseUrl.toString())),
+       _storage = storage ?? const FlutterSecureStorage();
 
   final TokenProvider _getToken;
   final Dio _dio;
+  final FlutterSecureStorage _storage;
 
   // Lazily resolved in `_ensureFirebase()` rather than in the constructor so constructing the
   // service never touches Firebase — the root widget subscribes to push taps on the first frame,
@@ -96,9 +109,6 @@ class FirebasePushService implements PushService {
   @override
   Stream<String> get onNotificationTap => _tapController.stream;
 
-  /// Initialize Firebase, request permission, get token, register with API.
-  ///
-  /// Returns the FCM token on success, null if permission denied or init failed.
   @override
   Future<String?> initialize() async {
     if (_initialized) return await _messaging.getToken();
@@ -108,16 +118,50 @@ class FirebasePushService implements PushService {
 
     await _initLocalNotifications();
 
+    final settings = await _messaging.getNotificationSettings();
+    if (settings.authorizationStatus != AuthorizationStatus.authorized) {
+      return null;
+    }
+
+    return _startMessaging();
+  }
+
+  @override
+  Future<bool> canRequestPermission() async {
+    await _ensureFirebase();
+    final settings = await _messaging.getNotificationSettings();
+    return switch (settings.authorizationStatus) {
+      // iOS, before the prompt has been shown.
+      AuthorizationStatus.notDetermined => true,
+      // Android 13+ reports a POST_NOTIFICATIONS permission it has never asked for as denied, the
+      // same as a refusal, so whether the app has asked is remembered here.
+      AuthorizationStatus.denied =>
+        defaultTargetPlatform == TargetPlatform.android &&
+            !await _storage.containsKey(key: _permissionRequestedKey),
+      _ => false,
+    };
+  }
+
+  @override
+  Future<String?> requestPermission() async {
+    await _ensureFirebase();
+    await _storage.write(key: _permissionRequestedKey, value: 'true');
+
     final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
-
     if (settings.authorizationStatus != AuthorizationStatus.authorized) {
       return null;
     }
 
+    return _startMessaging();
+  }
+
+  /// Listen for messages and token refreshes, register the token, and handle the notification
+  /// that launched the app, if any. Runs once permission is granted.
+  Future<String?> _startMessaging() async {
     // `onMessage` / `onMessageOpenedApp` are static on `FirebaseMessaging`; only
     // `onTokenRefresh` is an instance stream.
     _foregroundSub = FirebaseMessaging.onMessage.listen(_onForegroundMessage);
@@ -161,14 +205,17 @@ class FirebasePushService implements PushService {
 
   // -- Internal --------------------------------------------------------------
 
-  /// Resolves the lazily-initialized Firebase-backed members. Idempotent — `Firebase.initializeApp`
+  Future<void>? _firebaseReady;
+
+  /// Resolves the lazily-initialized Firebase-backed members, once. `Firebase.initializeApp`
   /// returns the existing default app on repeat calls, so both the deferred bootstrap setup and
-  /// `initialize()` can trigger it without coordination.
-  Future<void> _ensureFirebase() async {
+  /// `initialize()` can trigger it without coordination; the members themselves are `late final`
+  /// and must be assigned only the first time.
+  Future<void> _ensureFirebase() => _firebaseReady ??= () async {
     await Firebase.initializeApp();
     _messaging = FirebaseMessaging.instance;
     _localNotifications = FlutterLocalNotificationsPlugin();
-  }
+  }();
 
   Future<void> _initLocalNotifications() async {
     const androidSettings = AndroidInitializationSettings(

@@ -33,27 +33,58 @@ final pushServiceProvider = Provider<PushService>((ref) {
   return service;
 });
 
-/// Notifier that manages push initialization state.
-///
-/// Separate from [PushService] so the app can await initialization without
-/// blocking the provider graph. The service is created eagerly; init is called
-/// explicitly from the bootstrap or auth flow.
-class PushInitNotifier extends AsyncNotifier<void> {
-  @override
-  Future<void> build() async {}
+/// Where push setup stands for this app session.
+enum PushSetup {
+  /// Not started: the user isn't signed in yet.
+  idle,
 
-  /// Initialize push (request permission, get token, register).
-  /// No-op if already initialized.
+  /// Initializing, or waiting on the OS permission prompt.
+  inProgress,
+
+  /// The OS permission prompt is unanswered. The shell explains what notifications are for and
+  /// offers to continue to the prompt ([PushSetupNotifier.requestPermission]).
+  needsPermission,
+
+  /// Finished: registered, or permission refused or unavailable.
+  done,
+}
+
+/// Drives push setup once the user is signed in: registers straight away when permission is
+/// already granted, and otherwise holds at [PushSetup.needsPermission] until the user has read why
+/// the app asks. The OS prompt is never shown cold.
+class PushSetupNotifier extends Notifier<PushSetup> {
+  @override
+  PushSetup build() => PushSetup.idle;
+
+  /// Initialize push and register if permission is already granted. No-op after the first call.
   Future<void> initialize() async {
-    if (state.hasValue) return;
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    if (state != PushSetup.idle) return;
+    state = PushSetup.inProgress;
+    try {
       final service = ref.read(pushServiceProvider);
-      await service.initialize();
-    });
+      final token = await service.initialize();
+      state = token == null && await service.canRequestPermission()
+          ? PushSetup.needsPermission
+          : PushSetup.done;
+    } catch (_) {
+      state = PushSetup.done;
+    }
+  }
+
+  /// Show the OS permission prompt, then register if granted.
+  Future<void> requestPermission() async {
+    if (state != PushSetup.needsPermission) return;
+    state = PushSetup.inProgress;
+    try {
+      await ref.read(pushServiceProvider).requestPermission();
+    } catch (_) {
+      // Push is best-effort; a failure here leaves the app usable without it.
+    } finally {
+      state = PushSetup.done;
+    }
   }
 }
 
-final pushInitProvider = AsyncNotifierProvider<PushInitNotifier, void>(
-  PushInitNotifier.new,
+final pushSetupProvider = NotifierProvider<PushSetupNotifier, PushSetup>(
+  PushSetupNotifier.new,
 );

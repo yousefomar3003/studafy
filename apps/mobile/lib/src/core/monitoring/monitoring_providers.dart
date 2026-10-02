@@ -15,7 +15,7 @@ final crashReporterProvider = Provider<CrashReporter>((ref) {
 /// correlated to a session without carrying PII.
 ///
 /// Read once, for its side effect, from `StudafyApp` — the same activation pattern
-/// `pushInitProvider` uses. Not `autoDispose`: it must keep listening for the app's lifetime.
+/// `pushSetupProvider` uses. Not `autoDispose`: it must keep listening for the app's lifetime.
 final crashReportingUserSyncProvider = Provider<void>((ref) {
   void sync(AuthStatus status) {
     final crashReporter = ref.read(crashReporterProvider);
