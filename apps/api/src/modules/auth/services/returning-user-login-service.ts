@@ -24,10 +24,10 @@ import { emitAuditLog } from "../../../middleware/auditEmitter";
 
 import { issueTokenPair } from "./session-service";
 
+import type { DeviceContext, IssuedTokenPair, SessionTokenConfig } from "./session-service";
 import type { Database } from "../../../db/client";
 import type { Logger } from "../../../logger";
 import type { AuthChannel } from "../channels";
-import type { DeviceContext, IssuedTokenPair, SessionTokenConfig } from "./session-service";
 import type { Role } from "@studafy/constants";
 
 // ---------------------------------------------------------------------------

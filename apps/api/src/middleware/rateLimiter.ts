@@ -8,10 +8,10 @@ import {
 } from "../config/rateLimits";
 import { emitRateLimitBlock } from "../modules/auth/auth-anomaly-events";
 
+import type { AppEnv } from "./requestId";
 import type { RouteClass } from "../config/rateLimits";
 import type { SecurityEventSink } from "../lib/security/securityEventSink";
 import type { RedisClient } from "../redis";
-import type { AppEnv } from "./requestId";
 import type { MiddlewareHandler } from "hono";
 
 /**

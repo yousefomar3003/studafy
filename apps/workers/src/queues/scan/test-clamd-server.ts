@@ -69,11 +69,27 @@ export async function startFakeClamd(
   };
 }
 
-/** A server that accepts connections and never answers — for the timeout path. */
+/**
+ * A server that accepts connections and never answers — for the timeout path.
+ *
+ * `close` destroys the accepted sockets itself: `server.close()` waits for open connections, and
+ * the client destroying its end does not reliably end the server side, so it would hang otherwise.
+ */
 export async function startSilentServer(): Promise<{ port: number; close: () => Promise<void> }> {
-  const server: Server = createServer(() => undefined);
+  const sockets = new Set<Socket>();
+  const server: Server = createServer((socket: Socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+  });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   const port = typeof address === "object" && address !== null ? address.port : 0;
-  return { port, close: () => new Promise((resolve) => server.close(() => resolve())) };
+  return {
+    port,
+    close: () =>
+      new Promise((resolve) => {
+        for (const socket of sockets) socket.destroy();
+        server.close(() => resolve());
+      }),
+  };
 }
