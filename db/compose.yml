@@ -24,7 +24,7 @@ services:
     environment:
       POSTGRES_USER: studafy_test
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studafy_test}
-      POSTGRES_DB: postgres
+      POSTGRES_DB: studafy
     ports:
       - "127.0.0.1:54329:5432"
     healthcheck:
