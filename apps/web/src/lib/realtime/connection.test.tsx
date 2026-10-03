@@ -115,6 +115,46 @@ describe("useRealtimeConnection", () => {
     expect(socket.readyState).toBe(3);
   });
 
+  test("stays idle without asking for a token until enabled, and disconnects when disabled", async () => {
+    const socket = new FakeSocket();
+    let tokenRequests = 0;
+    const client = new RealtimeClient({
+      baseUrl: "ws://localhost:3001",
+      getToken: () => {
+        tokenRequests += 1;
+        return "jwt";
+      },
+      queryClient: new QueryClient(),
+      socketFactory: () => socket,
+    });
+
+    const { rerender } = render(
+      <RealtimeProvider client={client} enabled={false}>
+        <StatusProbe />
+      </RealtimeProvider>,
+    );
+    expect(client.getStatus()).toBe("idle");
+    expect(tokenRequests).toBe(0);
+
+    rerender(
+      <RealtimeProvider client={client} enabled>
+        <StatusProbe />
+      </RealtimeProvider>,
+    );
+    await waitFor(() => expect(client.getStatus()).toBe("connecting"));
+    act(() => socket.emitOpen());
+    expect(client.getStatus()).toBe("connected");
+    expect(tokenRequests).toBe(1);
+
+    rerender(
+      <RealtimeProvider client={client} enabled={false}>
+        <StatusProbe />
+      </RealtimeProvider>,
+    );
+    expect(client.getStatus()).toBe("idle");
+    expect(socket.readyState).toBe(3);
+  });
+
   test("throws outside a RealtimeProvider", () => {
     // React logs the boundary-caught error in dev; keep the suite output clean.
     let errorCalls = 0;

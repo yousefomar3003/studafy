@@ -2,7 +2,7 @@ import { ToastProvider } from "@studafy/ui";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useState, type PropsWithChildren } from "react";
 
-import { AuthProvider, sessionStore } from "../lib/auth";
+import { AuthProvider, sessionStore, useAuthStatus } from "../lib/auth";
 import { LocaleProvider } from "../lib/i18n";
 import { MonitoringUserSync } from "../lib/monitoring";
 import { RealtimeClient, RealtimeProvider } from "../lib/realtime";
@@ -58,11 +58,29 @@ export function AppProviders({
         <ToastProvider>
           <AuthProvider store={store}>
             <MonitoringUserSync />
-            <RealtimeProvider client={realtimeClient}>{children}</RealtimeProvider>
+            <SessionRealtimeProvider client={realtimeClient}>{children}</SessionRealtimeProvider>
           </AuthProvider>
         </ToastProvider>
       </QueryClientProvider>
     </LocaleProvider>
+  );
+}
+
+/**
+ * Connects the realtime socket only while the session is authenticated. The session store restores
+ * lazily (a guard or an authenticated request asks first), so connecting unconditionally on mount
+ * would make every public page — the marketing home included — call the refresh endpoint just to
+ * learn there is no session. Signing out (or the session expiring) disconnects the socket.
+ */
+function SessionRealtimeProvider({
+  client,
+  children,
+}: PropsWithChildren<{ client: RealtimeClient }>) {
+  const status = useAuthStatus();
+  return (
+    <RealtimeProvider client={client} enabled={status === "authenticated"}>
+      {children}
+    </RealtimeProvider>
   );
 }
 

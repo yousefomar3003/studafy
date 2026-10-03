@@ -18,15 +18,23 @@ const RealtimeContext = createContext<RealtimeClient | null>(null);
  * disconnects on unmount. `connect`/`disconnect` are idempotent, so React 18 StrictMode's
  * double-invoke is safe. Mount this under `QueryClientProvider` — the client invalidates through
  * the `QueryClient` it was constructed with.
+ *
+ * `enabled` gates the connection: while false the client stays `idle` and never asks for a token.
+ * The app passes the session status here so a public page load does not resolve a token — which
+ * would rotate the refresh cookie and put a cross-origin request on the marketing LCP path.
  */
 export function RealtimeProvider({
   client,
+  enabled = true,
   children,
-}: PropsWithChildren<{ client: RealtimeClient }>) {
+}: PropsWithChildren<{ client: RealtimeClient; enabled?: boolean }>) {
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     client.connect();
     return () => client.disconnect();
-  }, [client]);
+  }, [client, enabled]);
 
   return <RealtimeContext.Provider value={client}>{children}</RealtimeContext.Provider>;
 }
