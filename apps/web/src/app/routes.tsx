@@ -10,86 +10,223 @@ import { PortalLayout } from "../layouts/PortalLayout";
 import { RootLayout } from "../layouts/RootLayout";
 import { SetupWizardLayout } from "../layouts/SetupWizardLayout";
 import { RequireAuth, RequirePermission } from "../lib/auth";
+import { loadCatalogAreas } from "../lib/i18n";
 import HomePage from "../routes/marketing/HomePage";
 
+import type { CatalogArea } from "../lib/i18n";
+import type { ComponentType } from "react";
 import type { RouteObject } from "react-router-dom";
 
 // Secondary route groups are code-split so the initial (marketing) route stays small.
+// Translation catalogs each route group needs beyond the bundled shell (see lib/i18n/catalog-loader).
+const ADMIN_CATALOGS: readonly CatalogArea[] = ["adminPeople", "adminSchool"];
+const PRINCIPAL_CATALOGS: readonly CatalogArea[] = ["principal"];
+const FINANCE_CATALOGS: readonly CatalogArea[] = ["finance", "financeReports"];
+const ONBOARDING_CATALOGS: readonly CatalogArea[] = ["onboarding"];
+
+/**
+ * `React.lazy` that also fetches the page's translation catalogs for the active language, in
+ * parallel with its code chunk, so the page never renders before its strings exist.
+ */
+function lazyWithCatalogs<T extends ComponentType>(
+  areas: readonly CatalogArea[],
+  importPage: () => Promise<{ default: T }>,
+) {
+  return lazy(() => Promise.all([importPage(), loadCatalogAreas(areas)]).then(([page]) => page));
+}
+
 const FeaturesPage = lazy(() => import("../routes/marketing/FeaturesPage"));
 const PricingPage = lazy(() => import("../routes/marketing/PricingPage"));
 const AboutPage = lazy(() => import("../routes/marketing/AboutPage"));
 const AuthLoginPage = lazy(() => import("../routes/auth/LoginPage"));
 const AuthCallbackPage = lazy(() => import("../routes/auth/CallbackPage"));
 const AuthErrorPage = lazy(() => import("../routes/auth/ErrorPage"));
-const InvitePage = lazy(() => import("../routes/invite/InvitePage"));
-const InviteCompletePage = lazy(() => import("../routes/invite/InviteCompletePage"));
-const OnboardingPage = lazy(() => import("../routes/onboarding/OnboardingPage"));
-const SetupWizardPage = lazy(() => import("../routes/onboarding-setup/SetupWizardPage"));
-const PortalPage = lazy(() => import("../routes/portal/PortalPage"));
-const AdminDashboardPage = lazy(() => import("../features/admin/AdminDashboardPage"));
-const UsersListPage = lazy(() => import("../features/admin/users/UsersListPage"));
-const InvitationsListPage = lazy(() => import("../features/admin/invitations/InvitationsListPage"));
-const StudentsListPage = lazy(() => import("../features/admin/students/StudentsListPage"));
-const StudentProfilePage = lazy(() => import("../features/admin/students/StudentProfilePage"));
-const ImportStudentsPage = lazy(() => import("../features/admin/students/ImportStudentsPage"));
-const TimetableBuilderPage = lazy(() => import("../features/admin/timetable/TimetableBuilderPage"));
-const SchoolSettingsPage = lazy(() => import("../features/admin/settings/SchoolSettingsPage"));
-const AuditLogExplorerPage = lazy(() => import("../features/admin/audit/AuditLogExplorerPage"));
-const AnnouncementsPage = lazy(() => import("../features/admin/announcements/AnnouncementsPage"));
-const PrincipalDashboardPage = lazy(() => import("../features/principal/PrincipalDashboardPage"));
-const IncidentListPage = lazy(() => import("../features/principal/discipline/IncidentListPage"));
-const IncidentDetailPage = lazy(
+const InvitePage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/invite/InvitePage"),
+);
+const InviteCompletePage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/invite/InviteCompletePage"),
+);
+const OnboardingPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/onboarding/OnboardingPage"),
+);
+const SetupWizardPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/onboarding-setup/SetupWizardPage"),
+);
+const PortalPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/portal/PortalPage"),
+);
+const AdminDashboardPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/AdminDashboardPage"),
+);
+const UsersListPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/users/UsersListPage"),
+);
+const InvitationsListPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/invitations/InvitationsListPage"),
+);
+const StudentsListPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/students/StudentsListPage"),
+);
+const StudentProfilePage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/students/StudentProfilePage"),
+);
+const ImportStudentsPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/students/ImportStudentsPage"),
+);
+const TimetableBuilderPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/timetable/TimetableBuilderPage"),
+);
+const SchoolSettingsPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/settings/SchoolSettingsPage"),
+);
+const AuditLogExplorerPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/audit/AuditLogExplorerPage"),
+);
+const AnnouncementsPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/announcements/AnnouncementsPage"),
+);
+const PrincipalDashboardPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/PrincipalDashboardPage"),
+);
+const IncidentListPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/discipline/IncidentListPage"),
+);
+const IncidentDetailPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
   () => import("../features/principal/discipline/IncidentDetailPage"),
 );
-const AttendanceDashboardView = lazy(
+const AttendanceDashboardView = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
   () => import("../features/principal/attendance/views/AttendanceDashboardView"),
 );
-const EvaluationListPage = lazy(
+const EvaluationListPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
   () => import("../features/principal/evaluations/EvaluationListPage"),
 );
-const EvaluationDetailPage = lazy(
+const EvaluationDetailPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
   () => import("../features/principal/evaluations/EvaluationDetailPage"),
 );
-const CriteriaTemplatesPage = lazy(
+const CriteriaTemplatesPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
   () => import("../features/principal/evaluations/CriteriaTemplatesPage"),
 );
-const ApprovalQueuePage = lazy(() => import("../features/principal/approvals/ApprovalQueuePage"));
+const ApprovalQueuePage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/approvals/ApprovalQueuePage"),
+);
 const NotificationInboxPage = lazy(() => import("../features/notifications/NotificationInboxPage"));
 const NotificationPreferencesPage = lazy(
   () => import("../features/notifications/NotificationPreferencesPage"),
 );
 const BillingOverviewPage = lazy(() => import("../features/billing/BillingOverviewPage"));
 const BillingInvoicesPage = lazy(() => import("../features/billing/BillingInvoicesPage"));
-const FinanceDashboardPage = lazy(() => import("../features/finance/FinanceDashboardPage"));
-const FinanceOverdueInstallmentsPage = lazy(
+const FinanceDashboardPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/FinanceDashboardPage"),
+);
+const FinanceOverdueInstallmentsPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
   () => import("../features/finance/FinanceOverdueInstallmentsPage"),
 );
-const FeeStructureBuilderPage = lazy(
+const FeeStructureBuilderPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
   () => import("../features/finance/fees/FeeStructureBuilderPage"),
 );
-const InvoiceListPage = lazy(() => import("../features/finance/invoices/InvoiceListPage"));
-const InvoiceDetailPage = lazy(() => import("../features/finance/invoices/InvoiceDetailPage"));
-const InvoiceBatchPage = lazy(() => import("../features/finance/invoices/InvoiceBatchPage"));
-const PaymentsListPage = lazy(() => import("../features/finance/payments/PaymentsListPage"));
-const RecordPaymentPage = lazy(() => import("../features/finance/payments/RecordPaymentPage"));
-const ScholarshipAwardsListPage = lazy(
+const InvoiceListPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/invoices/InvoiceListPage"),
+);
+const InvoiceDetailPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/invoices/InvoiceDetailPage"),
+);
+const InvoiceBatchPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/invoices/InvoiceBatchPage"),
+);
+const PaymentsListPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/payments/PaymentsListPage"),
+);
+const RecordPaymentPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/payments/RecordPaymentPage"),
+);
+const ScholarshipAwardsListPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
   () => import("../features/finance/adjustments/ScholarshipAwardsListPage"),
 );
-const NewScholarshipAwardPage = lazy(
+const NewScholarshipAwardPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
   () => import("../features/finance/adjustments/NewScholarshipAwardPage"),
 );
-const RefundsListPage = lazy(() => import("../features/finance/adjustments/RefundsListPage"));
-const NewRefundPage = lazy(() => import("../features/finance/adjustments/NewRefundPage"));
-const ReportsCenterPage = lazy(() => import("../features/finance/reports/ReportsCenterPage"));
-const ExpenseListPage = lazy(() => import("../features/finance/expenses/ExpenseListPage"));
-const NewExpensePage = lazy(() => import("../features/finance/expenses/NewExpensePage"));
-const ExpenseDetailPage = lazy(() => import("../features/finance/expenses/ExpenseDetailPage"));
-const AccountPage = lazy(() => import("../routes/account/AccountPage"));
-const SessionsPage = lazy(() => import("../features/account/sessions/SessionsPage"));
-const DeleteAccountPage = lazy(() => import("../features/account/privacy/DeleteAccountPage"));
-const PrivacyPolicyPage = lazy(() => import("../routes/legal/PrivacyPolicyPage"));
-const DeleteAccountInfoPage = lazy(() => import("../routes/legal/DeleteAccountInfoPage"));
-const ConfirmAccountDeletionPage = lazy(() => import("../routes/legal/ConfirmAccountDeletionPage"));
+const RefundsListPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/adjustments/RefundsListPage"),
+);
+const NewRefundPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/adjustments/NewRefundPage"),
+);
+const ReportsCenterPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/reports/ReportsCenterPage"),
+);
+const ExpenseListPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/expenses/ExpenseListPage"),
+);
+const NewExpensePage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/expenses/NewExpensePage"),
+);
+const ExpenseDetailPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/expenses/ExpenseDetailPage"),
+);
+const AccountPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/account/AccountPage"),
+);
+const SessionsPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../features/account/sessions/SessionsPage"),
+);
+const DeleteAccountPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../features/account/privacy/DeleteAccountPage"),
+);
+const PrivacyPolicyPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/legal/PrivacyPolicyPage"),
+);
+const DeleteAccountInfoPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/legal/DeleteAccountInfoPage"),
+);
+const ConfirmAccountDeletionPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/legal/ConfirmAccountDeletionPage"),
+);
 const AiSubscriptionPurchasePage = lazy(
   () => import("../features/billing/AiSubscriptionPurchasePage"),
 );

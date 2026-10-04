@@ -11,6 +11,7 @@
 import { useEffect, useSyncExternalStore, type PropsWithChildren } from "react";
 import { I18nextProvider } from "react-i18next";
 
+import { prepareLocale } from "./catalog-loader";
 import { directionFor, SUPPORTED_LOCALES, type Locale } from "./config";
 import { i18next } from "./i18next";
 import { localeStore } from "./store";
@@ -18,7 +19,12 @@ import { localeStore } from "./store";
 export function LocaleProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     return localeStore.subscribe(() => {
-      void i18next.changeLanguage(localeStore.getLocale());
+      const locale = localeStore.getLocale();
+      // Fetch the new language's catalogs first so the switch never renders raw keys. If the store
+      // moved on again meanwhile, the later subscription call owns the switch.
+      void prepareLocale(locale).then(() => {
+        if (localeStore.getLocale() === locale) void i18next.changeLanguage(locale);
+      });
     });
   }, []);
 

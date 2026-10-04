@@ -17,6 +17,16 @@ export interface BrandLogoProps {
  * wrap the logo carry their own accessible name (e.g. `shell.homeLink`).
  */
 export function BrandLogo({ size = "sm", badge = false }: BrandLogoProps) {
-  const img = <img src={logoUrl} alt="Studafy" className={`brand-logo brand-logo--${size}`} />;
+  // Intrinsic size (the PNG's own) lets the browser reserve the box before the image arrives — no
+  // layout shift in the header; CSS sets the rendered height and the width follows the ratio.
+  const img = (
+    <img
+      src={logoUrl}
+      alt="Studafy"
+      width={388}
+      height={120}
+      className={`brand-logo brand-logo--${size}`}
+    />
+  );
   return badge ? <span className="brand-logo-badge">{img}</span> : img;
 }

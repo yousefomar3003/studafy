@@ -1,5 +1,8 @@
 /**
- * The merged translation catalogs. `en.json` / `ar.json` hold the shared shell strings (nav, header,
+ * The merged translation catalogs, for tooling and tests only (catalog.test.ts, the pseudo-locale
+ * generator, the test preload). The app itself never imports this file — it would pull every
+ * language into the entry bundle; it loads catalogs on demand via `../catalog-loader.ts`.
+ * `en.json` / `ar.json` hold the shared shell strings (nav, header,
  * account); each feature area keeps its own file under `en/` and `ar/`, mounted here under a
  * top-level key of the same name (`t("finance.…")`, `t("principal.…")`). Splitting by area keeps
  * catalog edits for one feature from colliding with another's.
