@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import { useSeo } from "../../components/Seo";
 import { MARKETING_CONTACT_EMAIL } from "../../lib/config";
+import { Trans, useFormatters, useLocale, useTranslation } from "../../lib/i18n";
 
 const LAST_UPDATED = "2026-10-01";
 
@@ -17,103 +18,89 @@ const LAST_UPDATED = "2026-10-01";
  * compliance/legal review before a store submission relies on it as final.
  */
 export default function PrivacyPolicyPage() {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
+  const { locale } = useLocale();
   useSeo({
-    title: "Privacy policy",
-    description: "What Studafy collects, why, and how to request your data or its deletion.",
+    title: t("onboarding.legal.privacy.seoTitle"),
+    description: t("onboarding.legal.privacy.seoDescription"),
     path: "/privacy",
   });
+
+  const strong = { strong: <strong /> };
 
   return (
     <section className="marketing-section">
       <div className="marketing-container marketing-about-body">
-        <h1>Privacy policy</h1>
-        <p>Last updated {LAST_UPDATED}.</p>
-
+        <h1>{t("onboarding.legal.privacy.title")}</h1>
         <p>
-          Studafy is provided to schools, who set up accounts for their students, families, and
-          staff. This page explains what the Studafy web and mobile apps collect from those
-          accounts, why, and how to request a copy of your data or its deletion.
+          {t("onboarding.legal.privacy.lastUpdated", {
+            date:
+              locale === "en"
+                ? LAST_UPDATED
+                : formatDate(new Date(`${LAST_UPDATED}T00:00:00Z`), {
+                    dateStyle: "long",
+                    timeZone: "UTC",
+                  }),
+          })}
         </p>
 
-        <h2>Accounts</h2>
-        <p>
-          Studafy accounts are created by your school, not by signing up directly. Signing in uses
-          your school-configured identity provider (Microsoft or Google) — Studafy does not see or
-          store your password.
-        </p>
+        <p>{t("onboarding.legal.privacy.intro")}</p>
 
-        <h2>What we collect</h2>
-        <p>
-          Everything below is collected either by Studafy&rsquo;s own servers, or by our crash and
-          performance diagnostics vendors (Firebase and Sentry) acting on our behalf. We do not use
-          any advertising or analytics network, and we do not sell or share your data with anyone
-          for their own purposes.
-        </p>
+        <h2>{t("onboarding.legal.privacy.accountsHeading")}</h2>
+        <p>{t("onboarding.legal.privacy.accountsBody")}</p>
+
+        <h2>{t("onboarding.legal.privacy.collectHeading")}</h2>
+        <p>{t("onboarding.legal.privacy.collectIntro")}</p>
         <ul>
           <li>
-            <strong>Education records.</strong> Timetable, grades, attendance, assignments, course
-            materials, and — for a teacher&rsquo;s own classes — discipline incident reports.
+            <Trans i18nKey="onboarding.legal.privacy.collectEducation" components={strong} />
           </li>
           <li>
-            <strong>Account identifiers.</strong> An internal account id and, if you enable push
-            notifications, a device push token, so notifications and crash reports can be tied to
-            your account.
+            <Trans i18nKey="onboarding.legal.privacy.collectIdentifiers" components={strong} />
           </li>
           <li>
-            <strong>Crash and performance diagnostics.</strong> If the app crashes or performs
-            poorly, technical details (device type, OS version, a stack trace) are sent to our
-            crash-reporting vendors, identified only by your internal account id — never your name
-            or email.
+            <Trans i18nKey="onboarding.legal.privacy.collectDiagnostics" components={strong} />
           </li>
           <li>
-            <strong>Content you or your school upload.</strong> Photos taken for teaching materials,
-            uploaded documents, and assignment submissions.
+            <Trans i18nKey="onboarding.legal.privacy.collectContent" components={strong} />
           </li>
           <li>
-            <strong>Billing history</strong> (parents/guardians only), if your school bills you
-            through Studafy: invoice amounts and payment status. Card details are entered on our
-            payment processor&rsquo;s own page, never stored by Studafy.
+            <Trans i18nKey="onboarding.legal.privacy.collectBilling" components={strong} />
           </li>
           <li>
-            <strong>Questions to the AI study tools</strong> (students), only after you agree to the
-            in-app notice: your question and the related study material are sent to our AI provider,
-            Anthropic, which processes them on our behalf to answer you.
+            <Trans i18nKey="onboarding.legal.privacy.collectAi" components={strong} />
           </li>
         </ul>
-        <p>
-          Your name and email address come from your school, which sets up your account, and from
-          your identity provider when you sign in. We use your email address to recognise your
-          account at sign-in and to send account messages, such as a deletion confirmation. We do
-          not collect your phone number.
-        </p>
+        <p>{t("onboarding.legal.privacy.collectContact")}</p>
 
-        <h2>Your rights</h2>
-        <p>You can request a copy of your data, or request that it be deleted, at any time:</p>
+        <h2>{t("onboarding.legal.privacy.rightsHeading")}</h2>
+        <p>{t("onboarding.legal.privacy.rightsIntro")}</p>
         <ul>
           <li>
-            Signed in, from <Link to="/account/delete">Account settings</Link>.
+            <Trans
+              i18nKey="onboarding.legal.privacy.rightsSignedIn"
+              components={{ settingsLink: <Link to="/account/delete" /> }}
+            />
           </li>
           <li>
-            Without signing in or installing the app, request deletion on the{" "}
-            <Link to="/legal/delete-account">delete your account</Link> page: we email a link to the
-            account&rsquo;s address, and the deletion happens once you confirm it.
+            <Trans
+              i18nKey="onboarding.legal.privacy.rightsSignedOut"
+              components={{ deleteLink: <Link to="/legal/delete-account" /> }}
+            />
           </li>
-          <li>For a copy of your data, contact your school, or email us — see Contact below.</li>
+          <li>{t("onboarding.legal.privacy.rightsCopy")}</li>
         </ul>
-        <p>
-          Deleting your account signs you out everywhere, removes you from your school and stops any
-          AI subscription from renewing immediately; erasing your personal data follows within 30
-          days. Your school keeps only records it is legally required to retain — grades and
-          attendance without your name or contact details, financial records, and its audit log —
-          and the confirmation screen and confirmation email list them, so nothing is silently kept
-          back.
-        </p>
+        <p>{t("onboarding.legal.privacy.rightsDeletion")}</p>
 
-        <h2>Contact</h2>
+        <h2>{t("onboarding.legal.privacy.contactHeading")}</h2>
         {MARKETING_CONTACT_EMAIL ? (
           <p>
-            Questions about this policy or your data:{" "}
-            <a href={`mailto:${MARKETING_CONTACT_EMAIL}`}>{MARKETING_CONTACT_EMAIL}</a>.
+            <Trans
+              i18nKey="onboarding.legal.privacy.contactBody"
+              values={{ email: MARKETING_CONTACT_EMAIL }}
+              components={{ mailLink: <a href={`mailto:${MARKETING_CONTACT_EMAIL}`} /> }}
+            />
           </p>
         ) : (
           <p>Contact address not yet configured (set VITE_MARKETING_CONTACT_EMAIL).</p>

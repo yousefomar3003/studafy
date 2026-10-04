@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cx } from "../../internal/cx";
+import { useUiStrings } from "../../internal/ui-strings";
 import { useControllableState } from "../../internal/use-controllable-state";
 import { computeVirtualRange } from "../../internal/virtual-range";
 import { TableBody, TableCell, TableHeader, TableHeaderCell, TableRow } from "../table";
@@ -119,6 +120,7 @@ export function DataGrid<TRow>({
   loading = false,
   empty,
 }: DataGridProps<TRow>) {
+  const strings = useUiStrings();
   const [resolvedSort, setSort] = useControllableState<DataGridSort | null>({
     value: sort,
     defaultValue: defaultSort,
@@ -197,7 +199,9 @@ export function DataGrid<TRow>({
               type="checkbox"
               className="sf-data-grid__select-checkbox"
               checked={selected}
-              aria-label={getRowLabel ? `Select ${getRowLabel(row)}` : "Select row"}
+              aria-label={
+                getRowLabel ? strings.selectRow(getRowLabel(row)) : strings.selectRowFallback
+              }
               onChange={() => toggleRow(rowId)}
             />
           </TableCell>
@@ -264,7 +268,7 @@ export function DataGrid<TRow>({
                     type="checkbox"
                     className="sf-data-grid__select-checkbox"
                     checked={allSelected}
-                    aria-label="Select all rows"
+                    aria-label={strings.selectAllRows}
                     onChange={toggleAll}
                   />
                 </TableHeaderCell>

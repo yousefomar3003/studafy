@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "../../../lib/i18n";
 import { fetchActiveClasses } from "../../admin/announcements/queries";
 import { fetchFeeStructures } from "../fees/queries";
 
@@ -21,6 +22,7 @@ import type { InvoiceBatch, InvoiceBatchItem, InvoiceBatchItemStatus } from "./q
 import type { ClassOption } from "../../admin/announcements/queries";
 import type { FeeStructure } from "../fees/queries";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
+import type { TFunction } from "i18next";
 import type { FormEvent } from "react";
 
 function apiErrorMessage(error: unknown, fallback: string): string {
@@ -34,14 +36,15 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  * the progress panel once `useCreateInvoiceBatch` returns a batch id.
  */
 export default function InvoiceBatchPage() {
+  const { t } = useTranslation();
   const [batchId, setBatchId] = useState<string | null>(null);
 
   return (
     <>
       <p className="invoices-detail__back">
-        <Link to="/portal/finance/invoices">&larr; Back to invoices</Link>
+        <Link to="/portal/finance/invoices">{t("finance.invoices.backToInvoices")}</Link>
       </p>
-      <h1>Generate invoices</h1>
+      <h1>{t("finance.invoices.batch.title")}</h1>
 
       {batchId ? (
         <BatchProgress batchId={batchId} onReset={() => setBatchId(null)} />
@@ -61,6 +64,7 @@ interface BatchFormProps {
 }
 
 function BatchForm({ onCreated }: BatchFormProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const createBatch = useCreateInvoiceBatch();
 
@@ -86,7 +90,10 @@ function BatchForm({ onCreated }: BatchFormProps) {
     (structure: FeeStructure) => structure.erpnext_status === "submitted",
   );
   const structureOptions: SelectOption<string>[] = [
-    { value: "", label: structuresPlaceholder(feeStructuresQuery.isPending, structures.length) },
+    {
+      value: "",
+      label: structuresPlaceholder(feeStructuresQuery.isPending, structures.length, t),
+    },
     ...structures.map((structure) => ({
       value: structure.erpnext_name,
       label: `${structure.title} (${structure.total_amount} ${structure.currency})`,
@@ -125,8 +132,8 @@ function BatchForm({ onCreated }: BatchFormProps) {
         onError: (error) => {
           show({
             variant: "error",
-            title: "Couldn't start the batch",
-            description: apiErrorMessage(error, "Please check the form and try again."),
+            title: t("finance.invoices.batch.startError"),
+            description: apiErrorMessage(error, t("finance.common.checkFormAndRetry")),
           });
         },
       },
@@ -134,11 +141,11 @@ function BatchForm({ onCreated }: BatchFormProps) {
   }
 
   return (
-    <Card as="section" aria-label="Batch generation form">
+    <Card as="section" aria-label={t("finance.invoices.batch.formLabel")}>
       <Card.Body>
         <form onSubmit={handleSubmit} className="invoices-batch__form">
           <Select
-            label="Fee structure"
+            label={t("finance.invoices.batch.feeStructure")}
             options={structureOptions}
             value={feeStructureErpnextName}
             onChange={setFeeStructureErpnextName}
@@ -147,20 +154,20 @@ function BatchForm({ onCreated }: BatchFormProps) {
           />
 
           <div className="sf-field">
-            <label htmlFor="invoice-batch-period">Period title</label>
+            <label htmlFor="invoice-batch-period">{t("finance.invoices.batch.periodTitle")}</label>
             <input
               id="invoice-batch-period"
               type="text"
               value={periodTitle}
               onChange={(event) => setPeriodTitle(event.target.value)}
-              placeholder="e.g. Spring 2026 Term 1"
+              placeholder={t("finance.invoices.batch.periodPlaceholder")}
               maxLength={200}
               required
             />
           </div>
 
           <div className="sf-field">
-            <label htmlFor="invoice-batch-due-date">Due date (optional)</label>
+            <label htmlFor="invoice-batch-due-date">{t("finance.invoices.batch.dueDate")}</label>
             <input
               id="invoice-batch-due-date"
               type="date"
@@ -170,7 +177,7 @@ function BatchForm({ onCreated }: BatchFormProps) {
           </div>
 
           <fieldset className="invoices-batch__target">
-            <legend>Target students</legend>
+            <legend>{t("finance.invoices.batch.target")}</legend>
             <label className="invoices-batch__target-option">
               <input
                 type="radio"
@@ -178,7 +185,7 @@ function BatchForm({ onCreated }: BatchFormProps) {
                 checked={targetMode === "all"}
                 onChange={() => setTargetMode("all")}
               />
-              Every enrolled student in the school
+              {t("finance.invoices.batch.targetAll")}
             </label>
             <label className="invoices-batch__target-option">
               <input
@@ -187,15 +194,19 @@ function BatchForm({ onCreated }: BatchFormProps) {
                 checked={targetMode === "classes"}
                 onChange={() => setTargetMode("classes")}
               />
-              Students actively enrolled in specific classes
+              {t("finance.invoices.batch.targetClasses")}
             </label>
 
             {targetMode === "classes" ? (
-              <div className="invoices-batch__classes" role="group" aria-label="Classes">
+              <div
+                className="invoices-batch__classes"
+                role="group"
+                aria-label={t("finance.invoices.batch.classes")}
+              >
                 {classesQuery.isPending ? (
-                  <p>Loading classes…</p>
+                  <p>{t("finance.invoices.batch.loadingClasses")}</p>
                 ) : classes.length === 0 ? (
-                  <p>No active classes.</p>
+                  <p>{t("finance.invoices.batch.noClasses")}</p>
                 ) : (
                   classes.map((klass) => (
                     <label key={klass.id} className="invoices-batch__class-option">
@@ -214,7 +225,7 @@ function BatchForm({ onCreated }: BatchFormProps) {
 
           <div className="invoices-batch__form-actions">
             <Button type="submit" loading={createBatch.isPending} disabled={!canSubmit}>
-              Start batch
+              {t("finance.invoices.batch.start")}
             </Button>
           </div>
         </form>
@@ -223,10 +234,10 @@ function BatchForm({ onCreated }: BatchFormProps) {
   );
 }
 
-function structuresPlaceholder(isPending: boolean, count: number): string {
-  if (isPending) return "Loading fee structures…";
-  if (count === 0) return "No submitted fee structures";
-  return "Select a fee structure";
+function structuresPlaceholder(isPending: boolean, count: number, t: TFunction): string {
+  if (isPending) return t("finance.invoices.batch.loadingStructures");
+  if (count === 0) return t("finance.invoices.batch.noStructures");
+  return t("finance.invoices.batch.selectStructure");
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +256,7 @@ const IN_FLIGHT_STATUSES = new Set<InvoiceBatch["status"]>(["pending", "processi
 const POLL_INTERVAL_MS = 3000;
 
 function BatchProgress({ batchId, onReset }: BatchProgressProps) {
+  const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState<InvoiceBatchItemStatus | "">("");
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([]);
@@ -274,28 +286,36 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
     batch && batch.total_count > 0 ? Math.round((processed / batch.total_count) * 100) : 0;
 
   const statusOptions: SelectOption<InvoiceBatchItemStatus | "">[] = [
-    { value: "", label: "All statuses" },
-    { value: "pending", label: "Pending" },
-    { value: "succeeded", label: "Created" },
-    { value: "already_existed", label: "Already existed" },
-    { value: "failed", label: "Failed" },
+    { value: "", label: t("finance.common.allStatuses") },
+    { value: "pending", label: invoiceBatchItemStatusLabel("pending", t) },
+    { value: "succeeded", label: invoiceBatchItemStatusLabel("succeeded", t) },
+    { value: "already_existed", label: invoiceBatchItemStatusLabel("already_existed", t) },
+    { value: "failed", label: invoiceBatchItemStatusLabel("failed", t) },
   ];
 
   const columns: DataGridColumn<InvoiceBatchItem>[] = [
-    { id: "student_name", header: "Student", renderCell: (row) => row.student_name },
-    { id: "admission_number", header: "Admission #", renderCell: (row) => row.admission_number },
+    {
+      id: "student_name",
+      header: t("finance.common.student"),
+      renderCell: (row) => row.student_name,
+    },
+    {
+      id: "admission_number",
+      header: t("finance.common.admissionNumber"),
+      renderCell: (row) => row.admission_number,
+    },
     {
       id: "status",
-      header: "Status",
+      header: t("finance.common.status"),
       renderCell: (row) => (
         <span className="invoices-status-pill" data-tone={invoiceBatchItemStatusTone(row.status)}>
-          {invoiceBatchItemStatusLabel(row.status)}
+          {invoiceBatchItemStatusLabel(row.status, t)}
         </span>
       ),
     },
     {
       id: "result",
-      header: "Result",
+      header: t("finance.invoices.batch.result"),
       renderCell: (row) => row.erpnext_docname ?? row.error_message ?? "—",
     },
   ];
@@ -303,33 +323,36 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
   return (
     <>
       {batch ? (
-        <Card as="section" aria-label="Batch progress">
+        <Card as="section" aria-label={t("finance.invoices.batch.progress")}>
           <Card.Body>
             <p role="status">
-              {invoiceBatchStatusLabel(batch.status)} — {batch.period_title}
+              {t("finance.invoices.batch.progressStatus", {
+                status: invoiceBatchStatusLabel(batch.status, t),
+                period: batch.period_title,
+              })}
             </p>
             <dl className="invoices-batch__stats">
               <div>
-                <dt>Total</dt>
+                <dt>{t("finance.common.total")}</dt>
                 <dd>{batch.total_count}</dd>
               </div>
               <div>
-                <dt>Created</dt>
+                <dt>{invoiceBatchItemStatusLabel("succeeded", t)}</dt>
                 <dd>{batch.succeeded_count}</dd>
               </div>
               <div>
-                <dt>Already existed</dt>
+                <dt>{invoiceBatchItemStatusLabel("already_existed", t)}</dt>
                 <dd>{batch.already_existed_count}</dd>
               </div>
               <div>
-                <dt>Failed</dt>
+                <dt>{invoiceBatchItemStatusLabel("failed", t)}</dt>
                 <dd>{batch.failed_count}</dd>
               </div>
             </dl>
             <div
               className="invoices-batch__meter"
               role="progressbar"
-              aria-label="Generation progress"
+              aria-label={t("finance.invoices.batch.generationProgress")}
               aria-valuenow={progressPercent}
               aria-valuemin={0}
               aria-valuemax={100}
@@ -341,22 +364,20 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
             </div>
             {batch.status === "completed" || batch.status === "failed" ? (
               <Button type="button" onClick={onReset}>
-                Start another batch
+                {t("finance.invoices.batch.startAnother")}
               </Button>
             ) : (
-              <p>
-                This can take a while for large batches. You can leave this page — it keeps running.
-              </p>
+              <p>{t("finance.invoices.batch.longRunning")}</p>
             )}
           </Card.Body>
         </Card>
       ) : (
-        <p role="status">Loading…</p>
+        <p role="status">{t("finance.common.loading")}</p>
       )}
 
       <div className="invoices-batch__toolbar">
         <Select
-          label="Filter by status"
+          label={t("finance.invoices.batch.filterByStatus")}
           options={statusOptions}
           value={statusFilter}
           onChange={(value) => {
@@ -368,13 +389,17 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
       </div>
 
       <DataGrid
-        caption="Batch results"
+        caption={t("finance.invoices.batch.resultsCaption")}
         columns={columns}
         rows={itemsQuery.data?.items ?? []}
         getRowId={(row) => row.id}
         getRowLabel={(row) => row.student_name}
         loading={itemsQuery.isPending}
-        empty={itemsQuery.isError ? "Unable to load results." : "No students match this filter."}
+        empty={
+          itemsQuery.isError
+            ? t("finance.invoices.batch.resultsError")
+            : t("finance.invoices.batch.resultsEmpty")
+        }
       />
 
       <div className="invoices-batch__pagination">
@@ -388,7 +413,7 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
             setCursor(previous);
           }}
         >
-          Previous
+          {t("finance.common.previous")}
         </Button>
         <Button
           variant="secondary"
@@ -400,7 +425,7 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
             setCursor(nextCursor);
           }}
         >
-          Next
+          {t("finance.common.next")}
         </Button>
       </div>
     </>

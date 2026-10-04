@@ -28,6 +28,14 @@
 .portal-header__brand {
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-lg);
+  color: var(--color-foreground);
+  text-decoration: none;
+}
+
+.portal-header__brand:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
 }
 
 .portal-header__actions {
@@ -39,21 +47,6 @@
 
 .portal-header__nav-toggle {
   display: none;
-}
-
-.portal-locale-switcher__select {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background-color: transparent;
-  color: var(--color-foreground);
-  padding: var(--space-4) var(--space-8);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-
-.portal-locale-switcher__select:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
 }
 
 /* Sidebar */
@@ -251,6 +244,7 @@
   background: transparent;
   color: var(--color-foreground);
   font-size: var(--font-size-sm);
+  text-decoration: none;
   cursor: pointer;
 }
 

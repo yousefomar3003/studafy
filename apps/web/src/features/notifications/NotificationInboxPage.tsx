@@ -2,6 +2,8 @@ import { Button, useCursorPagination } from "@studafy/ui";
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useFormatters, useTranslation } from "../../lib/i18n";
+
 import { notificationTypeLabel } from "./labels";
 import { useMarkAllRead, useMarkNotificationRead } from "./mutations";
 import { fetchNotificationsPage } from "./queries";
@@ -10,9 +12,15 @@ import "./notifications.css";
 
 type InboxFilter = "all" | "unread";
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
+/** Same fields `Date#toLocaleString()` shows by default, but in the active app locale. */
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "numeric",
+  second: "numeric",
+};
 
 /**
  * Full notification inbox (`/portal/notifications`). No permission gate — mirrors the API's own
@@ -29,6 +37,8 @@ function formatDateTime(iso: string): string {
  * its next poll tick.
  */
 export default function NotificationInboxPage() {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const [filter, setFilter] = useState<InboxFilter>("all");
   const fetchPage = useCallback(
     (cursor: string | undefined) => fetchNotificationsPage(filter === "unread", cursor),
@@ -46,25 +56,29 @@ export default function NotificationInboxPage() {
     <>
       <div className="notifications-page__header">
         <div>
-          <h1>Notifications</h1>
-          <p>Everything sent to you, newest first.</p>
+          <h1>{t("site.notifications.inbox.title")}</h1>
+          <p>{t("site.notifications.inbox.description")}</p>
         </div>
         <Link to="/portal/notifications/preferences">
           <Button type="button" variant="secondary">
-            Notification settings
+            {t("site.notifications.inbox.settings")}
           </Button>
         </Link>
       </div>
 
       <div className="notifications-page__toolbar">
-        <div className="notifications-page__filters" role="group" aria-label="Filter notifications">
+        <div
+          className="notifications-page__filters"
+          role="group"
+          aria-label={t("site.notifications.inbox.filterLabel")}
+        >
           <Button
             type="button"
             variant={filter === "all" ? "primary" : "tertiary"}
             aria-pressed={filter === "all"}
             onClick={() => setFilter("all")}
           >
-            All
+            {t("site.notifications.inbox.all")}
           </Button>
           <Button
             type="button"
@@ -72,7 +86,7 @@ export default function NotificationInboxPage() {
             aria-pressed={filter === "unread"}
             onClick={() => setFilter("unread")}
           >
-            Unread
+            {t("site.notifications.inbox.unread")}
           </Button>
         </div>
 
@@ -83,20 +97,24 @@ export default function NotificationInboxPage() {
           loading={markAllRead.isPending}
           onClick={() => markAllRead.mutate()}
         >
-          Mark all as read
+          {t("site.notifications.inbox.markAllRead")}
         </Button>
       </div>
 
       {error ? (
         <p className="notifications-page__notice" role="alert">
-          Unable to load notifications. Try reloading the page.
+          {t("site.notifications.inbox.loadError")}
         </p>
       ) : null}
 
       {loading ? (
-        <p role="status">Loading…</p>
+        <p role="status">{t("site.common.loading")}</p>
       ) : items.length === 0 ? (
-        <p>{filter === "unread" ? "No unread notifications." : "You’re all caught up."}</p>
+        <p>
+          {filter === "unread"
+            ? t("site.notifications.inbox.emptyUnread")
+            : t("site.notifications.inbox.empty")}
+        </p>
       ) : (
         <ul className="notifications-page__list">
           {items.map((notification) => (
@@ -107,12 +125,12 @@ export default function NotificationInboxPage() {
             >
               <div className="notifications-page__item-body">
                 <p className="notifications-page__item-type">
-                  {notificationTypeLabel(notification.notification_type)}
+                  {notificationTypeLabel(notification.notification_type, t)}
                 </p>
                 <p className="notifications-page__item-title">{notification.title}</p>
                 <p className="notifications-page__item-text">{notification.body}</p>
                 <p className="notifications-page__item-date">
-                  {formatDateTime(notification.created_at)}
+                  {formatDate(new Date(notification.created_at), DATE_TIME_OPTIONS)}
                 </p>
               </div>
               {notification.read_at === null ? (
@@ -122,7 +140,7 @@ export default function NotificationInboxPage() {
                   loading={markRead.isPending && markRead.variables === notification.id}
                   onClick={() => markRead.mutate(notification.id)}
                 >
-                  Mark as read
+                  {t("site.notifications.inbox.markAsRead")}
                 </Button>
               ) : null}
             </li>
@@ -137,10 +155,10 @@ export default function NotificationInboxPage() {
           disabled={!hasPreviousPage}
           onClick={goToPreviousPage}
         >
-          Previous
+          {t("site.common.previous")}
         </Button>
         <Button type="button" variant="secondary" disabled={!hasNextPage} onClick={goToNextPage}>
-          Next
+          {t("site.common.next")}
         </Button>
       </div>
     </>

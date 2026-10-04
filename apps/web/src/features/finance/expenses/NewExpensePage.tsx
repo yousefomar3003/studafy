@@ -3,7 +3,9 @@ import { Button, Card, Input, Select, useToast } from "@studafy/ui";
 import { useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { categoryFieldLabel, EXPENSE_DOCUMENT_TYPE_LABELS, vendorFieldLabel } from "./labels";
+import { Trans, useTranslation } from "../../../lib/i18n";
+
+import { categoryFieldLabel, EXPENSE_DOCUMENT_TYPE_LABEL_KEYS, vendorFieldLabel } from "./labels";
 import {
   useCreateExpense,
   useRequestExpenseUploadUrl,
@@ -21,13 +23,6 @@ function apiErrorMessage(error: unknown, fallback: string): string {
   return error.detail ?? error.title;
 }
 
-const DOCUMENT_TYPE_OPTIONS: SelectOption<ExpenseDocumentType | "">[] = [
-  { value: "", label: "Select a document type" },
-  ...(Object.entries(EXPENSE_DOCUMENT_TYPE_LABELS) as [ExpenseDocumentType, string][]).map(
-    ([value, label]) => ({ value, label }),
-  ),
-];
-
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 
 /**
@@ -44,14 +39,15 @@ const CURRENCY_PATTERN = /^[A-Z]{3}$/;
  * rather than claiming one is attached right here.
  */
 export default function NewExpensePage() {
+  const { t } = useTranslation();
   const [expense, setExpense] = useState<Expense | null>(null);
 
   return (
     <>
       <p className="expenses-form__back">
-        <Link to="/portal/finance/expenses">&larr; Back to expenses</Link>
+        <Link to="/portal/finance/expenses">{t("finance.expenses.back")}</Link>
       </p>
-      <h1>Record an expense</h1>
+      <h1>{t("finance.expenses.new.title")}</h1>
 
       {expense ? (
         <ExpenseCreated expense={expense} onReset={() => setExpense(null)} />
@@ -71,6 +67,7 @@ interface ExpenseFormProps {
 }
 
 function ExpenseForm({ onCreated }: ExpenseFormProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const requestUploadUrl = useRequestExpenseUploadUrl();
   const createExpense = useCreateExpense();
@@ -95,6 +92,13 @@ function ExpenseForm({ onCreated }: ExpenseFormProps) {
   const isValidAmount =
     amountInput.trim() !== "" && Number.isFinite(amountValue) && amountValue > 0;
   const isValidCurrency = CURRENCY_PATTERN.test(currency);
+
+  const documentTypeOptions: SelectOption<ExpenseDocumentType | "">[] = [
+    { value: "", label: t("finance.expenses.new.selectType") },
+    ...(Object.entries(EXPENSE_DOCUMENT_TYPE_LABEL_KEYS) as [ExpenseDocumentType, string][]).map(
+      ([value, labelKey]) => ({ value, label: t(labelKey) }),
+    ),
+  ];
 
   const canSubmit =
     documentType !== "" &&
@@ -141,14 +145,14 @@ function ExpenseForm({ onCreated }: ExpenseFormProps) {
       setIsSubmitting(false);
       show({
         variant: "error",
-        title: "Couldn't record the expense",
-        description: apiErrorMessage(error, "Please check the form and try again."),
+        title: t("finance.expenses.new.error"),
+        description: apiErrorMessage(error, t("finance.common.checkFormAndRetry")),
       });
     }
   }
 
   return (
-    <Card as="section" aria-label="Expense form">
+    <Card as="section" aria-label={t("finance.expenses.new.formLabel")}>
       <Card.Body>
         <form onSubmit={handleSubmit} className="expenses-form">
           {/* No `required` here: unlike `Input`'s asterisk (which only ever affects `getByLabelText`
@@ -158,25 +162,25 @@ function ExpenseForm({ onCreated }: ExpenseFormProps) {
               `payments/RecordPaymentPage`'s `RadioGroup` doc comment gives for skipping it on a
               different control. `canSubmit` below still gates on `documentType !== ""`. */}
           <Select
-            label="Document type"
-            options={DOCUMENT_TYPE_OPTIONS}
+            label={t("finance.expenses.new.documentType")}
+            options={documentTypeOptions}
             value={documentType}
             onChange={(value) => setDocumentType(value)}
           />
 
           <Input
-            label={categoryFieldLabel(documentType)}
+            label={categoryFieldLabel(documentType, t)}
             type="text"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
             maxLength={200}
             disabled={!documentType}
-            helperText="Must match an existing ERPNext document — ERPNext validates it on submit."
+            helperText={t("finance.expenses.new.categoryHelper")}
             required
           />
 
           <Input
-            label={vendorFieldLabel(documentType)}
+            label={vendorFieldLabel(documentType, t)}
             type="text"
             value={vendor}
             onChange={(event) => setVendor(event.target.value)}
@@ -186,7 +190,7 @@ function ExpenseForm({ onCreated }: ExpenseFormProps) {
           />
 
           <Input
-            label="Amount"
+            label={t("finance.common.amount")}
             type="text"
             inputMode="decimal"
             value={amountInput}
@@ -197,28 +201,30 @@ function ExpenseForm({ onCreated }: ExpenseFormProps) {
           />
 
           <Input
-            label="Currency"
+            label={t("finance.common.currency")}
             type="text"
             value={currency}
             onChange={(event) => setCurrency(event.target.value.toUpperCase().slice(0, 3))}
             maxLength={3}
             error={
-              currency !== "" && !isValidCurrency ? "Use a 3-letter currency code." : undefined
+              currency !== "" && !isValidCurrency
+                ? t("finance.expenses.new.currencyInvalid")
+                : undefined
             }
             required
           />
 
           <Input
-            label="Expense date (optional)"
+            label={t("finance.expenses.new.expenseDate")}
             type="date"
             value={expenseDate}
             onChange={(event) => setExpenseDate(event.target.value)}
-            helperText="Defaults to today."
+            helperText={t("finance.common.defaultsToToday")}
           />
 
           <div className="sf-field expenses-form__description">
             <label className="sf-field__label" htmlFor={descriptionId}>
-              Description (optional)
+              {t("finance.common.description")}
             </label>
             <div className="sf-input">
               <textarea
@@ -234,7 +240,7 @@ function ExpenseForm({ onCreated }: ExpenseFormProps) {
 
           <div className="sf-field">
             <label className="sf-field__label" htmlFor={attachmentId}>
-              Receipt (optional)
+              {t("finance.expenses.new.receipt")}
             </label>
             <div className="sf-input">
               <input
@@ -250,7 +256,7 @@ function ExpenseForm({ onCreated }: ExpenseFormProps) {
 
           <div className="expenses-form__actions">
             <Button type="submit" loading={isSubmitting} disabled={!canSubmit}>
-              Record expense
+              {t("finance.common.recordExpense")}
             </Button>
           </div>
         </form>
@@ -269,42 +275,49 @@ interface ExpenseCreatedProps {
 }
 
 function ExpenseCreated({ expense, onReset }: ExpenseCreatedProps) {
+  const { t } = useTranslation();
   return (
-    <Card as="section" aria-label="Expense recorded">
+    <Card as="section" aria-label={t("finance.expenses.new.recordedLabel")}>
       <Card.Body>
         <p role="status" className="expenses-success__headline">
-          Expense recorded &mdash; {expense.amount} {expense.currency}
+          {t("finance.expenses.new.recordedHeadline", {
+            amount: expense.amount,
+            currency: expense.currency,
+          })}
         </p>
 
         <dl className="expenses-success__summary">
           <div>
-            <dt>Type</dt>
-            <dd>{EXPENSE_DOCUMENT_TYPE_LABELS[expense.document_type]}</dd>
+            <dt>{t("finance.common.type")}</dt>
+            <dd>{t(EXPENSE_DOCUMENT_TYPE_LABEL_KEYS[expense.document_type])}</dd>
           </div>
           <div>
-            <dt>Category</dt>
+            <dt>{t("finance.common.category")}</dt>
             <dd>{expense.category}</dd>
           </div>
           <div>
-            <dt>Vendor</dt>
+            <dt>{t("finance.common.vendor")}</dt>
             <dd>{expense.vendor}</dd>
           </div>
           <div>
-            <dt>ERPNext document</dt>
+            <dt>{t("finance.common.erpnextDocument")}</dt>
             <dd>{expense.erpnext_name ?? "—"}</dd>
           </div>
         </dl>
 
         <p>
-          <Link to={`/portal/finance/expenses/${expense.id}`}>View this expense</Link> to open its
-          receipt, if one was attached.
+          <Trans
+            t={t}
+            i18nKey="finance.expenses.new.viewThisPrompt"
+            components={{ expenseLink: <Link to={`/portal/finance/expenses/${expense.id}`} /> }}
+          />
         </p>
 
         <div className="expenses-success__actions">
           <Button type="button" variant="secondary" onClick={onReset}>
-            Record another expense
+            {t("finance.expenses.new.recordAnother")}
           </Button>
-          <Link to="/portal/finance/expenses">View expenses</Link>
+          <Link to="/portal/finance/expenses">{t("finance.expenses.new.viewAll")}</Link>
         </div>
       </Card.Body>
     </Card>

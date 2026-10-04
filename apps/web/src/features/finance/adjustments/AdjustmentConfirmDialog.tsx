@@ -1,5 +1,7 @@
 import { Button, Modal } from "@studafy/ui";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import type { ReactNode } from "react";
 
 export interface AdjustmentConfirmDialogProps {
@@ -35,6 +37,7 @@ export function AdjustmentConfirmDialog({
   onClose,
   children,
 }: AdjustmentConfirmDialogProps) {
+  const { t } = useTranslation();
   return (
     <Modal open={open} onClose={onClose} title={title} description={description}>
       <Modal.Body>
@@ -47,7 +50,7 @@ export function AdjustmentConfirmDialog({
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>
-          Cancel
+          {t("financeReports.adjustments.common.cancel")}
         </Button>
         <Button type="button" variant="primary" loading={loading} onClick={onConfirm}>
           {confirmLabel}

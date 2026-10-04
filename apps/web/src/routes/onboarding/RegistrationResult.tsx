@@ -1,5 +1,7 @@
 import { Button, Card, CardBody } from "@studafy/ui";
 
+import { Trans, useTranslation } from "../../lib/i18n";
+
 export interface RegistrationResultProps {
   schoolName: string;
   schoolEmail: string;
@@ -24,19 +26,27 @@ export function RegistrationResult({
   resending,
   resendDisabled,
 }: RegistrationResultProps) {
+  const { t } = useTranslation();
+
   return (
     <Card>
       <CardBody>
-        <h2>{schoolName} is registered</h2>
+        <h2>{t("onboarding.registrationResult.title", { schoolName })}</h2>
 
         <p>
-          We sent a verification link to <strong>{schoolEmail}</strong>. Click it to activate your
-          school — this also triggers your school&rsquo;s workspace setup.
+          <Trans
+            i18nKey="onboarding.registrationResult.verificationSent"
+            values={{ email: schoolEmail }}
+            components={{ strong: <strong /> }}
+          />
         </p>
 
         <p>
-          We also sent an account-activation invitation to <strong>{adminEmail}</strong>. It becomes
-          usable once the school email above is verified.
+          <Trans
+            i18nKey="onboarding.registrationResult.invitationSent"
+            values={{ email: adminEmail }}
+            components={{ strong: <strong /> }}
+          />
         </p>
 
         <Button
@@ -46,7 +56,7 @@ export function RegistrationResult({
           disabled={resendDisabled}
           onClick={onResend}
         >
-          Resend verification email
+          {t("onboarding.registrationResult.resend")}
         </Button>
       </CardBody>
     </Card>

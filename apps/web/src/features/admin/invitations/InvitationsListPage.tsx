@@ -1,6 +1,7 @@
 import { Tabs } from "@studafy/ui";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
 import { helpPath } from "../../help/content";
 import { HelpLink } from "../../help/HelpLink";
 
@@ -32,6 +33,7 @@ import type { InvitationWithStatus } from "./queries";
  * models into one confusing view.
  */
 export default function InvitationsListPage() {
+  const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
   const [revokingInvitation, setRevokingInvitation] = useState<InvitationWithStatus | null>(null);
@@ -40,15 +42,17 @@ export default function InvitationsListPage() {
 
   return (
     <>
-      <h1>Invitations</h1>
+      <h1>{t("adminPeople.invitations.page.title")}</h1>
       <p>
-        <HelpLink to={helpPath("invitations")}>Read the guide</HelpLink>
+        <HelpLink to={helpPath("invitations")}>{t("adminPeople.invitations.page.guide")}</HelpLink>
       </p>
 
       <Tabs defaultValue="invitations">
         <Tabs.List>
-          <Tabs.Tab value="invitations">Invitations</Tabs.Tab>
-          <Tabs.Tab value="bulk">Bulk invites</Tabs.Tab>
+          <Tabs.Tab value="invitations">
+            {t("adminPeople.invitations.page.tabInvitations")}
+          </Tabs.Tab>
+          <Tabs.Tab value="bulk">{t("adminPeople.invitations.page.tabBulk")}</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="invitations">

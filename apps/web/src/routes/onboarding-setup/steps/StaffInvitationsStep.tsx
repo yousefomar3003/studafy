@@ -3,15 +3,17 @@ import { useState } from "react";
 
 import { HelpLink } from "../../../features/help/HelpLink";
 import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
+import { useTranslation } from "../../../lib/i18n";
 import { parseEmailList, staffInviteBatchSchema, STAFF_INVITE_ROLES } from "../schema";
 
 import type { StaffInviteBatch } from "../schema";
 import type { FormEvent } from "react";
 
-const ROLE_LABELS: Record<(typeof STAFF_INVITE_ROLES)[number], string> = {
-  ORG_ADMIN: "Admin",
-  INSTRUCTOR: "Teacher",
-  TEACHING_ASSISTANT: "Teaching assistant",
+/** Translation keys for each role's option label — resolved with `t()` at render time. */
+const ROLE_LABEL_KEYS: Record<(typeof STAFF_INVITE_ROLES)[number], string> = {
+  ORG_ADMIN: "onboarding.setup.staff.roles.orgAdmin",
+  INSTRUCTOR: "onboarding.setup.staff.roles.instructor",
+  TEACHING_ASSISTANT: "onboarding.setup.staff.roles.teachingAssistant",
 };
 
 interface BatchDraft {
@@ -33,6 +35,7 @@ export interface StaffInvitationsStepProps {
  * accepts (it also allows STUDENT/GUEST, which belong to the student import step instead).
  */
 export function StaffInvitationsStep({ onNext, onSkip, submitting }: StaffInvitationsStepProps) {
+  const { t } = useTranslation();
   const [batches, setBatches] = useState<BatchDraft[]>([EMPTY_BATCH]);
   const [errors, setErrors] = useState<Record<number, string>>({});
 
@@ -60,7 +63,7 @@ export function StaffInvitationsStep({ onNext, onSkip, submitting }: StaffInvita
       const result = staffInviteBatchSchema.safeParse({ role: batch.role, emails });
       if (!result.success) {
         // eslint-disable-next-line security/detect-object-injection -- `index` is this batch's array position, not user input
-        nextErrors[index] = result.error.issues[0]?.message ?? "Check this batch.";
+        nextErrors[index] = result.error.issues[0]?.message ?? "onboarding.setup.staff.checkBatch";
         return;
       }
       parsed.push(result.data);
@@ -76,32 +79,41 @@ export function StaffInvitationsStep({ onNext, onSkip, submitting }: StaffInvita
   return (
     <Card>
       <CardBody>
-        <form onSubmit={handleSubmit} noValidate aria-label="Staff invitations">
-          <h2>Staff invitations</h2>
-          <p>Invite staff by role. Paste one email per line, or separate them with commas.</p>
+        <form onSubmit={handleSubmit} noValidate aria-label={t("onboarding.setup.staff.title")}>
+          <h2>{t("onboarding.setup.staff.title")}</h2>
+          <p>{t("onboarding.setup.staff.description")}</p>
           <p>
-            <HelpLink to={onboardingStepHelpPath("staff")}>Need help with this step?</HelpLink>
+            <HelpLink to={onboardingStepHelpPath("staff")}>
+              {t("onboarding.setup.needHelp")}
+            </HelpLink>
           </p>
 
           {batches.map((batch, index) => (
             <fieldset key={index}>
-              <legend>Batch {index + 1}</legend>
+              <legend>{t("onboarding.setup.staff.batch", { number: index + 1 })}</legend>
               {/* eslint-disable-next-line security/detect-object-injection -- `index` is this batch's array position, not user input */}
-              {errors[index] ? <p role="alert">{errors[index]}</p> : null}
+              {errors[index] ? (
+                <p role="alert">
+                  {t(
+                    // eslint-disable-next-line security/detect-object-injection -- `index` is this batch's array position, not user input
+                    errors[index],
+                  )}
+                </p>
+              ) : null}
 
               <Select
-                label="Role"
+                label={t("onboarding.setup.staff.role")}
                 options={STAFF_INVITE_ROLES.map((role) => ({
                   value: role,
                   // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `STAFF_INVITE_ROLES` tuple, not user input
-                  label: ROLE_LABELS[role],
+                  label: t(ROLE_LABEL_KEYS[role]),
                 }))}
                 value={batch.role}
                 onChange={(value) => updateBatch(index, { role: value as BatchDraft["role"] })}
                 required
               />
 
-              <label htmlFor={`batch-emails-${index}`}>Emails</label>
+              <label htmlFor={`batch-emails-${index}`}>{t("onboarding.setup.staff.emails")}</label>
               <textarea
                 id={`batch-emails-${index}`}
                 value={batch.emailsRaw}
@@ -111,7 +123,7 @@ export function StaffInvitationsStep({ onNext, onSkip, submitting }: StaffInvita
 
               {batches.length > 1 ? (
                 <Button type="button" variant="tertiary" onClick={() => removeBatch(index)}>
-                  Remove batch
+                  {t("onboarding.setup.staff.removeBatch")}
                 </Button>
               ) : null}
             </fieldset>
@@ -122,14 +134,14 @@ export function StaffInvitationsStep({ onNext, onSkip, submitting }: StaffInvita
             variant="secondary"
             onClick={() => setBatches((prev) => [...prev, { ...EMPTY_BATCH }])}
           >
-            Add another role
+            {t("onboarding.setup.staff.addBatch")}
           </Button>
 
           <Button type="submit" loading={submitting}>
-            Send invitations
+            {t("onboarding.setup.staff.submit")}
           </Button>
           <Button type="button" variant="tertiary" onClick={onSkip} disabled={submitting}>
-            Skip for now
+            {t("onboarding.setup.skipForNow")}
           </Button>
         </form>
       </CardBody>

@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
-import { PAYMENT_MODE_LABELS, PAYMENT_STATUS_LABELS, paymentStatusTone } from "../labels";
+import { useTranslation } from "../../../lib/i18n";
+import { PAYMENT_MODE_LABEL_KEYS, PAYMENT_STATUS_LABEL_KEYS, paymentStatusTone } from "../labels";
 import { RECENT_PAYMENTS_QUERY_KEY, fetchRecentPayments } from "../queries";
 
 import type { Payment } from "../queries";
@@ -18,6 +19,7 @@ function formatPaymentAmount(payment: Payment): string {
  * to `payments/PaymentsListPage`, the same full history this feed previews.
  */
 export function RecentPaymentsFeedTile() {
+  const { t } = useTranslation();
   const { data, isPending, isError } = useQuery({
     queryKey: RECENT_PAYMENTS_QUERY_KEY,
     queryFn: fetchRecentPayments,
@@ -27,12 +29,12 @@ export function RecentPaymentsFeedTile() {
 
   return (
     <DashboardTile
-      title="Recent payments"
+      title={t("finance.tiles.payments.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load recent payments."
+      errorMessage={t("finance.tiles.payments.error")}
     >
       {payments.length === 0 ? (
-        <p className="dashboard-tile__caption">No payments recorded yet.</p>
+        <p className="dashboard-tile__caption">{t("finance.tiles.payments.empty")}</p>
       ) : (
         <ul className="finance-payments-feed" role="list">
           {payments.map((payment) => (
@@ -41,8 +43,8 @@ export function RecentPaymentsFeedTile() {
                 <p className="finance-payments-feed__amount">{formatPaymentAmount(payment)}</p>
                 <p className="dashboard-tile__caption">
                   {payment.payment_mode
-                    ? PAYMENT_MODE_LABELS[payment.payment_mode]
-                    : "Unknown mode"}{" "}
+                    ? t(PAYMENT_MODE_LABEL_KEYS[payment.payment_mode])
+                    : t("finance.paymentMode.unknown")}{" "}
                   · {payment.payment_date}
                 </p>
               </div>
@@ -50,7 +52,7 @@ export function RecentPaymentsFeedTile() {
                 className="dashboard-tile__status-pill"
                 data-tone={paymentStatusTone(payment.status)}
               >
-                {PAYMENT_STATUS_LABELS[payment.status]}
+                {t(PAYMENT_STATUS_LABEL_KEYS[payment.status])}
               </span>
             </li>
           ))}
@@ -58,7 +60,7 @@ export function RecentPaymentsFeedTile() {
       )}
 
       <Link className="dashboard-tile__link" to="/portal/finance/payments">
-        View all payments &rarr;
+        {t("finance.tiles.payments.viewAll")}
       </Link>
     </DashboardTile>
   );

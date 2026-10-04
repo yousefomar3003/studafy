@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useSeo } from "../../components/Seo";
 import { api } from "../../lib/api";
+import { Trans, useFormatters, useTranslation } from "../../lib/i18n";
 
 import type { components } from "@studafy/api-client";
 
@@ -19,9 +20,10 @@ type ConfirmedDeletion = components["schemas"]["AccountDeletionConfirmed"];
  * pressed: mail scanners open links on their own, and a GET must never delete an account.
  */
 export default function ConfirmAccountDeletionPage() {
+  const { t } = useTranslation();
   useSeo({
-    title: "Confirm account deletion",
-    description: "Confirm deletion of your Studafy account.",
+    title: t("onboarding.legal.confirmDeletion.seoTitle"),
+    description: t("onboarding.legal.confirmDeletion.seoDescription"),
     path: "/legal/delete-account/confirm",
   });
 
@@ -51,8 +53,8 @@ export default function ConfirmAccountDeletionPage() {
       const apiError = caught instanceof ApiError ? caught : null;
       setError(
         apiError?.code === "VERIFICATION_TOKEN_INVALID"
-          ? "This link is invalid, has expired, or has already been used."
-          : (apiError?.detail ?? "Something went wrong. Please try again."),
+          ? t("onboarding.legal.confirmDeletion.linkInvalid")
+          : (apiError?.detail ?? t("onboarding.common.genericError")),
       );
     } finally {
       setSubmitting(false);
@@ -66,17 +68,12 @@ export default function ConfirmAccountDeletionPage() {
           <DeletionResult result={result} />
         ) : (
           <>
-            <h1>Delete your account</h1>
+            <h1>{t("onboarding.legal.confirmDeletion.title")}</h1>
             {token ? (
               <>
+                <p>{t("onboarding.legal.confirmDeletion.body")}</p>
                 <p>
-                  This deletes the Studafy account registered to your email address, in every school
-                  it belongs to. Straight away, you are signed out on every device, the account is
-                  removed from the school, and any AI subscription is cancelled. Your name, contact
-                  details and profile are erased within 30 days.
-                </p>
-                <p>
-                  <strong>This cannot be undone.</strong>
+                  <strong>{t("onboarding.legal.confirmDeletion.irreversible")}</strong>
                 </p>
                 {error ? <p role="alert">{error}</p> : null}
                 <Button
@@ -85,15 +82,17 @@ export default function ConfirmAccountDeletionPage() {
                   loading={submitting}
                   onClick={handleConfirm}
                 >
-                  Delete my account
+                  {t("onboarding.legal.confirmDeletion.submit")}
                 </Button>
               </>
             ) : (
-              <p role="alert">This link is incomplete.</p>
+              <p role="alert">{t("onboarding.legal.confirmDeletion.linkIncomplete")}</p>
             )}
             {error || !token ? (
               <p>
-                <Link to="/legal/delete-account">Request a new link</Link>
+                <Link to="/legal/delete-account">
+                  {t("onboarding.legal.confirmDeletion.requestNewLink")}
+                </Link>
               </p>
             ) : null}
           </>
@@ -104,37 +103,42 @@ export default function ConfirmAccountDeletionPage() {
 }
 
 function DeletionResult({ result }: { result: ConfirmedDeletion }) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
+
   if (result.accounts.length === 0) {
     return (
       <>
-        <h1>Nothing to delete</h1>
-        <p role="status">
-          There is no active Studafy account for this email address any more. It may already have
-          been deleted.
-        </p>
+        <h1>{t("onboarding.legal.confirmDeletion.nothingTitle")}</h1>
+        <p role="status">{t("onboarding.legal.confirmDeletion.nothingBody")}</p>
       </>
     );
   }
 
   return (
     <>
-      <h1>Your account has been deleted</h1>
+      <h1>{t("onboarding.legal.confirmDeletion.deletedTitle")}</h1>
       <ul role="status">
         {result.accounts.map((account) => (
           <li key={account.request_id}>
-            {account.school_name}: personal data erased by{" "}
-            {new Date(account.completes_by).toLocaleDateString()}.
+            {t("onboarding.legal.confirmDeletion.erasedBy", {
+              school: account.school_name,
+              date: formatDate(new Date(account.completes_by)),
+            })}
           </li>
         ))}
       </ul>
-      <p>We have emailed you a confirmation. Your school keeps only these records:</p>
+      <p>{t("onboarding.legal.confirmDeletion.retainedIntro")}</p>
       <ul>
         {result.retained_records.map((record) => (
           <li key={record.category}>{record.description}</li>
         ))}
       </ul>
       <p>
-        See the <Link to="/privacy">privacy policy</Link> for why.
+        <Trans
+          i18nKey="onboarding.legal.confirmDeletion.seePrivacy"
+          components={{ privacyLink: <Link to="/privacy" /> }}
+        />
       </p>
     </>
   );

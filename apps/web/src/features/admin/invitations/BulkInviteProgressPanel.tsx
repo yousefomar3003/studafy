@@ -4,20 +4,22 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api } from "../../../lib/api";
+import { useTranslation } from "../../../lib/i18n";
 
 import { useRetryBulkInvite } from "./mutations";
 import { fetchBulkInviteRecipientsPage } from "./queries";
-import { BULK_INVITE_STATUS_LABELS, BULK_RECIPIENT_STATUS_LABELS } from "./schema";
+import {
+  BULK_INVITE_STATUS_LABEL_KEYS,
+  BULK_RECIPIENT_STATUS_LABEL_KEYS,
+  ROLE_LABEL_KEYS,
+} from "./schema";
 
 import type { BulkInviteRecipient, BulkInviteRecipientStatus } from "./queries";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
-const STATUS_OPTIONS: SelectOption<BulkInviteRecipientStatus | "">[] = [
-  { value: "", label: "All statuses" },
-  ...(Object.entries(BULK_RECIPIENT_STATUS_LABELS) as [BulkInviteRecipientStatus, string][]).map(
-    ([value, label]) => ({ value, label }),
-  ),
-];
+function isRole(value: string): value is keyof typeof ROLE_LABEL_KEYS {
+  return Object.hasOwn(ROLE_LABEL_KEYS, value);
+}
 
 /** Batches still being worked are polled; terminal batches (completed/failed) are fetched once. */
 const IN_FLIGHT_STATUSES = new Set(["pending", "processing"]);
@@ -35,9 +37,17 @@ export interface BulkInviteProgressPanelProps {
  * so this is the "live" progress view, not a one-shot result screen.
  */
 export function BulkInviteProgressPanel({ bulkInviteId, onClose }: BulkInviteProgressPanelProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const retryBulkInvite = useRetryBulkInvite();
   const open = bulkInviteId !== null;
+
+  const statusOptions: SelectOption<BulkInviteRecipientStatus | "">[] = [
+    { value: "", label: t("adminPeople.invitations.progress.allStatuses") },
+    ...(
+      Object.entries(BULK_RECIPIENT_STATUS_LABEL_KEYS) as [BulkInviteRecipientStatus, string][]
+    ).map(([value, key]) => ({ value, label: t(key) })),
+  ];
 
   const [statusFilter, setStatusFilter] = useState<BulkInviteRecipientStatus | "">("");
   const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -78,12 +88,12 @@ export function BulkInviteProgressPanel({ bulkInviteId, onClose }: BulkInvitePro
     if (!bulkInviteId) return;
     retryBulkInvite.mutate(bulkInviteId, {
       onSuccess: () => {
-        show({ variant: "success", title: "Retrying failed recipients" });
+        show({ variant: "success", title: t("adminPeople.invitations.progress.retryingToast") });
       },
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't retry",
+          title: t("adminPeople.invitations.progress.retryError"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
       },
@@ -97,19 +107,23 @@ export function BulkInviteProgressPanel({ bulkInviteId, onClose }: BulkInvitePro
       : 0;
 
   const columns: DataGridColumn<BulkInviteRecipient>[] = [
-    { id: "email", header: "Email", renderCell: (row) => row.email },
+    {
+      id: "email",
+      header: t("adminPeople.invitations.progress.columns.email"),
+      renderCell: (row) => row.email,
+    },
     {
       id: "status",
-      header: "Status",
+      header: t("adminPeople.invitations.progress.columns.status"),
       renderCell: (row) => (
         <span className="invitations-status-pill" data-status={row.status}>
-          {BULK_RECIPIENT_STATUS_LABELS[row.status]}
+          {t(BULK_RECIPIENT_STATUS_LABEL_KEYS[row.status])}
         </span>
       ),
     },
     {
       id: "error",
-      header: "Error",
+      header: t("adminPeople.invitations.progress.columns.error"),
       renderCell: (row) => row.error_message ?? "—",
     },
   ];
@@ -118,30 +132,37 @@ export function BulkInviteProgressPanel({ bulkInviteId, onClose }: BulkInvitePro
     <Modal
       open={open}
       onClose={handleClose}
-      title="Bulk invite progress"
-      description={batch ? `${BULK_INVITE_STATUS_LABELS[batch.status]} — ${batch.role}` : undefined}
+      title={t("adminPeople.invitations.progress.title")}
+      description={
+        batch
+          ? t("adminPeople.invitations.progress.description", {
+              status: t(BULK_INVITE_STATUS_LABEL_KEYS[batch.status]),
+              role: isRole(batch.role) ? t(ROLE_LABEL_KEYS[batch.role]) : batch.role,
+            })
+          : undefined
+      }
     >
       <Modal.Body>
         {batch ? (
           <>
             <dl className="invitations-bulk-progress__stats">
               <div>
-                <dt>Total</dt>
+                <dt>{t("adminPeople.invitations.progress.total")}</dt>
                 <dd>{batch.total_count}</dd>
               </div>
               <div>
-                <dt>Sent</dt>
+                <dt>{t("adminPeople.invitations.progress.sent")}</dt>
                 <dd>{batch.sent_count}</dd>
               </div>
               <div>
-                <dt>Failed</dt>
+                <dt>{t("adminPeople.invitations.progress.failed")}</dt>
                 <dd>{batch.failed_count}</dd>
               </div>
             </dl>
             <div
               className="invitations-bulk-progress__meter"
               role="progressbar"
-              aria-label="Dispatch progress"
+              aria-label={t("adminPeople.invitations.progress.dispatchProgress")}
               aria-valuenow={progressPercent}
               aria-valuemin={0}
               aria-valuemax={100}
@@ -153,13 +174,13 @@ export function BulkInviteProgressPanel({ bulkInviteId, onClose }: BulkInvitePro
             </div>
           </>
         ) : (
-          <p role="status">Loading…</p>
+          <p role="status">{t("adminPeople.common.loading")}</p>
         )}
 
         <div className="invitations-bulk-progress__toolbar">
           <Select
-            label="Filter by status"
-            options={STATUS_OPTIONS}
+            label={t("adminPeople.invitations.progress.filterByStatus")}
+            options={statusOptions}
             value={statusFilter}
             onChange={(value) => {
               setStatusFilter(value);
@@ -169,13 +190,13 @@ export function BulkInviteProgressPanel({ bulkInviteId, onClose }: BulkInvitePro
           />
           {batch && batch.failed_count > 0 && batch.status !== "processing" ? (
             <Button variant="secondary" loading={retryBulkInvite.isPending} onClick={handleRetry}>
-              Retry failed
+              {t("adminPeople.invitations.progress.retryFailed")}
             </Button>
           ) : null}
         </div>
 
         <DataGrid
-          caption="Recipients"
+          caption={t("adminPeople.invitations.progress.caption")}
           columns={columns}
           rows={recipientsQuery.data?.recipients ?? []}
           getRowId={(row) => row.id}
@@ -184,8 +205,8 @@ export function BulkInviteProgressPanel({ bulkInviteId, onClose }: BulkInvitePro
           loading={recipientsQuery.isPending}
           empty={
             recipientsQuery.isError
-              ? "Unable to load recipients."
-              : "No recipients match this filter."
+              ? t("adminPeople.invitations.progress.loadError")
+              : t("adminPeople.invitations.progress.empty")
           }
         />
 
@@ -200,7 +221,7 @@ export function BulkInviteProgressPanel({ bulkInviteId, onClose }: BulkInvitePro
               setCursor(previous);
             }}
           >
-            Previous
+            {t("adminPeople.common.previous")}
           </Button>
           <Button
             variant="secondary"
@@ -212,7 +233,7 @@ export function BulkInviteProgressPanel({ bulkInviteId, onClose }: BulkInvitePro
               setCursor(nextCursor);
             }}
           >
-            Next
+            {t("adminPeople.common.next")}
           </Button>
         </div>
       </Modal.Body>

@@ -1,6 +1,8 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Modal, useToast } from "@studafy/ui";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useRevokeInvitation } from "./mutations";
 
 import type { InvitationWithStatus } from "./queries";
@@ -15,6 +17,7 @@ export interface RevokeInvitationDialogProps {
  * link — irreversible from this screen, same as `DeactivateUserDialog` for users.
  */
 export function RevokeInvitationDialog({ invitation, onClose }: RevokeInvitationDialogProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const revokeInvitation = useRevokeInvitation();
 
@@ -22,13 +25,16 @@ export function RevokeInvitationDialog({ invitation, onClose }: RevokeInvitation
     if (!invitation) return;
     revokeInvitation.mutate(invitation.id, {
       onSuccess: () => {
-        show({ variant: "success", title: `Invitation to ${invitation.email} revoked` });
+        show({
+          variant: "success",
+          title: t("adminPeople.invitations.revoke.successToast", { email: invitation.email }),
+        });
         onClose();
       },
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't revoke invitation",
+          title: t("adminPeople.invitations.revoke.error"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
       },
@@ -39,18 +45,15 @@ export function RevokeInvitationDialog({ invitation, onClose }: RevokeInvitation
     <Modal
       open={invitation !== null}
       onClose={onClose}
-      title="Revoke invitation"
+      title={t("adminPeople.invitations.revoke.title")}
       description={invitation?.email}
     >
       <Modal.Body>
-        <p>
-          The invite link stops working immediately. This cannot be undone from this screen — send a
-          new invitation if they still need access.
-        </p>
+        <p>{t("adminPeople.invitations.revoke.body")}</p>
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>
-          Cancel
+          {t("adminPeople.common.cancel")}
         </Button>
         <Button
           type="button"
@@ -58,7 +61,7 @@ export function RevokeInvitationDialog({ invitation, onClose }: RevokeInvitation
           loading={revokeInvitation.isPending}
           onClick={handleConfirm}
         >
-          Revoke
+          {t("adminPeople.invitations.revoke.confirm")}
         </Button>
       </Modal.Footer>
     </Modal>

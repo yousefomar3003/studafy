@@ -1,6 +1,8 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
+import { i18next } from "../../../lib/i18n/i18next";
+
 import {
   assignColumn,
   confirmBlocker,
@@ -11,6 +13,9 @@ import {
   parentPairWarning,
   withPartialSuggestions,
 } from "./columnMapping";
+
+// The helpers take the caller's `t`; the default-language instance renders the English catalog.
+const t = i18next.getFixedT("en");
 
 const COMPLETE = {
   admission_number: "Student ID",
@@ -96,22 +101,22 @@ describe("missingRequiredFields / isSameMapping / mappingFitsHeaders", () => {
 
 describe("parentPairWarning", () => {
   test("warns only when exactly one of parent email and relationship is mapped", () => {
-    expect(parentPairWarning(COMPLETE)).toBeNull();
-    expect(parentPairWarning({ parent_email: "a", parent_relationship: "b" })).toBeNull();
-    expect(parentPairWarning({ parent_email: "a" })).toContain("Parent relationship");
+    expect(parentPairWarning(COMPLETE, t)).toBeNull();
+    expect(parentPairWarning({ parent_email: "a", parent_relationship: "b" }, t)).toBeNull();
+    expect(parentPairWarning({ parent_email: "a" }, t)).toContain("Parent relationship");
   });
 });
 
 describe("confirmBlocker", () => {
   test("blocks on missing required fields first, naming them", () => {
-    expect(confirmBlocker({ admission_number: "Student ID" }, {}, 0)).toBe(
+    expect(confirmBlocker({ admission_number: "Student ID" }, {}, 0, t)).toBe(
       "Map a column to every required field before confirming. Missing: Student email, First name, Last name.",
     );
   });
 
   test("blocks on unapplied changes, then on no valid rows", () => {
-    expect(confirmBlocker(COMPLETE, {}, 5)).toContain("Apply it");
-    expect(confirmBlocker(COMPLETE, COMPLETE, 0)).toContain("No rows passed validation");
-    expect(confirmBlocker(COMPLETE, COMPLETE, 5)).toBeNull();
+    expect(confirmBlocker(COMPLETE, {}, 5, t)).toContain("Apply it");
+    expect(confirmBlocker(COMPLETE, COMPLETE, 0, t)).toContain("No rows passed validation");
+    expect(confirmBlocker(COMPLETE, COMPLETE, 5, t)).toBeNull();
   });
 });

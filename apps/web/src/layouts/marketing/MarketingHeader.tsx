@@ -1,6 +1,11 @@
 import { NavLink } from "react-router-dom";
 
+import { BrandLogo } from "../../components/BrandLogo";
 import { LinkButton } from "../../components/LinkButton";
+import { LocaleSwitcher } from "../../components/LocaleSwitcher";
+import { usePublicAuthStatus } from "../../lib/auth";
+import { useTranslation } from "../../lib/i18n";
+import { UserMenu } from "../portal/UserMenu";
 
 import { MARKETING_NAV_ITEMS } from "./nav-items";
 
@@ -13,16 +18,19 @@ export interface MarketingHeaderProps {
 
 /**
  * Public site header: brand, primary nav, and the two real entry points into the app — sign in for
- * existing schools, and a contact link for prospects. There is no self-serve signup route yet (only
+ * existing schools (replaced by the account menu once signed in), and a contact link for prospects. There is no self-serve signup route yet (only
  * `/auth/login` and invitation-based onboarding exist), so the primary CTA goes to the contact
  * section on the About page rather than a page that doesn't exist.
  */
 export function MarketingHeader({ navId, navOpen, onToggleNav }: MarketingHeaderProps) {
+  const { t } = useTranslation();
+  const signedIn = usePublicAuthStatus() === "authenticated";
+
   return (
     <header className="marketing-header">
       <div className="marketing-header__row">
         <NavLink to="/" className="marketing-header__brand" end>
-          Studafy
+          <BrandLogo />
         </NavLink>
 
         <button
@@ -40,10 +48,15 @@ export function MarketingHeader({ navId, navOpen, onToggleNav }: MarketingHeader
               strokeLinecap="round"
             />
           </svg>
-          <span className="sf-visually-hidden">Toggle navigation</span>
+          <span className="sf-visually-hidden">{t("shell.toggleNav")}</span>
         </button>
 
-        <nav id={navId} aria-label="Primary" className="marketing-nav" data-open={navOpen}>
+        <nav
+          id={navId}
+          aria-label={t("shell.primaryNavAriaLabel")}
+          className="marketing-nav"
+          data-open={navOpen}
+        >
           <ul className="marketing-nav__list">
             {MARKETING_NAV_ITEMS.map((item) => (
               <li key={item.to}>
@@ -56,18 +69,23 @@ export function MarketingHeader({ navId, navOpen, onToggleNav }: MarketingHeader
                       : "marketing-nav__link"
                   }
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </NavLink>
               </li>
             ))}
           </ul>
 
           <div className="marketing-nav__actions">
-            <LinkButton variant="tertiary" href="/auth/login">
-              Sign in
-            </LinkButton>
+            <LocaleSwitcher />
+            {signedIn ? (
+              <UserMenu />
+            ) : (
+              <LinkButton variant="tertiary" href="/auth/login">
+                {t("site.marketing.header.signIn")}
+              </LinkButton>
+            )}
             <LinkButton variant="primary" href="/about#contact">
-              Talk to us
+              {t("site.marketing.header.talkToUs")}
             </LinkButton>
           </div>
         </nav>

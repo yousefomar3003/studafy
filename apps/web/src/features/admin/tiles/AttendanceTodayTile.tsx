@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { DashboardTile } from "../../../components/DashboardTile";
 import { api } from "../../../lib/api";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 /** No realtime event is routed for attendance marks yet, so this polls instead. */
 const ATTENDANCE_TODAY_POLL_MS = 60_000;
@@ -20,6 +21,8 @@ function todayDateString(): string {
  * dedicated "today" scalar, so only `totals` from the response is used here.
  */
 export function AttendanceTodayTile() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const today = todayDateString();
 
   const { data, isPending, isError } = useQuery({
@@ -38,18 +41,23 @@ export function AttendanceTodayTile() {
 
   return (
     <DashboardTile
-      title="Attendance today"
+      title={t("adminSchool.tiles.attendance.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load today's attendance."
+      errorMessage={t("adminSchool.tiles.attendance.error")}
     >
       {totalRecords === 0 || !totals ? (
-        <p className="dashboard-tile__caption">No attendance recorded yet today.</p>
+        <p className="dashboard-tile__caption">{t("adminSchool.tiles.attendance.empty")}</p>
       ) : (
         <>
-          <p className="dashboard-tile__value">{Math.round(totals.present_percent)}%</p>
+          <p className="dashboard-tile__value">
+            {formatNumber(Math.round(totals.present_percent) / 100, { style: "percent" })}
+          </p>
           <p className="dashboard-tile__caption">
-            {totals.present_count} present of {totalRecords} record
-            {totalRecords === 1 ? "" : "s"}
+            {t("adminSchool.tiles.attendance.summary", {
+              count: totalRecords,
+              present: formatNumber(totals.present_count),
+              total: formatNumber(totalRecords),
+            })}
           </p>
         </>
       )}

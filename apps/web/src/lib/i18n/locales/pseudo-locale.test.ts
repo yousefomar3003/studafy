@@ -1,7 +1,7 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import en from "./en.json";
+import { enCatalog } from "./catalog";
 import { pseudoizeCatalog } from "./pseudo-locale";
 import qpsPloc from "./qps-ploc.json";
 
@@ -12,7 +12,7 @@ import qpsPloc from "./qps-ploc.json";
  * locale silently drifting out of date.
  */
 describe("qps-ploc.json", () => {
-  test("matches pseudoizeCatalog(en.json)", () => {
-    expect(qpsPloc).toEqual(pseudoizeCatalog(en) as typeof qpsPloc);
+  test("matches pseudoizeCatalog(enCatalog)", () => {
+    expect(qpsPloc).toEqual(pseudoizeCatalog(enCatalog) as typeof qpsPloc);
   });
 });

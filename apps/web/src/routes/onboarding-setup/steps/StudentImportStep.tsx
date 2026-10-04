@@ -17,6 +17,7 @@ import { HelpLink } from "../../../features/help/HelpLink";
 import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
 import { api } from "../../../lib/api";
 import { buildImportErrorReportCsv, downloadTextFile } from "../../../lib/csv";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import type { StudentImportProgress } from "../progress";
 import type { components } from "@studafy/api-client";
@@ -37,6 +38,8 @@ export interface StudentImportStepProps {
  * is no error-report file endpoint). `POST .../confirm` is a separate, explicit action.
  */
 export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImportStepProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const [importRecord, setImportRecord] = useState<ImportRecord | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
 
@@ -74,7 +77,7 @@ export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImpor
     },
     onError: (error: unknown) => {
       const apiError = error instanceof ApiError ? error : null;
-      setBanner(apiError?.detail || "Could not validate that file. Please try again.");
+      setBanner(apiError?.detail || t("onboarding.setup.students.uploadError"));
     },
   });
 
@@ -91,7 +94,7 @@ export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImpor
     },
     onError: (error: unknown) => {
       const apiError = error instanceof ApiError ? error : null;
-      setBanner(apiError?.detail || "Could not confirm the import. Please try again.");
+      setBanner(apiError?.detail || t("onboarding.setup.students.confirmError"));
     },
   });
 
@@ -122,20 +125,22 @@ export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImpor
   return (
     <Card>
       <CardBody>
-        <h2>Student import</h2>
+        <h2>{t("onboarding.setup.students.title")}</h2>
         <p>
-          <HelpLink to={onboardingStepHelpPath("students")}>Need help with this step?</HelpLink>
+          <HelpLink to={onboardingStepHelpPath("students")}>
+            {t("onboarding.setup.needHelp")}
+          </HelpLink>
         </p>
 
         {banner ? <p role="alert">{banner}</p> : null}
 
         {!record ? (
           <>
-            <p>Upload a CSV of students to validate. Nothing is saved until you confirm.</p>
+            <p>{t("onboarding.setup.students.description")}</p>
             <Button type="button" variant="secondary" onClick={handleDownloadTemplate}>
-              Download CSV template
+              {t("onboarding.setup.students.downloadTemplate")}
             </Button>
-            <label htmlFor="student-csv-file">Student CSV file</label>
+            <label htmlFor="student-csv-file">{t("onboarding.setup.students.fileLabel")}</label>
             <input
               id="student-csv-file"
               type="file"
@@ -143,27 +148,33 @@ export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImpor
               onChange={handleFileChange}
               disabled={uploadMutation.isPending}
             />
-            {uploadMutation.isPending ? <p aria-live="polite">Validating…</p> : null}
+            {uploadMutation.isPending ? (
+              <p aria-live="polite">{t("onboarding.setup.students.validating")}</p>
+            ) : null}
           </>
         ) : (
           <>
             <dl>
-              <dt>Rows in file</dt>
-              <dd>{record.row_count}</dd>
-              <dt>Valid rows</dt>
-              <dd>{record.valid_rows}</dd>
-              <dt>Rows with errors</dt>
-              <dd>{record.error_rows}</dd>
+              <dt>{t("onboarding.setup.students.rowCount")}</dt>
+              <dd>{formatNumber(record.row_count)}</dd>
+              <dt>{t("onboarding.setup.students.validRows")}</dt>
+              <dd>{formatNumber(record.valid_rows)}</dd>
+              <dt>{t("onboarding.setup.students.errorRows")}</dt>
+              <dd>{formatNumber(record.error_rows)}</dd>
             </dl>
 
             {record.error_rows > 0 ? (
               <>
-                <Table caption="Row-level validation errors">
+                <Table caption={t("onboarding.setup.students.errorsCaption")}>
                   <TableHeader>
                     <TableRow>
-                      <TableHeaderCell>Line</TableHeaderCell>
-                      <TableHeaderCell>Field</TableHeaderCell>
-                      <TableHeaderCell>Message</TableHeaderCell>
+                      <TableHeaderCell>{t("onboarding.setup.students.columnLine")}</TableHeaderCell>
+                      <TableHeaderCell>
+                        {t("onboarding.setup.students.columnField")}
+                      </TableHeaderCell>
+                      <TableHeaderCell>
+                        {t("onboarding.setup.students.columnMessage")}
+                      </TableHeaderCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody columnCount={3}>
@@ -177,7 +188,7 @@ export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImpor
                   </TableBody>
                 </Table>
                 <Button type="button" variant="secondary" onClick={handleDownloadErrorReport}>
-                  Download error report
+                  {t("onboarding.setup.students.downloadErrors")}
                 </Button>
               </>
             ) : null}
@@ -186,9 +197,9 @@ export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImpor
             record.status === "processing" ||
             record.status === "completed" ? (
               <>
-                <p>Import confirmed. Students are being created in the background.</p>
+                <p>{t("onboarding.setup.students.confirmed")}</p>
                 <Button type="button" onClick={handleContinue}>
-                  Continue
+                  {t("onboarding.setup.students.continue")}
                 </Button>
               </>
             ) : (
@@ -199,10 +210,10 @@ export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImpor
                   loading={confirmMutation.isPending}
                   disabled={record.valid_rows === 0}
                 >
-                  Confirm import ({record.valid_rows} students)
+                  {t("onboarding.setup.students.confirm", { count: record.valid_rows })}
                 </Button>
                 <Button type="button" variant="tertiary" onClick={() => setImportRecord(null)}>
-                  Upload a different file
+                  {t("onboarding.setup.students.uploadAnother")}
                 </Button>
               </>
             )}
@@ -210,7 +221,7 @@ export function StudentImportStep({ cachedImport, onNext, onSkip }: StudentImpor
         )}
 
         <Button type="button" variant="tertiary" onClick={onSkip}>
-          Skip for now
+          {t("onboarding.setup.skipForNow")}
         </Button>
       </CardBody>
     </Card>

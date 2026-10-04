@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { DashboardTile } from "../../../components/DashboardTile";
 import { api } from "../../../lib/api";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 /**
  * Reuses the exact `["approval-queue"]` key the sidebar's `ApprovalQueueBadge` uses, so this tile
@@ -9,6 +10,8 @@ import { api } from "../../../lib/api";
  * realtime wiring needed here.
  */
 export function PendingApprovalsTile() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const { data, isPending, isError } = useQuery({
     queryKey: ["approval-queue"],
     queryFn: async () => {
@@ -21,13 +24,15 @@ export function PendingApprovalsTile() {
 
   return (
     <DashboardTile
-      title="Pending approvals"
+      title={t("adminSchool.tiles.approvals.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load the approval queue."
+      errorMessage={t("adminSchool.tiles.approvals.error")}
     >
-      <p className="dashboard-tile__value">{total}</p>
+      <p className="dashboard-tile__value">{formatNumber(total)}</p>
       <p className="dashboard-tile__caption">
-        {total === 0 ? "Nothing is waiting on your review." : "awaiting review"}
+        {total === 0
+          ? t("adminSchool.tiles.approvals.empty")
+          : t("adminSchool.tiles.approvals.awaiting")}
       </p>
     </DashboardTile>
   );

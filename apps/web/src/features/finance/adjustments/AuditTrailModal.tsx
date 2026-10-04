@@ -2,9 +2,11 @@ import { Modal } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
+import { Trans, useFormatters, useTranslation } from "../../../lib/i18n";
 import { buildAuditDiff, formatAuditValue } from "../../admin/audit/diff";
 
 import type { AuditLogEntry } from "../../admin/audit/queries";
+import type { TFunction } from "i18next";
 
 export interface AuditTrailTarget {
   /** Present for a closed dialog too, so `AuditTrailModal` can be mounted unconditionally and just
@@ -26,8 +28,21 @@ export interface AuditTrailModalProps {
   onClose: () => void;
 }
 
-function actorLabel(entry: AuditLogEntry): string {
-  return entry.actor_name ?? entry.actor_email ?? "System";
+// Same fields `Date#toLocaleString()` renders (numeric date plus time to the second), bound to the
+// app's active locale rather than the browser's.
+const ENTRY_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+};
+
+function actorLabel(entry: AuditLogEntry, t: TFunction): string {
+  return (
+    entry.actor_name ?? entry.actor_email ?? t("financeReports.adjustments.auditTrailModal.system")
+  );
 }
 
 function carriesRecordId(values: Record<string, unknown> | null, recordId: string): boolean {
@@ -43,6 +58,8 @@ function carriesRecordId(values: Record<string, unknown> | null, recordId: strin
  * matching this codebase's per-feature stylesheet convention (see `payments.css`'s doc comment).
  */
 export function AuditTrailModal({ target, onClose }: AuditTrailModalProps) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const query = useQuery({
     queryKey: ["finance", "adjustments", "audit-trail", target?.targetTable, target?.targetId],
     queryFn: async () => {
@@ -73,16 +90,16 @@ export function AuditTrailModal({ target, onClose }: AuditTrailModalProps) {
     <Modal
       open={target !== null}
       onClose={onClose}
-      title="Audit trail"
-      description="Every recorded change to this record, oldest first."
+      title={t("financeReports.adjustments.auditTrailModal.title")}
+      description={t("financeReports.adjustments.auditTrailModal.description")}
     >
       <Modal.Body>
         {query.isPending ? (
-          <p role="status">Loading…</p>
+          <p role="status">{t("financeReports.adjustments.auditTrailModal.loading")}</p>
         ) : query.isError ? (
-          <p role="alert">Couldn't load the audit trail.</p>
+          <p role="alert">{t("financeReports.adjustments.auditTrailModal.loadError")}</p>
         ) : entries.length === 0 ? (
-          <p>No audit entries recorded yet.</p>
+          <p>{t("financeReports.adjustments.auditTrailModal.empty")}</p>
         ) : (
           <ul className="adjustments-audit-trail">
             {[...entries].reverse().map((entry) => {
@@ -90,8 +107,16 @@ export function AuditTrailModal({ target, onClose }: AuditTrailModalProps) {
               return (
                 <li key={entry.id} className="adjustments-audit-trail__entry">
                   <p className="adjustments-audit-trail__meta">
-                    <strong>{entry.action}</strong> by {actorLabel(entry)} &middot;{" "}
-                    {new Date(entry.created_at).toLocaleString()}
+                    <Trans
+                      t={t}
+                      i18nKey="financeReports.adjustments.auditTrailModal.entryMeta"
+                      values={{
+                        action: entry.action,
+                        actor: actorLabel(entry, t),
+                        date: formatDate(new Date(entry.created_at), ENTRY_DATE_OPTIONS),
+                      }}
+                      components={{ strong: <strong /> }}
+                    />
                   </p>
                   {rows.length > 0 ? (
                     <ul className="adjustments-audit-trail__fields">

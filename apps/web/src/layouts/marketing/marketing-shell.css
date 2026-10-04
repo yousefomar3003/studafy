@@ -29,11 +29,6 @@
   letter-spacing: var(--tracking-tight);
 }
 
-.marketing-header__nav-toggle {
-  display: none;
-  margin-left: auto;
-}
-
 .marketing-icon-button {
   display: inline-flex;
   align-items: center;
@@ -56,11 +51,17 @@
   outline-offset: var(--focus-ring-offset);
 }
 
+/* Must follow .marketing-icon-button: same specificity, and that rule's display would win. */
+.marketing-header__nav-toggle {
+  display: none;
+  margin-inline-start: auto;
+}
+
 .marketing-nav {
   display: flex;
   align-items: center;
   gap: var(--space-32);
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .marketing-nav__list {
@@ -167,12 +168,11 @@
   .marketing-nav {
     position: absolute;
     top: 64px;
-    left: 0;
-    right: 0;
+    inset-inline: 0;
     flex-direction: column;
     align-items: stretch;
     gap: var(--space-16);
-    margin-left: 0;
+    margin-inline-start: 0;
     padding: var(--space-16) var(--space-24) var(--space-24);
     background-color: var(--color-background);
     border-bottom: 1px solid var(--color-border);

@@ -2,19 +2,16 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useUpdateUser, useUpdateUserRole } from "./mutations";
-import { ASSIGNABLE_ROLES, editUserSchema, fieldErrors, ROLE_LABELS } from "./schema";
+import { ASSIGNABLE_ROLES, editUserSchema, fieldErrors, ROLE_LABEL_KEYS } from "./schema";
 
 import type { UserWithRoles } from "./queries";
 import type { EditUserValues } from "./schema";
 import type { Role } from "@studafy/constants";
 import type { FormEvent } from "react";
 
-const ROLE_OPTIONS = ASSIGNABLE_ROLES.map((role) => ({
-  value: role,
-  // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `ASSIGNABLE_ROLES` array, not user input
-  label: ROLE_LABELS[role],
-}));
 const EMPTY_VALUES: EditUserValues = { display_name: "", role: ASSIGNABLE_ROLES[0]! };
 
 function valuesFor(user: UserWithRoles): EditUserValues {
@@ -34,8 +31,15 @@ export interface EditUserModalProps {
 
 /** Combines `PATCH /api/users/{userId}` (display name) and `PATCH .../role` behind one save action. */
 export function EditUserModal({ user, onClose }: EditUserModalProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const updateUser = useUpdateUser();
+
+  const roleOptions = ASSIGNABLE_ROLES.map((role) => ({
+    value: role,
+    // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `ASSIGNABLE_ROLES` array, not user input
+    label: t(ROLE_LABEL_KEYS[role]),
+  }));
   const updateUserRole = useUpdateUserRole();
 
   const [values, setValues] = useState<EditUserValues>(() =>
@@ -85,31 +89,36 @@ export function EditUserModal({ user, onClose }: EditUserModalProps) {
 
     try {
       await Promise.all(tasks);
-      show({ variant: "success", title: "User updated" });
+      show({ variant: "success", title: t("adminPeople.users.edit.updatedToast") });
       onClose();
     } catch (error) {
       show({
         variant: "error",
-        title: "Couldn't save changes",
+        title: t("adminPeople.users.edit.error"),
         description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
       });
     }
   }
 
   return (
-    <Modal open={user !== null} onClose={onClose} title="Edit user" description={user?.email}>
-      <form onSubmit={handleSubmit} noValidate aria-label="Edit user">
+    <Modal
+      open={user !== null}
+      onClose={onClose}
+      title={t("adminPeople.users.edit.title")}
+      description={user?.email}
+    >
+      <form onSubmit={handleSubmit} noValidate aria-label={t("adminPeople.users.edit.title")}>
         <Modal.Body>
           <Input
-            label="Display name"
+            label={t("adminPeople.users.form.displayName")}
             value={values.display_name}
             onChange={(e) => setField("display_name", e.target.value)}
-            error={errors.display_name}
+            error={errors.display_name && t(errors.display_name)}
             required
           />
           <Select
-            label="Role"
-            options={ROLE_OPTIONS}
+            label={t("adminPeople.users.form.role")}
+            options={roleOptions}
             value={values.role}
             onChange={(value) => setField("role", value)}
             required
@@ -117,10 +126,10 @@ export function EditUserModal({ user, onClose }: EditUserModalProps) {
         </Modal.Body>
         <Modal.Footer>
           <Button type="button" variant="tertiary" onClick={onClose}>
-            Cancel
+            {t("adminPeople.common.cancel")}
           </Button>
           <Button type="submit" loading={saving}>
-            Save changes
+            {t("adminPeople.common.saveChanges")}
           </Button>
         </Modal.Footer>
       </form>

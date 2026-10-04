@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
+import { useTranslation } from "../../../lib/i18n";
 import {
   COLLECTIONS_VS_DUE_QUERY_KEY,
   fetchCollectionsVsDueReport,
@@ -18,6 +19,7 @@ const PREVIEW_LIMIT = 5;
  * tiles rather than fetching the same report twice.
  */
 export function OverdueInstallmentsListTile() {
+  const { t } = useTranslation();
   const { data, isPending, isError } = useQuery({
     queryKey: COLLECTIONS_VS_DUE_QUERY_KEY,
     queryFn: fetchCollectionsVsDueReport,
@@ -28,16 +30,14 @@ export function OverdueInstallmentsListTile() {
 
   return (
     <DashboardTile
-      title="Overdue installments"
+      title={t("finance.tiles.overdue.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load overdue installments."
+      errorMessage={t("finance.tiles.overdue.error")}
     >
       {installments === null ? (
-        <p className="dashboard-tile__caption">
-          The collections report didn&rsquo;t include the columns this needs.
-        </p>
+        <p className="dashboard-tile__caption">{t("finance.tiles.overdue.missingColumns")}</p>
       ) : preview.length === 0 ? (
-        <p className="dashboard-tile__caption">Nothing is overdue.</p>
+        <p className="dashboard-tile__caption">{t("finance.tiles.overdue.empty")}</p>
       ) : (
         <ul className="finance-overdue-list" role="list">
           {preview.map((installment, index) => (
@@ -48,7 +48,10 @@ export function OverdueInstallmentsListTile() {
               <div>
                 <p className="finance-overdue-list__party">{installment.partyName || "—"}</p>
                 <p className="dashboard-tile__caption">
-                  Due {installment.dueDate} · {installment.daysOverdue}d overdue
+                  {t("finance.tiles.overdue.dueLine", {
+                    date: installment.dueDate,
+                    count: installment.daysOverdue,
+                  })}
                 </p>
               </div>
               <span className="finance-overdue-list__amount">{installment.outstandingDisplay}</span>
@@ -58,7 +61,7 @@ export function OverdueInstallmentsListTile() {
       )}
 
       <Link className="dashboard-tile__link" to="/portal/finance/overdue">
-        View all overdue installments →
+        {t("finance.tiles.overdue.viewAll")}
       </Link>
     </DashboardTile>
   );

@@ -6,10 +6,11 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuth, usePermissions } from "../../../lib/auth";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { AdjustmentConfirmDialog } from "./AdjustmentConfirmDialog";
 import { AuditTrailModal } from "./AuditTrailModal";
-import { REASON_CODE_LABELS, REFUND_STATUS_LABELS, refundStatusTone } from "./labels";
+import { REASON_CODE_LABEL_KEYS, REFUND_STATUS_LABEL_KEYS, refundStatusTone } from "./labels";
 import { useApproveRefund } from "./mutations";
 import { fetchRefundsPage, REFUNDS_PAGE_SIZE } from "./queries";
 import { RejectRefundModal } from "./RejectRefundModal";
@@ -19,14 +20,6 @@ import "./adjustments.css";
 import type { AuditTrailTarget } from "./AuditTrailModal";
 import type { Refund, RefundFilters, RefundStatus } from "./queries";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
-
-const STATUS_OPTIONS: SelectOption<RefundStatus | "">[] = [
-  { value: "", label: "All statuses" },
-  ...(Object.entries(REFUND_STATUS_LABELS) as [RefundStatus, string][]).map(([value, label]) => ({
-    value,
-    label,
-  })),
-];
 
 function apiErrorMessage(error: unknown, fallback: string): string {
   if (!(error instanceof ApiError)) return fallback;
@@ -41,6 +34,8 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  * offering a control that would always 403.
  */
 export default function RefundsListPage() {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { show } = useToast();
   const { userId } = useAuth();
   const permissions = usePermissions();
@@ -54,6 +49,13 @@ export default function RefundsListPage() {
   const [approveTarget, setApproveTarget] = useState<Refund | null>(null);
   const [rejectTarget, setRejectTarget] = useState<Refund | null>(null);
   const [auditTarget, setAuditTarget] = useState<AuditTrailTarget | null>(null);
+
+  const statusOptions: SelectOption<RefundStatus | "">[] = [
+    { value: "", label: t("financeReports.adjustments.common.allStatuses") },
+    ...(Object.entries(REFUND_STATUS_LABEL_KEYS) as [RefundStatus, string][]).map(
+      ([value, labelKey]) => ({ value, label: t(labelKey) }),
+    ),
+  ];
 
   const filters: RefundFilters = { status };
   const listQuery = useQuery({
@@ -79,7 +81,7 @@ export default function RefundsListPage() {
     if (!approveTarget) return;
     approveRefund.mutate(approveTarget.id, {
       onSuccess: () => {
-        show({ variant: "success", title: "Refund approved" });
+        show({ variant: "success", title: t("financeReports.adjustments.refunds.approvedToast") });
         setApproveTarget(null);
         invalidateList();
       },
@@ -89,29 +91,37 @@ export default function RefundsListPage() {
   const columns: DataGridColumn<Refund>[] = [
     {
       id: "created_at",
-      header: "Created",
-      renderCell: (row) => new Date(row.created_at).toLocaleDateString(),
+      header: t("financeReports.adjustments.common.created"),
+      renderCell: (row) => formatDate(new Date(row.created_at)),
     },
-    { id: "invoice", header: "Invoice", renderCell: (row) => row.erpnext_invoice_id },
+    {
+      id: "invoice",
+      header: t("financeReports.adjustments.common.invoice"),
+      renderCell: (row) => row.erpnext_invoice_id,
+    },
     {
       id: "amount",
-      header: "Amount",
+      header: t("financeReports.adjustments.common.amount"),
       align: "end",
       renderCell: (row) => `${row.amount} ${row.currency}`,
     },
-    { id: "reason", header: "Reason", renderCell: (row) => REASON_CODE_LABELS[row.reason_code] },
+    {
+      id: "reason",
+      header: t("financeReports.adjustments.common.reason"),
+      renderCell: (row) => t(REASON_CODE_LABEL_KEYS[row.reason_code]),
+    },
     {
       id: "status",
-      header: "Status",
+      header: t("financeReports.adjustments.common.status"),
       renderCell: (row) => (
         <span className="adjustments-status-pill" data-tone={refundStatusTone(row.status)}>
-          {REFUND_STATUS_LABELS[row.status]}
+          {t(REFUND_STATUS_LABEL_KEYS[row.status])}
         </span>
       ),
     },
     {
       id: "actions",
-      header: "Actions",
+      header: t("financeReports.adjustments.common.actions"),
       renderCell: (row) => {
         const isOwnRequest = row.maker_id === userId;
         const canDecideThisRow = row.status === "pending_approval" && canDecide;
@@ -123,19 +133,25 @@ export default function RefundsListPage() {
                   type="button"
                   variant="secondary"
                   disabled={isOwnRequest}
-                  title={isOwnRequest ? "A different user must approve this refund." : undefined}
+                  title={
+                    isOwnRequest
+                      ? t("financeReports.adjustments.refunds.ownApproveHint")
+                      : undefined
+                  }
                   onClick={() => setApproveTarget(row)}
                 >
-                  Approve
+                  {t("financeReports.adjustments.refunds.approve")}
                 </Button>
                 <Button
                   type="button"
                   variant="tertiary"
                   disabled={isOwnRequest}
-                  title={isOwnRequest ? "A different user must reject this refund." : undefined}
+                  title={
+                    isOwnRequest ? t("financeReports.adjustments.refunds.ownRejectHint") : undefined
+                  }
                   onClick={() => setRejectTarget(row)}
                 >
-                  Reject
+                  {t("financeReports.adjustments.refunds.reject")}
                 </Button>
               </>
             ) : null}
@@ -151,7 +167,7 @@ export default function RefundsListPage() {
                   })
                 }
               >
-                Audit trail
+                {t("financeReports.adjustments.common.auditTrail")}
               </Button>
             ) : null}
           </div>
@@ -164,26 +180,35 @@ export default function RefundsListPage() {
     <>
       <div className="adjustments-list__header">
         <div>
-          <h1>Refunds</h1>
-          <p>Pending refunds need approval from a different user with refund approval rights.</p>
+          <h1>{t("financeReports.adjustments.refunds.title")}</h1>
+          <p>{t("financeReports.adjustments.refunds.description")}</p>
         </div>
         <Link to="/portal/finance/adjustments/refunds/new">
-          <Button>Request refund</Button>
+          <Button>{t("financeReports.adjustments.refunds.requestRefund")}</Button>
         </Link>
       </div>
 
       <div className="adjustments-list__toolbar">
-        <Select label="Status" options={STATUS_OPTIONS} value={status} onChange={changeStatus} />
+        <Select
+          label={t("financeReports.adjustments.common.status")}
+          options={statusOptions}
+          value={status}
+          onChange={changeStatus}
+        />
       </div>
 
       <DataGrid
-        caption="Refund requests"
+        caption={t("financeReports.adjustments.refunds.caption")}
         columns={columns}
         rows={items}
         getRowId={(row) => row.id}
         getRowLabel={(row) => row.erpnext_invoice_id}
         loading={listQuery.isPending}
-        empty={listQuery.isError ? "Unable to load refunds." : "No refunds match this filter."}
+        empty={
+          listQuery.isError
+            ? t("financeReports.adjustments.refunds.loadError")
+            : t("financeReports.adjustments.refunds.empty")
+        }
       />
 
       <div className="adjustments-list__pagination">
@@ -192,26 +217,29 @@ export default function RefundsListPage() {
           disabled={!hasPreviousPage}
           onClick={() => setOffset(Math.max(0, offset - REFUNDS_PAGE_SIZE))}
         >
-          Previous
+          {t("financeReports.adjustments.common.previous")}
         </Button>
         <Button
           variant="secondary"
           disabled={!hasNextPage}
           onClick={() => setOffset(offset + REFUNDS_PAGE_SIZE)}
         >
-          Next
+          {t("financeReports.adjustments.common.next")}
         </Button>
       </div>
 
       <AdjustmentConfirmDialog
         open={approveTarget !== null}
-        title="Approve refund?"
-        description="This forwards the refund to ERPNext as a credit note. It cannot be undone from here."
-        confirmLabel="Approve refund"
+        title={t("financeReports.adjustments.refunds.approveTitle")}
+        description={t("financeReports.adjustments.refunds.approveDescription")}
+        confirmLabel={t("financeReports.adjustments.refunds.approveLabel")}
         loading={approveRefund.isPending}
         error={
           approveRefund.isError
-            ? apiErrorMessage(approveRefund.error, "The refund could not be approved.")
+            ? apiErrorMessage(
+                approveRefund.error,
+                t("financeReports.adjustments.refunds.approveError"),
+              )
             : undefined
         }
         onConfirm={handleApprove}
@@ -220,18 +248,18 @@ export default function RefundsListPage() {
         {approveTarget ? (
           <dl className="adjustments-effect">
             <div>
-              <dt>Invoice</dt>
+              <dt>{t("financeReports.adjustments.common.invoice")}</dt>
               <dd>{approveTarget.erpnext_invoice_id}</dd>
             </div>
             <div>
-              <dt>Refund amount</dt>
+              <dt>{t("financeReports.adjustments.common.refundAmount")}</dt>
               <dd>
                 {approveTarget.amount} {approveTarget.currency}
               </dd>
             </div>
             <div>
-              <dt>Reason</dt>
-              <dd>{REASON_CODE_LABELS[approveTarget.reason_code]}</dd>
+              <dt>{t("financeReports.adjustments.common.reason")}</dt>
+              <dd>{t(REASON_CODE_LABEL_KEYS[approveTarget.reason_code])}</dd>
             </div>
           </dl>
         ) : null}

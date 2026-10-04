@@ -15,6 +15,8 @@ import { z } from "zod";
 
 export const LOCALE_OPTIONS = ["en", "fr", "ar", "es", "pt", "de"] as const;
 
+/** Each language's own name (endonym), deliberately not translated: a language picker lists every
+ * option in its own script so a reader can find theirs regardless of the current UI language. */
 export const LOCALE_LABELS: Record<(typeof LOCALE_OPTIONS)[number], string> = {
   en: "English",
   fr: "Français",
@@ -32,13 +34,10 @@ export const GRADING_SCHEME_TYPES = [
   "pass_fail",
 ] as const;
 
-export const GRADING_SCHEME_LABELS: Record<(typeof GRADING_SCHEME_TYPES)[number], string> = {
-  letter: "Letter (A, B, C…)",
-  percentage: "Percentage (0-100%)",
-  gpa: "GPA (0-4.5)",
-  numeric: "Numeric score",
-  pass_fail: "Pass / fail",
-};
+/** Translation key for a grading scheme's display name, resolved with `t()` at render time. */
+export function gradingSchemeLabelKey(scheme: (typeof GRADING_SCHEME_TYPES)[number]): string {
+  return `adminSchool.settings.grading.schemes.${scheme}`;
+}
 
 // Mirrors apps/api/src/modules/tenancy/settings/schemas.ts's `timezoneSchema` exactly.
 const TIMEZONE_PATTERN = /^[A-Za-z]+\/[A-Za-z_]+$/;
@@ -47,8 +46,8 @@ export const profileSchema = z.object({
   display_name: z
     .string()
     .trim()
-    .min(1, "Name is required")
-    .max(200, "Keep it under 200 characters"),
+    .min(1, "adminSchool.settings.validation.nameRequired")
+    .max(200, "adminSchool.settings.validation.nameTooLong"),
 });
 export type ProfileValues = z.infer<typeof profileSchema>;
 
@@ -57,38 +56,39 @@ export const localeTimezoneSchema = z.object({
   timezone: z
     .string()
     .trim()
-    .regex(TIMEZONE_PATTERN, "Must be a valid IANA timezone (e.g. Africa/Casablanca)."),
+    .regex(TIMEZONE_PATTERN, "adminSchool.settings.validation.invalidTimezone"),
 });
 export type LocaleTimezoneValues = z.infer<typeof localeTimezoneSchema>;
 
 export const invitationExpirySchema = z.object({
   invitation_expiry_days: z.coerce
     .number()
-    .int("Enter a whole number of days.")
-    .min(1, "Must be at least 1 day.")
-    .max(365, "Must be 365 days or fewer."),
+    .int("adminSchool.settings.validation.wholeDays")
+    .min(1, "adminSchool.settings.validation.minDays")
+    .max(365, "adminSchool.settings.validation.maxDays"),
 });
 export type InvitationExpiryValues = z.infer<typeof invitationExpirySchema>;
 
 export const attendanceAlertsSchema = z.object({
   attendance_alert_threshold: z.coerce
     .number()
-    .min(0, "Must be between 0 and 100.")
-    .max(100, "Must be between 0 and 100."),
+    .min(0, "adminSchool.settings.validation.percentRange")
+    .max(100, "adminSchool.settings.validation.percentRange"),
   absence_alert_threshold: z.coerce
     .number()
-    .min(0, "Must be between 0 and 100.")
-    .max(100, "Must be between 0 and 100."),
+    .min(0, "adminSchool.settings.validation.percentRange")
+    .max(100, "adminSchool.settings.validation.percentRange"),
   attendance_correction_window_hours: z.coerce
     .number()
-    .int("Enter a whole number of hours.")
-    .min(1, "Must be at least 1 hour.")
-    .max(8760, "Must be 8760 hours (1 year) or fewer."),
+    .int("adminSchool.settings.validation.wholeHours")
+    .min(1, "adminSchool.settings.validation.minHours")
+    .max(8760, "adminSchool.settings.validation.maxHours"),
   parent_discipline_visibility: z.boolean(),
 });
 export type AttendanceAlertsValues = z.infer<typeof attendanceAlertsSchema>;
 
-/** First validation message per top-level field, for rendering against `Input`/`Select` `error` props. */
+/** First validation message per top-level field, for rendering against `Input`/`Select` `error` props.
+ * Schema messages above are translation keys — resolve them with `t()` where they are displayed. */
 export function fieldErrors(error: z.ZodError): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const issue of error.issues) {

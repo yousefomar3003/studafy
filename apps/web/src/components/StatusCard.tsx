@@ -1,3 +1,5 @@
+import { useTranslation } from "../lib/i18n";
+
 export interface StatusCardAction {
   readonly label: string;
   readonly href: string;
@@ -22,16 +24,22 @@ export interface StatusCardProps {
  * existing convention for "something needs the user's attention" (`RouteError`, `ErrorBoundary`).
  */
 export function StatusCard({ heading, message, action, requestId }: StatusCardProps) {
+  const { t } = useTranslation();
+
   return (
-    <div role="alert">
+    <div role="alert" className="status-card">
       <h1>{heading}</h1>
       <p>{message}</p>
       {action && (
         <p>
-          <a href={action.href}>{action.label}</a>
+          <a href={action.href} className="status-card__action">
+            {action.label}
+          </a>
         </p>
       )}
-      {requestId && <p>Reference: {requestId}</p>}
+      {requestId && (
+        <p className="status-card__reference">{t("site.statusCard.reference", { requestId })}</p>
+      )}
     </div>
   );
 }

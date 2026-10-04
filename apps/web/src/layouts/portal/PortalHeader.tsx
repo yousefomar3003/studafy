@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 
+import { BrandLogo } from "../../components/BrandLogo";
+import { LocaleSwitcher } from "../../components/LocaleSwitcher";
 import { GlobalSearchTrigger } from "../../features/search/GlobalSearchTrigger";
 import { useTranslation } from "../../lib/i18n";
 
-import { LocaleSwitcher } from "./LocaleSwitcher";
 import { NotificationBell } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
 
@@ -18,7 +19,7 @@ export interface PortalHeaderProps {
  * Single-tenant header: a static brand mark, no school switcher — Studafy is single-tenant per
  * deployment today, so there is nothing to switch between (see the ticket's own framing). The nav
  * toggle only does anything at the narrow breakpoint (`portal-shell.css` hides it above that width,
- * where the sidebar is always visible). "Studafy" is a proper noun and is never run through `t()`.
+ * where the sidebar is always visible). The brand is the `BrandLogo` wordmark, linking home.
  */
 export function PortalHeader({ navId, navOpen, onToggleNav }: PortalHeaderProps) {
   const { t } = useTranslation();
@@ -43,7 +44,9 @@ export function PortalHeader({ navId, navOpen, onToggleNav }: PortalHeaderProps)
         <span className="sf-visually-hidden">{t("shell.toggleNav")}</span>
       </button>
 
-      <span className="portal-header__brand">Studafy</span>
+      <Link to="/" className="portal-header__brand" aria-label={t("shell.homeLink")}>
+        <BrandLogo />
+      </Link>
 
       <div className="portal-header__actions">
         <GlobalSearchTrigger />

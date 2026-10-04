@@ -1,12 +1,13 @@
 export interface MarketingNavItem {
-  label: string;
+  /** Translation key for the link text — resolved with `t()` at render time, never at module load. */
+  labelKey: string;
   to: string;
 }
 
 /** Primary marketing nav, shared by the header (desktop + mobile) and the footer's sitemap column. */
 export const MARKETING_NAV_ITEMS: MarketingNavItem[] = [
-  { label: "Home", to: "/" },
-  { label: "Features", to: "/features" },
-  { label: "Pricing", to: "/pricing" },
-  { label: "About", to: "/about" },
+  { labelKey: "site.marketing.nav.home", to: "/" },
+  { labelKey: "site.marketing.nav.features", to: "/features" },
+  { labelKey: "site.marketing.nav.pricing", to: "/pricing" },
+  { labelKey: "site.marketing.nav.about", to: "/about" },
 ];

@@ -2,6 +2,7 @@ import { Button, Input } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
 import { fetchInvoicesPage } from "../invoices/queries";
 
 import type { Invoice } from "../invoices/queries";
@@ -26,6 +27,7 @@ export interface InvoicePickerFieldProps {
  * would pick from.
  */
 export function InvoicePickerField({ value, onChange }: InvoicePickerFieldProps) {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -48,16 +50,19 @@ export function InvoicePickerField({ value, onChange }: InvoicePickerFieldProps)
     return (
       <div className="payments-form__invoice-selected">
         <div>
-          <span className="sf-field__label">Invoice</span>
+          <span className="sf-field__label">{t("finance.common.invoice")}</span>
           <p>
             {value.erpnext_docname} &mdash; {value.student_name} ({value.admission_number})
           </p>
           <p className="payments-form__invoice-outstanding">
-            Outstanding: {value.outstanding_amount} {value.currency}
+            {t("finance.payments.picker.outstanding", {
+              amount: value.outstanding_amount,
+              currency: value.currency,
+            })}
           </p>
         </div>
         <Button type="button" variant="tertiary" onClick={() => onChange(null)}>
-          Change
+          {t("finance.payments.picker.change")}
         </Button>
       </div>
     );
@@ -66,12 +71,12 @@ export function InvoicePickerField({ value, onChange }: InvoicePickerFieldProps)
   return (
     <div className="payments-form__invoice-picker">
       <Input
-        label="Invoice"
+        label={t("finance.common.invoice")}
         type="search"
-        placeholder="Search by student or invoice number"
+        placeholder={t("finance.common.searchByStudentOrInvoice")}
         value={searchInput}
         onChange={(event) => setSearchInput(event.target.value)}
-        helperText="Only submitted invoices with an outstanding balance can be paid."
+        helperText={t("finance.payments.picker.helper")}
         required
       />
       {debouncedSearch.trim() ? (
@@ -89,14 +94,17 @@ export function InvoicePickerField({ value, onChange }: InvoicePickerFieldProps)
               >
                 <strong>{invoice.erpnext_docname}</strong>
                 <span>
-                  {invoice.student_name} &middot; {invoice.admission_number} &middot; Outstanding{" "}
-                  {invoice.outstanding_amount} {invoice.currency}
+                  {invoice.student_name} &middot; {invoice.admission_number} &middot;{" "}
+                  {t("finance.payments.picker.resultOutstanding", {
+                    amount: invoice.outstanding_amount,
+                    currency: invoice.currency,
+                  })}
                 </span>
               </button>
             </li>
           ))}
           {!resultsQuery.isPending && results.length === 0 ? (
-            <li className="payments-form__invoice-empty">No payable invoices match.</li>
+            <li className="payments-form__invoice-empty">{t("finance.payments.picker.empty")}</li>
           ) : null}
         </ul>
       ) : null}

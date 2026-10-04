@@ -14,14 +14,13 @@ import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
 
 import { DEFAULT_LOCALE } from "./config";
-import ar from "./locales/ar.json";
-import en from "./locales/en.json";
+import { arCatalog, enCatalog } from "./locales/catalog";
 import pseudo from "./locales/qps-ploc.json";
 import { localeStore } from "./store";
 
 const resources: Record<string, { translation: Record<string, unknown> }> = {
-  en: { translation: en },
-  ar: { translation: ar },
+  en: { translation: enCatalog },
+  ar: { translation: arCatalog },
   ...(import.meta.env.DEV ? { "qps-ploc": { translation: pseudo } } : {}),
 };
 

@@ -3,12 +3,14 @@ import { Button, Card, useToast } from "@studafy/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useLocale, useTranslation } from "../../lib/i18n";
 import { helpPath } from "../help/content";
 import { HelpLink } from "../help/HelpLink";
 
 import { CancelSubscriptionModal } from "./CancelSubscriptionModal";
 import { ChangePlanModal } from "./ChangePlanModal";
 import { DunningBanner } from "./DunningBanner";
+import { formatIsoDate } from "./format";
 import { isEndedStatus, subscriptionStatusLabel, subscriptionStatusTone } from "./labels";
 import { useOpenBillingPortal, useReverseSubscriptionCancellation } from "./mutations";
 import { useBillingOverviewQuery } from "./queries";
@@ -22,10 +24,6 @@ function apiErrorMessage(error: unknown, fallback: string): string {
   return error.detail ?? error.title;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString();
-}
-
 /**
  * School billing home (`/portal/billing`), gated by `organization:manageBilling` — the same
  * permission every subscriptions route itself requires (see `billing-overview-routes.ts` and its
@@ -35,6 +33,8 @@ function formatDate(iso: string): string {
  * (`BillingInvoicesPage`) since a receipt list can grow long.
  */
 export default function BillingOverviewPage() {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
   const { show } = useToast();
   const overviewQuery = useBillingOverviewQuery();
   const openPortal = useOpenBillingPortal();
@@ -52,40 +52,41 @@ export default function BillingOverviewPage() {
       onError: (error) =>
         show({
           variant: "error",
-          title: "Couldn't open the billing portal",
-          description: apiErrorMessage(error, "Please try again."),
+          title: t("site.billing.overview.portalError"),
+          description: apiErrorMessage(error, t("site.common.tryAgain")),
         }),
     });
   }
 
   function handleUndoCancel() {
     reverseCancel.mutate(undefined, {
-      onSuccess: () => show({ variant: "success", title: "Cancellation undone" }),
+      onSuccess: () =>
+        show({ variant: "success", title: t("site.billing.overview.cancellationUndone") }),
       onError: (error) =>
         show({
           variant: "error",
-          title: "Couldn't undo the cancellation",
-          description: apiErrorMessage(error, "Please try again."),
+          title: t("site.billing.overview.undoError"),
+          description: apiErrorMessage(error, t("site.common.tryAgain")),
         }),
     });
   }
 
   return (
     <>
-      <h1>Billing</h1>
-      <p>Plan, seats, payment method, invoice history, and subscription cancellation.</p>
+      <h1>{t("site.billing.overview.title")}</h1>
+      <p>{t("site.billing.overview.description")}</p>
       <p>
-        <HelpLink to={helpPath("subscriptions")}>Read the guide</HelpLink>
+        <HelpLink to={helpPath("subscriptions")}>{t("help.readGuide")}</HelpLink>
       </p>
 
       {overviewQuery.isError ? (
         <p className="billing-overview__notice" role="alert">
-          Unable to load billing details. Try reloading the page.
+          {t("site.billing.overview.loadError")}
         </p>
       ) : null}
 
       {overviewQuery.isPending ? (
-        <p role="status">Loading…</p>
+        <p role="status">{t("site.common.loading")}</p>
       ) : overview ? (
         <>
           <DunningBanner
@@ -97,37 +98,35 @@ export default function BillingOverviewPage() {
           {isEndedStatus(overview.subscription.status) ? (
             <div className="billing-banner" data-tone="neutral" role="status">
               <div>
-                <p className="billing-banner__title">Your subscription has ended</p>
-                <p className="billing-banner__body">
-                  Choose a plan to restore access for your school.
-                </p>
+                <p className="billing-banner__title">{t("site.billing.overview.endedTitle")}</p>
+                <p className="billing-banner__body">{t("site.billing.overview.endedBody")}</p>
               </div>
               <Button type="button" variant="primary" onClick={() => setChangePlanOpen(true)}>
-                Choose a plan
+                {t("site.billing.overview.choosePlan")}
               </Button>
             </div>
           ) : null}
 
           <div className="billing-overview__grid">
-            <Card as="section" aria-label="Plan and seats">
+            <Card as="section" aria-label={t("site.billing.overview.planCardLabel")}>
               <Card.Header>
-                <h2>Plan</h2>
+                <h2>{t("site.billing.overview.planHeading")}</h2>
               </Card.Header>
               <Card.Body>
                 <p
                   className="billing-status-pill"
                   data-tone={subscriptionStatusTone(overview.subscription.status)}
                 >
-                  {subscriptionStatusLabel(overview.subscription.status)}
+                  {subscriptionStatusLabel(overview.subscription.status, t)}
                 </p>
 
                 <dl className="billing-overview__stat-list">
                   <div className="billing-overview__stat">
-                    <dt>Plan</dt>
+                    <dt>{t("site.billing.overview.planLabel")}</dt>
                     <dd>{overview.plan.displayName}</dd>
                   </div>
                   <div className="billing-overview__stat">
-                    <dt>Seats</dt>
+                    <dt>{t("site.billing.overview.seatsLabel")}</dt>
                     <dd>
                       {overview.seats.used}/{overview.seats.cap}
                     </dd>
@@ -137,20 +136,23 @@ export default function BillingOverviewPage() {
                 <SeatsMeter used={overview.seats.used} cap={overview.seats.cap} />
 
                 <p className="billing-overview__caption">
-                  Current period: {formatDate(overview.subscription.currentPeriodStart)} –{" "}
-                  {formatDate(overview.subscription.currentPeriodEnd)}
+                  {t("site.billing.overview.currentPeriod", {
+                    start: formatIsoDate(overview.subscription.currentPeriodStart, locale),
+                    end: formatIsoDate(overview.subscription.currentPeriodEnd, locale),
+                  })}
                 </p>
 
                 {overview.subscription.cancelAtPeriodEnd ? (
                   <p className="billing-overview__notice" role="status">
-                    Cancellation scheduled — access ends{" "}
-                    {formatDate(overview.subscription.currentPeriodEnd)}.
+                    {t("site.billing.overview.cancellationScheduled", {
+                      date: formatIsoDate(overview.subscription.currentPeriodEnd, locale),
+                    })}
                   </p>
                 ) : null}
 
                 <div className="billing-overview__actions">
                   <Button type="button" variant="secondary" onClick={() => setChangePlanOpen(true)}>
-                    Change plan
+                    {t("site.billing.overview.changePlan")}
                   </Button>
                   {overview.subscription.cancelAtPeriodEnd ? (
                     <Button
@@ -159,25 +161,24 @@ export default function BillingOverviewPage() {
                       loading={reverseCancel.isPending}
                       onClick={handleUndoCancel}
                     >
-                      Keep subscription
+                      {t("site.billing.overview.keepSubscription")}
                     </Button>
                   ) : !isEndedStatus(overview.subscription.status) ? (
                     <Button type="button" variant="tertiary" onClick={() => setCancelOpen(true)}>
-                      Cancel subscription
+                      {t("site.billing.overview.cancelSubscription")}
                     </Button>
                   ) : null}
                 </div>
               </Card.Body>
             </Card>
 
-            <Card as="section" aria-label="Payment method and invoices">
+            <Card as="section" aria-label={t("site.billing.overview.paymentCardLabel")}>
               <Card.Header>
-                <h2>Payment and invoices</h2>
+                <h2>{t("site.billing.overview.paymentHeading")}</h2>
               </Card.Header>
               <Card.Body>
                 <p className="billing-overview__caption">
-                  Manage the payment method, tax details, and past receipts on file in the payment
-                  provider&rsquo;s own portal. Studafy does not store card details.
+                  {t("site.billing.overview.paymentBody")}
                 </p>
                 <div className="billing-overview__actions">
                   <Button
@@ -186,11 +187,11 @@ export default function BillingOverviewPage() {
                     loading={openPortal.isPending}
                     onClick={handleOpenPortal}
                   >
-                    Manage payment method
+                    {t("site.billing.overview.managePayment")}
                   </Button>
                   <Link to="/portal/billing/invoices">
                     <Button type="button" variant="tertiary">
-                      View invoice history
+                      {t("site.billing.overview.viewInvoices")}
                     </Button>
                   </Link>
                 </div>
@@ -217,6 +218,7 @@ export default function BillingOverviewPage() {
 }
 
 function SeatsMeter({ used, cap }: { used: number; cap: number }) {
+  const { t } = useTranslation();
   const hasCap = cap > 0;
   const percent = hasCap ? Math.round((used / cap) * 100) : 0;
   const tone =
@@ -226,7 +228,11 @@ function SeatsMeter({ used, cap }: { used: number; cap: number }) {
     <div
       className="billing-meter"
       role="img"
-      aria-label={hasCap ? `${percent}% of seats used` : "Seat cap not configured"}
+      aria-label={
+        hasCap
+          ? t("site.billing.overview.seatsUsed", { percent })
+          : t("site.billing.overview.seatCapMissing")
+      }
     >
       <div
         className="billing-meter-fill"

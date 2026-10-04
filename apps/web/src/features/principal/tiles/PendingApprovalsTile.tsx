@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
 import { api } from "../../../lib/api";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 /**
  * Reuses the exact `["approval-queue"]` key the sidebar's `ApprovalQueueBadge` and the admin
@@ -11,6 +12,8 @@ import { api } from "../../../lib/api";
  * (see `apps/web/src/lib/realtime/invalidations.ts`).
  */
 export function PendingApprovalsTile() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const { data, isPending, isError } = useQuery({
     queryKey: ["approval-queue"],
     queryFn: async () => {
@@ -23,16 +26,18 @@ export function PendingApprovalsTile() {
 
   return (
     <DashboardTile
-      title="Pending approvals"
+      title={t("principal.tiles.pendingApprovals.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load the approval queue."
+      errorMessage={t("principal.tiles.pendingApprovals.error")}
     >
-      <p className="dashboard-tile__value">{total}</p>
+      <p className="dashboard-tile__value">{formatNumber(total)}</p>
       <p className="dashboard-tile__caption">
-        {total === 0 ? "Nothing is waiting on review." : "awaiting review"}
+        {total === 0
+          ? t("principal.tiles.pendingApprovals.empty")
+          : t("principal.tiles.pendingApprovals.caption")}
       </p>
       <Link className="dashboard-tile__link" to="/portal/approvals">
-        Review approvals →
+        {t("principal.tiles.pendingApprovals.link")}
       </Link>
     </DashboardTile>
   );

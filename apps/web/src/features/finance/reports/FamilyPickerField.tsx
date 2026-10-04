@@ -2,6 +2,8 @@ import { Button, Input } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { familySearchQueryKey, searchFamilies } from "./queries";
 
 import type { Family } from "./queries";
@@ -18,6 +20,7 @@ export interface FamilyPickerFieldProps {
  * household — there is no "every family" run, unlike the other three report types' optional
  * student scope. */
 export function FamilyPickerField({ value, onChange }: FamilyPickerFieldProps) {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -36,11 +39,11 @@ export function FamilyPickerField({ value, onChange }: FamilyPickerFieldProps) {
     return (
       <div className="reports-filter__student-selected">
         <div>
-          <span className="sf-field__label">Family</span>
+          <span className="sf-field__label">{t("financeReports.reports.familyPicker.family")}</span>
           <p>{value.display_name}</p>
         </div>
         <Button type="button" variant="tertiary" onClick={() => onChange(null)}>
-          Change
+          {t("financeReports.reports.familyPicker.change")}
         </Button>
       </div>
     );
@@ -49,9 +52,9 @@ export function FamilyPickerField({ value, onChange }: FamilyPickerFieldProps) {
   return (
     <div className="reports-filter__student-picker">
       <Input
-        label="Family"
+        label={t("financeReports.reports.familyPicker.family")}
         type="search"
-        placeholder="Search by household name"
+        placeholder={t("financeReports.reports.familyPicker.placeholder")}
         value={searchInput}
         onChange={(event) => setSearchInput(event.target.value)}
         required
@@ -74,7 +77,9 @@ export function FamilyPickerField({ value, onChange }: FamilyPickerFieldProps) {
             </li>
           ))}
           {!resultsQuery.isPending && resultsQuery.data?.length === 0 ? (
-            <li className="reports-filter__student-empty">No families match.</li>
+            <li className="reports-filter__student-empty">
+              {t("financeReports.reports.familyPicker.noMatches")}
+            </li>
           ) : null}
         </ul>
       ) : null}

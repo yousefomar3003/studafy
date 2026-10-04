@@ -1,0 +1,529 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "saveChanges": "Save changes",
+    "previous": "Previous",
+    "next": "Next",
+    "loading": "Loading…",
+    "listSeparator": ", "
+  },
+  "roles": {
+    "SUPER_ADMIN": "Super admin",
+    "ORG_ADMIN": "Org admin",
+    "FINANCE": "Finance",
+    "INSTRUCTOR": "Instructor",
+    "TEACHING_ASSISTANT": "Teaching assistant",
+    "STUDENT": "Student",
+    "PARENT": "Parent",
+    "GUEST": "Guest",
+    "SUPPORT_AGENT": "Support agent"
+  },
+  "validation": {
+    "emailRequired": "Email is required",
+    "emailInvalid": "Enter a valid email address",
+    "maxLength200": "Keep it under 200 characters",
+    "maxLength100": "Keep it under 100 characters",
+    "nameRequired": "Name is required",
+    "firstNameRequired": "First name is required",
+    "lastNameRequired": "Last name is required",
+    "admissionNumberRequired": "Admission number is required",
+    "dateInvalid": "Enter a valid date",
+    "parentRequired": "Select a parent",
+    "expiryMin": "Must be at least 1 day",
+    "expiryMax": "Must be 365 days or fewer",
+    "recipientInvalid": "Invalid email address",
+    "recipientsMin": "Add at least one recipient",
+    "recipientsMax": "Maximum 5,000 recipients per batch"
+  },
+  "users": {
+    "status": {
+      "invited": "Invited",
+      "active": "Active",
+      "suspended": "Suspended",
+      "archived": "Archived"
+    },
+    "list": {
+      "title": "Users",
+      "description": "Invite, edit, and manage access for everyone in your school.",
+      "newUser": "New user",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by name or email",
+      "createdBetween": "Created between",
+      "roleFilter": "Role",
+      "statusFilter": "Status",
+      "allRoles": "All roles",
+      "allStatuses": "All statuses",
+      "caption": "School users",
+      "loadError": "Unable to load users.",
+      "empty": "No users match these filters.",
+      "never": "Never",
+      "edit": "Edit",
+      "sessions": "Sessions",
+      "deactivate": "Deactivate",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "role": "Role",
+        "status": "Status",
+        "lastActive": "Last active",
+        "actions": "Actions"
+      }
+    },
+    "form": {
+      "email": "Email",
+      "displayName": "Display name",
+      "role": "Role"
+    },
+    "create": {
+      "title": "New user",
+      "description": "Invite someone to this school.",
+      "displayNameHelper": "Optional — they can set this themselves once they accept the invite.",
+      "submit": "Send invite",
+      "invitedToast": "Invited {{email}}",
+      "error": "Couldn't create user"
+    },
+    "edit": {
+      "title": "Edit user",
+      "updatedToast": "User updated",
+      "error": "Couldn't save changes"
+    },
+    "deactivate": {
+      "title": "Deactivate user",
+      "body": "This immediately suspends the account and signs it out everywhere. It cannot be undone from this screen.",
+      "checking": "Checking active sessions…",
+      "noSessions": "This user has no active sessions or registered devices.",
+      "consequence": "This will end $t(adminPeople.users.deactivate.sessionCount, {\"count\": {{sessionCount}} }) across $t(adminPeople.users.deactivate.deviceCount, {\"count\": {{deviceCount}} }), and cancel any pending invitations for this account.",
+      "sessionCount_one": "{{count}} active session",
+      "sessionCount_other": "{{count}} active sessions",
+      "deviceCount_one": "{{count}} device",
+      "deviceCount_other": "{{count}} devices",
+      "confirm": "Deactivate",
+      "successToast": "{{name}} deactivated",
+      "successDescription": "{{revoked}} session(s) revoked across their devices; {{invitations}} pending invitation(s) cancelled.",
+      "error": "Couldn't deactivate user"
+    },
+    "sessions": {
+      "title": "Devices & sessions",
+      "sessionsHeading": "Sessions",
+      "noSessions": "No active sessions.",
+      "unknownLocation": "Unknown location",
+      "devicesHeading": "Devices",
+      "revokeAll": "Revoke all",
+      "noDevices": "No registered devices.",
+      "activeSessions_one": "{{count}} active session",
+      "activeSessions_other": "{{count}} active sessions",
+      "revokeDevice": "Revoke device"
+    }
+  },
+  "invitations": {
+    "status": {
+      "pending": "Pending",
+      "expired": "Expired",
+      "consumed": "Consumed",
+      "revoked": "Revoked"
+    },
+    "bulkStatus": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "recipientStatus": {
+      "pending": "Pending",
+      "sent": "Sent",
+      "failed": "Failed"
+    },
+    "page": {
+      "title": "Invitations",
+      "guide": "Read the guide",
+      "tabInvitations": "Invitations",
+      "tabBulk": "Bulk invites"
+    },
+    "form": {
+      "email": "Email",
+      "role": "Role",
+      "expiresAfter": "Expires after (days)"
+    },
+    "board": {
+      "description": "Track and manage invite links: resend, revoke, or copy a link directly.",
+      "newInvitation": "New invitation",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by email",
+      "roleFilter": "Role",
+      "statusFilter": "Status",
+      "allRoles": "All roles",
+      "allStatuses": "All statuses",
+      "resendError": "Couldn't resend invitation",
+      "resend": "Resend",
+      "revoke": "Revoke",
+      "caption": "Invitations",
+      "loadError": "Unable to load invitations.",
+      "empty": "No invitations match these filters.",
+      "columns": {
+        "email": "Email",
+        "role": "Role",
+        "status": "Status",
+        "expires": "Expires",
+        "sent": "Sent",
+        "actions": "Actions"
+      }
+    },
+    "create": {
+      "title": "New invitation",
+      "description": "Issue a one-time invite link for someone to join this school.",
+      "expiresHelper": "Optional — defaults to 7 days.",
+      "submit": "Send invite",
+      "invitedToast": "Invited {{email}}",
+      "error": "Couldn't create invitation"
+    },
+    "revoke": {
+      "title": "Revoke invitation",
+      "body": "The invite link stops working immediately. This cannot be undone from this screen — send a new invitation if they still need access.",
+      "confirm": "Revoke",
+      "successToast": "Invitation to {{email}} revoked",
+      "error": "Couldn't revoke invitation"
+    },
+    "link": {
+      "title": "Invitation sent",
+      "description": "{{email}} — share this link if the email doesn't arrive.",
+      "inviteLink": "Invite link",
+      "copyLink": "Copy link",
+      "copied": "Copied",
+      "done": "Done",
+      "copiedToast": "Link copied",
+      "copyError": "Couldn't copy the link",
+      "copyErrorDescription": "Select the link text and copy it manually."
+    },
+    "bulkBoard": {
+      "description": "Batches of invitations sent together, with per-recipient dispatch tracking.",
+      "newBulkInvite": "New bulk invite",
+      "caption": "Bulk invite batches",
+      "rowLabel": "Batch {{id}}",
+      "loadError": "Unable to load bulk invites.",
+      "empty": "No bulk invites yet.",
+      "viewProgress": "View progress",
+      "columns": {
+        "status": "Status",
+        "role": "Role",
+        "total": "Total",
+        "sent": "Sent",
+        "failed": "Failed",
+        "created": "Created",
+        "actions": "Actions"
+      }
+    },
+    "bulkModal": {
+      "title": "Bulk invite",
+      "description": "Invite many people at once. Each recipient is tracked and retriable individually.",
+      "recipients": "Recipients",
+      "placeholder": "One email per line, or separated by commas",
+      "detected_one": "{{count}} recipient detected. Maximum 5,000 per batch.",
+      "detected_other": "{{count}} recipients detected. Maximum 5,000 per batch.",
+      "expiresHelper": "Optional — defaults to 7 days for every recipient.",
+      "submit_zero": "Send invites",
+      "submit_one": "Send {{count}} invite",
+      "submit_other": "Send {{count}} invites",
+      "queuedToast": "Bulk invite queued",
+      "queuedDescription_one": "{{count}} recipient — dispatch is running in the background.",
+      "queuedDescription_other": "{{count}} recipients — dispatch is running in the background.",
+      "error": "Couldn't create bulk invite"
+    },
+    "progress": {
+      "title": "Bulk invite progress",
+      "description": "{{status}} — {{role}}",
+      "total": "Total",
+      "sent": "Sent",
+      "failed": "Failed",
+      "dispatchProgress": "Dispatch progress",
+      "filterByStatus": "Filter by status",
+      "allStatuses": "All statuses",
+      "retryFailed": "Retry failed",
+      "retryingToast": "Retrying failed recipients",
+      "retryError": "Couldn't retry",
+      "caption": "Recipients",
+      "loadError": "Unable to load recipients.",
+      "empty": "No recipients match this filter.",
+      "columns": {
+        "email": "Email",
+        "status": "Status",
+        "error": "Error"
+      }
+    }
+  },
+  "students": {
+    "backToStudents": "← Back to students",
+    "status": {
+      "applicant": "Applicant",
+      "enrolled": "Enrolled",
+      "suspended": "Suspended",
+      "graduated": "Graduated",
+      "withdrawn": "Withdrawn",
+      "archived": "Archived"
+    },
+    "relationship": {
+      "mother": "Mother",
+      "father": "Father",
+      "guardian": "Guardian",
+      "step_parent": "Step-parent",
+      "grandparent": "Grandparent",
+      "sibling": "Sibling",
+      "other": "Other"
+    },
+    "list": {
+      "title": "Students",
+      "description": "Search the student directory, review profiles, and manage guardian links.",
+      "importCsv": "Import CSV",
+      "newStudent": "New student",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by name or admission number",
+      "admittedBetween": "Admitted between",
+      "statusFilter": "Status",
+      "classFilter": "Class",
+      "allStatuses": "All statuses",
+      "allClasses": "All classes",
+      "caption": "Students",
+      "loadError": "Unable to load students.",
+      "empty": "No students match these filters.",
+      "view": "View",
+      "columns": {
+        "name": "Name",
+        "admissionNumber": "Admission #",
+        "status": "Status",
+        "dateOfBirth": "Date of birth",
+        "actions": "Actions"
+      }
+    },
+    "form": {
+      "firstName": "First name",
+      "middleName": "Middle name",
+      "lastName": "Last name",
+      "preferredName": "Preferred name",
+      "email": "Email",
+      "dateOfBirth": "Date of birth",
+      "admissionNumber": "Admission number",
+      "admissionDate": "Admission date",
+      "status": "Status"
+    },
+    "create": {
+      "title": "New student",
+      "description": "Create a student profile and linked account.",
+      "preferredNameHelper": "Optional — shown instead of the legal name where it fits.",
+      "emailHelper": "Used to create the student's linked account.",
+      "admissionNumberHelper": "Must be unique within this school.",
+      "submit": "Create student",
+      "addedToast": "Added {{firstName}} {{lastName}}",
+      "error": "Couldn't create student"
+    },
+    "profile": {
+      "tabProfile": "Profile",
+      "studentFallback": "Student",
+      "noStudent": "No student selected.",
+      "loadError": "Unable to load this student.",
+      "demographics": "Demographics",
+      "editDemographics": "Edit demographics",
+      "edit": "Edit",
+      "name": "Name",
+      "profileUpdatedToast": "Profile updated",
+      "saveError": "Couldn't save changes",
+      "admission": "Admission",
+      "editAdmission": "Edit admission",
+      "admissionUpdatedToast": "Admission info updated",
+      "guardians": "Guardians",
+      "addGuardian": "Add guardian",
+      "guardiansLoadError": "Unable to load guardians.",
+      "noGuardians": "No guardians linked yet.",
+      "accountUnavailable": "Account unavailable",
+      "removeGuardian": "Remove",
+      "enrollmentHistory": "Enrollment history",
+      "enrollmentLoadError": "Unable to load enrollment history.",
+      "noEnrollment": "No enrollment history yet.",
+      "enrollmentMeta": "{{status}} · enrolled {{enrolled}}",
+      "enrollmentMetaWithdrawn": "{{status}} · enrolled {{enrolled}} · withdrawn {{withdrawn}}",
+      "enrollmentStatus": {
+        "active": "active",
+        "waitlisted": "waitlisted",
+        "withdrawn": "withdrawn",
+        "completed": "completed",
+        "cancelled": "cancelled"
+      }
+    },
+    "linkGuardian": {
+      "title": "Add guardian",
+      "description": "Link an existing parent account to this student.",
+      "change": "Change",
+      "searchParents": "Search parents",
+      "searchPlaceholder": "Search by name or email",
+      "noMatches": "No parent accounts match.",
+      "relationship": "Relationship",
+      "submit": "Link guardian",
+      "linkedToast": "Linked {{name}}",
+      "guardianFallback": "guardian",
+      "error": "Couldn't link guardian"
+    },
+    "unlinkGuardian": {
+      "title": "Remove guardian",
+      "description": "{{name}} — {{relationship}}",
+      "body": "This removes the parent-child link. The guardian will no longer see this student's records.",
+      "confirm": "Remove",
+      "removedToast": "Removed {{name}}",
+      "guardianFallback": "guardian",
+      "error": "Couldn't remove guardian"
+    },
+    "import": {
+      "fields": {
+        "admission_number": "Admission number",
+        "email": "Student email",
+        "first_name": "First name",
+        "middle_name": "Middle name",
+        "last_name": "Last name",
+        "preferred_name": "Preferred name",
+        "date_of_birth": "Date of birth",
+        "status": "Status",
+        "parent_email": "Parent email",
+        "parent_name": "Parent name",
+        "parent_relationship": "Parent relationship"
+      },
+      "hints": {
+        "admission_number": "Your school's unique ID for the student.",
+        "email": "The student's sign-in email. An import never changes it for an existing student.",
+        "date_of_birth": "Must be YYYY-MM-DD, for example 2012-09-01.",
+        "status": "One of {{values}}. Blank means applicant for a new student.",
+        "parent_email": "Finds or creates the parent's account. Needs Parent relationship too.",
+        "parent_name": "Only used when a new parent account is created.",
+        "parent_relationship": "One of {{values}}. Needs Parent email too."
+      },
+      "parentPairWarning": "Map both {{email}} and {{relationship}}, or neither. Rows that give a parent without both are rejected.",
+      "blocker": {
+        "missing": "Map a column to every required field before confirming. Missing: {{fields}}.",
+        "unapplied": "You changed the mapping. Apply it to re-check the file before confirming.",
+        "noValidRows": "No rows passed validation, so there is nothing to import."
+      },
+      "confidence": {
+        "exact": "High: same name",
+        "alias": "High: known alternative name",
+        "partial": "Low: partial name, please check",
+        "manual": "Chosen manually"
+      },
+      "mapping": {
+        "region": "Column mapping",
+        "heading": "Match your columns",
+        "intro_one": "{{count}} column found on line {{line}} of {{file}}. Check each match, choose a column for anything that is missing, then apply the mapping to re-check the file.",
+        "intro_other": "{{count}} columns found on line {{line}} of {{file}}. Check each match, choose a column for anything that is missing, then apply the mapping to re-check the file.",
+        "savedLabel": "Use a saved mapping",
+        "savedPlaceholder": "Choose a saved mapping",
+        "savedHelper": "Applies straight away.",
+        "savedUnfit": "{{name}} (columns not in this file)",
+        "requiredMapped": "Required fields mapped",
+        "progress": "{{mapped}} of {{total}} required fields mapped.",
+        "progressMissing": "{{mapped}} of {{total}} required fields mapped. Missing: {{fields}}.",
+        "notMapped": "Not mapped",
+        "nowMapped": "{{header}} (now {{field}})",
+        "saveAs": "Save as (optional)",
+        "saveAsHelper": "Name this mapping to reuse it next time.",
+        "apply": "Apply mapping",
+        "save": "Save mapping"
+      },
+      "diff": {
+        "region": "Import preview",
+        "heading": "Preview changes",
+        "intro": "What confirming would do to your student records right now. Nothing has been saved yet.",
+        "loadError": "Couldn't load the preview. You can still confirm; the import is checked again when it runs.",
+        "loading": "Loading preview…",
+        "show": "Show",
+        "allRows": "All rows",
+        "caption": "Changes per row",
+        "rowLabel": "Line {{line}}, {{admissionNumber}}",
+        "empty": "No rows match this filter.",
+        "change": "{{field}}: {{from}} → {{to}}",
+        "blank": "(blank)",
+        "newParentAccount": "New parent account",
+        "newParentLink": "New parent link",
+        "parentLinkChanges": "Parent link changes",
+        "partSeparator": "; ",
+        "actions": {
+          "create": "New student",
+          "update": "Update",
+          "unchanged": "No change",
+          "conflict": "Skipped (conflict)"
+        },
+        "conflicts": {
+          "DUPLICATE_ADMISSION_NUMBER_IN_FILE": "An earlier line has the same admission number. The first line is imported.",
+          "DUPLICATE_EMAIL_IN_FILE": "An earlier line gives this email to a different admission number.",
+          "EMAIL_MISMATCH": "This student already exists and signs in with a different email.",
+          "EMAIL_BELONGS_TO_OTHER_STUDENT": "This email already belongs to another student.",
+          "EMAIL_BELONGS_TO_STAFF": "This email belongs to a staff account.",
+          "PARENT_EMAIL_BELONGS_TO_STUDENT": "The parent email belongs to a student."
+        },
+        "stats": {
+          "newStudents": "New students",
+          "updatedStudents": "Updated students",
+          "noChange": "No change",
+          "skipped": "Skipped (conflicts)",
+          "newParentAccounts": "New parent accounts"
+        },
+        "columns": {
+          "line": "Line",
+          "admissionNumber": "Admission number",
+          "result": "Result",
+          "details": "Details"
+        }
+      },
+      "page": {
+        "title": "Import students",
+        "intro": "Upload a CSV of students to validate. Nothing is saved until you confirm.",
+        "uploadRegion": "Upload CSV",
+        "downloadTemplate": "Download CSV template",
+        "fileLabel": "Student CSV file",
+        "uploadProgress": "Upload progress",
+        "uploading": "Uploading… {{percent}}%",
+        "templateError": "Couldn't download the template. Please try again.",
+        "validateError": "Couldn't validate that file. Please try again.",
+        "applyError": "Couldn't apply the mapping. Please try again.",
+        "confirmError": "Couldn't confirm the import. Please try again."
+      },
+      "report": {
+        "region": "Validation report",
+        "rowsInFile": "Rows in file",
+        "validRows": "Valid rows",
+        "rowsWithErrors": "Rows with errors",
+        "caption": "Row-level validation errors",
+        "rowLabel": "Line {{line}}, {{field}}",
+        "downloadErrorReport": "Download error report",
+        "columns": {
+          "line": "Line",
+          "field": "Field",
+          "message": "Message"
+        }
+      },
+      "confirm": {
+        "button_one": "Confirm import ({{count}} student)",
+        "button_other": "Confirm import ({{count}} students)",
+        "uploadDifferent": "Upload a different file"
+      },
+      "processing": {
+        "region": "Import progress",
+        "queued": "Queued for processing…",
+        "creating_one": "Creating {{count}} student record…",
+        "creating_other": "Creating {{count}} student records…",
+        "body": "This can take a few minutes for large files. You can leave this page — the import keeps running and the student directory will reflect it once it finishes."
+      },
+      "completed": {
+        "region": "Import summary",
+        "complete": "Import complete.",
+        "studentsCreated": "Students created",
+        "rowsSkipped": "Rows skipped (already existed)",
+        "parentsCreated": "Parent accounts created",
+        "guardianLinks": "Guardian links created",
+        "notImported_one": "{{count}} row from the original file were not imported due to validation errors.",
+        "notImported_other": "{{count}} rows from the original file were not imported due to validation errors.",
+        "importAnother": "Import another file",
+        "backToStudents": "Back to students"
+      },
+      "failed": {
+        "region": "Import failed",
+        "body": "The import failed while processing. No students were created from this file.",
+        "startNew": "Start a new import"
+      }
+    }
+  }
+}

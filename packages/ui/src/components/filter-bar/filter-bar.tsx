@@ -1,3 +1,4 @@
+import { useUiStrings } from "../../internal/ui-strings";
 import { useControllableState } from "../../internal/use-controllable-state";
 import { Button } from "../button";
 import { Chip } from "../chip";
@@ -49,20 +50,21 @@ function SearchIcon() {
  * router to make the filtered view bookmarkable.
  */
 export function FilterBar({
-  searchLabel = "Search",
+  searchLabel,
   searchPlaceholder,
   search,
   defaultSearch = "",
   onSearchChange,
-  dateRangeLabel = "Date range",
+  dateRangeLabel,
   dateRange,
   defaultDateRange = EMPTY_DATE_RANGE,
   onDateRangeChange,
   chips = [],
   onRemoveChip,
-  clearAllLabel = "Clear all",
+  clearAllLabel,
   onClearAll,
 }: FilterBarProps) {
+  const strings = useUiStrings();
   const [resolvedSearch, setSearch] = useControllableState<string>({
     value: search,
     defaultValue: defaultSearch,
@@ -77,7 +79,7 @@ export function FilterBar({
   return (
     <div className="sf-filter-bar" role="search">
       <Input
-        label={searchLabel}
+        label={searchLabel ?? strings.filterSearch}
         type="search"
         placeholder={searchPlaceholder}
         value={resolvedSearch}
@@ -86,10 +88,10 @@ export function FilterBar({
       />
 
       <fieldset className="sf-filter-bar__date-range">
-        <legend className="sf-field__label">{dateRangeLabel}</legend>
+        <legend className="sf-field__label">{dateRangeLabel ?? strings.filterDateRange}</legend>
         <div className="sf-filter-bar__date-inputs">
           <Input
-            label="From"
+            label={strings.filterDateFrom}
             type="date"
             value={resolvedDateRange.from ?? ""}
             max={resolvedDateRange.to || undefined}
@@ -98,7 +100,7 @@ export function FilterBar({
             }
           />
           <Input
-            label="To"
+            label={strings.filterDateTo}
             type="date"
             value={resolvedDateRange.to ?? ""}
             min={resolvedDateRange.from || undefined}
@@ -118,7 +120,7 @@ export function FilterBar({
           ))}
           {onClearAll ? (
             <Button variant="tertiary" onClick={onClearAll}>
-              {clearAllLabel}
+              {clearAllLabel ?? strings.filterClearAll}
             </Button>
           ) : null}
         </div>

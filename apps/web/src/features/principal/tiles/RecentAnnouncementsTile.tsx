@@ -3,20 +3,20 @@ import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
 import { api } from "../../../lib/api";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { DATE_TIME_OPTIONS } from "../format";
 
 import type { components } from "@studafy/api-client";
 
 const RECENT_LIMIT = 5;
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
 
 /** Most recently published announcements, newest first (`GET /api/announcements` already sorts
  * that way — see `apps/api/src/modules/announcements/routes.ts`). Scheduled-but-not-yet-published
  * announcements are excluded: a principal glancing at this tile cares what already went out, not
  * what's queued. */
 export function RecentAnnouncementsTile() {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { data, isPending, isError } = useQuery({
     queryKey: ["announcements", "recent"],
     queryFn: async () => {
@@ -34,26 +34,28 @@ export function RecentAnnouncementsTile() {
 
   return (
     <DashboardTile
-      title="Recent announcements"
+      title={t("principal.tiles.recentAnnouncements.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load announcements."
+      errorMessage={t("principal.tiles.recentAnnouncements.error")}
     >
       {announcements.length === 0 ? (
-        <p className="dashboard-tile__caption">No announcements published yet.</p>
+        <p className="dashboard-tile__caption">{t("principal.tiles.recentAnnouncements.empty")}</p>
       ) : (
         <ul className="principal-announcements-list">
           {announcements.map((announcement) => (
             <li key={announcement.id} className="principal-announcements-list__item">
               <p className="principal-announcements-list__title">{announcement.title}</p>
               <p className="dashboard-tile__caption">
-                {announcement.published_at ? formatDateTime(announcement.published_at) : "—"}
+                {announcement.published_at
+                  ? formatDate(new Date(announcement.published_at), DATE_TIME_OPTIONS)
+                  : "—"}
               </p>
             </li>
           ))}
         </ul>
       )}
       <Link className="dashboard-tile__link" to="/portal/admin/announcements">
-        View all announcements →
+        {t("principal.tiles.recentAnnouncements.link")}
       </Link>
     </DashboardTile>
   );

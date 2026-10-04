@@ -5,6 +5,8 @@ import { Button, Card, Chip, Input, Table, useToast } from "@studafy/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "../../lib/i18n";
+
 import { notificationChannelLabel, notificationTypeLabel } from "./labels";
 import { useUpdatePreferences } from "./mutations";
 import { usePreferencesQuery } from "./queries";
@@ -45,6 +47,7 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  * posture `admin/settings/SettingsCard` documents for the school settings screen.
  */
 export default function NotificationPreferencesPage() {
+  const { t } = useTranslation();
   const { show } = useToast();
   const preferencesQuery = usePreferencesQuery();
   // Two independent mutation instances, not one shared between the two forms below: they save
@@ -109,13 +112,13 @@ export default function NotificationPreferencesPage() {
       {
         onSuccess: () => {
           setPending(new Map());
-          show({ variant: "success", title: "Notification preferences updated" });
+          show({ variant: "success", title: t("site.notifications.preferences.savedToast") });
         },
         onError: (error) =>
           show({
             variant: "error",
-            title: "Couldn't save preferences",
-            description: apiErrorMessage(error, "Please try again."),
+            title: t("site.notifications.preferences.saveError"),
+            description: apiErrorMessage(error, t("site.common.tryAgain")),
           }),
       },
     );
@@ -128,12 +131,16 @@ export default function NotificationPreferencesPage() {
     updateThreshold.mutate(
       { attendance_alert_threshold: value },
       {
-        onSuccess: () => show({ variant: "success", title: "Attendance alert threshold updated" }),
+        onSuccess: () =>
+          show({
+            variant: "success",
+            title: t("site.notifications.preferences.thresholdSavedToast"),
+          }),
         onError: (error) =>
           show({
             variant: "error",
-            title: "Couldn't save the threshold",
-            description: apiErrorMessage(error, "Please try again."),
+            title: t("site.notifications.preferences.thresholdSaveError"),
+            description: apiErrorMessage(error, t("site.common.tryAgain")),
           }),
       },
     );
@@ -143,48 +150,49 @@ export default function NotificationPreferencesPage() {
     <>
       <div className="notifications-page__header">
         <div>
-          <h1>Notification settings</h1>
-          <p>
-            Choose which channels deliver each type of notification, and when to batch them into a
-            daily digest.
-          </p>
+          <h1>{t("site.notifications.preferences.title")}</h1>
+          <p>{t("site.notifications.preferences.description")}</p>
         </div>
         <Link to="/portal/notifications">
           <Button type="button" variant="secondary">
-            Back to inbox
+            {t("site.notifications.preferences.backToInbox")}
           </Button>
         </Link>
       </div>
 
       {preferencesQuery.isError ? (
         <p className="notifications-page__notice" role="alert">
-          Unable to load notification preferences. Try reloading the page.
+          {t("site.notifications.preferences.loadError")}
         </p>
       ) : null}
 
       {preferencesQuery.isPending ? (
-        <p role="status">Loading…</p>
+        <p role="status">{t("site.common.loading")}</p>
       ) : (
         <>
-          <Card as="section" aria-label="Channel preferences">
+          <Card as="section" aria-label={t("site.notifications.preferences.channelsLabel")}>
             <Card.Header>
-              <h2>Channels</h2>
+              <h2>{t("site.notifications.preferences.channelsHeading")}</h2>
               <p className="notifications-page__card-description">
-                A locked type is mandatory and always delivered on every channel.
+                {t("site.notifications.preferences.channelsDescription")}
               </p>
             </Card.Header>
             <Card.Body>
               <div className="notifications-prefs">
-                <Table caption="Notification channel preferences">
+                <Table caption={t("site.notifications.preferences.tableCaption")}>
                   <Table.Header>
                     <Table.Row>
-                      <Table.HeaderCell>Notification type</Table.HeaderCell>
+                      <Table.HeaderCell>
+                        {t("site.notifications.preferences.typeColumn")}
+                      </Table.HeaderCell>
                       {ORDERED_CHANNELS.map((channel) => (
                         <Table.HeaderCell key={channel}>
-                          {notificationChannelLabel(channel)}
+                          {notificationChannelLabel(channel, t)}
                         </Table.HeaderCell>
                       ))}
-                      <Table.HeaderCell>Daily digest</Table.HeaderCell>
+                      <Table.HeaderCell>
+                        {t("site.notifications.preferences.digestColumn")}
+                      </Table.HeaderCell>
                     </Table.Row>
                   </Table.Header>
                   <Table.Body columnCount={ORDERED_CHANNELS.length + 2}>
@@ -192,14 +200,18 @@ export default function NotificationPreferencesPage() {
                       const emailCell = cells.get(cellKey(type, NOTIFICATION_CHANNELS.EMAIL));
                       const mandatory = emailCell?.mandatory ?? false;
                       const digestEligible = emailCell?.digest_eligible ?? false;
-                      const typeLabel = notificationTypeLabel(type);
+                      const typeLabel = notificationTypeLabel(type, t);
 
                       return (
                         <Table.Row key={type}>
                           <Table.Cell>
                             <span className="notifications-prefs__type">
                               {typeLabel}
-                              {mandatory ? <Chip variant="outlined">Mandatory</Chip> : null}
+                              {mandatory ? (
+                                <Chip variant="outlined">
+                                  {t("site.notifications.preferences.mandatory")}
+                                </Chip>
+                              ) : null}
                             </span>
                           </Table.Cell>
                           {ORDERED_CHANNELS.map((channel) => {
@@ -212,7 +224,10 @@ export default function NotificationPreferencesPage() {
                                     className="notifications-prefs__checkbox"
                                     checked={effectiveEnabled(pref)}
                                     disabled={pref.mandatory}
-                                    aria-label={`${typeLabel} — ${notificationChannelLabel(channel)}`}
+                                    aria-label={t("site.notifications.preferences.cellLabel", {
+                                      type: typeLabel,
+                                      channel: notificationChannelLabel(channel, t),
+                                    })}
                                     onChange={(event) =>
                                       setPatch(type, channel, { enabled: event.target.checked })
                                     }
@@ -228,7 +243,9 @@ export default function NotificationPreferencesPage() {
                                 className="notifications-prefs__checkbox"
                                 checked={effectiveDigest(emailCell)}
                                 disabled={!digestEligible}
-                                aria-label={`${typeLabel} — daily digest`}
+                                aria-label={t("site.notifications.preferences.digestCellLabel", {
+                                  type: typeLabel,
+                                })}
                                 onChange={(event) =>
                                   setPatch(type, NOTIFICATION_CHANNELS.EMAIL, {
                                     digest: event.target.checked,
@@ -251,34 +268,37 @@ export default function NotificationPreferencesPage() {
                 loading={updatePreferences.isPending}
                 onClick={handleSavePreferences}
               >
-                Save channel preferences
+                {t("site.notifications.preferences.saveChannels")}
               </Button>
             </Card.Footer>
           </Card>
 
-          <Card as="section" aria-label="Attendance alert threshold">
+          <Card as="section" aria-label={t("site.notifications.preferences.thresholdLabel")}>
             <Card.Header>
-              <h2>Attendance alerts</h2>
+              <h2>{t("site.notifications.preferences.attendanceHeading")}</h2>
               <p className="notifications-page__card-description">
-                Optionally override your school&rsquo;s attendance alert threshold with your own
-                personal absence count.
+                {t("site.notifications.preferences.attendanceDescription")}
               </p>
             </Card.Header>
-            <form onSubmit={handleSaveThreshold} noValidate aria-label="Attendance alert threshold">
+            <form
+              onSubmit={handleSaveThreshold}
+              noValidate
+              aria-label={t("site.notifications.preferences.thresholdLabel")}
+            >
               <Card.Body>
                 <Input
-                  label="Personal absence threshold"
+                  label={t("site.notifications.preferences.thresholdInput")}
                   type="number"
                   min={1}
                   max={365}
                   value={threshold}
                   onChange={(event) => setThreshold(event.target.value)}
-                  helperText="Leave blank to use the school's own threshold."
+                  helperText={t("site.notifications.preferences.thresholdHelper")}
                 />
               </Card.Body>
               <Card.Footer>
                 <Button type="submit" loading={updateThreshold.isPending}>
-                  Save threshold
+                  {t("site.notifications.preferences.saveThreshold")}
                 </Button>
               </Card.Footer>
             </form>

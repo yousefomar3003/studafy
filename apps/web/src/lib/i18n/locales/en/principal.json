@@ -1,0 +1,523 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "loading": "Loading…"
+  },
+  "dashboard": {
+    "title": "Principal",
+    "description": "A live snapshot of approvals, attendance, discipline, evaluations, and announcements."
+  },
+  "tiles": {
+    "pendingApprovals": {
+      "title": "Pending approvals",
+      "error": "Unable to load the approval queue.",
+      "empty": "Nothing is waiting on review.",
+      "caption": "awaiting review",
+      "link": "Review approvals →"
+    },
+    "attendanceHeatMap": {
+      "title": "Attendance heat map",
+      "error": "Unable to load attendance by class.",
+      "caption_one": "Present rate by class, last {{days}} day",
+      "caption_other": "Present rate by class, last {{days}} days",
+      "empty": "No attendance recorded in this window.",
+      "link": "View attendance by class →"
+    },
+    "openIncidents": {
+      "title": "Open discipline incidents",
+      "error": "Unable to load discipline incidents.",
+      "empty": "No open incidents.",
+      "caption": "reported, under review, or escalated",
+      "link": "View discipline incidents →"
+    },
+    "draftEvaluations": {
+      "title": "Draft evaluations",
+      "error": "Unable to load evaluations.",
+      "empty": "No evaluations in progress.",
+      "caption": "awaiting scoring, submission, or sharing",
+      "link": "View evaluations →"
+    },
+    "recentAnnouncements": {
+      "title": "Recent announcements",
+      "error": "Unable to load announcements.",
+      "empty": "No announcements published yet.",
+      "link": "View all announcements →"
+    }
+  },
+  "attendanceByClass": {
+    "title": "Attendance by class",
+    "description": "Present, absent, late, and excused rates for the selected period.",
+    "period": "Period",
+    "range": {
+      "7": "Last 7 days",
+      "30": "Last 30 days",
+      "90": "Last 90 days"
+    },
+    "filtered": "Filtered to one class.",
+    "clearFilter": "Clear filter",
+    "caption": "Attendance by class",
+    "columns": {
+      "class": "Class",
+      "present": "Present",
+      "absent": "Absent",
+      "late": "Late",
+      "excused": "Excused"
+    },
+    "error": "Unable to load attendance.",
+    "empty": "No attendance recorded in this period."
+  },
+  "approvals": {
+    "title": "Approvals",
+    "description": "Grade submissions and timetable versions awaiting your review.",
+    "approveSelected": "Approve selected",
+    "approveCountSelected": "Approve {{selected}} selected",
+    "rejectSelected": "Reject selected",
+    "rejectCountSelected": "Reject {{selected}} selected",
+    "tableCaption": "Pending approval items",
+    "selectAll": "Select all pending items",
+    "selectItem": "Select {{summary}}",
+    "columns": {
+      "type": "Type",
+      "summary": "Summary",
+      "requestedBy": "Requested by",
+      "requestedAt": "Requested at",
+      "actions": "Actions"
+    },
+    "error": "Unable to load the approval queue.",
+    "empty": "Nothing is pending review.",
+    "viewDiff": "View diff",
+    "approve": "Approve",
+    "reject": "Reject",
+    "itemType": {
+      "grade_submission": "Grade submission",
+      "timetable_version": "Timetable version"
+    },
+    "toast": {
+      "approveFailed": "Couldn't approve item",
+      "approved": "Item approved",
+      "rejectFailed": "Couldn't reject item",
+      "rejected": "Item rejected",
+      "bulkRejectFailed": "Couldn't reject item(s)",
+      "bulkApproveFailed": "Couldn't process approvals",
+      "bulkApprovedAll_one": "{{succeeded}} of {{count}} item approved",
+      "bulkApprovedAll_other": "{{succeeded}} of {{count}} items approved",
+      "bulkApprovedPartial": "{{succeeded}} of {{total}} approved",
+      "bulkRejectedAll_one": "{{succeeded}} of {{count}} item rejected",
+      "bulkRejectedAll_other": "{{succeeded}} of {{count}} items rejected",
+      "bulkRejectedPartial": "{{succeeded}} of {{total}} rejected",
+      "bulkFailedDescription": "{{failed}} failed — see the error on each row below."
+    },
+    "rejectModal": {
+      "titleSingle": "Reject item",
+      "titleBulk": "Reject selected items",
+      "selectedCount_one": "{{count}} item selected",
+      "selectedCount_other": "{{count}} items selected",
+      "reason": "Reason",
+      "reasonRequired": "A reason is required to reject.",
+      "submit": "Reject"
+    },
+    "diff": {
+      "title": "What changed",
+      "class": "Class",
+      "student": "Student",
+      "gradesCaption": "Grades in this submission for {{student}}",
+      "label": "Label",
+      "score": "Score",
+      "maxScore": "Max score",
+      "weight": "Weight",
+      "empty": "No grade records in this submission.",
+      "version": "Version",
+      "term": "Term",
+      "slots": "Timetable slots"
+    }
+  },
+  "discipline": {
+    "type": {
+      "behavioral": "Behavioral",
+      "academic_integrity": "Academic integrity",
+      "attendance": "Attendance",
+      "bullying": "Bullying",
+      "substance": "Substance",
+      "vandalism": "Vandalism",
+      "safety": "Safety",
+      "other": "Other"
+    },
+    "status": {
+      "reported": "Reported",
+      "under_review": "Under review",
+      "resolved": "Resolved",
+      "escalated": "Escalated",
+      "closed": "Closed"
+    },
+    "severity": {
+      "minor": "Minor",
+      "moderate": "Moderate",
+      "major": "Major",
+      "critical": "Critical"
+    },
+    "actionType": {
+      "verbal_warning": "Verbal warning",
+      "written_warning": "Written warning",
+      "detention": "Detention",
+      "in_school_suspension": "In-school suspension",
+      "out_of_school_suspension": "Out-of-school suspension",
+      "expulsion": "Expulsion",
+      "parent_meeting": "Parent meeting",
+      "counseling_referral": "Counseling referral",
+      "community_service": "Community service",
+      "other": "Other"
+    },
+    "actionStatus": {
+      "pending": "Pending",
+      "active": "Active",
+      "completed": "Completed",
+      "revoked": "Revoked"
+    },
+    "transition": {
+      "under_review": "Start review",
+      "escalated": "Escalate",
+      "closed": "Close"
+    },
+    "list": {
+      "title": "Discipline incidents",
+      "description": "Incidents reported across the school.",
+      "inboxTab": "Teacher-reported inbox",
+      "allTab": "All incidents",
+      "filterOpen": "Open (reported, under review, escalated)",
+      "filterAll": "All statuses",
+      "statusLabel": "Status",
+      "inboxEmpty": "No incidents are waiting for triage.",
+      "filterEmpty": "No incidents match this filter.",
+      "caption": "Discipline incidents",
+      "error": "Unable to load discipline incidents.",
+      "columns": {
+        "title": "Title",
+        "type": "Type",
+        "severity": "Severity",
+        "status": "Status",
+        "reportedAt": "Reported at"
+      }
+    },
+    "detail": {
+      "back": "← Back to discipline incidents",
+      "loadError": "Unable to load this discipline incident.",
+      "markedToast": {
+        "reported": "Incident marked reported",
+        "under_review": "Incident marked under review",
+        "escalated": "Incident marked escalated",
+        "closed": "Incident marked closed"
+      },
+      "updateFailed": "Couldn't update incident",
+      "type": "Type",
+      "severity": "Severity",
+      "status": "Status",
+      "reportedAt": "Reported at",
+      "resolvedAt": "Resolved at",
+      "parentVisibility": "Parent visibility",
+      "visible": "Visible to the student's parent",
+      "notVisibleOff": "Not visible — parent discipline visibility is off for this school",
+      "notVisibleYet": "Not visible yet — only resolved incidents can be shown to parents",
+      "workflow": "Workflow",
+      "resolve": "Resolve",
+      "resolveHint": "Record at least one disciplinary action before resolving this incident.",
+      "actionsTaken": "Actions taken",
+      "addAction": "Add action",
+      "actionsCaption": "Disciplinary actions taken",
+      "actionColumns": {
+        "type": "Type",
+        "status": "Status",
+        "details": "Details",
+        "effective": "Effective"
+      },
+      "actionsError": "Unable to load actions for this incident.",
+      "actionsEmpty": "No actions have been recorded yet.",
+      "effectiveRange": "{{from}} – {{until}}"
+    },
+    "addAction": {
+      "title": "Record a disciplinary action",
+      "actionType": "Action type",
+      "details": "Details",
+      "detailsHelper": "Optional — what the action involved.",
+      "effectiveFrom": "Effective from",
+      "effectiveUntil": "Effective until",
+      "errorFallback": "The action could not be recorded.",
+      "submit": "Record action",
+      "success": "Action recorded",
+      "failed": "Couldn't record action"
+    },
+    "resolve": {
+      "title": "Resolve incident",
+      "description": "Marks the incident resolved. If this school allows parent visibility, it becomes visible to the student's parent.",
+      "notes": "Resolution notes",
+      "errorFallback": "The incident could not be resolved.",
+      "submit": "Resolve",
+      "success": "Incident resolved",
+      "failed": "Couldn't resolve incident"
+    }
+  },
+  "evaluations": {
+    "type": {
+      "formal_observation": "Formal observation",
+      "peer_review": "Peer review",
+      "self_assessment": "Self-assessment",
+      "student_feedback": "Student feedback",
+      "annual_review": "Annual review",
+      "probationary_review": "Probationary review"
+    },
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "finalized": "Finalized"
+    },
+    "rating": {
+      "unsatisfactory": "Unsatisfactory",
+      "developing": "Developing",
+      "proficient": "Proficient",
+      "exemplary": "Exemplary"
+    },
+    "backToList": "← Back to evaluations",
+    "list": {
+      "title": "Teacher evaluations",
+      "description": "Evaluation cycles, criteria scoring, and sharing with teachers.",
+      "manageTemplates": "Manage criteria templates",
+      "newEvaluation": "New evaluation",
+      "statusLabel": "Status",
+      "teacherLabel": "Teacher",
+      "allStatuses": "All statuses",
+      "allTeachers": "All teachers",
+      "caption": "Teacher evaluations",
+      "columns": {
+        "teacher": "Teacher",
+        "type": "Type",
+        "status": "Status",
+        "rating": "Rating",
+        "shared": "Shared with teacher",
+        "evaluatedAt": "Evaluated at"
+      },
+      "error": "Unable to load evaluations.",
+      "empty": "No evaluations match this filter.",
+      "shared": "Shared",
+      "notShared": "Not shared"
+    },
+    "create": {
+      "title": "Start a teacher evaluation",
+      "teacher": "Teacher",
+      "teacherPlaceholder": "Select a teacher",
+      "type": "Evaluation type",
+      "evaluatedAt": "Evaluated at",
+      "errorFallback": "The evaluation could not be started.",
+      "submit": "Start evaluation",
+      "success": "Evaluation started",
+      "failed": "Couldn't start evaluation"
+    },
+    "templates": {
+      "title": "Criteria templates",
+      "description": "Reusable scoring criteria for evaluation cycles.",
+      "newTemplate": "New template",
+      "caption": "Evaluation criteria templates",
+      "columns": {
+        "title": "Title",
+        "maxScore": "Max score",
+        "sortOrder": "Sort order",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "error": "Unable to load criteria templates.",
+      "empty": "No criteria templates yet.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "edit": "Edit",
+      "reactivate": "Reactivate",
+      "deactivate": "Deactivate",
+      "reactivated": "Template reactivated",
+      "reactivateFailed": "Couldn't reactivate template",
+      "deactivated": "Template deactivated",
+      "deactivateFailed": "Couldn't deactivate template"
+    },
+    "templateModal": {
+      "editTitle": "Edit criteria template",
+      "newTitle": "New criteria template",
+      "title": "Title",
+      "description": "Description",
+      "descriptionHelper": "Optional — what this criterion evaluates.",
+      "maxScore": "Max score",
+      "sortOrder": "Sort order",
+      "sortOrderHelper": "Lower numbers appear first in the scoring form.",
+      "errorFallback": "The template could not be saved.",
+      "saveChanges": "Save changes",
+      "create": "Create template",
+      "updated": "Template updated",
+      "created": "Template created",
+      "updateFailed": "Couldn't update template",
+      "createFailed": "Couldn't create template"
+    },
+    "detail": {
+      "loadError": "Unable to load this evaluation.",
+      "autosave": {
+        "saving": "Saving…",
+        "saved": "Saved",
+        "error": "Couldn't save"
+      },
+      "scoreLabel": "Score (0–{{max}})",
+      "outOfRange": "Out of range",
+      "comment": "Comment",
+      "historyTitle": "Evaluation history",
+      "historyEmpty": "No earlier evaluations for this teacher.",
+      "historyItem": "{{type}} — {{date}}",
+      "submitted": "Evaluation submitted",
+      "submitFailed": "Couldn't submit evaluation",
+      "sharedToast": "Shared with teacher",
+      "shareFailed": "Couldn't share evaluation",
+      "type": "Type",
+      "status": "Status",
+      "rating": "Rating",
+      "evaluatedAt": "Evaluated at",
+      "sharedWithTeacher": "Shared with teacher",
+      "sharedOn": "Shared on {{date}}",
+      "notShared": "Not shared — invisible to the teacher",
+      "workflow": "Workflow",
+      "submit": "Submit",
+      "share": "Share with teacher",
+      "submitHint": "Submit this evaluation before sharing it with the teacher.",
+      "criteriaScoring": "Criteria scoring",
+      "noTemplates": "No active criteria templates. <link>Add one</link> to start scoring.",
+      "noTemplatesShort": "No active criteria templates.",
+      "scoresCaption": "Criteria scores",
+      "scoreColumns": {
+        "criteria": "Criteria",
+        "score": "Score",
+        "comment": "Comment",
+        "saved": "Saved"
+      },
+      "narrative": "Narrative",
+      "readOnlyHint": "This evaluation has been shared with the teacher and can no longer be edited.",
+      "overallRating": "Overall rating",
+      "noRating": "No rating yet",
+      "strengths": "Strengths",
+      "areasForImprovement": "Areas for improvement",
+      "comments": "Comments"
+    }
+  },
+  "attendance": {
+    "status": {
+      "present": "Present",
+      "absent": "Absent",
+      "late": "Tardy",
+      "excused": "Excused"
+    },
+    "interval": {
+      "day": "Daily",
+      "week": "Weekly",
+      "month": "Monthly",
+      "term": "Term overview"
+    },
+    "dashboard": {
+      "eyebrow": "Principal · Attendance",
+      "title": "Attendance monitoring",
+      "description": "School-wide visibility, daily records, trends, and intervention alerts.",
+      "viewToggle": "Attendance view",
+      "schoolView": "School view",
+      "classView": "Class view",
+      "filtersTitle": "Attendance filters",
+      "searchLabel": "Student search",
+      "searchPlaceholder": "Name or admission number",
+      "grade": "Grade",
+      "gradeOption": "Grade {{grade}}",
+      "allGrades": "All grades",
+      "section": "Section",
+      "allSections": "All sections",
+      "statusLabel": "Attendance status",
+      "allStatuses": "All statuses",
+      "intervalLabel": "Trend interval",
+      "breachesOnly": "Threshold breaches only",
+      "classDrillDown": "Class drill-down",
+      "summaryError": "Unable to load attendance summary.",
+      "classBreakdown": "Class breakdown",
+      "classCaption": "Attendance summary by class",
+      "classColumns": {
+        "class": "Class",
+        "present": "Present",
+        "absent": "Absent",
+        "tardy": "Tardy"
+      },
+      "classEmpty": "No classes recorded in this period.",
+      "dailyTitle": "Daily attendance",
+      "studentCount_one": "{{formatted}} student in the active view",
+      "studentCount_other": "{{formatted}} students in the active view",
+      "refreshing": "Refreshing…"
+    },
+    "export": {
+      "unavailable": "Export unavailable",
+      "xlsx": "Export XLSX",
+      "pdf": "Export PDF",
+      "error": "Unable to create the export.",
+      "download": "Download report"
+    },
+    "summary": {
+      "label": "Attendance summary",
+      "overall": "Overall attendance",
+      "totalAbsences": "Total absences",
+      "unexcused": "Unexcused absences",
+      "tardy": "Tardy"
+    },
+    "trend": {
+      "title": "Attendance trend",
+      "description": "Present rate over the selected period",
+      "loading": "Loading attendance trend…",
+      "empty": "No trend data is available.",
+      "chartTitle": "Attendance present-rate trend",
+      "pointDescription": "{{date}}: {{percent}} percent",
+      "legendLabel": "Trend values",
+      "legendItem": "{{date}}: {{percent}}"
+    },
+    "correction": {
+      "title": "Request attendance correction",
+      "description": "{{date}} · Current status: {{status}}",
+      "correctedStatus": "Corrected status",
+      "minutesLate": "Minutes late",
+      "reason": "Reason",
+      "reasonHelper": "This justification is added to the attendance audit history.",
+      "canOverride": "You may correct records outside the standard correction window.",
+      "cannotOverride": "Corrections outside the standard window require an administrator override.",
+      "rejected": "The correction was rejected. Check the correction window and your permissions.",
+      "submit": "Submit correction",
+      "errors": {
+        "sameStatus": "Choose a status different from the current status.",
+        "reasonRequired": "Enter a correction reason.",
+        "minutesRequired": "Enter a positive number of minutes late."
+      }
+    },
+    "grid": {
+      "caption": "Daily student attendance",
+      "empty": "No students match the active filters.",
+      "columns": {
+        "student": "Student",
+        "admission": "Admission no.",
+        "class": "Class",
+        "section": "Section",
+        "status": "Status",
+        "minutesLate": "Minutes late"
+      }
+    },
+    "history": {
+      "fallbackTitle": "Student attendance history",
+      "description": "{{admissionNumber}} · {{classCode}} · {{percent}} attendance",
+      "loadingDescription": "Loading student attendance…",
+      "loading": "Loading attendance history…",
+      "error": "Unable to load the student history.",
+      "minutesLate_one": "{{formatted}} minute late",
+      "minutesLate_other": "{{formatted}} minutes late",
+      "version": "Version {{version}}",
+      "versionOverride": "Version {{version}} · Administrative override",
+      "requestCorrection": "Request correction",
+      "readOnly": "Read only"
+    },
+    "breaches": {
+      "title": "Chronic absenteeism alerts",
+      "description": "Students above {{threshold}} unexcused absence",
+      "alertCount_one": "{{count}} alert",
+      "alertCount_other": "{{count}} alerts",
+      "empty": "No threshold breaches in this view."
+    }
+  }
+}

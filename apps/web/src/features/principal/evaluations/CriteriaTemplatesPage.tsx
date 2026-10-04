@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+
 import { CriteriaTemplateModal } from "./CriteriaTemplateModal";
 import { useDeactivateTemplate, useUpdateTemplate } from "./mutations";
 import { evaluationTemplatesListKey, fetchTemplates } from "./queries";
@@ -19,6 +21,7 @@ function apiErrorDescription(error: unknown): string | undefined {
 }
 
 function ActivateButton({ template }: { template: EvaluationCriteriaTemplate }) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const update = useUpdateTemplate(template.id);
 
@@ -31,23 +34,25 @@ function ActivateButton({ template }: { template: EvaluationCriteriaTemplate }) 
         update.mutate(
           { is_active: true },
           {
-            onSuccess: () => show({ variant: "success", title: "Template reactivated" }),
+            onSuccess: () =>
+              show({ variant: "success", title: t("principal.evaluations.templates.reactivated") }),
             onError: (error) =>
               show({
                 variant: "error",
-                title: "Couldn't reactivate template",
+                title: t("principal.evaluations.templates.reactivateFailed"),
                 description: apiErrorDescription(error),
               }),
           },
         )
       }
     >
-      Reactivate
+      {t("principal.evaluations.templates.reactivate")}
     </Button>
   );
 }
 
 function DeactivateButton({ templateId }: { templateId: string }) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const deactivate = useDeactivateTemplate();
 
@@ -58,17 +63,18 @@ function DeactivateButton({ templateId }: { templateId: string }) {
       loading={deactivate.isPending}
       onClick={() =>
         deactivate.mutate(templateId, {
-          onSuccess: () => show({ variant: "success", title: "Template deactivated" }),
+          onSuccess: () =>
+            show({ variant: "success", title: t("principal.evaluations.templates.deactivated") }),
           onError: (error) =>
             show({
               variant: "error",
-              title: "Couldn't deactivate template",
+              title: t("principal.evaluations.templates.deactivateFailed"),
               description: apiErrorDescription(error),
             }),
         })
       }
     >
-      Deactivate
+      {t("principal.evaluations.templates.deactivate")}
     </Button>
   );
 }
@@ -80,6 +86,8 @@ function DeactivateButton({ templateId }: { templateId: string }) {
  * scoring forms without touching scores already recorded against it on past evaluations.
  */
 export default function CriteriaTemplatesPage() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<EvaluationCriteriaTemplate | null>(null);
 
@@ -103,27 +111,37 @@ export default function CriteriaTemplatesPage() {
   return (
     <>
       <Link className="evaluations-detail__back" to="/portal/principal/evaluations">
-        ← Back to evaluations
+        {t("principal.evaluations.backToList")}
       </Link>
 
       <div className="evaluations-list__header">
         <div>
-          <h1>Criteria templates</h1>
-          <p>Reusable scoring criteria for evaluation cycles.</p>
+          <h1>{t("principal.evaluations.templates.title")}</h1>
+          <p>{t("principal.evaluations.templates.description")}</p>
         </div>
         <Button type="button" variant="primary" onClick={openCreate}>
-          New template
+          {t("principal.evaluations.templates.newTemplate")}
         </Button>
       </div>
 
-      <Table caption="Evaluation criteria templates">
+      <Table caption={t("principal.evaluations.templates.caption")}>
         <Table.Header>
           <Table.Row>
-            <Table.HeaderCell>Title</Table.HeaderCell>
-            <Table.HeaderCell>Max score</Table.HeaderCell>
-            <Table.HeaderCell>Sort order</Table.HeaderCell>
-            <Table.HeaderCell>Status</Table.HeaderCell>
-            <Table.HeaderCell>Actions</Table.HeaderCell>
+            <Table.HeaderCell>
+              {t("principal.evaluations.templates.columns.title")}
+            </Table.HeaderCell>
+            <Table.HeaderCell>
+              {t("principal.evaluations.templates.columns.maxScore")}
+            </Table.HeaderCell>
+            <Table.HeaderCell>
+              {t("principal.evaluations.templates.columns.sortOrder")}
+            </Table.HeaderCell>
+            <Table.HeaderCell>
+              {t("principal.evaluations.templates.columns.status")}
+            </Table.HeaderCell>
+            <Table.HeaderCell>
+              {t("principal.evaluations.templates.columns.actions")}
+            </Table.HeaderCell>
           </Table.Row>
         </Table.Header>
         <Table.Body
@@ -131,8 +149,8 @@ export default function CriteriaTemplatesPage() {
           loading={templatesQuery.isPending}
           empty={
             templatesQuery.isError
-              ? "Unable to load criteria templates."
-              : "No criteria templates yet."
+              ? t("principal.evaluations.templates.error")
+              : t("principal.evaluations.templates.empty")
           }
         >
           {templates.map((template) => (
@@ -143,13 +161,17 @@ export default function CriteriaTemplatesPage() {
                   <div className="evaluations-score__description">{template.description}</div>
                 ) : null}
               </Table.Cell>
-              <Table.Cell>{template.max_score}</Table.Cell>
-              <Table.Cell>{template.sort_order}</Table.Cell>
-              <Table.Cell>{template.is_active ? "Active" : "Inactive"}</Table.Cell>
+              <Table.Cell>{formatNumber(template.max_score)}</Table.Cell>
+              <Table.Cell>{formatNumber(template.sort_order)}</Table.Cell>
+              <Table.Cell>
+                {template.is_active
+                  ? t("principal.evaluations.templates.active")
+                  : t("principal.evaluations.templates.inactive")}
+              </Table.Cell>
               <Table.Cell>
                 <div className="evaluations-detail__workflow-actions">
                   <Button type="button" variant="tertiary" onClick={() => openEdit(template)}>
-                    Edit
+                    {t("principal.evaluations.templates.edit")}
                   </Button>
                   {template.is_active ? (
                     <DeactivateButton templateId={template.id} />

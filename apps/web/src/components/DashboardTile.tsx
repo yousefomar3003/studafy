@@ -1,5 +1,7 @@
 import { Card } from "@studafy/ui";
 
+import { useTranslation } from "../lib/i18n";
+
 import type { ReactNode } from "react";
 
 export type DashboardTileStatus = "pending" | "error" | "ready";
@@ -19,6 +21,8 @@ export interface DashboardTileProps {
  * differs per tile.
  */
 export function DashboardTile({ title, status, errorMessage, children }: DashboardTileProps) {
+  const { t } = useTranslation();
+
   return (
     <Card as="section" aria-label={title}>
       <Card.Header>
@@ -27,7 +31,7 @@ export function DashboardTile({ title, status, errorMessage, children }: Dashboa
       <Card.Body>
         {status === "pending" ? (
           <p className="dashboard-tile__status" role="status">
-            Loading…
+            {t("site.common.loading")}
           </p>
         ) : status === "error" ? (
           <p className="dashboard-tile__status dashboard-tile__status--error" role="alert">

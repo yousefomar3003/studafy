@@ -1,28 +1,24 @@
 import { DataGrid } from "@studafy/ui";
 import { useMemo } from "react";
 
+import { useTranslation } from "../../../../lib/i18n";
+
 import type { AttendanceMatrixRow, AttendanceStatus } from "../types";
 import type { DataGridColumn } from "@studafy/ui";
 
-export const STATUS_LABELS: Record<AttendanceStatus, string> = {
-  present: "Present",
-  absent: "Absent",
-  late: "Tardy",
-  excused: "Excused",
+/** Translation keys (not display text) — resolve with `t(...)` at render time. */
+export const STATUS_LABEL_KEYS: Record<AttendanceStatus, string> = {
+  present: "principal.attendance.status.present",
+  absent: "principal.attendance.status.absent",
+  late: "principal.attendance.status.late",
+  excused: "principal.attendance.status.excused",
 };
 
 export function AttendanceStatusBadge({ status }: { status: AttendanceStatus }) {
-  const label =
-    status === "present"
-      ? "Present"
-      : status === "absent"
-        ? "Absent"
-        : status === "late"
-          ? "Tardy"
-          : "Excused";
+  const { t } = useTranslation();
   return (
     <span className="attendance-status" data-status={status}>
-      {label}
+      {t(STATUS_LABEL_KEYS[status])}
     </span>
   );
 }
@@ -34,11 +30,12 @@ export interface DailyAttendanceGridProps {
 }
 
 export function DailyAttendanceGrid({ rows, loading, onSelectStudent }: DailyAttendanceGridProps) {
+  const { t } = useTranslation();
   const columns = useMemo<DataGridColumn<AttendanceMatrixRow>[]>(
     () => [
       {
         id: "student",
-        header: "Student",
+        header: t("principal.attendance.grid.columns.student"),
         width: "30%",
         renderCell: (row) => (
           <button
@@ -50,31 +47,43 @@ export function DailyAttendanceGrid({ rows, loading, onSelectStudent }: DailyAtt
           </button>
         ),
       },
-      { id: "admission", header: "Admission no.", renderCell: (row) => row.admissionNumber },
-      { id: "class", header: "Class", renderCell: (row) => row.classCode },
-      { id: "section", header: "Section", renderCell: (row) => row.sectionName },
+      {
+        id: "admission",
+        header: t("principal.attendance.grid.columns.admission"),
+        renderCell: (row) => row.admissionNumber,
+      },
+      {
+        id: "class",
+        header: t("principal.attendance.grid.columns.class"),
+        renderCell: (row) => row.classCode,
+      },
+      {
+        id: "section",
+        header: t("principal.attendance.grid.columns.section"),
+        renderCell: (row) => row.sectionName,
+      },
       {
         id: "status",
-        header: "Status",
+        header: t("principal.attendance.grid.columns.status"),
         renderCell: (row) => <AttendanceStatusBadge status={row.status} />,
       },
       {
         id: "late",
-        header: "Minutes late",
+        header: t("principal.attendance.grid.columns.minutesLate"),
         align: "end",
         renderCell: (row) => row.minutesLate ?? "—",
       },
     ],
-    [onSelectStudent],
+    [onSelectStudent, t],
   );
   return (
     <DataGrid
-      caption="Daily student attendance"
+      caption={t("principal.attendance.grid.caption")}
       columns={columns}
       rows={rows}
       getRowId={(row) => row.recordId}
       loading={loading}
-      empty="No students match the active filters."
+      empty={t("principal.attendance.grid.empty")}
       height={440}
       rowHeight={44}
     />

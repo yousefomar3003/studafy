@@ -1,15 +1,15 @@
 import { Button } from "@studafy/ui";
 
+import { useLocale, useTranslation } from "../../lib/i18n";
+
+import { formatIsoDate } from "./format";
+
 import type { BillingOverview } from "./queries";
 
 export interface DunningBannerProps {
   subscription: BillingOverview["subscription"];
   onManagePayment: () => void;
   managingPayment: boolean;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString();
 }
 
 /**
@@ -22,6 +22,8 @@ export function DunningBanner({
   onManagePayment,
   managingPayment,
 }: DunningBannerProps) {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
   const { status, currentPeriodEnd } = subscription;
 
   if (status !== "past_due" && status !== "grace_period") {
@@ -31,12 +33,12 @@ export function DunningBanner({
   const tone = status === "grace_period" ? "danger" : "warning";
   const title =
     status === "grace_period"
-      ? "Your subscription is in a grace period"
-      : "Your last payment failed";
+      ? t("site.billing.dunning.graceTitle")
+      : t("site.billing.dunning.pastDueTitle");
   const body =
     status === "grace_period"
-      ? `Update your payment method before ${formatDate(currentPeriodEnd)} to keep access — the subscription closes automatically once the grace window ends.`
-      : "Update your payment method to keep the subscription active before the grace period begins.";
+      ? t("site.billing.dunning.graceBody", { date: formatIsoDate(currentPeriodEnd, locale) })
+      : t("site.billing.dunning.pastDueBody");
 
   return (
     <div className="billing-banner" data-tone={tone} role="status">
@@ -45,7 +47,7 @@ export function DunningBanner({
         <p className="billing-banner__body">{body}</p>
       </div>
       <Button type="button" variant="primary" loading={managingPayment} onClick={onManagePayment}>
-        Update payment method
+        {t("site.billing.dunning.updatePayment")}
       </Button>
     </div>
   );

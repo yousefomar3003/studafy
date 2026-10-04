@@ -3,7 +3,7 @@ import { Button, Modal } from "@studafy/ui";
 import { useRemoveDevice, useRevokeSession } from "../../features/account/sessions/mutations";
 import { useDevicesQuery, useSessionsQuery } from "../../features/account/sessions/queries";
 import { useAuth } from "../../lib/auth";
-import { useTranslation } from "../../lib/i18n";
+import { useFormatters, useTranslation } from "../../lib/i18n";
 
 import type { components } from "@studafy/api-client";
 
@@ -11,6 +11,16 @@ export interface DeviceSessionsPanelProps {
   open: boolean;
   onClose: () => void;
 }
+
+/** Same fields `Date#toLocaleString()` shows by default, but in the active app locale. */
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "numeric",
+  second: "numeric",
+};
 
 /**
  * Lists every live session and registered device for the account (`GET /api/auth/sessions`,
@@ -24,6 +34,7 @@ export interface DeviceSessionsPanelProps {
  */
 export function DeviceSessionsPanel({ open, onClose }: DeviceSessionsPanelProps) {
   const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { sessionId: currentSessionId } = useAuth();
 
   // Shared with the account sessions screen (`features/account/sessions`): both surfaces invalidate
@@ -62,10 +73,15 @@ export function DeviceSessionsPanel({ open, onClose }: DeviceSessionsPanelProps)
                 return (
                   <li key={session.id} className="portal-device-session-list__item">
                     <div>
-                      <p>{session.device_name ?? session.channel}</p>
+                      <p>
+                        {session.device_name ??
+                          t(`deviceSessions.channel.${session.channel}`, {
+                            defaultValue: session.channel,
+                          })}
+                      </p>
                       <p className="portal-device-session-list__meta">
                         {session.ip_address ?? t("deviceSessions.unknownLocation")} &middot;{" "}
-                        {new Date(session.issued_at).toLocaleString()}
+                        {formatDate(new Date(session.issued_at), DATE_TIME_OPTIONS)}
                       </p>
                     </div>
                     {isCurrent ? (

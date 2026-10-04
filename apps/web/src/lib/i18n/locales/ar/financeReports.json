@@ -1,0 +1,240 @@
+{
+  "adjustments": {
+    "common": {
+      "cancel": "إلغاء",
+      "change": "تغيير",
+      "student": "الطالب",
+      "invoice": "الفاتورة",
+      "reason": "السبب",
+      "amount": "المبلغ",
+      "refundAmount": "مبلغ الاسترداد",
+      "paidToDate": "المدفوع حتى تاريخه",
+      "scholarshipDiscount": "المنحة الدراسية / الخصم",
+      "effect": "الأثر",
+      "created": "تاريخ الإنشاء",
+      "status": "الحالة",
+      "actions": "الإجراءات",
+      "auditTrail": "سجل التدقيق",
+      "allStatuses": "جميع الحالات",
+      "previous": "السابق",
+      "next": "التالي",
+      "loading": "جارٍ التحميل…"
+    },
+    "awardStatus": {
+      "pending": "بانتظار التأكيد",
+      "confirmed": "مؤكَّد",
+      "cancelled": "ملغى"
+    },
+    "refundStatus": {
+      "pending_approval": "بانتظار الاعتماد",
+      "approved": "معتمد",
+      "rejected": "مرفوض",
+      "submitted_to_erpnext": "أُرسل إلى ERPNext",
+      "completed": "مكتمل",
+      "failed": "فشل"
+    },
+    "reasonCode": {
+      "overpayment": "دفعة زائدة",
+      "withdrawal": "انسحاب",
+      "discount_adjustment": "تعديل خصم",
+      "error_correction": "تصحيح خطأ"
+    },
+    "discountEffect": {
+      "fixedAll": "خصم {{amount}} على جميع فئات الرسوم في كل فاتورة مستقبلية.",
+      "fixedCategory": "خصم {{amount}} على فئة الرسوم \"{{category}}\" في كل فاتورة مستقبلية.",
+      "percentAll": "خصم {{amount}}% على جميع فئات الرسوم في كل فاتورة مستقبلية.",
+      "percentCategory": "خصم {{amount}}% على فئة الرسوم \"{{category}}\" في كل فاتورة مستقبلية."
+    },
+    "auditTrailModal": {
+      "title": "سجل التدقيق",
+      "description": "كل تغيير مسجَّل على هذا السجل، من الأقدم إلى الأحدث.",
+      "loading": "جارٍ التحميل…",
+      "loadError": "تعذّر تحميل سجل التدقيق.",
+      "empty": "لا توجد إدخالات تدقيق مسجَّلة بعد.",
+      "system": "النظام",
+      "entryMeta": "<strong>{{action}}</strong> بواسطة {{actor}} · {{date}}"
+    },
+    "studentPicker": {
+      "placeholder": "ابحث بالاسم أو رقم القيد",
+      "noMatches": "لا يوجد طلاب مطابقون."
+    },
+    "invoicePicker": {
+      "paidToDate": "المدفوع حتى تاريخه: {{amount}} {{currency}}",
+      "placeholder": "ابحث باسم الطالب أو رقم الفاتورة",
+      "helper": "لا يمكن الاسترداد إلا من الفواتير المعتمدة التي عليها مبلغ مدفوع.",
+      "paid": "مدفوع {{amount}} {{currency}}",
+      "noMatches": "لا توجد فواتير قابلة للاسترداد مطابقة."
+    },
+    "scholarships": {
+      "title": "منح المنح الدراسية والخصومات",
+      "description": "تحتاج المنح المعلّقة إلى تأكيد من مستخدم آخر قبل تطبيقها على الفواتير.",
+      "awardScholarship": "منح منحة دراسية",
+      "caption": "منح المنح الدراسية والخصومات",
+      "loadError": "تعذّر تحميل المنح.",
+      "empty": "لا توجد منح مطابقة لهذا الفلتر.",
+      "confirm": "تأكيد",
+      "ownAwardHint": "يجب أن يؤكد هذه المنحة مستخدم آخر.",
+      "confirmedToast": "تم تأكيد المنحة",
+      "confirmTitle": "تأكيد منح المنحة الدراسية؟",
+      "confirmDescription": "سيؤدي هذا إلى إرسال المنحة إلى ERPNext. لا يمكن التراجع عن ذلك من هنا.",
+      "confirmLabel": "تأكيد المنحة",
+      "confirmError": "تعذّر تأكيد المنحة."
+    },
+    "newScholarship": {
+      "back": "→ العودة إلى منح المنح الدراسية",
+      "title": "منح منحة دراسية أو خصم",
+      "formLabel": "نموذج منح المنحة الدراسية",
+      "selectDiscount": "اختر منحة دراسية أو خصمًا",
+      "reviewAward": "مراجعة المنحة",
+      "confirmTitle": "منح المنحة الدراسية؟",
+      "confirmDescription": "سيؤدي هذا إلى إنشاء منحة معلّقة. يجب أن يؤكدها مستخدم آخر قبل تطبيقها على أي فاتورة.",
+      "confirmLabel": "إنشاء المنحة",
+      "createError": "تعذّر إنشاء المنحة.",
+      "createdLabel": "تم إنشاء المنحة",
+      "createdHeadline": "تم إنشاء المنحة — {{title}}",
+      "createdBody": "بانتظار التأكيد من مستخدم آخر. لن تُطبَّق على أي فاتورة حتى يتم تأكيدها.",
+      "awardAnother": "منح منحة دراسية أخرى",
+      "viewAwards": "عرض منح المنح الدراسية"
+    },
+    "refunds": {
+      "title": "المبالغ المستردة",
+      "description": "تحتاج طلبات الاسترداد المعلّقة إلى اعتماد من مستخدم آخر لديه صلاحية اعتماد الاسترداد.",
+      "requestRefund": "طلب استرداد",
+      "caption": "طلبات الاسترداد",
+      "loadError": "تعذّر تحميل طلبات الاسترداد.",
+      "empty": "لا توجد طلبات استرداد مطابقة لهذا الفلتر.",
+      "approve": "اعتماد",
+      "reject": "رفض",
+      "ownApproveHint": "يجب أن يعتمد هذا الاسترداد مستخدم آخر.",
+      "ownRejectHint": "يجب أن يرفض هذا الاسترداد مستخدم آخر.",
+      "approvedToast": "تم اعتماد الاسترداد",
+      "approveTitle": "اعتماد الاسترداد؟",
+      "approveDescription": "سيؤدي هذا إلى إرسال الاسترداد إلى ERPNext كإشعار دائن. لا يمكن التراجع عن ذلك من هنا.",
+      "approveLabel": "اعتماد الاسترداد",
+      "approveError": "تعذّر اعتماد الاسترداد."
+    },
+    "newRefund": {
+      "back": "→ العودة إلى المبالغ المستردة",
+      "title": "طلب استرداد",
+      "formLabel": "نموذج الاسترداد",
+      "selectReason": "اختر سببًا",
+      "exceedsPaid": "يتجاوز هذا المبلغ المدفوع على هذه الفاتورة ({{amount}} {{currency}}). خفّض المبلغ للمتابعة.",
+      "upTo": "يمكن استرداد ما يصل إلى {{amount}} {{currency}} من هذه الفاتورة.",
+      "notesOptional": "ملاحظات (اختياري)",
+      "reviewRefund": "مراجعة الاسترداد",
+      "confirmTitle": "طلب الاسترداد؟",
+      "confirmDescription": "سيؤدي هذا إلى إنشاء طلب استرداد معلّق. يجب أن يعتمده مستخدم آخر لديه صلاحية اعتماد الاسترداد قبل أن يُصدر ERPNext إشعار الدائن.",
+      "confirmLabel": "طلب الاسترداد",
+      "requestError": "تعذّر طلب الاسترداد.",
+      "conflictError": "ربما سُجّل هذا الطلب مسبقًا بتفاصيل مختلفة. راجع سجل الاسترداد قبل إعادة المحاولة.",
+      "createdLabel": "تم طلب الاسترداد",
+      "createdHeadline": "تم طلب الاسترداد — {{amount}} {{currency}}",
+      "createdBody": "بانتظار الاعتماد من مستخدم آخر لديه صلاحية اعتماد الاسترداد. لن يُصدر ERPNext إشعار الدائن قبل ذلك.",
+      "requestAnother": "طلب استرداد آخر",
+      "viewRefunds": "عرض المبالغ المستردة"
+    },
+    "rejectRefund": {
+      "title": "رفض الاسترداد",
+      "description": "{{amount}} {{currency}} على الفاتورة {{invoice}}",
+      "reason": "السبب",
+      "reasonRequired": "يجب ذكر سبب للرفض.",
+      "reject": "رفض",
+      "rejectedToast": "تم رفض الاسترداد",
+      "rejectError": "تعذّر رفض الاسترداد"
+    }
+  },
+  "reports": {
+    "center": {
+      "title": "التقارير",
+      "description": "شغّل التقارير المالية ونزّلها. تتم معالجة التنزيلات في الخلفية — وسيصلك إشعار هنا عندما يصبح الملف جاهزًا.",
+      "tabs": {
+        "arAging": "أعمار الذمم",
+        "collections": "التحصيلات",
+        "generalLedger": "دفتر الأستاذ العام",
+        "familyStatement": "كشف حساب الأسرة"
+      }
+    },
+    "types": {
+      "ar_aging": "أعمار الذمم المدينة",
+      "general_ledger": "دفتر الأستاذ العام",
+      "collections_vs_due": "التحصيلات مقابل المستحق",
+      "family_statement": "كشف حساب الأسرة"
+    },
+    "typeDescriptions": {
+      "ar_aging": "الأرصدة المستحقة حسب الأسرة، موزعة على فترات 30/60/90 يومًا.",
+      "general_ledger": "كل حركة مرحّلة ضمن نطاق تاريخي، حسابًا تلو الآخر.",
+      "collections_vs_due": "ما تم تحصيله مقابل ما هو مستحق في هذا الفصل، حسب شرط الدفع.",
+      "family_statement": "الذمم المدينة لأسرة واحدة وحركات دفتر الأستاذ الخاصة بها جنبًا إلى جنب."
+    },
+    "exportStatus": {
+      "queued": "في قائمة الانتظار",
+      "processing": "قيد المعالجة",
+      "completed": "جاهز",
+      "failed": "فشل"
+    },
+    "export": {
+      "format": "الصيغة",
+      "downloadFormat": "تنزيل {{format}}",
+      "downloadReport": "تنزيل {{report}}",
+      "dismiss": "إخفاء",
+      "readyTitle": "التقرير جاهز",
+      "readyDescription": "تقرير {{report}} جاهز للتنزيل.",
+      "failedTitle": "فشل التصدير",
+      "failedDescription": "تعذّر إنشاء تقرير {{report}}. يرجى المحاولة مرة أخرى.",
+      "queueErrorTitle": "تعذّرت إضافة التصدير إلى قائمة الانتظار",
+      "tryAgain": "يرجى المحاولة مرة أخرى."
+    },
+    "table": {
+      "running": "جارٍ تشغيل التقرير…",
+      "error": "تعذّر تشغيل هذا التقرير. يرجى التحقق من عوامل التصفية والمحاولة مرة أخرى.",
+      "columnFallback": "العمود {{number}}",
+      "empty": "لا توجد سجلات مطابقة لعوامل التصفية هذه."
+    },
+    "filters": {
+      "asOfDateOptional": "حتى تاريخ (اختياري)",
+      "fromDate": "من تاريخ",
+      "toDate": "إلى تاريخ",
+      "fromDateOptional": "من تاريخ (اختياري)",
+      "toDateOptional": "إلى تاريخ (اختياري)",
+      "accountOptional": "الحساب (اختياري)",
+      "voucherNoOptional": "رقم القيد (اختياري)",
+      "voucherTypeOptional": "نوع القيد (اختياري)",
+      "runReport": "تشغيل التقرير"
+    },
+    "studentPicker": {
+      "student": "الطالب",
+      "studentOptional": "الطالب (اختياري)",
+      "clear": "مسح",
+      "placeholder": "ابحث بالاسم أو رقم القيد",
+      "helper": "اتركه فارغًا لتشغيل التقرير لجميع الطلاب.",
+      "noMatches": "لا يوجد طلاب مطابقون."
+    },
+    "familyPicker": {
+      "family": "الأسرة",
+      "change": "تغيير",
+      "placeholder": "ابحث باسم الأسرة",
+      "noMatches": "لا توجد أسر مطابقة."
+    },
+    "arAging": {
+      "caption": "نتائج أعمار الذمم المدينة",
+      "idle": "اضبط عوامل التصفية (اختياري) وشغّل التقرير لعرض أرصدة أعمار الذمم."
+    },
+    "collections": {
+      "caption": "نتائج التحصيلات مقابل المستحق",
+      "idle": "اضبط عوامل التصفية (اختياري) وشغّل التقرير لعرض التحصيلات مقابل المستحق."
+    },
+    "generalLedger": {
+      "caption": "نتائج دفتر الأستاذ العام",
+      "idle": "حدّد نطاقًا تاريخيًا وشغّل التقرير لعرض الحركات المرحّلة.",
+      "disabledReason": "حدّد نطاقًا تاريخيًا لتفعيل التصدير."
+    },
+    "familyStatement": {
+      "idle": "اختر أسرة وشغّل التقرير لعرض كشف حسابها.",
+      "accountsReceivable": "الذمم المدينة",
+      "accountsReceivableCaption": "الذمم المدينة للأسرة",
+      "generalLedger": "حركات دفتر الأستاذ العام",
+      "generalLedgerCaption": "دفتر الأستاذ العام للأسرة",
+      "disabledReason": "اختر أسرة لتفعيل التصدير."
+    }
+  }
+}

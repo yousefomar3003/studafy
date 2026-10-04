@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
   type PropsWithChildren,
@@ -9,6 +10,7 @@ import {
 import { API_BASE_URL } from "../config";
 
 import { permissionsForRoles } from "./permissions";
+import { syncSignedInHint, wasSignedIn } from "./signed-in-hint";
 
 import type { SessionStatus, SessionStore } from "./session-store";
 import type { Permission } from "@studafy/constants";
@@ -22,6 +24,8 @@ const SessionContext = createContext<SessionStore | null>(null);
  * navigates and stays router-independent.
  */
 export function AuthProvider({ store, children }: PropsWithChildren<{ store: SessionStore }>) {
+  // Keep the public-page "signed in" hint (signed-in-hint.ts) in step with the session.
+  useEffect(() => store.subscribe(() => syncSignedInHint(store.getStatus())), [store]);
   return <SessionContext.Provider value={store}>{children}</SessionContext.Provider>;
 }
 
@@ -43,6 +47,20 @@ export function useAuthStatus(): SessionStatus {
   const subscribe = useMemo(() => store.subscribe.bind(store), [store]);
   const getStatus = useMemo(() => store.getStatus.bind(store), [store]);
   return useSyncExternalStore(subscribe, getStatus);
+}
+
+/**
+ * Session status for public pages (marketing header). Unlike a guard, it only restores the session
+ * when this browser was signed in before, so anonymous visitors never trigger a refresh call; for
+ * everyone else it resolves to the real status (and an in-app navigation keeps the live session).
+ */
+export function usePublicAuthStatus(): SessionStatus {
+  const store = useSessionStore();
+  const status = useAuthStatus();
+  useEffect(() => {
+    if (store.getStatus() === "restoring" && wasSignedIn()) void store.restore();
+  }, [store]);
+  return status;
 }
 
 /** Convenience view over the session status for components that need more than the primitive. */

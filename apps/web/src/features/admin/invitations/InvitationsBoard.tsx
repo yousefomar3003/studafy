@@ -3,13 +3,15 @@ import { Button, DataGrid, FilterBar, Select, useToast } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+
 import { useResendInvitation } from "./mutations";
 import {
   EMPTY_INVITATIONS_FILTERS,
   fetchInvitationsPage,
   invitationsListQueryKey,
 } from "./queries";
-import { INVITATION_ROLES, INVITATION_STATUS_LABELS, ROLE_LABELS } from "./schema";
+import { INVITATION_ROLES, INVITATION_STATUS_LABEL_KEYS, ROLE_LABEL_KEYS } from "./schema";
 
 import type { InviteLinkDetails } from "./InviteLinkDialog";
 import type { InvitationsFilters, InvitationWithStatus } from "./queries";
@@ -19,18 +21,15 @@ import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-const ROLE_OPTIONS: SelectOption<InvitationRole | "">[] = [
-  { value: "", label: "All roles" },
-  // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `INVITATION_ROLES` array, not user input
-  ...INVITATION_ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] })),
-];
-
-const STATUS_OPTIONS: SelectOption<InvitationsFilters["status"]>[] = [
-  { value: "", label: "All statuses" },
-  ...(Object.entries(INVITATION_STATUS_LABELS) as [InvitationsFilters["status"], string][]).map(
-    ([value, label]) => ({ value, label }),
-  ),
-];
+/** Matches `Date#toLocaleString()`'s default fields, now formatted in the active locale. */
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+};
 
 /** Resend/revoke only make sense for invitations the backend hasn't already terminated — its
  * `revoke`/`regenerate` routes 404 once `revoked_at`/`consumed_at` is set, which covers "consumed"
@@ -47,6 +46,8 @@ export interface InvitationsBoardProps {
 }
 
 export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBoardProps) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { show } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -77,6 +78,19 @@ export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBo
     placeholderData: keepPreviousData,
   });
 
+  const roleOptions: SelectOption<InvitationRole | "">[] = [
+    { value: "", label: t("adminPeople.invitations.board.allRoles") },
+    // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `INVITATION_ROLES` array, not user input
+    ...INVITATION_ROLES.map((role) => ({ value: role, label: t(ROLE_LABEL_KEYS[role]) })),
+  ];
+
+  const statusOptions: SelectOption<InvitationsFilters["status"]>[] = [
+    { value: "", label: t("adminPeople.invitations.board.allStatuses") },
+    ...(
+      Object.entries(INVITATION_STATUS_LABEL_KEYS) as [InvitationsFilters["status"], string][]
+    ).map(([value, key]) => ({ value, label: t(key) })),
+  ];
+
   const resendInvitation = useResendInvitation();
   const [resendingId, setResendingId] = useState<string | null>(null);
 
@@ -89,7 +103,7 @@ export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBo
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't resend invitation",
+          title: t("adminPeople.invitations.board.resendError"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
       },
@@ -98,34 +112,41 @@ export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBo
   }
 
   const columns: DataGridColumn<InvitationWithStatus>[] = [
-    { id: "email", header: "Email", renderCell: (invitation) => invitation.email },
+    {
+      id: "email",
+      header: t("adminPeople.invitations.board.columns.email"),
+      renderCell: (invitation) => invitation.email,
+    },
     {
       id: "role",
-      header: "Role",
-      renderCell: (invitation) => ROLE_LABELS[invitation.role as Role] ?? invitation.role,
+      header: t("adminPeople.invitations.board.columns.role"),
+      renderCell: (invitation) => {
+        const key = ROLE_LABEL_KEYS[invitation.role as Role];
+        return key ? t(key) : invitation.role;
+      },
     },
     {
       id: "status",
-      header: "Status",
+      header: t("adminPeople.invitations.board.columns.status"),
       renderCell: (invitation) => (
         <span className="invitations-status-pill" data-status={invitation.status}>
-          {INVITATION_STATUS_LABELS[invitation.status]}
+          {t(INVITATION_STATUS_LABEL_KEYS[invitation.status])}
         </span>
       ),
     },
     {
       id: "expires_at",
-      header: "Expires",
-      renderCell: (invitation) => new Date(invitation.expires_at).toLocaleString(),
+      header: t("adminPeople.invitations.board.columns.expires"),
+      renderCell: (invitation) => formatDate(new Date(invitation.expires_at), DATE_TIME_OPTIONS),
     },
     {
       id: "created_at",
-      header: "Sent",
-      renderCell: (invitation) => new Date(invitation.created_at).toLocaleString(),
+      header: t("adminPeople.invitations.board.columns.sent"),
+      renderCell: (invitation) => formatDate(new Date(invitation.created_at), DATE_TIME_OPTIONS),
     },
     {
       id: "actions",
-      header: "Actions",
+      header: t("adminPeople.invitations.board.columns.actions"),
       renderCell: (invitation) =>
         canManage(invitation.status) ? (
           <div className="invitations-board__actions">
@@ -134,10 +155,10 @@ export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBo
               loading={resendInvitation.isPending && resendingId === invitation.id}
               onClick={() => handleResend(invitation)}
             >
-              Resend
+              {t("adminPeople.invitations.board.resend")}
             </Button>
             <Button variant="tertiary" onClick={() => onRevoke(invitation)}>
-              Revoke
+              {t("adminPeople.invitations.board.revoke")}
             </Button>
           </div>
         ) : (
@@ -149,39 +170,43 @@ export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBo
   return (
     <>
       <div className="invitations-board__header">
-        <p>Track and manage invite links: resend, revoke, or copy a link directly.</p>
-        <Button onClick={onCreate}>New invitation</Button>
+        <p>{t("adminPeople.invitations.board.description")}</p>
+        <Button onClick={onCreate}>{t("adminPeople.invitations.board.newInvitation")}</Button>
       </div>
 
       <div className="invitations-board__toolbar">
         <FilterBar
-          searchLabel="Search"
-          searchPlaceholder="Search by email"
+          searchLabel={t("adminPeople.invitations.board.searchLabel")}
+          searchPlaceholder={t("adminPeople.invitations.board.searchPlaceholder")}
           search={searchInput}
           onSearchChange={setSearchInput}
         />
         <Select
-          label="Role"
-          options={ROLE_OPTIONS}
+          label={t("adminPeople.invitations.board.roleFilter")}
+          options={roleOptions}
           value={role}
           onChange={(value) => setRole(value)}
         />
         <Select
-          label="Status"
-          options={STATUS_OPTIONS}
+          label={t("adminPeople.invitations.board.statusFilter")}
+          options={statusOptions}
           value={status}
           onChange={(value) => setStatus(value)}
         />
       </div>
 
       <DataGrid
-        caption="Invitations"
+        caption={t("adminPeople.invitations.board.caption")}
         columns={columns}
         rows={data?.invitations ?? []}
         getRowId={(invitation) => invitation.id}
         getRowLabel={(invitation) => invitation.email}
         loading={isPending}
-        empty={isError ? "Unable to load invitations." : "No invitations match these filters."}
+        empty={
+          isError
+            ? t("adminPeople.invitations.board.loadError")
+            : t("adminPeople.invitations.board.empty")
+        }
       />
 
       <div className="invitations-board__pagination">
@@ -195,7 +220,7 @@ export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBo
             setCursor(previous);
           }}
         >
-          Previous
+          {t("adminPeople.common.previous")}
         </Button>
         <Button
           variant="secondary"
@@ -207,7 +232,7 @@ export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBo
             setCursor(nextCursor);
           }}
         >
-          Next
+          {t("adminPeople.common.next")}
         </Button>
       </div>
     </>

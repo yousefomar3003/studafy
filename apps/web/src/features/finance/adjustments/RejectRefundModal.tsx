@@ -2,6 +2,8 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Modal, useToast } from "@studafy/ui";
 import { useId, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useRejectRefund } from "./mutations";
 
 import type { Refund } from "./queries";
@@ -26,6 +28,7 @@ function apiErrorDescription(error: unknown): string | undefined {
  * own remount note.
  */
 export function RejectRefundModal({ refund, onClose, onRejected }: RejectRefundModalProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const reject = useRejectRefund();
   const [reason, setReason] = useState("");
@@ -44,13 +47,16 @@ export function RejectRefundModal({ refund, onClose, onRejected }: RejectRefundM
       { refundId: refund.id, reasonNotes: trimmedReason },
       {
         onSuccess: (rejected) => {
-          show({ variant: "success", title: "Refund rejected" });
+          show({
+            variant: "success",
+            title: t("financeReports.adjustments.rejectRefund.rejectedToast"),
+          });
           onRejected(rejected);
         },
         onError: (error) =>
           show({
             variant: "error",
-            title: "Couldn't reject refund",
+            title: t("financeReports.adjustments.rejectRefund.rejectError"),
             description: apiErrorDescription(error),
           }),
       },
@@ -61,10 +67,14 @@ export function RejectRefundModal({ refund, onClose, onRejected }: RejectRefundM
     <Modal
       open={refund !== null}
       onClose={onClose}
-      title="Reject refund"
+      title={t("financeReports.adjustments.rejectRefund.title")}
       description={
         refund
-          ? `${refund.amount} ${refund.currency} against ${refund.erpnext_invoice_id}`
+          ? t("financeReports.adjustments.rejectRefund.description", {
+              amount: refund.amount,
+              currency: refund.currency,
+              invoice: refund.erpnext_invoice_id,
+            })
           : undefined
       }
     >
@@ -72,7 +82,7 @@ export function RejectRefundModal({ refund, onClose, onRejected }: RejectRefundM
         <Modal.Body>
           <div className="sf-field">
             <label className="sf-field__label" htmlFor={reasonId}>
-              Reason
+              {t("financeReports.adjustments.rejectRefund.reason")}
               <span className="sf-field__required" aria-hidden="true">
                 *
               </span>
@@ -92,17 +102,17 @@ export function RejectRefundModal({ refund, onClose, onRejected }: RejectRefundM
             </div>
             {invalid ? (
               <p className="sf-field__error" id={errorId} role="alert">
-                A reason is required to reject.
+                {t("financeReports.adjustments.rejectRefund.reasonRequired")}
               </p>
             ) : null}
           </div>
         </Modal.Body>
         <Modal.Footer>
           <Button type="button" variant="tertiary" onClick={onClose}>
-            Cancel
+            {t("financeReports.adjustments.common.cancel")}
           </Button>
           <Button type="submit" variant="primary" loading={reject.isPending}>
-            Reject
+            {t("financeReports.adjustments.rejectRefund.reject")}
           </Button>
         </Modal.Footer>
       </form>

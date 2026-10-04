@@ -1,3 +1,5 @@
+import { useTranslation } from "../../lib/i18n";
+
 import { AttendanceHeatMapTile } from "./tiles/AttendanceHeatMapTile";
 import { DraftEvaluationsTile } from "./tiles/DraftEvaluationsTile";
 import { OpenDisciplineIncidentsTile } from "./tiles/OpenDisciplineIncidentsTile";
@@ -16,10 +18,11 @@ import "./principal-dashboard.css";
  * rendering (same pattern `AdminDashboardPage` uses).
  */
 export default function PrincipalDashboardPage() {
+  const { t } = useTranslation();
   return (
     <>
-      <h1>Principal</h1>
-      <p>A live snapshot of approvals, attendance, discipline, evaluations, and announcements.</p>
+      <h1>{t("principal.dashboard.title")}</h1>
+      <p>{t("principal.dashboard.description")}</p>
 
       <div className="principal-dashboard-grid">
         <PendingApprovalsTile />

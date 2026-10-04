@@ -5,7 +5,9 @@ import { useState } from "react";
 
 import { LinkButton } from "../../components/LinkButton";
 import { useSeo } from "../../components/Seo";
+import { formatMinorAmount } from "../../features/billing/format";
 import { api } from "../../lib/api";
+import { Trans, useLocale, useTranslation } from "../../lib/i18n";
 
 import type { operations } from "@studafy/api-client";
 
@@ -15,31 +17,15 @@ type Plan =
   operations["listSubscriptionPlans"]["responses"][200]["content"]["application/json"][number];
 type BillingInterval = "monthly" | "yearly";
 
-const INCLUDED_IN_EVERY_PLAN = [
-  "Academics, attendance, grades, and discipline",
-  "Finance and billing",
-  "Family portal and notifications",
-  "Approvals and audit trail",
-];
+/** Keys under `site.marketing.pricing.included`, translated at render time. */
+const INCLUDED_IN_EVERY_PLAN = ["academics", "finance", "family", "approvals"] as const;
+
+const CONTACT_LINK = <a key="contact" href="/about#contact" />;
 
 /** Picks the price for the selected interval, preferring USD when a plan has more than one currency. */
 function priceFor(plan: Plan, interval: BillingInterval): Plan["prices"][number] | undefined {
   const matches = plan.prices.filter((price) => price.billingInterval === interval);
   return matches.find((price) => price.currencyCode === "USD") ?? matches[0];
-}
-
-function formatAmount(amountMinor: number, currencyCode: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currencyCode,
-      minimumFractionDigits: amountMinor % 100 === 0 ? 0 : 2,
-    }).format(amountMinor / 100);
-  } catch {
-    // An unrecognized ISO currency code would throw inside Intl.NumberFormat; fall back to a plain
-    // number rather than letting the whole pricing page crash on bad reference data.
-    return `${(amountMinor / 100).toFixed(2)} ${currencyCode}`;
-  }
 }
 
 /**
@@ -51,9 +37,12 @@ function formatAmount(amountMinor: number, currencyCode: string): string {
  * that plan's own `description` from the API.
  */
 export default function PricingPage() {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
+
   useSeo({
-    title: "Pricing",
-    description: "School subscription tiers and the optional AI add-on, with live pricing.",
+    title: t("site.marketing.pricing.seoTitle"),
+    description: t("site.marketing.pricing.seoDescription"),
     path: "/pricing",
   });
 
@@ -77,20 +66,21 @@ export default function PricingPage() {
     <>
       <section className="marketing-hero">
         <div className="marketing-container">
-          <h1 className="marketing-hero__title">Simple, per-school pricing</h1>
-          <p className="marketing-hero__subtitle">
-            One subscription per school. Every plan includes the same modules — the difference is
-            scale, described on each plan below.
-          </p>
+          <h1 className="marketing-hero__title">{t("site.marketing.pricing.heroTitle")}</h1>
+          <p className="marketing-hero__subtitle">{t("site.marketing.pricing.heroSubtitle")}</p>
 
-          <div className="marketing-pricing-toggle" role="group" aria-label="Billing interval">
+          <div
+            className="marketing-pricing-toggle"
+            role="group"
+            aria-label={t("site.marketing.pricing.intervalGroupLabel")}
+          >
             <button
               type="button"
               className="marketing-pricing-toggle__option"
               aria-pressed={interval === "monthly"}
               onClick={() => setInterval("monthly")}
             >
-              Monthly
+              {t("site.marketing.pricing.monthly")}
             </button>
             <button
               type="button"
@@ -98,7 +88,7 @@ export default function PricingPage() {
               aria-pressed={interval === "yearly"}
               onClick={() => setInterval("yearly")}
             >
-              Yearly
+              {t("site.marketing.pricing.yearly")}
             </button>
           </div>
         </div>
@@ -108,23 +98,32 @@ export default function PricingPage() {
         <div className="marketing-container">
           {isPending && (
             <p className="marketing-pricing-state" role="status" aria-live="polite">
-              Loading plans…
+              {t("site.marketing.pricing.loading")}
             </p>
           )}
 
           {isError && (
             <p className="marketing-pricing-state" role="alert">
-              We couldn&rsquo;t load current pricing
-              {error instanceof ApiError && error.request_id
-                ? ` (reference ${error.request_id})`
-                : ""}
-              . Please <a href="/about#contact">contact us</a> for current rates.
+              {error instanceof ApiError && error.request_id ? (
+                <Trans
+                  i18nKey="site.marketing.pricing.loadErrorWithReference"
+                  t={t}
+                  values={{ requestId: error.request_id }}
+                  components={[CONTACT_LINK]}
+                />
+              ) : (
+                <Trans
+                  i18nKey="site.marketing.pricing.loadError"
+                  t={t}
+                  components={[CONTACT_LINK]}
+                />
+              )}
             </p>
           )}
 
           {!isPending && !isError && plans.length === 0 && (
             <p className="marketing-pricing-state">
-              No plans are published yet. <a href="/about#contact">Contact us</a> for pricing.
+              <Trans i18nKey="site.marketing.pricing.empty" t={t} components={[CONTACT_LINK]} />
             </p>
           )}
 
@@ -144,15 +143,19 @@ export default function PricingPage() {
                         {price ? (
                           <>
                             <span className="marketing-pricing-card__amount">
-                              {formatAmount(price.amountMinor, price.currencyCode)}
+                              {formatMinorAmount(price.amountMinor, price.currencyCode, locale)}
                             </span>
                             <span className="marketing-pricing-card__interval">
-                              /{interval === "monthly" ? "mo" : "yr"}
+                              {interval === "monthly"
+                                ? t("site.marketing.pricing.perMonth")
+                                : t("site.marketing.pricing.perYear")}
                             </span>
                           </>
                         ) : (
                           <span className="marketing-pricing-card__interval">
-                            No {interval} price published
+                            {interval === "monthly"
+                              ? t("site.marketing.pricing.noMonthlyPrice")
+                              : t("site.marketing.pricing.noYearlyPrice")}
                           </span>
                         )}
                       </div>
@@ -176,13 +179,13 @@ export default function PricingPage() {
                                 fill="none"
                               />
                             </svg>
-                            {item}
+                            {t(`site.marketing.pricing.included.${item}`)}
                           </li>
                         ))}
                       </ul>
 
                       <LinkButton href="/about#contact" variant="secondary" fullWidth>
-                        Talk to us about {plan.displayName}
+                        {t("site.marketing.pricing.talkAboutPlan", { plan: plan.displayName })}
                       </LinkButton>
                     </Card.Body>
                   </Card>
@@ -198,16 +201,14 @@ export default function PricingPage() {
           <div className="marketing-ai-callout">
             <Card>
               <Card.Body>
-                <Chip>Add-on</Chip>
-                <h2 className="marketing-feature-card__title">AI add-on</h2>
+                <Chip>{t("site.marketing.addOnChip")}</Chip>
+                <h2 className="marketing-feature-card__title">
+                  {t("site.marketing.pricing.addOnTitle")}
+                </h2>
                 <p className="marketing-feature-card__body">
-                  Ask AI and study-material summaries are billed separately from the school plan: an
-                  active school subscription is required first, then the add-on is purchased per
-                  student and metered against a monthly usage budget.
+                  {t("site.marketing.pricing.addOnBody")}
                 </p>
-                <p className="marketing-pricing-note">
-                  Ask us for current add-on pricing when you talk to us about a school plan.
-                </p>
+                <p className="marketing-pricing-note">{t("site.marketing.pricing.addOnNote")}</p>
               </Card.Body>
             </Card>
           </div>

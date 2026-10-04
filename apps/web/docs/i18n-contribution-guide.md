@@ -3,27 +3,26 @@
 English (LTR) and Arabic (RTL) support for the web app, built on `i18next` / `react-i18next`. The
 moving parts:
 
-| Layer            | File(s)                                   | Responsibility                                                             |
-| ---------------- | ----------------------------------------- | -------------------------------------------------------------------------- |
-| Config           | `src/lib/i18n/config.ts`                  | The `Locale` union, its direction map, and the switcher's display labels   |
-| Locale store     | `src/lib/i18n/store.ts`                   | Which locale is active, persisted to `localStorage`, subscribable          |
-| i18next instance | `src/lib/i18n/i18next.ts`                 | Bundles `en.json`/`ar.json` (and, in dev, the pseudo-locale) synchronously |
-| React wiring     | `src/lib/i18n/context.tsx`                | `LocaleProvider` (syncs `<html lang dir>`), `useLocale`                    |
-| Formatting       | `src/lib/i18n/format.ts`                  | `Intl`-backed date/number/currency helpers, locale-aware                   |
-| Message catalogs | `src/lib/i18n/locales/en.json`, `ar.json` | Translated strings, one flat namespace                                     |
-| Pseudo-locale    | `src/lib/i18n/locales/qps-ploc.json`      | Generated QA locale — see "Pseudo-locale" below                            |
-| Switcher UI      | `src/layouts/portal/LocaleSwitcher.tsx`   | The only control that calls `setLocale`                                    |
-| Wiring           | `src/app/providers.tsx`                   | Mounts `LocaleProvider` outermost, before anything can render text         |
+| Layer            | File(s)                              | Responsibility                                                                                                                              |
+| ---------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Config           | `src/lib/i18n/config.ts`             | The `Locale` union, its direction map, and the switcher's display labels                                                                    |
+| Locale store     | `src/lib/i18n/store.ts`              | Which locale is active, persisted to `localStorage`, subscribable                                                                           |
+| i18next instance | `src/lib/i18n/i18next.ts`            | Bundles the merged catalogs (and, in dev, the pseudo-locale) synchronously                                                                  |
+| React wiring     | `src/lib/i18n/context.tsx`           | `LocaleProvider` (syncs `<html lang dir>`), `useLocale`                                                                                     |
+| Formatting       | `src/lib/i18n/format.ts`             | `Intl`-backed date/number/currency helpers, locale-aware                                                                                    |
+| Message catalogs | `src/lib/i18n/locales/catalog.ts`    | Merges `en.json`/`ar.json` (shell strings) with one file per feature area under `en/` and `ar/` (e.g. `en/finance.json` → `t("finance.…")`) |
+| Pseudo-locale    | `src/lib/i18n/locales/qps-ploc.json` | Generated QA locale — see "Pseudo-locale" below                                                                                             |
+| Switcher UI      | `src/components/LocaleSwitcher.tsx`  | The only control that calls `setLocale`                                                                                                     |
+| Wiring           | `src/app/providers.tsx`              | Mounts `LocaleProvider` outermost, before anything can render text                                                                          |
 
 ## Adding or changing a translated string
 
-1. Add the key to `src/lib/i18n/locales/en.json`, nested under the component/feature it belongs to
+1. Add the key to the feature area's file under `src/lib/i18n/locales/en/` (or `en.json` for shared shell strings), nested under the component it belongs to
    (see the existing `nav`, `userMenu`, `notificationBell` groups). Keep keys canonical: name the
    thing, not the screen it happens to appear on today.
-2. Add the same key to `ar.json` with a real Arabic translation — not a copy of the English string.
-   A missing Arabic key silently falls back to English (`fallbackLng` in `i18next.ts`), which will
-   pass CI but ships an untranslated string, so don't rely on the fallback as a substitute for
-   translating it.
+2. Add the same key to the matching `ar/` file (or `ar.json`) with a real Arabic translation — `catalog.test.ts` fails on any key missing from either side — not a copy of the English string.
+   At runtime a missing Arabic key would fall back to English (`fallbackLng` in `i18next.ts`) and
+   ship an untranslated string; `catalog.test.ts` catches that in CI.
 3. In the component, call `useTranslation()` from `../../lib/i18n` (not directly from
    `"react-i18next"` — the barrel is the one place allowed to know the package exists) and render
    `t("your.key")`.
@@ -58,7 +57,7 @@ There is no plugin architecture here — a third locale is a checklist:
 
 ## Pseudo-locale
 
-`qps-ploc.json` is generated from `en.json` by `locales/generate-pseudo-locale.ts` — accents every
+`qps-ploc.json` is generated from the merged English catalog by `locales/generate-pseudo-locale.ts` — accents every
 letter and pads the string ~35% longer, wrapped in brackets, so a layout that clips text or a
 template that silently drops a string is obvious without reading Arabic. It's registered as an
 i18next language only in dev builds (`import.meta.env.DEV` in `i18next.ts`) and is deliberately not
@@ -74,7 +73,7 @@ production API, and isn't covered by SemVer. There's no on-screen toggle for it;
 ticket's acceptance criteria called for a permanent pseudo-locale UI, only that switching to it is
 clean once you do.
 
-Run `bun run --cwd apps/web i18n:pseudo` after every `en.json` change; `pseudo-locale.test.ts` fails
+Run `bun run --cwd apps/web i18n:pseudo` after every English catalog change; `pseudo-locale.test.ts` fails
 CI if `qps-ploc.json` has drifted out of sync, the same guarantee `@studafy/ui`'s
 `tokens.consistency.test.ts` gives `tokens.css`.
 

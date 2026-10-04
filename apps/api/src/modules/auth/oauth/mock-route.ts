@@ -23,6 +23,7 @@ import { withTenantTx } from "../../../db/tenant-tx";
 import { createMockIdp } from "../../../dev/mock-idp";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { deliverTokenPair } from "../delivery";
+import { findOAuthIdentity } from "../services/returning-user-login-service";
 import { issueTokenPair } from "../services/session-service";
 
 import { oauthErrorUrl } from "./error-redirect";
@@ -209,29 +210,4 @@ export async function exchangeCode(
   }
 
   return tokenData.access_token;
-}
-
-interface OAuthIdentity {
-  userId: string;
-  schoolId: string;
-}
-
-async function findOAuthIdentity(
-  db: Database,
-  provider: string,
-  subject: string,
-): Promise<OAuthIdentity | undefined> {
-  let result: OAuthIdentity | undefined;
-  await db.begin(async (tx) => {
-    await tx.unsafe("SET LOCAL ROLE studafy_app");
-    const rows = await tx<{ user_id: string; school_id: string }[]>`
-      SELECT user_id, school_id
-        FROM app.oauth_identities
-       WHERE provider = ${provider}
-         AND subject = ${subject}
-       LIMIT 1
-    `;
-    result = rows[0] ? { userId: rows[0].user_id, schoolId: rows[0].school_id } : undefined;
-  });
-  return result;
 }

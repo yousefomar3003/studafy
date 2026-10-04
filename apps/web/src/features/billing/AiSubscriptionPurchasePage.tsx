@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { useTranslation } from "../../lib/i18n";
+
 import { useStartAiCheckout } from "./mutations";
 import { aiCheckoutStudentQueryKey, fetchAiCheckoutStudent } from "./queries";
 
@@ -56,6 +58,7 @@ function buildReturnUrl(
  * here.
  */
 export default function AiSubscriptionPurchasePage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const { show } = useToast();
   const [schoolInactive, setSchoolInactive] = useState(false);
@@ -75,10 +78,9 @@ export default function AiSubscriptionPurchasePage() {
   if (!studentId || !priceId) {
     return (
       <>
-        <h1>AI Study Assistant</h1>
+        <h1>{t("site.billing.ai.title")}</h1>
         <p role="alert" className="billing-overview__notice">
-          This link is missing some information and can&rsquo;t be opened here. Go back to the
-          Studafy app and try again.
+          {t("site.billing.ai.missingParams")}
         </p>
       </>
     );
@@ -89,16 +91,15 @@ export default function AiSubscriptionPurchasePage() {
   if (checkoutStatus === "success") {
     return (
       <>
-        <h1>You&rsquo;re all set</h1>
+        <h1>{t("site.billing.ai.successTitle")}</h1>
         <Card>
           <Card.Body>
             <p>
-              The AI Study Assistant add-on is now active
-              {studentName ? ` for ${studentName}` : ""}.
+              {studentName
+                ? t("site.billing.ai.activeFor", { name: studentName })
+                : t("site.billing.ai.active")}
             </p>
-            <p className="billing-overview__caption">
-              Return to the Studafy app on your phone to start using it.
-            </p>
+            <p className="billing-overview__caption">{t("site.billing.ai.returnToApp")}</p>
           </Card.Body>
         </Card>
       </>
@@ -124,8 +125,8 @@ export default function AiSubscriptionPurchasePage() {
           }
           show({
             variant: "error",
-            title: "Couldn't start checkout",
-            description: apiErrorMessage(error, "Please try again."),
+            title: t("site.billing.ai.checkoutError"),
+            description: apiErrorMessage(error, t("site.common.tryAgain")),
           });
         },
       },
@@ -134,36 +135,31 @@ export default function AiSubscriptionPurchasePage() {
 
   return (
     <>
-      <h1>AI Study Assistant</h1>
+      <h1>{t("site.billing.ai.title")}</h1>
       <p className="ai-purchase__intro">
-        A personal AI tutor for {studentName ?? "your student"} — ask-anything homework help,
-        practice quizzes and flashcards, and study-material summaries. Billed separately from the
-        school&rsquo;s own Studafy subscription, per student.
+        {studentName
+          ? t("site.billing.ai.introFor", { name: studentName })
+          : t("site.billing.ai.intro")}
       </p>
 
       {checkoutStatus === "cancelled" && !schoolInactive ? (
         <div className="billing-banner" data-tone="neutral" role="status">
           <div>
-            <p className="billing-banner__title">Checkout cancelled</p>
-            <p className="billing-banner__body">No charge was made. You can try again below.</p>
+            <p className="billing-banner__title">{t("site.billing.ai.cancelledTitle")}</p>
+            <p className="billing-banner__body">{t("site.billing.ai.cancelledBody")}</p>
           </div>
         </div>
       ) : null}
 
       {studentQuery.isError ? (
         <p role="alert" className="billing-overview__notice">
-          We couldn&rsquo;t find this student on your account. Go back to the Studafy app and try
-          the link again.
+          {t("site.billing.ai.studentNotFound")}
         </p>
       ) : schoolInactive ? (
         <div className="billing-banner" data-tone="warning" role="alert">
           <div>
-            <p className="billing-banner__title">Purchase blocked</p>
-            <p className="billing-banner__body">
-              Your school&rsquo;s Studafy subscription isn&rsquo;t active right now, so the AI
-              add-on can&rsquo;t be purchased. Contact your school to reactivate it, then come back
-              to this link.
-            </p>
+            <p className="billing-banner__title">{t("site.billing.ai.blockedTitle")}</p>
+            <p className="billing-banner__body">{t("site.billing.ai.blockedBody")}</p>
           </div>
         </div>
       ) : (
@@ -171,8 +167,8 @@ export default function AiSubscriptionPurchasePage() {
           <Card.Body>
             <p className="billing-overview__caption">
               {studentQuery.isPending
-                ? "Loading student details…"
-                : `You'll confirm the exact price on the next, secure step.`}
+                ? t("site.billing.ai.loadingStudent")
+                : t("site.billing.ai.confirmPrice")}
             </p>
             <div className="billing-overview__actions">
               <Button
@@ -182,7 +178,7 @@ export default function AiSubscriptionPurchasePage() {
                 disabled={studentQuery.isPending}
                 onClick={handleSubscribe}
               >
-                Subscribe
+                {t("site.billing.ai.subscribe")}
               </Button>
             </div>
           </Card.Body>

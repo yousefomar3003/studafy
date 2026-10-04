@@ -11,6 +11,7 @@ import {
   track,
 } from "../../lib/analytics";
 import { api } from "../../lib/api";
+import { useTranslation } from "../../lib/i18n";
 
 import { clearProgress, loadProgress, nextStepAfter, saveProgress } from "./progress";
 import { AcademicYearStep } from "./steps/AcademicYearStep";
@@ -50,6 +51,7 @@ function fullYearTermBody(values: AcademicYearValues, yearId: string) {
  * resumes exactly where the admin left off (`progress.ts`).
  */
 export default function SetupWizardPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [progress, setProgress] = useState<WizardProgress>(() => loadProgress());
   const [banner, setBanner] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export default function SetupWizardPage() {
       return values;
     },
     onSuccess: (values) => completeStep("school-profile", { schoolProfile: values }),
-    onError: (error) => handleError(error, "Could not save school settings. Please try again."),
+    onError: (error) => handleError(error, t("onboarding.setup.errors.schoolProfile")),
   });
 
   const academicYearMutation = useMutation({
@@ -123,7 +125,7 @@ export default function SetupWizardPage() {
       return { yearId: year.id, termId: term.id, ...values };
     },
     onSuccess: (result) => completeStep("academic-year", { academicYear: result }),
-    onError: (error) => handleError(error, "Could not create the academic year. Please try again."),
+    onError: (error) => handleError(error, t("onboarding.setup.errors.academicYear")),
   });
 
   const gradingSchemeMutation = useMutation({
@@ -142,7 +144,7 @@ export default function SetupWizardPage() {
       return { schemeId: scheme.id, name: values.name, schemeType: values.scheme_type };
     },
     onSuccess: (result) => completeStep("grading-scheme", { gradingScheme: result }),
-    onError: (error) => handleError(error, "Could not save the grading scheme. Please try again."),
+    onError: (error) => handleError(error, t("onboarding.setup.errors.gradingScheme")),
   });
 
   const timetableMutation = useMutation({
@@ -162,7 +164,7 @@ export default function SetupWizardPage() {
       };
     },
     onSuccess: (result) => completeStep("timetable", { timetable: result }),
-    onError: (error) => handleError(error, "Could not create the timetable. Please try again."),
+    onError: (error) => handleError(error, t("onboarding.setup.errors.timetable")),
   });
 
   const staffInvitesMutation = useMutation({
@@ -181,15 +183,15 @@ export default function SetupWizardPage() {
       return results;
     },
     onSuccess: (batches) => completeStep("staff", { staffInvites: { batches } }),
-    onError: (error) => handleError(error, "Could not send invitations. Please try again."),
+    onError: (error) => handleError(error, t("onboarding.setup.errors.staff")),
   });
 
   if (progress.currentStep === "complete") {
     return (
       <Card>
         <CardBody>
-          <h2>Setup complete</h2>
-          <p>Your school is ready. You can revisit any of these settings later from the portal.</p>
+          <h2>{t("onboarding.setup.complete.title")}</h2>
+          <p>{t("onboarding.setup.complete.body")}</p>
           <Button
             type="button"
             onClick={() => {
@@ -197,7 +199,7 @@ export default function SetupWizardPage() {
               void navigate("/portal");
             }}
           >
-            Go to dashboard
+            {t("onboarding.setup.complete.goToDashboard")}
           </Button>
         </CardBody>
       </Card>

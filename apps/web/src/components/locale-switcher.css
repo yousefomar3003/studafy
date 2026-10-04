@@ -1,0 +1,30 @@
+/* Locale select (LocaleSwitcher.tsx), shared by the portal header, marketing header, root nav, and
+   sign-in page. Token-based only: inside the dark-blue headers the tokens are re-declared (see
+   styles/global.css), so the same rules re-theme there with no per-host overrides. */
+
+.locale-switcher {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.locale-switcher__select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--color-foreground);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-8);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.locale-switcher__select:hover {
+  background-color: var(--color-surface);
+}
+
+.locale-switcher__select:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}

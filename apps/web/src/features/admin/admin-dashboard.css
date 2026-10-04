@@ -4,10 +4,6 @@
  * this file — this stylesheet only holds the layout classes specific to this page.
  */
 
-.admin-dashboard-link {
-  margin: 0 0 var(--space-16);
-}
-
 .admin-dashboard-banner {
   margin-bottom: var(--space-16);
 }

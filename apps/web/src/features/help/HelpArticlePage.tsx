@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 
 import { useTranslation } from "../../lib/i18n";
 
-import { articleBySlug, categoryLabel } from "./articles";
+import { articleBySlug } from "./articles";
 import { MarkdownContent } from "./markdown";
 
 import "./help.css";
@@ -37,14 +37,16 @@ export default function HelpArticlePage() {
 
   return (
     <article className="help-page" aria-labelledby="help-article-title">
-      <nav className="help-breadcrumbs" aria-label="Breadcrumb">
+      <nav className="help-breadcrumbs" aria-label={t("site.help.breadcrumb")}>
         <Link className="help-content__link" to="/help">
           {t("help.title")}
         </Link>
         <span className="help-breadcrumbs__separator" aria-hidden="true">
           ›
         </span>
-        <span className="help-breadcrumbs__current">{categoryLabel(article.category)}</span>
+        <span className="help-breadcrumbs__current">
+          {t(`site.help.categories.${article.category}`)}
+        </span>
       </nav>
 
       <h1 id="help-article-title" className="help-article__title">

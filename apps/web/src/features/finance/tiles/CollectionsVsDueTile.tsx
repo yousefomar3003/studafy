@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { DashboardTile } from "../../../components/DashboardTile";
+import { useTranslation } from "../../../lib/i18n";
 import {
   COLLECTIONS_VS_DUE_QUERY_KEY,
   fetchCollectionsVsDueReport,
@@ -15,6 +16,7 @@ import {
  * calculation to drift from the first.
  */
 export function CollectionsVsDueTile() {
+  const { t } = useTranslation();
   const { data, isPending, isError } = useQuery({
     queryKey: COLLECTIONS_VS_DUE_QUERY_KEY,
     queryFn: fetchCollectionsVsDueReport,
@@ -24,12 +26,12 @@ export function CollectionsVsDueTile() {
 
   return (
     <DashboardTile
-      title="Collections vs due this term"
+      title={t("finance.tiles.collections.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load the collections report."
+      errorMessage={t("finance.tiles.collections.error")}
     >
       {cards.length === 0 ? (
-        <p className="dashboard-tile__caption">No collections summary for this term yet.</p>
+        <p className="dashboard-tile__caption">{t("finance.tiles.collections.empty")}</p>
       ) : (
         <dl className="dashboard-tile__stat-list">
           {cards.map((card, index) => (

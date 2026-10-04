@@ -2,9 +2,11 @@ import { Button, Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { ExportPanel } from "./ExportPanel";
 import { FamilyPickerField } from "./FamilyPickerField";
-import { REPORT_TYPE_DESCRIPTIONS, REPORT_TYPE_LABELS } from "./labels";
+import { REPORT_TYPE_DESCRIPTION_KEYS, REPORT_TYPE_LABEL_KEYS } from "./labels";
 import { fetchFamilyStatement } from "./queries";
 import { ReportTable } from "./ReportTable";
 
@@ -15,6 +17,8 @@ import type { FormEvent } from "react";
  * activity, side by side. Unlike the other three reports, a family must be picked before a run
  * makes sense — there is no "every family" statement. */
 export default function FamilyStatementReportPanel() {
+  const { t } = useTranslation();
+  const reportLabel = t(REPORT_TYPE_LABEL_KEYS.family_statement);
   const [family, setFamily] = useState<Family | null>(null);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -37,14 +41,16 @@ export default function FamilyStatementReportPanel() {
   }
 
   return (
-    <Card as="section" aria-label={REPORT_TYPE_LABELS.family_statement}>
+    <Card as="section" aria-label={reportLabel}>
       <Card.Body>
-        <p>{REPORT_TYPE_DESCRIPTIONS.family_statement}</p>
+        <p>{t(REPORT_TYPE_DESCRIPTION_KEYS.family_statement)}</p>
 
         <form className="reports-panel__filters" onSubmit={handleSubmit}>
           <FamilyPickerField value={family} onChange={setFamily} />
           <div className="sf-field">
-            <label htmlFor="family-statement-from-date">From date (optional)</label>
+            <label htmlFor="family-statement-from-date">
+              {t("financeReports.reports.filters.fromDateOptional")}
+            </label>
             <input
               id="family-statement-from-date"
               type="date"
@@ -53,7 +59,9 @@ export default function FamilyStatementReportPanel() {
             />
           </div>
           <div className="sf-field">
-            <label htmlFor="family-statement-to-date">To date (optional)</label>
+            <label htmlFor="family-statement-to-date">
+              {t("financeReports.reports.filters.toDateOptional")}
+            </label>
             <input
               id="family-statement-to-date"
               type="date"
@@ -62,7 +70,7 @@ export default function FamilyStatementReportPanel() {
             />
           </div>
           <Button type="submit" loading={query.isFetching} disabled={!family}>
-            Run report
+            {t("financeReports.reports.filters.runReport")}
           </Button>
         </form>
 
@@ -71,42 +79,42 @@ export default function FamilyStatementReportPanel() {
             there is never a case where one half is ready and the other isn't. */}
         {runId === 0 ? (
           <p role="status" className="reports-panel__idle">
-            Pick a family and run the report to see its statement.
+            {t("financeReports.reports.familyStatement.idle")}
           </p>
         ) : query.isFetching ? (
           <p role="status" className="reports-panel__idle">
-            Running report…
+            {t("financeReports.reports.table.running")}
           </p>
         ) : query.isError || !query.data ? (
           <p role="alert" className="reports-panel__error">
-            Unable to run this report. Please check your filters and try again.
+            {t("financeReports.reports.table.error")}
           </p>
         ) : (
           <>
-            <h3>Accounts receivable</h3>
+            <h3>{t("financeReports.reports.familyStatement.accountsReceivable")}</h3>
             <ReportTable
               hasRun
               loading={false}
               error={false}
               report={query.data.accounts_receivable}
-              caption="Family accounts receivable"
+              caption={t("financeReports.reports.familyStatement.accountsReceivableCaption")}
               idleMessage=""
             />
 
-            <h3>General ledger activity</h3>
+            <h3>{t("financeReports.reports.familyStatement.generalLedger")}</h3>
             <ReportTable
               hasRun
               loading={false}
               error={false}
               report={query.data.general_ledger}
-              caption="Family general ledger"
+              caption={t("financeReports.reports.familyStatement.generalLedgerCaption")}
               idleMessage=""
             />
           </>
         )}
 
         <ExportPanel
-          reportLabel={REPORT_TYPE_LABELS.family_statement}
+          reportLabel={reportLabel}
           buildRequest={(fileFormat) =>
             family
               ? {
@@ -120,7 +128,7 @@ export default function FamilyStatementReportPanel() {
                 }
               : null
           }
-          disabledReason="Pick a family to enable export."
+          disabledReason={t("financeReports.reports.familyStatement.disabledReason")}
         />
       </Card.Body>
     </Card>

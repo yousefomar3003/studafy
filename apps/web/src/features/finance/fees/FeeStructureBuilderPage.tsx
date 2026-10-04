@@ -2,6 +2,8 @@ import { Button, Select } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { FeeStructureForm } from "./FeeStructureForm";
 import { feeStructureStatusLabel, feeStructureStatusTone } from "./labels";
 import {
@@ -25,6 +27,7 @@ import type { SelectOption } from "@studafy/ui";
  * into it.
  */
 export default function FeeStructureBuilderPage() {
+  const { t } = useTranslation();
   const [academicYearId, setAcademicYearId] = useState("");
   const [selectedErpnextName, setSelectedErpnextName] = useState<string | null>(null);
 
@@ -39,7 +42,7 @@ export default function FeeStructureBuilderPage() {
   const editing = structures.find((s) => s.erpnext_name === selectedErpnextName) ?? null;
 
   const yearFilterOptions: SelectOption<string>[] = [
-    { value: "", label: "All academic years" },
+    { value: "", label: t("finance.fees.builder.allYears") },
     ...years.map((year) => ({ value: year.id, label: year.name })),
   ];
 
@@ -51,19 +54,17 @@ export default function FeeStructureBuilderPage() {
     <>
       <div className="fee-builder__header">
         <div>
-          <h1>Fee structures</h1>
-          <p>
-            Build fee structures, see how they price out for a sample student, and track versions.
-          </p>
+          <h1>{t("finance.fees.builder.title")}</h1>
+          <p>{t("finance.fees.builder.intro")}</p>
         </div>
         <Button variant="secondary" onClick={() => setSelectedErpnextName(null)}>
-          New fee structure
+          {t("finance.fees.builder.newStructure")}
         </Button>
       </div>
 
       <div className="fee-builder__filter">
         <Select
-          label="Academic year"
+          label={t("finance.fees.builder.academicYear")}
           options={yearFilterOptions}
           value={academicYearId}
           onChange={(value) => {
@@ -74,20 +75,20 @@ export default function FeeStructureBuilderPage() {
       </div>
 
       <div className="fee-builder__layout">
-        <section className="fee-builder__list" aria-label="Existing fee structures">
+        <section className="fee-builder__list" aria-label={t("finance.fees.builder.existing")}>
           {structuresQuery.isPending ? (
-            <p>Loading…</p>
+            <p>{t("finance.common.loading")}</p>
           ) : structures.length === 0 ? (
-            <p className="fee-builder__list-empty">No fee structures yet for this filter.</p>
+            <p className="fee-builder__list-empty">{t("finance.fees.builder.empty")}</p>
           ) : (
             <table className="fee-builder__list-table">
-              <caption className="sf-visually-hidden">Fee structures</caption>
+              <caption className="sf-visually-hidden">{t("finance.fees.builder.caption")}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Title</th>
-                  <th scope="col">Program</th>
-                  <th scope="col">Total</th>
-                  <th scope="col">Status</th>
+                  <th scope="col">{t("finance.fees.builder.colTitle")}</th>
+                  <th scope="col">{t("finance.fees.builder.colProgram")}</th>
+                  <th scope="col">{t("finance.common.total")}</th>
+                  <th scope="col">{t("finance.common.status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,7 +113,7 @@ export default function FeeStructureBuilderPage() {
                         className="fee-builder__status-pill"
                         data-tone={feeStructureStatusTone(structure.erpnext_status)}
                       >
-                        {feeStructureStatusLabel(structure.erpnext_status)}
+                        {feeStructureStatusLabel(structure.erpnext_status, t)}
                       </span>
                     </td>
                   </tr>

@@ -2,6 +2,8 @@ import { Button, Input } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { actorSearchQueryKey, searchActorUsers } from "./queries";
 
 import type { UserWithRoles } from "./queries";
@@ -19,6 +21,7 @@ export interface ActorFilterFieldProps {
  * parent picker does — there is no combobox primitive in `@studafy/ui` to reach for instead.
  */
 export function ActorFilterField({ value, onChange }: ActorFilterFieldProps) {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -37,11 +40,11 @@ export function ActorFilterField({ value, onChange }: ActorFilterFieldProps) {
     return (
       <div className="audit-explorer__actor-selected">
         <div>
-          <span className="sf-field__label">Actor</span>
+          <span className="sf-field__label">{t("adminSchool.audit.actor.label")}</span>
           <p>{value.display_name ?? value.email}</p>
         </div>
         <Button type="button" variant="tertiary" onClick={() => onChange(null)}>
-          Clear
+          {t("adminSchool.audit.actor.clear")}
         </Button>
       </div>
     );
@@ -50,9 +53,9 @@ export function ActorFilterField({ value, onChange }: ActorFilterFieldProps) {
   return (
     <div className="audit-explorer__actor-picker">
       <Input
-        label="Actor"
+        label={t("adminSchool.audit.actor.label")}
         type="search"
-        placeholder="Search by name or email"
+        placeholder={t("adminSchool.audit.actor.placeholder")}
         value={searchInput}
         onChange={(event) => setSearchInput(event.target.value)}
       />
@@ -75,7 +78,9 @@ export function ActorFilterField({ value, onChange }: ActorFilterFieldProps) {
             </li>
           ))}
           {!resultsQuery.isPending && resultsQuery.data?.length === 0 ? (
-            <li className="audit-explorer__actor-empty">No users match.</li>
+            <li className="audit-explorer__actor-empty">
+              {t("adminSchool.audit.actor.noMatches")}
+            </li>
           ) : null}
         </ul>
       ) : null}

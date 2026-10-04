@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { HelpLink } from "../../../features/help/HelpLink";
 import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
+import { useTranslation } from "../../../lib/i18n";
 import { academicYearSchema, fieldErrors } from "../schema";
 
 import type { AcademicYearValues } from "../schema";
@@ -30,6 +31,7 @@ export function AcademicYearStep({
   onSkip,
   submitting,
 }: AcademicYearStepProps) {
+  const { t } = useTranslation();
   const [values, setValues] = useState<AcademicYearValues>(cachedValues ?? EMPTY_VALUES);
   const [errors, setErrors] = useState<Partial<Record<keyof AcademicYearValues, string>>>({});
 
@@ -51,55 +53,59 @@ export function AcademicYearStep({
   return (
     <Card>
       <CardBody>
-        <form onSubmit={handleSubmit} noValidate aria-label="Academic year">
-          <h2>Academic year</h2>
-          <p>This becomes your school's current academic year, with one term spanning it.</p>
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          aria-label={t("onboarding.setup.academicYear.title")}
+        >
+          <h2>{t("onboarding.setup.academicYear.title")}</h2>
+          <p>{t("onboarding.setup.academicYear.description")}</p>
           <p>
             <HelpLink to={onboardingStepHelpPath("academicYear")}>
-              Need help with this step?
+              {t("onboarding.setup.needHelp")}
             </HelpLink>
           </p>
 
           <Input
-            label="Year code"
+            label={t("onboarding.setup.academicYear.code")}
             value={values.code}
             onChange={(e) => setField("code", e.target.value)}
-            helperText={!errors.code ? "A short unique code, e.g. 2025-2026." : undefined}
-            error={errors.code}
+            helperText={!errors.code ? t("onboarding.setup.academicYear.codeHelper") : undefined}
+            error={errors.code && t(errors.code)}
             required
           />
 
           <Input
-            label="Year name"
+            label={t("onboarding.setup.academicYear.name")}
             value={values.name}
             onChange={(e) => setField("name", e.target.value)}
-            error={errors.name}
+            error={errors.name && t(errors.name)}
             required
           />
 
           <Input
-            label="Start date"
+            label={t("onboarding.setup.academicYear.startDate")}
             type="date"
             value={values.starts_on}
             onChange={(e) => setField("starts_on", e.target.value)}
-            error={errors.starts_on}
+            error={errors.starts_on && t(errors.starts_on)}
             required
           />
 
           <Input
-            label="End date"
+            label={t("onboarding.setup.academicYear.endDate")}
             type="date"
             value={values.ends_on}
             onChange={(e) => setField("ends_on", e.target.value)}
-            error={errors.ends_on}
+            error={errors.ends_on && t(errors.ends_on)}
             required
           />
 
           <Button type="submit" loading={submitting}>
-            Save and continue
+            {t("onboarding.setup.saveAndContinue")}
           </Button>
           <Button type="button" variant="tertiary" onClick={onSkip} disabled={submitting}>
-            Skip for now
+            {t("onboarding.setup.skipForNow")}
           </Button>
         </form>
       </CardBody>

@@ -1,5 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useId, useRef, useState } from "react";
 
+import { useTranslation } from "../lib/i18n";
+
 const SCRIPT_URL = "https://challenges.cloudflare.com/turnstile/v0/api.js";
 
 interface TurnstileRenderOptions {
@@ -66,6 +68,7 @@ export interface TurnstileWidgetProps {
  */
 export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
   function TurnstileWidget({ siteKey, onToken, onInvalidate }, ref) {
+    const { t } = useTranslation();
     const containerId = useId();
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<string | null>(null);
@@ -110,11 +113,7 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidget
     }, [siteKey]);
 
     if (error) {
-      return (
-        <p role="alert">
-          Bot-protection challenge failed to load. Check your connection and reload the page.
-        </p>
-      );
+      return <p role="alert">{t("site.turnstile.loadFailed")}</p>;
     }
 
     return <div id={containerId} ref={containerRef} />;

@@ -2,7 +2,8 @@
   "shell": {
     "skipToContent": "Skip to content",
     "primaryNavAriaLabel": "Primary",
-    "toggleNav": "Toggle navigation"
+    "toggleNav": "Toggle navigation",
+    "homeLink": "Studafy home"
   },
   "nav": {
     "ariaLabel": "Portal",
@@ -40,7 +41,8 @@
   "userMenu": {
     "ariaLabel": "Account menu",
     "devicesAndSessions": "Devices & sessions",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "goToPortal": "Go to portal"
   },
   "notificationBell": {
     "ariaLabel_zero": "Notifications",
@@ -84,7 +86,12 @@
     "revokedOthersToast": "Signed out of {{count}} other session(s)",
     "revokeOthersError": "Couldn't sign out elsewhere",
     "loadError": "Unable to load your devices and sessions. Try reloading the page.",
-    "tryAgain": "Please try again."
+    "tryAgain": "Please try again.",
+    "channel": {
+      "web": "Web browser",
+      "mobile": "Mobile app",
+      "api": "API client"
+    }
   },
   "accountDeletion": {
     "title": "Delete account",
@@ -137,5 +144,22 @@
     "clearRecent": "Clear",
     "noDetailPage": "No detail page for this yet.",
     "keyboardHint": "↑↓ to navigate · ↵ to open · esc to close"
+  },
+  "ui": {
+    "closeDialog": "Close dialog",
+    "dismissToast": "Dismiss {{title}}",
+    "removeChip": "Remove {{label}}",
+    "removeItem": "Remove item",
+    "selectRow": "Select {{label}}",
+    "selectRowFallback": "Select row",
+    "selectAllRows": "Select all rows",
+    "selectPlaceholder": "Select an option",
+    "tableLoading": "Loading",
+    "tableEmpty": "No results.",
+    "filterSearch": "Search",
+    "filterDateRange": "Date range",
+    "filterDateFrom": "From",
+    "filterDateTo": "To",
+    "filterClearAll": "Clear all"
   }
 }

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useTranslation } from "../../lib/i18n";
 
-import { articles, CATEGORY_ORDER, categoryLabel, helpPath, searchHelp } from "./articles";
+import { articles, CATEGORY_ORDER, helpPath, searchHelp } from "./articles";
 
 import type { CategorySlug, HelpArticle } from "./content.types";
 
@@ -54,8 +54,12 @@ export default function HelpHomePage() {
       ) : (
         CATEGORY_ORDER.filter((category) => byCategory.get(category)!.length > 0).map(
           (category) => (
-            <section key={category} className="help-category" aria-label={categoryLabel(category)}>
-              <h2 className="help-category__title">{categoryLabel(category)}</h2>
+            <section
+              key={category}
+              className="help-category"
+              aria-label={t(`site.help.categories.${category}`)}
+            >
+              <h2 className="help-category__title">{t(`site.help.categories.${category}`)}</h2>
               <ul className="help-category__list">
                 {byCategory.get(category)!.map((article) => (
                   <li key={article.slug}>

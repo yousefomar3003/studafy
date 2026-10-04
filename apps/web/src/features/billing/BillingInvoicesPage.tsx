@@ -1,6 +1,9 @@
 import { Button, DataGrid, useCursorPagination } from "@studafy/ui";
 import { Link } from "react-router-dom";
 
+import { useLocale, useTranslation } from "../../lib/i18n";
+
+import { formatIsoDate, formatMinorAmount } from "./format";
 import { fetchInvoicesPage } from "./queries";
 
 import "./billing.css";
@@ -8,23 +11,14 @@ import "./billing.css";
 import type { BillingInvoice } from "./queries";
 import type { DataGridColumn } from "@studafy/ui";
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString();
-}
-
-function formatAmount(amountMinor: number, currencyCode: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currencyCode,
-      minimumFractionDigits: amountMinor % 100 === 0 ? 0 : 2,
-    }).format(amountMinor / 100);
-  } catch {
-    // An unrecognized ISO currency code would throw inside Intl.NumberFormat — same fallback
-    // `PricingPage.tsx` uses rather than letting the page crash on bad reference data.
-    return `${(amountMinor / 100).toFixed(2)} ${currencyCode}`;
-  }
-}
+/** Translation keys for Stripe's invoice statuses; an unknown status renders as-is. */
+const INVOICE_STATUS_KEY = new Map<string, string>([
+  ["draft", "site.billing.invoices.status.draft"],
+  ["open", "site.billing.invoices.status.open"],
+  ["paid", "site.billing.invoices.status.paid"],
+  ["uncollectible", "site.billing.invoices.status.uncollectible"],
+  ["void", "site.billing.invoices.status.void"],
+]);
 
 /**
  * Invoice history (`/portal/billing/invoices`), gated by `organization:manageBilling` like the rest
@@ -34,43 +28,62 @@ function formatAmount(amountMinor: number, currencyCode: string): string {
  * way `finance/invoices/InvoiceListPage` adapts its own cursor contract.
  */
 export default function BillingInvoicesPage() {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
+  const formatDate = (iso: string) => formatIsoDate(iso, locale);
+  const statusLabel = (status: string) => {
+    const key = INVOICE_STATUS_KEY.get(status);
+    return key ? t(key) : status;
+  };
   const { items, loading, error, hasNextPage, hasPreviousPage, goToNextPage, goToPreviousPage } =
     useCursorPagination(fetchInvoicesPage);
 
   const columns: DataGridColumn<BillingInvoice>[] = [
-    { id: "created", header: "Date", renderCell: (row) => formatDate(row.created) },
+    {
+      id: "created",
+      header: t("site.billing.invoices.columns.date"),
+      renderCell: (row) => formatDate(row.created),
+    },
     {
       id: "period",
-      header: "Period",
-      renderCell: (row) => `${formatDate(row.periodStart)} – ${formatDate(row.periodEnd)}`,
+      header: t("site.billing.invoices.columns.period"),
+      renderCell: (row) =>
+        t("site.billing.invoices.periodRange", {
+          start: formatDate(row.periodStart),
+          end: formatDate(row.periodEnd),
+        }),
     },
-    { id: "status", header: "Status", renderCell: (row) => row.status ?? "—" },
+    {
+      id: "status",
+      header: t("site.billing.invoices.columns.status"),
+      renderCell: (row) => (row.status ? statusLabel(row.status) : "—"),
+    },
     {
       id: "amountDue",
-      header: "Amount due",
+      header: t("site.billing.invoices.columns.amountDue"),
       align: "end",
-      renderCell: (row) => formatAmount(row.amountDue, row.currency),
+      renderCell: (row) => formatMinorAmount(row.amountDue, row.currency, locale),
     },
     {
       id: "amountPaid",
-      header: "Amount paid",
+      header: t("site.billing.invoices.columns.amountPaid"),
       align: "end",
-      renderCell: (row) => formatAmount(row.amountPaid, row.currency),
+      renderCell: (row) => formatMinorAmount(row.amountPaid, row.currency, locale),
     },
     {
       id: "links",
-      header: "Documents",
+      header: t("site.billing.invoices.columns.documents"),
       renderCell: (row) => (
         <>
           {row.hostedInvoiceUrl ? (
             <a href={row.hostedInvoiceUrl} target="_blank" rel="noreferrer">
-              View
+              {t("site.billing.invoices.view")}
             </a>
           ) : null}
           {row.hostedInvoiceUrl && row.invoicePdf ? " · " : null}
           {row.invoicePdf ? (
             <a href={row.invoicePdf} target="_blank" rel="noreferrer">
-              PDF
+              {t("site.billing.invoices.pdf")}
             </a>
           ) : null}
         </>
@@ -81,30 +94,30 @@ export default function BillingInvoicesPage() {
   return (
     <>
       <p className="billing-overview__caption">
-        <Link to="/portal/billing">&larr; Back to billing</Link>
+        <Link to="/portal/billing">{t("site.billing.invoices.back")}</Link>
       </p>
 
       <div className="billing-invoices__header">
-        <h1>Invoices</h1>
-        <p>Billing history from the payment provider, most recent first.</p>
+        <h1>{t("site.billing.invoices.title")}</h1>
+        <p>{t("site.billing.invoices.description")}</p>
       </div>
 
       <DataGrid
-        caption="Invoices"
+        caption={t("site.billing.invoices.caption")}
         columns={columns}
         rows={items}
         getRowId={(row) => row.id}
         getRowLabel={(row) => row.id}
         loading={loading}
-        empty={error ? "Unable to load invoices." : "No invoices yet."}
+        empty={error ? t("site.billing.invoices.loadError") : t("site.billing.invoices.empty")}
       />
 
       <div className="billing-invoices__pagination">
         <Button variant="secondary" disabled={!hasPreviousPage} onClick={goToPreviousPage}>
-          Previous
+          {t("site.common.previous")}
         </Button>
         <Button variant="secondary" disabled={!hasNextPage} onClick={goToNextPage}>
-          Next
+          {t("site.common.next")}
         </Button>
       </div>
     </>

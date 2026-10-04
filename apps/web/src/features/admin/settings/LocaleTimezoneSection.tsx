@@ -2,6 +2,8 @@ import { ApiError } from "@studafy/api-client";
 import { Input, Select, useToast } from "@studafy/ui";
 import { useEffect, useRef, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useUpdateSchoolSettings } from "./mutations";
 import { fieldErrors, LOCALE_LABELS, LOCALE_OPTIONS, localeTimezoneSchema } from "./schema";
 import { SettingsCard } from "./SettingsCard";
@@ -24,6 +26,7 @@ export interface LocaleTimezoneSectionProps {
 /** Default language and IANA timezone for the school — used across emails, the portal UI, and
  * timetable rendering. Neither is retroactive to anything already recorded, so no confirm needed. */
 export function LocaleTimezoneSection({ settings, loading }: LocaleTimezoneSectionProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const updateSettings = useUpdateSchoolSettings();
 
@@ -53,11 +56,12 @@ export function LocaleTimezoneSection({ settings, loading }: LocaleTimezoneSecti
     }
 
     updateSettings.mutate(result.data, {
-      onSuccess: () => show({ variant: "success", title: "Locale and timezone updated" }),
+      onSuccess: () =>
+        show({ variant: "success", title: t("adminSchool.settings.locale.updated") }),
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't save changes",
+          title: t("adminSchool.settings.saveFailed"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
       },
@@ -66,26 +70,26 @@ export function LocaleTimezoneSection({ settings, loading }: LocaleTimezoneSecti
 
   return (
     <SettingsCard
-      title="Locale and timezone"
-      description="Default language and timezone for this school, used in emails, the portal, and timetable rendering."
+      title={t("adminSchool.settings.locale.title")}
+      description={t("adminSchool.settings.locale.description")}
       onSubmit={handleSubmit}
       saving={updateSettings.isPending}
     >
       <Select
-        label="Default language"
+        label={t("adminSchool.settings.locale.language")}
         options={LOCALE_SELECT_OPTIONS}
         value={values.locale}
         onChange={(value) => setField("locale", value)}
-        helperText="Applied to system emails and the portal's default language for new users."
+        helperText={t("adminSchool.settings.locale.languageHelp")}
         disabled={loading}
         required
       />
       <Input
-        label="Timezone"
+        label={t("adminSchool.settings.locale.timezone")}
         value={values.timezone}
         onChange={(e) => setField("timezone", e.target.value)}
-        helperText="IANA timezone, e.g. Africa/Casablanca. Used to render the timetable and schedule alerts."
-        error={errors.timezone}
+        helperText={t("adminSchool.settings.locale.timezoneHelp")}
+        error={errors.timezone ? t(errors.timezone) : undefined}
         disabled={loading}
         required
       />

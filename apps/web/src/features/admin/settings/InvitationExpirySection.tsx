@@ -2,6 +2,8 @@ import { ApiError } from "@studafy/api-client";
 import { Input, useToast } from "@studafy/ui";
 import { useEffect, useRef, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useUpdateSchoolSettings } from "./mutations";
 import { fieldErrors, invitationExpirySchema } from "./schema";
 import { SettingsCard } from "./SettingsCard";
@@ -18,6 +20,7 @@ export interface InvitationExpirySectionProps {
 /** How long a new invitation link stays valid. Only applies going forward — see the helper text —
  * so no confirm: nothing already sent is affected. */
 export function InvitationExpirySection({ settings, loading }: InvitationExpirySectionProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const updateSettings = useUpdateSchoolSettings();
 
@@ -42,11 +45,12 @@ export function InvitationExpirySection({ settings, loading }: InvitationExpiryS
     }
 
     updateSettings.mutate(result.data, {
-      onSuccess: () => show({ variant: "success", title: "Invitation expiry updated" }),
+      onSuccess: () =>
+        show({ variant: "success", title: t("adminSchool.settings.invitationExpiry.updated") }),
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't save changes",
+          title: t("adminSchool.settings.saveFailed"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
       },
@@ -55,13 +59,13 @@ export function InvitationExpirySection({ settings, loading }: InvitationExpiryS
 
   return (
     <SettingsCard
-      title="Invitation expiry"
-      description="How long a new invitation link stays valid before it expires."
+      title={t("adminSchool.settings.invitationExpiry.title")}
+      description={t("adminSchool.settings.invitationExpiry.description")}
       onSubmit={handleSubmit}
       saving={updateSettings.isPending}
     >
       <Input
-        label="Expires after (days)"
+        label={t("adminSchool.settings.invitationExpiry.label")}
         type="number"
         min={1}
         max={365}
@@ -70,8 +74,8 @@ export function InvitationExpirySection({ settings, loading }: InvitationExpiryS
           setValues({ invitation_expiry_days: Number(e.target.value) });
           setErrors({});
         }}
-        helperText="Applies to invitations sent after this change — already-sent links keep their original expiry."
-        error={errors.invitation_expiry_days}
+        helperText={t("adminSchool.settings.invitationExpiry.help")}
+        error={errors.invitation_expiry_days ? t(errors.invitation_expiry_days) : undefined}
         disabled={loading}
         required
       />

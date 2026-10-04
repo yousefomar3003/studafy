@@ -2,8 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { localeStore } from "../../lib/i18n";
-import { expectNoA11yViolations } from "../../lib/test/axe";
+import { localeStore } from "../lib/i18n";
+import { expectNoA11yViolations } from "../lib/test/axe";
 
 import { LocaleSwitcher } from "./LocaleSwitcher";
 

@@ -1,6 +1,9 @@
+import { i18next } from "../../../lib/i18n/i18next";
+
 import { weekdayLabel } from "./constants";
 
 import type { TimetableSlot } from "./queries";
+import type { TFunction } from "i18next";
 
 export interface SlotCandidate {
   teacher_id: string;
@@ -29,6 +32,9 @@ export interface SlotConflict {
  * Mirrors `findConflict`/`throwConflictError` in `apps/api/src/modules/academics/timetable-service.ts`
  * exactly: same "teacher wins over room when both collide" precedence, same message shape, so a
  * locally-caught conflict and a server-caught one read identically.
+ *
+ * `t` renders the message in the active UI language; components pass their own `useTranslation()`
+ * `t`, and it defaults to the app's i18next instance for non-React callers.
  */
 export function findLocalConflict(
   slots: readonly TimetableSlot[],
@@ -36,6 +42,7 @@ export function findLocalConflict(
   classCode: (classId: string) => string,
   teacherName: (teacherId: string) => string,
   roomName: (roomId: string) => string,
+  t: TFunction = i18next.t.bind(i18next),
 ): SlotConflict | null {
   const existing = slots.find(
     (slot) =>
@@ -50,13 +57,15 @@ export function findLocalConflict(
     existing.teacher_id === candidate.teacher_id ? "teacher" : "room";
   const label =
     conflictType === "teacher" ? teacherName(existing.teacher_id) : roomName(existing.room_id);
-  const resource = conflictType === "teacher" ? "Teacher" : "Room";
 
   return {
     conflictType,
     existingSlot: existing,
-    message:
-      `${resource} "${label}" is already scheduled for class "${classCode(existing.class_id)}" ` +
-      `on ${weekdayLabel(candidate.weekday)}, period ${candidate.period}.`,
+    message: t(`adminSchool.timetable.conflict.${conflictType}`, {
+      label,
+      classCode: classCode(existing.class_id),
+      day: weekdayLabel(candidate.weekday, t),
+      period: candidate.period,
+    }),
   };
 }

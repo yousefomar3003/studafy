@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
+import { useTranslation } from "../../../lib/i18n";
 import { AR_AGING_QUERY_KEY, agingBuckets, fetchArAgingReport, formatAmount } from "../queries";
 
 type BucketTone = "accent" | "warning" | "danger";
@@ -24,6 +25,7 @@ function toneForBucket(index: number, count: number): BucketTone {
  * installments list to the same day range.
  */
 export function AgingBucketsChartTile() {
+  const { t } = useTranslation();
   const { data, isPending, isError } = useQuery({
     queryKey: AR_AGING_QUERY_KEY,
     queryFn: fetchArAgingReport,
@@ -35,12 +37,12 @@ export function AgingBucketsChartTile() {
 
   return (
     <DashboardTile
-      title="Aging buckets"
+      title={t("finance.tiles.aging.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load the accounts receivable aging report."
+      errorMessage={t("finance.tiles.aging.error")}
     >
       {!report || buckets.length === 0 ? (
-        <p className="dashboard-tile__caption">No outstanding receivables to age.</p>
+        <p className="dashboard-tile__caption">{t("finance.tiles.aging.empty")}</p>
       ) : (
         <ul className="finance-aging-chart" role="list">
           {buckets.map((bucket, index) => (
@@ -67,7 +69,7 @@ export function AgingBucketsChartTile() {
       )}
 
       <Link className="dashboard-tile__link" to="/portal/finance/overdue">
-        View overdue installments →
+        {t("finance.tiles.aging.viewOverdue")}
       </Link>
     </DashboardTile>
   );

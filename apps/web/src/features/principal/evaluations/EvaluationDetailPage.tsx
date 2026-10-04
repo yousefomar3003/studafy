@@ -4,10 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { Trans, useFormatters, useTranslation } from "../../../lib/i18n";
+import { DATE_TIME_OPTIONS } from "../format";
+
 import {
-  EVALUATION_RATING_LABELS,
-  EVALUATION_STATUS_LABELS,
-  EVALUATION_TYPE_LABELS,
+  EVALUATION_RATING_LABEL_KEYS,
+  EVALUATION_STATUS_LABEL_KEYS,
+  EVALUATION_TYPE_LABEL_KEYS,
   ratingTone,
 } from "./labels";
 import {
@@ -41,19 +44,29 @@ function apiErrorDescription(error: unknown): string | undefined {
   return error instanceof ApiError ? (error.detail ?? error.title) : undefined;
 }
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
+/** Translation key for an autosave indicator; `idle` shows nothing. */
+const AUTOSAVE_LABEL_KEYS: Record<Exclude<AutosaveStatus, "idle">, string> = {
+  saving: "principal.evaluations.detail.autosave.saving",
+  saved: "principal.evaluations.detail.autosave.saved",
+  error: "principal.evaluations.detail.autosave.error",
+};
+
+/** Locale-aware date helpers shared by the components below. */
+function useDateFormatters() {
+  const { formatDate: formatLocaleDate } = useFormatters();
+  return {
+    formatDateTime: (iso: string) => formatLocaleDate(new Date(iso), DATE_TIME_OPTIONS),
+    formatDate: (iso: string | null) => (iso ? formatLocaleDate(new Date(iso)) : "—"),
+  };
 }
 
-function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleDateString() : "—";
-}
-
-function autosaveLabel(status: AutosaveStatus): string {
-  if (status === "saving") return "Saving…";
-  if (status === "saved") return "Saved";
-  if (status === "error") return "Couldn't save";
-  return "";
+function AutosaveIndicator({ status }: { status: AutosaveStatus }) {
+  const { t } = useTranslation();
+  return (
+    <span className="evaluations-autosave" data-status={status}>
+      {status === "idle" ? "" : t(AUTOSAVE_LABEL_KEYS[status])}
+    </span>
+  );
 }
 
 interface TextFieldProps {
@@ -104,6 +117,8 @@ interface ScoreFieldState {
  * a number within `[0, template.max_score]` — an in-progress edit (blank, non-numeric, or
  * out-of-range) is never sent, so a stray keystroke can't upsert an invalid score. */
 function ScoreRow({ evaluationId, template, initialScore, readOnly }: ScoreRowProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const [scoreText, setScoreText] = useState(initialScore ? String(initialScore.score) : "");
   const [comment, setComment] = useState(initialScore?.comment ?? "");
   const upsertScore = useUpsertScore(evaluationId);
@@ -136,28 +151,32 @@ function ScoreRow({ evaluationId, template, initialScore, readOnly }: ScoreRowPr
       </Table.Cell>
       <Table.Cell>
         <Input
-          label={`Score (0–${template.max_score})`}
+          label={t("principal.evaluations.detail.scoreLabel", {
+            max: formatNumber(template.max_score),
+          })}
           type="number"
           min={0}
           max={template.max_score}
           value={scoreText}
           disabled={readOnly}
-          error={scoreText.trim() !== "" && !isValidScore ? "Out of range" : undefined}
+          error={
+            scoreText.trim() !== "" && !isValidScore
+              ? t("principal.evaluations.detail.outOfRange")
+              : undefined
+          }
           onChange={(event) => setScoreText(event.target.value)}
         />
       </Table.Cell>
       <Table.Cell>
         <Input
-          label="Comment"
+          label={t("principal.evaluations.detail.comment")}
           value={comment}
           disabled={readOnly}
           onChange={(event) => setComment(event.target.value)}
         />
       </Table.Cell>
       <Table.Cell>
-        <span className="evaluations-autosave" data-status={status}>
-          {autosaveLabel(status)}
-        </span>
+        <AutosaveIndicator status={status} />
       </Table.Cell>
     </Table.Row>
   );
@@ -181,9 +200,7 @@ function toNotesForm(evaluation: EvaluationWithScores): NotesFormState {
   };
 }
 
-const RATING_OPTIONS: SelectOption<EvaluationRating>[] = Object.entries(
-  EVALUATION_RATING_LABELS,
-).map(([value, label]) => ({ value: value as EvaluationRating, label }));
+const RATINGS = Object.keys(EVALUATION_RATING_LABEL_KEYS) as EvaluationRating[];
 
 interface EvaluationHistoryProps {
   evaluationId: string;
@@ -194,6 +211,8 @@ interface EvaluationHistoryProps {
  * satisfies the "history" deliverable by reusing the same list endpoint `EvaluationListPage` calls,
  * scoped to one teacher rather than adding a dedicated history endpoint. */
 function EvaluationHistory({ evaluationId, teacherId }: EvaluationHistoryProps) {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormatters();
   const historyQuery = useQuery({
     queryKey: evaluationListKey({ teacherId }),
     queryFn: () => fetchEvaluations({ teacherId }),
@@ -204,22 +223,27 @@ function EvaluationHistory({ evaluationId, teacherId }: EvaluationHistoryProps) 
     .sort((a, b) => b.evaluated_at.localeCompare(a.evaluated_at));
 
   return (
-    <section className="evaluations-detail__section" aria-label="Evaluation history">
-      <h2>Evaluation history</h2>
+    <section
+      className="evaluations-detail__section"
+      aria-label={t("principal.evaluations.detail.historyTitle")}
+    >
+      <h2>{t("principal.evaluations.detail.historyTitle")}</h2>
       {historyQuery.isPending ? (
-        <p role="status">Loading…</p>
+        <p role="status">{t("principal.common.loading")}</p>
       ) : history.length === 0 ? (
-        <p className="evaluations-detail__hint">No earlier evaluations for this teacher.</p>
+        <p className="evaluations-detail__hint">{t("principal.evaluations.detail.historyEmpty")}</p>
       ) : (
         <ul className="evaluations-history">
           {history.map((evaluation) => (
             <li key={evaluation.id} className="evaluations-history__item">
               <Link to={`/portal/principal/evaluations/${evaluation.id}`}>
-                {EVALUATION_TYPE_LABELS[evaluation.evaluation_type]} —{" "}
-                {formatDate(evaluation.evaluated_at)}
+                {t("principal.evaluations.detail.historyItem", {
+                  type: t(EVALUATION_TYPE_LABEL_KEYS[evaluation.evaluation_type]),
+                  date: formatDate(evaluation.evaluated_at),
+                })}
               </Link>
               <span className="evaluations-history__status">
-                {EVALUATION_STATUS_LABELS[evaluation.status]}
+                {t(EVALUATION_STATUS_LABEL_KEYS[evaluation.status])}
               </span>
             </li>
           ))}
@@ -239,6 +263,8 @@ interface EvaluationWorkspaceProps {
  * `evaluation.id` on the parent (`EvaluationDetailPage`) so navigating between evaluations remounts
  * this component instead of carrying stale local form state across records. */
 function EvaluationWorkspace({ evaluation, templates, teacherName }: EvaluationWorkspaceProps) {
+  const { t } = useTranslation();
+  const { formatDate, formatDateTime } = useDateFormatters();
   const { show } = useToast();
   const [notes, setNotes] = useState<NotesFormState>(() => toNotesForm(evaluation));
   const update = useUpdateEvaluation(evaluation.id);
@@ -269,17 +295,23 @@ function EvaluationWorkspace({ evaluation, templates, teacherName }: EvaluationW
       }),
   });
 
+  const ratingOptions: SelectOption<EvaluationRating>[] = RATINGS.map((value) => ({
+    value,
+    label: t(EVALUATION_RATING_LABEL_KEYS[value]),
+  }));
+
   const scoresByTemplateId = new Map(
     evaluation.scores.map((score) => [score.criteria_template_id, score]),
   );
 
   function handleSubmit() {
     submit.mutate(undefined, {
-      onSuccess: () => show({ variant: "success", title: "Evaluation submitted" }),
+      onSuccess: () =>
+        show({ variant: "success", title: t("principal.evaluations.detail.submitted") }),
       onError: (error) =>
         show({
           variant: "error",
-          title: "Couldn't submit evaluation",
+          title: t("principal.evaluations.detail.submitFailed"),
           description: apiErrorDescription(error),
         }),
     });
@@ -287,11 +319,12 @@ function EvaluationWorkspace({ evaluation, templates, teacherName }: EvaluationW
 
   function handleShare() {
     share.mutate(undefined, {
-      onSuccess: () => show({ variant: "success", title: "Shared with teacher" }),
+      onSuccess: () =>
+        show({ variant: "success", title: t("principal.evaluations.detail.sharedToast") }),
       onError: (error) =>
         show({
           variant: "error",
-          title: "Couldn't share evaluation",
+          title: t("principal.evaluations.detail.shareFailed"),
           description: apiErrorDescription(error),
         }),
     });
@@ -303,19 +336,19 @@ function EvaluationWorkspace({ evaluation, templates, teacherName }: EvaluationW
 
       <dl className="evaluations-detail__summary">
         <div>
-          <dt>Type</dt>
-          <dd>{EVALUATION_TYPE_LABELS[evaluation.evaluation_type]}</dd>
+          <dt>{t("principal.evaluations.detail.type")}</dt>
+          <dd>{t(EVALUATION_TYPE_LABEL_KEYS[evaluation.evaluation_type])}</dd>
         </div>
         <div>
-          <dt>Status</dt>
-          <dd>{EVALUATION_STATUS_LABELS[evaluation.status]}</dd>
+          <dt>{t("principal.evaluations.detail.status")}</dt>
+          <dd>{t(EVALUATION_STATUS_LABEL_KEYS[evaluation.status])}</dd>
         </div>
         <div>
-          <dt>Rating</dt>
+          <dt>{t("principal.evaluations.detail.rating")}</dt>
           <dd>
             {evaluation.rating ? (
               <span className="evaluations-rating-pill" data-tone={ratingTone(evaluation.rating)}>
-                {EVALUATION_RATING_LABELS[evaluation.rating]}
+                {t(EVALUATION_RATING_LABEL_KEYS[evaluation.rating])}
               </span>
             ) : (
               "—"
@@ -323,21 +356,26 @@ function EvaluationWorkspace({ evaluation, templates, teacherName }: EvaluationW
           </dd>
         </div>
         <div>
-          <dt>Evaluated at</dt>
+          <dt>{t("principal.evaluations.detail.evaluatedAt")}</dt>
           <dd>{formatDateTime(evaluation.evaluated_at)}</dd>
         </div>
         <div>
-          <dt>Shared with teacher</dt>
+          <dt>{t("principal.evaluations.detail.sharedWithTeacher")}</dt>
           <dd>
             {evaluation.shared_with_teacher
-              ? `Shared on ${formatDate(evaluation.shared_at)}`
-              : "Not shared — invisible to the teacher"}
+              ? t("principal.evaluations.detail.sharedOn", {
+                  date: formatDate(evaluation.shared_at),
+                })
+              : t("principal.evaluations.detail.notShared")}
           </dd>
         </div>
       </dl>
 
-      <section className="evaluations-detail__section" aria-label="Workflow">
-        <h2>Workflow</h2>
+      <section
+        className="evaluations-detail__section"
+        aria-label={t("principal.evaluations.detail.workflow")}
+      >
+        <h2>{t("principal.evaluations.detail.workflow")}</h2>
         <div className="evaluations-detail__workflow-actions">
           <Button
             type="button"
@@ -346,7 +384,7 @@ function EvaluationWorkspace({ evaluation, templates, teacherName }: EvaluationW
             loading={submit.isPending}
             onClick={handleSubmit}
           >
-            Submit
+            {t("principal.evaluations.detail.submit")}
           </Button>
           <Button
             type="button"
@@ -355,34 +393,48 @@ function EvaluationWorkspace({ evaluation, templates, teacherName }: EvaluationW
             loading={share.isPending}
             onClick={handleShare}
           >
-            Share with teacher
+            {t("principal.evaluations.detail.share")}
           </Button>
         </div>
         {evaluation.status === "draft" ? (
-          <p className="evaluations-detail__hint">
-            Submit this evaluation before sharing it with the teacher.
-          </p>
+          <p className="evaluations-detail__hint">{t("principal.evaluations.detail.submitHint")}</p>
         ) : null}
       </section>
 
-      <section className="evaluations-detail__section" aria-label="Criteria scoring">
-        <h2>Criteria scoring</h2>
+      <section
+        className="evaluations-detail__section"
+        aria-label={t("principal.evaluations.detail.criteriaScoring")}
+      >
+        <h2>{t("principal.evaluations.detail.criteriaScoring")}</h2>
         {templates.length === 0 ? (
           <p className="evaluations-detail__hint">
-            No active criteria templates.{" "}
-            <Link to="/portal/principal/evaluations/templates">Add one</Link> to start scoring.
+            <Trans
+              i18nKey="principal.evaluations.detail.noTemplates"
+              components={{ link: <Link to="/portal/principal/evaluations/templates" /> }}
+            />
           </p>
         ) : (
-          <Table caption="Criteria scores">
+          <Table caption={t("principal.evaluations.detail.scoresCaption")}>
             <Table.Header>
               <Table.Row>
-                <Table.HeaderCell>Criteria</Table.HeaderCell>
-                <Table.HeaderCell>Score</Table.HeaderCell>
-                <Table.HeaderCell>Comment</Table.HeaderCell>
-                <Table.HeaderCell>Saved</Table.HeaderCell>
+                <Table.HeaderCell>
+                  {t("principal.evaluations.detail.scoreColumns.criteria")}
+                </Table.HeaderCell>
+                <Table.HeaderCell>
+                  {t("principal.evaluations.detail.scoreColumns.score")}
+                </Table.HeaderCell>
+                <Table.HeaderCell>
+                  {t("principal.evaluations.detail.scoreColumns.comment")}
+                </Table.HeaderCell>
+                <Table.HeaderCell>
+                  {t("principal.evaluations.detail.scoreColumns.saved")}
+                </Table.HeaderCell>
               </Table.Row>
             </Table.Header>
-            <Table.Body columnCount={SCORE_COLUMN_COUNT} empty="No active criteria templates.">
+            <Table.Body
+              columnCount={SCORE_COLUMN_COUNT}
+              empty={t("principal.evaluations.detail.noTemplatesShort")}
+            >
               {templates.map((template) => (
                 <ScoreRow
                   key={template.id}
@@ -397,49 +449,50 @@ function EvaluationWorkspace({ evaluation, templates, teacherName }: EvaluationW
         )}
       </section>
 
-      <section className="evaluations-detail__section" aria-label="Narrative">
+      <section
+        className="evaluations-detail__section"
+        aria-label={t("principal.evaluations.detail.narrative")}
+      >
         <div className="evaluations-detail__section-header">
-          <h2>Narrative</h2>
-          <span className="evaluations-autosave" data-status={notesStatus}>
-            {autosaveLabel(notesStatus)}
-          </span>
+          <h2>{t("principal.evaluations.detail.narrative")}</h2>
+          <AutosaveIndicator status={notesStatus} />
         </div>
 
         {readOnly ? (
           <p className="evaluations-detail__hint">
-            This evaluation has been shared with the teacher and can no longer be edited.
+            {t("principal.evaluations.detail.readOnlyHint")}
           </p>
         ) : null}
 
         <div className="evaluations-form">
           <Select
-            label="Overall rating"
-            options={RATING_OPTIONS}
+            label={t("principal.evaluations.detail.overallRating")}
+            options={ratingOptions}
             value={notes.rating || undefined}
-            placeholder="No rating yet"
+            placeholder={t("principal.evaluations.detail.noRating")}
             disabled={readOnly}
             onChange={(value) => setNotes((prev) => ({ ...prev, rating: value }))}
           />
           <TextField
-            label="Strengths"
+            label={t("principal.evaluations.detail.strengths")}
             value={notes.strengths}
             disabled={readOnly}
             onChange={(value) => setNotes((prev) => ({ ...prev, strengths: value }))}
           />
           <TextField
-            label="Areas for improvement"
+            label={t("principal.evaluations.detail.areasForImprovement")}
             value={notes.areas_for_improvement}
             disabled={readOnly}
             onChange={(value) => setNotes((prev) => ({ ...prev, areas_for_improvement: value }))}
           />
           <TextField
-            label="Comments"
+            label={t("principal.evaluations.detail.comments")}
             value={notes.comments}
             disabled={readOnly}
             onChange={(value) => setNotes((prev) => ({ ...prev, comments: value }))}
           />
           <TextField
-            label="Narrative"
+            label={t("principal.evaluations.detail.narrative")}
             rows={6}
             value={notes.narrative}
             disabled={readOnly}
@@ -460,6 +513,7 @@ function EvaluationWorkspace({ evaluation, templates, teacherName }: EvaluationW
  * `CreateEvaluationModal`.
  */
 export default function EvaluationDetailPage() {
+  const { t } = useTranslation();
   const { evaluationId = "" } = useParams<{ evaluationId: string }>();
 
   const evaluationQuery = useQuery({
@@ -477,7 +531,7 @@ export default function EvaluationDetailPage() {
 
   const backLink = (
     <Link className="evaluations-detail__back" to="/portal/principal/evaluations">
-      ← Back to evaluations
+      {t("principal.evaluations.backToList")}
     </Link>
   );
 
@@ -485,7 +539,7 @@ export default function EvaluationDetailPage() {
     return (
       <>
         {backLink}
-        <p role="status">Loading…</p>
+        <p role="status">{t("principal.common.loading")}</p>
       </>
     );
   }
@@ -494,7 +548,7 @@ export default function EvaluationDetailPage() {
     return (
       <>
         {backLink}
-        <p role="alert">Unable to load this evaluation.</p>
+        <p role="alert">{t("principal.evaluations.detail.loadError")}</p>
       </>
     );
   }

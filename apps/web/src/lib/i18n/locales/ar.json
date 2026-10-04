@@ -2,7 +2,8 @@
   "shell": {
     "skipToContent": "تخطي إلى المحتوى",
     "primaryNavAriaLabel": "التنقل الرئيسي",
-    "toggleNav": "تبديل التنقل"
+    "toggleNav": "تبديل التنقل",
+    "homeLink": "الصفحة الرئيسية لـ Studafy"
   },
   "nav": {
     "ariaLabel": "البوابة",
@@ -40,7 +41,8 @@
   "userMenu": {
     "ariaLabel": "قائمة الحساب",
     "devicesAndSessions": "الأجهزة والجلسات",
-    "signOut": "تسجيل الخروج"
+    "signOut": "تسجيل الخروج",
+    "goToPortal": "الانتقال إلى البوابة"
   },
   "notificationBell": {
     "ariaLabel_zero": "الإشعارات",
@@ -90,7 +92,12 @@
     "revokedOthersToast": "تم تسجيل الخروج من الجلسات الأخرى ({{count}})",
     "revokeOthersError": "تعذّر تسجيل الخروج من الأجهزة الأخرى",
     "loadError": "تعذّر تحميل أجهزتك وجلساتك. أعد تحميل الصفحة.",
-    "tryAgain": "يرجى المحاولة مرة أخرى."
+    "tryAgain": "يرجى المحاولة مرة أخرى.",
+    "channel": {
+      "web": "متصفح الويب",
+      "mobile": "تطبيق الجوال",
+      "api": "عميل API"
+    }
   },
   "accountDeletion": {
     "title": "حذف الحساب",
@@ -143,5 +150,22 @@
     "clearRecent": "مسح",
     "noDetailPage": "لا توجد صفحة تفاصيل لهذا بعد.",
     "keyboardHint": "↑↓ للتنقل · ↵ للفتح · esc للإغلاق"
+  },
+  "ui": {
+    "closeDialog": "إغلاق النافذة",
+    "dismissToast": "إغلاق التنبيه: {{title}}",
+    "removeChip": "إزالة {{label}}",
+    "removeItem": "إزالة العنصر",
+    "selectRow": "تحديد {{label}}",
+    "selectRowFallback": "تحديد الصف",
+    "selectAllRows": "تحديد كل الصفوف",
+    "selectPlaceholder": "اختر خيارًا",
+    "tableLoading": "جارٍ التحميل",
+    "tableEmpty": "لا توجد نتائج.",
+    "filterSearch": "بحث",
+    "filterDateRange": "النطاق الزمني",
+    "filterDateFrom": "من",
+    "filterDateTo": "إلى",
+    "filterClearAll": "مسح الكل"
   }
 }

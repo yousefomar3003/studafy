@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { REGISTRATION_EVENTS, track } from "../../lib/analytics";
 import { api } from "../../lib/api";
+import { useTranslation } from "../../lib/i18n";
 
 import { AdminContactStep } from "./AdminContactStep";
 import { RegistrationResult } from "./RegistrationResult";
@@ -36,6 +37,7 @@ const RESEND_COOLDOWN_MS = 30_000;
  * resend action for `POST /api/schools/resend-verification`.
  */
 export default function OnboardingPage() {
+  const { t } = useTranslation();
   const toast = useToast();
   const [step, setStep] = useState<Step>("school");
   const [schoolDetails, setSchoolDetails] = useState<SchoolDetails>(EMPTY_SCHOOL_DETAILS);
@@ -76,20 +78,20 @@ export default function OnboardingPage() {
       setResetCaptchaSignal((n) => n + 1);
 
       if (apiError?.code === "SCHOOL_SLUG_DUPLICATE") {
-        setServerFieldErrors({ slug: "This URL slug is already taken." });
+        setServerFieldErrors({ slug: "onboarding.register.slugTaken" });
         setStep("school");
         return;
       }
       if (apiError?.code === "SCHOOL_EMAIL_DUPLICATE") {
-        setServerFieldErrors({ email: "A school with this email already exists." });
+        setServerFieldErrors({ email: "onboarding.register.emailTaken" });
         setStep("school");
         return;
       }
       if (apiError?.code === "RATE_LIMIT_EXCEEDED") {
-        setBanner("Too many attempts. Please wait a moment and try again.");
+        setBanner(t("onboarding.register.rateLimited"));
         return;
       }
-      setBanner(apiError?.detail || "Something went wrong. Please try again.");
+      setBanner(apiError?.detail || t("onboarding.common.genericError"));
     },
   });
 
@@ -100,8 +102,10 @@ export default function OnboardingPage() {
     onSuccess: () => {
       track(REGISTRATION_EVENTS.VERIFICATION_RESEND_SUCCEEDED);
       toast.show({
-        title: "Verification email sent",
-        description: `Check ${schoolDetails.email}.`,
+        title: t("onboarding.register.resendToastTitle"),
+        description: t("onboarding.register.resendToastDescription", {
+          email: schoolDetails.email,
+        }),
         variant: "success",
       });
       setCanResend(false);
@@ -112,7 +116,10 @@ export default function OnboardingPage() {
   return (
     <div>
       <p aria-hidden="true">
-        {step === "result" ? "Step 3 of 3" : step === "admin" ? "Step 2 of 3" : "Step 1 of 3"}
+        {t("onboarding.register.stepIndicator", {
+          current: step === "result" ? 3 : step === "admin" ? 2 : 1,
+          total: 3,
+        })}
       </p>
 
       {banner ? <p role="alert">{banner}</p> : null}

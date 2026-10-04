@@ -9,6 +9,7 @@ import {
   useAuthStatus,
   useSessionStore,
 } from "../../lib/auth";
+import { useTranslation } from "../../lib/i18n";
 
 import { InvitationOutcome } from "./InvitationOutcome";
 
@@ -29,6 +30,7 @@ const REQUIRES_ADMIN_APPROVAL_OUTCOME = "requires_admin_approval";
  *     invitation itself is untouched, so the same link still works once the mismatch is resolved.
  */
 export default function InviteCompletePage() {
+  const { t } = useTranslation();
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
   const requiresApproval = searchParams.get("outcome") === REQUIRES_ADMIN_APPROVAL_OUTCOME;
@@ -76,10 +78,15 @@ export default function InviteCompletePage() {
   if (requiresApproval) {
     return (
       <InvitationOutcome
-        heading="Your sign-in needs admin approval"
-        message="The account you signed in with doesn't match the email this invitation was sent to, so we couldn't finish activating it automatically. An administrator at your school can review and approve it."
+        heading={t("onboarding.invite.approval.heading")}
+        message={t("onboarding.invite.approval.message")}
         {...(token
-          ? { action: { label: "Try a different account", href: `/invite/${token}` } }
+          ? {
+              action: {
+                label: t("onboarding.invite.approval.retry"),
+                href: `/invite/${token}`,
+              },
+            }
           : {})}
       />
     );

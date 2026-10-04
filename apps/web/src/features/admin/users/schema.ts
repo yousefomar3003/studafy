@@ -14,35 +14,49 @@ export const ASSIGNABLE_ROLES = Object.values(ROLES).filter(
   (role) => role !== ROLES.SUPER_ADMIN,
 ) as Role[];
 
-export const ROLE_LABELS: Record<Role, string> = {
-  SUPER_ADMIN: "Super admin",
-  ORG_ADMIN: "Org admin",
-  FINANCE: "Finance",
-  INSTRUCTOR: "Instructor",
-  TEACHING_ASSISTANT: "Teaching assistant",
-  STUDENT: "Student",
-  PARENT: "Parent",
-  GUEST: "Guest",
-  SUPPORT_AGENT: "Support agent",
+/**
+ * Translation keys for each role's display name, resolved with `t()` at render time so the label
+ * follows a runtime language switch.
+ */
+export const ROLE_LABEL_KEYS: Record<Role, string> = {
+  SUPER_ADMIN: "adminPeople.roles.SUPER_ADMIN",
+  ORG_ADMIN: "adminPeople.roles.ORG_ADMIN",
+  FINANCE: "adminPeople.roles.FINANCE",
+  INSTRUCTOR: "adminPeople.roles.INSTRUCTOR",
+  TEACHING_ASSISTANT: "adminPeople.roles.TEACHING_ASSISTANT",
+  STUDENT: "adminPeople.roles.STUDENT",
+  PARENT: "adminPeople.roles.PARENT",
+  GUEST: "adminPeople.roles.GUEST",
+  SUPPORT_AGENT: "adminPeople.roles.SUPPORT_AGENT",
 };
 
-export const STATUS_LABELS = {
-  invited: "Invited",
-  active: "Active",
-  suspended: "Suspended",
-  archived: "Archived",
+/** Translation keys for each user status's display name; resolve with `t()` at render time. */
+export const STATUS_LABEL_KEYS = {
+  invited: "adminPeople.users.status.invited",
+  active: "adminPeople.users.status.active",
+  suspended: "adminPeople.users.status.suspended",
+  archived: "adminPeople.users.status.archived",
 } as const;
 
-export type UserStatus = keyof typeof STATUS_LABELS;
+export type UserStatus = keyof typeof STATUS_LABEL_KEYS;
+
+/**
+ * Validation messages below are translation keys, not display text: `fieldErrors` hands them back
+ * as-is and the form translates them with `t()` where the error renders.
+ */
 
 const roleEnum = z.enum(ASSIGNABLE_ROLES as [Role, ...Role[]]);
 
 export const createUserSchema = z.object({
-  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "adminPeople.validation.emailRequired")
+    .email("adminPeople.validation.emailInvalid"),
   display_name: z
     .string()
     .trim()
-    .max(200, "Keep it under 200 characters")
+    .max(200, "adminPeople.validation.maxLength200")
     .optional()
     .transform((value) => (value ? value : undefined)),
   role: roleEnum,
@@ -53,8 +67,8 @@ export const editUserSchema = z.object({
   display_name: z
     .string()
     .trim()
-    .min(1, "Name is required")
-    .max(200, "Keep it under 200 characters"),
+    .min(1, "adminPeople.validation.nameRequired")
+    .max(200, "adminPeople.validation.maxLength200"),
   role: roleEnum,
 });
 export type EditUserValues = z.infer<typeof editUserSchema>;

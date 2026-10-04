@@ -1,5 +1,6 @@
 import { Link, Outlet } from "react-router-dom";
 
+import { BrandLogo } from "../components/BrandLogo";
 import { useTranslation } from "../lib/i18n";
 
 /**
@@ -12,13 +13,15 @@ export function HelpLayout() {
   return (
     <div className="help-shell">
       <header className="help-shell__header">
-        <Link to="/help" className="help-shell__brand">
-          Studafy{" "}
+        <p className="help-shell__brand">
+          <Link to="/" aria-label={t("shell.homeLink")}>
+            <BrandLogo badge />
+          </Link>{" "}
           <span className="help-shell__brand-separator" aria-hidden="true">
             ·
           </span>{" "}
-          <span>{t("help.title")}</span>
-        </Link>
+          <Link to="/help">{t("help.title")}</Link>
+        </p>
       </header>
       <Outlet />
     </div>

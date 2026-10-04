@@ -3,19 +3,23 @@ import { Button, Card, Checkbox, Input, Radio, RadioGroup, Select, useToast } fr
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useCreateAnnouncement } from "./mutations";
 import { activeClassesQueryKey, fetchActiveClasses } from "./queries";
 import {
-  AUDIENCE_TYPE_LABELS,
+  AUDIENCE_TYPE_LABEL_KEYS,
   composeAnnouncementSchema,
   EMPTY_COMPOSE_VALUES,
   fieldErrors,
-  ROLE_OPTIONS,
+  ROLE_VALUES,
+  roleLabelKey,
   toCreateAnnouncementBody,
 } from "./schema";
 
 import type { Announcement } from "./queries";
 import type { AnnouncementAudienceType, ComposeAnnouncementValues } from "./schema";
+import type { Role } from "@studafy/constants";
 import type { SelectOption } from "@studafy/ui";
 import type { FormEvent } from "react";
 
@@ -37,6 +41,7 @@ const AUDIENCE_TYPES: AnnouncementAudienceType[] = ["school", "role", "class"];
  * `audience_class_id` could be submitted alongside `audience_type: "school"`.
  */
 export function ComposeAnnouncementForm({ onCreated }: ComposeAnnouncementFormProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const createAnnouncement = useCreateAnnouncement();
   const bodyId = useId();
@@ -56,6 +61,17 @@ export function ComposeAnnouncementForm({ onCreated }: ComposeAnnouncementFormPr
     value: klass.id,
     label: klass.code,
   }));
+  const roleOptions: SelectOption<Role>[] = ROLE_VALUES.map((role) => ({
+    value: role,
+    label: t(roleLabelKey(role)),
+  }));
+
+  /** Field errors hold translation keys (see `schema.ts`), resolved here at render time. */
+  function errorText(key: keyof ComposeAnnouncementValues): string | undefined {
+    // eslint-disable-next-line security/detect-object-injection -- `key` is a literal field name of this form's own value shape
+    const message = errors[key];
+    return message ? t(message) : undefined;
+  }
 
   function setField<K extends keyof ComposeAnnouncementValues>(
     key: K,
@@ -99,8 +115,8 @@ export function ComposeAnnouncementForm({ onCreated }: ComposeAnnouncementFormPr
           variant: "success",
           title:
             announcement.status === "published"
-              ? "Announcement published"
-              : "Announcement scheduled",
+              ? t("adminSchool.announcements.compose.published")
+              : t("adminSchool.announcements.compose.scheduled"),
         });
         reset();
         onCreated(announcement);
@@ -108,7 +124,7 @@ export function ComposeAnnouncementForm({ onCreated }: ComposeAnnouncementFormPr
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't send announcement",
+          title: t("adminSchool.announcements.compose.sendFailed"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
       },
@@ -121,22 +137,26 @@ export function ComposeAnnouncementForm({ onCreated }: ComposeAnnouncementFormPr
     new Date(values.scheduled_at_local ?? "").getTime() > Date.now();
 
   return (
-    <Card as="section" aria-label="Compose announcement">
+    <Card as="section" aria-label={t("adminSchool.announcements.compose.ariaLabel")}>
       <Card.Body>
-        <form onSubmit={handleSubmit} noValidate aria-label="Compose announcement">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          aria-label={t("adminSchool.announcements.compose.ariaLabel")}
+        >
           <div className="announcements-compose__fields">
             <Input
-              label="Title"
+              label={t("adminSchool.announcements.compose.titleLabel")}
               value={values.title}
               onChange={(e) => setField("title", e.target.value)}
-              error={errors.title}
+              error={errorText("title")}
               required
               autoFocus
             />
 
             <div className="sf-field">
               <label className="sf-field__label" htmlFor={bodyId}>
-                Message
+                {t("adminSchool.announcements.compose.messageLabel")}
                 <span className="sf-field__required" aria-hidden="true">
                   *
                 </span>
@@ -155,48 +175,57 @@ export function ComposeAnnouncementForm({ onCreated }: ComposeAnnouncementFormPr
               </div>
               {errors.body ? (
                 <p className="sf-field__error" role="alert">
-                  {errors.body}
+                  {errorText("body")}
                 </p>
               ) : null}
             </div>
 
             <Checkbox
-              label="Mandatory — recipients cannot disable this notice"
+              label={t("adminSchool.announcements.compose.mandatory")}
               checked={values.mandatory}
               onChange={(e) => setField("mandatory", e.target.checked)}
             />
 
             <RadioGroup
-              label="Audience"
+              label={t("adminSchool.announcements.compose.audienceLabel")}
               name="audience_type"
               value={values.audience_type}
               onChange={(value) => setAudienceType(value as AnnouncementAudienceType)}
-              error={errors.audience_type}
+              error={errorText("audience_type")}
             >
               {AUDIENCE_TYPES.map((type) => (
-                <Radio key={type} value={type} label={AUDIENCE_TYPE_LABELS[type]} />
+                <Radio
+                  key={type}
+                  value={type}
+                  // eslint-disable-next-line security/detect-object-injection -- `type` comes from iterating this module's own fixed `AUDIENCE_TYPES` list, not user input
+                  label={t(AUDIENCE_TYPE_LABEL_KEYS[type])}
+                />
               ))}
             </RadioGroup>
 
             {values.audience_type === "role" ? (
               <Select
-                label="Role"
-                options={ROLE_OPTIONS}
+                label={t("adminSchool.announcements.compose.roleLabel")}
+                options={roleOptions}
                 value={values.audience_role}
                 onChange={(value) => setField("audience_role", value)}
-                error={errors.audience_role}
+                error={errorText("audience_role")}
                 required
               />
             ) : null}
 
             {values.audience_type === "class" ? (
               <Select
-                label="Class"
+                label={t("adminSchool.announcements.compose.classLabel")}
                 options={classOptions}
                 value={values.audience_class_id}
                 onChange={(value) => setField("audience_class_id", value)}
-                error={errors.audience_class_id}
-                placeholder={classesQuery.isPending ? "Loading classes…" : "Select a class"}
+                error={errorText("audience_class_id")}
+                placeholder={
+                  classesQuery.isPending
+                    ? t("adminSchool.announcements.compose.loadingClasses")
+                    : t("adminSchool.announcements.compose.selectClass")
+                }
                 disabled={classesQuery.isPending}
                 required
               />
@@ -204,7 +233,7 @@ export function ComposeAnnouncementForm({ onCreated }: ComposeAnnouncementFormPr
 
             <div className="sf-field">
               <label className="sf-field__label" htmlFor={scheduleId}>
-                Publish at
+                {t("adminSchool.announcements.compose.publishAtLabel")}
               </label>
               <div className="sf-input">
                 <input
@@ -217,12 +246,11 @@ export function ComposeAnnouncementForm({ onCreated }: ComposeAnnouncementFormPr
                 />
               </div>
               <p className="sf-field__helper">
-                Leave blank to publish immediately. Uses your device&rsquo;s local time zone —
-                converted to a fixed instant, so recipients see it at the same moment everywhere.
+                {t("adminSchool.announcements.compose.publishAtHelp")}
               </p>
               {errors.scheduled_at_local ? (
                 <p className="sf-field__error" role="alert">
-                  {errors.scheduled_at_local}
+                  {errorText("scheduled_at_local")}
                 </p>
               ) : null}
             </div>
@@ -230,7 +258,9 @@ export function ComposeAnnouncementForm({ onCreated }: ComposeAnnouncementFormPr
 
           <div className="announcements-compose__actions">
             <Button type="submit" loading={createAnnouncement.isPending}>
-              {isScheduledForLater ? "Schedule announcement" : "Publish now"}
+              {isScheduledForLater
+                ? t("adminSchool.announcements.compose.schedule")
+                : t("adminSchool.announcements.compose.publishNow")}
             </Button>
           </div>
         </form>

@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useId, useRef } from "react";
 
 import { mergeRefs } from "../../internal/merge-refs";
 import { Portal } from "../../internal/portal";
+import { useUiStrings } from "../../internal/ui-strings";
 import { useFocusTrap } from "../../internal/use-focus-trap";
 
 import type { HTMLAttributes, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
@@ -33,6 +34,7 @@ const ModalRoot = forwardRef<HTMLDivElement, ModalProps>(function Modal(
   },
   ref,
 ) {
+  const strings = useUiStrings();
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const descriptionId = `${baseId}-description`;
@@ -108,7 +110,7 @@ const ModalRoot = forwardRef<HTMLDivElement, ModalProps>(function Modal(
             <button
               type="button"
               className="sf-modal__close"
-              aria-label="Close dialog"
+              aria-label={strings.closeDialog}
               onClick={onClose}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">

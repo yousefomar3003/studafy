@@ -1,0 +1,503 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "tryAgain": "Please try again.",
+    "previous": "Previous",
+    "next": "Next",
+    "cancel": "Cancel"
+  },
+  "layouts": {
+    "account": "Account",
+    "onboarding": "Onboarding",
+    "setupWizard": "Setup wizard"
+  },
+  "statusCard": {
+    "reference": "Reference: {{requestId}}"
+  },
+  "routeError": {
+    "heading": "Something went wrong",
+    "unexpected": "An unexpected error occurred."
+  },
+  "errorBoundary": {
+    "heading": "Something went wrong",
+    "message": "Please reload the page. If the problem persists, contact support."
+  },
+  "approvalQueueBadge": {
+    "pending_one": "{{count}} pending approval",
+    "pending_other": "{{count}} pending approvals"
+  },
+  "turnstile": {
+    "loadFailed": "Bot-protection challenge failed to load. Check your connection and reload the page."
+  },
+  "marketing": {
+    "nav": {
+      "home": "Home",
+      "features": "Features",
+      "pricing": "Pricing",
+      "about": "About"
+    },
+    "header": {
+      "signIn": "Sign in",
+      "talkToUs": "Talk to us"
+    },
+    "footer": {
+      "tagline": "School operations, in one system.",
+      "navAriaLabel": "Footer",
+      "signIn": "Sign in",
+      "privacy": "Privacy policy",
+      "deleteAccount": "Delete your account",
+      "copyright": "© {{year}} Studafy. All rights reserved.",
+      "portal": "Portal"
+    },
+    "cta": {
+      "talkToUs": "Talk to us",
+      "seePricing": "See pricing",
+      "exploreFeatures": "Explore features"
+    },
+    "addOnChip": "Add-on",
+    "home": {
+      "seoTitle": "School operations, in one system",
+      "seoDescription": "Studafy brings academics, attendance, grades, discipline, finance, and family communication into one school management platform.",
+      "heroTitle": "Studafy: school operations, in one system",
+      "heroSubtitle": "Academics, attendance, grades, discipline, finance, and family communication — one platform your staff and families both actually use.",
+      "includedEyebrow": "What’s included",
+      "includedTitle": "Everything a school runs on",
+      "includedLede": "Not a bolt-on gradebook or a standalone fee tracker — the modules below share the same student, class, and school records.",
+      "valueProps": {
+        "academics": {
+          "title": "Academics & attendance",
+          "body": "Terms, subjects, classes, timetables, enrollment, and daily attendance — with corrections that keep an audit trail instead of silently overwriting a record."
+        },
+        "grades": {
+          "title": "Grades & discipline",
+          "body": "Gradebooks, assignments, submissions, and exam results staff can enter and publish, plus discipline records and evaluations in the same system."
+        },
+        "finance": {
+          "title": "Finance & billing",
+          "body": "Fee structures, installments, scholarships and discounts, payments, refunds, and reconciliation — with reporting that adds up for finance staff, not just for parents."
+        },
+        "family": {
+          "title": "Family portal & notifications",
+          "body": "Guardians see attendance, grades, and balances for each child, and get notified through the channels your school already uses."
+        }
+      },
+      "howEyebrow": "How it works",
+      "howTitle": "Set up once, run every term",
+      "steps": {
+        "onboard": {
+          "title": "Your school onboards",
+          "body": "We set up your school as its own tenant with its own data, roles, and permissions."
+        },
+        "staff": {
+          "title": "Staff run the school day-to-day",
+          "body": "Teachers, admins, and finance staff work in one system instead of switching between spreadsheets and separate tools."
+        },
+        "families": {
+          "title": "Families stay in the loop",
+          "body": "Guardians get a live portal and notifications — no more chasing down a printed report card."
+        }
+      },
+      "ctaTitle": "See it against your own school’s numbers",
+      "ctaBody": "Tell us about your school and we’ll walk you through Studafy — including where it won’t be a fit, if that’s the case."
+    },
+    "features": {
+      "seoTitle": "Features",
+      "seoDescription": "Academics, attendance, grades, discipline, finance, family portal, and an optional AI add-on — see what's included in Studafy.",
+      "heroTitle": "One system for the whole school day",
+      "heroSubtitle": "Every group below shares the same student, class, and school records — nothing here is a separate tool bolted on afterward.",
+      "groups": {
+        "academics": {
+          "title": "Academics",
+          "body": "The structure everything else hangs off of.",
+          "items": {
+            "years": "Academic years and terms",
+            "subjects": "Subjects, courses, and classes",
+            "enrollment": "Enrollment",
+            "timetabling": "Timetabling"
+          }
+        },
+        "attendance": {
+          "title": "Attendance",
+          "body": "Daily records with a real audit trail.",
+          "items": {
+            "sessions": "Attendance sessions per class",
+            "corrections": "Corrections logged, not overwritten",
+            "reporting": "Attendance reporting for admins"
+          }
+        },
+        "grades": {
+          "title": "Grades & assessments",
+          "body": "From assignment to published result.",
+          "items": {
+            "assignments": "Assignments and student submissions",
+            "exams": "Exams and gradebook configuration",
+            "entry": "Grade entry with a publish step",
+            "reporting": "Grade reporting"
+          }
+        },
+        "discipline": {
+          "title": "Discipline",
+          "body": "Incidents and evaluations on the student record.",
+          "items": {
+            "cases": "Discipline case records",
+            "evaluations": "Student evaluations"
+          }
+        },
+        "finance": {
+          "title": "Finance & billing",
+          "body": "Fees through to reconciliation.",
+          "items": {
+            "fees": "Fee structures and installments",
+            "scholarships": "Scholarships and discounts",
+            "payments": "Payments and refunds",
+            "reconciliation": "Reconciliation and finance reporting"
+          }
+        },
+        "family": {
+          "title": "Family portal & notifications",
+          "body": "What guardians see, and how they hear about it.",
+          "items": {
+            "perChild": "Per-child attendance, grades, and balances",
+            "siblings": "Multi-child comparison for guardians with siblings enrolled",
+            "preferences": "Notification preferences per channel"
+          }
+        },
+        "approvals": {
+          "title": "Approvals & audit",
+          "body": "A record of who changed what, and who signed off.",
+          "items": {
+            "queue": "A shared approval queue for review-gated actions",
+            "audit": "An audit trail across modules"
+          }
+        }
+      },
+      "aiTitle": "Ask AI & summaries",
+      "aiBody": "A grounded question-and-answer assistant that cites the school records it draws from, plus a study-material summarizer. It’s opt-in on top of a school subscription, purchased per student, and metered against a monthly usage budget rather than sold as unlimited — see <0>pricing</0> for how it’s billed.",
+      "ctaTitle": "Want to see it against your data?"
+    },
+    "pricing": {
+      "seoTitle": "Pricing",
+      "seoDescription": "School subscription tiers and the optional AI add-on, with live pricing.",
+      "heroTitle": "Simple, per-school pricing",
+      "heroSubtitle": "One subscription per school. Every plan includes the same modules — the difference is scale, described on each plan below.",
+      "intervalGroupLabel": "Billing interval",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "loading": "Loading plans…",
+      "loadError": "We couldn’t load current pricing. Please <0>contact us</0> for current rates.",
+      "loadErrorWithReference": "We couldn’t load current pricing (reference {{requestId}}). Please <0>contact us</0> for current rates.",
+      "empty": "No plans are published yet. <0>Contact us</0> for pricing.",
+      "perMonth": "/mo",
+      "perYear": "/yr",
+      "noMonthlyPrice": "No monthly price published",
+      "noYearlyPrice": "No yearly price published",
+      "included": {
+        "academics": "Academics, attendance, grades, and discipline",
+        "finance": "Finance and billing",
+        "family": "Family portal and notifications",
+        "approvals": "Approvals and audit trail"
+      },
+      "talkAboutPlan": "Talk to us about {{plan}}",
+      "addOnTitle": "AI add-on",
+      "addOnBody": "Ask AI and study-material summaries are billed separately from the school plan: an active school subscription is required first, then the add-on is purchased per student and metered against a monthly usage budget.",
+      "addOnNote": "Ask us for current add-on pricing when you talk to us about a school plan."
+    },
+    "about": {
+      "seoTitle": "About & contact",
+      "seoDescription": "What Studafy is, and how to get in touch about bringing it to your school.",
+      "heroTitle": "About Studafy",
+      "heroSubtitle": "A school operations platform, built as one system rather than a bundle of separate tools.",
+      "body1": "Studafy runs the day-to-day of a school in a single system: academics and timetabling, attendance, grades and assessments, discipline, finance and billing, and a family portal with notifications — all sharing the same student, class, and school records instead of syncing between separate tools.",
+      "body2": "Actions that need a second set of eyes — grade publishing, discipline decisions, and other review-gated changes — go through a shared approval queue with an audit trail, so there’s a record of who signed off and when.",
+      "body3": "Each school is provisioned as its own tenant, with its own data, roles, and permissions. An optional AI add-on (grounded question-answering and study-material summaries) is available on top of a school subscription.",
+      "contactEyebrow": "Contact",
+      "contactTitle": "Talk to us",
+      "contactLede": "Tell us about your school and we’ll walk you through Studafy.",
+      "emailLabel": "Email"
+    }
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Welcome back. Choose how you'd like to continue.",
+    "sessionExpired": "Your session expired. Sign in again to continue.",
+    "continueWith": "Continue with {{provider}}",
+    "divider": "or sign in with email",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "submit": "Sign in",
+    "errors": {
+      "invalidCredentials": "Incorrect email or password.",
+      "suspended": "Your school's account has been suspended.",
+      "passwordDisabled": "Email sign-in isn't enabled on this server.",
+      "rateLimited": "Too many attempts. Wait a moment and try again.",
+      "generic": "We couldn't sign you in. Check your connection and try again.",
+      "sessionNotStarted": "Signed in, but the session couldn't be started. Try again."
+    },
+    "dev": {
+      "badge": "Dev",
+      "title": "Quick sign-in as a demo account",
+      "selectLabel": "Demo account",
+      "personaWithRole": "{{role}} — {{name}}",
+      "groups": {
+        "administrators": "Administrators",
+        "teachers": "Teachers",
+        "students": "Students",
+        "parents": "Parents"
+      },
+      "roles": {
+        "superAdmin": "Super admin",
+        "schoolAdmin": "School admin",
+        "science": "Science",
+        "math": "Math",
+        "arts": "Arts",
+        "teachingAssistant": "Teaching assistant"
+      }
+    }
+  },
+  "authError": {
+    "retry": "Try again",
+    "backToSignIn": "Back to sign in",
+    "stateInvalid": {
+      "heading": "This sign-in link has expired",
+      "message": "The sign-in you started is no longer valid. Start again from the sign-in page."
+    },
+    "noAccount": {
+      "heading": "No account found for this sign-in",
+      "message": "The account you signed in with isn't linked to a Studafy account yet. If you used the wrong account, sign in again — otherwise ask your school administrator for an invitation."
+    },
+    "emailNotVerified": {
+      "heading": "Your sign-in email isn't verified",
+      "message": "The provider hasn't verified the email on the account you signed in with. Verify it there, then try again."
+    },
+    "providerError": {
+      "heading": "We couldn't complete your sign-in",
+      "message": "The sign-in service had a problem. Please try again in a moment."
+    },
+    "suspended": {
+      "heading": "Your school's account is suspended",
+      "message": "Sign-in is paused while your school's account is suspended. Contact your school administrator."
+    },
+    "cancelled": {
+      "heading": "Sign-in cancelled",
+      "message": "You cancelled the sign-in. Nothing changed — try again whenever you're ready."
+    },
+    "generic": {
+      "heading": "We couldn't complete your sign-in",
+      "message": "Something went wrong on our end. Please try again in a moment."
+    }
+  },
+  "help": {
+    "breadcrumb": "Breadcrumb",
+    "categories": {
+      "getting-started": "Getting started",
+      "academics": "Academics",
+      "finance": "Finance",
+      "billing": "Billing"
+    }
+  },
+  "search": {
+    "studentStatus": {
+      "applicant": "Applicant",
+      "enrolled": "Enrolled",
+      "suspended": "Suspended",
+      "graduated": "Graduated",
+      "withdrawn": "Withdrawn",
+      "archived": "Archived"
+    },
+    "userStatus": {
+      "invited": "Invited",
+      "active": "Active",
+      "suspended": "Suspended",
+      "archived": "Archived"
+    },
+    "materialStatus": {
+      "uploaded": "Uploaded",
+      "queued": "Queued",
+      "processing": "Processing",
+      "scanning": "Scanning",
+      "ready": "Ready",
+      "failed": "Failed",
+      "quarantined": "Quarantined"
+    }
+  },
+  "notifications": {
+    "types": {
+      "ASSIGNMENT_DUE_SOON": "Assignment due soon",
+      "GRADE_POSTED": "Grade posted",
+      "ENROLLMENT_APPROVED": "Enrollment approved",
+      "COURSE_PUBLISHED": "Course published",
+      "DISCUSSION_REPLY": "Discussion reply",
+      "STUDY_GROUP_INVITE": "Study group invite",
+      "CERTIFICATE_ISSUED": "Certificate issued",
+      "SUPPORT_MESSAGE": "Support message",
+      "ATTENDANCE_ALERT": "Attendance alert",
+      "ADMIN_ANNOUNCEMENT": "School announcement",
+      "ANNOUNCEMENT": "Announcement",
+      "MATERIAL_SCAN_QUARANTINED": "Material blocked by security scan",
+      "MATERIAL_SCAN_FAILED": "Material scan failed",
+      "MATERIAL_OCR_LOW_CONFIDENCE": "Material text quality warning",
+      "MATERIAL_INGESTED": "Material ready for AI search",
+      "MATERIAL_INGEST_FAILED": "Material processing failed"
+    },
+    "channels": {
+      "in_app": "In-app",
+      "push": "Push",
+      "email": "Email"
+    },
+    "inbox": {
+      "title": "Notifications",
+      "description": "Everything sent to you, newest first.",
+      "settings": "Notification settings",
+      "filterLabel": "Filter notifications",
+      "all": "All",
+      "unread": "Unread",
+      "markAllRead": "Mark all as read",
+      "loadError": "Unable to load notifications. Try reloading the page.",
+      "emptyUnread": "No unread notifications.",
+      "empty": "You’re all caught up.",
+      "markAsRead": "Mark as read"
+    },
+    "preferences": {
+      "title": "Notification settings",
+      "description": "Choose which channels deliver each type of notification, and when to batch them into a daily digest.",
+      "backToInbox": "Back to inbox",
+      "loadError": "Unable to load notification preferences. Try reloading the page.",
+      "channelsLabel": "Channel preferences",
+      "channelsHeading": "Channels",
+      "channelsDescription": "A locked type is mandatory and always delivered on every channel.",
+      "tableCaption": "Notification channel preferences",
+      "typeColumn": "Notification type",
+      "digestColumn": "Daily digest",
+      "mandatory": "Mandatory",
+      "cellLabel": "{{type}} — {{channel}}",
+      "digestCellLabel": "{{type}} — daily digest",
+      "saveChannels": "Save channel preferences",
+      "thresholdLabel": "Attendance alert threshold",
+      "attendanceHeading": "Attendance alerts",
+      "attendanceDescription": "Optionally override your school’s attendance alert threshold with your own personal absence count.",
+      "thresholdInput": "Personal absence threshold",
+      "thresholdHelper": "Leave blank to use the school's own threshold.",
+      "saveThreshold": "Save threshold",
+      "savedToast": "Notification preferences updated",
+      "saveError": "Couldn't save preferences",
+      "thresholdSavedToast": "Attendance alert threshold updated",
+      "thresholdSaveError": "Couldn't save the threshold"
+    }
+  },
+  "billing": {
+    "status": {
+      "trialing": "Trialing",
+      "active": "Active",
+      "past_due": "Past due",
+      "grace_period": "Grace period",
+      "canceled": "Canceled",
+      "expired": "Expired",
+      "closed": "Closed",
+      "paused": "Paused"
+    },
+    "dunning": {
+      "graceTitle": "Your subscription is in a grace period",
+      "pastDueTitle": "Your last payment failed",
+      "graceBody": "Update your payment method before {{date}} to keep access — the subscription closes automatically once the grace window ends.",
+      "pastDueBody": "Update your payment method to keep the subscription active before the grace period begins.",
+      "updatePayment": "Update payment method"
+    },
+    "overview": {
+      "title": "Billing",
+      "description": "Plan, seats, payment method, invoice history, and subscription cancellation.",
+      "loadError": "Unable to load billing details. Try reloading the page.",
+      "endedTitle": "Your subscription has ended",
+      "endedBody": "Choose a plan to restore access for your school.",
+      "choosePlan": "Choose a plan",
+      "planCardLabel": "Plan and seats",
+      "planHeading": "Plan",
+      "planLabel": "Plan",
+      "seatsLabel": "Seats",
+      "currentPeriod": "Current period: {{start}} – {{end}}",
+      "cancellationScheduled": "Cancellation scheduled — access ends {{date}}.",
+      "changePlan": "Change plan",
+      "keepSubscription": "Keep subscription",
+      "cancelSubscription": "Cancel subscription",
+      "paymentCardLabel": "Payment method and invoices",
+      "paymentHeading": "Payment and invoices",
+      "paymentBody": "Manage the payment method, tax details, and past receipts on file in the payment provider’s own portal. Studafy does not store card details.",
+      "managePayment": "Manage payment method",
+      "viewInvoices": "View invoice history",
+      "seatsUsed": "{{percent}}% of seats used",
+      "seatCapMissing": "Seat cap not configured",
+      "portalError": "Couldn't open the billing portal",
+      "cancellationUndone": "Cancellation undone",
+      "undoError": "Couldn't undo the cancellation"
+    },
+    "cancelModal": {
+      "title": "Cancel subscription?",
+      "description": "This schedules cancellation for the end of the current billing period.",
+      "noticeWithDate": "Access and billing continue until {{date}}. You can undo this at any time before then.",
+      "notice": "Access and billing continue until the end of the current period. You can undo this at any time before then.",
+      "reasonLabel": "Reason (optional)",
+      "keepSubscription": "Keep subscription",
+      "confirm": "Cancel subscription",
+      "scheduledToast": "Cancellation scheduled",
+      "errorToast": "Couldn't cancel the subscription"
+    },
+    "changePlanModal": {
+      "title": "Change plan",
+      "description": "Starts a checkout session for the new plan's seat-based price. The current plan stays active until checkout completes.",
+      "loading": "Loading plans…",
+      "loadError": "Unable to load plans.",
+      "empty": "No plans are published yet.",
+      "groupLabel": "Plan",
+      "pricePerMonth": "{{amount}}/mo",
+      "pricePerYear": "{{amount}}/yr",
+      "optionWithPrice": "{{plan}} — {{price}}",
+      "currentPlan": "{{label}} (current plan)",
+      "continue": "Continue to checkout",
+      "checkoutError": "Couldn't start checkout"
+    },
+    "invoices": {
+      "back": "← Back to billing",
+      "title": "Invoices",
+      "description": "Billing history from the payment provider, most recent first.",
+      "caption": "Invoices",
+      "columns": {
+        "date": "Date",
+        "period": "Period",
+        "status": "Status",
+        "amountDue": "Amount due",
+        "amountPaid": "Amount paid",
+        "documents": "Documents"
+      },
+      "periodRange": "{{start}} – {{end}}",
+      "status": {
+        "draft": "draft",
+        "open": "open",
+        "paid": "paid",
+        "uncollectible": "uncollectible",
+        "void": "void"
+      },
+      "view": "View",
+      "pdf": "PDF",
+      "loadError": "Unable to load invoices.",
+      "empty": "No invoices yet."
+    },
+    "ai": {
+      "title": "AI Study Assistant",
+      "missingParams": "This link is missing some information and can’t be opened here. Go back to the Studafy app and try again.",
+      "successTitle": "You’re all set",
+      "activeFor": "The AI Study Assistant add-on is now active for {{name}}.",
+      "active": "The AI Study Assistant add-on is now active.",
+      "returnToApp": "Return to the Studafy app on your phone to start using it.",
+      "introFor": "A personal AI tutor for {{name}} — ask-anything homework help, practice quizzes and flashcards, and study-material summaries. Billed separately from the school’s own Studafy subscription, per student.",
+      "intro": "A personal AI tutor for your student — ask-anything homework help, practice quizzes and flashcards, and study-material summaries. Billed separately from the school’s own Studafy subscription, per student.",
+      "cancelledTitle": "Checkout cancelled",
+      "cancelledBody": "No charge was made. You can try again below.",
+      "studentNotFound": "We couldn’t find this student on your account. Go back to the Studafy app and try the link again.",
+      "blockedTitle": "Purchase blocked",
+      "blockedBody": "Your school’s Studafy subscription isn’t active right now, so the AI add-on can’t be purchased. Contact your school to reactivate it, then come back to this link.",
+      "loadingStudent": "Loading student details…",
+      "confirmPrice": "You'll confirm the exact price on the next, secure step.",
+      "subscribe": "Subscribe",
+      "checkoutError": "Couldn't start checkout"
+    }
+  }
+}

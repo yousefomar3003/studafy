@@ -2,6 +2,8 @@ import { ApiError } from "@studafy/api-client";
 import { Button, useToast } from "@studafy/ui";
 import { useMemo, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { findLocalConflict } from "./conflicts";
 import { DEFAULT_PERIOD_COUNT, WEEKDAYS } from "./constants";
 import { EditSlotModal } from "./EditSlotModal";
@@ -54,6 +56,7 @@ export function TimetableGrid({
   rooms,
   isReadOnly,
 }: TimetableGridProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const createSlot = useCreateSlot();
 
@@ -83,13 +86,13 @@ export function TimetableGrid({
   }, [slots]);
 
   function classCode(classId: string): string {
-    return classById.get(classId)?.code ?? "Unknown class";
+    return classById.get(classId)?.code ?? t("adminSchool.timetable.unknownClass");
   }
   function teacherName(teacherId: string): string {
-    return teacherById.get(teacherId)?.display_name ?? "Unknown teacher";
+    return teacherById.get(teacherId)?.display_name ?? t("adminSchool.timetable.unknownTeacher");
   }
   function roomCode(roomId: string): string {
-    return roomById.get(roomId)?.code ?? "Unknown room";
+    return roomById.get(roomId)?.code ?? t("adminSchool.timetable.unknownRoom");
   }
 
   const pickedClass = pickedClassId ? (classById.get(pickedClassId) ?? null) : null;
@@ -107,7 +110,7 @@ export function TimetableGrid({
       weekday,
       period,
     };
-    const localConflict = findLocalConflict(slots, candidate, classCode, teacherName, roomCode);
+    const localConflict = findLocalConflict(slots, candidate, classCode, teacherName, roomCode, t);
     if (localConflict) {
       setConflict({
         message: localConflict.message,
@@ -128,7 +131,7 @@ export function TimetableGrid({
             setConflict({ message: err.detail });
             return;
           }
-          show({ variant: "error", title: "Couldn't place slot" });
+          show({ variant: "error", title: t("adminSchool.timetable.toast.placeFailed") });
         },
       },
     );
@@ -159,18 +162,21 @@ export function TimetableGrid({
         <div className="timetable-grid__conflict" role="alert">
           <span>{conflict.message}</span>
           <Button variant="tertiary" onClick={() => setConflict(null)}>
-            Dismiss
+            {t("adminSchool.timetable.grid.dismiss")}
           </Button>
         </div>
       ) : null}
 
       {!isReadOnly ? (
-        <div className="timetable-grid__palette" aria-label="Classes">
-          <h2>Classes</h2>
+        <div
+          className="timetable-grid__palette"
+          aria-label={t("adminSchool.timetable.grid.classes")}
+        >
+          <h2>{t("adminSchool.timetable.grid.classes")}</h2>
           <p role="status" className="timetable-grid__palette-status">
             {pickedClass
-              ? `${pickedClass.code} picked — choose a cell to place it, or press Escape to cancel.`
-              : "Drag a class onto the grid, or press Enter to pick it up and then Enter on a cell."}
+              ? t("adminSchool.timetable.grid.picked", { code: pickedClass.code })
+              : t("adminSchool.timetable.grid.instructions")}
           </p>
           <ul className="timetable-grid__palette-list">
             {classes.map((klass) => (
@@ -194,7 +200,7 @@ export function TimetableGrid({
             ))}
             {classes.length === 0 ? (
               <li className="timetable-grid__palette-empty">
-                No schedulable classes in this term.
+                {t("adminSchool.timetable.grid.noClasses")}
               </li>
             ) : null}
           </ul>
@@ -202,13 +208,15 @@ export function TimetableGrid({
       ) : null}
 
       <table className="timetable-grid__table">
-        <caption className="sf-visually-hidden">Weekly timetable grid for {version.name}</caption>
+        <caption className="sf-visually-hidden">
+          {t("adminSchool.timetable.grid.caption", { name: version.name })}
+        </caption>
         <thead>
           <tr>
-            <th scope="col">Period</th>
+            <th scope="col">{t("adminSchool.timetable.grid.period")}</th>
             {WEEKDAYS.map((day) => (
               <th scope="col" key={day.value}>
-                {day.short}
+                {t(day.shortKey)}
               </th>
             ))}
           </tr>
@@ -219,6 +227,7 @@ export function TimetableGrid({
               <th scope="row">{period}</th>
               {WEEKDAYS.map((day) => {
                 const cellSlots = slotsByCell.get(cellKey(day.value, period)) ?? [];
+                const dayLabel = t(day.labelKey);
 
                 return (
                   <td key={day.value}>
@@ -231,7 +240,13 @@ export function TimetableGrid({
                           data-conflict={conflict?.existingSlotId === slot.id || undefined}
                           disabled={isReadOnly}
                           onClick={() => setEditingSlot(slot)}
-                          aria-label={`${classCode(slot.class_id)}, ${day.label} period ${period}, taught by ${teacherName(slot.teacher_id)} in ${roomCode(slot.room_id)}. Activate to edit.`}
+                          aria-label={t("adminSchool.timetable.grid.slotLabel", {
+                            classCode: classCode(slot.class_id),
+                            day: dayLabel,
+                            period,
+                            teacher: teacherName(slot.teacher_id),
+                            room: roomCode(slot.room_id),
+                          })}
                         >
                           <span className="timetable-grid__slot-class">
                             {classCode(slot.class_id)}
@@ -256,8 +271,21 @@ export function TimetableGrid({
                           }}
                           aria-label={
                             pickedClass
-                              ? `Place ${pickedClass.code} on ${day.label} period ${period}`
-                              : `${day.label} period ${period}${cellSlots.length > 0 ? `, ${cellSlots.length} scheduled` : ", empty"}`
+                              ? t("adminSchool.timetable.grid.placeLabel", {
+                                  code: pickedClass.code,
+                                  day: dayLabel,
+                                  period,
+                                })
+                              : cellSlots.length > 0
+                                ? t("adminSchool.timetable.grid.cellScheduled", {
+                                    day: dayLabel,
+                                    period,
+                                    count: cellSlots.length,
+                                  })
+                                : t("adminSchool.timetable.grid.cellEmpty", {
+                                    day: dayLabel,
+                                    period,
+                                  })
                           }
                         >
                           +
@@ -275,11 +303,11 @@ export function TimetableGrid({
       {!isReadOnly ? (
         <div className="timetable-grid__period-controls">
           <Button variant="secondary" onClick={() => setPeriodCount((count) => count + 1)}>
-            Add period
+            {t("adminSchool.timetable.grid.addPeriod")}
           </Button>
           {periods.length > 1 && lastPeriodIsEmpty ? (
             <Button variant="tertiary" onClick={() => setPeriodCount((count) => count - 1)}>
-              Remove empty period
+              {t("adminSchool.timetable.grid.removePeriod")}
             </Button>
           ) : null}
         </div>

@@ -10,8 +10,10 @@ import {
 } from "@studafy/ui";
 import { useMemo } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { buildAuditDiff, formatAuditValue } from "./diff";
-import { ACTION_LABELS } from "./schema";
+import { ACTION_LABEL_KEYS } from "./schema";
 
 import type { AuditLogEntry } from "./queries";
 
@@ -29,6 +31,7 @@ export interface AuditDiffModalProps {
  * like any other string; the server already decided what this viewer is allowed to show.
  */
 export function AuditDiffModal({ entry, onClose }: AuditDiffModalProps) {
+  const { t } = useTranslation();
   const rows = useMemo(
     () => (entry ? buildAuditDiff(entry.old_values, entry.new_values) : []),
     [entry],
@@ -38,19 +41,26 @@ export function AuditDiffModal({ entry, onClose }: AuditDiffModalProps) {
     <Modal
       open={entry !== null}
       onClose={onClose}
-      title="Audit entry diff"
-      description={entry ? `${ACTION_LABELS[entry.action]} · ${entry.target_table}` : undefined}
+      title={t("adminSchool.audit.diff.title")}
+      description={
+        entry
+          ? t("adminSchool.audit.diff.description", {
+              action: t(ACTION_LABEL_KEYS[entry.action]),
+              table: entry.target_table,
+            })
+          : undefined
+      }
     >
       <Modal.Body>
         {rows.length === 0 ? (
-          <p>No field-level changes recorded for this entry.</p>
+          <p>{t("adminSchool.audit.diff.empty")}</p>
         ) : (
-          <Table caption="Before and after values">
+          <Table caption={t("adminSchool.audit.diff.caption")}>
             <TableHeader>
               <TableRow>
-                <TableHeaderCell>Field</TableHeaderCell>
-                <TableHeaderCell>Before</TableHeaderCell>
-                <TableHeaderCell>After</TableHeaderCell>
+                <TableHeaderCell>{t("adminSchool.audit.diff.field")}</TableHeaderCell>
+                <TableHeaderCell>{t("adminSchool.audit.diff.before")}</TableHeaderCell>
+                <TableHeaderCell>{t("adminSchool.audit.diff.after")}</TableHeaderCell>
               </TableRow>
             </TableHeader>
             <TableBody columnCount={3}>
@@ -81,7 +91,7 @@ export function AuditDiffModal({ entry, onClose }: AuditDiffModalProps) {
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>
-          Close
+          {t("adminSchool.audit.diff.close")}
         </Button>
       </Modal.Footer>
     </Modal>

@@ -2,6 +2,8 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Input, Select, useToast } from "@studafy/ui";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { FeeComponentsEditor } from "./FeeComponentsEditor";
 import { InvoicePreviewPanel } from "./InvoicePreviewPanel";
 import { feeStructureStatusLabel, feeStructureStatusTone } from "./labels";
@@ -14,6 +16,7 @@ import type { FormEvent } from "react";
 
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 
+/** Every message here is a translation key, resolved with `t` where the error is rendered. */
 interface FieldErrors {
   title?: string;
   currency?: string;
@@ -35,20 +38,20 @@ function validate(
 ): FieldErrors {
   const errors: FieldErrors = {};
 
-  if (title.trim() === "") errors.title = "Title is required";
-  if (!CURRENCY_PATTERN.test(currency)) errors.currency = "Use a 3-letter ISO code, e.g. JOD";
+  if (title.trim() === "") errors.title = "finance.fees.form.titleRequired";
+  if (!CURRENCY_PATTERN.test(currency)) errors.currency = "finance.fees.form.currencyInvalid";
 
   if (components.length === 0) {
-    if (requireComponents) errors.componentsGeneral = "Add at least one fee component";
+    if (requireComponents) errors.componentsGeneral = "finance.fees.form.componentsRequired";
     return errors;
   }
 
   const rowErrors: Record<number, { fee_category?: string; amount?: string }> = {};
   components.forEach((component, index) => {
     const row: { fee_category?: string; amount?: string } = {};
-    if (component.fee_category.trim() === "") row.fee_category = "Required";
+    if (component.fee_category.trim() === "") row.fee_category = "finance.fees.form.required";
     if (!Number.isFinite(component.amount) || component.amount < 0) {
-      row.amount = "Enter a non-negative amount";
+      row.amount = "finance.fees.form.amountInvalid";
     }
     // `index` comes from iterating `components` itself, never external input — the same
     // bounded-key shape `finance/queries.ts` documents for this rule.
@@ -77,6 +80,7 @@ export interface FeeStructureFormProps {
  * full set, same as ERPNext's own PUT semantics.
  */
 export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructureFormProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const createFeeStructure = useCreateFeeStructure();
   const updateFeeStructure = useUpdateFeeStructure();
@@ -110,15 +114,34 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
   }, [editing]);
 
   const yearOptions: SelectOption<string>[] = [
-    { value: "", label: "No academic year" },
+    { value: "", label: t("finance.fees.form.noYear") },
     ...academicYears.map((year) => ({
       value: year.id,
-      label: `${year.name} (${year.starts_on} – ${year.ends_on})`,
+      label: t("finance.fees.form.yearOption", {
+        name: year.name,
+        start: year.starts_on,
+        end: year.ends_on,
+      }),
     })),
   ];
   const selectedYear = academicYears.find((year) => year.id === academicYearId);
 
   const isPending = createFeeStructure.isPending || updateFeeStructure.isPending;
+
+  function translateRowErrors(
+    rowErrors: FieldErrors["components"],
+  ): FieldErrors["components"] | undefined {
+    if (!rowErrors) return undefined;
+    return Object.fromEntries(
+      Object.entries(rowErrors).map(([index, row]) => [
+        index,
+        {
+          fee_category: row.fee_category && t(row.fee_category),
+          amount: row.amount && t(row.amount),
+        },
+      ]),
+    );
+  }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -140,8 +163,8 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
 
     const onError = (err: unknown) => {
       const detail = err instanceof ApiError ? (err.detail ?? err.title) : undefined;
-      setServerError(detail ?? "Something went wrong. Try again.");
-      show({ variant: "error", title: "Couldn't save fee structure", description: detail });
+      setServerError(detail ?? t("finance.fees.form.genericError"));
+      show({ variant: "error", title: t("finance.fees.form.saveError"), description: detail });
     };
 
     if (editing) {
@@ -158,7 +181,10 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
         },
         {
           onSuccess: () => {
-            show({ variant: "success", title: `Updated "${title.trim()}"` });
+            show({
+              variant: "success",
+              title: t("finance.fees.form.updated", { title: title.trim() }),
+            });
             onSaved();
           },
           onError,
@@ -177,7 +203,10 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
       },
       {
         onSuccess: (structure) => {
-          show({ variant: "success", title: `Created "${structure.title}"` });
+          show({
+            variant: "success",
+            title: t("finance.fees.form.created", { title: structure.title }),
+          });
           onSaved();
         },
         onError,
@@ -188,67 +217,72 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
   return (
     <div className="fee-builder__form-panel">
       <div className="fee-builder__form-header">
-        <h2>{editing ? "Edit fee structure" : "New fee structure"}</h2>
+        <h2>{editing ? t("finance.fees.form.editHeading") : t("finance.fees.form.newHeading")}</h2>
         {editing ? (
           <span
             className="fee-builder__status-pill"
             data-tone={feeStructureStatusTone(editing.erpnext_status)}
           >
-            {feeStructureStatusLabel(editing.erpnext_status)}
+            {feeStructureStatusLabel(editing.erpnext_status, t)}
           </span>
         ) : null}
       </div>
 
       {isReadOnly ? (
         <p className="fee-builder__readonly-note">
-          This structure is {feeStructureStatusLabel(editing!.erpnext_status).toLowerCase()} and
-          immutable in ERPNext — create a new fee structure instead of editing this one.
+          {t("finance.fees.form.readOnlyNote", {
+            status: feeStructureStatusLabel(editing!.erpnext_status, t).toLowerCase(),
+          })}
         </p>
       ) : null}
 
       <form
         onSubmit={handleSubmit}
         noValidate
-        aria-label={editing ? "Edit fee structure" : "New fee structure"}
+        aria-label={
+          editing ? t("finance.fees.form.editHeading") : t("finance.fees.form.newHeading")
+        }
       >
         <Input
-          label="Title"
+          label={t("finance.fees.form.title")}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          error={errors.title}
+          error={errors.title && t(errors.title)}
           disabled={isReadOnly}
           required
-          placeholder="Grade 5 — 2025/2026"
+          placeholder={t("finance.fees.form.titlePlaceholder")}
         />
 
         <Select
-          label="Academic year"
+          label={t("finance.fees.builder.academicYear")}
           options={yearOptions}
           value={academicYearId}
           onChange={setAcademicYearId}
           disabled={isReadOnly}
           helperText={
             selectedYear
-              ? `Effective ${selectedYear.starts_on} through ${selectedYear.ends_on}.`
-              : "Fee structures don't carry their own effective dates — the academic year they " +
-                "belong to is what dates them."
+              ? t("finance.fees.form.effective", {
+                  start: selectedYear.starts_on,
+                  end: selectedYear.ends_on,
+                })
+              : t("finance.fees.form.noEffectiveDates")
           }
         />
 
         <Input
-          label="Program (ERPNext, grade/year grouping)"
+          label={t("finance.fees.form.program")}
           value={program}
           onChange={(event) => setProgram(event.target.value)}
           disabled={isReadOnly}
-          placeholder="Grade 5"
-          helperText="The ERPNext Program document name this structure applies to."
+          placeholder={t("finance.fees.form.programPlaceholder")}
+          helperText={t("finance.fees.form.programHelper")}
         />
 
         <Input
-          label="Currency"
+          label={t("finance.common.currency")}
           value={currency}
           onChange={(event) => setCurrency(event.target.value.toUpperCase())}
-          error={errors.currency}
+          error={errors.currency && t(errors.currency)}
           disabled={isReadOnly}
           required
           maxLength={3}
@@ -257,31 +291,27 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
 
         {isReadOnly ? null : editing && components.length === 0 ? (
           <div className="fee-builder__components-note">
-            <p>
-              Component breakdown isn't returned by the list API, so it starts empty here. Leave it
-              empty to keep the existing components unchanged, or add the full replacement set below
-              — saving replaces all components at once, it doesn't merge.
-            </p>
+            <p>{t("finance.fees.form.componentsNote")}</p>
             <Button
               type="button"
               variant="tertiary"
               disabled={isReadOnly}
               onClick={() => setComponents([emptyComponent()])}
             >
-              Change components
+              {t("finance.fees.form.changeComponents")}
             </Button>
           </div>
         ) : (
           <>
             {errors.componentsGeneral ? (
               <p className="fee-builder__server-error" role="alert">
-                {errors.componentsGeneral}
+                {t(errors.componentsGeneral)}
               </p>
             ) : null}
             <FeeComponentsEditor
               components={components}
               onChange={setComponents}
-              errors={errors.components}
+              errors={translateRowErrors(errors.components)}
               disabled={isReadOnly}
               currency={currency}
             />
@@ -297,7 +327,7 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
         {!isReadOnly ? (
           <div className="fee-builder__form-actions">
             <Button type="submit" loading={isPending}>
-              {editing ? "Save changes" : "Create fee structure"}
+              {editing ? t("finance.fees.form.saveChanges") : t("finance.fees.form.create")}
             </Button>
           </div>
         ) : null}

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { useTranslation } from "../../../lib/i18n";
 import { StorageUsageTile } from "../tiles/StorageUsageTile";
 
 import { AttendanceAlertsSection } from "./AttendanceAlertsSection";
@@ -21,6 +22,7 @@ import "./settings.css";
  * `StorageUsageTile`, hence the `admin-dashboard.css` import for its meter styles).
  */
 export default function SchoolSettingsPage() {
+  const { t } = useTranslation();
   const settingsQuery = useQuery({
     queryKey: SCHOOL_SETTINGS_KEY,
     queryFn: fetchSchoolSettings,
@@ -28,12 +30,12 @@ export default function SchoolSettingsPage() {
 
   return (
     <>
-      <h1>Settings</h1>
-      <p>Configure your profile, school defaults, invitation and attendance policy, and storage.</p>
+      <h1>{t("adminSchool.settings.title")}</h1>
+      <p>{t("adminSchool.settings.intro")}</p>
 
       {settingsQuery.isError ? (
         <p className="settings-page__error" role="alert">
-          Unable to load school settings. Try reloading the page.
+          {t("adminSchool.settings.loadError")}
         </p>
       ) : null}
 

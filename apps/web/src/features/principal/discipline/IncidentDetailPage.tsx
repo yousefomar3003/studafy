@@ -4,15 +4,18 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { DATE_TIME_OPTIONS } from "../format";
+
 import { AddActionModal } from "./AddActionModal";
 import {
-  DISCIPLINE_ACTION_STATUS_LABELS,
-  DISCIPLINE_ACTION_TYPE_LABELS,
-  DISCIPLINE_SEVERITY_LABELS,
-  DISCIPLINE_STATUS_LABELS,
-  DISCIPLINE_TYPE_LABELS,
+  DISCIPLINE_ACTION_STATUS_LABEL_KEYS,
+  DISCIPLINE_ACTION_TYPE_LABEL_KEYS,
+  DISCIPLINE_SEVERITY_LABEL_KEYS,
+  DISCIPLINE_STATUS_LABEL_KEYS,
+  DISCIPLINE_TYPE_LABEL_KEYS,
   INCIDENT_STATUS_TRANSITIONS,
-  INCIDENT_TRANSITION_LABELS,
+  INCIDENT_TRANSITION_LABEL_KEYS,
   severityTone,
 } from "./labels";
 import { useUpdateIncidentStatus } from "./mutations";
@@ -38,13 +41,13 @@ const ACTION_COLUMN_COUNT = 4;
  * incident"), so the "Add action" button is never left enabled for a call the server would reject. */
 const ACTION_LOCKED_STATUSES: readonly DisciplineIncidentStatus[] = ["resolved", "closed"];
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
-
-function formatDate(isoDate: string | null): string {
-  return isoDate ? new Date(isoDate).toLocaleDateString() : "—";
-}
+/** Toast copy per transition target — whole sentences, so each locale can word them naturally. */
+const TRANSITION_TOAST_KEYS: Record<IncidentTransitionStatus, string> = {
+  reported: "principal.discipline.detail.markedToast.reported",
+  under_review: "principal.discipline.detail.markedToast.under_review",
+  escalated: "principal.discipline.detail.markedToast.escalated",
+  closed: "principal.discipline.detail.markedToast.closed",
+};
 
 function apiErrorDescription(error: unknown): string | undefined {
   return error instanceof ApiError ? (error.detail ?? error.title) : undefined;
@@ -62,6 +65,8 @@ function apiErrorDescription(error: unknown): string | undefined {
  */
 export default function IncidentDetailPage() {
   const { incidentId = "" } = useParams<{ incidentId: string }>();
+  const { t } = useTranslation();
+  const { formatDate: formatLocaleDate } = useFormatters();
   const { show } = useToast();
   const [addActionOpen, setAddActionOpen] = useState(false);
   const [resolveOpen, setResolveOpen] = useState(false);
@@ -81,9 +86,13 @@ export default function IncidentDetailPage() {
 
   const updateStatus = useUpdateIncidentStatus(incidentId);
 
+  const formatDateTime = (iso: string) => formatLocaleDate(new Date(iso), DATE_TIME_OPTIONS);
+  const formatDate = (isoDate: string | null) =>
+    isoDate ? formatLocaleDate(new Date(isoDate)) : "—";
+
   const backLink = (
     <Link className="discipline-detail__back" to="/portal/principal/discipline">
-      ← Back to discipline incidents
+      {t("principal.discipline.detail.back")}
     </Link>
   );
 
@@ -91,7 +100,7 @@ export default function IncidentDetailPage() {
     return (
       <>
         {backLink}
-        <p role="status">Loading…</p>
+        <p role="status">{t("principal.common.loading")}</p>
       </>
     );
   }
@@ -100,7 +109,7 @@ export default function IncidentDetailPage() {
     return (
       <>
         {backLink}
-        <p role="alert">Unable to load this discipline incident.</p>
+        <p role="alert">{t("principal.discipline.detail.loadError")}</p>
       </>
     );
   }
@@ -120,12 +129,12 @@ export default function IncidentDetailPage() {
       onSuccess: () =>
         show({
           variant: "success",
-          title: `Incident marked ${DISCIPLINE_STATUS_LABELS[status].toLowerCase()}`,
+          title: t(TRANSITION_TOAST_KEYS[status]),
         }),
       onError: (error) =>
         show({
           variant: "error",
-          title: "Couldn't update incident",
+          title: t("principal.discipline.detail.updateFailed"),
           description: apiErrorDescription(error),
         }),
     });
@@ -139,45 +148,48 @@ export default function IncidentDetailPage() {
 
       <dl className="discipline-detail__summary">
         <div>
-          <dt>Type</dt>
-          <dd>{DISCIPLINE_TYPE_LABELS[incident.incident_type]}</dd>
+          <dt>{t("principal.discipline.detail.type")}</dt>
+          <dd>{t(DISCIPLINE_TYPE_LABEL_KEYS[incident.incident_type])}</dd>
         </div>
         <div>
-          <dt>Severity</dt>
+          <dt>{t("principal.discipline.detail.severity")}</dt>
           <dd>
             <span className="discipline-severity-pill" data-tone={severityTone(incident.severity)}>
-              {DISCIPLINE_SEVERITY_LABELS[incident.severity]}
+              {t(DISCIPLINE_SEVERITY_LABEL_KEYS[incident.severity])}
             </span>
           </dd>
         </div>
         <div>
-          <dt>Status</dt>
-          <dd>{DISCIPLINE_STATUS_LABELS[incident.status]}</dd>
+          <dt>{t("principal.discipline.detail.status")}</dt>
+          <dd>{t(DISCIPLINE_STATUS_LABEL_KEYS[incident.status])}</dd>
         </div>
         <div>
-          <dt>Reported at</dt>
+          <dt>{t("principal.discipline.detail.reportedAt")}</dt>
           <dd>{formatDateTime(incident.incident_at)}</dd>
         </div>
         <div>
-          <dt>Resolved at</dt>
+          <dt>{t("principal.discipline.detail.resolvedAt")}</dt>
           <dd>{incident.resolved_at ? formatDateTime(incident.resolved_at) : "—"}</dd>
         </div>
         <div>
-          <dt>Parent visibility</dt>
+          <dt>{t("principal.discipline.detail.parentVisibility")}</dt>
           <dd>
             {parentVisible
-              ? "Visible to the student's parent"
+              ? t("principal.discipline.detail.visible")
               : incident.status === "resolved"
-                ? "Not visible — parent discipline visibility is off for this school"
-                : "Not visible yet — only resolved incidents can be shown to parents"}
+                ? t("principal.discipline.detail.notVisibleOff")
+                : t("principal.discipline.detail.notVisibleYet")}
           </dd>
         </div>
       </dl>
 
       {incident.description ? <p>{incident.description}</p> : null}
 
-      <section className="discipline-detail__section" aria-label="Workflow">
-        <h2>Workflow</h2>
+      <section
+        className="discipline-detail__section"
+        aria-label={t("principal.discipline.detail.workflow")}
+      >
+        <h2>{t("principal.discipline.detail.workflow")}</h2>
         <div className="discipline-detail__workflow-actions">
           {transitionTargets.map((status) => (
             <Button
@@ -187,7 +199,7 @@ export default function IncidentDetailPage() {
               loading={updateStatus.isPending}
               onClick={() => handleTransition(status)}
             >
-              {INCIDENT_TRANSITION_LABELS[status]}
+              {t(INCIDENT_TRANSITION_LABEL_KEYS[status] ?? "")}
             </Button>
           ))}
           {canResolve ? (
@@ -197,37 +209,46 @@ export default function IncidentDetailPage() {
               disabled={!hasActionRecord}
               onClick={() => setResolveOpen(true)}
             >
-              Resolve
+              {t("principal.discipline.detail.resolve")}
             </Button>
           ) : null}
         </div>
         {canResolve && !hasActionRecord ? (
-          <p className="discipline-detail__hint">
-            Record at least one disciplinary action before resolving this incident.
-          </p>
+          <p className="discipline-detail__hint">{t("principal.discipline.detail.resolveHint")}</p>
         ) : null}
       </section>
 
-      <section className="discipline-detail__section" aria-label="Actions taken">
+      <section
+        className="discipline-detail__section"
+        aria-label={t("principal.discipline.detail.actionsTaken")}
+      >
         <div className="discipline-detail__actions-header">
-          <h2>Actions taken</h2>
+          <h2>{t("principal.discipline.detail.actionsTaken")}</h2>
           <Button
             type="button"
             variant="secondary"
             disabled={!canAddAction}
             onClick={() => setAddActionOpen(true)}
           >
-            Add action
+            {t("principal.discipline.detail.addAction")}
           </Button>
         </div>
 
-        <Table caption="Disciplinary actions taken">
+        <Table caption={t("principal.discipline.detail.actionsCaption")}>
           <Table.Header>
             <Table.Row>
-              <Table.HeaderCell>Type</Table.HeaderCell>
-              <Table.HeaderCell>Status</Table.HeaderCell>
-              <Table.HeaderCell>Details</Table.HeaderCell>
-              <Table.HeaderCell>Effective</Table.HeaderCell>
+              <Table.HeaderCell>
+                {t("principal.discipline.detail.actionColumns.type")}
+              </Table.HeaderCell>
+              <Table.HeaderCell>
+                {t("principal.discipline.detail.actionColumns.status")}
+              </Table.HeaderCell>
+              <Table.HeaderCell>
+                {t("principal.discipline.detail.actionColumns.details")}
+              </Table.HeaderCell>
+              <Table.HeaderCell>
+                {t("principal.discipline.detail.actionColumns.effective")}
+              </Table.HeaderCell>
             </Table.Row>
           </Table.Header>
           <Table.Body
@@ -235,18 +256,21 @@ export default function IncidentDetailPage() {
             loading={actionsQuery.isPending}
             empty={
               actionsQuery.isError
-                ? "Unable to load actions for this incident."
-                : "No actions have been recorded yet."
+                ? t("principal.discipline.detail.actionsError")
+                : t("principal.discipline.detail.actionsEmpty")
             }
           >
             {actions.map((action) => (
               <Table.Row key={action.id}>
-                <Table.Cell>{DISCIPLINE_ACTION_TYPE_LABELS[action.action_type]}</Table.Cell>
-                <Table.Cell>{DISCIPLINE_ACTION_STATUS_LABELS[action.status]}</Table.Cell>
+                <Table.Cell>{t(DISCIPLINE_ACTION_TYPE_LABEL_KEYS[action.action_type])}</Table.Cell>
+                <Table.Cell>{t(DISCIPLINE_ACTION_STATUS_LABEL_KEYS[action.status])}</Table.Cell>
                 <Table.Cell>{action.description ?? "—"}</Table.Cell>
                 <Table.Cell>
                   {action.effective_from
-                    ? `${formatDate(action.effective_from)} – ${formatDate(action.effective_until)}`
+                    ? t("principal.discipline.detail.effectiveRange", {
+                        from: formatDate(action.effective_from),
+                        until: formatDate(action.effective_until),
+                      })
                     : "—"}
                 </Table.Cell>
               </Table.Row>

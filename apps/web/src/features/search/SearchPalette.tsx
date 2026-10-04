@@ -70,9 +70,9 @@ export function SearchPalette({ onClose }: SearchPaletteProps) {
     // cast restores it without widening to `any`; the actual JSON shape is exactly `GlobalSearchResult`.
     () =>
       mode === "results" && searchQuery.data
-        ? buildResultGroups(searchQuery.data as GlobalSearchResult)
+        ? buildResultGroups(searchQuery.data as GlobalSearchResult, t)
         : [],
-    [mode, searchQuery.data],
+    [mode, searchQuery.data, t],
   );
 
   const rows: PaletteRow[] = useMemo(() => {

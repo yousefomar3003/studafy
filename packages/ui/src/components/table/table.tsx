@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 
 import { cx } from "../../internal/cx";
+import { useUiStrings } from "../../internal/ui-strings";
 
 import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
 
@@ -50,6 +51,7 @@ export const TableBody = forwardRef<HTMLTableSectionElement, TableBodyProps>(fun
   { loading = false, empty, columnCount, children, ...rest },
   ref,
 ) {
+  const strings = useUiStrings();
   const hasRows = Boolean(children) && (!Array.isArray(children) || children.length > 0);
 
   if (loading) {
@@ -59,7 +61,7 @@ export const TableBody = forwardRef<HTMLTableSectionElement, TableBodyProps>(fun
           <td colSpan={columnCount} className="sf-table__placeholder">
             {/* Announced politely; the skeleton itself is decorative. */}
             <span className="sf-visually-hidden" role="status">
-              Loading
+              {strings.tableLoading}
             </span>
             <span className="sf-table__skeleton" aria-hidden="true" />
             <span className="sf-table__skeleton" aria-hidden="true" />
@@ -75,7 +77,7 @@ export const TableBody = forwardRef<HTMLTableSectionElement, TableBodyProps>(fun
       <tbody {...rest} ref={ref} className="sf-table__body">
         <tr>
           <td colSpan={columnCount} className="sf-table__placeholder">
-            {empty ?? "No results."}
+            {empty ?? strings.tableEmpty}
           </td>
         </tr>
       </tbody>

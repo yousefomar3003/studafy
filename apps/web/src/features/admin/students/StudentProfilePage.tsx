@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { usePermissions } from "../../../lib/auth";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { LinkGuardianModal } from "./LinkGuardianModal";
 import { useUpdateStudent } from "./mutations";
@@ -21,8 +22,8 @@ import {
   editAdmissionSchema,
   editStudentSchema,
   fieldErrors,
-  RELATIONSHIP_LABELS,
-  STATUS_LABELS,
+  RELATIONSHIP_LABEL_KEYS,
+  STATUS_LABEL_KEYS,
 } from "./schema";
 import { UnlinkGuardianDialog } from "./UnlinkGuardianDialog";
 
@@ -32,10 +33,6 @@ import type { GuardianContact, StudentProfile } from "./queries";
 import type { EditAdmissionValues, EditStudentValues } from "./schema";
 import type { SelectOption } from "@studafy/ui";
 import type { FormEvent } from "react";
-
-const STATUS_OPTIONS: SelectOption<EditStudentValues["status"]>[] = (
-  Object.entries(STATUS_LABELS) as [EditStudentValues["status"], string][]
-).map(([value, label]) => ({ value, label }));
 
 function fullName(student: StudentProfile): string {
   return [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ");
@@ -67,11 +64,16 @@ interface DemographicsSectionProps {
 /** View/edit for name, DOB, and status — always visible to anyone who can reach this page (holding
  * `student:read`), edit gated on `student:update`. */
 function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const updateStudent = useUpdateStudent();
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState<EditStudentValues>(() => demographicsValuesFor(student));
   const [errors, setErrors] = useState<Partial<Record<keyof EditStudentValues, string>>>({});
+
+  const statusOptions: SelectOption<EditStudentValues["status"]>[] = (
+    Object.entries(STATUS_LABEL_KEYS) as [EditStudentValues["status"], string][]
+  ).map(([value, key]) => ({ value, label: t(key) }));
 
   useEffect(() => {
     if (!editing) {
@@ -112,13 +114,16 @@ function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
       },
       {
         onSuccess: () => {
-          show({ variant: "success", title: "Profile updated" });
+          show({
+            variant: "success",
+            title: t("adminPeople.students.profile.profileUpdatedToast"),
+          });
           setEditing(false);
         },
         onError: (error) => {
           show({
             variant: "error",
-            title: "Couldn't save changes",
+            title: t("adminPeople.students.profile.saveError"),
             description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
           });
         },
@@ -128,13 +133,13 @@ function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
 
   if (!editing) {
     return (
-      <Card as="section" aria-label="Demographics">
+      <Card as="section" aria-label={t("adminPeople.students.profile.demographics")}>
         <Card.Header>
           <div className="students-profile__section-header">
-            <h2>Demographics</h2>
+            <h2>{t("adminPeople.students.profile.demographics")}</h2>
             {canEdit ? (
               <Button variant="tertiary" onClick={() => setEditing(true)}>
-                Edit
+                {t("adminPeople.students.profile.edit")}
               </Button>
             ) : null}
           </div>
@@ -142,22 +147,22 @@ function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
         <Card.Body>
           <dl className="students-profile__fields">
             <div>
-              <dt>Name</dt>
+              <dt>{t("adminPeople.students.profile.name")}</dt>
               <dd>{fullName(student) || "—"}</dd>
             </div>
             <div>
-              <dt>Preferred name</dt>
+              <dt>{t("adminPeople.students.form.preferredName")}</dt>
               <dd>{student.preferred_name ?? "—"}</dd>
             </div>
             <div>
-              <dt>Date of birth</dt>
+              <dt>{t("adminPeople.students.form.dateOfBirth")}</dt>
               <dd>{student.date_of_birth ?? "—"}</dd>
             </div>
             <div>
-              <dt>Status</dt>
+              <dt>{t("adminPeople.students.form.status")}</dt>
               <dd>
                 <span className="students-list__status-pill" data-status={student.status}>
-                  {STATUS_LABELS[student.status]}
+                  {t(STATUS_LABEL_KEYS[student.status])}
                 </span>
               </dd>
             </div>
@@ -168,48 +173,52 @@ function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
   }
 
   return (
-    <Card as="section" aria-label="Edit demographics">
+    <Card as="section" aria-label={t("adminPeople.students.profile.editDemographics")}>
       <Card.Header>
-        <h2>Demographics</h2>
+        <h2>{t("adminPeople.students.profile.demographics")}</h2>
       </Card.Header>
-      <form onSubmit={handleSubmit} noValidate aria-label="Edit demographics">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        aria-label={t("adminPeople.students.profile.editDemographics")}
+      >
         <Card.Body>
           <Input
-            label="First name"
+            label={t("adminPeople.students.form.firstName")}
             value={values.first_name}
             onChange={(e) => setField("first_name", e.target.value)}
-            error={errors.first_name}
+            error={errors.first_name && t(errors.first_name)}
             required
           />
           <Input
-            label="Middle name"
+            label={t("adminPeople.students.form.middleName")}
             value={values.middle_name}
             onChange={(e) => setField("middle_name", e.target.value)}
-            error={errors.middle_name}
+            error={errors.middle_name && t(errors.middle_name)}
           />
           <Input
-            label="Last name"
+            label={t("adminPeople.students.form.lastName")}
             value={values.last_name}
             onChange={(e) => setField("last_name", e.target.value)}
-            error={errors.last_name}
+            error={errors.last_name && t(errors.last_name)}
             required
           />
           <Input
-            label="Preferred name"
+            label={t("adminPeople.students.form.preferredName")}
             value={values.preferred_name}
             onChange={(e) => setField("preferred_name", e.target.value)}
-            error={errors.preferred_name}
+            error={errors.preferred_name && t(errors.preferred_name)}
           />
           <Input
-            label="Date of birth"
+            label={t("adminPeople.students.form.dateOfBirth")}
             type="date"
             value={values.date_of_birth}
             onChange={(e) => setField("date_of_birth", e.target.value)}
-            error={errors.date_of_birth}
+            error={errors.date_of_birth && t(errors.date_of_birth)}
           />
           <Select
-            label="Status"
-            options={STATUS_OPTIONS}
+            label={t("adminPeople.students.form.status")}
+            options={statusOptions}
             value={values.status}
             onChange={(value) => setField("status", value)}
             required
@@ -217,10 +226,10 @@ function DemographicsSection({ student, canEdit }: DemographicsSectionProps) {
         </Card.Body>
         <Card.Footer>
           <Button type="button" variant="tertiary" onClick={handleCancel}>
-            Cancel
+            {t("adminPeople.common.cancel")}
           </Button>
           <Button type="submit" loading={updateStudent.isPending}>
-            Save changes
+            {t("adminPeople.common.saveChanges")}
           </Button>
         </Card.Footer>
       </form>
@@ -241,6 +250,7 @@ interface AdmissionSectionProps {
  * an empty/placeholder block for them — there is nothing true to say about a field the API withheld.
  */
 function AdmissionSection({ student, canEdit }: AdmissionSectionProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const updateStudent = useUpdateStudent();
   const [editing, setEditing] = useState(false);
@@ -276,13 +286,16 @@ function AdmissionSection({ student, canEdit }: AdmissionSectionProps) {
       { studentId: student.id, patch: result.data },
       {
         onSuccess: () => {
-          show({ variant: "success", title: "Admission info updated" });
+          show({
+            variant: "success",
+            title: t("adminPeople.students.profile.admissionUpdatedToast"),
+          });
           setEditing(false);
         },
         onError: (error) => {
           show({
             variant: "error",
-            title: "Couldn't save changes",
+            title: t("adminPeople.students.profile.saveError"),
             description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
           });
         },
@@ -292,13 +305,13 @@ function AdmissionSection({ student, canEdit }: AdmissionSectionProps) {
 
   if (!editing) {
     return (
-      <Card as="section" aria-label="Admission">
+      <Card as="section" aria-label={t("adminPeople.students.profile.admission")}>
         <Card.Header>
           <div className="students-profile__section-header">
-            <h2>Admission</h2>
+            <h2>{t("adminPeople.students.profile.admission")}</h2>
             {canEdit ? (
               <Button variant="tertiary" onClick={() => setEditing(true)}>
-                Edit
+                {t("adminPeople.students.profile.edit")}
               </Button>
             ) : null}
           </div>
@@ -306,11 +319,11 @@ function AdmissionSection({ student, canEdit }: AdmissionSectionProps) {
         <Card.Body>
           <dl className="students-profile__fields">
             <div>
-              <dt>Admission number</dt>
+              <dt>{t("adminPeople.students.form.admissionNumber")}</dt>
               <dd>{student.admission_number || "—"}</dd>
             </div>
             <div>
-              <dt>Admission date</dt>
+              <dt>{t("adminPeople.students.form.admissionDate")}</dt>
               <dd>{student.admission_date ?? "—"}</dd>
             </div>
           </dl>
@@ -320,33 +333,37 @@ function AdmissionSection({ student, canEdit }: AdmissionSectionProps) {
   }
 
   return (
-    <Card as="section" aria-label="Edit admission">
+    <Card as="section" aria-label={t("adminPeople.students.profile.editAdmission")}>
       <Card.Header>
-        <h2>Admission</h2>
+        <h2>{t("adminPeople.students.profile.admission")}</h2>
       </Card.Header>
-      <form onSubmit={handleSubmit} noValidate aria-label="Edit admission">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        aria-label={t("adminPeople.students.profile.editAdmission")}
+      >
         <Card.Body>
           <Input
-            label="Admission number"
+            label={t("adminPeople.students.form.admissionNumber")}
             value={values.admission_number}
             onChange={(e) => setField("admission_number", e.target.value)}
-            error={errors.admission_number}
+            error={errors.admission_number && t(errors.admission_number)}
             required
           />
           <Input
-            label="Admission date"
+            label={t("adminPeople.students.form.admissionDate")}
             type="date"
             value={values.admission_date}
             onChange={(e) => setField("admission_date", e.target.value)}
-            error={errors.admission_date}
+            error={errors.admission_date && t(errors.admission_date)}
           />
         </Card.Body>
         <Card.Footer>
           <Button type="button" variant="tertiary" onClick={handleCancel}>
-            Cancel
+            {t("adminPeople.common.cancel")}
           </Button>
           <Button type="submit" loading={updateStudent.isPending}>
-            Save changes
+            {t("adminPeople.common.saveChanges")}
           </Button>
         </Card.Footer>
       </form>
@@ -360,6 +377,7 @@ interface GuardiansTabProps {
 }
 
 function GuardiansTab({ studentId, canManage }: GuardiansTabProps) {
+  const { t } = useTranslation();
   const guardiansQuery = useQuery({
     queryKey: studentGuardiansQueryKey(studentId),
     queryFn: () => fetchStudentGuardians(studentId),
@@ -370,16 +388,20 @@ function GuardiansTab({ studentId, canManage }: GuardiansTabProps) {
   return (
     <>
       <div className="students-profile__section-header">
-        <h2>Guardians</h2>
-        {canManage ? <Button onClick={() => setLinkOpen(true)}>Add guardian</Button> : null}
+        <h2>{t("adminPeople.students.profile.guardians")}</h2>
+        {canManage ? (
+          <Button onClick={() => setLinkOpen(true)}>
+            {t("adminPeople.students.profile.addGuardian")}
+          </Button>
+        ) : null}
       </div>
 
       {guardiansQuery.isPending ? (
-        <p role="status">Loading…</p>
+        <p role="status">{t("adminPeople.common.loading")}</p>
       ) : guardiansQuery.isError ? (
-        <p role="alert">Unable to load guardians.</p>
+        <p role="alert">{t("adminPeople.students.profile.guardiansLoadError")}</p>
       ) : guardiansQuery.data.length === 0 ? (
-        <p>No guardians linked yet.</p>
+        <p>{t("adminPeople.students.profile.noGuardians")}</p>
       ) : (
         <ul className="students-detail-list">
           {guardiansQuery.data.map((guardian) => (
@@ -389,13 +411,13 @@ function GuardiansTab({ studentId, canManage }: GuardiansTabProps) {
                   {guardian.user?.display_name ?? guardian.user?.email ?? guardian.parent_user_id}
                 </p>
                 <p className="students-detail-list__meta">
-                  {guardian.user?.email ?? "Account unavailable"} &middot;{" "}
-                  {RELATIONSHIP_LABELS[guardian.relationship]}
+                  {guardian.user?.email ?? t("adminPeople.students.profile.accountUnavailable")}{" "}
+                  &middot; {t(RELATIONSHIP_LABEL_KEYS[guardian.relationship])}
                 </p>
               </div>
               {canManage ? (
                 <Button variant="tertiary" onClick={() => setRemovingGuardian(guardian)}>
-                  Remove
+                  {t("adminPeople.students.profile.removeGuardian")}
                 </Button>
               ) : null}
             </li>
@@ -414,6 +436,8 @@ function GuardiansTab({ studentId, canManage }: GuardiansTabProps) {
 }
 
 function EnrollmentHistoryTab({ studentId }: { studentId: string }) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const historyQuery = useQuery({
     queryKey: studentEnrollmentHistoryQueryKey(studentId),
     queryFn: () => fetchStudentEnrollmentHistory(studentId),
@@ -421,13 +445,13 @@ function EnrollmentHistoryTab({ studentId }: { studentId: string }) {
 
   return (
     <>
-      <h2>Enrollment history</h2>
+      <h2>{t("adminPeople.students.profile.enrollmentHistory")}</h2>
       {historyQuery.isPending ? (
-        <p role="status">Loading…</p>
+        <p role="status">{t("adminPeople.common.loading")}</p>
       ) : historyQuery.isError ? (
-        <p role="alert">Unable to load enrollment history.</p>
+        <p role="alert">{t("adminPeople.students.profile.enrollmentLoadError")}</p>
       ) : historyQuery.data.length === 0 ? (
-        <p>No enrollment history yet.</p>
+        <p>{t("adminPeople.students.profile.noEnrollment")}</p>
       ) : (
         <ul className="students-detail-list">
           {historyQuery.data.map((entry) => (
@@ -438,11 +462,16 @@ function EnrollmentHistoryTab({ studentId }: { studentId: string }) {
               <div>
                 <p>{entry.class?.code ?? entry.class_id}</p>
                 <p className="students-detail-list__meta">
-                  {entry.status} &middot; enrolled{" "}
-                  {new Date(entry.enrolled_at).toLocaleDateString()}
                   {entry.withdrawn_at
-                    ? ` · withdrawn ${new Date(entry.withdrawn_at).toLocaleDateString()}`
-                    : ""}
+                    ? t("adminPeople.students.profile.enrollmentMetaWithdrawn", {
+                        status: t(`adminPeople.students.profile.enrollmentStatus.${entry.status}`),
+                        enrolled: formatDate(new Date(entry.enrolled_at)),
+                        withdrawn: formatDate(new Date(entry.withdrawn_at)),
+                      })
+                    : t("adminPeople.students.profile.enrollmentMeta", {
+                        status: t(`adminPeople.students.profile.enrollmentStatus.${entry.status}`),
+                        enrolled: formatDate(new Date(entry.enrolled_at)),
+                      })}
                 </p>
               </div>
             </li>
@@ -462,6 +491,7 @@ function EnrollmentHistoryTab({ studentId }: { studentId: string }) {
  * independently (see `RequirePermission`'s doc for the same caveat).
  */
 export default function StudentProfilePage() {
+  const { t } = useTranslation();
   const { studentId } = useParams<{ studentId: string }>();
   const permissions = usePermissions();
   const canViewAdmissionData = permissions.has(PERMISSIONS.BILLING_READ);
@@ -474,15 +504,15 @@ export default function StudentProfilePage() {
   });
 
   if (!studentId) {
-    return <p role="alert">No student selected.</p>;
+    return <p role="alert">{t("adminPeople.students.profile.noStudent")}</p>;
   }
 
   if (studentQuery.isPending) {
-    return <p role="status">Loading…</p>;
+    return <p role="status">{t("adminPeople.common.loading")}</p>;
   }
 
   if (studentQuery.isError || !studentQuery.data) {
-    return <p role="alert">Unable to load this student.</p>;
+    return <p role="alert">{t("adminPeople.students.profile.loadError")}</p>;
   }
 
   const student = studentQuery.data;
@@ -490,15 +520,17 @@ export default function StudentProfilePage() {
   return (
     <>
       <p className="students-profile__back">
-        <Link to="/portal/admin/students">&larr; Back to students</Link>
+        <Link to="/portal/admin/students">{t("adminPeople.students.backToStudents")}</Link>
       </p>
-      <h1>{fullName(student) || "Student"}</h1>
+      <h1>{fullName(student) || t("adminPeople.students.profile.studentFallback")}</h1>
 
       <Tabs defaultValue="profile">
         <Tabs.List>
-          <Tabs.Tab value="profile">Profile</Tabs.Tab>
-          <Tabs.Tab value="guardians">Guardians</Tabs.Tab>
-          <Tabs.Tab value="enrollment">Enrollment history</Tabs.Tab>
+          <Tabs.Tab value="profile">{t("adminPeople.students.profile.tabProfile")}</Tabs.Tab>
+          <Tabs.Tab value="guardians">{t("adminPeople.students.profile.guardians")}</Tabs.Tab>
+          <Tabs.Tab value="enrollment">
+            {t("adminPeople.students.profile.enrollmentHistory")}
+          </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="profile">

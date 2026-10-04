@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../lib/api";
+import { useTranslation } from "../lib/i18n";
 
 /**
  * Pending-approval count badge. Consumes `GET /api/approvals/queue` under the `["approval-queue"]`
@@ -11,6 +12,7 @@ import { api } from "../lib/api";
  * Hides while loading and when the count is zero.
  */
 export function ApprovalQueueBadge() {
+  const { t } = useTranslation();
   const { data, isPending, isError } = useQuery({
     queryKey: ["approval-queue"],
     queryFn: async () => {
@@ -26,7 +28,7 @@ export function ApprovalQueueBadge() {
   const total = data?.total ?? 0;
   return (
     <span role="status" className="approval-queue-badge">
-      {total > 0 ? `${total} pending approval${total === 1 ? "" : "s"}` : ""}
+      {total > 0 ? t("site.approvalQueueBadge.pending", { count: total }) : ""}
     </span>
   );
 }

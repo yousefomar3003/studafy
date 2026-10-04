@@ -2,12 +2,24 @@ import { Button, DataGrid } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+
 import { bulkInvitesListQueryKey, fetchBulkInvitesPage } from "./queries";
-import { BULK_INVITE_STATUS_LABELS, ROLE_LABELS } from "./schema";
+import { BULK_INVITE_STATUS_LABEL_KEYS, ROLE_LABEL_KEYS } from "./schema";
 
 import type { BulkInvite } from "./queries";
 import type { Role } from "@studafy/constants";
 import type { DataGridColumn } from "@studafy/ui";
+
+/** Matches `Date#toLocaleString()`'s default fields, now formatted in the active locale. */
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+};
 
 export interface BulkInvitesBoardProps {
   onCreate: () => void;
@@ -15,6 +27,8 @@ export interface BulkInvitesBoardProps {
 }
 
 export function BulkInvitesBoard({ onCreate, onViewProgress }: BulkInvitesBoardProps) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([]);
 
@@ -27,32 +41,50 @@ export function BulkInvitesBoard({ onCreate, onViewProgress }: BulkInvitesBoardP
   const columns: DataGridColumn<BulkInvite>[] = [
     {
       id: "status",
-      header: "Status",
+      header: t("adminPeople.invitations.bulkBoard.columns.status"),
       renderCell: (batch) => (
         <span className="invitations-status-pill" data-status={batch.status}>
-          {BULK_INVITE_STATUS_LABELS[batch.status]}
+          {t(BULK_INVITE_STATUS_LABEL_KEYS[batch.status])}
         </span>
       ),
     },
     {
       id: "role",
-      header: "Role",
-      renderCell: (batch) => ROLE_LABELS[batch.role as Role] ?? batch.role,
+      header: t("adminPeople.invitations.bulkBoard.columns.role"),
+      renderCell: (batch) => {
+        const key = ROLE_LABEL_KEYS[batch.role as Role];
+        return key ? t(key) : batch.role;
+      },
     },
-    { id: "total", header: "Total", renderCell: (batch) => batch.total_count, align: "end" },
-    { id: "sent", header: "Sent", renderCell: (batch) => batch.sent_count, align: "end" },
-    { id: "failed", header: "Failed", renderCell: (batch) => batch.failed_count, align: "end" },
+    {
+      id: "total",
+      header: t("adminPeople.invitations.bulkBoard.columns.total"),
+      renderCell: (batch) => batch.total_count,
+      align: "end",
+    },
+    {
+      id: "sent",
+      header: t("adminPeople.invitations.bulkBoard.columns.sent"),
+      renderCell: (batch) => batch.sent_count,
+      align: "end",
+    },
+    {
+      id: "failed",
+      header: t("adminPeople.invitations.bulkBoard.columns.failed"),
+      renderCell: (batch) => batch.failed_count,
+      align: "end",
+    },
     {
       id: "created_at",
-      header: "Created",
-      renderCell: (batch) => new Date(batch.created_at).toLocaleString(),
+      header: t("adminPeople.invitations.bulkBoard.columns.created"),
+      renderCell: (batch) => formatDate(new Date(batch.created_at), DATE_TIME_OPTIONS),
     },
     {
       id: "actions",
-      header: "Actions",
+      header: t("adminPeople.invitations.bulkBoard.columns.actions"),
       renderCell: (batch) => (
         <Button variant="tertiary" onClick={() => onViewProgress(batch.id)}>
-          View progress
+          {t("adminPeople.invitations.bulkBoard.viewProgress")}
         </Button>
       ),
     },
@@ -61,18 +93,22 @@ export function BulkInvitesBoard({ onCreate, onViewProgress }: BulkInvitesBoardP
   return (
     <>
       <div className="invitations-board__header">
-        <p>Batches of invitations sent together, with per-recipient dispatch tracking.</p>
-        <Button onClick={onCreate}>New bulk invite</Button>
+        <p>{t("adminPeople.invitations.bulkBoard.description")}</p>
+        <Button onClick={onCreate}>{t("adminPeople.invitations.bulkBoard.newBulkInvite")}</Button>
       </div>
 
       <DataGrid
-        caption="Bulk invite batches"
+        caption={t("adminPeople.invitations.bulkBoard.caption")}
         columns={columns}
         rows={data?.bulkInvites ?? []}
         getRowId={(batch) => batch.id}
-        getRowLabel={(batch) => `Batch ${batch.id}`}
+        getRowLabel={(batch) => t("adminPeople.invitations.bulkBoard.rowLabel", { id: batch.id })}
         loading={isPending}
-        empty={isError ? "Unable to load bulk invites." : "No bulk invites yet."}
+        empty={
+          isError
+            ? t("adminPeople.invitations.bulkBoard.loadError")
+            : t("adminPeople.invitations.bulkBoard.empty")
+        }
       />
 
       <div className="invitations-board__pagination">
@@ -86,7 +122,7 @@ export function BulkInvitesBoard({ onCreate, onViewProgress }: BulkInvitesBoardP
             setCursor(previous);
           }}
         >
-          Previous
+          {t("adminPeople.common.previous")}
         </Button>
         <Button
           variant="secondary"
@@ -98,7 +134,7 @@ export function BulkInvitesBoard({ onCreate, onViewProgress }: BulkInvitesBoardP
             setCursor(nextCursor);
           }}
         >
-          Next
+          {t("adminPeople.common.next")}
         </Button>
       </div>
     </>

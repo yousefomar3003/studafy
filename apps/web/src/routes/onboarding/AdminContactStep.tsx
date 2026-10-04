@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { TurnstileWidget } from "../../components/TurnstileWidget";
 import { TURNSTILE_SITE_KEY } from "../../lib/config";
+import { useTranslation } from "../../lib/i18n";
 
 import { adminContactSchema, fieldErrors } from "./schema";
 
@@ -27,6 +28,7 @@ export function AdminContactStep({
   onBack,
   onSubmit,
 }: AdminContactStepProps) {
+  const { t } = useTranslation();
   const [values, setValues] = useState(defaultValues);
   const [errors, setErrors] = useState<Partial<Record<keyof AdminContact, string>>>({});
   const [captchaToken, setCaptchaToken] = useState("");
@@ -62,7 +64,7 @@ export function AdminContactStep({
       return;
     }
     if (!captchaToken) {
-      setCaptchaError("Complete the challenge before submitting.");
+      setCaptchaError("onboarding.common.captchaRequired");
       return;
     }
     setCaptchaError(undefined);
@@ -70,26 +72,24 @@ export function AdminContactStep({
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="Administrator contact">
-      <h2>Administrator contact</h2>
+    <form onSubmit={handleSubmit} noValidate aria-label={t("onboarding.adminContact.title")}>
+      <h2>{t("onboarding.adminContact.title")}</h2>
 
       <Input
-        label="Administrator email"
+        label={t("onboarding.adminContact.email")}
         type="email"
         value={values.admin_email}
         onChange={(e) => setField("admin_email", e.target.value)}
-        helperText={
-          !errors.admin_email ? "We'll send an account-activation invitation here." : undefined
-        }
-        error={errors.admin_email}
+        helperText={!errors.admin_email ? t("onboarding.adminContact.emailHelper") : undefined}
+        error={errors.admin_email && t(errors.admin_email)}
         required
       />
 
       <Input
-        label="Administrator name"
+        label={t("onboarding.adminContact.name")}
         value={values.admin_name ?? ""}
         onChange={(e) => setField("admin_name", e.target.value)}
-        error={errors.admin_name}
+        error={errors.admin_name && t(errors.admin_name)}
       />
 
       <TurnstileWidget
@@ -101,7 +101,7 @@ export function AdminContactStep({
         }}
         onInvalidate={() => setCaptchaToken("")}
       />
-      {captchaError ? <p role="alert">{captchaError}</p> : null}
+      {captchaError ? <p role="alert">{t(captchaError)}</p> : null}
 
       <Button
         type="button"
@@ -109,10 +109,10 @@ export function AdminContactStep({
         onClick={() => onBack(values)}
         disabled={submitting}
       >
-        Back
+        {t("onboarding.common.back")}
       </Button>
       <Button type="submit" loading={submitting}>
-        Create school account
+        {t("onboarding.adminContact.submit")}
       </Button>
     </form>
   );

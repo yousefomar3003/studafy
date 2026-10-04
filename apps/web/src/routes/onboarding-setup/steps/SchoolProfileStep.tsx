@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { HelpLink } from "../../../features/help/HelpLink";
 import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
 import { api } from "../../../lib/api";
+import { useTranslation } from "../../../lib/i18n";
 import { fieldErrors, LOCALE_OPTIONS, schoolProfileSchema } from "../schema";
 
 import type { SchoolProfileValues } from "../schema";
@@ -49,6 +50,7 @@ export function SchoolProfileStep({
   onSkip,
   submitting,
 }: SchoolProfileStepProps) {
+  const { t } = useTranslation();
   const settingsQuery = useQuery({
     queryKey: ["schools", "current", "settings"],
     queryFn: async () => {
@@ -93,17 +95,21 @@ export function SchoolProfileStep({
   return (
     <Card>
       <CardBody>
-        <form onSubmit={handleSubmit} noValidate aria-label="School profile">
-          <h2>School profile</h2>
-          <p>These defaults apply across your school and can be changed later from settings.</p>
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          aria-label={t("onboarding.setup.schoolProfile.title")}
+        >
+          <h2>{t("onboarding.setup.schoolProfile.title")}</h2>
+          <p>{t("onboarding.setup.schoolProfile.description")}</p>
           <p>
             <HelpLink to={onboardingStepHelpPath("schoolProfile")}>
-              Need help with this step?
+              {t("onboarding.setup.needHelp")}
             </HelpLink>
           </p>
 
           <Select
-            label="Default language"
+            label={t("onboarding.setup.schoolProfile.defaultLanguage")}
             options={LOCALE_OPTIONS.map((locale) => ({
               value: locale,
               // eslint-disable-next-line security/detect-object-injection -- `locale` comes from iterating this module's own fixed `LOCALE_OPTIONS` tuple, not user input
@@ -115,69 +121,74 @@ export function SchoolProfileStep({
           />
 
           <Input
-            label="Timezone"
+            label={t("onboarding.setup.schoolProfile.timezone")}
             value={values.timezone}
             onChange={(e) => setField("timezone", e.target.value)}
-            helperText={!errors.timezone ? "IANA timezone, e.g. Africa/Casablanca." : undefined}
-            error={errors.timezone}
+            helperText={
+              !errors.timezone ? t("onboarding.setup.schoolProfile.timezoneHelper") : undefined
+            }
+            error={errors.timezone && t(errors.timezone)}
             required
           />
 
           <Input
-            label="Invitation expiry (days)"
+            label={t("onboarding.setup.schoolProfile.invitationExpiry")}
             type="number"
             min={1}
             max={365}
             value={values.invitation_expiry_days}
             onChange={(e) => setField("invitation_expiry_days", Number(e.target.value))}
-            error={errors.invitation_expiry_days}
+            error={errors.invitation_expiry_days && t(errors.invitation_expiry_days)}
             required
           />
 
           <Input
-            label="Attendance alert threshold (%)"
+            label={t("onboarding.setup.schoolProfile.attendanceThreshold")}
             type="number"
             min={0}
             max={100}
             value={values.attendance_alert_threshold}
             onChange={(e) => setField("attendance_alert_threshold", Number(e.target.value))}
-            error={errors.attendance_alert_threshold}
+            error={errors.attendance_alert_threshold && t(errors.attendance_alert_threshold)}
             required
           />
 
           <Input
-            label="Absence alert threshold (%)"
+            label={t("onboarding.setup.schoolProfile.absenceThreshold")}
             type="number"
             min={0}
             max={100}
             value={values.absence_alert_threshold}
             onChange={(e) => setField("absence_alert_threshold", Number(e.target.value))}
-            error={errors.absence_alert_threshold}
+            error={errors.absence_alert_threshold && t(errors.absence_alert_threshold)}
             required
           />
 
           <Input
-            label="Attendance correction window (hours)"
+            label={t("onboarding.setup.schoolProfile.correctionWindow")}
             type="number"
             min={1}
             max={8760}
             value={values.attendance_correction_window_hours}
             onChange={(e) => setField("attendance_correction_window_hours", Number(e.target.value))}
-            error={errors.attendance_correction_window_hours}
+            error={
+              errors.attendance_correction_window_hours &&
+              t(errors.attendance_correction_window_hours)
+            }
             required
           />
 
           <Checkbox
             checked={values.parent_discipline_visibility}
             onChange={(e) => setField("parent_discipline_visibility", e.target.checked)}
-            label="Parents can view their child's resolved discipline incidents"
+            label={t("onboarding.setup.schoolProfile.parentDisciplineVisibility")}
           />
 
           <Button type="submit" loading={submitting}>
-            Save and continue
+            {t("onboarding.setup.saveAndContinue")}
           </Button>
           <Button type="button" variant="tertiary" onClick={onSkip} disabled={submitting}>
-            Skip for now
+            {t("onboarding.setup.skipForNow")}
           </Button>
         </form>
       </CardBody>

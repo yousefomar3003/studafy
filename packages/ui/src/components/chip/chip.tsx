@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 
 import { cx } from "../../internal/cx";
+import { useUiStrings } from "../../internal/ui-strings";
 
 import type { HTMLAttributes } from "react";
 
@@ -19,6 +20,7 @@ export const Chip = forwardRef<HTMLSpanElement, ChipProps>(function Chip(
   { variant = "filled", disabled = false, onRemove, removeLabel, children, ...rest },
   ref,
 ) {
+  const strings = useUiStrings();
   return (
     <span
       {...rest}
@@ -33,7 +35,10 @@ export const Chip = forwardRef<HTMLSpanElement, ChipProps>(function Chip(
           type="button"
           className="sf-chip__remove"
           disabled={disabled}
-          aria-label={removeLabel ?? `Remove ${typeof children === "string" ? children : "item"}`}
+          aria-label={
+            removeLabel ??
+            (typeof children === "string" ? strings.removeChip(children) : strings.removeItem)
+          }
           onClick={onRemove}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">

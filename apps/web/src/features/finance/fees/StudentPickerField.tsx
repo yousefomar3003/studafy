@@ -2,6 +2,8 @@ import { Button, Input } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { searchStudents, studentDisplayName, studentSearchQueryKey } from "./queries";
 
 import type { StudentProfile } from "./queries";
@@ -19,6 +21,7 @@ export interface StudentPickerFieldProps {
  * so search-then-pick-a-result is the established pattern for resolving a name into an id.
  */
 export function StudentPickerField({ value, onChange }: StudentPickerFieldProps) {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -37,13 +40,13 @@ export function StudentPickerField({ value, onChange }: StudentPickerFieldProps)
     return (
       <div className="fee-builder__student-selected">
         <div>
-          <span className="sf-field__label">Sample student</span>
+          <span className="sf-field__label">{t("finance.fees.studentPicker.label")}</span>
           <p>
             {studentDisplayName(value)} — {value.admission_number}
           </p>
         </div>
         <Button type="button" variant="tertiary" onClick={() => onChange(null)}>
-          Clear
+          {t("finance.fees.studentPicker.clear")}
         </Button>
       </div>
     );
@@ -52,12 +55,12 @@ export function StudentPickerField({ value, onChange }: StudentPickerFieldProps)
   return (
     <div className="fee-builder__student-picker">
       <Input
-        label="Sample student"
+        label={t("finance.fees.studentPicker.label")}
         type="search"
-        placeholder="Search by name or admission number"
+        placeholder={t("finance.fees.studentPicker.placeholder")}
         value={searchInput}
         onChange={(event) => setSearchInput(event.target.value)}
-        helperText="Picks a real student to preview the invoice this structure would generate."
+        helperText={t("finance.fees.studentPicker.helper")}
       />
       {debouncedSearch.trim() ? (
         <ul className="fee-builder__student-results">
@@ -78,7 +81,7 @@ export function StudentPickerField({ value, onChange }: StudentPickerFieldProps)
             </li>
           ))}
           {!resultsQuery.isPending && resultsQuery.data?.length === 0 ? (
-            <li className="fee-builder__student-empty">No students match.</li>
+            <li className="fee-builder__student-empty">{t("finance.fees.studentPicker.empty")}</li>
           ) : null}
         </ul>
       ) : null}

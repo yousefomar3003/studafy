@@ -3,11 +3,13 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+
 import { CreateUserModal } from "./CreateUserModal";
 import { DeactivateUserDialog } from "./DeactivateUserDialog";
 import { EditUserModal } from "./EditUserModal";
 import { fetchUsersPage, usersListQueryKey } from "./queries";
-import { ROLE_LABELS, STATUS_LABELS } from "./schema";
+import { ROLE_LABEL_KEYS, STATUS_LABEL_KEYS } from "./schema";
 import { UserSessionsPanel } from "./UserSessionsPanel";
 
 import "./users.css";
@@ -18,21 +20,15 @@ import type { DataGridColumn, DateRangeValue, SelectOption } from "@studafy/ui";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-const ROLE_OPTIONS: SelectOption<Role | "">[] = [
-  { value: "", label: "All roles" },
-  ...(Object.entries(ROLE_LABELS) as [Role, string][]).map(([value, label]) => ({ value, label })),
-];
-
-const STATUS_OPTIONS: SelectOption<UsersFilters["status"]>[] = [
-  { value: "", label: "All statuses" },
-  ...(Object.entries(STATUS_LABELS) as [UsersFilters["status"], string][]).map(
-    ([value, label]) => ({ value, label }),
-  ),
-];
-
-function statusToneLabel(status: UserWithRoles["status"]): string {
-  return STATUS_LABELS[status as keyof typeof STATUS_LABELS] ?? status;
-}
+/** Matches `Date#toLocaleString()`'s default fields, now formatted in the active locale. */
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+};
 
 /**
  * User management (`/portal/admin/users`), gated by `organization:manageSettings` like the rest of
@@ -49,6 +45,8 @@ export default function UsersListPage() {
   // sends a matched user to, since there is no per-user detail route to link straight to a record
   // (see `result-groups.ts`'s doc comment on why). Read once on mount, not kept in sync afterward:
   // this is a starting point for the local search box below, not a URL-driven filter.
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(() => searchParams.get("q") ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("q") ?? "");
@@ -87,51 +85,79 @@ export default function UsersListPage() {
   const [deactivatingUser, setDeactivatingUser] = useState<UserWithRoles | null>(null);
   const [sessionsUser, setSessionsUser] = useState<UserWithRoles | null>(null);
 
+  const roleOptions: SelectOption<Role | "">[] = [
+    { value: "", label: t("adminPeople.users.list.allRoles") },
+    ...(Object.entries(ROLE_LABEL_KEYS) as [Role, string][]).map(([value, key]) => ({
+      value,
+      label: t(key),
+    })),
+  ];
+
+  const statusOptions: SelectOption<UsersFilters["status"]>[] = [
+    { value: "", label: t("adminPeople.users.list.allStatuses") },
+    ...(Object.entries(STATUS_LABEL_KEYS) as [UsersFilters["status"], string][]).map(
+      ([value, key]) => ({ value, label: t(key) }),
+    ),
+  ];
+
+  function statusLabel(status: UserWithRoles["status"]): string {
+    const key = STATUS_LABEL_KEYS[status as keyof typeof STATUS_LABEL_KEYS];
+    return key ? t(key) : status;
+  }
+
+  function roleLabel(role: string): string {
+    const key = ROLE_LABEL_KEYS[role as Role];
+    return key ? t(key) : role;
+  }
+
   const columns: DataGridColumn<UserWithRoles>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("adminPeople.users.list.columns.name"),
       renderCell: (user) => user.display_name ?? "—",
     },
     {
       id: "email",
-      header: "Email",
+      header: t("adminPeople.users.list.columns.email"),
       renderCell: (user) => user.email,
     },
     {
       id: "role",
-      header: "Role",
-      renderCell: (user) => user.roles.map((r) => ROLE_LABELS[r as Role] ?? r).join(", ") || "—",
+      header: t("adminPeople.users.list.columns.role"),
+      renderCell: (user) =>
+        user.roles.map(roleLabel).join(t("adminPeople.common.listSeparator")) || "—",
     },
     {
       id: "status",
-      header: "Status",
+      header: t("adminPeople.users.list.columns.status"),
       renderCell: (user) => (
         <span className="users-list__status-pill" data-status={user.status}>
-          {statusToneLabel(user.status)}
+          {statusLabel(user.status)}
         </span>
       ),
     },
     {
       id: "last_login",
-      header: "Last active",
+      header: t("adminPeople.users.list.columns.lastActive"),
       renderCell: (user) =>
-        user.last_login_at ? new Date(user.last_login_at).toLocaleString() : "Never",
+        user.last_login_at
+          ? formatDate(new Date(user.last_login_at), DATE_TIME_OPTIONS)
+          : t("adminPeople.users.list.never"),
     },
     {
       id: "actions",
-      header: "Actions",
+      header: t("adminPeople.users.list.columns.actions"),
       renderCell: (user) => (
         <div className="users-list__actions">
           <Button variant="tertiary" onClick={() => setEditingUser(user)}>
-            Edit
+            {t("adminPeople.users.list.edit")}
           </Button>
           <Button variant="tertiary" onClick={() => setSessionsUser(user)}>
-            Sessions
+            {t("adminPeople.users.list.sessions")}
           </Button>
           {user.status !== "suspended" && user.status !== "archived" ? (
             <Button variant="tertiary" onClick={() => setDeactivatingUser(user)}>
-              Deactivate
+              {t("adminPeople.users.list.deactivate")}
             </Button>
           ) : null}
         </div>
@@ -143,44 +169,44 @@ export default function UsersListPage() {
     <>
       <div className="users-list__header">
         <div>
-          <h1>Users</h1>
-          <p>Invite, edit, and manage access for everyone in your school.</p>
+          <h1>{t("adminPeople.users.list.title")}</h1>
+          <p>{t("adminPeople.users.list.description")}</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>New user</Button>
+        <Button onClick={() => setCreateOpen(true)}>{t("adminPeople.users.list.newUser")}</Button>
       </div>
 
       <div className="users-list__toolbar">
         <FilterBar
-          searchLabel="Search"
-          searchPlaceholder="Search by name or email"
+          searchLabel={t("adminPeople.users.list.searchLabel")}
+          searchPlaceholder={t("adminPeople.users.list.searchPlaceholder")}
           search={searchInput}
           onSearchChange={setSearchInput}
           dateRange={dateRange}
-          dateRangeLabel="Created between"
+          dateRangeLabel={t("adminPeople.users.list.createdBetween")}
           onDateRangeChange={setDateRange}
         />
         <Select
-          label="Role"
-          options={ROLE_OPTIONS}
+          label={t("adminPeople.users.list.roleFilter")}
+          options={roleOptions}
           value={role}
           onChange={(value) => setRole(value)}
         />
         <Select
-          label="Status"
-          options={STATUS_OPTIONS}
+          label={t("adminPeople.users.list.statusFilter")}
+          options={statusOptions}
           value={status}
           onChange={(value) => setStatus(value)}
         />
       </div>
 
       <DataGrid
-        caption="School users"
+        caption={t("adminPeople.users.list.caption")}
         columns={columns}
         rows={data?.users ?? []}
         getRowId={(user) => user.id}
         getRowLabel={(user) => user.display_name ?? user.email}
         loading={isPending}
-        empty={isError ? "Unable to load users." : "No users match these filters."}
+        empty={isError ? t("adminPeople.users.list.loadError") : t("adminPeople.users.list.empty")}
       />
 
       <div className="users-list__pagination">
@@ -194,7 +220,7 @@ export default function UsersListPage() {
             setCursor(previous);
           }}
         >
-          Previous
+          {t("adminPeople.common.previous")}
         </Button>
         <Button
           variant="secondary"
@@ -206,7 +232,7 @@ export default function UsersListPage() {
             setCursor(nextCursor);
           }}
         >
-          Next
+          {t("adminPeople.common.next")}
         </Button>
       </div>
 

@@ -2,9 +2,20 @@ import { Button, Modal } from "@studafy/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import type { UserWithRoles } from "./queries";
 import type { components } from "@studafy/api-client";
+
+/** Matches `Date#toLocaleString()`'s default fields, now formatted in the active locale. */
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+};
 
 export interface UserSessionsPanelProps {
   user: UserWithRoles | null;
@@ -19,6 +30,8 @@ export interface UserSessionsPanelProps {
  * exactly the actions the API actually has, rather than a control for an endpoint that doesn't exist.
  */
 export function UserSessionsPanel({ user, onClose }: UserSessionsPanelProps) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const queryClient = useQueryClient();
   const open = user !== null;
   const userId = user?.id;
@@ -84,25 +97,30 @@ export function UserSessionsPanel({ user, onClose }: UserSessionsPanelProps) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Devices & sessions"
+      title={t("adminPeople.users.sessions.title")}
       description={user ? `${user.display_name ?? user.email} (${user.email})` : undefined}
     >
       <Modal.Body>
         <section aria-labelledby="admin-sessions-heading">
-          <h3 id="admin-sessions-heading">Sessions</h3>
+          <h3 id="admin-sessions-heading">{t("adminPeople.users.sessions.sessionsHeading")}</h3>
           {sessionsQuery.isPending ? (
-            <p role="status">Loading…</p>
+            <p role="status">{t("adminPeople.common.loading")}</p>
           ) : sessions.length === 0 ? (
-            <p>No active sessions.</p>
+            <p>{t("adminPeople.users.sessions.noSessions")}</p>
           ) : (
             <ul className="users-sessions-list">
               {sessions.map((session) => (
                 <li key={session.id} className="users-sessions-list__item">
                   <div>
-                    <p>{session.device_name ?? session.channel}</p>
+                    <p>
+                      {session.device_name ??
+                        t(`deviceSessions.channel.${session.channel}`, {
+                          defaultValue: session.channel,
+                        })}
+                    </p>
                     <p className="users-sessions-list__meta">
-                      {session.ip_address ?? "Unknown location"} &middot;{" "}
-                      {new Date(session.issued_at).toLocaleString()}
+                      {session.ip_address ?? t("adminPeople.users.sessions.unknownLocation")}{" "}
+                      &middot; {formatDate(new Date(session.issued_at), DATE_TIME_OPTIONS)}
                     </p>
                   </div>
                 </li>
@@ -113,21 +131,21 @@ export function UserSessionsPanel({ user, onClose }: UserSessionsPanelProps) {
 
         <section aria-labelledby="admin-devices-heading">
           <div className="users-sessions-list__section-header">
-            <h3 id="admin-devices-heading">Devices</h3>
+            <h3 id="admin-devices-heading">{t("adminPeople.users.sessions.devicesHeading")}</h3>
             {devices.length > 0 ? (
               <Button
                 variant="tertiary"
                 loading={revokeAllDevices.isPending}
                 onClick={() => revokeAllDevices.mutate()}
               >
-                Revoke all
+                {t("adminPeople.users.sessions.revokeAll")}
               </Button>
             ) : null}
           </div>
           {devicesQuery.isPending ? (
-            <p role="status">Loading…</p>
+            <p role="status">{t("adminPeople.common.loading")}</p>
           ) : devices.length === 0 ? (
-            <p>No registered devices.</p>
+            <p>{t("adminPeople.users.sessions.noDevices")}</p>
           ) : (
             <ul className="users-sessions-list">
               {devices.map((device) => (
@@ -135,8 +153,9 @@ export function UserSessionsPanel({ user, onClose }: UserSessionsPanelProps) {
                   <div>
                     <p>{device.platform}</p>
                     <p className="users-sessions-list__meta">
-                      {device.active_session_count} active session
-                      {device.active_session_count === 1 ? "" : "s"}
+                      {t("adminPeople.users.sessions.activeSessions", {
+                        count: device.active_session_count,
+                      })}
                     </p>
                   </div>
                   <Button
@@ -144,7 +163,7 @@ export function UserSessionsPanel({ user, onClose }: UserSessionsPanelProps) {
                     loading={revokeDevice.isPending && revokeDevice.variables === device.id}
                     onClick={() => revokeDevice.mutate(device.id)}
                   >
-                    Revoke device
+                    {t("adminPeople.users.sessions.revokeDevice")}
                   </Button>
                 </li>
               ))}

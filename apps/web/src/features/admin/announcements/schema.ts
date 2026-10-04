@@ -3,39 +3,28 @@ import { z } from "zod";
 
 import type { CreateAnnouncementBody } from "./queries";
 import type { Role } from "@studafy/constants";
-import type { SelectOption } from "@studafy/ui";
 
 export type AnnouncementAudienceType = "school" | "role" | "class";
 
-export const AUDIENCE_TYPE_LABELS: Record<AnnouncementAudienceType, string> = {
-  school: "Everyone in the school",
-  role: "Everyone with a role",
-  class: "Everyone in a class",
+/** Translation keys (under `adminSchool.announcements.audience`) — resolved with `t()` at render
+ * time, never here, so a runtime language switch re-labels them. */
+export const AUDIENCE_TYPE_LABEL_KEYS: Record<AnnouncementAudienceType, string> = {
+  school: "adminSchool.announcements.audience.school",
+  role: "adminSchool.announcements.audience.role",
+  class: "adminSchool.announcements.audience.class",
 };
 
 /**
- * Duplicated from `users/schema.ts` rather than imported — each admin feature folder is
- * self-contained (see `audit/queries.ts`'s `toIsoDateBoundary` for the same precedent). Unlike
- * `ASSIGNABLE_ROLES` (which excludes SUPER_ADMIN as a privilege-assignment ceiling), audience
+ * Translation key for a role's display name (`adminSchool.roles.*`). Unlike `ASSIGNABLE_ROLES` in
+ * `users/schema.ts` (which excludes SUPER_ADMIN as a privilege-assignment ceiling), audience
  * targeting has no such ceiling — addressing a notice to every SUPER_ADMIN is a legitimate audience.
  */
-export const ROLE_LABELS: Record<Role, string> = {
-  SUPER_ADMIN: "Super admin",
-  ORG_ADMIN: "Org admin",
-  FINANCE: "Finance",
-  INSTRUCTOR: "Instructor",
-  TEACHING_ASSISTANT: "Teaching assistant",
-  STUDENT: "Student",
-  PARENT: "Parent",
-  GUEST: "Guest",
-  SUPPORT_AGENT: "Support agent",
-};
+export function roleLabelKey(role: Role): string {
+  return `adminSchool.roles.${role}`;
+}
 
-export const ROLE_OPTIONS: SelectOption<Role>[] = Object.values(ROLES).map((role) => ({
-  value: role,
-  // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `ROLES` values, not user input
-  label: ROLE_LABELS[role],
-}));
+/** Every role, in `ROLES` order — labels are translation keys, resolved with `t()` at render time. */
+export const ROLE_VALUES: Role[] = Object.values(ROLES);
 
 /**
  * The compose form's own value shape — `scheduled_at_local` is a `datetime-local` input's raw
@@ -48,12 +37,16 @@ export const ROLE_OPTIONS: SelectOption<Role>[] = Object.values(ROLES).map((role
  */
 export const composeAnnouncementSchema = z
   .object({
-    title: z.string().trim().min(1, "Title is required").max(200, "Keep it under 200 characters"),
+    title: z
+      .string()
+      .trim()
+      .min(1, "adminSchool.announcements.validation.titleRequired")
+      .max(200, "adminSchool.announcements.validation.titleTooLong"),
     body: z
       .string()
       .trim()
-      .min(1, "Message is required")
-      .max(5000, "Keep it under 5,000 characters"),
+      .min(1, "adminSchool.announcements.validation.bodyRequired")
+      .max(5000, "adminSchool.announcements.validation.bodyTooLong"),
     mandatory: z.boolean(),
     audience_type: z.enum(["school", "role", "class"]),
     audience_role: z.string().optional(),
@@ -65,18 +58,22 @@ export const composeAnnouncementSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["audience_role"],
-        message: "Choose a role",
+        message: "adminSchool.announcements.validation.chooseRole",
       });
     }
     if (value.audience_type === "class" && !value.audience_class_id) {
       ctx.addIssue({
         code: "custom",
         path: ["audience_class_id"],
-        message: "Choose a class",
+        message: "adminSchool.announcements.validation.chooseClass",
       });
     }
     if (value.scheduled_at_local && Number.isNaN(new Date(value.scheduled_at_local).getTime())) {
-      ctx.addIssue({ code: "custom", path: ["scheduled_at_local"], message: "Invalid date/time" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["scheduled_at_local"],
+        message: "adminSchool.announcements.validation.invalidDateTime",
+      });
     }
   });
 
@@ -92,7 +89,8 @@ export const EMPTY_COMPOSE_VALUES: ComposeAnnouncementValues = {
   scheduled_at_local: "",
 };
 
-/** Maps a `ZodError` to one message per field, keeping only the first issue per path — matches
+/** Maps a `ZodError` to one message per field (a translation key — resolve it with `t()` where it is
+ * displayed), keeping only the first issue per path — matches
  * `users/schema.ts`'s `fieldErrors`, duplicated for the same self-contained-feature reason. */
 export function fieldErrors(error: z.ZodError): Record<string, string> {
   const errors: Record<string, string> = {};

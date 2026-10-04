@@ -1,6 +1,9 @@
 import { Card } from "@studafy/ui";
 import { useMemo } from "react";
 
+import { useFormatters, useTranslation } from "../../../../lib/i18n";
+import { ONE_DECIMAL_PERCENT_OPTIONS } from "../../format";
+
 import type { AttendanceTrends } from "../types";
 
 const WIDTH = 640;
@@ -14,7 +17,10 @@ export function AttendanceTrendChart({
   data?: AttendanceTrends;
   loading?: boolean;
 }) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const points = data?.points ?? [];
+  const formatPercent = (value: number) => formatNumber(value / 100, ONE_DECIMAL_PERCENT_OPTIONS);
   const polyline = useMemo(() => {
     if (points.length === 0) return "";
     return points
@@ -30,12 +36,12 @@ export function AttendanceTrendChart({
     <Card>
       <div className="attendance-card-heading">
         <div>
-          <h2>Attendance trend</h2>
-          <p>Present rate over the selected period</p>
+          <h2>{t("principal.attendance.trend.title")}</h2>
+          <p>{t("principal.attendance.trend.description")}</p>
         </div>
       </div>
-      {loading ? <p role="status">Loading attendance trend…</p> : null}
-      {!loading && points.length === 0 ? <p>No trend data is available.</p> : null}
+      {loading ? <p role="status">{t("principal.attendance.trend.loading")}</p> : null}
+      {!loading && points.length === 0 ? <p>{t("principal.attendance.trend.empty")}</p> : null}
       {points.length > 0 ? (
         <>
           <svg
@@ -44,11 +50,17 @@ export function AttendanceTrendChart({
             role="img"
             aria-labelledby="attendance-trend-title attendance-trend-description"
           >
-            <title id="attendance-trend-title">Attendance present-rate trend</title>
+            <title id="attendance-trend-title">{t("principal.attendance.trend.chartTitle")}</title>
             <desc id="attendance-trend-description">
               {points
-                .map(
-                  (point) => `${point.bucket_start}: ${point.present_percent.toFixed(1)} percent`,
+                .map((point) =>
+                  t("principal.attendance.trend.pointDescription", {
+                    date: point.bucket_start,
+                    percent: formatNumber(point.present_percent, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    }),
+                  }),
                 )
                 .join(", ")}
             </desc>
@@ -63,10 +75,16 @@ export function AttendanceTrendChart({
               );
             })}
           </svg>
-          <ul className="attendance-trend-legend" aria-label="Trend values">
+          <ul
+            className="attendance-trend-legend"
+            aria-label={t("principal.attendance.trend.legendLabel")}
+          >
             {points.map((point) => (
               <li key={point.bucket_start}>
-                {point.bucket_start}: {point.present_percent.toFixed(1)}%
+                {t("principal.attendance.trend.legendItem", {
+                  date: point.bucket_start,
+                  percent: formatPercent(point.present_percent),
+                })}
               </li>
             ))}
           </ul>

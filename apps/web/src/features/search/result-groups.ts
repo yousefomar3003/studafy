@@ -47,8 +47,11 @@ function userTitle(hit: UserSearchHit): string {
   return hit.display_name ?? hit.email;
 }
 
-function userSubtitle(hit: UserSearchHit): string {
-  const status = userStatusLabel(hit.status);
+/** Label translator — the palette passes its hook `t`; tests and other callers can omit it. */
+type Translate = (key: string) => string;
+
+function userSubtitle(hit: UserSearchHit, t?: Translate): string {
+  const status = userStatusLabel(hit.status, t);
   return hit.display_name ? `${hit.email} · ${status}` : status;
 }
 
@@ -66,14 +69,14 @@ function userSubtitle(hit: UserSearchHit): string {
  *   `apps/api/src/modules/academics/routes/material-routes.ts` is API-only so far). These rows are
  *   left with no `href` and rendered as read-only until a page ships.
  */
-export function buildResultGroups(result: GlobalSearchResult): SearchResultGroup[] {
+export function buildResultGroups(result: GlobalSearchResult, t?: Translate): SearchResultGroup[] {
   const groups: SearchResultGroup[] = [
     {
       type: "students",
       items: result.results.students.map((hit) => ({
         key: `students:${hit.id}`,
         title: studentTitle(hit),
-        subtitle: `${hit.admission_number} · ${studentStatusLabel(hit.status)}`,
+        subtitle: `${hit.admission_number} · ${studentStatusLabel(hit.status, t)}`,
         href: `/portal/admin/students/${hit.id}`,
       })),
     },
@@ -82,7 +85,7 @@ export function buildResultGroups(result: GlobalSearchResult): SearchResultGroup
       items: result.results.users.map((hit) => ({
         key: `users:${hit.id}`,
         title: userTitle(hit),
-        subtitle: userSubtitle(hit),
+        subtitle: userSubtitle(hit, t),
         href: `/portal/admin/users?q=${encodeURIComponent(hit.email)}`,
       })),
     },
@@ -100,7 +103,7 @@ export function buildResultGroups(result: GlobalSearchResult): SearchResultGroup
       items: result.results.materials.map((hit) => ({
         key: `materials:${hit.id}`,
         title: hit.title,
-        subtitle: materialIngestStatusLabel(hit.ingest_status),
+        subtitle: materialIngestStatusLabel(hit.ingest_status, t),
       })),
     },
   ];

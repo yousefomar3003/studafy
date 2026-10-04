@@ -241,6 +241,8 @@ export interface AppOptions {
    * env.REVIEW_LOGIN_PASSWORD. Absent keeps POST /api/auth/login/review registered but answering 404.
    */
   reviewLoginPassword?: string;
+  /** Skips the rate limiter. Local development only (env.RATE_LIMIT_DISABLED, refused elsewhere). */
+  rateLimitDisabled?: boolean;
   /**
    * S3-compatible object storage for assignment attachments (ST-103).
    *
@@ -303,6 +305,7 @@ export function createApp({
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
   reviewLoginPassword,
+  rateLimitDisabled = false,
   storage = null,
   stripeProvider = null,
   tapProvider = null,
@@ -410,7 +413,7 @@ export function createApp({
   // Rate limiter middleware: token-bucket rate limiting via Redis. Registered after the logger
   // so rate-limited requests are still logged for observability, but before routes so they
   // short-circuit before any handler runs.
-  if (redis) {
+  if (redis && !rateLimitDisabled) {
     app.use("*", rateLimiterMiddleware({ redis, eventSink }));
   }
 

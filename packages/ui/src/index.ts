@@ -88,3 +88,6 @@ export type {
   ToastProviderProps,
   ToastVariant,
 } from "./components/toast";
+
+export { DEFAULT_UI_STRINGS, UiStringsProvider, useUiStrings } from "./internal/ui-strings";
+export type { UiStrings, UiStringsProviderProps } from "./internal/ui-strings";

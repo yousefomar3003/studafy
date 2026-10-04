@@ -3,17 +3,20 @@ import { useState } from "react";
 
 import { HelpLink } from "../../../features/help/HelpLink";
 import { onboardingStepHelpPath } from "../../../features/help/onboarding-guide-links";
+import { useTranslation } from "../../../lib/i18n";
 import { fieldErrors, GRADING_SCHEME_TYPES, gradingSchemeSchema } from "../schema";
 
 import type { GradeBoundaryRow, GradingSchemeValues } from "../schema";
+import type { TFunction } from "i18next";
 import type { FormEvent } from "react";
 
-const SCHEME_TYPE_LABELS: Record<(typeof GRADING_SCHEME_TYPES)[number], string> = {
-  letter: "Letter grades",
-  percentage: "Percentage",
-  gpa: "GPA",
-  numeric: "Numeric score",
-  pass_fail: "Pass / fail",
+/** Translation keys for each scheme type's option label — resolved with `t()` at render time. */
+const SCHEME_TYPE_LABEL_KEYS: Record<(typeof GRADING_SCHEME_TYPES)[number], string> = {
+  letter: "onboarding.setup.gradingScheme.types.letter",
+  percentage: "onboarding.setup.gradingScheme.types.percentage",
+  gpa: "onboarding.setup.gradingScheme.types.gpa",
+  numeric: "onboarding.setup.gradingScheme.types.numeric",
+  pass_fail: "onboarding.setup.gradingScheme.types.passFail",
 };
 
 const LETTER_TEMPLATE: GradeBoundaryRow[] = [
@@ -24,23 +27,44 @@ const LETTER_TEMPLATE: GradeBoundaryRow[] = [
   { label: "F", min: 0, max: 59, gpa_points: 0.0 },
 ];
 
-const PASS_FAIL_TEMPLATE: GradeBoundaryRow[] = [
-  { label: "Pass", min: 60, max: 100, gpa_points: null },
-  { label: "Fail", min: 0, max: 59, gpa_points: null },
-];
+// The word-labelled starter templates are built per render with `t` so their editable default
+// labels follow the active locale.
+function passFailTemplate(t: TFunction): GradeBoundaryRow[] {
+  return [
+    {
+      label: t("onboarding.setup.gradingScheme.templatePass"),
+      min: 60,
+      max: 100,
+      gpa_points: null,
+    },
+    { label: t("onboarding.setup.gradingScheme.templateFail"), min: 0, max: 59, gpa_points: null },
+  ];
+}
 
-const SCORE_TEMPLATE: GradeBoundaryRow[] = [{ label: "Score", min: 0, max: 100, gpa_points: null }];
+function scoreTemplate(t: TFunction): GradeBoundaryRow[] {
+  return [
+    {
+      label: t("onboarding.setup.gradingScheme.templateScore"),
+      min: 0,
+      max: 100,
+      gpa_points: null,
+    },
+  ];
+}
 
-function templateFor(schemeType: (typeof GRADING_SCHEME_TYPES)[number]): GradeBoundaryRow[] {
+function templateFor(
+  schemeType: (typeof GRADING_SCHEME_TYPES)[number],
+  t: TFunction,
+): GradeBoundaryRow[] {
   switch (schemeType) {
     case "letter":
     case "gpa":
       return LETTER_TEMPLATE;
     case "pass_fail":
-      return PASS_FAIL_TEMPLATE;
+      return passFailTemplate(t);
     case "percentage":
     case "numeric":
-      return SCORE_TEMPLATE;
+      return scoreTemplate(t);
   }
 }
 
@@ -70,12 +94,14 @@ export function GradingSchemeStep({
   onGoToAcademicYear,
   submitting,
 }: GradingSchemeStepProps) {
+  const { t } = useTranslation();
   const [values, setValues] = useState<GradingSchemeValues>(
-    cachedValues ?? {
-      name: "Standard Scale",
-      scheme_type: "letter",
-      grade_boundaries: LETTER_TEMPLATE,
-    },
+    () =>
+      cachedValues ?? {
+        name: t("onboarding.setup.gradingScheme.defaultName"),
+        scheme_type: "letter",
+        grade_boundaries: LETTER_TEMPLATE,
+      },
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -83,10 +109,10 @@ export function GradingSchemeStep({
     return (
       <Card>
         <CardBody>
-          <h2>Grading scheme</h2>
-          <p role="alert">Create an academic year first — a grading scheme attaches to a term.</p>
+          <h2>{t("onboarding.setup.gradingScheme.title")}</h2>
+          <p role="alert">{t("onboarding.setup.gradingScheme.needsAcademicYear")}</p>
           <Button type="button" onClick={onGoToAcademicYear}>
-            Go to academic year
+            {t("onboarding.setup.goToAcademicYear")}
           </Button>
         </CardBody>
       </Card>
@@ -122,54 +148,58 @@ export function GradingSchemeStep({
   return (
     <Card>
       <CardBody>
-        <form onSubmit={handleSubmit} noValidate aria-label="Grading scheme">
-          <h2>Grading scheme</h2>
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          aria-label={t("onboarding.setup.gradingScheme.title")}
+        >
+          <h2>{t("onboarding.setup.gradingScheme.title")}</h2>
           <p>
             <HelpLink to={onboardingStepHelpPath("gradingScheme")}>
-              Need help with this step?
+              {t("onboarding.setup.needHelp")}
             </HelpLink>
           </p>
 
           <Input
-            label="Scheme name"
+            label={t("onboarding.setup.gradingScheme.name")}
             value={values.name}
             onChange={(e) => setValues((prev) => ({ ...prev, name: e.target.value }))}
-            error={errors.name}
+            error={errors.name && t(errors.name)}
             required
           />
 
           <Select
-            label="Scheme type"
+            label={t("onboarding.setup.gradingScheme.type")}
             options={GRADING_SCHEME_TYPES.map((type) => ({
               value: type,
               // eslint-disable-next-line security/detect-object-injection -- `type` comes from iterating this module's own fixed `GRADING_SCHEME_TYPES` tuple, not user input
-              label: SCHEME_TYPE_LABELS[type],
+              label: t(SCHEME_TYPE_LABEL_KEYS[type]),
             }))}
             value={values.scheme_type}
             onChange={(value) =>
               setValues((prev) => ({
                 ...prev,
                 scheme_type: value as GradingSchemeValues["scheme_type"],
-                grade_boundaries: templateFor(value as GradingSchemeValues["scheme_type"]),
+                grade_boundaries: templateFor(value as GradingSchemeValues["scheme_type"], t),
               }))
             }
             required
           />
 
           <fieldset>
-            <legend>Grade boundaries</legend>
-            {errors.grade_boundaries ? <p role="alert">{errors.grade_boundaries}</p> : null}
+            <legend>{t("onboarding.setup.gradingScheme.boundaries")}</legend>
+            {errors.grade_boundaries ? <p role="alert">{t(errors.grade_boundaries)}</p> : null}
 
             {values.grade_boundaries.map((row, index) => (
               <div key={index}>
                 <Input
-                  label={`Label ${index + 1}`}
+                  label={t("onboarding.setup.gradingScheme.rowLabel", { number: index + 1 })}
                   value={row.label}
                   onChange={(e) => updateRow(index, { label: e.target.value })}
                   required
                 />
                 <Input
-                  label={`Min % ${index + 1}`}
+                  label={t("onboarding.setup.gradingScheme.rowMin", { number: index + 1 })}
                   type="number"
                   min={0}
                   max={100}
@@ -178,7 +208,7 @@ export function GradingSchemeStep({
                   required
                 />
                 <Input
-                  label={`Max % ${index + 1}`}
+                  label={t("onboarding.setup.gradingScheme.rowMax", { number: index + 1 })}
                   type="number"
                   min={0}
                   max={100}
@@ -187,7 +217,7 @@ export function GradingSchemeStep({
                   required
                 />
                 <Input
-                  label={`GPA points ${index + 1}`}
+                  label={t("onboarding.setup.gradingScheme.rowGpa", { number: index + 1 })}
                   type="number"
                   min={0}
                   max={4.5}
@@ -205,7 +235,7 @@ export function GradingSchemeStep({
                   onClick={() => removeRow(index)}
                   disabled={values.grade_boundaries.length <= 1}
                 >
-                  Remove
+                  {t("onboarding.setup.gradingScheme.removeRow")}
                 </Button>
               </div>
             ))}
@@ -220,15 +250,15 @@ export function GradingSchemeStep({
                 }))
               }
             >
-              Add boundary
+              {t("onboarding.setup.gradingScheme.addRow")}
             </Button>
           </fieldset>
 
           <Button type="submit" loading={submitting}>
-            Save and continue
+            {t("onboarding.setup.saveAndContinue")}
           </Button>
           <Button type="button" variant="tertiary" onClick={onSkip} disabled={submitting}>
-            Skip for now
+            {t("onboarding.setup.skipForNow")}
           </Button>
         </form>
       </CardBody>

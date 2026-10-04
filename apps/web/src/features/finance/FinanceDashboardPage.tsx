@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "../../lib/i18n";
 import { helpPath } from "../help/content";
 import { HelpLink } from "../help/HelpLink";
 
@@ -21,29 +22,31 @@ import "./finance-dashboard.css";
  * `PrincipalDashboardPage` — one failing report never blocks the others from rendering.
  */
 export default function FinanceDashboardPage() {
+  const { t } = useTranslation();
+
   return (
     <>
-      <h1>Finance</h1>
+      <h1>{t("finance.dashboard.title")}</h1>
+      <p>{t("finance.dashboard.intro")}</p>
       <p>
-        Collections vs due this term, receivables aging, overdue installments, and recent payments.
+        <HelpLink to={helpPath("workflows")}>{t("finance.dashboard.readGuide")}</HelpLink>
       </p>
       <p>
-        <HelpLink to={helpPath("workflows")}>Read the guide</HelpLink>
-      </p>
-      <p>
-        <Link to="/portal/finance/fees">Fee structure builder</Link>
+        <Link to="/portal/finance/fees">{t("finance.dashboard.nav.fees")}</Link>
         {" · "}
-        <Link to="/portal/finance/invoices">Invoices</Link>
+        <Link to="/portal/finance/invoices">{t("finance.dashboard.nav.invoices")}</Link>
         {" · "}
-        <Link to="/portal/finance/payments">Payments</Link>
+        <Link to="/portal/finance/payments">{t("finance.dashboard.nav.payments")}</Link>
         {" · "}
-        <Link to="/portal/finance/adjustments/scholarships">Scholarships</Link>
+        <Link to="/portal/finance/adjustments/scholarships">
+          {t("finance.dashboard.nav.scholarships")}
+        </Link>
         {" · "}
-        <Link to="/portal/finance/adjustments/refunds">Refunds</Link>
+        <Link to="/portal/finance/adjustments/refunds">{t("finance.dashboard.nav.refunds")}</Link>
         {" · "}
-        <Link to="/portal/finance/reports">Reports</Link>
+        <Link to="/portal/finance/reports">{t("finance.dashboard.nav.reports")}</Link>
         {" · "}
-        <Link to="/portal/finance/expenses">Expenses</Link>
+        <Link to="/portal/finance/expenses">{t("finance.dashboard.nav.expenses")}</Link>
       </p>
 
       <div className="finance-dashboard-grid">

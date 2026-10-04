@@ -2,6 +2,7 @@ import { Button, Input } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
 import { searchStudents, studentDisplayName, studentSearchQueryKey } from "../fees/queries";
 
 import type { StudentProfile } from "../fees/queries";
@@ -22,6 +23,7 @@ export interface StudentPickerFieldProps {
  * duplicated — only the presentational component is feature-local.
  */
 export function StudentPickerField({ value, onChange }: StudentPickerFieldProps) {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -40,13 +42,13 @@ export function StudentPickerField({ value, onChange }: StudentPickerFieldProps)
     return (
       <div className="adjustments-form__student-selected">
         <div>
-          <span className="sf-field__label">Student</span>
+          <span className="sf-field__label">{t("financeReports.adjustments.common.student")}</span>
           <p>
             {studentDisplayName(value)} &mdash; {value.admission_number}
           </p>
         </div>
         <Button type="button" variant="tertiary" onClick={() => onChange(null)}>
-          Change
+          {t("financeReports.adjustments.common.change")}
         </Button>
       </div>
     );
@@ -55,9 +57,9 @@ export function StudentPickerField({ value, onChange }: StudentPickerFieldProps)
   return (
     <div className="adjustments-form__student-picker">
       <Input
-        label="Student"
+        label={t("financeReports.adjustments.common.student")}
         type="search"
-        placeholder="Search by name or admission number"
+        placeholder={t("financeReports.adjustments.studentPicker.placeholder")}
         value={searchInput}
         onChange={(event) => setSearchInput(event.target.value)}
         required
@@ -81,7 +83,9 @@ export function StudentPickerField({ value, onChange }: StudentPickerFieldProps)
             </li>
           ))}
           {!resultsQuery.isPending && resultsQuery.data?.length === 0 ? (
-            <li className="adjustments-form__student-empty">No students match.</li>
+            <li className="adjustments-form__student-empty">
+              {t("financeReports.adjustments.studentPicker.noMatches")}
+            </li>
           ) : null}
         </ul>
       ) : null}

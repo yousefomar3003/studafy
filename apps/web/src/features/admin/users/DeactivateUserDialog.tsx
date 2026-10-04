@@ -3,6 +3,7 @@ import { Button, Modal, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
+import { useTranslation } from "../../../lib/i18n";
 
 import { useDeactivateUser } from "./mutations";
 
@@ -20,6 +21,7 @@ export interface DeactivateUserDialogProps {
  * `enabled: open` so it is fetched only while the dialog is actually up, matching DeviceSessionsPanel.
  */
 export function DeactivateUserDialog({ user, onClose }: DeactivateUserDialogProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const deactivateUser = useDeactivateUser();
   const open = user !== null;
@@ -52,15 +54,20 @@ export function DeactivateUserDialog({ user, onClose }: DeactivateUserDialogProp
       onSuccess: (result) => {
         show({
           variant: "success",
-          title: `${user.display_name ?? user.email} deactivated`,
-          description: `${result.revoked} session(s) revoked across their devices; ${result.invitations_revoked} pending invitation(s) cancelled.`,
+          title: t("adminPeople.users.deactivate.successToast", {
+            name: user.display_name ?? user.email,
+          }),
+          description: t("adminPeople.users.deactivate.successDescription", {
+            revoked: result.revoked,
+            invitations: result.invitations_revoked,
+          }),
         });
         onClose();
       },
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't deactivate user",
+          title: t("adminPeople.users.deactivate.error"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
       },
@@ -75,25 +82,22 @@ export function DeactivateUserDialog({ user, onClose }: DeactivateUserDialogProp
     <Modal
       open={open}
       onClose={onClose}
-      title="Deactivate user"
+      title={t("adminPeople.users.deactivate.title")}
       description={user ? `${user.display_name ?? user.email} (${user.email})` : undefined}
     >
       <Modal.Body>
-        <p>
-          This immediately suspends the account and signs it out everywhere. It cannot be undone
-          from this screen.
-        </p>
+        <p>{t("adminPeople.users.deactivate.body")}</p>
         <p role={countsLoading ? "status" : undefined}>
           {countsLoading
-            ? "Checking active sessions…"
+            ? t("adminPeople.users.deactivate.checking")
             : sessionCount === 0 && deviceCount === 0
-              ? "This user has no active sessions or registered devices."
-              : `This will end ${sessionCount} active session${sessionCount === 1 ? "" : "s"} across ${deviceCount} device${deviceCount === 1 ? "" : "s"}, and cancel any pending invitations for this account.`}
+              ? t("adminPeople.users.deactivate.noSessions")
+              : t("adminPeople.users.deactivate.consequence", { sessionCount, deviceCount })}
         </p>
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>
-          Cancel
+          {t("adminPeople.common.cancel")}
         </Button>
         <Button
           type="button"
@@ -101,7 +105,7 @@ export function DeactivateUserDialog({ user, onClose }: DeactivateUserDialogProp
           loading={deactivateUser.isPending}
           onClick={handleConfirm}
         >
-          Deactivate
+          {t("adminPeople.users.deactivate.confirm")}
         </Button>
       </Modal.Footer>
     </Modal>

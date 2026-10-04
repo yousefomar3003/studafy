@@ -2,12 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 
 import { DashboardTile } from "../../../components/DashboardTile";
 import { api } from "../../../lib/api";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 /** No realtime event is routed for user status changes yet, so this polls instead. */
 const ACTIVATION_FUNNEL_POLL_MS = 60_000;
 
 /** Invited-to-active user counts, backed by `GET /api/users/status-counts`. */
 export function ActivationFunnelTile() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const { data, isPending, isError } = useQuery({
     queryKey: ["user-status-counts"],
     queryFn: async () => {
@@ -22,21 +25,21 @@ export function ActivationFunnelTile() {
 
   return (
     <DashboardTile
-      title="Activation funnel"
+      title={t("adminSchool.tiles.activation.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load user activation counts."
+      errorMessage={t("adminSchool.tiles.activation.error")}
     >
       {invited === 0 && active === 0 ? (
-        <p className="dashboard-tile__caption">No invited or active users yet.</p>
+        <p className="dashboard-tile__caption">{t("adminSchool.tiles.activation.empty")}</p>
       ) : (
         <dl className="dashboard-tile__stat-list">
           <div className="dashboard-tile__stat">
-            <dt>Invited</dt>
-            <dd>{invited}</dd>
+            <dt>{t("adminSchool.tiles.activation.invited")}</dt>
+            <dd>{formatNumber(invited)}</dd>
           </div>
           <div className="dashboard-tile__stat">
-            <dt>Active</dt>
-            <dd>{active}</dd>
+            <dt>{t("adminSchool.tiles.activation.active")}</dt>
+            <dd>{formatNumber(active)}</dd>
           </div>
         </dl>
       )}

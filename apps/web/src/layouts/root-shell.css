@@ -1,0 +1,78 @@
+/* Shared top bar rendered by RootLayout on the non-marketing, non-portal route groups
+   (onboarding, account, invite). Theme-aware via the shared tokens; logical properties for RTL. */
+
+.root-nav {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 10;
+  border-block-end: 1px solid var(--color-border);
+  background-color: var(--color-background);
+}
+
+.root-nav__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-24);
+  max-inline-size: 72rem;
+  min-block-size: 64px;
+  margin-inline: auto;
+  padding-inline: var(--space-24);
+}
+
+.root-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--color-foreground);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.root-nav__links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-inline-start: auto;
+  overflow-x: auto;
+}
+
+.root-nav__link {
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-fast) var(--easing-standard),
+    color var(--duration-fast) var(--easing-standard);
+}
+
+.root-nav__link:hover {
+  background-color: var(--color-surface);
+  color: var(--color-foreground);
+}
+
+.root-nav__link[aria-current="page"] {
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+}
+
+.root-nav__brand:focus-visible,
+.root-nav__link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (max-width: 40rem) {
+  .root-nav__inner {
+    gap: var(--space-12);
+    padding-inline: var(--space-16);
+  }
+
+  .root-nav__link {
+    padding-inline: var(--space-8);
+  }
+}

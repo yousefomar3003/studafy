@@ -3,8 +3,11 @@ import { Button, Table, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { DATE_TIME_OPTIONS } from "../format";
+
 import { ApprovalDiffModal } from "./ApprovalDiffModal";
-import { ITEM_TYPE_LABELS } from "./labels";
+import { ITEM_TYPE_LABEL_KEYS } from "./labels";
 import { useDecideApprovals } from "./mutations";
 import { APPROVAL_QUEUE_KEY, fetchApprovalQueue } from "./queries";
 import { RejectReasonModal } from "./RejectReasonModal";
@@ -42,6 +45,8 @@ function apiErrorDescription(error: unknown): string | undefined {
  * live — no client-side row removal.
  */
 export default function ApprovalQueuePage() {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { show } = useToast();
   const decide = useDecideApprovals();
 
@@ -119,11 +124,15 @@ export default function ApprovalQueuePage() {
         const failed = result.results[0]?.error;
         show(
           failed
-            ? { variant: "error", title: "Couldn't approve item", description: failed }
-            : { variant: "success", title: "Item approved" },
+            ? {
+                variant: "error",
+                title: t("principal.approvals.toast.approveFailed"),
+                description: failed,
+              }
+            : { variant: "success", title: t("principal.approvals.toast.approved") },
         );
       },
-      onError: (error) => showApiError("Couldn't approve item", error),
+      onError: (error) => showApiError(t("principal.approvals.toast.approveFailed"), error),
     });
   }
 
@@ -145,10 +154,14 @@ export default function ApprovalQueuePage() {
         if (rejectTarget.kind === "single") {
           const failed = result.results[0]?.error;
           if (failed) {
-            show({ variant: "error", title: "Couldn't reject item", description: failed });
+            show({
+              variant: "error",
+              title: t("principal.approvals.toast.rejectFailed"),
+              description: failed,
+            });
             return; // keep the modal open so the reason can be fixed and resubmitted
           }
-          show({ variant: "success", title: "Item rejected" });
+          show({ variant: "success", title: t("principal.approvals.toast.rejected") });
           setRejectTarget(null);
           return;
         }
@@ -161,17 +174,17 @@ export default function ApprovalQueuePage() {
           failed === 0
             ? {
                 variant: "success",
-                title: `${succeeded} of ${total} item${total === 1 ? "" : "s"} rejected`,
+                title: t("principal.approvals.toast.bulkRejectedAll", { succeeded, count: total }),
               }
             : {
                 variant: succeeded === 0 ? "error" : "warning",
-                title: `${succeeded} of ${total} rejected`,
-                description: `${failed} failed — see the error on each row below.`,
+                title: t("principal.approvals.toast.bulkRejectedPartial", { succeeded, total }),
+                description: t("principal.approvals.toast.bulkFailedDescription", { failed }),
               },
         );
         setRejectTarget(null);
       },
-      onError: (error) => showApiError("Couldn't reject item(s)", error),
+      onError: (error) => showApiError(t("principal.approvals.toast.bulkRejectFailed"), error),
     });
   }
 
@@ -189,16 +202,16 @@ export default function ApprovalQueuePage() {
           failed === 0
             ? {
                 variant: "success",
-                title: `${succeeded} of ${total} item${total === 1 ? "" : "s"} approved`,
+                title: t("principal.approvals.toast.bulkApprovedAll", { succeeded, count: total }),
               }
             : {
                 variant: succeeded === 0 ? "error" : "warning",
-                title: `${succeeded} of ${total} approved`,
-                description: `${failed} failed — see the error on each row below.`,
+                title: t("principal.approvals.toast.bulkApprovedPartial", { succeeded, total }),
+                description: t("principal.approvals.toast.bulkFailedDescription", { failed }),
               };
         show(toast);
       },
-      onError: (error) => showApiError("Couldn't process approvals", error),
+      onError: (error) => showApiError(t("principal.approvals.toast.bulkApproveFailed"), error),
     });
   }
 
@@ -210,8 +223,8 @@ export default function ApprovalQueuePage() {
 
   return (
     <>
-      <h1>Approvals</h1>
-      <p>Grade submissions and timetable versions awaiting your review.</p>
+      <h1>{t("principal.approvals.title")}</h1>
+      <p>{t("principal.approvals.description")}</p>
 
       <div className="approvals-queue__toolbar">
         <Button
@@ -220,14 +233,18 @@ export default function ApprovalQueuePage() {
           loading={decide.isPending}
           onClick={handleApproveSelected}
         >
-          {selectedIds.size > 0 ? `Approve ${selectedIds.size} selected` : "Approve selected"}
+          {selectedIds.size > 0
+            ? t("principal.approvals.approveCountSelected", { selected: selectedIds.size })
+            : t("principal.approvals.approveSelected")}
         </Button>
         <Button variant="tertiary" disabled={selectedIds.size === 0} onClick={handleRejectSelected}>
-          {selectedIds.size > 0 ? `Reject ${selectedIds.size} selected` : "Reject selected"}
+          {selectedIds.size > 0
+            ? t("principal.approvals.rejectCountSelected", { selected: selectedIds.size })
+            : t("principal.approvals.rejectSelected")}
         </Button>
       </div>
 
-      <Table caption="Pending approval items">
+      <Table caption={t("principal.approvals.tableCaption")}>
         <Table.Header>
           <Table.Row>
             <Table.HeaderCell>
@@ -236,22 +253,22 @@ export default function ApprovalQueuePage() {
                 type="checkbox"
                 className="approvals-queue__select-checkbox"
                 checked={allSelected}
-                aria-label="Select all pending items"
+                aria-label={t("principal.approvals.selectAll")}
                 disabled={items.length === 0}
                 onChange={toggleAll}
               />
             </Table.HeaderCell>
-            <Table.HeaderCell>Type</Table.HeaderCell>
-            <Table.HeaderCell>Summary</Table.HeaderCell>
-            <Table.HeaderCell>Requested by</Table.HeaderCell>
-            <Table.HeaderCell>Requested at</Table.HeaderCell>
-            <Table.HeaderCell>Actions</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.approvals.columns.type")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.approvals.columns.summary")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.approvals.columns.requestedBy")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.approvals.columns.requestedAt")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.approvals.columns.actions")}</Table.HeaderCell>
           </Table.Row>
         </Table.Header>
         <Table.Body
           columnCount={COLUMN_COUNT}
           loading={isPending}
-          empty={isError ? "Unable to load the approval queue." : "Nothing is pending review."}
+          empty={isError ? t("principal.approvals.error") : t("principal.approvals.empty")}
         >
           {items.map((item) => (
             <Table.Row key={item.id} aria-selected={selectedIds.has(item.id)}>
@@ -260,34 +277,36 @@ export default function ApprovalQueuePage() {
                   type="checkbox"
                   className="approvals-queue__select-checkbox"
                   checked={selectedIds.has(item.id)}
-                  aria-label={`Select ${item.summary}`}
+                  aria-label={t("principal.approvals.selectItem", { summary: item.summary })}
                   onChange={() => toggleRow(item.id)}
                 />
               </Table.Cell>
-              <Table.Cell>{ITEM_TYPE_LABELS[item.item_type]}</Table.Cell>
+              <Table.Cell>{t(ITEM_TYPE_LABEL_KEYS[item.item_type])}</Table.Cell>
               <Table.Cell>{item.summary}</Table.Cell>
               <Table.Cell>{item.requested_by_display_name ?? "—"}</Table.Cell>
               <Table.Cell>
-                {item.requested_at ? new Date(item.requested_at).toLocaleString() : "—"}
+                {item.requested_at
+                  ? formatDate(new Date(item.requested_at), DATE_TIME_OPTIONS)
+                  : "—"}
               </Table.Cell>
               <Table.Cell>
                 <div className="approvals-queue__actions">
                   <Button variant="tertiary" onClick={() => setViewingItem(item)}>
-                    View diff
+                    {t("principal.approvals.viewDiff")}
                   </Button>
                   <Button
                     variant="secondary"
                     disabled={decide.isPending}
                     onClick={() => handleApprove(item)}
                   >
-                    Approve
+                    {t("principal.approvals.approve")}
                   </Button>
                   <Button
                     variant="tertiary"
                     disabled={decide.isPending}
                     onClick={() => setRejectTarget({ kind: "single", item })}
                   >
-                    Reject
+                    {t("principal.approvals.reject")}
                   </Button>
                 </div>
                 {rowErrors[item.id] ? (
@@ -306,12 +325,18 @@ export default function ApprovalQueuePage() {
       <RejectReasonModal
         key={rejectTargetKey(rejectTarget)}
         open={rejectTarget !== null}
-        title={rejectTarget?.kind === "bulk" ? "Reject selected items" : "Reject item"}
+        title={
+          rejectTarget?.kind === "bulk"
+            ? t("principal.approvals.rejectModal.titleBulk")
+            : t("principal.approvals.rejectModal.titleSingle")
+        }
         description={
           rejectTarget?.kind === "single"
             ? rejectTarget.item.summary
             : rejectTarget?.kind === "bulk"
-              ? `${rejectTarget.items.length} item${rejectTarget.items.length === 1 ? "" : "s"} selected`
+              ? t("principal.approvals.rejectModal.selectedCount", {
+                  count: rejectTarget.items.length,
+                })
               : undefined
         }
         submitting={decide.isPending}

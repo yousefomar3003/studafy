@@ -2,6 +2,8 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Modal, useToast } from "@studafy/ui";
 import { useEffect, useId, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useResolveIncident } from "./mutations";
 
 export interface ResolveIncidentModalProps {
@@ -20,6 +22,7 @@ function apiErrorDescription(error: unknown): string | undefined {
  * re-check that, it just carries out the resolve call the caller already gated.
  */
 export function ResolveIncidentModal({ open, incidentId, onClose }: ResolveIncidentModalProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const [resolutionDescription, setResolutionDescription] = useState("");
   const resolve = useResolveIncident(incidentId);
@@ -35,13 +38,13 @@ export function ResolveIncidentModal({ open, incidentId, onClose }: ResolveIncid
       { resolution_description: resolutionDescription.trim() || undefined },
       {
         onSuccess: () => {
-          show({ variant: "success", title: "Incident resolved" });
+          show({ variant: "success", title: t("principal.discipline.resolve.success") });
           onClose();
         },
         onError: (error) =>
           show({
             variant: "error",
-            title: "Couldn't resolve incident",
+            title: t("principal.discipline.resolve.failed"),
             description: apiErrorDescription(error),
           }),
       },
@@ -52,13 +55,13 @@ export function ResolveIncidentModal({ open, incidentId, onClose }: ResolveIncid
     <Modal
       open={open}
       onClose={onClose}
-      title="Resolve incident"
-      description="Marks the incident resolved. If this school allows parent visibility, it becomes visible to the student's parent."
+      title={t("principal.discipline.resolve.title")}
+      description={t("principal.discipline.resolve.description")}
     >
       <Modal.Body>
         <div className="sf-field">
           <label className="sf-field__label" htmlFor={notesId}>
-            Resolution notes
+            {t("principal.discipline.resolve.notes")}
           </label>
           <div className="sf-input discipline-resolution-input">
             <textarea
@@ -72,16 +75,16 @@ export function ResolveIncidentModal({ open, incidentId, onClose }: ResolveIncid
         </div>
         {resolve.isError ? (
           <p role="alert" className="discipline-detail__hint">
-            {apiErrorDescription(resolve.error) ?? "The incident could not be resolved."}
+            {apiErrorDescription(resolve.error) ?? t("principal.discipline.resolve.errorFallback")}
           </p>
         ) : null}
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>
-          Cancel
+          {t("principal.common.cancel")}
         </Button>
         <Button type="button" variant="primary" loading={resolve.isPending} onClick={handleSubmit}>
-          Resolve
+          {t("principal.discipline.resolve.submit")}
         </Button>
       </Modal.Footer>
     </Modal>

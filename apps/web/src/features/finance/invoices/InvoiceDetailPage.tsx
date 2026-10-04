@@ -2,6 +2,8 @@ import { Button, Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { invoiceStatusLabel, invoiceStatusTone } from "./labels";
 import { fetchInvoice, invoiceQueryKey } from "./queries";
 
@@ -19,6 +21,7 @@ import "./invoices.css";
  * of the exact DOM the detail view shows — rather than by reproducing ERPNext's own print template.
  */
 export default function InvoiceDetailPage() {
+  const { t } = useTranslation();
   const { invoiceId } = useParams<{ invoiceId: string }>();
 
   const query = useQuery({
@@ -33,16 +36,16 @@ export default function InvoiceDetailPage() {
   }
 
   if (query.isPending) {
-    return <p role="status">Loading…</p>;
+    return <p role="status">{t("finance.common.loading")}</p>;
   }
 
   if (query.isError) {
     return (
       <>
         <p className="invoices-detail__back invoices-detail__no-print">
-          <Link to="/portal/finance/invoices">&larr; Back to invoices</Link>
+          <Link to="/portal/finance/invoices">{t("finance.invoices.backToInvoices")}</Link>
         </p>
-        <p role="alert">Couldn't load this invoice. Please try again.</p>
+        <p role="alert">{t("finance.invoices.detail.loadError")}</p>
       </>
     );
   }
@@ -57,12 +60,12 @@ export default function InvoiceDetailPage() {
   return (
     <div className="invoices-detail">
       <p className="invoices-detail__back invoices-detail__no-print">
-        <Link to="/portal/finance/invoices">&larr; Back to invoices</Link>
+        <Link to="/portal/finance/invoices">{t("finance.invoices.backToInvoices")}</Link>
       </p>
 
       <div className="invoices-detail__header">
         <div>
-          <h1>Invoice {invoice.erpnext_docname}</h1>
+          <h1>{t("finance.invoices.detail.title", { number: invoice.erpnext_docname })}</h1>
           <p>
             {invoice.student_name} &middot; {invoice.admission_number}
           </p>
@@ -72,38 +75,38 @@ export default function InvoiceDetailPage() {
             className="invoices-status-pill"
             data-tone={invoiceStatusTone(invoice.erpnext_status)}
           >
-            {invoiceStatusLabel(invoice.erpnext_status)}
+            {invoiceStatusLabel(invoice.erpnext_status, t)}
           </span>
           {canRecordPayment ? (
             <Link to={`/portal/finance/payments/new?invoiceId=${invoice.id}`}>
-              <Button type="button">Record payment</Button>
+              <Button type="button">{t("finance.common.recordPayment")}</Button>
             </Link>
           ) : null}
           <Button type="button" variant="secondary" onClick={handlePrint}>
-            Print / Save as PDF
+            {t("finance.invoices.detail.print")}
           </Button>
         </div>
       </div>
 
-      <Card as="section" aria-label="Invoice summary">
+      <Card as="section" aria-label={t("finance.invoices.detail.summary")}>
         <Card.Body>
           <dl className="invoices-detail__summary">
             <div>
-              <dt>Issued</dt>
+              <dt>{t("finance.common.issued")}</dt>
               <dd>{invoice.issued_date}</dd>
             </div>
             <div>
-              <dt>Due</dt>
+              <dt>{t("finance.common.due")}</dt>
               <dd>{invoice.due_date ?? "—"}</dd>
             </div>
             <div>
-              <dt>Total</dt>
+              <dt>{t("finance.common.total")}</dt>
               <dd>
                 {invoice.total_amount} {invoice.currency}
               </dd>
             </div>
             <div>
-              <dt>Outstanding</dt>
+              <dt>{t("finance.common.outstanding")}</dt>
               <dd>
                 {invoice.outstanding_amount} {invoice.currency}
               </dd>
@@ -112,19 +115,24 @@ export default function InvoiceDetailPage() {
         </Card.Body>
       </Card>
 
-      <section aria-label="Invoice lines" className="invoices-detail__lines">
-        <h2>Lines</h2>
+      <section
+        aria-label={t("finance.invoices.detail.linesLabel")}
+        className="invoices-detail__lines"
+      >
+        <h2>{t("finance.invoices.detail.lines")}</h2>
         {invoice.lines.length === 0 ? (
-          <p className="invoices-detail__lines-empty">No line items on this invoice.</p>
+          <p className="invoices-detail__lines-empty">{t("finance.invoices.detail.noLines")}</p>
         ) : (
           <table className="invoices-detail__lines-table">
-            <caption className="sf-visually-hidden">Invoice lines</caption>
+            <caption className="sf-visually-hidden">
+              {t("finance.invoices.detail.linesLabel")}
+            </caption>
             <thead>
               <tr>
-                <th scope="col">Fee category</th>
-                <th scope="col">Description</th>
-                <th scope="col">Qty</th>
-                <th scope="col">Amount</th>
+                <th scope="col">{t("finance.invoices.detail.feeCategory")}</th>
+                <th scope="col">{t("finance.invoices.detail.lineDescription")}</th>
+                <th scope="col">{t("finance.invoices.detail.quantity")}</th>
+                <th scope="col">{t("finance.common.amount")}</th>
               </tr>
             </thead>
             <tbody>
@@ -144,7 +152,7 @@ export default function InvoiceDetailPage() {
             <tfoot>
               <tr>
                 <th scope="row" colSpan={3}>
-                  Total
+                  {t("finance.common.total")}
                 </th>
                 <td>
                   {invoice.total_amount} {invoice.currency}

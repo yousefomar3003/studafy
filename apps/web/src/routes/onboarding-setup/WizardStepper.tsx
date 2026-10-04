@@ -1,16 +1,19 @@
 import { Chip } from "@studafy/ui";
 
+import { useTranslation } from "../../lib/i18n";
+
 import { STEP_IDS } from "./progress";
 
 import type { StepId, StepState } from "./progress";
 
-const STEP_LABELS: Record<StepId, string> = {
-  "school-profile": "School profile",
-  "academic-year": "Academic year",
-  "grading-scheme": "Grading scheme",
-  timetable: "Timetable periods",
-  staff: "Staff invitations",
-  students: "Student import",
+/** Translation keys for each step's label — resolved with `t()` at render time. */
+const STEP_LABEL_KEYS: Record<StepId, string> = {
+  "school-profile": "onboarding.setup.steps.schoolProfile",
+  "academic-year": "onboarding.setup.steps.academicYear",
+  "grading-scheme": "onboarding.setup.steps.gradingScheme",
+  timetable: "onboarding.setup.steps.timetable",
+  staff: "onboarding.setup.steps.staff",
+  students: "onboarding.setup.steps.students",
 };
 
 export interface WizardStepperProps {
@@ -24,17 +27,19 @@ function chipVariant(state: StepState, isCurrent: boolean): "filled" | "outlined
   return isCurrent || state === "completed" ? "filled" : "outlined";
 }
 
-function statusLabel(state: StepState, isCurrent: boolean): string {
-  if (isCurrent) return "current";
-  if (state === "completed") return "done";
-  if (state === "skipped") return "skipped";
-  return "not started";
+function statusLabelKey(state: StepState, isCurrent: boolean): string {
+  if (isCurrent) return "onboarding.setup.stepStatus.current";
+  if (state === "completed") return "onboarding.setup.stepStatus.done";
+  if (state === "skipped") return "onboarding.setup.stepStatus.skipped";
+  return "onboarding.setup.stepStatus.notStarted";
 }
 
 /** Step rail for the setup wizard. Visited steps (done or skipped) are clickable so an admin can jump back. */
 export function WizardStepper({ currentStep, stepState, onSelect }: WizardStepperProps) {
+  const { t } = useTranslation();
+
   return (
-    <nav aria-label="Setup steps">
+    <nav aria-label={t("onboarding.setup.stepsNavLabel")}>
       <ol>
         {STEP_IDS.map((step, index) => {
           const isCurrent = step === currentStep;
@@ -50,10 +55,15 @@ export function WizardStepper({ currentStep, stepState, onSelect }: WizardSteppe
                 disabled={!visited}
                 aria-current={isCurrent ? "step" : undefined}
               >
-                {/* eslint-disable-next-line security/detect-object-injection -- same as above */}
-                {index + 1}. {STEP_LABELS[step]}
+                {t("onboarding.setup.stepLabel", {
+                  number: index + 1,
+                  // eslint-disable-next-line security/detect-object-injection -- same as above
+                  label: t(STEP_LABEL_KEYS[step]),
+                })}
               </button>
-              <Chip variant={chipVariant(state, isCurrent)}>{statusLabel(state, isCurrent)}</Chip>
+              <Chip variant={chipVariant(state, isCurrent)}>
+                {t(statusLabelKey(state, isCurrent))}
+              </Chip>
             </li>
           );
         })}

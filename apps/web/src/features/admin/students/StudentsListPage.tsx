@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { usePermissions } from "../../../lib/auth";
+import { useTranslation } from "../../../lib/i18n";
 
 import { CreateStudentModal } from "./CreateStudentModal";
 import {
@@ -14,7 +15,7 @@ import {
   studentsInClassQueryKey,
   studentsListQueryKey,
 } from "./queries";
-import { STATUS_LABELS } from "./schema";
+import { STATUS_LABEL_KEYS } from "./schema";
 
 import "./students.css";
 
@@ -22,13 +23,6 @@ import type { StudentProfile, StudentsFilters } from "./queries";
 import type { DateRangeValue, SelectOption } from "@studafy/ui";
 
 const SEARCH_DEBOUNCE_MS = 300;
-
-const STATUS_OPTIONS: SelectOption<StudentsFilters["status"]>[] = [
-  { value: "", label: "All statuses" },
-  ...(Object.entries(STATUS_LABELS) as [StudentsFilters["status"], string][]).map(
-    ([value, label]) => ({ value, label }),
-  ),
-];
 
 function fullName(student: StudentProfile): string {
   return [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ");
@@ -46,6 +40,7 @@ function fullName(student: StudentProfile): string {
  * controls are hidden while a class filter is active.
  */
 export default function StudentsListPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const permissions = usePermissions();
   const canViewAdmissionData = permissions.has(PERMISSIONS.BILLING_READ);
@@ -85,8 +80,14 @@ export default function StudentsListPage() {
   ]);
 
   const classesQuery = useQuery({ queryKey: ["classes", "active"], queryFn: fetchActiveClasses });
+  const statusOptions: SelectOption<StudentsFilters["status"]>[] = [
+    { value: "", label: t("adminPeople.students.list.allStatuses") },
+    ...(Object.entries(STATUS_LABEL_KEYS) as [StudentsFilters["status"], string][]).map(
+      ([value, key]) => ({ value, label: t(key) }),
+    ),
+  ];
   const classOptions: SelectOption<string>[] = [
-    { value: "", label: "All classes" },
+    { value: "", label: t("adminPeople.students.list.allClasses") },
     ...(classesQuery.data ?? []).map((klass) => ({ value: klass.id, label: klass.code })),
   ];
 
@@ -116,38 +117,38 @@ export default function StudentsListPage() {
   const columns = [
     {
       id: "name",
-      header: "Name",
+      header: t("adminPeople.students.list.columns.name"),
       renderCell: (student: StudentProfile) => fullName(student) || "—",
     },
     ...(canViewAdmissionData
       ? [
           {
             id: "admission_number",
-            header: "Admission #",
+            header: t("adminPeople.students.list.columns.admissionNumber"),
             renderCell: (student: StudentProfile) => student.admission_number || "—",
           },
         ]
       : []),
     {
       id: "status",
-      header: "Status",
+      header: t("adminPeople.students.list.columns.status"),
       renderCell: (student: StudentProfile) => (
         <span className="students-list__status-pill" data-status={student.status}>
-          {STATUS_LABELS[student.status]}
+          {t(STATUS_LABEL_KEYS[student.status])}
         </span>
       ),
     },
     {
       id: "date_of_birth",
-      header: "Date of birth",
+      header: t("adminPeople.students.list.columns.dateOfBirth"),
       renderCell: (student: StudentProfile) => student.date_of_birth ?? "—",
     },
     {
       id: "actions",
-      header: "Actions",
+      header: t("adminPeople.students.list.columns.actions"),
       renderCell: (student: StudentProfile) => (
         <Button variant="tertiary" onClick={() => navigate(`/portal/admin/students/${student.id}`)}>
-          View
+          {t("adminPeople.students.list.view")}
         </Button>
       ),
     },
@@ -157,37 +158,41 @@ export default function StudentsListPage() {
     <>
       <div className="students-list__header">
         <div>
-          <h1>Students</h1>
-          <p>Search the student directory, review profiles, and manage guardian links.</p>
+          <h1>{t("adminPeople.students.list.title")}</h1>
+          <p>{t("adminPeople.students.list.description")}</p>
         </div>
         <div className="students-list__header-actions">
           {canImport ? (
             <Button variant="secondary" onClick={() => navigate("/portal/admin/students/import")}>
-              Import CSV
+              {t("adminPeople.students.list.importCsv")}
             </Button>
           ) : null}
-          {canCreate ? <Button onClick={() => setCreateOpen(true)}>New student</Button> : null}
+          {canCreate ? (
+            <Button onClick={() => setCreateOpen(true)}>
+              {t("adminPeople.students.list.newStudent")}
+            </Button>
+          ) : null}
         </div>
       </div>
 
       <div className="students-list__toolbar">
         <FilterBar
-          searchLabel="Search"
-          searchPlaceholder="Search by name or admission number"
+          searchLabel={t("adminPeople.students.list.searchLabel")}
+          searchPlaceholder={t("adminPeople.students.list.searchPlaceholder")}
           search={searchInput}
           onSearchChange={setSearchInput}
           dateRange={dateRange}
-          dateRangeLabel="Admitted between"
+          dateRangeLabel={t("adminPeople.students.list.admittedBetween")}
           onDateRangeChange={setDateRange}
         />
         <Select
-          label="Status"
-          options={STATUS_OPTIONS}
+          label={t("adminPeople.students.list.statusFilter")}
+          options={statusOptions}
           value={status}
           onChange={(value) => setStatus(value)}
         />
         <Select
-          label="Class"
+          label={t("adminPeople.students.list.classFilter")}
           options={classOptions}
           value={classId}
           onChange={(value) => setClassId(value)}
@@ -195,13 +200,15 @@ export default function StudentsListPage() {
       </div>
 
       <DataGrid
-        caption="Students"
+        caption={t("adminPeople.students.list.caption")}
         columns={columns}
         rows={rows}
         getRowId={(student) => student.id}
         getRowLabel={(student) => fullName(student)}
         loading={isPending}
-        empty={isError ? "Unable to load students." : "No students match these filters."}
+        empty={
+          isError ? t("adminPeople.students.list.loadError") : t("adminPeople.students.list.empty")
+        }
       />
 
       {isClassFiltered ? null : (
@@ -216,7 +223,7 @@ export default function StudentsListPage() {
               setCursor(previous);
             }}
           >
-            Previous
+            {t("adminPeople.common.previous")}
           </Button>
           <Button
             variant="secondary"
@@ -228,7 +235,7 @@ export default function StudentsListPage() {
               setCursor(nextCursor);
             }}
           >
-            Next
+            {t("adminPeople.common.next")}
           </Button>
         </div>
       )}

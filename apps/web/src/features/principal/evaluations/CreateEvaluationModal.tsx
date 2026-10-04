@@ -3,17 +3,18 @@ import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { EVALUATION_TYPE_LABELS } from "./labels";
+import { useTranslation } from "../../../lib/i18n";
+
+import { EVALUATION_TYPE_LABEL_KEYS } from "./labels";
 import { useCreateEvaluation } from "./mutations";
 
 import type { CreateEvaluationInput } from "./mutations";
 import type { TeacherContact } from "./queries";
 import type { SelectOption } from "@studafy/ui";
 
-const TYPE_OPTIONS = Object.entries(EVALUATION_TYPE_LABELS).map(([value, label]) => ({
-  value,
-  label,
-})) as SelectOption<CreateEvaluationInput["evaluation_type"]>[];
+const EVALUATION_TYPES = Object.keys(
+  EVALUATION_TYPE_LABEL_KEYS,
+) as CreateEvaluationInput["evaluation_type"][];
 
 const DEFAULT_TYPE: CreateEvaluationInput["evaluation_type"] = "formal_observation";
 
@@ -37,6 +38,7 @@ function todayIsoDate(): string {
  * `EvaluationDetailPage`, which this navigates to once the record exists.
  */
 export function CreateEvaluationModal({ open, teachers, onClose }: CreateEvaluationModalProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const navigate = useNavigate();
   const [teacherId, setTeacherId] = useState("");
@@ -44,6 +46,9 @@ export function CreateEvaluationModal({ open, teachers, onClose }: CreateEvaluat
     useState<CreateEvaluationInput["evaluation_type"]>(DEFAULT_TYPE);
   const [evaluatedAt, setEvaluatedAt] = useState(todayIsoDate());
   const create = useCreateEvaluation();
+
+  const typeOptions: SelectOption<CreateEvaluationInput["evaluation_type"]>[] =
+    EVALUATION_TYPES.map((value) => ({ value, label: t(EVALUATION_TYPE_LABEL_KEYS[value]) }));
 
   const teacherOptions: SelectOption<string>[] = teachers.map((teacher) => ({
     value: teacher.id,
@@ -68,14 +73,14 @@ export function CreateEvaluationModal({ open, teachers, onClose }: CreateEvaluat
       },
       {
         onSuccess: (evaluation) => {
-          show({ variant: "success", title: "Evaluation started" });
+          show({ variant: "success", title: t("principal.evaluations.create.success") });
           onClose();
           navigate(`/portal/principal/evaluations/${evaluation.id}`);
         },
         onError: (error) =>
           show({
             variant: "error",
-            title: "Couldn't start evaluation",
+            title: t("principal.evaluations.create.failed"),
             description: apiErrorDescription(error),
           }),
       },
@@ -83,38 +88,38 @@ export function CreateEvaluationModal({ open, teachers, onClose }: CreateEvaluat
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Start a teacher evaluation">
+    <Modal open={open} onClose={onClose} title={t("principal.evaluations.create.title")}>
       <Modal.Body>
         <div className="evaluations-form">
           <Select
-            label="Teacher"
+            label={t("principal.evaluations.create.teacher")}
             options={teacherOptions}
             value={teacherId || undefined}
             onChange={setTeacherId}
-            placeholder="Select a teacher"
+            placeholder={t("principal.evaluations.create.teacherPlaceholder")}
           />
           <Select
-            label="Evaluation type"
-            options={TYPE_OPTIONS}
+            label={t("principal.evaluations.create.type")}
+            options={typeOptions}
             value={evaluationType}
             onChange={setEvaluationType}
           />
           <Input
-            label="Evaluated at"
+            label={t("principal.evaluations.create.evaluatedAt")}
             type="date"
             value={evaluatedAt}
             onChange={(event) => setEvaluatedAt(event.target.value)}
           />
           {create.isError ? (
             <p role="alert" className="evaluations-detail__hint">
-              {apiErrorDescription(create.error) ?? "The evaluation could not be started."}
+              {apiErrorDescription(create.error) ?? t("principal.evaluations.create.errorFallback")}
             </p>
           ) : null}
         </div>
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>
-          Cancel
+          {t("principal.common.cancel")}
         </Button>
         <Button
           type="button"
@@ -123,7 +128,7 @@ export function CreateEvaluationModal({ open, teachers, onClose }: CreateEvaluat
           disabled={!teacherId}
           onClick={handleSubmit}
         >
-          Start evaluation
+          {t("principal.evaluations.create.submit")}
         </Button>
       </Modal.Footer>
     </Modal>

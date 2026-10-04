@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+
 import { buildInvoicePreview } from "./preview";
 import {
   confirmedAwardsQueryKey,
@@ -24,7 +26,16 @@ export interface InvoicePreviewPanelProps {
  * simulation rather than a call to a preview endpoint — none exists). Selecting a student is optional:
  * with none selected this just totals the components with no discounts applied.
  */
+/** Three fixed decimals, ungrouped — the same `toFixed(3)` shape ERPNext amounts use. */
+const AMOUNT_FORMAT: Intl.NumberFormatOptions = {
+  minimumFractionDigits: 3,
+  maximumFractionDigits: 3,
+  useGrouping: false,
+};
+
 export function InvoicePreviewPanel({ components, currency }: InvoicePreviewPanelProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const [student, setStudent] = useState<StudentProfile | null>(null);
 
   const discountsQuery = useQuery({
@@ -46,25 +57,22 @@ export function InvoicePreviewPanel({ components, currency }: InvoicePreviewPane
     student !== null && (awardsQuery.isPending || discountsQuery.isPending);
 
   return (
-    <section className="fee-builder__preview" aria-label="Invoice preview">
-      <h2>Invoice preview</h2>
-      <p className="fee-builder__preview-note">
-        Estimated from the components below, computed the same way invoice generation computes a
-        real one. ERPNext's own total is authoritative once an invoice actually exists.
-      </p>
+    <section className="fee-builder__preview" aria-label={t("finance.fees.preview.title")}>
+      <h2>{t("finance.fees.preview.title")}</h2>
+      <p className="fee-builder__preview-note">{t("finance.fees.preview.note")}</p>
 
       <StudentPickerField value={student} onChange={setStudent} />
 
       {validComponents.length === 0 ? (
-        <p className="fee-builder__preview-empty">Add at least one component to see a preview.</p>
+        <p className="fee-builder__preview-empty">{t("finance.fees.preview.empty")}</p>
       ) : (
         <>
           <table className="fee-builder__preview-table">
-            <caption className="sf-visually-hidden">Estimated invoice line items</caption>
+            <caption className="sf-visually-hidden">{t("finance.fees.preview.caption")}</caption>
             <thead>
               <tr>
-                <th scope="col">Category</th>
-                <th scope="col">Amount</th>
+                <th scope="col">{t("finance.common.category")}</th>
+                <th scope="col">{t("finance.common.amount")}</th>
               </tr>
             </thead>
             <tbody>
@@ -72,40 +80,41 @@ export function InvoicePreviewPanel({ components, currency }: InvoicePreviewPane
                 <tr key={`${line.feeCategory}-${index}`}>
                   <td>{line.feeCategory}</td>
                   <td>
-                    {line.amount.toFixed(3)} {currency}
+                    {formatNumber(line.amount, AMOUNT_FORMAT)} {currency}
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
-                <th scope="row">Subtotal</th>
+                <th scope="row">{t("finance.fees.preview.subtotal")}</th>
                 <td>
-                  {preview.subtotal.toFixed(3)} {currency}
+                  {formatNumber(preview.subtotal, AMOUNT_FORMAT)} {currency}
                 </td>
               </tr>
               {student ? (
                 <tr>
                   <th scope="row">
-                    {isLoadingDiscountInputs ? "Discount (loading…)" : "Discount"}
+                    {isLoadingDiscountInputs
+                      ? t("finance.fees.preview.discountLoading")
+                      : t("finance.fees.preview.discount")}
                   </th>
                   <td>
-                    -{preview.discountAmount.toFixed(3)} {currency}
+                    -{formatNumber(preview.discountAmount, AMOUNT_FORMAT)} {currency}
                   </td>
                 </tr>
               ) : null}
               <tr className="fee-builder__preview-total">
-                <th scope="row">Total</th>
+                <th scope="row">{t("finance.common.total")}</th>
                 <td>
-                  {preview.total.toFixed(3)} {currency}
+                  {formatNumber(preview.total, AMOUNT_FORMAT)} {currency}
                 </td>
               </tr>
             </tfoot>
           </table>
           {student && !isLoadingDiscountInputs && awards.length === 0 ? (
             <p className="fee-builder__preview-note">
-              {student.first_name} has no confirmed scholarship or discount awards, so no discount
-              applies.
+              {t("finance.fees.preview.noAwards", { name: student.first_name })}
             </p>
           ) : null}
         </>

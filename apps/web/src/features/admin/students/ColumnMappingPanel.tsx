@@ -2,10 +2,12 @@ import { Button, Card, Input, Select } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import {
   assignColumn,
-  FIELD_HINTS,
-  FIELD_LABELS,
+  fieldHint,
+  fieldLabel,
   isSameMapping,
   joinLabels,
   mappingFitsHeaders,
@@ -22,11 +24,11 @@ import type { StudentImport } from "./queries";
 
 const NOT_MAPPED = "";
 
-const CONFIDENCE_LABELS: Readonly<Record<MatchConfidence, string>> = {
-  exact: "High: same name",
-  alias: "High: known alternative name",
-  partial: "Low: partial name, please check",
-  manual: "Chosen manually",
+const CONFIDENCE_LABEL_KEYS: Readonly<Record<MatchConfidence, string>> = {
+  exact: "adminPeople.students.import.confidence.exact",
+  alias: "adminPeople.students.import.confidence.alias",
+  partial: "adminPeople.students.import.confidence.partial",
+  manual: "adminPeople.students.import.confidence.manual",
 };
 
 interface ColumnMappingPanelProps {
@@ -53,6 +55,7 @@ export function ColumnMappingPanel({
   applying,
   onApply,
 }: ColumnMappingPanelProps) {
+  const { t } = useTranslation();
   const [saveAs, setSaveAs] = useState("");
 
   const savedMappingsQuery = useQuery({
@@ -65,7 +68,7 @@ export function ColumnMappingPanel({
   const missing = missingRequiredFields(draft);
   const mappedRequired = REQUIRED_STUDENT_IMPORT_FIELDS.length - missing.length;
   const dirty = !isSameMapping(draft, record.column_mapping);
-  const pairWarning = parentPairWarning(draft);
+  const pairWarning = parentPairWarning(draft, t);
   const trimmedSaveAs = saveAs.trim();
 
   function fieldOf(header: string): StudentImportField | undefined {
@@ -74,12 +77,18 @@ export function ColumnMappingPanel({
 
   function optionsFor(field: StudentImportField) {
     return [
-      { value: NOT_MAPPED, label: "Not mapped" },
+      { value: NOT_MAPPED, label: t("adminPeople.students.import.mapping.notMapped") },
       ...headers.map((header) => {
         const owner = fieldOf(header);
         return {
           value: header,
-          label: owner && owner !== field ? `${header} (now ${FIELD_LABELS[owner]})` : header,
+          label:
+            owner && owner !== field
+              ? t("adminPeople.students.import.mapping.nowMapped", {
+                  header,
+                  field: fieldLabel(owner, t),
+                })
+              : header,
         };
       }),
     ];
@@ -96,27 +105,33 @@ export function ColumnMappingPanel({
   }
 
   return (
-    <Card as="section" aria-label="Column mapping">
+    <Card as="section" aria-label={t("adminPeople.students.import.mapping.region")}>
       <Card.Body>
-        <h2 className="students-import__heading">Match your columns</h2>
+        <h2 className="students-import__heading">
+          {t("adminPeople.students.import.mapping.heading")}
+        </h2>
         <p>
-          {headers.length} column{headers.length === 1 ? "" : "s"} found on line{" "}
-          {record.header_line} of {record.file_name}. Check each match, choose a column for anything
-          that is missing, then apply the mapping to re-check the file.
+          {t("adminPeople.students.import.mapping.intro", {
+            count: headers.length,
+            line: record.header_line,
+            file: record.file_name,
+          })}
         </p>
 
         {savedMappings.length > 0 ? (
           <div className="students-import__saved-mapping">
             <Select
-              label="Use a saved mapping"
-              placeholder="Choose a saved mapping"
-              helperText="Applies straight away."
+              label={t("adminPeople.students.import.mapping.savedLabel")}
+              placeholder={t("adminPeople.students.import.mapping.savedPlaceholder")}
+              helperText={t("adminPeople.students.import.mapping.savedHelper")}
               disabled={applying}
               options={savedMappings.map((mapping) => {
                 const fits = mappingFitsHeaders(mapping.column_mapping, headers);
                 return {
                   value: mapping.id,
-                  label: fits ? mapping.name : `${mapping.name} (columns not in this file)`,
+                  label: fits
+                    ? mapping.name
+                    : t("adminPeople.students.import.mapping.savedUnfit", { name: mapping.name }),
                   disabled: !fits,
                 };
               })}
@@ -129,11 +144,19 @@ export function ColumnMappingPanel({
           <progress
             value={mappedRequired}
             max={REQUIRED_STUDENT_IMPORT_FIELDS.length}
-            aria-label="Required fields mapped"
+            aria-label={t("adminPeople.students.import.mapping.requiredMapped")}
           />
           <span>
-            {mappedRequired} of {REQUIRED_STUDENT_IMPORT_FIELDS.length} required fields mapped
-            {missing.length > 0 ? `. Missing: ${joinLabels(missing)}.` : "."}
+            {missing.length > 0
+              ? t("adminPeople.students.import.mapping.progressMissing", {
+                  mapped: mappedRequired,
+                  total: REQUIRED_STUDENT_IMPORT_FIELDS.length,
+                  fields: joinLabels(missing, t),
+                })
+              : t("adminPeople.students.import.mapping.progress", {
+                  mapped: mappedRequired,
+                  total: REQUIRED_STUDENT_IMPORT_FIELDS.length,
+                })}
           </span>
         </div>
 
@@ -146,9 +169,9 @@ export function ColumnMappingPanel({
             return (
               <li key={field} className="students-import__field">
                 <Select
-                  label={FIELD_LABELS[field]}
+                  label={fieldLabel(field, t)}
                   required={REQUIRED_STUDENT_IMPORT_FIELDS.includes(field)}
-                  helperText={FIELD_HINTS[field]}
+                  helperText={fieldHint(field, t)}
                   options={optionsFor(field)}
                   value={header ?? NOT_MAPPED}
                   disabled={applying}
@@ -160,7 +183,7 @@ export function ColumnMappingPanel({
                 />
                 {confidence ? (
                   <span className="students-import__confidence" data-confidence={confidence}>
-                    {CONFIDENCE_LABELS[confidence]}
+                    {t(CONFIDENCE_LABEL_KEYS[confidence])}
                   </span>
                 ) : null}
               </li>
@@ -170,8 +193,8 @@ export function ColumnMappingPanel({
 
         <div className="students-import__apply">
           <Input
-            label="Save as (optional)"
-            helperText="Name this mapping to reuse it next time."
+            label={t("adminPeople.students.import.mapping.saveAs")}
+            helperText={t("adminPeople.students.import.mapping.saveAsHelper")}
             value={saveAs}
             maxLength={100}
             onChange={(event) => setSaveAs(event.target.value)}
@@ -183,7 +206,9 @@ export function ColumnMappingPanel({
             disabled={!dirty && !trimmedSaveAs}
             onClick={() => void handleApply()}
           >
-            {dirty ? "Apply mapping" : "Save mapping"}
+            {dirty
+              ? t("adminPeople.students.import.mapping.apply")
+              : t("adminPeople.students.import.mapping.save")}
           </Button>
         </div>
       </Card.Body>

@@ -3,11 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+
 import { CreateEvaluationModal } from "./CreateEvaluationModal";
 import {
-  EVALUATION_RATING_LABELS,
-  EVALUATION_STATUS_LABELS,
-  EVALUATION_TYPE_LABELS,
+  EVALUATION_RATING_LABEL_KEYS,
+  EVALUATION_STATUS_LABEL_KEYS,
+  EVALUATION_TYPE_LABEL_KEYS,
 } from "./labels";
 import {
   evaluationListKey,
@@ -25,16 +27,13 @@ const COLUMN_COUNT = 6;
 const ALL_TEACHERS = "all";
 const ALL_STATUSES = "all";
 
-const STATUS_OPTIONS: SelectOption<EvaluationStatus | typeof ALL_STATUSES>[] = [
-  { value: ALL_STATUSES, label: "All statuses" },
-  { value: "draft", label: EVALUATION_STATUS_LABELS.draft },
-  { value: "submitted", label: EVALUATION_STATUS_LABELS.submitted },
-  { value: "finalized", label: EVALUATION_STATUS_LABELS.finalized },
+/** Status filter options as translation keys — resolved with `t(...)` at render time. */
+const STATUS_OPTION_KEYS: { value: EvaluationStatus | typeof ALL_STATUSES; labelKey: string }[] = [
+  { value: ALL_STATUSES, labelKey: "principal.evaluations.list.allStatuses" },
+  { value: "draft", labelKey: EVALUATION_STATUS_LABEL_KEYS.draft },
+  { value: "submitted", labelKey: EVALUATION_STATUS_LABEL_KEYS.submitted },
+  { value: "finalized", labelKey: EVALUATION_STATUS_LABEL_KEYS.finalized },
 ];
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString();
-}
 
 /**
  * Teacher evaluation list (`/portal/principal/evaluations`). Filterable by status and teacher;
@@ -43,6 +42,8 @@ function formatDate(iso: string): string {
  * defined. A row's teacher name links to that evaluation's detail screen.
  */
 export default function EvaluationListPage() {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const [statusFilter, setStatusFilter] = useState<EvaluationStatus | typeof ALL_STATUSES>(
     ALL_STATUSES,
   );
@@ -70,8 +71,11 @@ export default function EvaluationListPage() {
     return map;
   }, [teachersQuery.data]);
 
+  const statusOptions: SelectOption<EvaluationStatus | typeof ALL_STATUSES>[] =
+    STATUS_OPTION_KEYS.map(({ value, labelKey }) => ({ value, label: t(labelKey) }));
+
   const teacherOptions: SelectOption<string>[] = [
-    { value: ALL_TEACHERS, label: "All teachers" },
+    { value: ALL_TEACHERS, label: t("principal.evaluations.list.allTeachers") },
     ...(teachersQuery.data ?? []).map((teacher) => ({
       value: teacher.id,
       label: teacher.display_name,
@@ -84,46 +88,48 @@ export default function EvaluationListPage() {
     <>
       <div className="evaluations-list__header">
         <div>
-          <h1>Teacher evaluations</h1>
-          <p>Evaluation cycles, criteria scoring, and sharing with teachers.</p>
+          <h1>{t("principal.evaluations.list.title")}</h1>
+          <p>{t("principal.evaluations.list.description")}</p>
         </div>
         <div className="evaluations-list__header-actions">
           <Link
             className="evaluations-list__templates-link"
             to="/portal/principal/evaluations/templates"
           >
-            Manage criteria templates
+            {t("principal.evaluations.list.manageTemplates")}
           </Link>
           <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
-            New evaluation
+            {t("principal.evaluations.list.newEvaluation")}
           </Button>
         </div>
       </div>
 
       <div className="evaluations-list__filters">
         <Select
-          label="Status"
-          options={STATUS_OPTIONS}
+          label={t("principal.evaluations.list.statusLabel")}
+          options={statusOptions}
           value={statusFilter}
           onChange={setStatusFilter}
         />
         <Select
-          label="Teacher"
+          label={t("principal.evaluations.list.teacherLabel")}
           options={teacherOptions}
           value={teacherFilter}
           onChange={setTeacherFilter}
         />
       </div>
 
-      <Table caption="Teacher evaluations">
+      <Table caption={t("principal.evaluations.list.caption")}>
         <Table.Header>
           <Table.Row>
-            <Table.HeaderCell>Teacher</Table.HeaderCell>
-            <Table.HeaderCell>Type</Table.HeaderCell>
-            <Table.HeaderCell>Status</Table.HeaderCell>
-            <Table.HeaderCell>Rating</Table.HeaderCell>
-            <Table.HeaderCell>Shared with teacher</Table.HeaderCell>
-            <Table.HeaderCell>Evaluated at</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.evaluations.list.columns.teacher")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.evaluations.list.columns.type")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.evaluations.list.columns.status")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.evaluations.list.columns.rating")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("principal.evaluations.list.columns.shared")}</Table.HeaderCell>
+            <Table.HeaderCell>
+              {t("principal.evaluations.list.columns.evaluatedAt")}
+            </Table.HeaderCell>
           </Table.Row>
         </Table.Header>
         <Table.Body
@@ -131,8 +137,8 @@ export default function EvaluationListPage() {
           loading={evaluationsQuery.isPending}
           empty={
             evaluationsQuery.isError
-              ? "Unable to load evaluations."
-              : "No evaluations match this filter."
+              ? t("principal.evaluations.list.error")
+              : t("principal.evaluations.list.empty")
           }
         >
           {evaluations.map((evaluation) => (
@@ -142,13 +148,17 @@ export default function EvaluationListPage() {
                   {teacherNameById.get(evaluation.teacher_id) ?? evaluation.teacher_id}
                 </Link>
               </Table.Cell>
-              <Table.Cell>{EVALUATION_TYPE_LABELS[evaluation.evaluation_type]}</Table.Cell>
-              <Table.Cell>{EVALUATION_STATUS_LABELS[evaluation.status]}</Table.Cell>
+              <Table.Cell>{t(EVALUATION_TYPE_LABEL_KEYS[evaluation.evaluation_type])}</Table.Cell>
+              <Table.Cell>{t(EVALUATION_STATUS_LABEL_KEYS[evaluation.status])}</Table.Cell>
               <Table.Cell>
-                {evaluation.rating ? EVALUATION_RATING_LABELS[evaluation.rating] : "—"}
+                {evaluation.rating ? t(EVALUATION_RATING_LABEL_KEYS[evaluation.rating]) : "—"}
               </Table.Cell>
-              <Table.Cell>{evaluation.shared_with_teacher ? "Shared" : "Not shared"}</Table.Cell>
-              <Table.Cell>{formatDate(evaluation.evaluated_at)}</Table.Cell>
+              <Table.Cell>
+                {evaluation.shared_with_teacher
+                  ? t("principal.evaluations.list.shared")
+                  : t("principal.evaluations.list.notShared")}
+              </Table.Cell>
+              <Table.Cell>{formatDate(new Date(evaluation.evaluated_at))}</Table.Cell>
             </Table.Row>
           ))}
         </Table.Body>

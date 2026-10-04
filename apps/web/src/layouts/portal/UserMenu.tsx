@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useSessionStore } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
@@ -7,13 +7,17 @@ import { useTranslation } from "../../lib/i18n";
 import { DeviceSessionsPanel } from "./DeviceSessionsPanel";
 import { useDisclosure } from "./use-disclosure";
 
-/** User menu: devices/sessions and sign-out, both against the real session-lifecycle endpoints. */
+/**
+ * User menu: devices/sessions and sign-out, both against the real session-lifecycle endpoints, plus a
+ * shortcut back into the portal when it is opened from a public page.
+ */
 export function UserMenu() {
   const { t } = useTranslation();
   const { open, toggle, close, triggerRef, panelRef } = useDisclosure();
   const [devicePanelOpen, setDevicePanelOpen] = useState(false);
   const store = useSessionStore();
   const navigate = useNavigate();
+  const inPortal = useLocation().pathname.startsWith("/portal");
   const panelId = "portal-user-menu-panel";
 
   const handleSignOut = async () => {
@@ -54,6 +58,11 @@ export function UserMenu() {
           aria-label={t("userMenu.ariaLabel")}
           className="portal-popover portal-user-menu__panel"
         >
+          {inPortal ? null : (
+            <Link to="/portal" className="portal-user-menu__item" onClick={close}>
+              {t("userMenu.goToPortal")}
+            </Link>
+          )}
           <button
             type="button"
             className="portal-user-menu__item"

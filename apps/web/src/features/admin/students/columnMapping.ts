@@ -8,6 +8,7 @@ import {
 } from "@studafy/student-import";
 
 import type { ColumnMapping, StudentImportField } from "@studafy/student-import";
+import type { TFunction } from "i18next";
 
 /**
  * Client-side logic for the import's column-mapping step (ST-300). The field list, aliases and
@@ -17,29 +18,49 @@ import type { ColumnMapping, StudentImportField } from "@studafy/student-import"
 
 export type { ColumnMapping, StudentImportField };
 
-export const FIELD_LABELS: Readonly<Record<StudentImportField, string>> = {
-  admission_number: "Admission number",
-  email: "Student email",
-  first_name: "First name",
-  middle_name: "Middle name",
-  last_name: "Last name",
-  preferred_name: "Preferred name",
-  date_of_birth: "Date of birth",
-  status: "Status",
-  parent_email: "Parent email",
-  parent_name: "Parent name",
-  parent_relationship: "Parent relationship",
+/**
+ * Field display names and hints are translation keys, resolved with the caller's `t` at render time
+ * so they follow a runtime language switch. The helpers below that build sentences take `t` too.
+ */
+export const FIELD_LABEL_KEYS: Readonly<Record<StudentImportField, string>> = {
+  admission_number: "adminPeople.students.import.fields.admission_number",
+  email: "adminPeople.students.import.fields.email",
+  first_name: "adminPeople.students.import.fields.first_name",
+  middle_name: "adminPeople.students.import.fields.middle_name",
+  last_name: "adminPeople.students.import.fields.last_name",
+  preferred_name: "adminPeople.students.import.fields.preferred_name",
+  date_of_birth: "adminPeople.students.import.fields.date_of_birth",
+  status: "adminPeople.students.import.fields.status",
+  parent_email: "adminPeople.students.import.fields.parent_email",
+  parent_name: "adminPeople.students.import.fields.parent_name",
+  parent_relationship: "adminPeople.students.import.fields.parent_relationship",
 };
 
-export const FIELD_HINTS: Readonly<Partial<Record<StudentImportField, string>>> = {
-  admission_number: "Your school's unique ID for the student.",
-  email: "The student's sign-in email. An import never changes it for an existing student.",
-  date_of_birth: "Must be YYYY-MM-DD, for example 2012-09-01.",
-  status: `One of ${STUDENT_STATUSES.join(", ")}. Blank means applicant for a new student.`,
-  parent_email: "Finds or creates the parent's account. Needs Parent relationship too.",
-  parent_name: "Only used when a new parent account is created.",
-  parent_relationship: `One of ${PARENT_RELATIONSHIPS.join(", ")}. Needs Parent email too.`,
+const FIELD_HINT_KEYS: Readonly<Partial<Record<StudentImportField, string>>> = {
+  admission_number: "adminPeople.students.import.hints.admission_number",
+  email: "adminPeople.students.import.hints.email",
+  date_of_birth: "adminPeople.students.import.hints.date_of_birth",
+  status: "adminPeople.students.import.hints.status",
+  parent_email: "adminPeople.students.import.hints.parent_email",
+  parent_name: "adminPeople.students.import.hints.parent_name",
+  parent_relationship: "adminPeople.students.import.hints.parent_relationship",
 };
+
+export function fieldLabel(field: StudentImportField, t: TFunction): string {
+  // eslint-disable-next-line security/detect-object-injection -- `field` is a `StudentImportField`, keyed into this module's own fixed map
+  return t(FIELD_LABEL_KEYS[field]);
+}
+
+/** The accepted values in the status/relationship hints are the CSV's literal codes, so they stay
+ * untranslated inside the localized sentence. */
+export function fieldHint(field: StudentImportField, t: TFunction): string | undefined {
+  // eslint-disable-next-line security/detect-object-injection -- `field` is a `StudentImportField`, keyed into this module's own fixed map
+  const key = FIELD_HINT_KEYS[field];
+  if (!key) return undefined;
+  if (field === "status") return t(key, { values: STUDENT_STATUSES.join(", ") });
+  if (field === "parent_relationship") return t(key, { values: PARENT_RELATIONSHIPS.join(", ") });
+  return t(key);
+}
 
 export { REQUIRED_STUDENT_IMPORT_FIELDS, STUDENT_IMPORT_FIELDS };
 
@@ -130,15 +151,18 @@ export function mappingFitsHeaders(mapping: ColumnMapping, headers: readonly str
 }
 
 /** A parent is all or nothing on the server: a row naming only one of these two is rejected. */
-export function parentPairWarning(mapping: ColumnMapping): string | null {
+export function parentPairWarning(mapping: ColumnMapping, t: TFunction): string | null {
   const hasEmail = mapping.parent_email !== undefined;
   const hasRelationship = mapping.parent_relationship !== undefined;
   if (hasEmail === hasRelationship) return null;
-  return `Map both ${FIELD_LABELS.parent_email} and ${FIELD_LABELS.parent_relationship}, or neither. Rows that give a parent without both are rejected.`;
+  return t("adminPeople.students.import.parentPairWarning", {
+    email: fieldLabel("parent_email", t),
+    relationship: fieldLabel("parent_relationship", t),
+  });
 }
 
-export function joinLabels(fields: readonly StudentImportField[]): string {
-  return fields.map((field) => FIELD_LABELS[field]).join(", ");
+export function joinLabels(fields: readonly StudentImportField[], t: TFunction): string {
+  return fields.map((field) => fieldLabel(field, t)).join(t("adminPeople.common.listSeparator"));
 }
 
 /**
@@ -149,14 +173,15 @@ export function confirmBlocker(
   draft: ColumnMapping,
   applied: ColumnMapping,
   validRows: number,
+  t: TFunction,
 ): string | null {
   const missing = missingRequiredFields(draft);
   if (missing.length > 0) {
-    return `Map a column to every required field before confirming. Missing: ${joinLabels(missing)}.`;
+    return t("adminPeople.students.import.blocker.missing", { fields: joinLabels(missing, t) });
   }
   if (!isSameMapping(draft, applied)) {
-    return "You changed the mapping. Apply it to re-check the file before confirming.";
+    return t("adminPeople.students.import.blocker.unapplied");
   }
-  if (validRows === 0) return "No rows passed validation, so there is nothing to import.";
+  if (validRows === 0) return t("adminPeople.students.import.blocker.noValidRows");
   return null;
 }

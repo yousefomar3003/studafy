@@ -2,6 +2,8 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Modal, Select, useToast } from "@studafy/ui";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { findLocalConflict } from "./conflicts";
 import { weekdayLabel } from "./constants";
 import { useDeleteSlot, useUpdateSlot } from "./mutations";
@@ -33,6 +35,7 @@ export function EditSlotModal({
   allSlots,
   onConflict,
 }: EditSlotModalProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const updateSlot = useUpdateSlot();
   const deleteSlot = useDeleteSlot();
@@ -74,8 +77,11 @@ export function EditSlotModal({
         excludeSlotId: slot.id,
       },
       classCode,
-      (id) => teachers.find((t) => t.id === id)?.display_name ?? "Unknown teacher",
-      (id) => rooms.find((r) => r.id === id)?.code ?? "Unknown room",
+      (id) =>
+        teachers.find((teacher) => teacher.id === id)?.display_name ??
+        t("adminSchool.timetable.unknownTeacher"),
+      (id) => rooms.find((r) => r.id === id)?.code ?? t("adminSchool.timetable.unknownRoom"),
+      t,
     );
     if (conflict) {
       onConflict(conflict.message);
@@ -86,7 +92,7 @@ export function EditSlotModal({
       { slotId: slot.id, versionId, body: { teacher_id: teacherId, room_id: roomId } },
       {
         onSuccess: () => {
-          show({ variant: "success", title: "Slot updated" });
+          show({ variant: "success", title: t("adminSchool.timetable.toast.slotUpdated") });
           onClose();
         },
         onError: (err) => {
@@ -94,7 +100,7 @@ export function EditSlotModal({
             onConflict(err.detail);
             return;
           }
-          show({ variant: "error", title: "Couldn't update slot" });
+          show({ variant: "error", title: t("adminSchool.timetable.toast.slotUpdateFailed") });
         },
       },
     );
@@ -106,10 +112,11 @@ export function EditSlotModal({
       { slotId: slot.id, versionId },
       {
         onSuccess: () => {
-          show({ variant: "success", title: "Slot removed" });
+          show({ variant: "success", title: t("adminSchool.timetable.toast.slotRemoved") });
           onClose();
         },
-        onError: () => show({ variant: "error", title: "Couldn't remove slot" }),
+        onError: () =>
+          show({ variant: "error", title: t("adminSchool.timetable.toast.slotRemoveFailed") }),
       },
     );
   }
@@ -118,22 +125,32 @@ export function EditSlotModal({
     <Modal
       open
       onClose={onClose}
-      title="Edit slot"
-      description={`${classCode(slot.class_id)} — ${weekdayLabel(slot.weekday)}, period ${slot.period}`}
+      title={t("adminSchool.timetable.editModal.title")}
+      description={t("adminSchool.timetable.editModal.description", {
+        classCode: classCode(slot.class_id),
+        day: weekdayLabel(slot.weekday, t),
+        period: slot.period,
+      })}
     >
       <Modal.Body>
         <Select
-          label="Teacher"
+          label={t("adminSchool.timetable.editModal.teacher")}
           options={teacherOptions}
           value={teacherId}
           onChange={setTeacherId}
           required
         />
-        <Select label="Room" options={roomOptions} value={roomId} onChange={setRoomId} required />
+        <Select
+          label={t("adminSchool.timetable.editModal.room")}
+          options={roomOptions}
+          value={roomId}
+          onChange={setRoomId}
+          required
+        />
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>
-          Cancel
+          {t("adminSchool.timetable.editModal.cancel")}
         </Button>
         <Button
           type="button"
@@ -141,10 +158,10 @@ export function EditSlotModal({
           loading={deleteSlot.isPending}
           onClick={handleRemove}
         >
-          Remove
+          {t("adminSchool.timetable.editModal.remove")}
         </Button>
         <Button type="button" loading={updateSlot.isPending} onClick={handleSave}>
-          Save changes
+          {t("adminSchool.timetable.editModal.save")}
         </Button>
       </Modal.Footer>
     </Modal>

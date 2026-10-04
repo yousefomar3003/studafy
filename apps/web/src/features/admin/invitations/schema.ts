@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import { fieldErrors, ROLE_LABELS } from "../users/schema";
+import { fieldErrors, ROLE_LABEL_KEYS } from "../users/schema";
 
 import type { Role } from "@studafy/constants";
 
-export { fieldErrors, ROLE_LABELS };
+export { fieldErrors, ROLE_LABEL_KEYS };
 
 /**
  * Roles the invitation endpoints accept — `createInvitationBodySchema` /
@@ -22,38 +22,46 @@ export const INVITATION_ROLES = [
 
 export type InvitationRole = (typeof INVITATION_ROLES)[number];
 
-export const INVITATION_STATUS_LABELS = {
-  pending: "Pending",
-  expired: "Expired",
-  consumed: "Consumed",
-  revoked: "Revoked",
+/**
+ * Status display names as translation keys, resolved with `t()` at render time so they follow a
+ * runtime language switch. Validation messages in the schemas below are translation keys too.
+ */
+export const INVITATION_STATUS_LABEL_KEYS = {
+  pending: "adminPeople.invitations.status.pending",
+  expired: "adminPeople.invitations.status.expired",
+  consumed: "adminPeople.invitations.status.consumed",
+  revoked: "adminPeople.invitations.status.revoked",
 } as const;
 
-export type InvitationStatus = keyof typeof INVITATION_STATUS_LABELS;
+export type InvitationStatus = keyof typeof INVITATION_STATUS_LABEL_KEYS;
 
-export const BULK_INVITE_STATUS_LABELS = {
-  pending: "Pending",
-  processing: "Processing",
-  completed: "Completed",
-  failed: "Failed",
+export const BULK_INVITE_STATUS_LABEL_KEYS = {
+  pending: "adminPeople.invitations.bulkStatus.pending",
+  processing: "adminPeople.invitations.bulkStatus.processing",
+  completed: "adminPeople.invitations.bulkStatus.completed",
+  failed: "adminPeople.invitations.bulkStatus.failed",
 } as const;
 
-export const BULK_RECIPIENT_STATUS_LABELS = {
-  pending: "Pending",
-  sent: "Sent",
-  failed: "Failed",
+export const BULK_RECIPIENT_STATUS_LABEL_KEYS = {
+  pending: "adminPeople.invitations.recipientStatus.pending",
+  sent: "adminPeople.invitations.recipientStatus.sent",
+  failed: "adminPeople.invitations.recipientStatus.failed",
 } as const;
 
 const invitationRoleEnum = z.enum(INVITATION_ROLES);
 const expiryDaysSchema = z
   .number()
   .int()
-  .min(1, "Must be at least 1 day")
-  .max(365, "Must be 365 days or fewer")
+  .min(1, "adminPeople.validation.expiryMin")
+  .max(365, "adminPeople.validation.expiryMax")
   .optional();
 
 export const createInvitationSchema = z.object({
-  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "adminPeople.validation.emailRequired")
+    .email("adminPeople.validation.emailInvalid"),
   role: invitationRoleEnum,
   expiry_days: expiryDaysSchema,
 });
@@ -69,9 +77,9 @@ export const bulkInviteSchema = z.object({
   role: invitationRoleEnum,
   expiry_days: expiryDaysSchema,
   recipients: z
-    .array(z.string().trim().email())
-    .min(1, "Add at least one recipient")
-    .max(5000, "Maximum 5,000 recipients per batch"),
+    .array(z.string().trim().email("adminPeople.validation.recipientInvalid"))
+    .min(1, "adminPeople.validation.recipientsMin")
+    .max(5000, "adminPeople.validation.recipientsMax"),
 });
 export type BulkInviteValues = z.infer<typeof bulkInviteSchema>;
 

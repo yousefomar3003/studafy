@@ -2,6 +2,8 @@ import { PERMISSIONS } from "@studafy/constants";
 import { Button, Modal } from "@studafy/ui";
 
 import { usePermissions } from "../../../../lib/auth";
+import { useFormatters, useTranslation } from "../../../../lib/i18n";
+import { ONE_DECIMAL_PERCENT_OPTIONS } from "../../format";
 import { useRecordHistory, useStudentProfile } from "../hooks/useAttendanceData";
 
 import { AttendanceStatusBadge } from "./DailyAttendanceGrid";
@@ -21,6 +23,8 @@ export function StudentAttendanceHistoryModal({
   onClose,
   onRequestCorrection,
 }: StudentAttendanceHistoryModalProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const permissions = usePermissions();
   const canCorrect = permissions.has(PERMISSIONS.ATTENDANCE_RECORD_CORRECT);
   const profile = useStudentProfile(studentId);
@@ -47,17 +51,23 @@ export function StudentAttendanceHistoryModal({
     <Modal
       open={studentId !== null}
       onClose={onClose}
-      title={student?.studentName ?? "Student attendance history"}
+      title={student?.studentName ?? t("principal.attendance.history.fallbackTitle")}
       description={
         student
-          ? `${student.admissionNumber} · ${student.classCode} · ${student.attendancePercent.toFixed(1)}% attendance`
-          : "Loading student attendance…"
+          ? t("principal.attendance.history.description", {
+              admissionNumber: student.admissionNumber,
+              classCode: student.classCode,
+              percent: formatNumber(student.attendancePercent / 100, ONE_DECIMAL_PERCENT_OPTIONS),
+            })
+          : t("principal.attendance.history.loadingDescription")
       }
     >
       <Modal.Body>
-        {profile.isPending ? <p role="status">Loading attendance history…</p> : null}
+        {profile.isPending ? (
+          <p role="status">{t("principal.attendance.history.loading")}</p>
+        ) : null}
         {profile.isError || (!student && !profile.isPending) ? (
-          <p role="alert">Unable to load the student history.</p>
+          <p role="alert">{t("principal.attendance.history.error")}</p>
         ) : null}
         <ol className="attendance-timeline">
           {timeline.map((entry) => (
@@ -65,19 +75,32 @@ export function StudentAttendanceHistoryModal({
               <div>
                 <strong>{entry.date}</strong>
                 <AttendanceStatusBadge status={entry.status} />
-                {entry.minutesLate ? <span>{entry.minutesLate} minutes late</span> : null}
+                {entry.minutesLate ? (
+                  <span>
+                    {t("principal.attendance.history.minutesLate", {
+                      count: entry.minutesLate,
+                      formatted: formatNumber(entry.minutesLate),
+                    })}
+                  </span>
+                ) : null}
                 {entry.reason ? <small>{entry.reason}</small> : null}
                 <small>
-                  Version {entry.version}
-                  {entry.outOfWindow ? " · Administrative override" : ""}
+                  {t(
+                    entry.outOfWindow
+                      ? "principal.attendance.history.versionOverride"
+                      : "principal.attendance.history.version",
+                    { version: entry.version },
+                  )}
                 </small>
               </div>
               {canCorrect ? (
                 <Button variant="tertiary" onClick={() => onRequestCorrection(entry)}>
-                  Request correction
+                  {t("principal.attendance.history.requestCorrection")}
                 </Button>
               ) : (
-                <span className="attendance-readonly-badge">Read only</span>
+                <span className="attendance-readonly-badge">
+                  {t("principal.attendance.history.readOnly")}
+                </span>
               )}
             </li>
           ))}

@@ -1,8 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 
 import { StatusCard } from "../../components/StatusCard";
-
-import type { StatusCardProps } from "../../components/StatusCard";
+import { useTranslation } from "../../lib/i18n";
 
 /**
  * OAuth sign-in error page (`/auth/error?code=…`).
@@ -19,91 +18,50 @@ import type { StatusCardProps } from "../../components/StatusCard";
  * the original deep link.
  */
 export default function ErrorPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const code = searchParams.get("code");
 
   const state = (code && STATE_COPY.get(code)) || GENERIC_FAILURE;
 
-  return <StatusCard {...state} />;
+  return (
+    <StatusCard
+      heading={t(state.headingKey)}
+      message={t(state.messageKey)}
+      action={state.action && { label: t(state.action.labelKey), href: state.action.href }}
+    />
+  );
 }
 
-const RETRY = { label: "Try again", href: "/auth/login" } as const;
-const BACK_TO_SIGN_IN = { label: "Back to sign in", href: "/auth/login" } as const;
+/** Copy is stored as translation keys (under `site.authError`) and resolved at render time. */
+interface StateCopy {
+  readonly headingKey: string;
+  readonly messageKey: string;
+  readonly action?: { readonly labelKey: string; readonly href: string };
+}
 
-const STATE_COPY = new Map<string, StatusCardProps>([
-  [
-    "OAUTH_STATE_INVALID",
-    {
-      heading: "This sign-in link has expired",
-      message: "The sign-in you started is no longer valid. Start again from the sign-in page.",
-      action: RETRY,
-    },
-  ],
+const RETRY = { labelKey: "site.authError.retry", href: "/auth/login" } as const;
+const BACK_TO_SIGN_IN = { labelKey: "site.authError.backToSignIn", href: "/auth/login" } as const;
+
+function copy(state: string, action?: StateCopy["action"]): StateCopy {
+  return {
+    headingKey: `site.authError.${state}.heading`,
+    messageKey: `site.authError.${state}.message`,
+    action,
+  };
+}
+
+const STATE_COPY = new Map<string, StateCopy>([
+  ["OAUTH_STATE_INVALID", copy("stateInvalid", RETRY)],
   // The OAuth callbacks answer "Account not found. Contact your administrator." with AUTHZ_FORBIDDEN;
   // the returning-user login answers with NO_ACCOUNT. Both mean the same thing on this page.
-  [
-    "AUTHZ_FORBIDDEN",
-    {
-      heading: "No account found for this sign-in",
-      message:
-        "The account you signed in with isn't linked to a Studafy account yet. If you used the wrong account, sign in again — otherwise ask your school administrator for an invitation.",
-      action: BACK_TO_SIGN_IN,
-    },
-  ],
-  [
-    "NO_ACCOUNT",
-    {
-      heading: "No account found for this sign-in",
-      message:
-        "The account you signed in with isn't linked to a Studafy account yet. If you used the wrong account, sign in again — otherwise ask your school administrator for an invitation.",
-      action: BACK_TO_SIGN_IN,
-    },
-  ],
-  [
-    "OAUTH_EMAIL_NOT_VERIFIED",
-    {
-      heading: "Your sign-in email isn't verified",
-      message:
-        "The provider hasn't verified the email on the account you signed in with. Verify it there, then try again.",
-      action: RETRY,
-    },
-  ],
-  [
-    "OAUTH_PROVIDER_ERROR",
-    {
-      heading: "We couldn't complete your sign-in",
-      message: "The sign-in service had a problem. Please try again in a moment.",
-      action: RETRY,
-    },
-  ],
-  [
-    "SCHOOL_SUSPENDED",
-    {
-      heading: "Your school's account is suspended",
-      message:
-        "Sign-in is paused while your school's account is suspended. Contact your school administrator.",
-    },
-  ],
-  [
-    "TENANT_SUSPENDED",
-    {
-      heading: "Your school's account is suspended",
-      message:
-        "Sign-in is paused while your school's account is suspended. Contact your school administrator.",
-    },
-  ],
-  [
-    "OAUTH_CANCELLED",
-    {
-      heading: "Sign-in cancelled",
-      message: "You cancelled the sign-in. Nothing changed — try again whenever you're ready.",
-      action: RETRY,
-    },
-  ],
+  ["AUTHZ_FORBIDDEN", copy("noAccount", BACK_TO_SIGN_IN)],
+  ["NO_ACCOUNT", copy("noAccount", BACK_TO_SIGN_IN)],
+  ["OAUTH_EMAIL_NOT_VERIFIED", copy("emailNotVerified", RETRY)],
+  ["OAUTH_PROVIDER_ERROR", copy("providerError", RETRY)],
+  ["SCHOOL_SUSPENDED", copy("suspended")],
+  ["TENANT_SUSPENDED", copy("suspended")],
+  ["OAUTH_CANCELLED", copy("cancelled", RETRY)],
 ]);
 
-const GENERIC_FAILURE: StatusCardProps = {
-  heading: "We couldn't complete your sign-in",
-  message: "Something went wrong on our end. Please try again in a moment.",
-  action: RETRY,
-};
+const GENERIC_FAILURE = copy("generic", RETRY);

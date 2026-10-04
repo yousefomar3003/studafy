@@ -2,6 +2,8 @@ import { ApiError } from "@studafy/api-client";
 import { Checkbox, Input, useToast } from "@studafy/ui";
 import { useEffect, useRef, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { ConfirmChangeDialog } from "./ConfirmChangeDialog";
 import { useUpdateSchoolSettings } from "./mutations";
 import { attendanceAlertsSchema, fieldErrors } from "./schema";
@@ -31,6 +33,7 @@ export interface AttendanceAlertsSectionProps {
  * immediate privacy consequence.
  */
 export function AttendanceAlertsSection({ settings, loading }: AttendanceAlertsSectionProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const updateSettings = useUpdateSchoolSettings();
 
@@ -62,18 +65,25 @@ export function AttendanceAlertsSection({ settings, loading }: AttendanceAlertsS
   function save(next: AttendanceAlertsValues) {
     updateSettings.mutate(next, {
       onSuccess: () => {
-        show({ variant: "success", title: "Attendance alerts updated" });
+        show({ variant: "success", title: t("adminSchool.settings.attendance.updated") });
         setPendingValues(null);
       },
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't save changes",
+          title: t("adminSchool.settings.saveFailed"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
         setPendingValues(null);
       },
     });
+  }
+
+  /** Field errors hold translation keys (see `schema.ts`), resolved here at render time. */
+  function errorText(key: keyof AttendanceAlertsValues): string | undefined {
+    // eslint-disable-next-line security/detect-object-injection -- `key` is a literal field name of this form's own value shape
+    const message = errors[key];
+    return message ? t(message) : undefined;
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -98,51 +108,51 @@ export function AttendanceAlertsSection({ settings, loading }: AttendanceAlertsS
   return (
     <>
       <SettingsCard
-        title="Attendance alerts"
-        description="Thresholds that trigger attendance alerts, the teacher correction window, and discipline visibility for parents."
+        title={t("adminSchool.settings.attendance.title")}
+        description={t("adminSchool.settings.attendance.description")}
         onSubmit={handleSubmit}
         saving={updateSettings.isPending}
       >
         <Input
-          label="Attendance alert threshold (%)"
+          label={t("adminSchool.settings.attendance.attendanceThreshold")}
           type="number"
           min={0}
           max={100}
           value={values.attendance_alert_threshold}
           onChange={(e) => setField("attendance_alert_threshold", Number(e.target.value))}
-          helperText="An alert fires when a student's attendance rate falls below this percentage."
-          error={errors.attendance_alert_threshold}
+          helperText={t("adminSchool.settings.attendance.attendanceThresholdHelp")}
+          error={errorText("attendance_alert_threshold")}
           disabled={loading}
           required
         />
         <Input
-          label="Absence alert threshold (%)"
+          label={t("adminSchool.settings.attendance.absenceThreshold")}
           type="number"
           min={0}
           max={100}
           value={values.absence_alert_threshold}
           onChange={(e) => setField("absence_alert_threshold", Number(e.target.value))}
-          helperText="An alert fires when a student's absence rate rises above this percentage."
-          error={errors.absence_alert_threshold}
+          helperText={t("adminSchool.settings.attendance.absenceThresholdHelp")}
+          error={errorText("absence_alert_threshold")}
           disabled={loading}
           required
         />
         <Input
-          label="Correction window (hours)"
+          label={t("adminSchool.settings.attendance.correctionWindow")}
           type="number"
           min={1}
           max={8760}
           value={values.attendance_correction_window_hours}
           onChange={(e) => setField("attendance_correction_window_hours", Number(e.target.value))}
-          helperText="How long after a session teachers can still correct its attendance. After it, only a principal can."
-          error={errors.attendance_correction_window_hours}
+          helperText={t("adminSchool.settings.attendance.correctionWindowHelp")}
+          error={errorText("attendance_correction_window_hours")}
           disabled={loading}
           required
         />
         <Checkbox
           checked={values.parent_discipline_visibility}
           onChange={(e) => setField("parent_discipline_visibility", e.target.checked)}
-          label="Parents can view their child's resolved discipline incidents"
+          label={t("adminSchool.settings.attendance.parentVisibility")}
           disabled={loading}
         />
       </SettingsCard>
@@ -151,8 +161,8 @@ export function AttendanceAlertsSection({ settings, loading }: AttendanceAlertsS
         open={pendingValues !== null}
         title={
           pendingValues?.parent_discipline_visibility
-            ? "Show discipline incidents to parents?"
-            : "Hide discipline incidents from parents?"
+            ? t("adminSchool.settings.attendance.showTitle")
+            : t("adminSchool.settings.attendance.hideTitle")
         }
         loading={updateSettings.isPending}
         onConfirm={() => pendingValues && save(pendingValues)}
@@ -160,8 +170,8 @@ export function AttendanceAlertsSection({ settings, loading }: AttendanceAlertsS
       >
         <p>
           {pendingValues?.parent_discipline_visibility
-            ? "Every parent at this school will immediately be able to see their own child's resolved discipline incidents in the portal."
-            : "Parents will immediately lose access to their child's resolved discipline incidents in the portal."}
+            ? t("adminSchool.settings.attendance.showBody")
+            : t("adminSchool.settings.attendance.hideBody")}
         </p>
       </ConfirmChangeDialog>
     </>

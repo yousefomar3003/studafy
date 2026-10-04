@@ -1,6 +1,20 @@
 import { Component, type ErrorInfo, type PropsWithChildren, type ReactNode } from "react";
 
+import { useTranslation } from "../lib/i18n";
 import { captureException } from "../lib/monitoring";
+
+/** The fallback is a function component so it can read translations through the hook; the
+ * i18next instance is initialized at import time, so this works even when a provider crashed. */
+function ErrorFallback() {
+  const { t } = useTranslation();
+
+  return (
+    <div role="alert">
+      <h1>{t("site.errorBoundary.heading")}</h1>
+      <p>{t("site.errorBoundary.message")}</p>
+    </div>
+  );
+}
 
 interface ErrorBoundaryState {
   error: Error | null;
@@ -27,12 +41,7 @@ export class ErrorBoundary extends Component<PropsWithChildren, ErrorBoundarySta
 
   render(): ReactNode {
     if (this.state.error) {
-      return (
-        <div role="alert">
-          <h1>Something went wrong</h1>
-          <p>Please reload the page. If the problem persists, contact support.</p>
-        </div>
-      );
+      return <ErrorFallback />;
     }
 
     return this.props.children;

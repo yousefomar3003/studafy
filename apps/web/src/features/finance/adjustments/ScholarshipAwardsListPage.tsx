@@ -6,10 +6,11 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuth, usePermissions } from "../../../lib/auth";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { AdjustmentConfirmDialog } from "./AdjustmentConfirmDialog";
 import { AuditTrailModal } from "./AuditTrailModal";
-import { AWARD_STATUS_LABELS, awardStatusTone, discountEffectLine } from "./labels";
+import { AWARD_STATUS_LABEL_KEYS, awardStatusTone, discountEffectLine } from "./labels";
 import { useConfirmAward } from "./mutations";
 import {
   AWARDS_PAGE_SIZE,
@@ -24,13 +25,6 @@ import type { AuditTrailTarget } from "./AuditTrailModal";
 import type { Award, AwardFilters, AwardStatus } from "./queries";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
-const STATUS_OPTIONS: SelectOption<AwardStatus | "">[] = [
-  { value: "", label: "All statuses" },
-  { value: "pending", label: "Pending confirmation" },
-  { value: "confirmed", label: "Confirmed" },
-  { value: "cancelled", label: "Cancelled" },
-];
-
 function apiErrorMessage(error: unknown, fallback: string): string {
   if (!(error instanceof ApiError)) return fallback;
   return error.detail ?? error.title;
@@ -44,6 +38,8 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  * the API regardless (see `confirmAward`'s doc comment).
  */
 export default function ScholarshipAwardsListPage() {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { show } = useToast();
   const { userId } = useAuth();
   const permissions = usePermissions();
@@ -56,6 +52,13 @@ export default function ScholarshipAwardsListPage() {
   const [offset, setOffset] = useState(0);
   const [confirmTarget, setConfirmTarget] = useState<Award | null>(null);
   const [auditTarget, setAuditTarget] = useState<AuditTrailTarget | null>(null);
+
+  const statusOptions: SelectOption<AwardStatus | "">[] = [
+    { value: "", label: t("financeReports.adjustments.common.allStatuses") },
+    ...(Object.entries(AWARD_STATUS_LABEL_KEYS) as [AwardStatus, string][]).map(
+      ([value, labelKey]) => ({ value, label: t(labelKey) }),
+    ),
+  ];
 
   const filters: AwardFilters = { status };
   const listQuery = useQuery({
@@ -84,7 +87,10 @@ export default function ScholarshipAwardsListPage() {
     if (!confirmTarget) return;
     confirmAward.mutate(confirmTarget.id, {
       onSuccess: () => {
-        show({ variant: "success", title: "Award confirmed" });
+        show({
+          variant: "success",
+          title: t("financeReports.adjustments.scholarships.confirmedToast"),
+        });
         setConfirmTarget(null);
         void queryClient.invalidateQueries({ queryKey: ["finance", "adjustments", "awards"] });
       },
@@ -98,27 +104,31 @@ export default function ScholarshipAwardsListPage() {
   const columns: DataGridColumn<Award>[] = [
     {
       id: "created_at",
-      header: "Created",
-      renderCell: (row) => new Date(row.created_at).toLocaleDateString(),
+      header: t("financeReports.adjustments.common.created"),
+      renderCell: (row) => formatDate(new Date(row.created_at)),
     },
-    { id: "student_id", header: "Student", renderCell: (row) => row.student_id },
+    {
+      id: "student_id",
+      header: t("financeReports.adjustments.common.student"),
+      renderCell: (row) => row.student_id,
+    },
     {
       id: "discount",
-      header: "Scholarship / discount",
+      header: t("financeReports.adjustments.common.scholarshipDiscount"),
       renderCell: (row) => row.scholarship_discount_title,
     },
     {
       id: "status",
-      header: "Status",
+      header: t("financeReports.adjustments.common.status"),
       renderCell: (row) => (
         <span className="adjustments-status-pill" data-tone={awardStatusTone(row.award_status)}>
-          {AWARD_STATUS_LABELS[row.award_status]}
+          {t(AWARD_STATUS_LABEL_KEYS[row.award_status])}
         </span>
       ),
     },
     {
       id: "actions",
-      header: "Actions",
+      header: t("financeReports.adjustments.common.actions"),
       renderCell: (row) => {
         const isOwnAward = row.awarded_by === userId;
         return (
@@ -128,10 +138,12 @@ export default function ScholarshipAwardsListPage() {
                 type="button"
                 variant="secondary"
                 disabled={isOwnAward}
-                title={isOwnAward ? "A different user must confirm this award." : undefined}
+                title={
+                  isOwnAward ? t("financeReports.adjustments.scholarships.ownAwardHint") : undefined
+                }
                 onClick={() => setConfirmTarget(row)}
               >
-                Confirm
+                {t("financeReports.adjustments.scholarships.confirm")}
               </Button>
             ) : null}
             {canViewAudit ? (
@@ -147,7 +159,7 @@ export default function ScholarshipAwardsListPage() {
                   })
                 }
               >
-                Audit trail
+                {t("financeReports.adjustments.common.auditTrail")}
               </Button>
             ) : null}
           </div>
@@ -160,28 +172,35 @@ export default function ScholarshipAwardsListPage() {
     <>
       <div className="adjustments-list__header">
         <div>
-          <h1>Scholarship &amp; discount awards</h1>
-          <p>
-            Pending awards need confirmation from a different user before they apply to invoices.
-          </p>
+          <h1>{t("financeReports.adjustments.scholarships.title")}</h1>
+          <p>{t("financeReports.adjustments.scholarships.description")}</p>
         </div>
         <Link to="/portal/finance/adjustments/scholarships/new">
-          <Button>Award scholarship</Button>
+          <Button>{t("financeReports.adjustments.scholarships.awardScholarship")}</Button>
         </Link>
       </div>
 
       <div className="adjustments-list__toolbar">
-        <Select label="Status" options={STATUS_OPTIONS} value={status} onChange={changeStatus} />
+        <Select
+          label={t("financeReports.adjustments.common.status")}
+          options={statusOptions}
+          value={status}
+          onChange={changeStatus}
+        />
       </div>
 
       <DataGrid
-        caption="Scholarship and discount awards"
+        caption={t("financeReports.adjustments.scholarships.caption")}
         columns={columns}
         rows={items}
         getRowId={(row) => row.id}
         getRowLabel={(row) => row.scholarship_discount_title}
         loading={listQuery.isPending}
-        empty={listQuery.isError ? "Unable to load awards." : "No awards match this filter."}
+        empty={
+          listQuery.isError
+            ? t("financeReports.adjustments.scholarships.loadError")
+            : t("financeReports.adjustments.scholarships.empty")
+        }
       />
 
       <div className="adjustments-list__pagination">
@@ -190,26 +209,29 @@ export default function ScholarshipAwardsListPage() {
           disabled={!hasPreviousPage}
           onClick={() => setOffset(Math.max(0, offset - AWARDS_PAGE_SIZE))}
         >
-          Previous
+          {t("financeReports.adjustments.common.previous")}
         </Button>
         <Button
           variant="secondary"
           disabled={!hasNextPage}
           onClick={() => setOffset(offset + AWARDS_PAGE_SIZE)}
         >
-          Next
+          {t("financeReports.adjustments.common.next")}
         </Button>
       </div>
 
       <AdjustmentConfirmDialog
         open={confirmTarget !== null}
-        title="Confirm scholarship award?"
-        description="This forwards the award to ERPNext. It cannot be undone from here."
-        confirmLabel="Confirm award"
+        title={t("financeReports.adjustments.scholarships.confirmTitle")}
+        description={t("financeReports.adjustments.scholarships.confirmDescription")}
+        confirmLabel={t("financeReports.adjustments.scholarships.confirmLabel")}
         loading={confirmAward.isPending}
         error={
           confirmAward.isError
-            ? apiErrorMessage(confirmAward.error, "The award could not be confirmed.")
+            ? apiErrorMessage(
+                confirmAward.error,
+                t("financeReports.adjustments.scholarships.confirmError"),
+              )
             : undefined
         }
         onConfirm={handleConfirm}
@@ -218,16 +240,16 @@ export default function ScholarshipAwardsListPage() {
         {confirmTarget ? (
           <dl className="adjustments-effect">
             <div>
-              <dt>Student</dt>
+              <dt>{t("financeReports.adjustments.common.student")}</dt>
               <dd>{confirmTarget.student_id}</dd>
             </div>
             <div>
-              <dt>Scholarship / discount</dt>
+              <dt>{t("financeReports.adjustments.common.scholarshipDiscount")}</dt>
               <dd>{confirmTarget.scholarship_discount_title}</dd>
             </div>
             <div>
-              <dt>Effect</dt>
-              <dd>{confirmDiscount ? discountEffectLine(confirmDiscount) : "—"}</dd>
+              <dt>{t("financeReports.adjustments.common.effect")}</dt>
+              <dd>{confirmDiscount ? discountEffectLine(confirmDiscount, t) : "—"}</dd>
             </div>
           </dl>
         ) : null}

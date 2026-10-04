@@ -1,5 +1,6 @@
 import { DataGrid } from "@studafy/ui";
 
+import { useTranslation } from "../../../lib/i18n";
 import { reportSummaryCards } from "../queries";
 
 import { cellDisplay, columnAlign, reportColumns } from "./erp-report";
@@ -44,6 +45,8 @@ export function ReportTable({
   caption,
   idleMessage,
 }: ReportTableProps) {
+  const { t } = useTranslation();
+
   if (!hasRun) {
     return (
       <p role="status" className="reports-panel__idle">
@@ -55,7 +58,7 @@ export function ReportTable({
   if (loading) {
     return (
       <p role="status" className="reports-panel__idle">
-        Running report…
+        {t("financeReports.reports.table.running")}
       </p>
     );
   }
@@ -63,7 +66,7 @@ export function ReportTable({
   if (error || !report) {
     return (
       <p role="alert" className="reports-panel__error">
-        Unable to run this report. Please check your filters and try again.
+        {t("financeReports.reports.table.error")}
       </p>
     );
   }
@@ -71,7 +74,10 @@ export function ReportTable({
   const columns = reportColumns(report);
   const gridColumns: DataGridColumn<ReportRow>[] = columns.map((column, columnIndex) => ({
     id: column.fieldname ?? `col-${columnIndex}`,
-    header: column.label ?? column.fieldname ?? `Column ${columnIndex + 1}`,
+    header:
+      column.label ??
+      column.fieldname ??
+      t("financeReports.reports.table.columnFallback", { number: columnIndex + 1 }),
     align: columnAlign(column),
     renderCell: (row) => cellDisplay(report, row.index, column, columnIndex),
   }));
@@ -96,7 +102,7 @@ export function ReportTable({
         columns={gridColumns}
         rows={rows}
         getRowId={(row) => row.id}
-        empty="No records match these filters."
+        empty={t("financeReports.reports.table.empty")}
       />
     </div>
   );

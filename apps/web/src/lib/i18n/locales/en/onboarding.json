@@ -1,0 +1,333 @@
+{
+  "common": {
+    "back": "Back",
+    "next": "Next",
+    "captchaRequired": "Complete the challenge before submitting.",
+    "genericError": "Something went wrong. Please try again."
+  },
+  "validation": {
+    "schoolNameRequired": "Enter the school's name.",
+    "slugTooShort": "Must be at least 3 characters.",
+    "slugPattern": "Lowercase letters, numbers, and hyphens only.",
+    "emailInvalid": "Enter a valid email address.",
+    "countryRequired": "Select a country.",
+    "currencyRequired": "Select a currency.",
+    "tooLong": "This is too long.",
+    "invalid": "Enter a valid value."
+  },
+  "register": {
+    "stepIndicator": "Step {{current}} of {{total}}",
+    "slugTaken": "This URL slug is already taken.",
+    "emailTaken": "A school with this email already exists.",
+    "rateLimited": "Too many attempts. Please wait a moment and try again.",
+    "resendToastTitle": "Verification email sent",
+    "resendToastDescription": "Check {{email}}."
+  },
+  "schoolDetails": {
+    "title": "School details",
+    "schoolName": "School name",
+    "slug": "School URL slug",
+    "slugHelper": "Used in your school's web address. Lowercase, hyphens allowed.",
+    "contactEmail": "School contact email",
+    "contactEmailHelper": "We'll send a verification link here.",
+    "country": "Country",
+    "loadingCountries": "Loading countries…",
+    "selectCountry": "Select a country",
+    "currency": "Default currency",
+    "loadingCurrencies": "Loading currencies…",
+    "selectCurrency": "Select a currency",
+    "codedOption": "{{name}} ({{code}})"
+  },
+  "adminContact": {
+    "title": "Administrator contact",
+    "email": "Administrator email",
+    "emailHelper": "We'll send an account-activation invitation here.",
+    "name": "Administrator name",
+    "submit": "Create school account"
+  },
+  "registrationResult": {
+    "title": "{{schoolName}} is registered",
+    "verificationSent": "We sent a verification link to <strong>{{email}}</strong>. Click it to activate your school — this also triggers your school’s workspace setup.",
+    "invitationSent": "We also sent an account-activation invitation to <strong>{{email}}</strong>. It becomes usable once the school email above is verified.",
+    "resend": "Resend verification email"
+  },
+  "setup": {
+    "stepsNavLabel": "Setup steps",
+    "stepLabel": "{{number}}. {{label}}",
+    "steps": {
+      "schoolProfile": "School profile",
+      "academicYear": "Academic year",
+      "gradingScheme": "Grading scheme",
+      "timetable": "Timetable periods",
+      "staff": "Staff invitations",
+      "students": "Student import"
+    },
+    "stepStatus": {
+      "current": "current",
+      "done": "done",
+      "skipped": "skipped",
+      "notStarted": "not started"
+    },
+    "needHelp": "Need help with this step?",
+    "saveAndContinue": "Save and continue",
+    "skipForNow": "Skip for now",
+    "goToAcademicYear": "Go to academic year",
+    "errors": {
+      "schoolProfile": "Could not save school settings. Please try again.",
+      "academicYear": "Could not create the academic year. Please try again.",
+      "gradingScheme": "Could not save the grading scheme. Please try again.",
+      "timetable": "Could not create the timetable. Please try again.",
+      "staff": "Could not send invitations. Please try again."
+    },
+    "complete": {
+      "title": "Setup complete",
+      "body": "Your school is ready. You can revisit any of these settings later from the portal.",
+      "goToDashboard": "Go to dashboard"
+    },
+    "schoolProfile": {
+      "title": "School profile",
+      "description": "These defaults apply across your school and can be changed later from settings.",
+      "defaultLanguage": "Default language",
+      "timezone": "Timezone",
+      "timezoneHelper": "IANA timezone, e.g. Africa/Casablanca.",
+      "invitationExpiry": "Invitation expiry (days)",
+      "attendanceThreshold": "Attendance alert threshold (%)",
+      "absenceThreshold": "Absence alert threshold (%)",
+      "correctionWindow": "Attendance correction window (hours)",
+      "parentDisciplineVisibility": "Parents can view their child's resolved discipline incidents"
+    },
+    "academicYear": {
+      "title": "Academic year",
+      "description": "This becomes your school's current academic year, with one term spanning it.",
+      "code": "Year code",
+      "codeHelper": "A short unique code, e.g. 2025-2026.",
+      "name": "Year name",
+      "startDate": "Start date",
+      "endDate": "End date"
+    },
+    "gradingScheme": {
+      "title": "Grading scheme",
+      "needsAcademicYear": "Create an academic year first — a grading scheme attaches to a term.",
+      "name": "Scheme name",
+      "defaultName": "Standard Scale",
+      "type": "Scheme type",
+      "types": {
+        "letter": "Letter grades",
+        "percentage": "Percentage",
+        "gpa": "GPA",
+        "numeric": "Numeric score",
+        "passFail": "Pass / fail"
+      },
+      "templatePass": "Pass",
+      "templateFail": "Fail",
+      "templateScore": "Score",
+      "boundaries": "Grade boundaries",
+      "rowLabel": "Label {{number}}",
+      "rowMin": "Min % {{number}}",
+      "rowMax": "Max % {{number}}",
+      "rowGpa": "GPA points {{number}}",
+      "removeRow": "Remove",
+      "addRow": "Add boundary"
+    },
+    "timetable": {
+      "title": "Timetable periods",
+      "needsAcademicYear": "Create an academic year first — a timetable belongs to a term.",
+      "description": "Reserve the weekly structure now — period start and end times can be finalized once you add classes, teachers, and rooms.",
+      "name": "Timetable name",
+      "defaultName": "Draft Timetable",
+      "periodsPerDay": "Periods per day",
+      "schoolDays": "School days"
+    },
+    "weekdays": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "staff": {
+      "title": "Staff invitations",
+      "description": "Invite staff by role. Paste one email per line, or separate them with commas.",
+      "batch": "Batch {{number}}",
+      "role": "Role",
+      "roles": {
+        "orgAdmin": "Admin",
+        "instructor": "Teacher",
+        "teachingAssistant": "Teaching assistant"
+      },
+      "emails": "Emails",
+      "checkBatch": "Check this batch.",
+      "removeBatch": "Remove batch",
+      "addBatch": "Add another role",
+      "submit": "Send invitations"
+    },
+    "students": {
+      "title": "Student import",
+      "description": "Upload a CSV of students to validate. Nothing is saved until you confirm.",
+      "downloadTemplate": "Download CSV template",
+      "fileLabel": "Student CSV file",
+      "validating": "Validating…",
+      "rowCount": "Rows in file",
+      "validRows": "Valid rows",
+      "errorRows": "Rows with errors",
+      "errorsCaption": "Row-level validation errors",
+      "columnLine": "Line",
+      "columnField": "Field",
+      "columnMessage": "Message",
+      "downloadErrors": "Download error report",
+      "confirmed": "Import confirmed. Students are being created in the background.",
+      "continue": "Continue",
+      "confirm_one": "Confirm import ({{count}} student)",
+      "confirm_other": "Confirm import ({{count}} students)",
+      "uploadAnother": "Upload a different file",
+      "uploadError": "Could not validate that file. Please try again.",
+      "confirmError": "Could not confirm the import. Please try again."
+    },
+    "validation": {
+      "timezone": "Must be a valid IANA timezone (e.g. Africa/Casablanca).",
+      "expiryDaysRange": "Enter a number of days from 1 to 365.",
+      "percentRange": "Enter a percentage from 0 to 100.",
+      "correctionWindowRange": "Enter a number of hours from 1 to 8760.",
+      "codeRequired": "Enter a short code.",
+      "nameRequired": "Enter a name.",
+      "startDateInvalid": "Enter a valid start date.",
+      "endDateInvalid": "Enter a valid end date.",
+      "endBeforeStart": "End date must be after the start date.",
+      "labelRequired": "Enter a label.",
+      "gpaRange": "Enter GPA points from 0 to 4.5.",
+      "minAboveMax": "Minimum must not exceed maximum.",
+      "boundaryRequired": "Add at least one grade boundary.",
+      "periodsMin": "Enter at least 1 period.",
+      "periodsMax": "Enter at most 20 periods.",
+      "weekdayRequired": "Select at least one day.",
+      "emailInvalid": "Invalid email address",
+      "emailRequired": "Add at least one email.",
+      "tooLong": "This is too long.",
+      "invalid": "Enter a valid value."
+    }
+  },
+  "invite": {
+    "title": "You’re invited to {{schoolName}}",
+    "intro": "Activating {{email}}. Choose how you’d like to sign in to finish setting up your account.",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithMicrosoft": "Continue with Microsoft",
+    "continueWithMock": "Continue with Mock",
+    "failures": {
+      "invalid": {
+        "heading": "This invitation link isn't valid",
+        "message": "Double-check the link your school sent you, or ask them to send a new one."
+      },
+      "expired": {
+        "heading": "This invitation has expired",
+        "message": "Invitations are time-limited. Ask your school administrator to send you a new one."
+      },
+      "revoked": {
+        "heading": "This invitation was revoked",
+        "message": "Your school administrator canceled this invitation. Contact them if you believe this is a mistake."
+      },
+      "consumed": {
+        "heading": "This invitation was already used",
+        "message": "This link has already activated an account. If that was you, sign in instead.",
+        "action": "Sign in"
+      },
+      "schoolSuspended": {
+        "heading": "Your school's account is suspended",
+        "message": "Onboarding is paused while your school's account is suspended. Contact your school administrator."
+      },
+      "generic": {
+        "heading": "We couldn't verify this invitation",
+        "message": "Something went wrong on our end. Please try again in a moment."
+      }
+    },
+    "approval": {
+      "heading": "Your sign-in needs admin approval",
+      "message": "The account you signed in with doesn't match the email this invitation was sent to, so we couldn't finish activating it automatically. An administrator at your school can review and approve it.",
+      "retry": "Try a different account"
+    }
+  },
+  "account": {
+    "title": "Account",
+    "description": "Manage your account settings.",
+    "sessionsLink": "Devices & sessions",
+    "deleteLink": "Delete account"
+  },
+  "portal": {
+    "title": "Portal",
+    "forbidden": "You don’t have access to that page.",
+    "intro": "Your Studafy portal.",
+    "apiStatus": "API status: {{status}}",
+    "statusChecking": "checking…",
+    "statusOk": "ok",
+    "statusUnavailable": "unavailable",
+    "statusUnavailableRef": "unavailable (ref {{requestId}})",
+    "unknownRef": "unknown"
+  },
+  "legal": {
+    "privacy": {
+      "seoTitle": "Privacy policy",
+      "seoDescription": "What Studafy collects, why, and how to request your data or its deletion.",
+      "title": "Privacy policy",
+      "lastUpdated": "Last updated {{date}}.",
+      "intro": "Studafy is provided to schools, who set up accounts for their students, families, and staff. This page explains what the Studafy web and mobile apps collect from those accounts, why, and how to request a copy of your data or its deletion.",
+      "accountsHeading": "Accounts",
+      "accountsBody": "Studafy accounts are created by your school, not by signing up directly. Signing in uses your school-configured identity provider (Microsoft or Google) — Studafy does not see or store your password.",
+      "collectHeading": "What we collect",
+      "collectIntro": "Everything below is collected either by Studafy’s own servers, or by our crash and performance diagnostics vendors (Firebase and Sentry) acting on our behalf. We do not use any advertising or analytics network, and we do not sell or share your data with anyone for their own purposes.",
+      "collectEducation": "<strong>Education records.</strong> Timetable, grades, attendance, assignments, course materials, and — for a teacher’s own classes — discipline incident reports.",
+      "collectIdentifiers": "<strong>Account identifiers.</strong> An internal account id and, if you enable push notifications, a device push token, so notifications and crash reports can be tied to your account.",
+      "collectDiagnostics": "<strong>Crash and performance diagnostics.</strong> If the app crashes or performs poorly, technical details (device type, OS version, a stack trace) are sent to our crash-reporting vendors, identified only by your internal account id — never your name or email.",
+      "collectContent": "<strong>Content you or your school upload.</strong> Photos taken for teaching materials, uploaded documents, and assignment submissions.",
+      "collectBilling": "<strong>Billing history</strong> (parents/guardians only), if your school bills you through Studafy: invoice amounts and payment status. Card details are entered on our payment processor’s own page, never stored by Studafy.",
+      "collectAi": "<strong>Questions to the AI study tools</strong> (students), only after you agree to the in-app notice: your question and the related study material are sent to our AI provider, Anthropic, which processes them on our behalf to answer you.",
+      "collectContact": "Your name and email address come from your school, which sets up your account, and from your identity provider when you sign in. We use your email address to recognise your account at sign-in and to send account messages, such as a deletion confirmation. We do not collect your phone number.",
+      "rightsHeading": "Your rights",
+      "rightsIntro": "You can request a copy of your data, or request that it be deleted, at any time:",
+      "rightsSignedIn": "Signed in, from <settingsLink>Account settings</settingsLink>.",
+      "rightsSignedOut": "Without signing in or installing the app, request deletion on the <deleteLink>delete your account</deleteLink> page: we email a link to the account’s address, and the deletion happens once you confirm it.",
+      "rightsCopy": "For a copy of your data, contact your school, or email us — see Contact below.",
+      "rightsDeletion": "Deleting your account signs you out everywhere, removes you from your school and stops any AI subscription from renewing immediately; erasing your personal data follows within 30 days. Your school keeps only records it is legally required to retain — grades and attendance without your name or contact details, financial records, and its audit log — and the confirmation screen and confirmation email list them, so nothing is silently kept back.",
+      "contactHeading": "Contact",
+      "contactBody": "Questions about this policy or your data: <mailLink>{{email}}</mailLink>."
+    },
+    "deleteAccount": {
+      "seoTitle": "Delete your account",
+      "seoDescription": "How to request deletion of your Studafy account and data.",
+      "title": "Delete your account",
+      "intro": "You can delete your Studafy account and its data at any time, with or without the app. Personal data is erased within 30 days; see the <privacyLink>privacy policy</privacyLink> for the records the law requires your school to keep.",
+      "signedInHeading": "If you can sign in",
+      "signedInBody": "Go to <deleteLink>Account settings › Delete account</deleteLink> in the Studafy web app (or the equivalent screen in the mobile app) and confirm. It takes effect immediately — no one else needs to act on it.",
+      "signedOutHeading": "Without signing in",
+      "signedOutBody": "Enter the email address your school uses for your account. If it has a Studafy account, we will email it a link to confirm the deletion. The link works once, for one hour.",
+      "noMailbox": "No longer have access to that mailbox? Contact your school.",
+      "noMailboxWithEmail": "No longer have access to that mailbox? Contact your school, or email us at <mailLink>{{email}}</mailLink>.",
+      "whatHappensHeading": "What happens",
+      "whatHappensBody": "Straight away, you are signed out on every device, your account is removed from your school, and any AI subscription is cancelled so it does not renew. Within 30 days, your name, contact details and profile are erased. We email you a confirmation.",
+      "retainedBody": "Your school keeps only the records it is legally required to: your grades and attendance (without your name or contact details), financial records, and its audit log. The confirmation screen lists these — see the <privacyLink>privacy policy</privacyLink> for detail.",
+      "formLabel": "Request account deletion",
+      "emailLabel": "Account email",
+      "submit": "Email me a deletion link",
+      "sent": "If {{email}} has a Studafy account, we have sent it a link to confirm the deletion. Check your inbox and spam folder; the link expires in one hour.",
+      "rateLimited": "Too many attempts. Please wait a few minutes and try again.",
+      "captchaExpired": "The challenge expired. Please complete it again."
+    },
+    "confirmDeletion": {
+      "seoTitle": "Confirm account deletion",
+      "seoDescription": "Confirm deletion of your Studafy account.",
+      "title": "Delete your account",
+      "body": "This deletes the Studafy account registered to your email address, in every school it belongs to. Straight away, you are signed out on every device, the account is removed from the school, and any AI subscription is cancelled. Your name, contact details and profile are erased within 30 days.",
+      "irreversible": "This cannot be undone.",
+      "submit": "Delete my account",
+      "linkInvalid": "This link is invalid, has expired, or has already been used.",
+      "linkIncomplete": "This link is incomplete.",
+      "requestNewLink": "Request a new link",
+      "nothingTitle": "Nothing to delete",
+      "nothingBody": "There is no active Studafy account for this email address any more. It may already have been deleted.",
+      "deletedTitle": "Your account has been deleted",
+      "erasedBy": "{{school}}: personal data erased by {{date}}.",
+      "retainedIntro": "We have emailed you a confirmation. Your school keeps only these records:",
+      "seePrivacy": "See the <privacyLink>privacy policy</privacyLink> for why."
+    }
+  }
+}

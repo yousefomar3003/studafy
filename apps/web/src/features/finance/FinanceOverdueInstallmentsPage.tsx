@@ -2,6 +2,8 @@ import { Table } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { useTranslation } from "../../lib/i18n";
+
 import {
   COLLECTIONS_VS_DUE_QUERY_KEY,
   fetchCollectionsVsDueReport,
@@ -13,11 +15,11 @@ const COLUMN_COUNT = 4;
 
 /** Matches `bucketForDaysOverdue` in `queries.ts` — the same 30/60/90 day boundaries the aging
  * chart's bars use, so a bucket clicked there lands on the matching filter here. */
-const BUCKET_LABELS: Readonly<Record<string, string>> = {
-  range1: "0–30 days overdue",
-  range2: "31–60 days overdue",
-  range3: "61–90 days overdue",
-  range4: "90+ days overdue",
+const BUCKET_LABEL_KEYS: Readonly<Record<string, string>> = {
+  range1: "finance.overdue.buckets.range1",
+  range2: "finance.overdue.buckets.range2",
+  range3: "finance.overdue.buckets.range3",
+  range4: "finance.overdue.buckets.range4",
 };
 
 /**
@@ -28,6 +30,7 @@ const BUCKET_LABELS: Readonly<Record<string, string>> = {
  * fetched once and filtered here instead.
  */
 export default function FinanceOverdueInstallmentsPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const bucket = searchParams.get("bucket") ?? undefined;
 
@@ -40,29 +43,32 @@ export default function FinanceOverdueInstallmentsPage() {
   const installments = (allInstallments ?? []).filter(
     (installment) => !bucket || installment.bucket === bucket,
   );
+  // `bucket` comes from `?bucket=` and only ever indexes a display fallback (`?? bucket` itself)
+  // into a fixed object literal — never used to read or write anything else.
+  // eslint-disable-next-line security/detect-object-injection
+  const bucketLabelKey = bucket ? BUCKET_LABEL_KEYS[bucket] : undefined;
 
   return (
     <>
-      <h1>Overdue installments</h1>
-      <p>Installments past due with a balance still owed, from the collections vs due report.</p>
+      <h1>{t("finance.overdue.title")}</h1>
+      <p>{t("finance.overdue.intro")}</p>
 
       {bucket ? (
         <p>
-          {/* `bucket` comes from `?bucket=` and only ever indexes a display fallback (`?? bucket`
-              itself) into a fixed object literal — never used to read or write anything else. */}
-          {/* eslint-disable-next-line security/detect-object-injection */}
-          Filtered to {BUCKET_LABELS[bucket] ?? bucket}.{" "}
-          <Link to="/portal/finance/overdue">Clear filter</Link>
+          {t("finance.overdue.filteredTo", {
+            bucket: bucketLabelKey ? t(bucketLabelKey) : bucket,
+          })}{" "}
+          <Link to="/portal/finance/overdue">{t("finance.overdue.clearFilter")}</Link>
         </p>
       ) : null}
 
-      <Table caption="Overdue installments">
+      <Table caption={t("finance.overdue.title")}>
         <Table.Header>
           <Table.Row>
-            <Table.HeaderCell>Party</Table.HeaderCell>
-            <Table.HeaderCell>Reference</Table.HeaderCell>
-            <Table.HeaderCell>Due date</Table.HeaderCell>
-            <Table.HeaderCell>Outstanding</Table.HeaderCell>
+            <Table.HeaderCell>{t("finance.overdue.columns.party")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("finance.overdue.columns.reference")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("finance.overdue.columns.dueDate")}</Table.HeaderCell>
+            <Table.HeaderCell>{t("finance.overdue.columns.outstanding")}</Table.HeaderCell>
           </Table.Row>
         </Table.Header>
         <Table.Body
@@ -70,10 +76,10 @@ export default function FinanceOverdueInstallmentsPage() {
           loading={isPending}
           empty={
             isError
-              ? "Unable to load the collections report."
+              ? t("finance.overdue.loadError")
               : allInstallments === null
-                ? "The collections report didn't include the columns this needs."
-                : "Nothing is overdue."
+                ? t("finance.overdue.missingColumns")
+                : t("finance.overdue.empty")
           }
         >
           {installments.map((installment, index) => (

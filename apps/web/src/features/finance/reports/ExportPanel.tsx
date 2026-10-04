@@ -5,8 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { usePermissions } from "../../../lib/auth";
+import { useTranslation } from "../../../lib/i18n";
 
-import { EXPORT_STATUS_LABELS, exportFileFormatLabel, exportStatusTone } from "./labels";
+import { EXPORT_STATUS_LABEL_KEYS, exportFileFormatLabel, exportStatusTone } from "./labels";
 import { useCreateReportExport } from "./mutations";
 import { exportJobQueryKey, fetchExportJob } from "./queries";
 
@@ -16,6 +17,7 @@ import type { SelectOption } from "@studafy/ui";
 const IN_FLIGHT_STATUSES = new Set<ExportJob["status"]>(["queued", "processing"]);
 const POLL_INTERVAL_MS = 2000;
 
+// Format codes, identical in every locale — deliberately not translated.
 const FORMAT_OPTIONS: SelectOption<ExportFileFormat>[] = [
   { value: "csv", label: "CSV" },
   { value: "pdf", label: "PDF" },
@@ -26,7 +28,8 @@ function apiErrorMessage(error: unknown, fallback: string): string {
 }
 
 export interface ExportPanelProps {
-  /** Used in toast copy and the download link's accessible name, e.g. "Accounts receivable aging". */
+  /** Already-translated report name, used in toast copy and the download link's accessible name,
+   * e.g. "Accounts receivable aging". */
   reportLabel: string;
   /** Builds the typed export request for the currently selected format, or `null` when a required
    * filter isn't set yet (e.g. no family picked for a family statement) — `null` disables the
@@ -49,6 +52,7 @@ export interface ExportPanelProps {
  * independently.
  */
 export function ExportPanel({ reportLabel, buildRequest, disabledReason }: ExportPanelProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const permissions = usePermissions();
   const [fileFormat, setFileFormat] = useState<ExportFileFormat>("csv");
@@ -77,18 +81,19 @@ export function ExportPanel({ reportLabel, buildRequest, disabledReason }: Expor
     if (job.status === "completed") {
       show({
         variant: "success",
-        title: "Report ready",
-        description: `${reportLabel} is ready to download.`,
+        title: t("financeReports.reports.export.readyTitle"),
+        description: t("financeReports.reports.export.readyDescription", { report: reportLabel }),
       });
     } else if (job.status === "failed") {
       show({
         variant: "error",
-        title: "Export failed",
+        title: t("financeReports.reports.export.failedTitle"),
         description:
-          job.failure_message ?? `${reportLabel} couldn't be generated. Please try again.`,
+          job.failure_message ??
+          t("financeReports.reports.export.failedDescription", { report: reportLabel }),
       });
     }
-  }, [job, reportLabel, show]);
+  }, [job, reportLabel, show, t]);
 
   // Export is a write against the report-export gate specifically (`report:export`) — narrower than
   // the `report:viewFinancial` this whole page is already routed behind, so a viewer without the
@@ -107,8 +112,8 @@ export function ExportPanel({ reportLabel, buildRequest, disabledReason }: Expor
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't queue the export",
-          description: apiErrorMessage(error, "Please try again."),
+          title: t("financeReports.reports.export.queueErrorTitle"),
+          description: apiErrorMessage(error, t("financeReports.reports.export.tryAgain")),
         });
       },
     });
@@ -117,7 +122,7 @@ export function ExportPanel({ reportLabel, buildRequest, disabledReason }: Expor
   return (
     <div className="reports-panel__export">
       <Select
-        label="Format"
+        label={t("financeReports.reports.export.format")}
         options={FORMAT_OPTIONS}
         value={fileFormat}
         onChange={setFileFormat}
@@ -130,7 +135,9 @@ export function ExportPanel({ reportLabel, buildRequest, disabledReason }: Expor
         loading={createExport.isPending}
         disabled={!request || inFlight}
       >
-        Download {exportFileFormatLabel(fileFormat)}
+        {t("financeReports.reports.export.downloadFormat", {
+          format: exportFileFormatLabel(fileFormat),
+        })}
       </Button>
 
       {!request && disabledReason ? (
@@ -140,16 +147,16 @@ export function ExportPanel({ reportLabel, buildRequest, disabledReason }: Expor
       {job ? (
         <p className="reports-panel__export-status" aria-live="polite">
           <span className="reports-status-pill" data-tone={exportStatusTone(job.status)}>
-            {EXPORT_STATUS_LABELS[job.status]}
+            {t(EXPORT_STATUS_LABEL_KEYS[job.status])}
           </span>
           {job.status === "completed" && job.download_url ? (
             <a href={job.download_url} target="_blank" rel="noreferrer">
-              Download {reportLabel}
+              {t("financeReports.reports.export.downloadReport", { report: reportLabel })}
             </a>
           ) : null}
           {job.status === "failed" ? (
             <Button type="button" variant="tertiary" onClick={() => setJobId(null)}>
-              Dismiss
+              {t("financeReports.reports.export.dismiss")}
             </Button>
           ) : null}
         </p>

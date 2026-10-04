@@ -2,6 +2,8 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Input, Modal, useToast } from "@studafy/ui";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useCreateTemplate, useUpdateTemplate } from "./mutations";
 
 import type { EvaluationCriteriaTemplate } from "./queries";
@@ -25,6 +27,7 @@ function apiErrorDescription(error: unknown): string | undefined {
  * `EvaluationDetailPage`'s criteria table draws on.
  */
 export function CriteriaTemplateModal({ open, template, onClose }: CriteriaTemplateModalProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -55,13 +58,20 @@ export function CriteriaTemplateModal({ open, template, onClose }: CriteriaTempl
       sort_order: Number(sortOrder) || 0,
     };
     const onSuccess = () => {
-      show({ variant: "success", title: template ? "Template updated" : "Template created" });
+      show({
+        variant: "success",
+        title: template
+          ? t("principal.evaluations.templateModal.updated")
+          : t("principal.evaluations.templateModal.created"),
+      });
       onClose();
     };
     const onError = (error: unknown) =>
       show({
         variant: "error",
-        title: template ? "Couldn't update template" : "Couldn't create template",
+        title: template
+          ? t("principal.evaluations.templateModal.updateFailed")
+          : t("principal.evaluations.templateModal.createFailed"),
         description: apiErrorDescription(error),
       });
 
@@ -76,47 +86,52 @@ export function CriteriaTemplateModal({ open, template, onClose }: CriteriaTempl
     <Modal
       open={open}
       onClose={onClose}
-      title={template ? "Edit criteria template" : "New criteria template"}
+      title={
+        template
+          ? t("principal.evaluations.templateModal.editTitle")
+          : t("principal.evaluations.templateModal.newTitle")
+      }
     >
       <Modal.Body>
         <div className="evaluations-form">
           <Input
-            label="Title"
+            label={t("principal.evaluations.templateModal.title")}
             value={title}
             required
             onChange={(event) => setTitle(event.target.value)}
           />
           <Input
-            label="Description"
+            label={t("principal.evaluations.templateModal.description")}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            helperText="Optional — what this criterion evaluates."
+            helperText={t("principal.evaluations.templateModal.descriptionHelper")}
           />
           <Input
-            label="Max score"
+            label={t("principal.evaluations.templateModal.maxScore")}
             type="number"
             min={1}
             value={maxScore}
             onChange={(event) => setMaxScore(event.target.value)}
           />
           <Input
-            label="Sort order"
+            label={t("principal.evaluations.templateModal.sortOrder")}
             type="number"
             min={0}
             value={sortOrder}
             onChange={(event) => setSortOrder(event.target.value)}
-            helperText="Lower numbers appear first in the scoring form."
+            helperText={t("principal.evaluations.templateModal.sortOrderHelper")}
           />
           {saving.isError ? (
             <p role="alert" className="evaluations-detail__hint">
-              {apiErrorDescription(saving.error) ?? "The template could not be saved."}
+              {apiErrorDescription(saving.error) ??
+                t("principal.evaluations.templateModal.errorFallback")}
             </p>
           ) : null}
         </div>
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>
-          Cancel
+          {t("principal.common.cancel")}
         </Button>
         <Button
           type="button"
@@ -125,7 +140,9 @@ export function CriteriaTemplateModal({ open, template, onClose }: CriteriaTempl
           disabled={!canSubmit}
           onClick={handleSubmit}
         >
-          {template ? "Save changes" : "Create template"}
+          {template
+            ? t("principal.evaluations.templateModal.saveChanges")
+            : t("principal.evaluations.templateModal.create")}
         </Button>
       </Modal.Footer>
     </Modal>

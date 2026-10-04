@@ -7,18 +7,21 @@ import { Loading } from "../../components/Loading";
 import { ACTIVATION_EVENTS, track } from "../../lib/analytics";
 import { api } from "../../lib/api";
 import { API_BASE_URL, SHOW_MOCK_LOGIN } from "../../lib/config";
+import { useTranslation } from "../../lib/i18n";
 
 import { InvitationOutcome } from "./InvitationOutcome";
 
 import type { InvitationOutcomeProps } from "./InvitationOutcome";
+import type { TFunction } from "i18next";
 
 /** The OAuth providers the invitation activation flow offers. Mirrors `activation-oauth-routes.ts`. */
 export type InvitationOAuthProvider = "google" | "microsoft" | "mock";
 
-const PROVIDER_LABELS: Record<InvitationOAuthProvider, string> = {
-  google: "Continue with Google",
-  microsoft: "Continue with Microsoft",
-  mock: "Continue with Mock",
+/** Translation keys for each provider button — resolved with `t()` at render time. */
+const PROVIDER_LABEL_KEYS: Record<InvitationOAuthProvider, string> = {
+  google: "onboarding.invite.continueWithGoogle",
+  microsoft: "onboarding.invite.continueWithMicrosoft",
+  mock: "onboarding.invite.continueWithMock",
 };
 
 /**
@@ -51,52 +54,32 @@ export function activationOAuthStartUrl(
  */
 // A Map, not a plain object: `code` is a string the server put on the wire, and a Map sidesteps any
 // prototype-property lookup concern that indexing a literal object with untrusted-shaped input would
-// raise, with no loss of clarity.
-const FAILURE_COPY = new Map<string, Omit<InvitationOutcomeProps, "requestId">>([
-  [
-    "INVITATION_INVALID",
-    {
-      heading: "This invitation link isn't valid",
-      message: "Double-check the link your school sent you, or ask them to send a new one.",
-    },
-  ],
-  [
-    "EXPIRED",
-    {
-      heading: "This invitation has expired",
-      message: "Invitations are time-limited. Ask your school administrator to send you a new one.",
-    },
-  ],
-  [
-    "REVOKED",
-    {
-      heading: "This invitation was revoked",
-      message:
-        "Your school administrator canceled this invitation. Contact them if you believe this is a mistake.",
-    },
-  ],
-  [
-    "CONSUMED",
-    {
-      heading: "This invitation was already used",
-      message: "This link has already activated an account. If that was you, sign in instead.",
-      action: { label: "Sign in", href: "/auth/login" },
-    },
-  ],
-  [
-    "SCHOOL_SUSPENDED",
-    {
-      heading: "Your school's account is suspended",
-      message:
-        "Onboarding is paused while your school's account is suspended. Contact your school administrator.",
-    },
-  ],
+// raise, with no loss of clarity. Values are translation-key prefixes under `onboarding.invite.*`
+// (`.heading`, `.message`, and `.action` where an action exists), resolved at render time.
+interface FailureCopy {
+  keyPrefix: string;
+  actionHref?: string;
+}
+
+const FAILURE_COPY = new Map<string, FailureCopy>([
+  ["INVITATION_INVALID", { keyPrefix: "onboarding.invite.failures.invalid" }],
+  ["EXPIRED", { keyPrefix: "onboarding.invite.failures.expired" }],
+  ["REVOKED", { keyPrefix: "onboarding.invite.failures.revoked" }],
+  ["CONSUMED", { keyPrefix: "onboarding.invite.failures.consumed", actionHref: "/auth/login" }],
+  ["SCHOOL_SUSPENDED", { keyPrefix: "onboarding.invite.failures.schoolSuspended" }],
 ]);
 
-const GENERIC_FAILURE: Omit<InvitationOutcomeProps, "requestId"> = {
-  heading: "We couldn't verify this invitation",
-  message: "Something went wrong on our end. Please try again in a moment.",
-};
+const GENERIC_FAILURE: FailureCopy = { keyPrefix: "onboarding.invite.failures.generic" };
+
+function outcomeProps(copy: FailureCopy, t: TFunction): Omit<InvitationOutcomeProps, "requestId"> {
+  return {
+    heading: t(`${copy.keyPrefix}.heading`),
+    message: t(`${copy.keyPrefix}.message`),
+    ...(copy.actionHref
+      ? { action: { label: t(`${copy.keyPrefix}.action`), href: copy.actionHref } }
+      : {}),
+  };
+}
 
 /**
  * Public invitation activation page (`/invite/:token`).
@@ -110,6 +93,7 @@ const GENERIC_FAILURE: Omit<InvitationOutcomeProps, "requestId"> = {
  * first visit or retry alike) or on `/invite/:token/complete` on success.
  */
 export default function InvitePage() {
+  const { t } = useTranslation();
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
 
@@ -139,7 +123,7 @@ export default function InvitePage() {
   }, [isPending, data, code]);
 
   if (!token) {
-    return <InvitationOutcome {...FAILURE_COPY.get("INVITATION_INVALID")!} />;
+    return <InvitationOutcome {...outcomeProps(FAILURE_COPY.get("INVITATION_INVALID")!, t)} />;
   }
 
   if (isPending) {
@@ -149,22 +133,19 @@ export default function InvitePage() {
   if (error || !data) {
     const copy = (code && FAILURE_COPY.get(code)) || GENERIC_FAILURE;
     const requestId = error instanceof ApiError ? error.request_id : null;
-    return <InvitationOutcome {...copy} requestId={requestId} />;
+    return <InvitationOutcome {...outcomeProps(copy, t)} requestId={requestId} />;
   }
 
   return (
     <>
-      <h1>You&rsquo;re invited to {data.schoolName}</h1>
-      <p>
-        Activating {data.emailHint}. Choose how you&rsquo;d like to sign in to finish setting up
-        your account.
-      </p>
+      <h1>{t("onboarding.invite.title", { schoolName: data.schoolName })}</h1>
+      <p>{t("onboarding.invite.intro", { email: data.emailHint })}</p>
       <p>
         <a
           href={activationOAuthStartUrl(token, "google")}
           onClick={() => track(ACTIVATION_EVENTS.OAUTH_STARTED, { provider: "google" })}
         >
-          {PROVIDER_LABELS.google}
+          {t(PROVIDER_LABEL_KEYS.google)}
         </a>
       </p>
       <p>
@@ -172,7 +153,7 @@ export default function InvitePage() {
           href={activationOAuthStartUrl(token, "microsoft")}
           onClick={() => track(ACTIVATION_EVENTS.OAUTH_STARTED, { provider: "microsoft" })}
         >
-          {PROVIDER_LABELS.microsoft}
+          {t(PROVIDER_LABEL_KEYS.microsoft)}
         </a>
       </p>
       {SHOW_MOCK_LOGIN && (
@@ -185,7 +166,7 @@ export default function InvitePage() {
             )}
             onClick={() => track(ACTIVATION_EVENTS.OAUTH_STARTED, { provider: "mock" })}
           >
-            {PROVIDER_LABELS.mock}
+            {t(PROVIDER_LABEL_KEYS.mock)}
           </a>
         </p>
       )}

@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "../../../lib/auth";
+import { useTranslation } from "../../../lib/i18n";
 import { useUpdateUser } from "../users/mutations";
-import { ROLE_LABELS } from "../users/schema";
 
 import { myProfileQueryKey, fetchMyProfile } from "./queries";
 import { fieldErrors, profileSchema } from "./schema";
@@ -25,6 +25,7 @@ const EMPTY_VALUES: ProfileValues = { display_name: "" };
  * keeps the users list in sync too if this admin is also in it.
  */
 export function ProfileSection() {
+  const { t } = useTranslation();
   const { show } = useToast();
   const { userId } = useAuth();
   const updateUser = useUpdateUser();
@@ -61,11 +62,12 @@ export function ProfileSection() {
     updateUser.mutate(
       { userId, display_name: result.data.display_name },
       {
-        onSuccess: () => show({ variant: "success", title: "Profile updated" }),
+        onSuccess: () =>
+          show({ variant: "success", title: t("adminSchool.settings.profile.updated") }),
         onError: (error) => {
           show({
             variant: "error",
-            title: "Couldn't save changes",
+            title: t("adminSchool.settings.saveFailed"),
             description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
           });
         },
@@ -77,34 +79,33 @@ export function ProfileSection() {
 
   return (
     <SettingsCard
-      title="Profile"
-      description="How you show up to other staff, students, and parents across the portal."
+      title={t("adminSchool.settings.profile.title")}
+      description={t("adminSchool.settings.profile.description")}
       onSubmit={handleSubmit}
       saving={updateUser.isPending}
     >
       <Input
-        label="Display name"
+        label={t("adminSchool.settings.profile.displayName")}
         value={values.display_name}
         onChange={(e) => {
           setValues({ display_name: e.target.value });
           setErrors({});
         }}
-        helperText="Shown instead of your email wherever your name appears in the portal."
-        error={errors.display_name}
+        helperText={t("adminSchool.settings.profile.displayNameHelp")}
+        error={errors.display_name ? t(errors.display_name) : undefined}
         disabled={profileQuery.isPending}
         required
       />
       <Input
-        label="Email"
+        label={t("adminSchool.settings.profile.email")}
         value={profileQuery.data?.email ?? ""}
-        helperText="Your sign-in email. Changing it isn't supported from this screen."
+        helperText={t("adminSchool.settings.profile.emailHelp")}
         disabled
       />
       <Input
-        label="Role"
-        // eslint-disable-next-line security/detect-object-injection -- `role` is narrowed to the closed `Role` union from the API response, not user input
-        value={role ? ROLE_LABELS[role] : ""}
-        helperText="Assigned by another admin from the Users screen, not editable here."
+        label={t("adminSchool.settings.profile.role")}
+        value={role ? t(`adminSchool.roles.${role}`) : ""}
+        helperText={t("adminSchool.settings.profile.roleHelp")}
         disabled
       />
     </SettingsCard>

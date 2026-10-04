@@ -1,5 +1,7 @@
 import { Button, Modal } from "@studafy/ui";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import type { ReactNode } from "react";
 
 export interface ConfirmChangeDialogProps {
@@ -24,18 +26,19 @@ export function ConfirmChangeDialog({
   loading,
   onConfirm,
   onClose,
-  confirmLabel = "Save anyway",
+  confirmLabel,
   children,
 }: ConfirmChangeDialogProps) {
+  const { t } = useTranslation();
   return (
     <Modal open={open} onClose={onClose} title={title}>
       <Modal.Body>{children}</Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>
-          Cancel
+          {t("adminSchool.settings.confirm.cancel")}
         </Button>
         <Button type="button" variant="primary" loading={loading} onClick={onConfirm}>
-          {confirmLabel}
+          {confirmLabel ?? t("adminSchool.settings.confirm.saveAnyway")}
         </Button>
       </Modal.Footer>
     </Modal>

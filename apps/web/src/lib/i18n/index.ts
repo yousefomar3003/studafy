@@ -31,4 +31,4 @@ export { createLocaleStore, localeStore } from "./store";
 export type { LocaleStore, LocaleStoreOptions } from "./store";
 
 // Components read translations the same way regardless of which app-level provider mounted i18next.
-export { useTranslation } from "react-i18next";
+export { Trans, useTranslation } from "react-i18next";

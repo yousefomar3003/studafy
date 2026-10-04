@@ -3,7 +3,7 @@ import { Button, Card, useToast } from "@studafy/ui";
 import { useState } from "react";
 
 import { useSessionStore } from "../../../lib/auth";
-import { useTranslation } from "../../../lib/i18n";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { ConfirmDialog } from "../sessions/ConfirmDialog";
 
 import { useDeleteAccount } from "./mutations";
@@ -27,6 +27,7 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  */
 export default function DeleteAccountPage() {
   const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { show } = useToast();
   const sessionStore = useSessionStore();
   const requestsQuery = useSelfDsrRequestsQuery();
@@ -74,7 +75,7 @@ export default function DeleteAccountPage() {
         <Card.Body>
           <p role="status">
             {t("accountDeletion.completedBody", {
-              date: new Date(deletion.completes_by).toLocaleDateString(),
+              date: formatDate(new Date(deletion.completes_by)),
             })}
           </p>
           {deletion.ai_subscriptions_canceled > 0 ? (
@@ -111,7 +112,7 @@ export default function DeleteAccountPage() {
           ) : pendingErasure ? (
             <p>
               {t("accountDeletion.pending", {
-                date: new Date(pendingErasure.created_at).toLocaleDateString(),
+                date: formatDate(new Date(pendingErasure.created_at)),
               })}
             </p>
           ) : (

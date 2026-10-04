@@ -1,0 +1,240 @@
+{
+  "adjustments": {
+    "common": {
+      "cancel": "Cancel",
+      "change": "Change",
+      "student": "Student",
+      "invoice": "Invoice",
+      "reason": "Reason",
+      "amount": "Amount",
+      "refundAmount": "Refund amount",
+      "paidToDate": "Paid to date",
+      "scholarshipDiscount": "Scholarship / discount",
+      "effect": "Effect",
+      "created": "Created",
+      "status": "Status",
+      "actions": "Actions",
+      "auditTrail": "Audit trail",
+      "allStatuses": "All statuses",
+      "previous": "Previous",
+      "next": "Next",
+      "loading": "Loading…"
+    },
+    "awardStatus": {
+      "pending": "Pending confirmation",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled"
+    },
+    "refundStatus": {
+      "pending_approval": "Pending approval",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "submitted_to_erpnext": "Submitted to ERPNext",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "reasonCode": {
+      "overpayment": "Overpayment",
+      "withdrawal": "Withdrawal",
+      "discount_adjustment": "Discount adjustment",
+      "error_correction": "Error correction"
+    },
+    "discountEffect": {
+      "fixedAll": "{{amount}} off all fee categories on every future invoice.",
+      "fixedCategory": "{{amount}} off the \"{{category}}\" fee category on every future invoice.",
+      "percentAll": "{{amount}}% off all fee categories on every future invoice.",
+      "percentCategory": "{{amount}}% off the \"{{category}}\" fee category on every future invoice."
+    },
+    "auditTrailModal": {
+      "title": "Audit trail",
+      "description": "Every recorded change to this record, oldest first.",
+      "loading": "Loading…",
+      "loadError": "Couldn't load the audit trail.",
+      "empty": "No audit entries recorded yet.",
+      "system": "System",
+      "entryMeta": "<strong>{{action}}</strong> by {{actor}} · {{date}}"
+    },
+    "studentPicker": {
+      "placeholder": "Search by name or admission number",
+      "noMatches": "No students match."
+    },
+    "invoicePicker": {
+      "paidToDate": "Paid to date: {{amount}} {{currency}}",
+      "placeholder": "Search by student or invoice number",
+      "helper": "Only submitted invoices with a paid amount can be refunded.",
+      "paid": "Paid {{amount}} {{currency}}",
+      "noMatches": "No refundable invoices match."
+    },
+    "scholarships": {
+      "title": "Scholarship & discount awards",
+      "description": "Pending awards need confirmation from a different user before they apply to invoices.",
+      "awardScholarship": "Award scholarship",
+      "caption": "Scholarship and discount awards",
+      "loadError": "Unable to load awards.",
+      "empty": "No awards match this filter.",
+      "confirm": "Confirm",
+      "ownAwardHint": "A different user must confirm this award.",
+      "confirmedToast": "Award confirmed",
+      "confirmTitle": "Confirm scholarship award?",
+      "confirmDescription": "This forwards the award to ERPNext. It cannot be undone from here.",
+      "confirmLabel": "Confirm award",
+      "confirmError": "The award could not be confirmed."
+    },
+    "newScholarship": {
+      "back": "← Back to scholarship awards",
+      "title": "Award a scholarship or discount",
+      "formLabel": "Scholarship award form",
+      "selectDiscount": "Select a scholarship or discount",
+      "reviewAward": "Review award",
+      "confirmTitle": "Award scholarship?",
+      "confirmDescription": "This creates a pending award. A different user must confirm it before it applies to any invoice.",
+      "confirmLabel": "Create award",
+      "createError": "The award could not be created.",
+      "createdLabel": "Award created",
+      "createdHeadline": "Award created — {{title}}",
+      "createdBody": "Pending confirmation from a different user. It will not apply to any invoice until confirmed.",
+      "awardAnother": "Award another scholarship",
+      "viewAwards": "View scholarship awards"
+    },
+    "refunds": {
+      "title": "Refunds",
+      "description": "Pending refunds need approval from a different user with refund approval rights.",
+      "requestRefund": "Request refund",
+      "caption": "Refund requests",
+      "loadError": "Unable to load refunds.",
+      "empty": "No refunds match this filter.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "ownApproveHint": "A different user must approve this refund.",
+      "ownRejectHint": "A different user must reject this refund.",
+      "approvedToast": "Refund approved",
+      "approveTitle": "Approve refund?",
+      "approveDescription": "This forwards the refund to ERPNext as a credit note. It cannot be undone from here.",
+      "approveLabel": "Approve refund",
+      "approveError": "The refund could not be approved."
+    },
+    "newRefund": {
+      "back": "← Back to refunds",
+      "title": "Request a refund",
+      "formLabel": "Refund form",
+      "selectReason": "Select a reason",
+      "exceedsPaid": "This exceeds the paid amount on this invoice ({{amount}} {{currency}}). Reduce the amount to continue.",
+      "upTo": "Up to {{amount}} {{currency}} can be refunded on this invoice.",
+      "notesOptional": "Notes (optional)",
+      "reviewRefund": "Review refund",
+      "confirmTitle": "Request refund?",
+      "confirmDescription": "This creates a pending refund. A different user with refund approval rights must approve it before ERPNext issues the credit note.",
+      "confirmLabel": "Request refund",
+      "requestError": "The refund could not be requested.",
+      "conflictError": "This submission may have already been recorded with different details. Check the refund history before retrying.",
+      "createdLabel": "Refund requested",
+      "createdHeadline": "Refund requested — {{amount}} {{currency}}",
+      "createdBody": "Pending approval from a different user with refund approval rights. ERPNext will not issue the credit note until then.",
+      "requestAnother": "Request another refund",
+      "viewRefunds": "View refunds"
+    },
+    "rejectRefund": {
+      "title": "Reject refund",
+      "description": "{{amount}} {{currency}} against {{invoice}}",
+      "reason": "Reason",
+      "reasonRequired": "A reason is required to reject.",
+      "reject": "Reject",
+      "rejectedToast": "Refund rejected",
+      "rejectError": "Couldn't reject refund"
+    }
+  },
+  "reports": {
+    "center": {
+      "title": "Reports",
+      "description": "Run and download finance reports. Downloads process in the background — you’ll be notified here once a file is ready.",
+      "tabs": {
+        "arAging": "Aging",
+        "collections": "Collections",
+        "generalLedger": "General ledger",
+        "familyStatement": "Family statement"
+      }
+    },
+    "types": {
+      "ar_aging": "Accounts receivable aging",
+      "general_ledger": "General ledger",
+      "collections_vs_due": "Collections vs due",
+      "family_statement": "Family statement"
+    },
+    "typeDescriptions": {
+      "ar_aging": "Outstanding balances by household, aged into 30/60/90-day buckets.",
+      "general_ledger": "Every posted transaction in a date range, account by account.",
+      "collections_vs_due": "What's been collected against what's due this term, by payment term.",
+      "family_statement": "One household's receivables and ledger activity, side by side."
+    },
+    "exportStatus": {
+      "queued": "Queued",
+      "processing": "Processing",
+      "completed": "Ready",
+      "failed": "Failed"
+    },
+    "export": {
+      "format": "Format",
+      "downloadFormat": "Download {{format}}",
+      "downloadReport": "Download {{report}}",
+      "dismiss": "Dismiss",
+      "readyTitle": "Report ready",
+      "readyDescription": "{{report}} is ready to download.",
+      "failedTitle": "Export failed",
+      "failedDescription": "{{report}} couldn't be generated. Please try again.",
+      "queueErrorTitle": "Couldn't queue the export",
+      "tryAgain": "Please try again."
+    },
+    "table": {
+      "running": "Running report…",
+      "error": "Unable to run this report. Please check your filters and try again.",
+      "columnFallback": "Column {{number}}",
+      "empty": "No records match these filters."
+    },
+    "filters": {
+      "asOfDateOptional": "As of date (optional)",
+      "fromDate": "From date",
+      "toDate": "To date",
+      "fromDateOptional": "From date (optional)",
+      "toDateOptional": "To date (optional)",
+      "accountOptional": "Account (optional)",
+      "voucherNoOptional": "Voucher # (optional)",
+      "voucherTypeOptional": "Voucher type (optional)",
+      "runReport": "Run report"
+    },
+    "studentPicker": {
+      "student": "Student",
+      "studentOptional": "Student (optional)",
+      "clear": "Clear",
+      "placeholder": "Search by name or admission number",
+      "helper": "Leave blank to run the report for every student.",
+      "noMatches": "No students match."
+    },
+    "familyPicker": {
+      "family": "Family",
+      "change": "Change",
+      "placeholder": "Search by household name",
+      "noMatches": "No families match."
+    },
+    "arAging": {
+      "caption": "Accounts receivable aging results",
+      "idle": "Set filters (optional) and run the report to see aging balances."
+    },
+    "collections": {
+      "caption": "Collections vs due results",
+      "idle": "Set filters (optional) and run the report to see collections against what's due."
+    },
+    "generalLedger": {
+      "caption": "General ledger results",
+      "idle": "Set a date range and run the report to see posted transactions.",
+      "disabledReason": "Set a date range to enable export."
+    },
+    "familyStatement": {
+      "idle": "Pick a family and run the report to see its statement.",
+      "accountsReceivable": "Accounts receivable",
+      "accountsReceivableCaption": "Family accounts receivable",
+      "generalLedger": "General ledger activity",
+      "generalLedgerCaption": "Family general ledger",
+      "disabledReason": "Pick a family to enable export."
+    }
+  }
+}

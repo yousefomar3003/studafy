@@ -1,6 +1,8 @@
 import { Tabs } from "@studafy/ui";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { AnnouncementHistoryTable } from "./AnnouncementHistoryTable";
 import { ComposeAnnouncementForm } from "./ComposeAnnouncementForm";
 
@@ -19,13 +21,14 @@ type AnnouncementsTab = "compose" | "history";
  * `AnnouncementHistoryTable`'s cursor pagination back to page one — see that component's doc comment.
  */
 export default function AnnouncementsPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<AnnouncementsTab>("compose");
   const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
 
   return (
     <>
-      <h1>Announcements</h1>
-      <p>Compose and publish school notices, targeted by role or class, now or on a schedule.</p>
+      <h1>{t("adminSchool.announcements.title")}</h1>
+      <p>{t("adminSchool.announcements.intro")}</p>
 
       <Tabs
         value={tab}
@@ -33,8 +36,8 @@ export default function AnnouncementsPage() {
         onChange={(value) => setTab(value as AnnouncementsTab)}
       >
         <Tabs.List>
-          <Tabs.Tab value="compose">Compose</Tabs.Tab>
-          <Tabs.Tab value="history">History</Tabs.Tab>
+          <Tabs.Tab value="compose">{t("adminSchool.announcements.tabs.compose")}</Tabs.Tab>
+          <Tabs.Tab value="history">{t("adminSchool.announcements.tabs.history")}</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="compose">

@@ -1,6 +1,8 @@
 import { Button, Modal } from "@studafy/ui";
 import { useId, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import type { FormEvent } from "react";
 
 export interface RejectReasonModalProps {
@@ -27,12 +29,13 @@ export interface RejectReasonModalProps {
  */
 export function RejectReasonModal({
   open,
-  title = "Reject item",
+  title,
   description,
   submitting,
   onCancel,
   onConfirm,
 }: RejectReasonModalProps) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState("");
   const [touched, setTouched] = useState(false);
   const reasonId = useId();
@@ -48,12 +51,17 @@ export function RejectReasonModal({
   }
 
   return (
-    <Modal open={open} onClose={onCancel} title={title} description={description}>
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title={title ?? t("principal.approvals.rejectModal.titleSingle")}
+      description={description}
+    >
       <form onSubmit={handleSubmit} noValidate>
         <Modal.Body>
           <div className="sf-field">
             <label className="sf-field__label" htmlFor={reasonId}>
-              Reason
+              {t("principal.approvals.rejectModal.reason")}
               <span className="sf-field__required" aria-hidden="true">
                 *
               </span>
@@ -73,17 +81,17 @@ export function RejectReasonModal({
             </div>
             {invalid ? (
               <p className="sf-field__error" id={errorId} role="alert">
-                A reason is required to reject.
+                {t("principal.approvals.rejectModal.reasonRequired")}
               </p>
             ) : null}
           </div>
         </Modal.Body>
         <Modal.Footer>
           <Button type="button" variant="tertiary" onClick={onCancel}>
-            Cancel
+            {t("principal.common.cancel")}
           </Button>
           <Button type="submit" variant="primary" loading={submitting}>
-            Reject
+            {t("principal.approvals.rejectModal.submit")}
           </Button>
         </Modal.Footer>
       </form>

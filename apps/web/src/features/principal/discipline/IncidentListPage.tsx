@@ -3,10 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { DATE_TIME_OPTIONS } from "../format";
+
 import {
-  DISCIPLINE_SEVERITY_LABELS,
-  DISCIPLINE_STATUS_LABELS,
-  DISCIPLINE_TYPE_LABELS,
+  DISCIPLINE_SEVERITY_LABEL_KEYS,
+  DISCIPLINE_STATUS_LABEL_KEYS,
+  DISCIPLINE_TYPE_LABEL_KEYS,
 } from "./labels";
 import { disciplineListKey, fetchIncidentsByFilter } from "./queries";
 
@@ -19,19 +22,16 @@ const COLUMN_COUNT = 5;
 const INBOX_TAB = "inbox";
 const ALL_TAB = "all";
 
-const ALL_FILTER_OPTIONS: SelectOption<IncidentListFilter>[] = [
-  { value: "open", label: "Open (reported, under review, escalated)" },
-  { value: "reported", label: DISCIPLINE_STATUS_LABELS.reported },
-  { value: "under_review", label: DISCIPLINE_STATUS_LABELS.under_review },
-  { value: "escalated", label: DISCIPLINE_STATUS_LABELS.escalated },
-  { value: "resolved", label: DISCIPLINE_STATUS_LABELS.resolved },
-  { value: "closed", label: DISCIPLINE_STATUS_LABELS.closed },
-  { value: "all", label: "All statuses" },
+/** Filter options as translation keys — resolved with `t(...)` at render time. */
+const ALL_FILTER_OPTION_KEYS: { value: IncidentListFilter; labelKey: string }[] = [
+  { value: "open", labelKey: "principal.discipline.list.filterOpen" },
+  { value: "reported", labelKey: DISCIPLINE_STATUS_LABEL_KEYS.reported },
+  { value: "under_review", labelKey: DISCIPLINE_STATUS_LABEL_KEYS.under_review },
+  { value: "escalated", labelKey: DISCIPLINE_STATUS_LABEL_KEYS.escalated },
+  { value: "resolved", labelKey: DISCIPLINE_STATUS_LABEL_KEYS.resolved },
+  { value: "closed", labelKey: DISCIPLINE_STATUS_LABEL_KEYS.closed },
+  { value: "all", labelKey: "principal.discipline.list.filterAll" },
 ];
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
 
 interface IncidentTableProps {
   incidents: DisciplineIncident[];
@@ -41,31 +41,33 @@ interface IncidentTableProps {
 }
 
 function IncidentTable({ incidents, isPending, isError, emptyMessage }: IncidentTableProps) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   return (
-    <Table caption="Discipline incidents">
+    <Table caption={t("principal.discipline.list.caption")}>
       <Table.Header>
         <Table.Row>
-          <Table.HeaderCell>Title</Table.HeaderCell>
-          <Table.HeaderCell>Type</Table.HeaderCell>
-          <Table.HeaderCell>Severity</Table.HeaderCell>
-          <Table.HeaderCell>Status</Table.HeaderCell>
-          <Table.HeaderCell>Reported at</Table.HeaderCell>
+          <Table.HeaderCell>{t("principal.discipline.list.columns.title")}</Table.HeaderCell>
+          <Table.HeaderCell>{t("principal.discipline.list.columns.type")}</Table.HeaderCell>
+          <Table.HeaderCell>{t("principal.discipline.list.columns.severity")}</Table.HeaderCell>
+          <Table.HeaderCell>{t("principal.discipline.list.columns.status")}</Table.HeaderCell>
+          <Table.HeaderCell>{t("principal.discipline.list.columns.reportedAt")}</Table.HeaderCell>
         </Table.Row>
       </Table.Header>
       <Table.Body
         columnCount={COLUMN_COUNT}
         loading={isPending}
-        empty={isError ? "Unable to load discipline incidents." : emptyMessage}
+        empty={isError ? t("principal.discipline.list.error") : emptyMessage}
       >
         {incidents.map((incident) => (
           <Table.Row key={incident.id}>
             <Table.Cell>
               <Link to={`/portal/principal/discipline/${incident.id}`}>{incident.title}</Link>
             </Table.Cell>
-            <Table.Cell>{DISCIPLINE_TYPE_LABELS[incident.incident_type]}</Table.Cell>
-            <Table.Cell>{DISCIPLINE_SEVERITY_LABELS[incident.severity]}</Table.Cell>
-            <Table.Cell>{DISCIPLINE_STATUS_LABELS[incident.status]}</Table.Cell>
-            <Table.Cell>{formatDate(incident.incident_at)}</Table.Cell>
+            <Table.Cell>{t(DISCIPLINE_TYPE_LABEL_KEYS[incident.incident_type])}</Table.Cell>
+            <Table.Cell>{t(DISCIPLINE_SEVERITY_LABEL_KEYS[incident.severity])}</Table.Cell>
+            <Table.Cell>{t(DISCIPLINE_STATUS_LABEL_KEYS[incident.status])}</Table.Cell>
+            <Table.Cell>{formatDate(new Date(incident.incident_at), DATE_TIME_OPTIONS)}</Table.Cell>
           </Table.Row>
         ))}
       </Table.Body>
@@ -87,6 +89,7 @@ function IncidentTable({ incidents, isPending, isError, emptyMessage }: Incident
  * resolve/escalate workflow live.
  */
 export default function IncidentListPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<string>(INBOX_TAB);
   const [allFilter, setAllFilter] = useState<IncidentListFilter>("open");
 
@@ -100,16 +103,20 @@ export default function IncidentListPage() {
     queryFn: () => fetchIncidentsByFilter(allFilter),
   });
 
+  const allFilterOptions: SelectOption<IncidentListFilter>[] = ALL_FILTER_OPTION_KEYS.map(
+    ({ value, labelKey }) => ({ value, label: t(labelKey) }),
+  );
+
   return (
     <>
-      <h1>Discipline incidents</h1>
-      <p>Incidents reported across the school.</p>
+      <h1>{t("principal.discipline.list.title")}</h1>
+      <p>{t("principal.discipline.list.description")}</p>
 
       <Tabs defaultValue={INBOX_TAB} value={tab} onChange={setTab}>
         <div className="discipline-list__tabs">
           <Tabs.List>
-            <Tabs.Tab value={INBOX_TAB}>Teacher-reported inbox</Tabs.Tab>
-            <Tabs.Tab value={ALL_TAB}>All incidents</Tabs.Tab>
+            <Tabs.Tab value={INBOX_TAB}>{t("principal.discipline.list.inboxTab")}</Tabs.Tab>
+            <Tabs.Tab value={ALL_TAB}>{t("principal.discipline.list.allTab")}</Tabs.Tab>
           </Tabs.List>
         </div>
 
@@ -118,15 +125,15 @@ export default function IncidentListPage() {
             incidents={inbox.data ?? []}
             isPending={inbox.isPending}
             isError={inbox.isError}
-            emptyMessage="No incidents are waiting for triage."
+            emptyMessage={t("principal.discipline.list.inboxEmpty")}
           />
         </Tabs.Panel>
 
         <Tabs.Panel value={ALL_TAB}>
           <div className="discipline-list__filter">
             <Select
-              label="Status"
-              options={ALL_FILTER_OPTIONS}
+              label={t("principal.discipline.list.statusLabel")}
+              options={allFilterOptions}
               value={allFilter}
               onChange={setAllFilter}
             />
@@ -136,7 +143,7 @@ export default function IncidentListPage() {
             incidents={all.data ?? []}
             isPending={all.isPending}
             isError={all.isError}
-            emptyMessage="No incidents match this filter."
+            emptyMessage={t("principal.discipline.list.filterEmpty")}
           />
         </Tabs.Panel>
       </Tabs>

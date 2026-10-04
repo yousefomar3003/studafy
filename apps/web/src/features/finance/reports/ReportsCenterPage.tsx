@@ -1,5 +1,7 @@
 import { Tabs } from "@studafy/ui";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import ArAgingReportPanel from "./ArAgingReportPanel";
 import CollectionsVsDueReportPanel from "./CollectionsVsDueReportPanel";
 import FamilyStatementReportPanel from "./FamilyStatementReportPanel";
@@ -20,20 +22,24 @@ import "./reports.css";
  * reports don't block UI" means in practice here).
  */
 export default function ReportsCenterPage() {
+  const { t } = useTranslation();
   return (
     <>
-      <h1>Reports</h1>
-      <p>
-        Run and download finance reports. Downloads process in the background — you&rsquo;ll be
-        notified here once a file is ready.
-      </p>
+      <h1>{t("financeReports.reports.center.title")}</h1>
+      <p>{t("financeReports.reports.center.description")}</p>
 
       <Tabs defaultValue="ar_aging">
         <Tabs.List>
-          <Tabs.Tab value="ar_aging">Aging</Tabs.Tab>
-          <Tabs.Tab value="collections_vs_due">Collections</Tabs.Tab>
-          <Tabs.Tab value="general_ledger">General ledger</Tabs.Tab>
-          <Tabs.Tab value="family_statement">Family statement</Tabs.Tab>
+          <Tabs.Tab value="ar_aging">{t("financeReports.reports.center.tabs.arAging")}</Tabs.Tab>
+          <Tabs.Tab value="collections_vs_due">
+            {t("financeReports.reports.center.tabs.collections")}
+          </Tabs.Tab>
+          <Tabs.Tab value="general_ledger">
+            {t("financeReports.reports.center.tabs.generalLedger")}
+          </Tabs.Tab>
+          <Tabs.Tab value="family_statement">
+            {t("financeReports.reports.center.tabs.familyStatement")}
+          </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="ar_aging">

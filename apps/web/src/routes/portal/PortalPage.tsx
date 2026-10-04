@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 
 import { api } from "../../lib/api";
+import { useTranslation } from "../../lib/i18n";
 
 /**
  * Portal home page (`/portal`).
@@ -16,6 +17,7 @@ import { api } from "../../lib/api";
  * `/auth/login` (see `RequirePermission`, which sends a denied session back here with that param).
  */
 export default function PortalPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const { data, isPending, error } = useQuery({
     queryKey: ["healthz"],
@@ -29,16 +31,21 @@ export default function PortalPage() {
 
   return (
     <>
-      <h1>Portal</h1>
-      {forbidden && <p role="alert">You don&rsquo;t have access to that page.</p>}
-      <p>Your Studafy portal.</p>
+      <h1>{t("onboarding.portal.title")}</h1>
+      {forbidden && <p role="alert">{t("onboarding.portal.forbidden")}</p>}
+      <p>{t("onboarding.portal.intro")}</p>
       <p>
-        API status:{" "}
-        {isPending
-          ? "checking…"
-          : error instanceof ApiError
-            ? `unavailable (ref ${error.request_id ?? "unknown"})`
-            : (data?.status ?? "unavailable")}
+        {t("onboarding.portal.apiStatus", {
+          status: isPending
+            ? t("onboarding.portal.statusChecking")
+            : error instanceof ApiError
+              ? t("onboarding.portal.statusUnavailableRef", {
+                  requestId: error.request_id ?? t("onboarding.portal.unknownRef"),
+                })
+              : data?.status === "ok"
+                ? t("onboarding.portal.statusOk")
+                : t("onboarding.portal.statusUnavailable"),
+        })}
       </p>
     </>
   );

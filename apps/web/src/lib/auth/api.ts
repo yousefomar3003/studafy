@@ -56,3 +56,22 @@ export function createAuthRefreshClient(
 
 /** The app-wide session client. The store and the bearer client's token seam read through this. */
 export const authRefreshClient: SessionRefreshClient = createAuthRefreshClient();
+
+/**
+ * Email/password sign-in (`POST /api/auth/login/review`, ST-303). Uses the `web` channel, so the API
+ * sets the HttpOnly refresh cookie and the caller completes the session with
+ * {@link SessionStore.restore} — the same hand-off the OAuth callback page uses. Throws the client's
+ * typed `ApiError` on any non-2xx (401 bad credentials, 403 suspended school, 404 not configured).
+ */
+export async function loginWithPassword(
+  email: string,
+  password: string,
+  options: AuthRefreshClientOptions = {},
+): Promise<void> {
+  const authApi = createApiClient({
+    baseUrl: API_BASE_URL,
+    credentials: "include",
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  await authApi.POST("/api/auth/login/review", { body: { email, password, channel: "web" } });
+}

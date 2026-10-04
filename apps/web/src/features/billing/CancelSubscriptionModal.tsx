@@ -2,6 +2,9 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Modal, useToast } from "@studafy/ui";
 import { useId, useState } from "react";
 
+import { useLocale, useTranslation } from "../../lib/i18n";
+
+import { formatIsoDate } from "./format";
 import { useCancelSubscription } from "./mutations";
 
 import type { FormEvent } from "react";
@@ -18,10 +21,6 @@ function apiErrorMessage(error: unknown, fallback: string): string {
   return error.detail ?? error.title;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString();
-}
-
 /**
  * Cancellation flow: schedules cancellation at the end of the current billing period rather than
  * cutting access off immediately (see `scheduleCancellation`'s doc comment in the API) — the reason
@@ -35,6 +34,8 @@ export function CancelSubscriptionModal({
   onClose,
   onCancelled,
 }: CancelSubscriptionModalProps) {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
   const { show } = useToast();
   const cancel = useCancelSubscription();
   const [reason, setReason] = useState("");
@@ -46,15 +47,15 @@ export function CancelSubscriptionModal({
       { reason: reason.trim() },
       {
         onSuccess: () => {
-          show({ variant: "success", title: "Cancellation scheduled" });
+          show({ variant: "success", title: t("site.billing.cancelModal.scheduledToast") });
           setReason("");
           onCancelled();
         },
         onError: (error) =>
           show({
             variant: "error",
-            title: "Couldn't cancel the subscription",
-            description: apiErrorMessage(error, "Please try again."),
+            title: t("site.billing.cancelModal.errorToast"),
+            description: apiErrorMessage(error, t("site.common.tryAgain")),
           }),
       },
     );
@@ -64,19 +65,21 @@ export function CancelSubscriptionModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Cancel subscription?"
-      description="This schedules cancellation for the end of the current billing period."
+      title={t("site.billing.cancelModal.title")}
+      description={t("site.billing.cancelModal.description")}
     >
       <form onSubmit={handleSubmit} noValidate>
         <Modal.Body>
           <p className="billing-cancel__notice">
             {currentPeriodEnd
-              ? `Access and billing continue until ${formatDate(currentPeriodEnd)}. You can undo this at any time before then.`
-              : "Access and billing continue until the end of the current period. You can undo this at any time before then."}
+              ? t("site.billing.cancelModal.noticeWithDate", {
+                  date: formatIsoDate(currentPeriodEnd, locale),
+                })
+              : t("site.billing.cancelModal.notice")}
           </p>
           <div className="sf-field">
             <label className="sf-field__label" htmlFor={reasonId}>
-              Reason (optional)
+              {t("site.billing.cancelModal.reasonLabel")}
             </label>
             <div className="sf-input">
               <textarea
@@ -91,10 +94,10 @@ export function CancelSubscriptionModal({
         </Modal.Body>
         <Modal.Footer>
           <Button type="button" variant="tertiary" onClick={onClose}>
-            Keep subscription
+            {t("site.billing.cancelModal.keepSubscription")}
           </Button>
           <Button type="submit" variant="primary" loading={cancel.isPending}>
-            Cancel subscription
+            {t("site.billing.cancelModal.confirm")}
           </Button>
         </Modal.Footer>
       </form>

@@ -62,7 +62,7 @@
 }
 
 .notifications-page__item[data-unread] {
-  border-left: 3px solid var(--color-accent);
+  border-inline-start: 3px solid var(--color-accent);
   background-color: var(--color-accent-subtle-bg);
 }
 

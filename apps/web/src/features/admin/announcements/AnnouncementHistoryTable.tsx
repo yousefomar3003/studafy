@@ -1,30 +1,37 @@
 import { Button, Chip, DataGrid, Select, useCursorPagination } from "@studafy/ui";
 import { useCallback, useState } from "react";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+
 import { fetchAnnouncementsPage } from "./queries";
-import { AUDIENCE_TYPE_LABELS, ROLE_LABELS } from "./schema";
+import { AUDIENCE_TYPE_LABEL_KEYS, roleLabelKey } from "./schema";
 
 import type { Announcement, AnnouncementStatus } from "./queries";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
+import type { TFunction } from "i18next";
 
-const STATUS_OPTIONS: SelectOption<AnnouncementStatus | "">[] = [
-  { value: "", label: "All statuses" },
-  { value: "scheduled", label: "Scheduled" },
-  { value: "published", label: "Published" },
-];
+/** Same fields `Date#toLocaleString()` shows, but in the active app locale rather than the browser's. */
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "numeric",
+  second: "numeric",
+};
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
-
-function audienceLabel(announcement: Announcement): string {
+function audienceLabel(announcement: Announcement, t: TFunction): string {
   if (announcement.audience_type === "role" && announcement.audience_role) {
-    return `Role: ${ROLE_LABELS[announcement.audience_role]}`;
+    return t("adminSchool.announcements.history.audienceRole", {
+      role: t(roleLabelKey(announcement.audience_role)),
+    });
   }
   if (announcement.audience_type === "class") {
-    return `Class: ${announcement.audience_class_code ?? "—"}`;
+    return t("adminSchool.announcements.history.audienceClass", {
+      code: announcement.audience_class_code ?? "—",
+    });
   }
-  return AUDIENCE_TYPE_LABELS.school;
+  return t(AUDIENCE_TYPE_LABEL_KEYS.school);
 }
 
 export interface AnnouncementHistoryTableProps {
@@ -41,7 +48,19 @@ export interface AnnouncementHistoryTableProps {
  * for its own list.
  */
 export function AnnouncementHistoryTable({ refreshToken }: AnnouncementHistoryTableProps) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const [status, setStatus] = useState<AnnouncementStatus | "">("");
+
+  const statusOptions: SelectOption<AnnouncementStatus | "">[] = [
+    { value: "", label: t("adminSchool.announcements.history.allStatuses") },
+    { value: "scheduled", label: t("adminSchool.announcements.history.status.scheduled") },
+    { value: "published", label: t("adminSchool.announcements.history.status.published") },
+  ];
+
+  function formatDateTime(iso: string): string {
+    return formatDate(new Date(iso), DATE_TIME_FORMAT);
+  }
 
   const fetchPage = useCallback(
     (cursor: string | undefined) =>
@@ -53,28 +72,36 @@ export function AnnouncementHistoryTable({ refreshToken }: AnnouncementHistoryTa
   const columns: DataGridColumn<Announcement>[] = [
     {
       id: "title",
-      header: "Title",
+      header: t("adminSchool.announcements.history.columns.title"),
       renderCell: (a) => (
         <span>
           {a.title}
           {a.mandatory ? (
             <span className="announcements-history__mandatory-chip">
-              <Chip variant="outlined">Mandatory</Chip>
+              <Chip variant="outlined">{t("adminSchool.announcements.history.mandatory")}</Chip>
             </span>
           ) : null}
         </span>
       ),
     },
-    { id: "audience", header: "Audience", renderCell: audienceLabel, width: 200 },
+    {
+      id: "audience",
+      header: t("adminSchool.announcements.history.columns.audience"),
+      renderCell: (a) => audienceLabel(a, t),
+      width: 200,
+    },
     {
       id: "status",
-      header: "Status",
-      renderCell: (a) => (a.status === "published" ? "Published" : "Scheduled"),
+      header: t("adminSchool.announcements.history.columns.status"),
+      renderCell: (a) =>
+        a.status === "published"
+          ? t("adminSchool.announcements.history.status.published")
+          : t("adminSchool.announcements.history.status.scheduled"),
       width: 120,
     },
     {
       id: "when",
-      header: "When",
+      header: t("adminSchool.announcements.history.columns.when"),
       renderCell: (a) =>
         a.status === "published" && a.published_at
           ? formatDateTime(a.published_at)
@@ -83,14 +110,19 @@ export function AnnouncementHistoryTable({ refreshToken }: AnnouncementHistoryTa
     },
     {
       id: "reach",
-      header: "Reach",
+      header: t("adminSchool.announcements.history.columns.reach"),
       renderCell: (a) =>
-        a.status === "published" ? `${a.notified_count} / ${a.recipient_count}` : "—",
+        a.status === "published"
+          ? t("adminSchool.announcements.history.reach", {
+              notified: a.notified_count,
+              recipients: a.recipient_count,
+            })
+          : "—",
       width: 120,
     },
     {
       id: "created_by",
-      header: "Sent by",
+      header: t("adminSchool.announcements.history.columns.sentBy"),
       renderCell: (a) => a.created_by_name ?? "—",
       width: 160,
     },
@@ -100,21 +132,25 @@ export function AnnouncementHistoryTable({ refreshToken }: AnnouncementHistoryTa
     <>
       <div className="announcements-history__toolbar">
         <Select
-          label="Status"
-          options={STATUS_OPTIONS}
+          label={t("adminSchool.announcements.history.statusLabel")}
+          options={statusOptions}
           value={status}
           onChange={(value) => setStatus(value)}
         />
       </div>
 
       <DataGrid
-        caption="Announcement history"
+        caption={t("adminSchool.announcements.history.caption")}
         columns={columns}
         rows={pagination.items}
         getRowId={(a) => a.id}
         getRowLabel={(a) => a.title}
         loading={pagination.loading}
-        empty={pagination.error ? "Unable to load announcements." : "No announcements yet."}
+        empty={
+          pagination.error
+            ? t("adminSchool.announcements.history.loadError")
+            : t("adminSchool.announcements.history.empty")
+        }
       />
 
       <div className="announcements-history__pagination">
@@ -124,7 +160,7 @@ export function AnnouncementHistoryTable({ refreshToken }: AnnouncementHistoryTa
           disabled={!pagination.hasPreviousPage}
           onClick={pagination.goToPreviousPage}
         >
-          Previous
+          {t("adminSchool.announcements.history.previous")}
         </Button>
         <Button
           type="button"
@@ -132,7 +168,7 @@ export function AnnouncementHistoryTable({ refreshToken }: AnnouncementHistoryTa
           disabled={!pagination.hasNextPage}
           onClick={pagination.goToNextPage}
         >
-          Next
+          {t("adminSchool.announcements.history.next")}
         </Button>
       </div>
     </>

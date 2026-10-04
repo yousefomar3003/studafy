@@ -103,6 +103,14 @@ export const envSchema = z
     DATABASE_USER: z.string().min(1).optional(),
     DATABASE_PASSWORD: z.string().min(1).optional(),
     DATABASE_CA_CERT: z.string().min(1).optional(),
+    // Local development only: `disable` connects to the plain docker-compose Postgres (db/compose.yml)
+    // without TLS. Refused below outside APP_ENV=development / NODE_ENV!=production, so a deployed
+    // API always verifies the database certificate.
+    DATABASE_SSL_MODE: z.enum(["disable", "verify-full"]).optional(),
+    // Local development only: skips the Redis token-bucket rate limiter, whose IP-scoped auth budget
+    // (5 refreshes, ~1 more per 12s) is shared by every request from localhost and is exhausted by
+    // a few page reloads or account switches. Refused below outside APP_ENV=development.
+    RATE_LIMIT_DISABLED: z.enum(["true", "false"]).optional(),
     // Analytics are isolated on a dedicated PgBouncer database backed by an RDS read replica.
     // Local development and tests may omit these values and reuse the primary pool.
     READ_DATABASE_HOST: z.string().min(1).optional(),
@@ -336,6 +344,28 @@ export const envSchema = z
         code: "custom",
         path: ["MOCK_OAUTH_ISSUER_URL"],
         message: "Mock OAuth variables must not be set when NODE_ENV or APP_ENV is production",
+      });
+    }
+
+    if (
+      env.DATABASE_SSL_MODE === "disable" &&
+      (env.NODE_ENV === "production" || env.APP_ENV !== "development")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["DATABASE_SSL_MODE"],
+        message: "DATABASE_SSL_MODE=disable is only allowed in local development",
+      });
+    }
+
+    if (
+      env.RATE_LIMIT_DISABLED === "true" &&
+      (env.NODE_ENV === "production" || env.APP_ENV !== "development")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["RATE_LIMIT_DISABLED"],
+        message: "RATE_LIMIT_DISABLED is only allowed in local development",
       });
     }
 

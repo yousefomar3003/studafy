@@ -2,6 +2,7 @@ import { Button, Input } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
 import { searchStudents, studentDisplayName, studentSearchQueryKey } from "../fees/queries";
 
 import type { StudentProfile } from "../fees/queries";
@@ -22,6 +23,7 @@ export interface StudentPickerFieldProps {
  * use case, and a multi-select adds real UI weight for a filter most runs leave off entirely.
  */
 export function StudentPickerField({ value, onChange }: StudentPickerFieldProps) {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -40,13 +42,15 @@ export function StudentPickerField({ value, onChange }: StudentPickerFieldProps)
     return (
       <div className="reports-filter__student-selected">
         <div>
-          <span className="sf-field__label">Student</span>
+          <span className="sf-field__label">
+            {t("financeReports.reports.studentPicker.student")}
+          </span>
           <p>
             {studentDisplayName(value)} &mdash; {value.admission_number}
           </p>
         </div>
         <Button type="button" variant="tertiary" onClick={() => onChange(null)}>
-          Clear
+          {t("financeReports.reports.studentPicker.clear")}
         </Button>
       </div>
     );
@@ -55,12 +59,12 @@ export function StudentPickerField({ value, onChange }: StudentPickerFieldProps)
   return (
     <div className="reports-filter__student-picker">
       <Input
-        label="Student (optional)"
+        label={t("financeReports.reports.studentPicker.studentOptional")}
         type="search"
-        placeholder="Search by name or admission number"
+        placeholder={t("financeReports.reports.studentPicker.placeholder")}
         value={searchInput}
         onChange={(event) => setSearchInput(event.target.value)}
-        helperText="Leave blank to run the report for every student."
+        helperText={t("financeReports.reports.studentPicker.helper")}
       />
       {debouncedSearch.trim() ? (
         <ul className="reports-filter__student-results">
@@ -81,7 +85,9 @@ export function StudentPickerField({ value, onChange }: StudentPickerFieldProps)
             </li>
           ))}
           {!resultsQuery.isPending && resultsQuery.data?.length === 0 ? (
-            <li className="reports-filter__student-empty">No students match.</li>
+            <li className="reports-filter__student-empty">
+              {t("financeReports.reports.studentPicker.noMatches")}
+            </li>
           ) : null}
         </ul>
       ) : null}

@@ -2,24 +2,20 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useId, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useCreateBulkInvite } from "./mutations";
 import {
   bulkInviteSchema,
   fieldErrors,
   INVITATION_ROLES,
   parseRecipients,
-  ROLE_LABELS,
+  ROLE_LABEL_KEYS,
 } from "./schema";
 
 import type { InvitationRole } from "./schema";
 import type { SelectOption } from "@studafy/ui";
 import type { FormEvent } from "react";
-
-const ROLE_OPTIONS: SelectOption<InvitationRole>[] = INVITATION_ROLES.map((role) => ({
-  value: role,
-  // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `INVITATION_ROLES` array, not user input
-  label: ROLE_LABELS[role],
-}));
 
 const EMPTY_VALUES = {
   recipientsText: "",
@@ -36,8 +32,15 @@ export interface BulkInviteModalProps {
 
 /** `POST /api/invitations/bulk` — issues up to 5,000 invitations as one batch, processed async. */
 export function BulkInviteModal({ open, onClose, onCreated }: BulkInviteModalProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const createBulkInvite = useCreateBulkInvite();
+
+  const roleOptions: SelectOption<InvitationRole>[] = INVITATION_ROLES.map((role) => ({
+    value: role,
+    // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `INVITATION_ROLES` array, not user input
+    label: t(ROLE_LABEL_KEYS[role]),
+  }));
   const recipientsId = useId();
 
   const [values, setValues] = useState(EMPTY_VALUES);
@@ -79,8 +82,10 @@ export function BulkInviteModal({ open, onClose, onCreated }: BulkInviteModalPro
       onSuccess: (data) => {
         show({
           variant: "success",
-          title: `Bulk invite queued`,
-          description: `${data.total_count} recipient${data.total_count === 1 ? "" : "s"} — dispatch is running in the background.`,
+          title: t("adminPeople.invitations.bulkModal.queuedToast"),
+          description: t("adminPeople.invitations.bulkModal.queuedDescription", {
+            count: data.total_count,
+          }),
         });
         handleClose();
         onCreated(data.id);
@@ -88,7 +93,7 @@ export function BulkInviteModal({ open, onClose, onCreated }: BulkInviteModalPro
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't create bulk invite",
+          title: t("adminPeople.invitations.bulkModal.error"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
       },
@@ -99,14 +104,18 @@ export function BulkInviteModal({ open, onClose, onCreated }: BulkInviteModalPro
     <Modal
       open={open}
       onClose={handleClose}
-      title="Bulk invite"
-      description="Invite many people at once. Each recipient is tracked and retriable individually."
+      title={t("adminPeople.invitations.bulkModal.title")}
+      description={t("adminPeople.invitations.bulkModal.description")}
     >
-      <form onSubmit={handleSubmit} noValidate aria-label="Bulk invite">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        aria-label={t("adminPeople.invitations.bulkModal.title")}
+      >
         <Modal.Body>
           <div className="sf-field">
             <label className="sf-field__label" htmlFor={recipientsId}>
-              Recipients
+              {t("adminPeople.invitations.bulkModal.recipients")}
               <span className="sf-field__required" aria-hidden="true">
                 *
               </span>
@@ -116,7 +125,7 @@ export function BulkInviteModal({ open, onClose, onCreated }: BulkInviteModalPro
                 id={recipientsId}
                 className="sf-input__control"
                 rows={6}
-                placeholder="One email per line, or separated by commas"
+                placeholder={t("adminPeople.invitations.bulkModal.placeholder")}
                 value={values.recipientsText}
                 onChange={(e) => setField("recipientsText", e.target.value)}
                 aria-invalid={errors.recipients ? true : undefined}
@@ -124,40 +133,39 @@ export function BulkInviteModal({ open, onClose, onCreated }: BulkInviteModalPro
               />
             </div>
             <p className="sf-field__helper">
-              {recipients.length} recipient{recipients.length === 1 ? "" : "s"} detected. Maximum
-              5,000 per batch.
+              {t("adminPeople.invitations.bulkModal.detected", { count: recipients.length })}
             </p>
             {errors.recipients ? (
               <p className="sf-field__error" role="alert">
-                {errors.recipients}
+                {t(errors.recipients)}
               </p>
             ) : null}
           </div>
 
           <Select
-            label="Role"
-            options={ROLE_OPTIONS}
+            label={t("adminPeople.invitations.form.role")}
+            options={roleOptions}
             value={values.role}
             onChange={(value) => setField("role", value)}
             required
           />
           <Input
-            label="Expires after (days)"
+            label={t("adminPeople.invitations.form.expiresAfter")}
             type="number"
             min={1}
             max={365}
             value={values.expiry_days}
             onChange={(e) => setField("expiry_days", e.target.value)}
-            error={errors.expiry_days}
-            helperText="Optional — defaults to 7 days for every recipient."
+            error={errors.expiry_days && t(errors.expiry_days)}
+            helperText={t("adminPeople.invitations.bulkModal.expiresHelper")}
           />
         </Modal.Body>
         <Modal.Footer>
           <Button type="button" variant="tertiary" onClick={handleClose}>
-            Cancel
+            {t("adminPeople.common.cancel")}
           </Button>
           <Button type="submit" loading={createBulkInvite.isPending}>
-            Send {recipients.length || ""} invite{recipients.length === 1 ? "" : "s"}
+            {t("adminPeople.invitations.bulkModal.submit", { count: recipients.length })}
           </Button>
         </Modal.Footer>
       </form>

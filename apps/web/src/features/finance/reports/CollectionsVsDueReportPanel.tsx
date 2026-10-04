@@ -2,8 +2,10 @@ import { Button, Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { ExportPanel } from "./ExportPanel";
-import { REPORT_TYPE_DESCRIPTIONS, REPORT_TYPE_LABELS } from "./labels";
+import { REPORT_TYPE_DESCRIPTION_KEYS, REPORT_TYPE_LABEL_KEYS } from "./labels";
 import { fetchCollectionsVsDueReport } from "./queries";
 import { ReportTable } from "./ReportTable";
 import { StudentPickerField } from "./StudentPickerField";
@@ -15,6 +17,8 @@ import type { FormEvent } from "react";
  * been collected against what's due this term. Same optional-filter shape as
  * `ArAgingReportPanel`. */
 export default function CollectionsVsDueReportPanel() {
+  const { t } = useTranslation();
+  const reportLabel = t(REPORT_TYPE_LABEL_KEYS.collections_vs_due);
   const [reportDate, setReportDate] = useState("");
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [runId, setRunId] = useState(0);
@@ -35,13 +39,15 @@ export default function CollectionsVsDueReportPanel() {
   }
 
   return (
-    <Card as="section" aria-label={REPORT_TYPE_LABELS.collections_vs_due}>
+    <Card as="section" aria-label={reportLabel}>
       <Card.Body>
-        <p>{REPORT_TYPE_DESCRIPTIONS.collections_vs_due}</p>
+        <p>{t(REPORT_TYPE_DESCRIPTION_KEYS.collections_vs_due)}</p>
 
         <form className="reports-panel__filters" onSubmit={handleSubmit}>
           <div className="sf-field">
-            <label htmlFor="collections-report-date">As of date (optional)</label>
+            <label htmlFor="collections-report-date">
+              {t("financeReports.reports.filters.asOfDateOptional")}
+            </label>
             <input
               id="collections-report-date"
               type="date"
@@ -51,7 +57,7 @@ export default function CollectionsVsDueReportPanel() {
           </div>
           <StudentPickerField value={student} onChange={setStudent} />
           <Button type="submit" loading={query.isFetching}>
-            Run report
+            {t("financeReports.reports.filters.runReport")}
           </Button>
         </form>
 
@@ -60,12 +66,12 @@ export default function CollectionsVsDueReportPanel() {
           loading={query.isFetching}
           error={query.isError}
           report={query.data}
-          caption="Collections vs due results"
-          idleMessage="Set filters (optional) and run the report to see collections against what's due."
+          caption={t("financeReports.reports.collections.caption")}
+          idleMessage={t("financeReports.reports.collections.idle")}
         />
 
         <ExportPanel
-          reportLabel={REPORT_TYPE_LABELS.collections_vs_due}
+          reportLabel={reportLabel}
           buildRequest={(fileFormat) => ({
             report_type: "collections_vs_due",
             file_format: fileFormat,

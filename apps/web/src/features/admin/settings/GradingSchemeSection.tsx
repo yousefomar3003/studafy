@@ -2,19 +2,15 @@ import { ApiError } from "@studafy/api-client";
 import { Select, useToast } from "@studafy/ui";
 import { useEffect, useRef, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { ConfirmChangeDialog } from "./ConfirmChangeDialog";
 import { useUpdateSchoolSettings } from "./mutations";
-import { GRADING_SCHEME_LABELS, GRADING_SCHEME_TYPES } from "./schema";
+import { GRADING_SCHEME_TYPES, gradingSchemeLabelKey } from "./schema";
 import { SettingsCard } from "./SettingsCard";
 
 import type { SchoolSettings } from "./queries";
 import type { FormEvent } from "react";
-
-const GRADING_SCHEME_OPTIONS = GRADING_SCHEME_TYPES.map((scheme) => ({
-  value: scheme,
-  // eslint-disable-next-line security/detect-object-injection -- `scheme` comes from iterating this module's own fixed `GRADING_SCHEME_TYPES` tuple, not user input
-  label: GRADING_SCHEME_LABELS[scheme],
-}));
 
 export interface GradingSchemeSectionProps {
   settings: SchoolSettings | undefined;
@@ -27,8 +23,14 @@ export interface GradingSchemeSectionProps {
  * grade the moment it saves, so it confirms first, unlike the other sections here.
  */
 export function GradingSchemeSection({ settings, loading }: GradingSchemeSectionProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const updateSettings = useUpdateSchoolSettings();
+
+  const gradingSchemeOptions = GRADING_SCHEME_TYPES.map((scheme) => ({
+    value: scheme,
+    label: t(gradingSchemeLabelKey(scheme)),
+  }));
 
   const [value, setValue] = useState<(typeof GRADING_SCHEME_TYPES)[number]>("letter");
   const [confirming, setConfirming] = useState(false);
@@ -51,13 +53,13 @@ export function GradingSchemeSection({ settings, loading }: GradingSchemeSection
       { grading_scheme: value },
       {
         onSuccess: () => {
-          show({ variant: "success", title: "Grading scheme updated" });
+          show({ variant: "success", title: t("adminSchool.settings.grading.updated") });
           setConfirming(false);
         },
         onError: (error) => {
           show({
             variant: "error",
-            title: "Couldn't save changes",
+            title: t("adminSchool.settings.saveFailed"),
             description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
           });
           setConfirming(false);
@@ -69,17 +71,17 @@ export function GradingSchemeSection({ settings, loading }: GradingSchemeSection
   return (
     <>
       <SettingsCard
-        title="Grading scheme"
-        description="How grades are displayed across report cards and gradebooks school-wide."
+        title={t("adminSchool.settings.grading.title")}
+        description={t("adminSchool.settings.grading.description")}
         onSubmit={handleSubmit}
         saving={updateSettings.isPending}
       >
         <Select
-          label="Grading scheme"
-          options={GRADING_SCHEME_OPTIONS}
+          label={t("adminSchool.settings.grading.label")}
+          options={gradingSchemeOptions}
           value={value}
           onChange={setValue}
-          helperText="Changes how every existing grade is labeled, not just new ones."
+          helperText={t("adminSchool.settings.grading.help")}
           disabled={loading}
           required
         />
@@ -87,19 +89,18 @@ export function GradingSchemeSection({ settings, loading }: GradingSchemeSection
 
       <ConfirmChangeDialog
         open={confirming}
-        title="Change grading scheme?"
+        title={t("adminSchool.settings.grading.confirmTitle")}
         loading={updateSettings.isPending}
         onConfirm={handleConfirm}
         onClose={() => setConfirming(false)}
       >
         <p>
-          This changes how every existing grade at this school is displayed — from{" "}
-          {settings ? GRADING_SCHEME_LABELS[settings.grading_scheme] : "the current scheme"} to{" "}
-          {
-            // eslint-disable-next-line security/detect-object-injection -- `value` is state set only from this module's own `GRADING_SCHEME_TYPES`-derived Select options, not user input
-            GRADING_SCHEME_LABELS[value]
-          }
-          . It takes effect immediately across every report card and gradebook.
+          {t("adminSchool.settings.grading.confirmBody", {
+            from: settings
+              ? t(gradingSchemeLabelKey(settings.grading_scheme))
+              : t("adminSchool.settings.grading.currentScheme"),
+            to: t(gradingSchemeLabelKey(value)),
+          })}
         </p>
       </ConfirmChangeDialog>
     </>

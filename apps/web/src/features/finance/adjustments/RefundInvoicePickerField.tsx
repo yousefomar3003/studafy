@@ -2,6 +2,7 @@ import { Button, Input } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
 import { fetchInvoicesPage } from "../invoices/queries";
 
 import { formatMinorAmount, invoicePaidAmountMinor } from "./queries";
@@ -25,6 +26,7 @@ export interface RefundInvoicePickerFieldProps {
  * (see `initiateRefundBodySchema`'s doc comment in the API).
  */
 export function RefundInvoicePickerField({ value, onChange }: RefundInvoicePickerFieldProps) {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -48,16 +50,19 @@ export function RefundInvoicePickerField({ value, onChange }: RefundInvoicePicke
     return (
       <div className="adjustments-form__invoice-selected">
         <div>
-          <span className="sf-field__label">Invoice</span>
+          <span className="sf-field__label">{t("financeReports.adjustments.common.invoice")}</span>
           <p>
             {value.erpnext_docname} &mdash; {value.student_name} ({value.admission_number})
           </p>
           <p className="adjustments-form__invoice-paid">
-            Paid to date: {formatMinorAmount(paidMinor, value.currency_minor_unit)} {value.currency}
+            {t("financeReports.adjustments.invoicePicker.paidToDate", {
+              amount: formatMinorAmount(paidMinor, value.currency_minor_unit),
+              currency: value.currency,
+            })}
           </p>
         </div>
         <Button type="button" variant="tertiary" onClick={() => onChange(null)}>
-          Change
+          {t("financeReports.adjustments.common.change")}
         </Button>
       </div>
     );
@@ -66,12 +71,12 @@ export function RefundInvoicePickerField({ value, onChange }: RefundInvoicePicke
   return (
     <div className="adjustments-form__invoice-picker">
       <Input
-        label="Invoice"
+        label={t("financeReports.adjustments.common.invoice")}
         type="search"
-        placeholder="Search by student or invoice number"
+        placeholder={t("financeReports.adjustments.invoicePicker.placeholder")}
         value={searchInput}
         onChange={(event) => setSearchInput(event.target.value)}
-        helperText="Only submitted invoices with a paid amount can be refunded."
+        helperText={t("financeReports.adjustments.invoicePicker.helper")}
         required
       />
       {debouncedSearch.trim() ? (
@@ -91,15 +96,20 @@ export function RefundInvoicePickerField({ value, onChange }: RefundInvoicePicke
                 >
                   <strong>{invoice.erpnext_docname}</strong>
                   <span>
-                    {invoice.student_name} &middot; {invoice.admission_number} &middot; Paid{" "}
-                    {formatMinorAmount(paidMinor, invoice.currency_minor_unit)} {invoice.currency}
+                    {invoice.student_name} &middot; {invoice.admission_number} &middot;{" "}
+                    {t("financeReports.adjustments.invoicePicker.paid", {
+                      amount: formatMinorAmount(paidMinor, invoice.currency_minor_unit),
+                      currency: invoice.currency,
+                    })}
                   </span>
                 </button>
               </li>
             );
           })}
           {!resultsQuery.isPending && results.length === 0 ? (
-            <li className="adjustments-form__invoice-empty">No refundable invoices match.</li>
+            <li className="adjustments-form__invoice-empty">
+              {t("financeReports.adjustments.invoicePicker.noMatches")}
+            </li>
           ) : null}
         </ul>
       ) : null}

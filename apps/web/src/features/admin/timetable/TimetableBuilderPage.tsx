@@ -3,10 +3,11 @@ import { Button, Select, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
 import { helpPath } from "../../help/content";
 import { HelpLink } from "../../help/HelpLink";
 
-import { STATUS_LABELS } from "./constants";
+import { READ_ONLY_NOTE_KEYS, STATUS_LABEL_KEYS } from "./constants";
 import { CreateVersionModal } from "./CreateVersionModal";
 import { useDeleteVersion, useSubmitVersion } from "./mutations";
 import {
@@ -47,6 +48,7 @@ function preferActive<T extends { id: string; status: string }>(items: T[]): str
  * year → term → version drill-down that hands the selected draft to `TimetableGrid` for editing.
  */
 export default function TimetableBuilderPage() {
+  const { t } = useTranslation();
   const { show } = useToast();
 
   const [yearId, setYearId] = useState("");
@@ -119,7 +121,10 @@ export default function TimetableBuilderPage() {
   }));
   const versionOptions: SelectOption<string>[] = (versionsQuery.data ?? []).map((version) => ({
     value: version.id,
-    label: `${version.name} — ${STATUS_LABELS[version.status]}`,
+    label: t("adminSchool.timetable.versionOption", {
+      name: version.name,
+      status: t(STATUS_LABEL_KEYS[version.status]),
+    }),
   }));
 
   const version = versionsQuery.data?.find((candidate) => candidate.id === versionId);
@@ -132,11 +137,14 @@ export default function TimetableBuilderPage() {
       { versionId: version.id, termId },
       {
         onSuccess: () =>
-          show({ variant: "success", title: `Submitted "${version.name}" for review` }),
+          show({
+            variant: "success",
+            title: t("adminSchool.timetable.toast.submitted", { name: version.name }),
+          }),
         onError: (err) =>
           show({
             variant: "error",
-            title: "Couldn't submit for approval",
+            title: t("adminSchool.timetable.toast.submitFailed"),
             description: err instanceof ApiError ? (err.detail ?? err.title) : undefined,
           }),
       },
@@ -149,13 +157,16 @@ export default function TimetableBuilderPage() {
       { versionId: version.id, termId },
       {
         onSuccess: () => {
-          show({ variant: "success", title: `Deleted draft "${version.name}"` });
+          show({
+            variant: "success",
+            title: t("adminSchool.timetable.toast.deleted", { name: version.name }),
+          });
           setVersionId("");
         },
         onError: (err) =>
           show({
             variant: "error",
-            title: "Couldn't delete draft",
+            title: t("adminSchool.timetable.toast.deleteFailed"),
             description: err instanceof ApiError ? (err.detail ?? err.title) : undefined,
           }),
       },
@@ -166,40 +177,49 @@ export default function TimetableBuilderPage() {
     <>
       <div className="timetable-builder__header">
         <div>
-          <h1>Timetable builder</h1>
-          <p>Build a weekly schedule, resolve scheduling conflicts, and submit it for review.</p>
+          <h1>{t("adminSchool.timetable.title")}</h1>
+          <p>{t("adminSchool.timetable.intro")}</p>
           <p>
-            <HelpLink to={helpPath("timetable")}>Read the guide</HelpLink>
+            <HelpLink to={helpPath("timetable")}>{t("adminSchool.timetable.guide")}</HelpLink>
           </p>
         </div>
       </div>
 
       <div className="timetable-builder__selectors">
-        <Select label="Academic year" options={yearOptions} value={yearId} onChange={setYearId} />
         <Select
-          label="Term"
+          label={t("adminSchool.timetable.academicYear")}
+          options={yearOptions}
+          value={yearId}
+          onChange={setYearId}
+        />
+        <Select
+          label={t("adminSchool.timetable.term")}
           options={termOptions}
           value={termId}
           onChange={setTermId}
           disabled={yearId === ""}
         />
         <Select
-          label="Draft version"
+          label={t("adminSchool.timetable.draftVersion")}
           options={versionOptions}
           value={versionId}
           onChange={setVersionId}
           disabled={termId === ""}
-          placeholder={versionsQuery.data?.length ? "Select a version" : "No versions yet"}
+          placeholder={
+            versionsQuery.data?.length
+              ? t("adminSchool.timetable.selectVersion")
+              : t("adminSchool.timetable.noVersions")
+          }
         />
         <Button variant="secondary" disabled={termId === ""} onClick={() => setCreateOpen(true)}>
-          New draft
+          {t("adminSchool.timetable.newDraft")}
         </Button>
       </div>
 
       {version ? (
         <div className="timetable-builder__version-bar">
           <span className="timetable-builder__status-pill" data-status={version.status}>
-            {STATUS_LABELS[version.status]}
+            {t(STATUS_LABEL_KEYS[version.status])}
           </span>
           {version.status === "draft" ? (
             <>
@@ -208,34 +228,36 @@ export default function TimetableBuilderPage() {
                 loading={deleteVersion.isPending}
                 onClick={handleDeleteDraft}
               >
-                Delete draft
+                {t("adminSchool.timetable.deleteDraft")}
               </Button>
               <Button loading={submitVersion.isPending} onClick={handleSubmitForApproval}>
-                Submit for approval
+                {t("adminSchool.timetable.submitForApproval")}
               </Button>
             </>
           ) : (
             <p className="timetable-builder__readonly-note">
-              This version is {STATUS_LABELS[version.status].toLowerCase()} and read-only.
+              {t(READ_ONLY_NOTE_KEYS[version.status])}
             </p>
           )}
           {version.rejected_reason ? (
-            <p className="timetable-builder__rejected-note">Sent back: {version.rejected_reason}</p>
+            <p className="timetable-builder__rejected-note">
+              {t("adminSchool.timetable.sentBack", { reason: version.rejected_reason })}
+            </p>
           ) : null}
         </div>
       ) : null}
 
       {termId === "" ? (
-        <p>Select a term to build its timetable.</p>
+        <p>{t("adminSchool.timetable.selectTerm")}</p>
       ) : versionsQuery.isPending ||
         classesQuery.isPending ||
         teachersQuery.isPending ||
         roomsQuery.isPending ? (
-        <p>Loading…</p>
+        <p>{t("adminSchool.timetable.loading")}</p>
       ) : !version ? (
-        <p>Create a draft version to start building this term's schedule.</p>
+        <p>{t("adminSchool.timetable.noVersion")}</p>
       ) : slotsQuery.isPending ? (
-        <p>Loading…</p>
+        <p>{t("adminSchool.timetable.loading")}</p>
       ) : (
         <TimetableGrid
           version={version}

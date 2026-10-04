@@ -1,0 +1,568 @@
+{
+  "common": {
+    "cancel": "إلغاء",
+    "saveChanges": "حفظ التغييرات",
+    "previous": "السابق",
+    "next": "التالي",
+    "loading": "جارٍ التحميل…",
+    "listSeparator": "، "
+  },
+  "roles": {
+    "SUPER_ADMIN": "مسؤول أعلى",
+    "ORG_ADMIN": "مسؤول المدرسة",
+    "FINANCE": "الشؤون المالية",
+    "INSTRUCTOR": "معلم",
+    "TEACHING_ASSISTANT": "مساعد معلم",
+    "STUDENT": "طالب",
+    "PARENT": "ولي أمر",
+    "GUEST": "ضيف",
+    "SUPPORT_AGENT": "موظف دعم"
+  },
+  "validation": {
+    "emailRequired": "البريد الإلكتروني مطلوب",
+    "emailInvalid": "أدخل عنوان بريد إلكتروني صالحًا",
+    "maxLength200": "يجب ألا يتجاوز 200 حرف",
+    "maxLength100": "يجب ألا يتجاوز 100 حرف",
+    "nameRequired": "الاسم مطلوب",
+    "firstNameRequired": "الاسم الأول مطلوب",
+    "lastNameRequired": "اسم العائلة مطلوب",
+    "admissionNumberRequired": "رقم القبول مطلوب",
+    "dateInvalid": "أدخل تاريخًا صالحًا",
+    "parentRequired": "اختر ولي الأمر",
+    "expiryMin": "يجب أن تكون يومًا واحدًا على الأقل",
+    "expiryMax": "يجب ألا تتجاوز 365 يومًا",
+    "recipientInvalid": "عنوان بريد إلكتروني غير صالح",
+    "recipientsMin": "أضف مستلمًا واحدًا على الأقل",
+    "recipientsMax": "الحد الأقصى 5000 مستلم في الدفعة الواحدة"
+  },
+  "users": {
+    "status": {
+      "invited": "مدعو",
+      "active": "نشط",
+      "suspended": "موقوف",
+      "archived": "مؤرشف"
+    },
+    "list": {
+      "title": "المستخدمون",
+      "description": "ادعُ جميع أفراد مدرستك وعدّل بياناتهم وأدر صلاحيات وصولهم.",
+      "newUser": "مستخدم جديد",
+      "searchLabel": "بحث",
+      "searchPlaceholder": "ابحث بالاسم أو البريد الإلكتروني",
+      "createdBetween": "تاريخ الإنشاء بين",
+      "roleFilter": "الدور",
+      "statusFilter": "الحالة",
+      "allRoles": "جميع الأدوار",
+      "allStatuses": "جميع الحالات",
+      "caption": "مستخدمو المدرسة",
+      "loadError": "تعذّر تحميل المستخدمين.",
+      "empty": "لا يوجد مستخدمون يطابقون عوامل التصفية هذه.",
+      "never": "أبدًا",
+      "edit": "تعديل",
+      "sessions": "الجلسات",
+      "deactivate": "إلغاء التنشيط",
+      "columns": {
+        "name": "الاسم",
+        "email": "البريد الإلكتروني",
+        "role": "الدور",
+        "status": "الحالة",
+        "lastActive": "آخر نشاط",
+        "actions": "الإجراءات"
+      }
+    },
+    "form": {
+      "email": "البريد الإلكتروني",
+      "displayName": "الاسم المعروض",
+      "role": "الدور"
+    },
+    "create": {
+      "title": "مستخدم جديد",
+      "description": "ادعُ شخصًا للانضمام إلى هذه المدرسة.",
+      "displayNameHelper": "اختياري — يمكنه تعيينه بنفسه بعد قبول الدعوة.",
+      "submit": "إرسال الدعوة",
+      "invitedToast": "تمت دعوة {{email}}",
+      "error": "تعذّر إنشاء المستخدم"
+    },
+    "edit": {
+      "title": "تعديل المستخدم",
+      "updatedToast": "تم تحديث المستخدم",
+      "error": "تعذّر حفظ التغييرات"
+    },
+    "deactivate": {
+      "title": "إلغاء تنشيط المستخدم",
+      "body": "يؤدي هذا إلى إيقاف الحساب فورًا وتسجيل خروجه من جميع الأجهزة. لا يمكن التراجع عن ذلك من هذه الشاشة.",
+      "checking": "جارٍ التحقق من الجلسات النشطة…",
+      "noSessions": "ليس لدى هذا المستخدم أي جلسات نشطة أو أجهزة مسجّلة.",
+      "consequence": "سيؤدي هذا إلى إنهاء $t(adminPeople.users.deactivate.sessionCount, {\"count\": {{sessionCount}} }) على $t(adminPeople.users.deactivate.deviceCount, {\"count\": {{deviceCount}} })، وإلغاء أي دعوات معلّقة لهذا الحساب.",
+      "sessionCount_zero": "لا جلسات نشطة",
+      "sessionCount_one": "جلسة نشطة واحدة",
+      "sessionCount_two": "جلستين نشطتين",
+      "sessionCount_few": "{{count}} جلسات نشطة",
+      "sessionCount_many": "{{count}} جلسة نشطة",
+      "sessionCount_other": "{{count}} جلسة نشطة",
+      "deviceCount_zero": "أي جهاز",
+      "deviceCount_one": "جهاز واحد",
+      "deviceCount_two": "جهازين",
+      "deviceCount_few": "{{count}} أجهزة",
+      "deviceCount_many": "{{count}} جهازًا",
+      "deviceCount_other": "{{count}} جهاز",
+      "confirm": "إلغاء التنشيط",
+      "successToast": "تم إلغاء تنشيط {{name}}",
+      "successDescription": "تم إبطال {{revoked}} من الجلسات على أجهزته، وإلغاء {{invitations}} من الدعوات المعلّقة.",
+      "error": "تعذّر إلغاء تنشيط المستخدم"
+    },
+    "sessions": {
+      "title": "الأجهزة والجلسات",
+      "sessionsHeading": "الجلسات",
+      "noSessions": "لا توجد جلسات نشطة.",
+      "unknownLocation": "موقع غير معروف",
+      "devicesHeading": "الأجهزة",
+      "revokeAll": "إبطال الكل",
+      "noDevices": "لا توجد أجهزة مسجّلة.",
+      "activeSessions_zero": "لا توجد جلسات نشطة",
+      "activeSessions_one": "جلسة نشطة واحدة",
+      "activeSessions_two": "جلستان نشطتان",
+      "activeSessions_few": "{{count}} جلسات نشطة",
+      "activeSessions_many": "{{count}} جلسة نشطة",
+      "activeSessions_other": "{{count}} جلسة نشطة",
+      "revokeDevice": "إبطال الجهاز"
+    }
+  },
+  "invitations": {
+    "status": {
+      "pending": "معلّقة",
+      "expired": "منتهية الصلاحية",
+      "consumed": "مستخدمة",
+      "revoked": "مُبطلة"
+    },
+    "bulkStatus": {
+      "pending": "معلّقة",
+      "processing": "قيد المعالجة",
+      "completed": "مكتملة",
+      "failed": "فشلت"
+    },
+    "recipientStatus": {
+      "pending": "معلّق",
+      "sent": "أُرسلت",
+      "failed": "فشل"
+    },
+    "page": {
+      "title": "الدعوات",
+      "guide": "اقرأ الدليل",
+      "tabInvitations": "الدعوات",
+      "tabBulk": "الدعوات الجماعية"
+    },
+    "form": {
+      "email": "البريد الإلكتروني",
+      "role": "الدور",
+      "expiresAfter": "تنتهي بعد (أيام)"
+    },
+    "board": {
+      "description": "تتبّع روابط الدعوات وأدِرها: أعد إرسالها أو أبطلها أو انسخ الرابط مباشرة.",
+      "newInvitation": "دعوة جديدة",
+      "searchLabel": "بحث",
+      "searchPlaceholder": "ابحث بالبريد الإلكتروني",
+      "roleFilter": "الدور",
+      "statusFilter": "الحالة",
+      "allRoles": "جميع الأدوار",
+      "allStatuses": "جميع الحالات",
+      "resendError": "تعذّرت إعادة إرسال الدعوة",
+      "resend": "إعادة الإرسال",
+      "revoke": "إبطال",
+      "caption": "الدعوات",
+      "loadError": "تعذّر تحميل الدعوات.",
+      "empty": "لا توجد دعوات تطابق عوامل التصفية هذه.",
+      "columns": {
+        "email": "البريد الإلكتروني",
+        "role": "الدور",
+        "status": "الحالة",
+        "expires": "تاريخ الانتهاء",
+        "sent": "تاريخ الإرسال",
+        "actions": "الإجراءات"
+      }
+    },
+    "create": {
+      "title": "دعوة جديدة",
+      "description": "أنشئ رابط دعوة يُستخدم مرة واحدة ليتمكن شخص ما من الانضمام إلى هذه المدرسة.",
+      "expiresHelper": "اختياري — القيمة الافتراضية 7 أيام.",
+      "submit": "إرسال الدعوة",
+      "invitedToast": "تمت دعوة {{email}}",
+      "error": "تعذّر إنشاء الدعوة"
+    },
+    "revoke": {
+      "title": "إبطال الدعوة",
+      "body": "سيتوقف رابط الدعوة عن العمل فورًا. لا يمكن التراجع عن ذلك من هذه الشاشة — أرسل دعوة جديدة إذا كان الشخص لا يزال بحاجة إلى الوصول.",
+      "confirm": "إبطال",
+      "successToast": "تم إبطال الدعوة المرسلة إلى {{email}}",
+      "error": "تعذّر إبطال الدعوة"
+    },
+    "link": {
+      "title": "تم إرسال الدعوة",
+      "description": "{{email}} — شارك هذا الرابط إذا لم يصل البريد الإلكتروني.",
+      "inviteLink": "رابط الدعوة",
+      "copyLink": "نسخ الرابط",
+      "copied": "تم النسخ",
+      "done": "تم",
+      "copiedToast": "تم نسخ الرابط",
+      "copyError": "تعذّر نسخ الرابط",
+      "copyErrorDescription": "حدّد نص الرابط وانسخه يدويًا."
+    },
+    "bulkBoard": {
+      "description": "دفعات من الدعوات أُرسلت معًا، مع تتبّع الإرسال لكل مستلم.",
+      "newBulkInvite": "دعوة جماعية جديدة",
+      "caption": "دفعات الدعوات الجماعية",
+      "rowLabel": "الدفعة {{id}}",
+      "loadError": "تعذّر تحميل الدعوات الجماعية.",
+      "empty": "لا توجد دعوات جماعية بعد.",
+      "viewProgress": "عرض التقدّم",
+      "columns": {
+        "status": "الحالة",
+        "role": "الدور",
+        "total": "الإجمالي",
+        "sent": "المُرسلة",
+        "failed": "الفاشلة",
+        "created": "تاريخ الإنشاء",
+        "actions": "الإجراءات"
+      }
+    },
+    "bulkModal": {
+      "title": "دعوة جماعية",
+      "description": "ادعُ عدة أشخاص دفعة واحدة. يُتتبّع كل مستلم ويمكن إعادة المحاولة له بشكل منفرد.",
+      "recipients": "المستلمون",
+      "placeholder": "بريد إلكتروني واحد في كل سطر، أو افصل بينها بفواصل",
+      "detected_zero": "لم يُعثر على أي مستلم. الحد الأقصى 5000 لكل دفعة.",
+      "detected_one": "تم العثور على مستلم واحد. الحد الأقصى 5000 لكل دفعة.",
+      "detected_two": "تم العثور على مستلمَين. الحد الأقصى 5000 لكل دفعة.",
+      "detected_few": "تم العثور على {{count}} مستلمين. الحد الأقصى 5000 لكل دفعة.",
+      "detected_many": "تم العثور على {{count}} مستلمًا. الحد الأقصى 5000 لكل دفعة.",
+      "detected_other": "تم العثور على {{count}} مستلم. الحد الأقصى 5000 لكل دفعة.",
+      "expiresHelper": "اختياري — القيمة الافتراضية 7 أيام لكل مستلم.",
+      "submit_zero": "إرسال الدعوات",
+      "submit_one": "إرسال دعوة واحدة",
+      "submit_two": "إرسال دعوتين",
+      "submit_few": "إرسال {{count}} دعوات",
+      "submit_many": "إرسال {{count}} دعوة",
+      "submit_other": "إرسال {{count}} دعوة",
+      "queuedToast": "تمت جدولة الدعوة الجماعية",
+      "queuedDescription_zero": "لا يوجد مستلمون — يجري الإرسال في الخلفية.",
+      "queuedDescription_one": "مستلم واحد — يجري الإرسال في الخلفية.",
+      "queuedDescription_two": "مستلمان — يجري الإرسال في الخلفية.",
+      "queuedDescription_few": "{{count}} مستلمين — يجري الإرسال في الخلفية.",
+      "queuedDescription_many": "{{count}} مستلمًا — يجري الإرسال في الخلفية.",
+      "queuedDescription_other": "{{count}} مستلم — يجري الإرسال في الخلفية.",
+      "error": "تعذّر إنشاء الدعوة الجماعية"
+    },
+    "progress": {
+      "title": "تقدّم الدعوة الجماعية",
+      "description": "{{status}} — {{role}}",
+      "total": "الإجمالي",
+      "sent": "المُرسلة",
+      "failed": "الفاشلة",
+      "dispatchProgress": "تقدّم الإرسال",
+      "filterByStatus": "التصفية حسب الحالة",
+      "allStatuses": "جميع الحالات",
+      "retryFailed": "إعادة محاولة الفاشلة",
+      "retryingToast": "جارٍ إعادة المحاولة للمستلمين الذين فشل الإرسال إليهم",
+      "retryError": "تعذّرت إعادة المحاولة",
+      "caption": "المستلمون",
+      "loadError": "تعذّر تحميل المستلمين.",
+      "empty": "لا يوجد مستلمون يطابقون عامل التصفية هذا.",
+      "columns": {
+        "email": "البريد الإلكتروني",
+        "status": "الحالة",
+        "error": "الخطأ"
+      }
+    }
+  },
+  "students": {
+    "backToStudents": "→ العودة إلى الطلاب",
+    "status": {
+      "applicant": "متقدّم",
+      "enrolled": "مسجّل",
+      "suspended": "موقوف",
+      "graduated": "متخرّج",
+      "withdrawn": "منسحب",
+      "archived": "مؤرشف"
+    },
+    "relationship": {
+      "mother": "الأم",
+      "father": "الأب",
+      "guardian": "ولي الأمر",
+      "step_parent": "زوج الأم / زوجة الأب",
+      "grandparent": "الجد / الجدة",
+      "sibling": "الأخ / الأخت",
+      "other": "أخرى"
+    },
+    "list": {
+      "title": "الطلاب",
+      "description": "ابحث في دليل الطلاب، وراجع ملفاتهم الشخصية، وأدِر روابط أولياء الأمور.",
+      "importCsv": "استيراد CSV",
+      "newStudent": "طالب جديد",
+      "searchLabel": "بحث",
+      "searchPlaceholder": "ابحث بالاسم أو رقم القبول",
+      "admittedBetween": "تاريخ القبول بين",
+      "statusFilter": "الحالة",
+      "classFilter": "الفصل",
+      "allStatuses": "جميع الحالات",
+      "allClasses": "جميع الفصول",
+      "caption": "الطلاب",
+      "loadError": "تعذّر تحميل الطلاب.",
+      "empty": "لا يوجد طلاب يطابقون عوامل التصفية هذه.",
+      "view": "عرض",
+      "columns": {
+        "name": "الاسم",
+        "admissionNumber": "رقم القبول",
+        "status": "الحالة",
+        "dateOfBirth": "تاريخ الميلاد",
+        "actions": "الإجراءات"
+      }
+    },
+    "form": {
+      "firstName": "الاسم الأول",
+      "middleName": "الاسم الأوسط",
+      "lastName": "اسم العائلة",
+      "preferredName": "الاسم المفضّل",
+      "email": "البريد الإلكتروني",
+      "dateOfBirth": "تاريخ الميلاد",
+      "admissionNumber": "رقم القبول",
+      "admissionDate": "تاريخ القبول",
+      "status": "الحالة"
+    },
+    "create": {
+      "title": "طالب جديد",
+      "description": "أنشئ ملفًا شخصيًا للطالب وحسابًا مرتبطًا به.",
+      "preferredNameHelper": "اختياري — يُعرض بدلًا من الاسم الرسمي حيثما يناسب.",
+      "emailHelper": "يُستخدم لإنشاء الحساب المرتبط بالطالب.",
+      "admissionNumberHelper": "يجب أن يكون فريدًا داخل هذه المدرسة.",
+      "submit": "إنشاء الطالب",
+      "addedToast": "تمت إضافة {{firstName}} {{lastName}}",
+      "error": "تعذّر إنشاء الطالب"
+    },
+    "profile": {
+      "tabProfile": "الملف الشخصي",
+      "studentFallback": "طالب",
+      "noStudent": "لم يتم اختيار أي طالب.",
+      "loadError": "تعذّر تحميل بيانات هذا الطالب.",
+      "demographics": "البيانات الشخصية",
+      "editDemographics": "تعديل البيانات الشخصية",
+      "edit": "تعديل",
+      "name": "الاسم",
+      "profileUpdatedToast": "تم تحديث الملف الشخصي",
+      "saveError": "تعذّر حفظ التغييرات",
+      "admission": "القبول",
+      "editAdmission": "تعديل بيانات القبول",
+      "admissionUpdatedToast": "تم تحديث بيانات القبول",
+      "guardians": "أولياء الأمور",
+      "addGuardian": "إضافة ولي أمر",
+      "guardiansLoadError": "تعذّر تحميل أولياء الأمور.",
+      "noGuardians": "لم يُربط أي ولي أمر بعد.",
+      "accountUnavailable": "الحساب غير متاح",
+      "removeGuardian": "إزالة",
+      "enrollmentHistory": "سجل التسجيل",
+      "enrollmentLoadError": "تعذّر تحميل سجل التسجيل.",
+      "noEnrollment": "لا يوجد سجل تسجيل بعد.",
+      "enrollmentMeta": "{{status}} · سُجّل في {{enrolled}}",
+      "enrollmentMetaWithdrawn": "{{status}} · سُجّل في {{enrolled}} · انسحب في {{withdrawn}}",
+      "enrollmentStatus": {
+        "active": "نشط",
+        "waitlisted": "على قائمة الانتظار",
+        "withdrawn": "منسحب",
+        "completed": "مكتمل",
+        "cancelled": "ملغى"
+      }
+    },
+    "linkGuardian": {
+      "title": "إضافة ولي أمر",
+      "description": "اربط حساب ولي أمر موجودًا بهذا الطالب.",
+      "change": "تغيير",
+      "searchParents": "البحث عن أولياء الأمور",
+      "searchPlaceholder": "ابحث بالاسم أو البريد الإلكتروني",
+      "noMatches": "لا توجد حسابات أولياء أمور مطابقة.",
+      "relationship": "صلة القرابة",
+      "submit": "ربط ولي الأمر",
+      "linkedToast": "تم ربط {{name}}",
+      "guardianFallback": "ولي الأمر",
+      "error": "تعذّر ربط ولي الأمر"
+    },
+    "unlinkGuardian": {
+      "title": "إزالة ولي الأمر",
+      "description": "{{name}} — {{relationship}}",
+      "body": "يؤدي هذا إلى إزالة الرابط بين ولي الأمر والطالب. لن يتمكن ولي الأمر بعد ذلك من رؤية سجلات هذا الطالب.",
+      "confirm": "إزالة",
+      "removedToast": "تمت إزالة {{name}}",
+      "guardianFallback": "ولي الأمر",
+      "error": "تعذّرت إزالة ولي الأمر"
+    },
+    "import": {
+      "fields": {
+        "admission_number": "رقم القبول",
+        "email": "البريد الإلكتروني للطالب",
+        "first_name": "الاسم الأول",
+        "middle_name": "الاسم الأوسط",
+        "last_name": "اسم العائلة",
+        "preferred_name": "الاسم المفضّل",
+        "date_of_birth": "تاريخ الميلاد",
+        "status": "الحالة",
+        "parent_email": "البريد الإلكتروني لولي الأمر",
+        "parent_name": "اسم ولي الأمر",
+        "parent_relationship": "صلة قرابة ولي الأمر"
+      },
+      "hints": {
+        "admission_number": "المعرّف الفريد للطالب في مدرستك.",
+        "email": "البريد الإلكتروني الذي يسجّل به الطالب الدخول. لا يغيّره الاستيراد أبدًا لطالب موجود.",
+        "date_of_birth": "يجب أن يكون بالصيغة YYYY-MM-DD، مثل 2012-09-01.",
+        "status": "إحدى القيم: {{values}}. تركه فارغًا يعني \"متقدّم\" للطالب الجديد.",
+        "parent_email": "يبحث عن حساب ولي الأمر أو ينشئه. يتطلب أيضًا صلة قرابة ولي الأمر.",
+        "parent_name": "يُستخدم فقط عند إنشاء حساب جديد لولي الأمر.",
+        "parent_relationship": "إحدى القيم: {{values}}. يتطلب أيضًا البريد الإلكتروني لولي الأمر."
+      },
+      "parentPairWarning": "اربط كلًّا من {{email}} و{{relationship}}، أو لا تربط أيًّا منهما. تُرفض الصفوف التي تذكر ولي أمر دون كليهما.",
+      "blocker": {
+        "missing": "اربط عمودًا بكل حقل مطلوب قبل التأكيد. الحقول الناقصة: {{fields}}.",
+        "unapplied": "لقد غيّرت الربط. طبّقه لإعادة فحص الملف قبل التأكيد.",
+        "noValidRows": "لم يجتز أي صف التحقق، لذا لا يوجد ما يُستورد."
+      },
+      "confidence": {
+        "exact": "عالية: الاسم نفسه",
+        "alias": "عالية: اسم بديل معروف",
+        "partial": "منخفضة: تطابق جزئي في الاسم، يرجى التحقق",
+        "manual": "اختيار يدوي"
+      },
+      "mapping": {
+        "region": "ربط الأعمدة",
+        "heading": "طابِق أعمدتك",
+        "intro_zero": "لم يُعثر على أي عمود في السطر {{line}} من {{file}}. تحقّق من كل تطابق، واختر عمودًا لأي حقل ناقص، ثم طبّق الربط لإعادة فحص الملف.",
+        "intro_one": "تم العثور على عمود واحد في السطر {{line}} من {{file}}. تحقّق من كل تطابق، واختر عمودًا لأي حقل ناقص، ثم طبّق الربط لإعادة فحص الملف.",
+        "intro_two": "تم العثور على عمودين في السطر {{line}} من {{file}}. تحقّق من كل تطابق، واختر عمودًا لأي حقل ناقص، ثم طبّق الربط لإعادة فحص الملف.",
+        "intro_few": "تم العثور على {{count}} أعمدة في السطر {{line}} من {{file}}. تحقّق من كل تطابق، واختر عمودًا لأي حقل ناقص، ثم طبّق الربط لإعادة فحص الملف.",
+        "intro_many": "تم العثور على {{count}} عمودًا في السطر {{line}} من {{file}}. تحقّق من كل تطابق، واختر عمودًا لأي حقل ناقص، ثم طبّق الربط لإعادة فحص الملف.",
+        "intro_other": "تم العثور على {{count}} عمود في السطر {{line}} من {{file}}. تحقّق من كل تطابق، واختر عمودًا لأي حقل ناقص، ثم طبّق الربط لإعادة فحص الملف.",
+        "savedLabel": "استخدام ربط محفوظ",
+        "savedPlaceholder": "اختر ربطًا محفوظًا",
+        "savedHelper": "يُطبَّق فورًا.",
+        "savedUnfit": "{{name}} (أعمدة غير موجودة في هذا الملف)",
+        "requiredMapped": "الحقول المطلوبة المربوطة",
+        "progress": "تم ربط {{mapped}} من {{total}} من الحقول المطلوبة.",
+        "progressMissing": "تم ربط {{mapped}} من {{total}} من الحقول المطلوبة. الحقول الناقصة: {{fields}}.",
+        "notMapped": "غير مربوط",
+        "nowMapped": "{{header}} (مربوط حاليًا بـ{{field}})",
+        "saveAs": "حفظ باسم (اختياري)",
+        "saveAsHelper": "سمِّ هذا الربط لإعادة استخدامه في المرة القادمة.",
+        "apply": "تطبيق الربط",
+        "save": "حفظ الربط"
+      },
+      "diff": {
+        "region": "معاينة الاستيراد",
+        "heading": "معاينة التغييرات",
+        "intro": "ما سيحدث لسجلات طلابك عند التأكيد الآن. لم يُحفظ أي شيء بعد.",
+        "loadError": "تعذّر تحميل المعاينة. لا يزال بإمكانك التأكيد؛ إذ يُعاد فحص الاستيراد عند تشغيله.",
+        "loading": "جارٍ تحميل المعاينة…",
+        "show": "عرض",
+        "allRows": "جميع الصفوف",
+        "caption": "التغييرات لكل صف",
+        "rowLabel": "السطر {{line}}، {{admissionNumber}}",
+        "empty": "لا توجد صفوف تطابق عامل التصفية هذا.",
+        "change": "{{field}}: {{from}} ← {{to}}",
+        "blank": "(فارغ)",
+        "newParentAccount": "حساب ولي أمر جديد",
+        "newParentLink": "رابط ولي أمر جديد",
+        "parentLinkChanges": "تغييرات على رابط ولي الأمر",
+        "partSeparator": "؛ ",
+        "actions": {
+          "create": "طالب جديد",
+          "update": "تحديث",
+          "unchanged": "دون تغيير",
+          "conflict": "تم التخطي (تعارض)"
+        },
+        "conflicts": {
+          "DUPLICATE_ADMISSION_NUMBER_IN_FILE": "يحتوي سطر سابق على رقم القبول نفسه. سيُستورد السطر الأول.",
+          "DUPLICATE_EMAIL_IN_FILE": "يُسند سطر سابق هذا البريد الإلكتروني إلى رقم قبول مختلف.",
+          "EMAIL_MISMATCH": "هذا الطالب موجود بالفعل ويسجّل الدخول ببريد إلكتروني مختلف.",
+          "EMAIL_BELONGS_TO_OTHER_STUDENT": "هذا البريد الإلكتروني يخص طالبًا آخر بالفعل.",
+          "EMAIL_BELONGS_TO_STAFF": "هذا البريد الإلكتروني يخص حساب أحد الموظفين.",
+          "PARENT_EMAIL_BELONGS_TO_STUDENT": "البريد الإلكتروني لولي الأمر يخص أحد الطلاب."
+        },
+        "stats": {
+          "newStudents": "طلاب جدد",
+          "updatedStudents": "طلاب محدَّثون",
+          "noChange": "دون تغيير",
+          "skipped": "تم التخطي (تعارضات)",
+          "newParentAccounts": "حسابات أولياء أمور جديدة"
+        },
+        "columns": {
+          "line": "السطر",
+          "admissionNumber": "رقم القبول",
+          "result": "النتيجة",
+          "details": "التفاصيل"
+        }
+      },
+      "page": {
+        "title": "استيراد الطلاب",
+        "intro": "ارفع ملف CSV للطلاب للتحقق منه. لن يُحفظ أي شيء حتى تؤكّد.",
+        "uploadRegion": "رفع ملف CSV",
+        "downloadTemplate": "تنزيل قالب CSV",
+        "fileLabel": "ملف CSV للطلاب",
+        "uploadProgress": "تقدّم الرفع",
+        "uploading": "جارٍ الرفع… {{percent}}%",
+        "templateError": "تعذّر تنزيل القالب. يرجى المحاولة مرة أخرى.",
+        "validateError": "تعذّر التحقق من هذا الملف. يرجى المحاولة مرة أخرى.",
+        "applyError": "تعذّر تطبيق الربط. يرجى المحاولة مرة أخرى.",
+        "confirmError": "تعذّر تأكيد الاستيراد. يرجى المحاولة مرة أخرى."
+      },
+      "report": {
+        "region": "تقرير التحقق",
+        "rowsInFile": "الصفوف في الملف",
+        "validRows": "الصفوف الصالحة",
+        "rowsWithErrors": "الصفوف التي بها أخطاء",
+        "caption": "أخطاء التحقق على مستوى الصف",
+        "rowLabel": "السطر {{line}}، {{field}}",
+        "downloadErrorReport": "تنزيل تقرير الأخطاء",
+        "columns": {
+          "line": "السطر",
+          "field": "الحقل",
+          "message": "الرسالة"
+        }
+      },
+      "confirm": {
+        "button_zero": "تأكيد الاستيراد (لا يوجد طلاب)",
+        "button_one": "تأكيد الاستيراد (طالب واحد)",
+        "button_two": "تأكيد الاستيراد (طالبان)",
+        "button_few": "تأكيد الاستيراد ({{count}} طلاب)",
+        "button_many": "تأكيد الاستيراد ({{count}} طالبًا)",
+        "button_other": "تأكيد الاستيراد ({{count}} طالب)",
+        "uploadDifferent": "رفع ملف آخر"
+      },
+      "processing": {
+        "region": "تقدّم الاستيراد",
+        "queued": "في قائمة الانتظار للمعالجة…",
+        "creating_zero": "لا توجد سجلات طلاب لإنشائها…",
+        "creating_one": "جارٍ إنشاء سجل طالب واحد…",
+        "creating_two": "جارٍ إنشاء سجلَّي طالبين…",
+        "creating_few": "جارٍ إنشاء {{count}} سجلات طلاب…",
+        "creating_many": "جارٍ إنشاء {{count}} سجلًا للطلاب…",
+        "creating_other": "جارٍ إنشاء {{count}} سجل طالب…",
+        "body": "قد يستغرق ذلك بضع دقائق للملفات الكبيرة. يمكنك مغادرة هذه الصفحة — سيستمر الاستيراد في العمل وسيظهر أثره في دليل الطلاب عند انتهائه."
+      },
+      "completed": {
+        "region": "ملخص الاستيراد",
+        "complete": "اكتمل الاستيراد.",
+        "studentsCreated": "الطلاب الذين أُنشئوا",
+        "rowsSkipped": "الصفوف التي تم تخطيها (موجودة مسبقًا)",
+        "parentsCreated": "حسابات أولياء الأمور التي أُنشئت",
+        "guardianLinks": "روابط أولياء الأمور التي أُنشئت",
+        "notImported_zero": "لم يُستبعد أي صف من الملف الأصلي بسبب أخطاء التحقق.",
+        "notImported_one": "لم يُستورد صف واحد من الملف الأصلي بسبب أخطاء التحقق.",
+        "notImported_two": "لم يُستورد صفّان من الملف الأصلي بسبب أخطاء التحقق.",
+        "notImported_few": "لم تُستورد {{count}} صفوف من الملف الأصلي بسبب أخطاء التحقق.",
+        "notImported_many": "لم يُستورد {{count}} صفًا من الملف الأصلي بسبب أخطاء التحقق.",
+        "notImported_other": "لم يُستورد {{count}} صف من الملف الأصلي بسبب أخطاء التحقق.",
+        "importAnother": "استيراد ملف آخر",
+        "backToStudents": "العودة إلى الطلاب"
+      },
+      "failed": {
+        "region": "فشل الاستيراد",
+        "body": "فشل الاستيراد أثناء المعالجة. لم يُنشأ أي طالب من هذا الملف.",
+        "startNew": "بدء استيراد جديد"
+      }
+    }
+  }
+}

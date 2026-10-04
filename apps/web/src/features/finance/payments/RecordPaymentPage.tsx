@@ -4,8 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { fetchInvoice, invoiceQueryKey } from "../invoices/queries";
-import { PAYMENT_MODE_LABELS, PAYMENT_STATUS_LABELS, paymentStatusTone } from "../labels";
+import { PAYMENT_MODE_LABEL_KEYS, PAYMENT_STATUS_LABEL_KEYS, paymentStatusTone } from "../labels";
 
 import { InvoicePickerField } from "./InvoicePickerField";
 import { useCreatePayment } from "./mutations";
@@ -16,22 +17,19 @@ import "./payments.css";
 import type { Invoice } from "../invoices/queries";
 import type { Payment } from "../queries";
 import type { CreatePaymentBody, PaymentMode } from "./queries";
+import type { TFunction } from "i18next";
 import type { FormEvent } from "react";
 
-function apiErrorMessage(error: unknown, fallback: string): string {
+function apiErrorMessage(error: unknown, fallback: string, t: TFunction): string {
   if (!(error instanceof ApiError)) return fallback;
   // A 409 here means this exact idempotency key already produced a *different* payment — most
   // likely an earlier submission actually went through and this retry silently changed the body
   // (see `idempotencyMiddleware`'s doc comment in the API). Pointing at the list is safer than
   // inviting a second attempt that could genuinely double-record.
   if (error.status === 409) {
-    return "This submission may have already been recorded with different details. Check the payment history before retrying.";
+    return t("finance.payments.record.conflict");
   }
   return error.detail ?? error.title;
-}
-
-function formatMinorAmount(minor: number, minorUnit: number): string {
-  return (minor / 10 ** minorUnit).toFixed(minorUnit);
 }
 
 /**
@@ -43,14 +41,15 @@ function formatMinorAmount(minor: number, minorUnit: number): string {
  * `invoice.id`) — plain lookup-by-search still works with no query param at all.
  */
 export default function RecordPaymentPage() {
+  const { t } = useTranslation();
   const [payment, setPayment] = useState<Payment | null>(null);
 
   return (
     <>
       <p className="payments-form__back">
-        <Link to="/portal/finance/payments">&larr; Back to payments</Link>
+        <Link to="/portal/finance/payments">{t("finance.payments.record.back")}</Link>
       </p>
-      <h1>Record a payment</h1>
+      <h1>{t("finance.payments.record.title")}</h1>
 
       {payment ? (
         <PaymentSuccess payment={payment} onReset={() => setPayment(null)} />
@@ -70,6 +69,8 @@ interface PaymentFormProps {
 }
 
 function PaymentForm({ onRecorded }: PaymentFormProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const { show } = useToast();
   const createPayment = useCreatePayment();
   const [searchParams] = useSearchParams();
@@ -148,8 +149,8 @@ function PaymentForm({ onRecorded }: PaymentFormProps) {
           submittingRef.current = false;
           show({
             variant: "error",
-            title: "Couldn't record the payment",
-            description: apiErrorMessage(error, "Please check the form and try again."),
+            title: t("finance.payments.record.error"),
+            description: apiErrorMessage(error, t("finance.common.checkFormAndRetry"), t),
           });
         },
       },
@@ -157,13 +158,13 @@ function PaymentForm({ onRecorded }: PaymentFormProps) {
   }
 
   return (
-    <Card as="section" aria-label="Payment form">
+    <Card as="section" aria-label={t("finance.payments.record.formLabel")}>
       <Card.Body>
         <form onSubmit={handleSubmit} className="payments-form">
           <InvoicePickerField value={invoice} onChange={setManualInvoice} />
 
           <Input
-            label="Amount"
+            label={t("finance.common.amount")}
             type="text"
             inputMode="decimal"
             value={amountInput}
@@ -181,10 +182,20 @@ function PaymentForm({ onRecorded }: PaymentFormProps) {
               data-tone={exceedsOutstanding ? "warning" : "neutral"}
             >
               {exceedsOutstanding
-                ? `This exceeds the invoice's outstanding balance of ${invoice.outstanding_amount} ${invoice.currency}. ERPNext will reject an overpayment.`
+                ? t("finance.payments.record.exceeds", {
+                    amount: invoice.outstanding_amount,
+                    currency: invoice.currency,
+                  })
                 : remainingMinor === 0
-                  ? "Full payment — this invoice will be fully settled."
-                  : `Partial payment — ${formatMinorAmount(remainingMinor, invoice.currency_minor_unit)} ${invoice.currency} will remain outstanding.`}
+                  ? t("finance.payments.record.full")
+                  : t("finance.payments.record.partial", {
+                      amount: formatNumber(remainingMinor / 10 ** invoice.currency_minor_unit, {
+                        minimumFractionDigits: invoice.currency_minor_unit,
+                        maximumFractionDigits: invoice.currency_minor_unit,
+                        useGrouping: false,
+                      }),
+                      currency: invoice.currency,
+                    })}
             </p>
           ) : null}
 
@@ -193,48 +204,48 @@ function PaymentForm({ onRecorded }: PaymentFormProps) {
               `aria-required` on a group role. `canSubmit` below already gates on `mode !== ""`,
               so the requirement is still enforced — just not restated in markup that would fail. */}
           <RadioGroup
-            label="Payment method"
+            label={t("finance.payments.record.method")}
             name="payment-mode"
             value={mode}
             onChange={(value) => setMode(value as PaymentMode)}
           >
-            {(Object.entries(PAYMENT_MODE_LABELS) as [PaymentMode, string][]).map(
-              ([value, label]) => (
-                <Radio key={value} value={value} label={label} />
+            {(Object.entries(PAYMENT_MODE_LABEL_KEYS) as [PaymentMode, string][]).map(
+              ([value, labelKey]) => (
+                <Radio key={value} value={value} label={t(labelKey)} />
               ),
             )}
           </RadioGroup>
 
           <Input
-            label="Reference number"
+            label={t("finance.payments.record.referenceNumber")}
             type="text"
             value={referenceNo}
             onChange={(event) => setReferenceNo(event.target.value)}
             maxLength={140}
             helperText={
               requiresReference
-                ? "Required by ERPNext for bank transfer and card payments."
-                : "Bank or terminal reference, if any."
+                ? t("finance.payments.record.referenceRequired")
+                : t("finance.payments.record.referenceOptional")
             }
           />
 
           <Input
-            label="Reference date (optional)"
+            label={t("finance.payments.record.referenceDate")}
             type="date"
             value={referenceDate}
             onChange={(event) => setReferenceDate(event.target.value)}
           />
 
           <Input
-            label="Posting date (optional)"
+            label={t("finance.payments.record.postingDate")}
             type="date"
             value={postingDate}
             onChange={(event) => setPostingDate(event.target.value)}
-            helperText="Defaults to today."
+            helperText={t("finance.common.defaultsToToday")}
           />
 
           <Input
-            label="Remarks (optional)"
+            label={t("finance.payments.record.remarks")}
             type="text"
             value={remarks}
             onChange={(event) => setRemarks(event.target.value)}
@@ -243,7 +254,7 @@ function PaymentForm({ onRecorded }: PaymentFormProps) {
 
           <div className="payments-form__actions">
             <Button type="submit" loading={createPayment.isPending} disabled={!canSubmit}>
-              Record payment
+              {t("finance.common.recordPayment")}
             </Button>
           </div>
         </form>
@@ -271,6 +282,7 @@ const POLL_INTERVAL_MS = 3000;
  * still pending, stopping once ERPNext confirms or rejects it.
  */
 function PaymentSuccess({ payment: created, onReset }: PaymentSuccessProps) {
+  const { t } = useTranslation();
   const query = useQuery({
     queryKey: paymentQueryKey(created.id),
     queryFn: () => fetchPayment(created.id),
@@ -284,41 +296,42 @@ function PaymentSuccess({ payment: created, onReset }: PaymentSuccessProps) {
   const payment = query.data ?? created;
 
   return (
-    <Card as="section" aria-label="Payment recorded">
+    <Card as="section" aria-label={t("finance.payments.record.recordedLabel")}>
       <Card.Body>
         <p role="status" className="payments-success__headline">
-          Payment recorded &mdash; {payment.amount} {payment.currency}
+          {t("finance.payments.record.recordedHeadline", {
+            amount: payment.amount,
+            currency: payment.currency,
+          })}
         </p>
 
         <dl className="payments-success__summary">
           <div>
-            <dt>Invoice</dt>
+            <dt>{t("finance.common.invoice")}</dt>
             <dd>{payment.erpnext_invoice_id ?? "—"}</dd>
           </div>
           <div>
-            <dt>Method</dt>
-            <dd>{payment.payment_mode ? PAYMENT_MODE_LABELS[payment.payment_mode] : "—"}</dd>
+            <dt>{t("finance.common.method")}</dt>
+            <dd>{payment.payment_mode ? t(PAYMENT_MODE_LABEL_KEYS[payment.payment_mode]) : "—"}</dd>
           </div>
           <div>
-            <dt>Date</dt>
+            <dt>{t("finance.common.date")}</dt>
             <dd>{payment.payment_date}</dd>
           </div>
           <div>
-            <dt>Status</dt>
+            <dt>{t("finance.common.status")}</dt>
             <dd>
               <span className="payments-status-pill" data-tone={paymentStatusTone(payment.status)}>
-                {PAYMENT_STATUS_LABELS[payment.status]}
+                {t(PAYMENT_STATUS_LABEL_KEYS[payment.status])}
               </span>
             </dd>
           </div>
         </dl>
 
         {payment.status === "pending" ? (
-          <p>Awaiting confirmation from ERPNext. The receipt will appear here once confirmed.</p>
+          <p>{t("finance.payments.record.awaiting")}</p>
         ) : payment.status === "failed" ? (
-          <p role="alert">
-            ERPNext ultimately rejected this payment. Check the payment history for details.
-          </p>
+          <p role="alert">{t("finance.payments.record.rejected")}</p>
         ) : payment.receipt_url ? (
           <a
             className="sf-button sf-button--primary"
@@ -326,15 +339,15 @@ function PaymentSuccess({ payment: created, onReset }: PaymentSuccessProps) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open receipt
+            {t("finance.common.openReceipt")}
           </a>
         ) : null}
 
         <div className="payments-success__actions">
           <Button type="button" variant="secondary" onClick={onReset}>
-            Record another payment
+            {t("finance.payments.record.recordAnother")}
           </Button>
-          <Link to="/portal/finance/payments">View payment history</Link>
+          <Link to="/portal/finance/payments">{t("finance.payments.record.viewHistory")}</Link>
         </div>
       </Card.Body>
     </Card>

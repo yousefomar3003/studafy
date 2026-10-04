@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import { cx } from "../../internal/cx";
 import { Portal } from "../../internal/portal";
+import { useUiStrings } from "../../internal/ui-strings";
 
 import { ToastContextProvider, useToast } from "./toast-context";
 
@@ -25,6 +26,7 @@ interface ToastItemProps {
 }
 
 function ToastItem({ toast, onDismiss }: ToastItemProps) {
+  const strings = useUiStrings();
   const assertive = isAssertive(toast.variant);
 
   return (
@@ -45,7 +47,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
       <button
         type="button"
         className="sf-toast__dismiss"
-        aria-label={`Dismiss ${toast.title}`}
+        aria-label={strings.dismissToast(toast.title)}
         onClick={() => onDismiss(toast.id)}
       >
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">

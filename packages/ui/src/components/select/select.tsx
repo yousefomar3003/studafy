@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { cx } from "../../internal/cx";
 import { firstEnabledIndex, lastEnabledIndex, nextEnabledIndex } from "../../internal/roving";
+import { useUiStrings } from "../../internal/ui-strings";
 import { useControllableState } from "../../internal/use-controllable-state";
 
 import type { KeyboardEvent } from "react";
@@ -42,7 +43,7 @@ export function Select<Value extends string = string>({
   value,
   defaultValue,
   onChange,
-  placeholder = "Select an option",
+  placeholder,
   helperText,
   error,
   disabled = false,
@@ -50,6 +51,7 @@ export function Select<Value extends string = string>({
   name,
   id,
 }: SelectProps<Value>) {
+  const strings = useUiStrings();
   const generatedId = useId();
   const baseId = id ?? generatedId;
   const labelId = `${baseId}-label`;
@@ -244,7 +246,7 @@ export function Select<Value extends string = string>({
           <span
             className={cx("sf-select__value", !selectedOption && "sf-select__value--placeholder")}
           >
-            {selectedOption?.label ?? placeholder}
+            {selectedOption?.label ?? placeholder ?? strings.selectPlaceholder}
           </span>
           <span className="sf-select__arrow" aria-hidden="true" />
         </button>

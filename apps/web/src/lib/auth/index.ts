@@ -23,7 +23,7 @@ export type {
   SessionTokens,
 } from "./session-store";
 
-export { createAuthRefreshClient, authRefreshClient } from "./api";
+export { createAuthRefreshClient, authRefreshClient, loginWithPassword } from "./api";
 export type { AuthRefreshClientOptions } from "./api";
 
 export {
@@ -32,6 +32,7 @@ export {
   useAuth,
   useAuthStatus,
   useOAuthLogin,
+  usePublicAuthStatus,
   usePermissions,
   useSessionStore,
 } from "./context";

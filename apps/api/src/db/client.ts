@@ -12,6 +12,12 @@ export interface DatabasePools {
 /** Production pool capacity. Benchmarks use the same value so contention is representative. */
 export const DATABASE_MAX_CONNECTIONS = 16;
 
+/** TLS options for every pool. `disable` is dev-only — env.ts refuses it in any deployed tier. */
+function databaseSsl(env: Env): false | { ca: string | undefined; rejectUnauthorized: true } {
+  if (env.DATABASE_SSL_MODE === "disable") return false;
+  return { ca: env.DATABASE_CA_CERT, rejectUnauthorized: true };
+}
+
 export function createDatabase(env: Env): Database | null {
   if (!env.DATABASE_HOST) {
     return null;
@@ -23,7 +29,7 @@ export function createDatabase(env: Env): Database | null {
     database: env.DATABASE_NAME,
     username: env.DATABASE_USER,
     password: env.DATABASE_PASSWORD,
-    ssl: { ca: env.DATABASE_CA_CERT, rejectUnauthorized: true },
+    ssl: databaseSsl(env),
     max: DATABASE_MAX_CONNECTIONS,
     idle_timeout: 20,
     connect_timeout: 5,
@@ -45,7 +51,7 @@ export function createReadDatabase(env: Env, primary: Database | null): Database
     database: env.READ_DATABASE_NAME ?? env.DATABASE_NAME,
     username: env.DATABASE_USER,
     password: env.DATABASE_PASSWORD,
-    ssl: { ca: env.DATABASE_CA_CERT, rejectUnauthorized: true },
+    ssl: databaseSsl(env),
     max: DATABASE_MAX_CONNECTIONS,
     idle_timeout: 20,
     connect_timeout: 5,

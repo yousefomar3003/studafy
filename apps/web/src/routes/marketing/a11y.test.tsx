@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import { MarketingFooter } from "../../layouts/marketing/MarketingFooter";
 import { MarketingHeader } from "../../layouts/marketing/MarketingHeader";
+import { AuthProvider, createSessionStore } from "../../lib/auth";
 import { expectNoA11yViolations } from "../../lib/test/axe";
 
 import type { ComponentType } from "react";
@@ -52,18 +53,31 @@ const loadConfirmAccountDeletionPage = async (): Promise<ComponentType> =>
 
 function renderPage(Page: ComponentType) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // A signed-out visitor: the header shows "Sign in" and never probes the refresh endpoint.
+  const store = createSessionStore({
+    refreshClient: {
+      refresh: () => Promise.reject(new Error("no session")),
+      logout: () => Promise.resolve(),
+    },
+  });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <main id="main">
-          <div className="marketing-shell">
-            <MarketingHeader navId="marketing-nav" navOpen={false} onToggleNav={() => undefined} />
-            <Page />
-            <MarketingFooter />
-          </div>
-        </main>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <main id="main">
+            <div className="marketing-shell">
+              <MarketingHeader
+                navId="marketing-nav"
+                navOpen={false}
+                onToggleNav={() => undefined}
+              />
+              <Page />
+              <MarketingFooter />
+            </div>
+          </main>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 

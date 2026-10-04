@@ -2,6 +2,8 @@ import { Button, DataGrid, Select, useCursorPagination } from "@studafy/ui";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { invoiceStatusLabel, invoiceStatusTone } from "./labels";
 import { fetchInvoicesPage } from "./queries";
 
@@ -12,11 +14,11 @@ import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-const STATUS_OPTIONS: SelectOption<string>[] = [
-  { value: "", label: "All statuses" },
-  { value: "draft", label: "Draft" },
-  { value: "submitted", label: "Submitted" },
-  { value: "cancelled", label: "Cancelled" },
+const STATUS_OPTION_KEYS: { value: string; labelKey: string }[] = [
+  { value: "", labelKey: "finance.common.allStatuses" },
+  { value: "draft", labelKey: "finance.docStatus.draft" },
+  { value: "submitted", labelKey: "finance.docStatus.submitted" },
+  { value: "cancelled", labelKey: "finance.docStatus.cancelled" },
 ];
 
 /**
@@ -30,6 +32,7 @@ const STATUS_OPTIONS: SelectOption<string>[] = [
  * optimistically and the purpose-built hook is the simpler fit.
  */
 export default function InvoiceListPage() {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -51,84 +54,102 @@ export default function InvoiceListPage() {
   const { items, loading, error, hasNextPage, hasPreviousPage, goToNextPage, goToPreviousPage } =
     useCursorPagination(fetchPage);
 
+  const statusOptions: SelectOption<string>[] = STATUS_OPTION_KEYS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+
   const columns: DataGridColumn<Invoice>[] = [
     {
       id: "erpnext_docname",
-      header: "Invoice #",
+      header: t("finance.invoices.list.invoiceNumber"),
       renderCell: (row) => (
         <Link to={`/portal/finance/invoices/${row.id}`}>{row.erpnext_docname}</Link>
       ),
     },
-    { id: "student_name", header: "Student", renderCell: (row) => row.student_name },
-    { id: "admission_number", header: "Admission #", renderCell: (row) => row.admission_number },
+    {
+      id: "student_name",
+      header: t("finance.common.student"),
+      renderCell: (row) => row.student_name,
+    },
+    {
+      id: "admission_number",
+      header: t("finance.common.admissionNumber"),
+      renderCell: (row) => row.admission_number,
+    },
     {
       id: "status",
-      header: "Status",
+      header: t("finance.common.status"),
       renderCell: (row) => (
         <span className="invoices-status-pill" data-tone={invoiceStatusTone(row.erpnext_status)}>
-          {invoiceStatusLabel(row.erpnext_status)}
+          {invoiceStatusLabel(row.erpnext_status, t)}
         </span>
       ),
     },
     {
       id: "total",
-      header: "Total",
+      header: t("finance.common.total"),
       align: "end",
       renderCell: (row) => `${row.total_amount} ${row.currency}`,
     },
     {
       id: "outstanding",
-      header: "Outstanding",
+      header: t("finance.common.outstanding"),
       align: "end",
       renderCell: (row) => `${row.outstanding_amount} ${row.currency}`,
     },
-    { id: "issued_date", header: "Issued", renderCell: (row) => row.issued_date },
-    { id: "due_date", header: "Due", renderCell: (row) => row.due_date ?? "—" },
+    { id: "issued_date", header: t("finance.common.issued"), renderCell: (row) => row.issued_date },
+    { id: "due_date", header: t("finance.common.due"), renderCell: (row) => row.due_date ?? "—" },
   ];
 
   return (
     <>
       <div className="invoices-list__header">
         <div>
-          <h1>Invoices</h1>
-          <p>Search by student or invoice number, and filter by status.</p>
+          <h1>{t("finance.invoices.list.title")}</h1>
+          <p>{t("finance.invoices.list.intro")}</p>
         </div>
         <Link to="/portal/finance/invoices/batches/new">
-          <Button variant="secondary">Generate invoices</Button>
+          <Button variant="secondary">{t("finance.invoices.list.generate")}</Button>
         </Link>
       </div>
 
       <div className="invoices-list__toolbar">
         <label className="sf-visually-hidden" htmlFor="invoices-search">
-          Search by student or invoice number
+          {t("finance.common.searchByStudentOrInvoice")}
         </label>
         <input
           id="invoices-search"
           type="search"
           className="invoices-list__search"
-          placeholder="Search by student or invoice number…"
+          placeholder={t("finance.invoices.list.searchPlaceholder")}
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
         />
-        <Select label="Status" options={STATUS_OPTIONS} value={status} onChange={setStatus} />
+        <Select
+          label={t("finance.common.status")}
+          options={statusOptions}
+          value={status}
+          onChange={setStatus}
+        />
       </div>
 
       <DataGrid
-        caption="Invoices"
+        caption={t("finance.invoices.list.caption")}
         columns={columns}
         rows={items}
         getRowId={(row) => row.id}
         getRowLabel={(row) => row.erpnext_docname}
         loading={loading}
-        empty={error ? "Unable to load invoices." : "No invoices match this filter."}
+        empty={error ? t("finance.invoices.list.loadError") : t("finance.invoices.list.empty")}
       />
 
       <div className="invoices-list__pagination">
         <Button variant="secondary" disabled={!hasPreviousPage} onClick={goToPreviousPage}>
-          Previous
+          {t("finance.common.previous")}
         </Button>
         <Button variant="secondary" disabled={!hasNextPage} onClick={goToNextPage}>
-          Next
+          {t("finance.common.next")}
         </Button>
       </div>
     </>

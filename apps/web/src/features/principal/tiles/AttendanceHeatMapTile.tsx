@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { WHOLE_PERCENT_OPTIONS } from "../format";
 import { fetchClassAttendanceSummary, lastNDaysRange } from "../queries";
 
 const HEAT_MAP_WINDOW_DAYS = 7;
@@ -27,6 +29,8 @@ function toneFor(presentPercent: number): "success" | "warning" | "danger" {
  * skill's accessibility pass.
  */
 export function AttendanceHeatMapTile() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
   const range = lastNDaysRange(HEAT_MAP_WINDOW_DAYS);
 
   const { data, isPending, isError } = useQuery({
@@ -38,16 +42,19 @@ export function AttendanceHeatMapTile() {
 
   return (
     <DashboardTile
-      title="Attendance heat map"
+      title={t("principal.tiles.attendanceHeatMap.title")}
       status={isPending ? "pending" : isError ? "error" : "ready"}
-      errorMessage="Unable to load attendance by class."
+      errorMessage={t("principal.tiles.attendanceHeatMap.error")}
     >
       <p className="dashboard-tile__caption">
-        Present rate by class, last {HEAT_MAP_WINDOW_DAYS} days
+        {t("principal.tiles.attendanceHeatMap.caption", {
+          count: HEAT_MAP_WINDOW_DAYS,
+          days: formatNumber(HEAT_MAP_WINDOW_DAYS),
+        })}
       </p>
 
       {classes.length === 0 ? (
-        <p className="dashboard-tile__caption">No attendance recorded in this window.</p>
+        <p className="dashboard-tile__caption">{t("principal.tiles.attendanceHeatMap.empty")}</p>
       ) : (
         <ul className="principal-heat-map" role="list">
           {classes.map((klass) => (
@@ -59,7 +66,7 @@ export function AttendanceHeatMapTile() {
               >
                 <span className="principal-heat-map__code">{klass.class_code}</span>
                 <span className="principal-heat-map__percent">
-                  {Math.round(klass.present_percent)}%
+                  {formatNumber(klass.present_percent / 100, WHOLE_PERCENT_OPTIONS)}
                 </span>
               </Link>
             </li>
@@ -68,7 +75,7 @@ export function AttendanceHeatMapTile() {
       )}
 
       <Link className="dashboard-tile__link" to="/portal/principal/attendance">
-        View attendance by class →
+        {t("principal.tiles.attendanceHeatMap.link")}
       </Link>
     </DashboardTile>
   );

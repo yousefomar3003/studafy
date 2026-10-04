@@ -3,7 +3,7 @@ import { Button, Card, useToast } from "@studafy/ui";
 import { useState } from "react";
 
 import { useAuth } from "../../../lib/auth";
-import { useTranslation } from "../../../lib/i18n";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useRemoveDevice, useRevokeOthers, useRevokeSession } from "./mutations";
@@ -37,6 +37,7 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  */
 export default function SessionsPage() {
   const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const { show } = useToast();
   const { sessionId: currentSessionId } = useAuth();
 
@@ -147,10 +148,22 @@ export default function SessionsPage() {
                 return (
                   <li key={session.id} className="sessions-page__item">
                     <div>
-                      <p>{session.device_name ?? session.channel}</p>
+                      <p>
+                        {session.device_name ??
+                          t(`deviceSessions.channel.${session.channel}`, {
+                            defaultValue: session.channel,
+                          })}
+                      </p>
                       <p className="sessions-page__meta">
                         {session.ip_address ?? t("deviceSessions.unknownLocation")} &middot;{" "}
-                        {new Date(session.issued_at).toLocaleString()}
+                        {formatDate(new Date(session.issued_at), {
+                          year: "numeric",
+                          month: "numeric",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
                       </p>
                     </div>
                     {isCurrent ? (

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { isRouteErrorResponse, useRouteError } from "react-router-dom";
 
+import { useTranslation } from "../lib/i18n";
 import { captureException } from "../lib/monitoring";
 
 /**
@@ -10,6 +11,7 @@ import { captureException } from "../lib/monitoring";
  * monitoring the same way `ErrorBoundary`'s sibling catch point only reports real exceptions.
  */
 export function RouteError() {
+  const { t } = useTranslation();
   const error = useRouteError();
 
   useEffect(() => {
@@ -20,11 +22,11 @@ export function RouteError() {
 
   const message = isRouteErrorResponse(error)
     ? `${error.status} ${error.statusText}`
-    : "An unexpected error occurred.";
+    : t("site.routeError.unexpected");
 
   return (
     <div role="alert">
-      <h1>Something went wrong</h1>
+      <h1>{t("site.routeError.heading")}</h1>
       <p>{message}</p>
     </div>
   );

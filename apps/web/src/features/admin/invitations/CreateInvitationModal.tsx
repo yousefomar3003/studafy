@@ -2,19 +2,15 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useCreateInvitation } from "./mutations";
-import { createInvitationSchema, fieldErrors, INVITATION_ROLES, ROLE_LABELS } from "./schema";
+import { createInvitationSchema, fieldErrors, INVITATION_ROLES, ROLE_LABEL_KEYS } from "./schema";
 
 import type { InviteLinkDetails } from "./InviteLinkDialog";
 import type { CreateInvitationValues, InvitationRole } from "./schema";
 import type { SelectOption } from "@studafy/ui";
 import type { FormEvent } from "react";
-
-const ROLE_OPTIONS: SelectOption<InvitationRole>[] = INVITATION_ROLES.map((role) => ({
-  value: role,
-  // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `INVITATION_ROLES` array, not user input
-  label: ROLE_LABELS[role],
-}));
 
 const EMPTY_VALUES = { email: "", role: INVITATION_ROLES[0] as InvitationRole, expiry_days: "" };
 
@@ -28,8 +24,15 @@ export interface CreateInvitationModalProps {
 /** `POST /api/invitations` — issues a token-based invitation, distinct from the users feature's
  * `POST /api/users` (which creates an account row directly, no token exchange). */
 export function CreateInvitationModal({ open, onClose, onCreated }: CreateInvitationModalProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const createInvitation = useCreateInvitation();
+
+  const roleOptions: SelectOption<InvitationRole>[] = INVITATION_ROLES.map((role) => ({
+    value: role,
+    // eslint-disable-next-line security/detect-object-injection -- `role` comes from iterating this module's own fixed `INVITATION_ROLES` array, not user input
+    label: t(ROLE_LABEL_KEYS[role]),
+  }));
 
   const [values, setValues] = useState(EMPTY_VALUES);
   const [errors, setErrors] = useState<Partial<Record<keyof CreateInvitationValues, string>>>({});
@@ -64,14 +67,17 @@ export function CreateInvitationModal({ open, onClose, onCreated }: CreateInvita
 
     createInvitation.mutate(result.data, {
       onSuccess: (data) => {
-        show({ variant: "success", title: `Invited ${result.data.email}` });
+        show({
+          variant: "success",
+          title: t("adminPeople.invitations.create.invitedToast", { email: result.data.email }),
+        });
         handleClose();
         onCreated({ email: data.invitation.email, token: data.token });
       },
       onError: (error) => {
         show({
           variant: "error",
-          title: "Couldn't create invitation",
+          title: t("adminPeople.invitations.create.error"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         });
       },
@@ -82,44 +88,48 @@ export function CreateInvitationModal({ open, onClose, onCreated }: CreateInvita
     <Modal
       open={open}
       onClose={handleClose}
-      title="New invitation"
-      description="Issue a one-time invite link for someone to join this school."
+      title={t("adminPeople.invitations.create.title")}
+      description={t("adminPeople.invitations.create.description")}
     >
-      <form onSubmit={handleSubmit} noValidate aria-label="New invitation">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        aria-label={t("adminPeople.invitations.create.title")}
+      >
         <Modal.Body>
           <Input
-            label="Email"
+            label={t("adminPeople.invitations.form.email")}
             type="email"
             value={values.email}
             onChange={(e) => setField("email", e.target.value)}
-            error={errors.email}
+            error={errors.email && t(errors.email)}
             required
             autoFocus
           />
           <Select
-            label="Role"
-            options={ROLE_OPTIONS}
+            label={t("adminPeople.invitations.form.role")}
+            options={roleOptions}
             value={values.role}
             onChange={(value) => setField("role", value)}
             required
           />
           <Input
-            label="Expires after (days)"
+            label={t("adminPeople.invitations.form.expiresAfter")}
             type="number"
             min={1}
             max={365}
             value={values.expiry_days}
             onChange={(e) => setField("expiry_days", e.target.value)}
-            error={errors.expiry_days}
-            helperText="Optional — defaults to 7 days."
+            error={errors.expiry_days && t(errors.expiry_days)}
+            helperText={t("adminPeople.invitations.create.expiresHelper")}
           />
         </Modal.Body>
         <Modal.Footer>
           <Button type="button" variant="tertiary" onClick={handleClose}>
-            Cancel
+            {t("adminPeople.common.cancel")}
           </Button>
           <Button type="submit" loading={createInvitation.isPending}>
-            Send invite
+            {t("adminPeople.invitations.create.submit")}
           </Button>
         </Modal.Footer>
       </form>

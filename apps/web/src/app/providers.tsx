@@ -1,9 +1,9 @@
-import { ToastProvider } from "@studafy/ui";
+import { ToastProvider, UiStringsProvider } from "@studafy/ui";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useState, type PropsWithChildren } from "react";
+import { useMemo, useState, type PropsWithChildren } from "react";
 
 import { AuthProvider, sessionStore, useAuthStatus } from "../lib/auth";
-import { LocaleProvider } from "../lib/i18n";
+import { LocaleProvider, useTranslation } from "../lib/i18n";
 import { MonitoringUserSync } from "../lib/monitoring";
 import { RealtimeClient, RealtimeProvider } from "../lib/realtime";
 
@@ -54,16 +54,49 @@ export function AppProviders({
 
   return (
     <LocaleProvider>
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <AuthProvider store={store}>
-            <MonitoringUserSync />
-            <SessionRealtimeProvider client={realtimeClient}>{children}</SessionRealtimeProvider>
-          </AuthProvider>
-        </ToastProvider>
-      </QueryClientProvider>
+      <TranslatedUiStrings>
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <AuthProvider store={store}>
+              <MonitoringUserSync />
+              <SessionRealtimeProvider client={realtimeClient}>{children}</SessionRealtimeProvider>
+            </AuthProvider>
+          </ToastProvider>
+        </QueryClientProvider>
+      </TranslatedUiStrings>
     </LocaleProvider>
   );
+}
+
+/**
+ * Feeds the `@studafy/ui` components' built-in strings (close/dismiss labels, table empty and loading
+ * states, filter-bar labels, select placeholder) from the `ui.*` catalog, rebuilt whenever the active
+ * language changes so the kit follows a runtime switch like the rest of the app.
+ */
+function TranslatedUiStrings({ children }: PropsWithChildren) {
+  const { t, i18n } = useTranslation();
+  const strings = useMemo(
+    () => ({
+      closeDialog: t("ui.closeDialog"),
+      dismissToast: (title: string) => t("ui.dismissToast", { title }),
+      removeChip: (label: string) => t("ui.removeChip", { label }),
+      removeItem: t("ui.removeItem"),
+      selectRow: (label: string) => t("ui.selectRow", { label }),
+      selectRowFallback: t("ui.selectRowFallback"),
+      selectAllRows: t("ui.selectAllRows"),
+      selectPlaceholder: t("ui.selectPlaceholder"),
+      tableLoading: t("ui.tableLoading"),
+      tableEmpty: t("ui.tableEmpty"),
+      filterSearch: t("ui.filterSearch"),
+      filterDateRange: t("ui.filterDateRange"),
+      filterDateFrom: t("ui.filterDateFrom"),
+      filterDateTo: t("ui.filterDateTo"),
+      filterClearAll: t("ui.filterClearAll"),
+    }),
+    // `i18n.language` is the dependency that matters: `t` is stable across a language switch.
+    [t, i18n.language],
+  );
+  return <UiStringsProvider strings={strings}>{children}</UiStringsProvider>;
 }
 
 /**

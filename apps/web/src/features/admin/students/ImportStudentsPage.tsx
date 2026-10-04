@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { buildImportErrorReportCsv, downloadTextFile } from "../../../lib/csv";
+import { useTranslation } from "../../../lib/i18n";
 
 import { confirmBlocker, withPartialSuggestions } from "./columnMapping";
 import { ColumnMappingPanel } from "./ColumnMappingPanel";
@@ -79,6 +80,7 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  * status warrants it and stops the moment the component unmounts or the status leaves that set.
  */
 export default function ImportStudentsPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [record, setRecord] = useState<StudentImport | null>(null);
@@ -136,7 +138,7 @@ export default function ImportStudentsPage() {
       const csv = await fetchStudentImportTemplate();
       downloadTextFile("student-import-template.csv", csv, "text/csv");
     } catch (error) {
-      setBanner(apiErrorMessage(error, "Couldn't download the template. Please try again."));
+      setBanner(apiErrorMessage(error, t("adminPeople.students.import.page.templateError")));
     }
   }
 
@@ -156,7 +158,7 @@ export default function ImportStudentsPage() {
         },
         onError: (error) => {
           setUploadProgress(null);
-          setBanner(apiErrorMessage(error, "Couldn't validate that file. Please try again."));
+          setBanner(apiErrorMessage(error, t("adminPeople.students.import.page.validateError")));
         },
       },
     );
@@ -175,7 +177,7 @@ export default function ImportStudentsPage() {
       setMappingDraft(data.column_mapping);
       return true;
     } catch (error) {
-      setBanner(apiErrorMessage(error, "Couldn't apply the mapping. Please try again."));
+      setBanner(apiErrorMessage(error, t("adminPeople.students.import.page.applyError")));
       return false;
     }
   }
@@ -185,7 +187,7 @@ export default function ImportStudentsPage() {
     confirmImport.mutate(record.id, {
       onSuccess: (data) => setRecord(data),
       onError: (error) => {
-        setBanner(apiErrorMessage(error, "Couldn't confirm the import. Please try again."));
+        setBanner(apiErrorMessage(error, t("adminPeople.students.import.page.confirmError")));
       },
     });
   }
@@ -199,10 +201,10 @@ export default function ImportStudentsPage() {
   return (
     <>
       <p className="students-profile__back">
-        <Link to="/portal/admin/students">&larr; Back to students</Link>
+        <Link to="/portal/admin/students">{t("adminPeople.students.backToStudents")}</Link>
       </p>
-      <h1>Import students</h1>
-      <p>Upload a CSV of students to validate. Nothing is saved until you confirm.</p>
+      <h1>{t("adminPeople.students.import.page.title")}</h1>
+      <p>{t("adminPeople.students.import.page.intro")}</p>
 
       {banner ? (
         <p role="alert" className="students-import__banner">
@@ -211,14 +213,16 @@ export default function ImportStudentsPage() {
       ) : null}
 
       {step === "upload" ? (
-        <Card as="section" aria-label="Upload CSV">
+        <Card as="section" aria-label={t("adminPeople.students.import.page.uploadRegion")}>
           <Card.Body>
             <Button type="button" variant="secondary" onClick={handleDownloadTemplate}>
-              Download CSV template
+              {t("adminPeople.students.import.page.downloadTemplate")}
             </Button>
 
             <div className="students-import__upload">
-              <label htmlFor="student-csv-file">Student CSV file</label>
+              <label htmlFor="student-csv-file">
+                {t("adminPeople.students.import.page.fileLabel")}
+              </label>
               <input
                 id="student-csv-file"
                 type="file"
@@ -233,9 +237,13 @@ export default function ImportStudentsPage() {
                 <progress
                   value={uploadProgress?.percent ?? 0}
                   max={100}
-                  aria-label="Upload progress"
+                  aria-label={t("adminPeople.students.import.page.uploadProgress")}
                 />
-                <span>Uploading… {uploadProgress?.percent ?? 0}%</span>
+                <span>
+                  {t("adminPeople.students.import.page.uploading", {
+                    percent: uploadProgress?.percent ?? 0,
+                  })}
+                </span>
               </div>
             ) : null}
           </Card.Body>
@@ -291,7 +299,8 @@ function ReviewStep({
   onDownloadErrorReport,
   onReset,
 }: ReviewStepProps) {
-  const blocker = confirmBlocker(mappingDraft, record.column_mapping, record.valid_rows);
+  const { t } = useTranslation();
+  const blocker = confirmBlocker(mappingDraft, record.column_mapping, record.valid_rows, t);
 
   return (
     <div className="students-import__review">
@@ -323,22 +332,23 @@ interface ReviewPanelProps {
 /** The dry-run report: row counts plus one actionable line per error, all resolved in the same
  * upload response — nothing further to fetch. */
 function ReviewPanel({ record, onDownloadErrorReport }: ReviewPanelProps) {
+  const { t } = useTranslation();
   const errorRows = toErrorRows(record.errors);
 
   return (
-    <Card as="section" aria-label="Validation report">
+    <Card as="section" aria-label={t("adminPeople.students.import.report.region")}>
       <Card.Body>
         <dl className="students-import__stats">
           <div>
-            <dt>Rows in file</dt>
+            <dt>{t("adminPeople.students.import.report.rowsInFile")}</dt>
             <dd>{record.row_count}</dd>
           </div>
           <div>
-            <dt>Valid rows</dt>
+            <dt>{t("adminPeople.students.import.report.validRows")}</dt>
             <dd>{record.valid_rows}</dd>
           </div>
           <div>
-            <dt>Rows with errors</dt>
+            <dt>{t("adminPeople.students.import.report.rowsWithErrors")}</dt>
             <dd>{record.error_rows}</dd>
           </div>
         </dl>
@@ -346,24 +356,38 @@ function ReviewPanel({ record, onDownloadErrorReport }: ReviewPanelProps) {
         {record.error_rows > 0 ? (
           <>
             <DataGrid
-              caption="Row-level validation errors"
+              caption={t("adminPeople.students.import.report.caption")}
               columns={[
-                { id: "line", header: "Line", renderCell: (row: ErrorRow) => row.line, width: 80 },
+                {
+                  id: "line",
+                  header: t("adminPeople.students.import.report.columns.line"),
+                  renderCell: (row: ErrorRow) => row.line,
+                  width: 80,
+                },
                 {
                   id: "field",
-                  header: "Field",
+                  header: t("adminPeople.students.import.report.columns.field"),
                   renderCell: (row: ErrorRow) => row.field,
                   width: 200,
                 },
-                { id: "message", header: "Message", renderCell: (row: ErrorRow) => row.message },
+                {
+                  id: "message",
+                  header: t("adminPeople.students.import.report.columns.message"),
+                  renderCell: (row: ErrorRow) => row.message,
+                },
               ]}
               rows={errorRows}
               getRowId={(row) => row.key}
-              getRowLabel={(row) => `Line ${row.line}, ${row.field}`}
+              getRowLabel={(row) =>
+                t("adminPeople.students.import.report.rowLabel", {
+                  line: row.line,
+                  field: row.field,
+                })
+              }
               height={Math.min(480, 44 * Math.min(errorRows.length, 10) + 44)}
             />
             <Button type="button" variant="secondary" onClick={onDownloadErrorReport}>
-              Download error report
+              {t("adminPeople.students.import.report.downloadErrorReport")}
             </Button>
           </>
         ) : null}
@@ -383,6 +407,7 @@ interface ConfirmBarProps {
 }
 
 function ConfirmBar({ validRows, blocker, confirming, onConfirm, onReset }: ConfirmBarProps) {
+  const { t } = useTranslation();
   return (
     <div className="students-import__confirm">
       {blocker ? (
@@ -398,10 +423,10 @@ function ConfirmBar({ validRows, blocker, confirming, onConfirm, onReset }: Conf
           disabled={blocker !== null}
           aria-describedby={blocker ? CONFIRM_BLOCKER_ID : undefined}
         >
-          Confirm import ({validRows} student{validRows === 1 ? "" : "s"})
+          {t("adminPeople.students.import.confirm.button", { count: validRows })}
         </Button>
         <Button type="button" variant="tertiary" onClick={onReset}>
-          Upload a different file
+          {t("adminPeople.students.import.confirm.uploadDifferent")}
         </Button>
       </div>
     </div>
@@ -416,21 +441,19 @@ interface ProcessingPanelProps {
  * per-row progress signal from the backend (only the terminal `status` — see
  * `apps/workers/src/queues/imports/worker.ts`), so the bar is indeterminate rather than faked. */
 function ProcessingPanel({ record }: ProcessingPanelProps) {
+  const { t } = useTranslation();
   return (
-    <Card as="section" aria-label="Import progress">
+    <Card as="section" aria-label={t("adminPeople.students.import.processing.region")}>
       <Card.Body>
         <div className="students-import__progress" aria-live="polite">
-          <progress aria-label="Import progress" />
+          <progress aria-label={t("adminPeople.students.import.processing.region")} />
           <span>
             {record.status === "confirmed"
-              ? "Queued for processing…"
-              : `Creating ${record.valid_rows} student record${record.valid_rows === 1 ? "" : "s"}…`}
+              ? t("adminPeople.students.import.processing.queued")
+              : t("adminPeople.students.import.processing.creating", { count: record.valid_rows })}
           </span>
         </div>
-        <p>
-          This can take a few minutes for large files. You can leave this page — the import keeps
-          running and the student directory will reflect it once it finishes.
-        </p>
+        <p>{t("adminPeople.students.import.processing.body")}</p>
       </Card.Body>
     </Card>
   );
@@ -442,43 +465,43 @@ interface CompletedPanelProps {
 }
 
 function CompletedPanel({ record, onReset }: CompletedPanelProps) {
+  const { t } = useTranslation();
   const summary = record.summary;
 
   return (
-    <Card as="section" aria-label="Import summary">
+    <Card as="section" aria-label={t("adminPeople.students.import.completed.region")}>
       <Card.Body>
-        <p role="status">Import complete.</p>
+        <p role="status">{t("adminPeople.students.import.completed.complete")}</p>
         <dl className="students-import__stats">
           <div>
-            <dt>Students created</dt>
+            <dt>{t("adminPeople.students.import.completed.studentsCreated")}</dt>
             <dd>{summary?.students_created ?? 0}</dd>
           </div>
           <div>
-            <dt>Rows skipped (already existed)</dt>
+            <dt>{t("adminPeople.students.import.completed.rowsSkipped")}</dt>
             <dd>{summary?.students_skipped ?? 0}</dd>
           </div>
           <div>
-            <dt>Parent accounts created</dt>
+            <dt>{t("adminPeople.students.import.completed.parentsCreated")}</dt>
             <dd>{summary?.parents_created ?? 0}</dd>
           </div>
           <div>
-            <dt>Guardian links created</dt>
+            <dt>{t("adminPeople.students.import.completed.guardianLinks")}</dt>
             <dd>{summary?.parents_linked ?? 0}</dd>
           </div>
         </dl>
         {record.error_rows > 0 ? (
           <p>
-            {record.error_rows} row{record.error_rows === 1 ? "" : "s"} from the original file were
-            not imported due to validation errors.
+            {t("adminPeople.students.import.completed.notImported", { count: record.error_rows })}
           </p>
         ) : null}
         <div className="students-import__actions">
           <Button type="button" onClick={onReset}>
-            Import another file
+            {t("adminPeople.students.import.completed.importAnother")}
           </Button>
           <Link to="/portal/admin/students">
             <Button type="button" variant="tertiary">
-              Back to students
+              {t("adminPeople.students.import.completed.backToStudents")}
             </Button>
           </Link>
         </div>
@@ -492,14 +515,13 @@ interface FailedPanelProps {
 }
 
 function FailedPanel({ onReset }: FailedPanelProps) {
+  const { t } = useTranslation();
   return (
-    <Card as="section" aria-label="Import failed">
+    <Card as="section" aria-label={t("adminPeople.students.import.failed.region")}>
       <Card.Body>
-        <p role="alert">
-          The import failed while processing. No students were created from this file.
-        </p>
+        <p role="alert">{t("adminPeople.students.import.failed.body")}</p>
         <Button type="button" onClick={onReset}>
-          Start a new import
+          {t("adminPeople.students.import.failed.startNew")}
         </Button>
       </Card.Body>
     </Card>

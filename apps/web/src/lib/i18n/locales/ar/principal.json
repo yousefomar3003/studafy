@@ -1,0 +1,551 @@
+{
+  "common": {
+    "cancel": "إلغاء",
+    "loading": "جارٍ التحميل…"
+  },
+  "dashboard": {
+    "title": "المدير",
+    "description": "لمحة مباشرة عن الموافقات والحضور والانضباط والتقييمات والإعلانات."
+  },
+  "tiles": {
+    "pendingApprovals": {
+      "title": "الموافقات المعلّقة",
+      "error": "تعذّر تحميل قائمة الموافقات.",
+      "empty": "لا يوجد ما ينتظر المراجعة.",
+      "caption": "بانتظار المراجعة",
+      "link": "مراجعة الموافقات ←"
+    },
+    "attendanceHeatMap": {
+      "title": "الخريطة الحرارية للحضور",
+      "error": "تعذّر تحميل الحضور حسب الصف.",
+      "caption_zero": "نسبة الحضور حسب الصف، آخر {{days}} يوم",
+      "caption_one": "نسبة الحضور حسب الصف، آخر يوم",
+      "caption_two": "نسبة الحضور حسب الصف، آخر يومين",
+      "caption_few": "نسبة الحضور حسب الصف، آخر {{days}} أيام",
+      "caption_many": "نسبة الحضور حسب الصف، آخر {{days}} يومًا",
+      "caption_other": "نسبة الحضور حسب الصف، آخر {{days}} يوم",
+      "empty": "لم يُسجَّل أي حضور في هذه الفترة.",
+      "link": "عرض الحضور حسب الصف ←"
+    },
+    "openIncidents": {
+      "title": "المخالفات السلوكية المفتوحة",
+      "error": "تعذّر تحميل المخالفات السلوكية.",
+      "empty": "لا توجد مخالفات مفتوحة.",
+      "caption": "مُبلَّغ عنها أو قيد المراجعة أو مُصعَّدة",
+      "link": "عرض المخالفات السلوكية ←"
+    },
+    "draftEvaluations": {
+      "title": "مسودات التقييمات",
+      "error": "تعذّر تحميل التقييمات.",
+      "empty": "لا توجد تقييمات قيد التنفيذ.",
+      "caption": "بانتظار التقدير أو الإرسال أو المشاركة",
+      "link": "عرض التقييمات ←"
+    },
+    "recentAnnouncements": {
+      "title": "أحدث الإعلانات",
+      "error": "تعذّر تحميل الإعلانات.",
+      "empty": "لم يُنشر أي إعلان بعد.",
+      "link": "عرض جميع الإعلانات ←"
+    }
+  },
+  "attendanceByClass": {
+    "title": "الحضور حسب الصف",
+    "description": "نسب الحضور والغياب والتأخر والغياب بعذر للفترة المحددة.",
+    "period": "الفترة",
+    "range": {
+      "7": "آخر 7 أيام",
+      "30": "آخر 30 يومًا",
+      "90": "آخر 90 يومًا"
+    },
+    "filtered": "مُصفّى على صف واحد.",
+    "clearFilter": "مسح عامل التصفية",
+    "caption": "الحضور حسب الصف",
+    "columns": {
+      "class": "الصف",
+      "present": "حاضر",
+      "absent": "غائب",
+      "late": "متأخر",
+      "excused": "غائب بعذر"
+    },
+    "error": "تعذّر تحميل الحضور.",
+    "empty": "لم يُسجَّل أي حضور في هذه الفترة."
+  },
+  "approvals": {
+    "title": "الموافقات",
+    "description": "تقديمات الدرجات وإصدارات الجداول الدراسية بانتظار مراجعتك.",
+    "approveSelected": "اعتماد المحدد",
+    "approveCountSelected": "اعتماد المحدد ({{selected}})",
+    "rejectSelected": "رفض المحدد",
+    "rejectCountSelected": "رفض المحدد ({{selected}})",
+    "tableCaption": "العناصر بانتظار الموافقة",
+    "selectAll": "تحديد جميع العناصر المعلّقة",
+    "selectItem": "تحديد {{summary}}",
+    "columns": {
+      "type": "النوع",
+      "summary": "الملخص",
+      "requestedBy": "مقدّم الطلب",
+      "requestedAt": "تاريخ الطلب",
+      "actions": "الإجراءات"
+    },
+    "error": "تعذّر تحميل قائمة الموافقات.",
+    "empty": "لا يوجد ما ينتظر المراجعة.",
+    "viewDiff": "عرض التغييرات",
+    "approve": "اعتماد",
+    "reject": "رفض",
+    "itemType": {
+      "grade_submission": "تقديم درجات",
+      "timetable_version": "إصدار جدول دراسي"
+    },
+    "toast": {
+      "approveFailed": "تعذّر اعتماد العنصر",
+      "approved": "تم اعتماد العنصر",
+      "rejectFailed": "تعذّر رفض العنصر",
+      "rejected": "تم رفض العنصر",
+      "bulkRejectFailed": "تعذّر رفض العنصر (العناصر)",
+      "bulkApproveFailed": "تعذّرت معالجة الموافقات",
+      "bulkApprovedAll_zero": "تم اعتماد {{succeeded}} من {{count}} عنصر",
+      "bulkApprovedAll_one": "تم اعتماد {{succeeded}} من عنصر واحد",
+      "bulkApprovedAll_two": "تم اعتماد {{succeeded}} من عنصرين",
+      "bulkApprovedAll_few": "تم اعتماد {{succeeded}} من {{count}} عناصر",
+      "bulkApprovedAll_many": "تم اعتماد {{succeeded}} من {{count}} عنصرًا",
+      "bulkApprovedAll_other": "تم اعتماد {{succeeded}} من {{count}} عنصر",
+      "bulkApprovedPartial": "تم اعتماد {{succeeded}} من {{total}}",
+      "bulkRejectedAll_zero": "تم رفض {{succeeded}} من {{count}} عنصر",
+      "bulkRejectedAll_one": "تم رفض {{succeeded}} من عنصر واحد",
+      "bulkRejectedAll_two": "تم رفض {{succeeded}} من عنصرين",
+      "bulkRejectedAll_few": "تم رفض {{succeeded}} من {{count}} عناصر",
+      "bulkRejectedAll_many": "تم رفض {{succeeded}} من {{count}} عنصرًا",
+      "bulkRejectedAll_other": "تم رفض {{succeeded}} من {{count}} عنصر",
+      "bulkRejectedPartial": "تم رفض {{succeeded}} من {{total}}",
+      "bulkFailedDescription": "فشل {{failed}} — راجع الخطأ في كل صف أدناه."
+    },
+    "rejectModal": {
+      "titleSingle": "رفض العنصر",
+      "titleBulk": "رفض العناصر المحددة",
+      "selectedCount_zero": "لم يُحدَّد أي عنصر",
+      "selectedCount_one": "عنصر واحد محدد",
+      "selectedCount_two": "عنصران محددان",
+      "selectedCount_few": "{{count}} عناصر محددة",
+      "selectedCount_many": "{{count}} عنصرًا محددًا",
+      "selectedCount_other": "{{count}} عنصر محدد",
+      "reason": "السبب",
+      "reasonRequired": "يجب إدخال سبب للرفض.",
+      "submit": "رفض"
+    },
+    "diff": {
+      "title": "ما الذي تغيّر",
+      "class": "الصف",
+      "student": "الطالب",
+      "gradesCaption": "الدرجات في هذا التقديم للطالب {{student}}",
+      "label": "البند",
+      "score": "الدرجة",
+      "maxScore": "الدرجة القصوى",
+      "weight": "الوزن",
+      "empty": "لا توجد سجلات درجات في هذا التقديم.",
+      "version": "الإصدار",
+      "term": "الفصل الدراسي",
+      "slots": "حصص الجدول الدراسي"
+    }
+  },
+  "discipline": {
+    "type": {
+      "behavioral": "سلوكية",
+      "academic_integrity": "النزاهة الأكاديمية",
+      "attendance": "الحضور",
+      "bullying": "التنمّر",
+      "substance": "مواد ممنوعة",
+      "vandalism": "التخريب",
+      "safety": "السلامة",
+      "other": "أخرى"
+    },
+    "status": {
+      "reported": "مُبلَّغ عنها",
+      "under_review": "قيد المراجعة",
+      "resolved": "تمت معالجتها",
+      "escalated": "مُصعَّدة",
+      "closed": "مغلقة"
+    },
+    "severity": {
+      "minor": "بسيطة",
+      "moderate": "متوسطة",
+      "major": "كبيرة",
+      "critical": "حرجة"
+    },
+    "actionType": {
+      "verbal_warning": "إنذار شفهي",
+      "written_warning": "إنذار كتابي",
+      "detention": "احتجاز بعد الدوام",
+      "in_school_suspension": "إيقاف داخل المدرسة",
+      "out_of_school_suspension": "إيقاف خارج المدرسة",
+      "expulsion": "فصل",
+      "parent_meeting": "اجتماع مع ولي الأمر",
+      "counseling_referral": "إحالة إلى الإرشاد",
+      "community_service": "خدمة مجتمعية",
+      "other": "أخرى"
+    },
+    "actionStatus": {
+      "pending": "معلّق",
+      "active": "نشط",
+      "completed": "مكتمل",
+      "revoked": "مُلغى"
+    },
+    "transition": {
+      "under_review": "بدء المراجعة",
+      "escalated": "تصعيد",
+      "closed": "إغلاق"
+    },
+    "list": {
+      "title": "المخالفات السلوكية",
+      "description": "المخالفات المُبلَّغ عنها على مستوى المدرسة.",
+      "inboxTab": "بلاغات المعلمين الواردة",
+      "allTab": "جميع المخالفات",
+      "filterOpen": "مفتوحة (مُبلَّغ عنها، قيد المراجعة، مُصعَّدة)",
+      "filterAll": "جميع الحالات",
+      "statusLabel": "الحالة",
+      "inboxEmpty": "لا توجد مخالفات بانتظار الفرز.",
+      "filterEmpty": "لا توجد مخالفات تطابق عامل التصفية هذا.",
+      "caption": "المخالفات السلوكية",
+      "error": "تعذّر تحميل المخالفات السلوكية.",
+      "columns": {
+        "title": "العنوان",
+        "type": "النوع",
+        "severity": "الخطورة",
+        "status": "الحالة",
+        "reportedAt": "تاريخ الإبلاغ"
+      }
+    },
+    "detail": {
+      "back": "→ العودة إلى المخالفات السلوكية",
+      "loadError": "تعذّر تحميل هذه المخالفة السلوكية.",
+      "markedToast": {
+        "reported": "تم وضع المخالفة في حالة مُبلَّغ عنها",
+        "under_review": "تم وضع المخالفة قيد المراجعة",
+        "escalated": "تم تصعيد المخالفة",
+        "closed": "تم إغلاق المخالفة"
+      },
+      "updateFailed": "تعذّر تحديث المخالفة",
+      "type": "النوع",
+      "severity": "الخطورة",
+      "status": "الحالة",
+      "reportedAt": "تاريخ الإبلاغ",
+      "resolvedAt": "تاريخ المعالجة",
+      "parentVisibility": "إتاحة الاطلاع لولي الأمر",
+      "visible": "مرئية لولي أمر الطالب",
+      "notVisibleOff": "غير مرئية — ميزة اطلاع أولياء الأمور على المخالفات معطّلة في هذه المدرسة",
+      "notVisibleYet": "غير مرئية بعد — لا تُعرض على أولياء الأمور إلا المخالفات التي تمت معالجتها",
+      "workflow": "سير العمل",
+      "resolve": "معالجة",
+      "resolveHint": "سجّل إجراءً تأديبيًا واحدًا على الأقل قبل معالجة هذه المخالفة.",
+      "actionsTaken": "الإجراءات المتخذة",
+      "addAction": "إضافة إجراء",
+      "actionsCaption": "الإجراءات التأديبية المتخذة",
+      "actionColumns": {
+        "type": "النوع",
+        "status": "الحالة",
+        "details": "التفاصيل",
+        "effective": "مدة السريان"
+      },
+      "actionsError": "تعذّر تحميل إجراءات هذه المخالفة.",
+      "actionsEmpty": "لم يُسجَّل أي إجراء بعد.",
+      "effectiveRange": "{{from}} – {{until}}"
+    },
+    "addAction": {
+      "title": "تسجيل إجراء تأديبي",
+      "actionType": "نوع الإجراء",
+      "details": "التفاصيل",
+      "detailsHelper": "اختياري — ما الذي تضمّنه الإجراء.",
+      "effectiveFrom": "يسري من",
+      "effectiveUntil": "يسري حتى",
+      "errorFallback": "تعذّر تسجيل الإجراء.",
+      "submit": "تسجيل الإجراء",
+      "success": "تم تسجيل الإجراء",
+      "failed": "تعذّر تسجيل الإجراء"
+    },
+    "resolve": {
+      "title": "معالجة المخالفة",
+      "description": "يضع المخالفة في حالة \"تمت معالجتها\". إذا كانت المدرسة تسمح باطلاع أولياء الأمور، فستصبح مرئية لولي أمر الطالب.",
+      "notes": "ملاحظات المعالجة",
+      "errorFallback": "تعذّرت معالجة المخالفة.",
+      "submit": "معالجة",
+      "success": "تمت معالجة المخالفة",
+      "failed": "تعذّرت معالجة المخالفة"
+    }
+  },
+  "evaluations": {
+    "type": {
+      "formal_observation": "ملاحظة صفية رسمية",
+      "peer_review": "مراجعة الأقران",
+      "self_assessment": "تقييم ذاتي",
+      "student_feedback": "آراء الطلاب",
+      "annual_review": "مراجعة سنوية",
+      "probationary_review": "مراجعة فترة التجربة"
+    },
+    "status": {
+      "draft": "مسودة",
+      "submitted": "مُرسَل",
+      "finalized": "نهائي"
+    },
+    "rating": {
+      "unsatisfactory": "غير مُرضٍ",
+      "developing": "في طور التطور",
+      "proficient": "متمكّن",
+      "exemplary": "متميّز"
+    },
+    "backToList": "→ العودة إلى التقييمات",
+    "list": {
+      "title": "تقييمات المعلمين",
+      "description": "دورات التقييم وتقدير المعايير والمشاركة مع المعلمين.",
+      "manageTemplates": "إدارة قوالب المعايير",
+      "newEvaluation": "تقييم جديد",
+      "statusLabel": "الحالة",
+      "teacherLabel": "المعلم",
+      "allStatuses": "جميع الحالات",
+      "allTeachers": "جميع المعلمين",
+      "caption": "تقييمات المعلمين",
+      "columns": {
+        "teacher": "المعلم",
+        "type": "النوع",
+        "status": "الحالة",
+        "rating": "التقدير",
+        "shared": "تمت مشاركته مع المعلم",
+        "evaluatedAt": "تاريخ التقييم"
+      },
+      "error": "تعذّر تحميل التقييمات.",
+      "empty": "لا توجد تقييمات تطابق عامل التصفية هذا.",
+      "shared": "تمت المشاركة",
+      "notShared": "لم تتم المشاركة"
+    },
+    "create": {
+      "title": "بدء تقييم معلم",
+      "teacher": "المعلم",
+      "teacherPlaceholder": "اختر معلمًا",
+      "type": "نوع التقييم",
+      "evaluatedAt": "تاريخ التقييم",
+      "errorFallback": "تعذّر بدء التقييم.",
+      "submit": "بدء التقييم",
+      "success": "تم بدء التقييم",
+      "failed": "تعذّر بدء التقييم"
+    },
+    "templates": {
+      "title": "قوالب المعايير",
+      "description": "معايير تقدير قابلة لإعادة الاستخدام في دورات التقييم.",
+      "newTemplate": "قالب جديد",
+      "caption": "قوالب معايير التقييم",
+      "columns": {
+        "title": "العنوان",
+        "maxScore": "الدرجة القصوى",
+        "sortOrder": "ترتيب العرض",
+        "status": "الحالة",
+        "actions": "الإجراءات"
+      },
+      "error": "تعذّر تحميل قوالب المعايير.",
+      "empty": "لا توجد قوالب معايير بعد.",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "edit": "تعديل",
+      "reactivate": "إعادة التفعيل",
+      "deactivate": "إلغاء التفعيل",
+      "reactivated": "تمت إعادة تفعيل القالب",
+      "reactivateFailed": "تعذّرت إعادة تفعيل القالب",
+      "deactivated": "تم إلغاء تفعيل القالب",
+      "deactivateFailed": "تعذّر إلغاء تفعيل القالب"
+    },
+    "templateModal": {
+      "editTitle": "تعديل قالب المعايير",
+      "newTitle": "قالب معايير جديد",
+      "title": "العنوان",
+      "description": "الوصف",
+      "descriptionHelper": "اختياري — ما الذي يقيّمه هذا المعيار.",
+      "maxScore": "الدرجة القصوى",
+      "sortOrder": "ترتيب العرض",
+      "sortOrderHelper": "تظهر الأرقام الأصغر أولًا في نموذج التقدير.",
+      "errorFallback": "تعذّر حفظ القالب.",
+      "saveChanges": "حفظ التغييرات",
+      "create": "إنشاء القالب",
+      "updated": "تم تحديث القالب",
+      "created": "تم إنشاء القالب",
+      "updateFailed": "تعذّر تحديث القالب",
+      "createFailed": "تعذّر إنشاء القالب"
+    },
+    "detail": {
+      "loadError": "تعذّر تحميل هذا التقييم.",
+      "autosave": {
+        "saving": "جارٍ الحفظ…",
+        "saved": "تم الحفظ",
+        "error": "تعذّر الحفظ"
+      },
+      "scoreLabel": "الدرجة (0–{{max}})",
+      "outOfRange": "خارج النطاق",
+      "comment": "تعليق",
+      "historyTitle": "سجل التقييمات",
+      "historyEmpty": "لا توجد تقييمات سابقة لهذا المعلم.",
+      "historyItem": "{{type}} — {{date}}",
+      "submitted": "تم إرسال التقييم",
+      "submitFailed": "تعذّر إرسال التقييم",
+      "sharedToast": "تمت المشاركة مع المعلم",
+      "shareFailed": "تعذّرت مشاركة التقييم",
+      "type": "النوع",
+      "status": "الحالة",
+      "rating": "التقدير",
+      "evaluatedAt": "تاريخ التقييم",
+      "sharedWithTeacher": "المشاركة مع المعلم",
+      "sharedOn": "تمت المشاركة في {{date}}",
+      "notShared": "لم تتم المشاركة — غير مرئي للمعلم",
+      "workflow": "سير العمل",
+      "submit": "إرسال",
+      "share": "مشاركة مع المعلم",
+      "submitHint": "أرسل هذا التقييم قبل مشاركته مع المعلم.",
+      "criteriaScoring": "تقدير المعايير",
+      "noTemplates": "لا توجد قوالب معايير نشطة. <link>أضف قالبًا</link> لبدء التقدير.",
+      "noTemplatesShort": "لا توجد قوالب معايير نشطة.",
+      "scoresCaption": "درجات المعايير",
+      "scoreColumns": {
+        "criteria": "المعيار",
+        "score": "الدرجة",
+        "comment": "تعليق",
+        "saved": "الحفظ"
+      },
+      "narrative": "التقرير السردي",
+      "readOnlyHint": "تمت مشاركة هذا التقييم مع المعلم ولم يعد بالإمكان تعديله.",
+      "overallRating": "التقدير العام",
+      "noRating": "لا يوجد تقدير بعد",
+      "strengths": "نقاط القوة",
+      "areasForImprovement": "مجالات التحسين",
+      "comments": "ملاحظات"
+    }
+  },
+  "attendance": {
+    "status": {
+      "present": "حاضر",
+      "absent": "غائب",
+      "late": "متأخر",
+      "excused": "غائب بعذر"
+    },
+    "interval": {
+      "day": "يومي",
+      "week": "أسبوعي",
+      "month": "شهري",
+      "term": "نظرة عامة على الفصل الدراسي"
+    },
+    "dashboard": {
+      "eyebrow": "المدير · الحضور",
+      "title": "متابعة الحضور",
+      "description": "رؤية على مستوى المدرسة، وسجلات يومية، واتجاهات، وتنبيهات للتدخل.",
+      "viewToggle": "طريقة عرض الحضور",
+      "schoolView": "عرض المدرسة",
+      "classView": "عرض الصف",
+      "filtersTitle": "عوامل تصفية الحضور",
+      "searchLabel": "البحث عن طالب",
+      "searchPlaceholder": "الاسم أو رقم القيد",
+      "grade": "الصف الدراسي",
+      "gradeOption": "الصف {{grade}}",
+      "allGrades": "جميع الصفوف الدراسية",
+      "section": "الشعبة",
+      "allSections": "جميع الشعب",
+      "statusLabel": "حالة الحضور",
+      "allStatuses": "جميع الحالات",
+      "intervalLabel": "فترة الاتجاه",
+      "breachesOnly": "تجاوزات الحد فقط",
+      "classDrillDown": "تفاصيل الصف",
+      "summaryError": "تعذّر تحميل ملخص الحضور.",
+      "classBreakdown": "التفصيل حسب الصف",
+      "classCaption": "ملخص الحضور حسب الصف",
+      "classColumns": {
+        "class": "الصف",
+        "present": "حاضر",
+        "absent": "غائب",
+        "tardy": "متأخر"
+      },
+      "classEmpty": "لا توجد صفوف مسجّلة في هذه الفترة.",
+      "dailyTitle": "الحضور اليومي",
+      "studentCount_zero": "لا يوجد طلاب في العرض الحالي",
+      "studentCount_one": "طالب واحد في العرض الحالي",
+      "studentCount_two": "طالبان في العرض الحالي",
+      "studentCount_few": "{{formatted}} طلاب في العرض الحالي",
+      "studentCount_many": "{{formatted}} طالبًا في العرض الحالي",
+      "studentCount_other": "{{formatted}} طالب في العرض الحالي",
+      "refreshing": "جارٍ التحديث…"
+    },
+    "export": {
+      "unavailable": "التصدير غير متاح",
+      "xlsx": "تصدير XLSX",
+      "pdf": "تصدير PDF",
+      "error": "تعذّر إنشاء ملف التصدير.",
+      "download": "تنزيل التقرير"
+    },
+    "summary": {
+      "label": "ملخص الحضور",
+      "overall": "نسبة الحضور الإجمالية",
+      "totalAbsences": "إجمالي الغياب",
+      "unexcused": "الغياب بدون عذر",
+      "tardy": "التأخر"
+    },
+    "trend": {
+      "title": "اتجاه الحضور",
+      "description": "نسبة الحضور خلال الفترة المحددة",
+      "loading": "جارٍ تحميل اتجاه الحضور…",
+      "empty": "لا تتوفر بيانات للاتجاه.",
+      "chartTitle": "اتجاه نسبة الحضور",
+      "pointDescription": "{{date}}: {{percent}} بالمئة",
+      "legendLabel": "قيم الاتجاه",
+      "legendItem": "{{date}}: {{percent}}"
+    },
+    "correction": {
+      "title": "طلب تصحيح الحضور",
+      "description": "{{date}} · الحالة الحالية: {{status}}",
+      "correctedStatus": "الحالة المصحّحة",
+      "minutesLate": "دقائق التأخر",
+      "reason": "السبب",
+      "reasonHelper": "يُضاف هذا المبرر إلى سجل تدقيق الحضور.",
+      "canOverride": "يمكنك تصحيح السجلات خارج فترة التصحيح المعتادة.",
+      "cannotOverride": "تتطلب التصحيحات خارج الفترة المعتادة تجاوزًا من المسؤول.",
+      "rejected": "رُفض التصحيح. تحقّق من فترة التصحيح ومن صلاحياتك.",
+      "submit": "إرسال التصحيح",
+      "errors": {
+        "sameStatus": "اختر حالة مختلفة عن الحالة الحالية.",
+        "reasonRequired": "أدخل سبب التصحيح.",
+        "minutesRequired": "أدخل عددًا موجبًا لدقائق التأخر."
+      }
+    },
+    "grid": {
+      "caption": "الحضور اليومي للطلاب",
+      "empty": "لا يوجد طلاب يطابقون عوامل التصفية الحالية.",
+      "columns": {
+        "student": "الطالب",
+        "admission": "رقم القيد",
+        "class": "الصف",
+        "section": "الشعبة",
+        "status": "الحالة",
+        "minutesLate": "دقائق التأخر"
+      }
+    },
+    "history": {
+      "fallbackTitle": "سجل حضور الطالب",
+      "description": "{{admissionNumber}} · {{classCode}} · نسبة الحضور {{percent}}",
+      "loadingDescription": "جارٍ تحميل حضور الطالب…",
+      "loading": "جارٍ تحميل سجل الحضور…",
+      "error": "تعذّر تحميل سجل الطالب.",
+      "minutesLate_zero": "تأخر {{formatted}} دقيقة",
+      "minutesLate_one": "تأخر دقيقة واحدة",
+      "minutesLate_two": "تأخر دقيقتين",
+      "minutesLate_few": "تأخر {{formatted}} دقائق",
+      "minutesLate_many": "تأخر {{formatted}} دقيقة",
+      "minutesLate_other": "تأخر {{formatted}} دقيقة",
+      "version": "الإصدار {{version}}",
+      "versionOverride": "الإصدار {{version}} · تجاوز إداري",
+      "requestCorrection": "طلب تصحيح",
+      "readOnly": "للقراءة فقط"
+    },
+    "breaches": {
+      "title": "تنبيهات الغياب المزمن",
+      "description": "الطلاب الذين تتجاوز نسبة غيابهم بدون عذر {{threshold}}",
+      "alertCount_zero": "لا توجد تنبيهات",
+      "alertCount_one": "تنبيه واحد",
+      "alertCount_two": "تنبيهان",
+      "alertCount_few": "{{count}} تنبيهات",
+      "alertCount_many": "{{count}} تنبيهًا",
+      "alertCount_other": "{{count}} تنبيه",
+      "empty": "لا توجد تجاوزات للحد في هذا العرض."
+    }
+  }
+}

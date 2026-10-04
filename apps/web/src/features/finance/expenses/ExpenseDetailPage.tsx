@@ -2,7 +2,9 @@ import { Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
-import { EXPENSE_DOCUMENT_TYPE_LABELS, expenseStatusLabel, expenseStatusTone } from "./labels";
+import { useTranslation } from "../../../lib/i18n";
+
+import { EXPENSE_DOCUMENT_TYPE_LABEL_KEYS, expenseStatusLabel, expenseStatusTone } from "./labels";
 import { expenseQueryKey, fetchExpense } from "./queries";
 
 import "./expenses.css";
@@ -15,6 +17,7 @@ import "./expenses.css";
  * `NewExpensePage`'s doc comment on why the create response can't show one either.
  */
 export default function ExpenseDetailPage() {
+  const { t } = useTranslation();
   const { expenseId } = useParams<{ expenseId: string }>();
   const query = useQuery({
     queryKey: expenseQueryKey(expenseId ?? ""),
@@ -27,46 +30,46 @@ export default function ExpenseDetailPage() {
   return (
     <>
       <p className="expenses-detail__back">
-        <Link to="/portal/finance/expenses">&larr; Back to expenses</Link>
+        <Link to="/portal/finance/expenses">{t("finance.expenses.back")}</Link>
       </p>
 
       {query.isPending ? (
-        <p>Loading&hellip;</p>
+        <p>{t("finance.common.loading")}</p>
       ) : query.isError || !expense ? (
-        <p role="alert">Unable to load this expense.</p>
+        <p role="alert">{t("finance.expenses.detail.loadError")}</p>
       ) : (
-        <Card as="section" aria-label="Expense detail">
+        <Card as="section" aria-label={t("finance.expenses.detail.label")}>
           <Card.Body>
             <div className="expenses-detail__header">
               <div>
                 <h1>{expense.category}</h1>
-                <p>{EXPENSE_DOCUMENT_TYPE_LABELS[expense.document_type]}</p>
+                <p>{t(EXPENSE_DOCUMENT_TYPE_LABEL_KEYS[expense.document_type])}</p>
               </div>
               <span
                 className="expenses-status-pill"
                 data-tone={expenseStatusTone(expense.erpnext_status)}
               >
-                {expenseStatusLabel(expense.erpnext_status)}
+                {expenseStatusLabel(expense.erpnext_status, t)}
               </span>
             </div>
 
             <dl className="expenses-detail__summary">
               <div>
-                <dt>Vendor</dt>
+                <dt>{t("finance.common.vendor")}</dt>
                 <dd>{expense.vendor}</dd>
               </div>
               <div>
-                <dt>Amount</dt>
+                <dt>{t("finance.common.amount")}</dt>
                 <dd>
                   {expense.amount} {expense.currency}
                 </dd>
               </div>
               <div>
-                <dt>Date</dt>
+                <dt>{t("finance.common.date")}</dt>
                 <dd>{expense.expense_date}</dd>
               </div>
               <div>
-                <dt>ERPNext document</dt>
+                <dt>{t("finance.common.erpnextDocument")}</dt>
                 <dd>{expense.erpnext_name ?? "—"}</dd>
               </div>
             </dl>
@@ -80,10 +83,12 @@ export default function ExpenseDetailPage() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                View receipt
+                {t("finance.expenses.detail.viewReceipt")}
               </a>
             ) : (
-              <p className="expenses-detail__no-attachment">No receipt attached.</p>
+              <p className="expenses-detail__no-attachment">
+                {t("finance.expenses.detail.noReceipt")}
+              </p>
             )}
           </Card.Body>
         </Card>

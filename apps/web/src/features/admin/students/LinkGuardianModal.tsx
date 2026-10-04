@@ -3,9 +3,11 @@ import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { useLinkGuardian } from "./mutations";
 import { parentSearchQueryKey, searchParentUsers } from "./queries";
-import { fieldErrors, linkGuardianSchema, RELATIONSHIP_LABELS } from "./schema";
+import { fieldErrors, linkGuardianSchema, RELATIONSHIP_LABEL_KEYS } from "./schema";
 
 import type { UserWithRoles } from "./queries";
 import type { GuardianRelationship, LinkGuardianValues } from "./schema";
@@ -13,10 +15,6 @@ import type { SelectOption } from "@studafy/ui";
 import type { FormEvent } from "react";
 
 const SEARCH_DEBOUNCE_MS = 300;
-
-const RELATIONSHIP_OPTIONS: SelectOption<GuardianRelationship>[] = (
-  Object.entries(RELATIONSHIP_LABELS) as [GuardianRelationship, string][]
-).map(([value, label]) => ({ value, label }));
 
 export interface LinkGuardianModalProps {
   studentId: string;
@@ -31,8 +29,13 @@ export interface LinkGuardianModalProps {
  * server-side search-as-you-type over the school's parent accounts.
  */
 export function LinkGuardianModal({ studentId, open, onClose }: LinkGuardianModalProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const linkGuardian = useLinkGuardian();
+
+  const relationshipOptions: SelectOption<GuardianRelationship>[] = (
+    Object.entries(RELATIONSHIP_LABEL_KEYS) as [GuardianRelationship, string][]
+  ).map(([value, key]) => ({ value, label: t(key) }));
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -81,14 +84,19 @@ export function LinkGuardianModal({ studentId, open, onClose }: LinkGuardianModa
         onSuccess: () => {
           show({
             variant: "success",
-            title: `Linked ${selectedParent?.display_name ?? selectedParent?.email ?? "guardian"}`,
+            title: t("adminPeople.students.linkGuardian.linkedToast", {
+              name:
+                selectedParent?.display_name ??
+                selectedParent?.email ??
+                t("adminPeople.students.linkGuardian.guardianFallback"),
+            }),
           });
           handleClose();
         },
         onError: (error) => {
           show({
             variant: "error",
-            title: "Couldn't link guardian",
+            title: t("adminPeople.students.linkGuardian.error"),
             description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
           });
         },
@@ -100,10 +108,14 @@ export function LinkGuardianModal({ studentId, open, onClose }: LinkGuardianModa
     <Modal
       open={open}
       onClose={handleClose}
-      title="Add guardian"
-      description="Link an existing parent account to this student."
+      title={t("adminPeople.students.linkGuardian.title")}
+      description={t("adminPeople.students.linkGuardian.description")}
     >
-      <form onSubmit={handleSubmit} noValidate aria-label="Add guardian">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        aria-label={t("adminPeople.students.linkGuardian.title")}
+      >
         <Modal.Body>
           {selectedParent ? (
             <div className="students-guardian-picker__selected">
@@ -112,18 +124,18 @@ export function LinkGuardianModal({ studentId, open, onClose }: LinkGuardianModa
                 <p>{selectedParent.email}</p>
               </div>
               <Button type="button" variant="tertiary" onClick={() => setSelectedParent(null)}>
-                Change
+                {t("adminPeople.students.linkGuardian.change")}
               </Button>
             </div>
           ) : (
             <>
               <Input
-                label="Search parents"
+                label={t("adminPeople.students.linkGuardian.searchParents")}
                 type="search"
-                placeholder="Search by name or email"
+                placeholder={t("adminPeople.students.linkGuardian.searchPlaceholder")}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                error={errors.parent_user_id}
+                error={errors.parent_user_id && t(errors.parent_user_id)}
                 autoFocus
               />
               <ul className="students-guardian-picker__results">
@@ -142,15 +154,17 @@ export function LinkGuardianModal({ studentId, open, onClose }: LinkGuardianModa
                 {debouncedSearch.trim() &&
                 !resultsQuery.isPending &&
                 resultsQuery.data?.length === 0 ? (
-                  <li className="students-guardian-picker__empty">No parent accounts match.</li>
+                  <li className="students-guardian-picker__empty">
+                    {t("adminPeople.students.linkGuardian.noMatches")}
+                  </li>
                 ) : null}
               </ul>
             </>
           )}
 
           <Select
-            label="Relationship"
-            options={RELATIONSHIP_OPTIONS}
+            label={t("adminPeople.students.linkGuardian.relationship")}
+            options={relationshipOptions}
             value={relationship}
             onChange={(value) => setRelationship(value)}
             required
@@ -158,10 +172,10 @@ export function LinkGuardianModal({ studentId, open, onClose }: LinkGuardianModa
         </Modal.Body>
         <Modal.Footer>
           <Button type="button" variant="tertiary" onClick={handleClose}>
-            Cancel
+            {t("adminPeople.common.cancel")}
           </Button>
           <Button type="submit" loading={linkGuardian.isPending} disabled={!selectedParent}>
-            Link guardian
+            {t("adminPeople.students.linkGuardian.submit")}
           </Button>
         </Modal.Footer>
       </form>

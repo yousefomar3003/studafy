@@ -16,5 +16,8 @@
     "**/.turbo/**": true,
     "**/dist/**": true,
     "**/.dart_tool/**": true
-  }
+  },
+  "git.inputValidation": true,
+  "git.inputValidationSubjectLength": 100,
+  "git.inputValidationLength": 100
 }

@@ -1,0 +1,353 @@
+{
+  "common": {
+    "previous": "Previous",
+    "next": "Next",
+    "loading": "Loading…",
+    "allStatuses": "All statuses",
+    "status": "Status",
+    "student": "Student",
+    "admissionNumber": "Admission #",
+    "total": "Total",
+    "outstanding": "Outstanding",
+    "amount": "Amount",
+    "date": "Date",
+    "category": "Category",
+    "currency": "Currency",
+    "description": "Description (optional)",
+    "invoice": "Invoice",
+    "method": "Method",
+    "type": "Type",
+    "vendor": "Vendor",
+    "issued": "Issued",
+    "due": "Due",
+    "erpnextDocument": "ERPNext document",
+    "openReceipt": "Open receipt",
+    "recordPayment": "Record payment",
+    "recordExpense": "Record expense",
+    "defaultsToToday": "Defaults to today.",
+    "checkFormAndRetry": "Please check the form and try again.",
+    "searchByStudentOrInvoice": "Search by student or invoice number"
+  },
+  "docStatus": {
+    "draft": "Draft",
+    "submitted": "Submitted",
+    "cancelled": "Cancelled"
+  },
+  "paymentMode": {
+    "cash": "Cash",
+    "bank_transfer": "Bank transfer",
+    "card_external": "Card (external)",
+    "unknown": "Unknown mode"
+  },
+  "paymentStatus": {
+    "pending": "Pending",
+    "confirmed": "Confirmed",
+    "failed": "Failed"
+  },
+  "dashboard": {
+    "title": "Finance",
+    "intro": "Collections vs due this term, receivables aging, overdue installments, and recent payments.",
+    "readGuide": "Read the guide",
+    "nav": {
+      "fees": "Fee structure builder",
+      "invoices": "Invoices",
+      "payments": "Payments",
+      "scholarships": "Scholarships",
+      "refunds": "Refunds",
+      "reports": "Reports",
+      "expenses": "Expenses"
+    }
+  },
+  "overdue": {
+    "title": "Overdue installments",
+    "intro": "Installments past due with a balance still owed, from the collections vs due report.",
+    "filteredTo": "Filtered to {{bucket}}.",
+    "clearFilter": "Clear filter",
+    "buckets": {
+      "range1": "0–30 days overdue",
+      "range2": "31–60 days overdue",
+      "range3": "61–90 days overdue",
+      "range4": "90+ days overdue"
+    },
+    "columns": {
+      "party": "Party",
+      "reference": "Reference",
+      "dueDate": "Due date",
+      "outstanding": "Outstanding"
+    },
+    "loadError": "Unable to load the collections report.",
+    "missingColumns": "The collections report didn't include the columns this needs.",
+    "empty": "Nothing is overdue."
+  },
+  "tiles": {
+    "aging": {
+      "title": "Aging buckets",
+      "error": "Unable to load the accounts receivable aging report.",
+      "empty": "No outstanding receivables to age.",
+      "viewOverdue": "View overdue installments →"
+    },
+    "collections": {
+      "title": "Collections vs due this term",
+      "error": "Unable to load the collections report.",
+      "empty": "No collections summary for this term yet."
+    },
+    "overdue": {
+      "title": "Overdue installments",
+      "error": "Unable to load overdue installments.",
+      "missingColumns": "The collections report didn’t include the columns this needs.",
+      "empty": "Nothing is overdue.",
+      "dueLine_one": "Due {{date}} · {{count}}d overdue",
+      "dueLine_other": "Due {{date}} · {{count}}d overdue",
+      "viewAll": "View all overdue installments →"
+    },
+    "payments": {
+      "title": "Recent payments",
+      "error": "Unable to load recent payments.",
+      "empty": "No payments recorded yet.",
+      "viewAll": "View all payments →"
+    }
+  },
+  "invoices": {
+    "backToInvoices": "← Back to invoices",
+    "batchStatus": {
+      "pending": "Queued",
+      "processing": "Generating…",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "batchItemStatus": {
+      "pending": "Pending",
+      "succeeded": "Created",
+      "already_existed": "Already existed",
+      "failed": "Failed"
+    },
+    "list": {
+      "title": "Invoices",
+      "intro": "Search by student or invoice number, and filter by status.",
+      "generate": "Generate invoices",
+      "searchPlaceholder": "Search by student or invoice number…",
+      "invoiceNumber": "Invoice #",
+      "caption": "Invoices",
+      "loadError": "Unable to load invoices.",
+      "empty": "No invoices match this filter."
+    },
+    "detail": {
+      "loadError": "Couldn't load this invoice. Please try again.",
+      "title": "Invoice {{number}}",
+      "print": "Print / Save as PDF",
+      "summary": "Invoice summary",
+      "lines": "Lines",
+      "linesLabel": "Invoice lines",
+      "noLines": "No line items on this invoice.",
+      "feeCategory": "Fee category",
+      "lineDescription": "Description",
+      "quantity": "Qty"
+    },
+    "batch": {
+      "title": "Generate invoices",
+      "startError": "Couldn't start the batch",
+      "formLabel": "Batch generation form",
+      "feeStructure": "Fee structure",
+      "periodTitle": "Period title",
+      "periodPlaceholder": "e.g. Spring 2026 Term 1",
+      "dueDate": "Due date (optional)",
+      "target": "Target students",
+      "targetAll": "Every enrolled student in the school",
+      "targetClasses": "Students actively enrolled in specific classes",
+      "classes": "Classes",
+      "loadingClasses": "Loading classes…",
+      "noClasses": "No active classes.",
+      "start": "Start batch",
+      "loadingStructures": "Loading fee structures…",
+      "noStructures": "No submitted fee structures",
+      "selectStructure": "Select a fee structure",
+      "result": "Result",
+      "progress": "Batch progress",
+      "progressStatus": "{{status}} — {{period}}",
+      "generationProgress": "Generation progress",
+      "startAnother": "Start another batch",
+      "longRunning": "This can take a while for large batches. You can leave this page — it keeps running.",
+      "filterByStatus": "Filter by status",
+      "resultsCaption": "Batch results",
+      "resultsError": "Unable to load results.",
+      "resultsEmpty": "No students match this filter."
+    }
+  },
+  "payments": {
+    "list": {
+      "title": "Payments",
+      "intro": "Every payment recorded for this school, with receipts for confirmed ones.",
+      "receipt": "Receipt",
+      "caption": "Payments",
+      "loadError": "Unable to load payments.",
+      "empty": "No payments match this filter."
+    },
+    "record": {
+      "back": "← Back to payments",
+      "title": "Record a payment",
+      "conflict": "This submission may have already been recorded with different details. Check the payment history before retrying.",
+      "error": "Couldn't record the payment",
+      "formLabel": "Payment form",
+      "exceeds": "This exceeds the invoice's outstanding balance of {{amount}} {{currency}}. ERPNext will reject an overpayment.",
+      "full": "Full payment — this invoice will be fully settled.",
+      "partial": "Partial payment — {{amount}} {{currency}} will remain outstanding.",
+      "method": "Payment method",
+      "referenceNumber": "Reference number",
+      "referenceRequired": "Required by ERPNext for bank transfer and card payments.",
+      "referenceOptional": "Bank or terminal reference, if any.",
+      "referenceDate": "Reference date (optional)",
+      "postingDate": "Posting date (optional)",
+      "remarks": "Remarks (optional)",
+      "recordedLabel": "Payment recorded",
+      "recordedHeadline": "Payment recorded — {{amount}} {{currency}}",
+      "awaiting": "Awaiting confirmation from ERPNext. The receipt will appear here once confirmed.",
+      "rejected": "ERPNext ultimately rejected this payment. Check the payment history for details.",
+      "recordAnother": "Record another payment",
+      "viewHistory": "View payment history"
+    },
+    "picker": {
+      "outstanding": "Outstanding: {{amount}} {{currency}}",
+      "change": "Change",
+      "helper": "Only submitted invoices with an outstanding balance can be paid.",
+      "resultOutstanding": "Outstanding {{amount}} {{currency}}",
+      "empty": "No payable invoices match."
+    }
+  },
+  "fees": {
+    "builder": {
+      "allYears": "All academic years",
+      "title": "Fee structures",
+      "intro": "Build fee structures, see how they price out for a sample student, and track versions.",
+      "newStructure": "New fee structure",
+      "academicYear": "Academic year",
+      "existing": "Existing fee structures",
+      "empty": "No fee structures yet for this filter.",
+      "caption": "Fee structures",
+      "colTitle": "Title",
+      "colProgram": "Program"
+    },
+    "form": {
+      "titleRequired": "Title is required",
+      "currencyInvalid": "Use a 3-letter ISO code, e.g. JOD",
+      "componentsRequired": "Add at least one fee component",
+      "required": "Required",
+      "amountInvalid": "Enter a non-negative amount",
+      "noYear": "No academic year",
+      "yearOption": "{{name}} ({{start}} – {{end}})",
+      "genericError": "Something went wrong. Try again.",
+      "saveError": "Couldn't save fee structure",
+      "updated": "Updated \"{{title}}\"",
+      "created": "Created \"{{title}}\"",
+      "editHeading": "Edit fee structure",
+      "newHeading": "New fee structure",
+      "readOnlyNote": "This structure is {{status}} and immutable in ERPNext — create a new fee structure instead of editing this one.",
+      "title": "Title",
+      "titlePlaceholder": "Grade 5 — 2025/2026",
+      "effective": "Effective {{start}} through {{end}}.",
+      "noEffectiveDates": "Fee structures don't carry their own effective dates — the academic year they belong to is what dates them.",
+      "program": "Program (ERPNext, grade/year grouping)",
+      "programPlaceholder": "Grade 5",
+      "programHelper": "The ERPNext Program document name this structure applies to.",
+      "componentsNote": "Component breakdown isn't returned by the list API, so it starts empty here. Leave it empty to keep the existing components unchanged, or add the full replacement set below — saving replaces all components at once, it doesn't merge.",
+      "changeComponents": "Change components",
+      "saveChanges": "Save changes",
+      "create": "Create fee structure"
+    },
+    "components": {
+      "legend": "Fee components",
+      "empty": "No components yet.",
+      "rowLegend": "Component {{number}}",
+      "feeCategory": "Fee category",
+      "feeCategoryPlaceholder": "Tuition",
+      "remove": "Remove",
+      "removeLabel": "Remove component {{number}}",
+      "add": "Add component",
+      "subtotal": "Subtotal: {{amount}} {{currency}}"
+    },
+    "preview": {
+      "title": "Invoice preview",
+      "note": "Estimated from the components below, computed the same way invoice generation computes a real one. ERPNext's own total is authoritative once an invoice actually exists.",
+      "empty": "Add at least one component to see a preview.",
+      "caption": "Estimated invoice line items",
+      "subtotal": "Subtotal",
+      "discount": "Discount",
+      "discountLoading": "Discount (loading…)",
+      "noAwards": "{{name}} has no confirmed scholarship or discount awards, so no discount applies."
+    },
+    "studentPicker": {
+      "label": "Sample student",
+      "clear": "Clear",
+      "placeholder": "Search by name or admission number",
+      "helper": "Picks a real student to preview the invoice this structure would generate.",
+      "empty": "No students match."
+    }
+  },
+  "expenses": {
+    "back": "← Back to expenses",
+    "documentType": {
+      "purchase_invoice": "Purchase invoice",
+      "expense_claim": "Expense claim",
+      "journal_entry": "Journal entry"
+    },
+    "categoryField": {
+      "default": "Category",
+      "purchase_invoice": "Expense account",
+      "expense_claim": "Expense type",
+      "journal_entry": "Account"
+    },
+    "vendorField": {
+      "default": "Vendor",
+      "purchase_invoice": "Supplier",
+      "expense_claim": "Employee",
+      "journal_entry": "Reference"
+    },
+    "list": {
+      "title": "Expenses",
+      "intro": "Filter by category or month, then select an expense to view its receipt.",
+      "filterCategory": "Filter by category",
+      "filterCategoryPlaceholder": "Filter by category…",
+      "filterMonth": "Filter by month",
+      "caption": "Expenses",
+      "loadError": "Unable to load expenses.",
+      "empty": "No expenses match this filter.",
+      "summaryLabel": "Monthly summary",
+      "summaryHeading": "Monthly summary — {{month}}",
+      "summaryError": "Unable to load the monthly summary.",
+      "count": "Count",
+      "grandTotal": "Grand total",
+      "summaryEmpty": "No expenses recorded for this month."
+    },
+    "detail": {
+      "loadError": "Unable to load this expense.",
+      "label": "Expense detail",
+      "viewReceipt": "View receipt",
+      "noReceipt": "No receipt attached."
+    },
+    "new": {
+      "title": "Record an expense",
+      "error": "Couldn't record the expense",
+      "selectType": "Select a document type",
+      "formLabel": "Expense form",
+      "documentType": "Document type",
+      "categoryHelper": "Must match an existing ERPNext document — ERPNext validates it on submit.",
+      "currencyInvalid": "Use a 3-letter currency code.",
+      "expenseDate": "Expense date (optional)",
+      "receipt": "Receipt (optional)",
+      "recordedLabel": "Expense recorded",
+      "recordedHeadline": "Expense recorded — {{amount}} {{currency}}",
+      "viewThisPrompt": "<expenseLink>View this expense</expenseLink> to open its receipt, if one was attached.",
+      "recordAnother": "Record another expense",
+      "viewAll": "View expenses"
+    }
+  },
+  "invoiceStatus": {
+    "Paid": "Paid",
+    "Unpaid": "Unpaid",
+    "PartlyPaid": "Partly Paid",
+    "Overdue": "Overdue",
+    "Return": "Return",
+    "CreditNoteIssued": "Credit Note Issued",
+    "Cancelled": "Cancelled",
+    "Draft": "Draft"
+  }
+}

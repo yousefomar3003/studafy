@@ -2,8 +2,10 @@ import { Button, Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { ExportPanel } from "./ExportPanel";
-import { REPORT_TYPE_DESCRIPTIONS, REPORT_TYPE_LABELS } from "./labels";
+import { REPORT_TYPE_DESCRIPTION_KEYS, REPORT_TYPE_LABEL_KEYS } from "./labels";
 import { fetchGeneralLedgerReport } from "./queries";
 import { ReportTable } from "./ReportTable";
 import { StudentPickerField } from "./StudentPickerField";
@@ -14,6 +16,8 @@ import type { FormEvent } from "react";
 /** ERPNext's General Ledger, filtered to a date range that's required (there is no useful "every
  * posting ever" default for a ledger) plus optional account/voucher/student narrowing. */
 export default function GeneralLedgerReportPanel() {
+  const { t } = useTranslation();
+  const reportLabel = t(REPORT_TYPE_LABEL_KEYS.general_ledger);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [account, setAccount] = useState("");
@@ -45,13 +49,13 @@ export default function GeneralLedgerReportPanel() {
   }
 
   return (
-    <Card as="section" aria-label={REPORT_TYPE_LABELS.general_ledger}>
+    <Card as="section" aria-label={reportLabel}>
       <Card.Body>
-        <p>{REPORT_TYPE_DESCRIPTIONS.general_ledger}</p>
+        <p>{t(REPORT_TYPE_DESCRIPTION_KEYS.general_ledger)}</p>
 
         <form className="reports-panel__filters" onSubmit={handleSubmit}>
           <div className="sf-field">
-            <label htmlFor="gl-from-date">From date</label>
+            <label htmlFor="gl-from-date">{t("financeReports.reports.filters.fromDate")}</label>
             <input
               id="gl-from-date"
               type="date"
@@ -61,7 +65,7 @@ export default function GeneralLedgerReportPanel() {
             />
           </div>
           <div className="sf-field">
-            <label htmlFor="gl-to-date">To date</label>
+            <label htmlFor="gl-to-date">{t("financeReports.reports.filters.toDate")}</label>
             <input
               id="gl-to-date"
               type="date"
@@ -71,7 +75,9 @@ export default function GeneralLedgerReportPanel() {
             />
           </div>
           <div className="sf-field">
-            <label htmlFor="gl-account">Account (optional)</label>
+            <label htmlFor="gl-account">
+              {t("financeReports.reports.filters.accountOptional")}
+            </label>
             <input
               id="gl-account"
               type="text"
@@ -81,7 +87,9 @@ export default function GeneralLedgerReportPanel() {
             />
           </div>
           <div className="sf-field">
-            <label htmlFor="gl-voucher-no">Voucher # (optional)</label>
+            <label htmlFor="gl-voucher-no">
+              {t("financeReports.reports.filters.voucherNoOptional")}
+            </label>
             <input
               id="gl-voucher-no"
               type="text"
@@ -91,7 +99,9 @@ export default function GeneralLedgerReportPanel() {
             />
           </div>
           <div className="sf-field">
-            <label htmlFor="gl-voucher-type">Voucher type (optional)</label>
+            <label htmlFor="gl-voucher-type">
+              {t("financeReports.reports.filters.voucherTypeOptional")}
+            </label>
             <input
               id="gl-voucher-type"
               type="text"
@@ -102,7 +112,7 @@ export default function GeneralLedgerReportPanel() {
           </div>
           <StudentPickerField value={student} onChange={setStudent} />
           <Button type="submit" loading={query.isFetching} disabled={!canRun}>
-            Run report
+            {t("financeReports.reports.filters.runReport")}
           </Button>
         </form>
 
@@ -111,12 +121,12 @@ export default function GeneralLedgerReportPanel() {
           loading={query.isFetching}
           error={query.isError}
           report={query.data}
-          caption="General ledger results"
-          idleMessage="Set a date range and run the report to see posted transactions."
+          caption={t("financeReports.reports.generalLedger.caption")}
+          idleMessage={t("financeReports.reports.generalLedger.idle")}
         />
 
         <ExportPanel
-          reportLabel={REPORT_TYPE_LABELS.general_ledger}
+          reportLabel={reportLabel}
           buildRequest={(fileFormat) =>
             canRun
               ? {
@@ -133,7 +143,7 @@ export default function GeneralLedgerReportPanel() {
                 }
               : null
           }
-          disabledReason="Set a date range to enable export."
+          disabledReason={t("financeReports.reports.generalLedger.disabledReason")}
         />
       </Card.Body>
     </Card>

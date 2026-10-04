@@ -2,8 +2,10 @@ import { Button, Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import { ExportPanel } from "./ExportPanel";
-import { REPORT_TYPE_DESCRIPTIONS, REPORT_TYPE_LABELS } from "./labels";
+import { REPORT_TYPE_DESCRIPTION_KEYS, REPORT_TYPE_LABEL_KEYS } from "./labels";
 import { fetchArAgingReport } from "./queries";
 import { ReportTable } from "./ReportTable";
 import { StudentPickerField } from "./StudentPickerField";
@@ -14,6 +16,8 @@ import type { FormEvent } from "react";
 /** Accounts Receivable Summary, aged into 30/60/90-day buckets. No required filters — an empty run
  * covers every household as of today. */
 export default function ArAgingReportPanel() {
+  const { t } = useTranslation();
+  const reportLabel = t(REPORT_TYPE_LABEL_KEYS.ar_aging);
   const [reportDate, setReportDate] = useState("");
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [runId, setRunId] = useState(0);
@@ -34,13 +38,15 @@ export default function ArAgingReportPanel() {
   }
 
   return (
-    <Card as="section" aria-label={REPORT_TYPE_LABELS.ar_aging}>
+    <Card as="section" aria-label={reportLabel}>
       <Card.Body>
-        <p>{REPORT_TYPE_DESCRIPTIONS.ar_aging}</p>
+        <p>{t(REPORT_TYPE_DESCRIPTION_KEYS.ar_aging)}</p>
 
         <form className="reports-panel__filters" onSubmit={handleSubmit}>
           <div className="sf-field">
-            <label htmlFor="ar-aging-report-date">As of date (optional)</label>
+            <label htmlFor="ar-aging-report-date">
+              {t("financeReports.reports.filters.asOfDateOptional")}
+            </label>
             <input
               id="ar-aging-report-date"
               type="date"
@@ -50,7 +56,7 @@ export default function ArAgingReportPanel() {
           </div>
           <StudentPickerField value={student} onChange={setStudent} />
           <Button type="submit" loading={query.isFetching}>
-            Run report
+            {t("financeReports.reports.filters.runReport")}
           </Button>
         </form>
 
@@ -59,12 +65,12 @@ export default function ArAgingReportPanel() {
           loading={query.isFetching}
           error={query.isError}
           report={query.data}
-          caption="Accounts receivable aging results"
-          idleMessage="Set filters (optional) and run the report to see aging balances."
+          caption={t("financeReports.reports.arAging.caption")}
+          idleMessage={t("financeReports.reports.arAging.idle")}
         />
 
         <ExportPanel
-          reportLabel={REPORT_TYPE_LABELS.ar_aging}
+          reportLabel={reportLabel}
           buildRequest={(fileFormat) => ({
             report_type: "ar_aging",
             file_format: fileFormat,

@@ -1,0 +1,23 @@
+/* Studafy wordmark (components/BrandLogo.tsx). The source PNG is 120px tall, so both sizes stay
+   crisp on 2x/3x displays. */
+
+.brand-logo {
+  display: block;
+  inline-size: auto;
+}
+
+.brand-logo--sm {
+  block-size: 28px;
+}
+
+.brand-logo--lg {
+  block-size: 40px;
+}
+
+/* The logo artwork's own navy, for light surfaces (sign-in card, help center). */
+.brand-logo-badge {
+  display: inline-flex;
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  background-color: #161551;
+}

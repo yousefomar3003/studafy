@@ -1,17 +1,15 @@
 import { Input, Modal, Button, Select } from "@studafy/ui";
 import { useEffect, useState } from "react";
 
+import { useTranslation } from "../../../../lib/i18n";
 import { useCorrectAttendance } from "../hooks/useAttendanceData";
 
-import { STATUS_LABELS } from "./DailyAttendanceGrid";
+import { STATUS_LABEL_KEYS } from "./DailyAttendanceGrid";
 
 import type { AttendanceStatus, AttendanceTimelineEntry } from "../types";
 import type { SelectOption } from "@studafy/ui";
 
-const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({
-  value,
-  label,
-})) as SelectOption<AttendanceStatus>[];
+const STATUSES = Object.keys(STATUS_LABEL_KEYS) as AttendanceStatus[];
 
 export interface CorrectionRequestModalProps {
   entry: AttendanceTimelineEntry | null;
@@ -26,11 +24,17 @@ export function CorrectionRequestModal({
   onClose,
   onSubmitted,
 }: CorrectionRequestModalProps) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<AttendanceStatus>(entry?.status ?? "present");
   const [reason, setReason] = useState("");
   const [minutesLate, setMinutesLate] = useState("");
+  /** Translation key of the current validation error. */
   const [error, setError] = useState<string>();
   const mutation = useCorrectAttendance();
+  const statusOptions: SelectOption<AttendanceStatus>[] = STATUSES.map((value) => ({
+    value,
+    label: t(STATUS_LABEL_KEYS[value]),
+  }));
 
   useEffect(() => {
     if (entry) {
@@ -45,11 +49,11 @@ export function CorrectionRequestModal({
     if (!entry) return;
     const trimmedReason = reason.trim();
     if (status === entry.status)
-      return setError("Choose a status different from the current status.");
-    if (!trimmedReason) return setError("Enter a correction reason.");
+      return setError("principal.attendance.correction.errors.sameStatus");
+    if (!trimmedReason) return setError("principal.attendance.correction.errors.reasonRequired");
     const parsedMinutes = Number(minutesLate);
     if (status === "late" && (!Number.isInteger(parsedMinutes) || parsedMinutes <= 0)) {
-      return setError("Enter a positive number of minutes late.");
+      return setError("principal.attendance.correction.errors.minutesRequired");
     }
     setError(undefined);
     mutation.mutate(
@@ -67,22 +71,27 @@ export function CorrectionRequestModal({
     <Modal
       open={entry !== null}
       onClose={onClose}
-      title="Request attendance correction"
+      title={t("principal.attendance.correction.title")}
       description={
-        entry ? `${entry.date} · Current status: ${STATUS_LABELS[entry.status]}` : undefined
+        entry
+          ? t("principal.attendance.correction.description", {
+              date: entry.date,
+              status: t(STATUS_LABEL_KEYS[entry.status]),
+            })
+          : undefined
       }
     >
       <Modal.Body>
         <div className="attendance-form">
           <Select
-            label="Corrected status"
-            options={STATUS_OPTIONS}
+            label={t("principal.attendance.correction.correctedStatus")}
+            options={statusOptions}
             value={status}
             onChange={setStatus}
           />
           {status === "late" ? (
             <Input
-              label="Minutes late"
+              label={t("principal.attendance.correction.minutesLate")}
               type="number"
               min={1}
               value={minutesLate}
@@ -91,36 +100,36 @@ export function CorrectionRequestModal({
             />
           ) : null}
           <Input
-            label="Reason"
+            label={t("principal.attendance.correction.reason")}
             value={reason}
             maxLength={500}
             onChange={(event) => setReason(event.target.value)}
             required
-            helperText="This justification is added to the attendance audit history."
+            helperText={t("principal.attendance.correction.reasonHelper")}
           />
           <p className="attendance-permission-note">
             {canOverride
-              ? "You may correct records outside the standard correction window."
-              : "Corrections outside the standard window require an administrator override."}
+              ? t("principal.attendance.correction.canOverride")
+              : t("principal.attendance.correction.cannotOverride")}
           </p>
           {error ? (
             <p role="alert" className="attendance-error">
-              {error}
+              {t(error)}
             </p>
           ) : null}
           {mutation.isError ? (
             <p role="alert" className="attendance-error">
-              The correction was rejected. Check the correction window and your permissions.
+              {t("principal.attendance.correction.rejected")}
             </p>
           ) : null}
         </div>
       </Modal.Body>
       <Modal.Footer>
         <Button variant="tertiary" onClick={onClose}>
-          Cancel
+          {t("principal.common.cancel")}
         </Button>
         <Button loading={mutation.isPending} onClick={submit}>
-          Submit correction
+          {t("principal.attendance.correction.submit")}
         </Button>
       </Modal.Footer>
     </Modal>

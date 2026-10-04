@@ -1,6 +1,8 @@
 import { Button, Input, Modal, useToast } from "@studafy/ui";
 import { useState } from "react";
 
+import { useTranslation } from "../../../lib/i18n";
+
 export interface InviteLinkDetails {
   email: string;
   /** The raw, one-time-use token. Only ever available right after create/resend — the API never
@@ -28,6 +30,7 @@ function inviteLinkFor(token: string): string {
  * or revoke an invitation. There is no broader audience to additionally exclude here.
  */
 export function InviteLinkDialog({ details, onClose }: InviteLinkDialogProps) {
+  const { t } = useTranslation();
   const { show } = useToast();
   const [copied, setCopied] = useState(false);
 
@@ -37,12 +40,12 @@ export function InviteLinkDialog({ details, onClose }: InviteLinkDialogProps) {
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
-      show({ variant: "success", title: "Link copied" });
+      show({ variant: "success", title: t("adminPeople.invitations.link.copiedToast") });
     } catch {
       show({
         variant: "error",
-        title: "Couldn't copy the link",
-        description: "Select the link text and copy it manually.",
+        title: t("adminPeople.invitations.link.copyError"),
+        description: t("adminPeople.invitations.link.copyErrorDescription"),
       });
     }
   }
@@ -56,27 +59,31 @@ export function InviteLinkDialog({ details, onClose }: InviteLinkDialogProps) {
     <Modal
       open={details !== null}
       onClose={handleClose}
-      title="Invitation sent"
+      title={t("adminPeople.invitations.link.title")}
       description={
-        details ? `${details.email} — share this link if the email doesn't arrive.` : undefined
+        details
+          ? t("adminPeople.invitations.link.description", { email: details.email })
+          : undefined
       }
     >
       <Modal.Body>
         <div className="invitations-link-row">
           <Input
-            label="Invite link"
+            label={t("adminPeople.invitations.link.inviteLink")}
             readOnly
             value={details ? inviteLinkFor(details.token) : ""}
             onFocus={(e) => e.currentTarget.select()}
           />
           <Button type="button" variant="secondary" onClick={handleCopy}>
-            {copied ? "Copied" : "Copy link"}
+            {copied
+              ? t("adminPeople.invitations.link.copied")
+              : t("adminPeople.invitations.link.copyLink")}
           </Button>
         </div>
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" onClick={handleClose}>
-          Done
+          {t("adminPeople.invitations.link.done")}
         </Button>
       </Modal.Footer>
     </Modal>

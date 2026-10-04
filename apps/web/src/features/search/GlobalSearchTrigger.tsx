@@ -54,7 +54,9 @@ export function GlobalSearchTrigger() {
           />
         </svg>
         <span>{t("globalSearch.triggerLabel")}</span>
-        <kbd className="global-search-trigger__shortcut">{isMacPlatform() ? "⌘K" : "Ctrl+K"}</kbd>
+        <kbd className="global-search-trigger__shortcut" dir="ltr">
+          {isMacPlatform() ? "⌘K" : "Ctrl+K"}
+        </kbd>
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title={t("globalSearch.title")}>

@@ -1,5 +1,7 @@
 import { Button, Card } from "@studafy/ui";
 
+import { useTranslation } from "../../../lib/i18n";
+
 import type { FormEvent, ReactNode } from "react";
 
 export interface SettingsCardProps {
@@ -25,9 +27,10 @@ export function SettingsCard({
   description,
   onSubmit,
   saving,
-  saveLabel = "Save changes",
+  saveLabel,
   children,
 }: SettingsCardProps) {
+  const { t } = useTranslation();
   return (
     <Card as="section" aria-label={title}>
       <Card.Header>
@@ -38,7 +41,7 @@ export function SettingsCard({
         <Card.Body>{children}</Card.Body>
         <Card.Footer>
           <Button type="submit" loading={saving}>
-            {saveLabel}
+            {saveLabel ?? t("adminSchool.settings.saveChanges")}
           </Button>
         </Card.Footer>
       </form>
