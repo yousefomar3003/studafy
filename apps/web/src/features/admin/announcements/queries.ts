@@ -16,9 +16,10 @@ const PAGE_SIZE = 20;
 export async function fetchAnnouncementsPage(
   cursor: string | undefined,
   status: AnnouncementStatus | undefined,
+  limit: number = PAGE_SIZE,
 ): Promise<CursorPage<Announcement>> {
   const { data } = await api.GET("/api/announcements", {
-    params: { query: { limit: PAGE_SIZE, cursor, status } },
+    params: { query: { limit, cursor, status } },
   });
   return {
     items: (data?.items ?? []) as Announcement[],

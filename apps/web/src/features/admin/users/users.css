@@ -12,6 +12,12 @@
   margin-bottom: var(--space-16);
 }
 
+.users-list__header-actions {
+  display: flex;
+  gap: var(--space-8);
+  flex-shrink: 0;
+}
+
 .users-list__toolbar {
   display: flex;
   flex-wrap: wrap;

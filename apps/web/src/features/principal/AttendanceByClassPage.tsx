@@ -1,14 +1,25 @@
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Select, Table } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { ExportCsvButton } from "../../components/ExportCsvButton";
+import { collectOffsetPages } from "../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
 import { WHOLE_PERCENT_OPTIONS } from "./format";
-import { fetchClassAttendanceSummary, lastNDaysRange } from "./queries";
+import {
+  fetchClassAttendanceSummary,
+  fetchClassAttendanceSummaryPage,
+  lastNDaysRange,
+} from "./queries";
 
+import type { ClassAttendanceSummaryItem } from "./queries";
+import type { ExportColumn } from "../../lib/data-transfer";
 import type { SelectOption } from "@studafy/ui";
+
+import "./school/principal-school.css";
 
 const COLUMN_COUNT = 5;
 
@@ -43,17 +54,48 @@ export default function AttendanceByClassPage() {
   }));
   const formatPercent = (value: number) => formatNumber(value / 100, WHOLE_PERCENT_OPTIONS);
 
+  // Percentages go out as the API's raw 0–100 numbers, not locale-formatted strings.
+  const exportColumns: ExportColumn<ClassAttendanceSummaryItem>[] = [
+    { header: t("principal.attendanceByClass.columns.class"), value: (row) => row.class_code },
+    {
+      header: t("principal.attendanceByClass.columns.present"),
+      value: (row) => row.present_percent,
+    },
+    {
+      header: t("principal.attendanceByClass.columns.absent"),
+      value: (row) => row.absent_percent,
+    },
+    { header: t("principal.attendanceByClass.columns.late"), value: (row) => row.late_percent },
+    {
+      header: t("principal.attendanceByClass.columns.excused"),
+      value: (row) => row.excused_percent,
+    },
+  ];
+
   return (
     <>
       <h1>{t("principal.attendanceByClass.title")}</h1>
       <p>{t("principal.attendanceByClass.description")}</p>
 
-      <Select
-        label={t("principal.attendanceByClass.period")}
-        options={rangeOptions}
-        value={rangeDays}
-        onChange={(value) => setRangeDays(value)}
-      />
+      <div className="principal-school__filters">
+        <Select
+          label={t("principal.attendanceByClass.period")}
+          options={rangeOptions}
+          value={rangeDays}
+          onChange={(value) => setRangeDays(value)}
+        />
+        <div className="principal-school__actions">
+          <ExportCsvButton
+            filename="attendance-by-class"
+            columns={exportColumns}
+            getRows={() =>
+              collectOffsetPages((offset) =>
+                fetchClassAttendanceSummaryPage(range, classId, offset, PAGINATION_MAX_LIMIT),
+              )
+            }
+          />
+        </div>
+      </div>
 
       {classId ? (
         <p>

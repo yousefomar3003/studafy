@@ -220,7 +220,7 @@ export function subjectRoutes(database: Database): OpenAPIHono<AppEnv> {
       deleteSubject(tx, auth.schoolId, subjectId),
     );
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   return routes;

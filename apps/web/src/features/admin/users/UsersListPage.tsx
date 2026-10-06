@@ -1,8 +1,11 @@
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, DataGrid, FilterBar, Select } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { collectCursorPages } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { CreateUserModal } from "./CreateUserModal";
@@ -15,6 +18,7 @@ import { UserSessionsPanel } from "./UserSessionsPanel";
 import "./users.css";
 
 import type { UsersFilters, UserWithRoles } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { Role } from "@studafy/constants";
 import type { DataGridColumn, DateRangeValue, SelectOption } from "@studafy/ui";
 
@@ -165,6 +169,21 @@ export default function UsersListPage() {
     },
   ];
 
+  // Same headers as the grid; roles as their stable codes and last login as an ISO timestamp.
+  const exportColumns: ExportColumn<UserWithRoles>[] = [
+    { header: t("adminPeople.users.list.columns.name"), value: (user) => user.display_name },
+    { header: t("adminPeople.users.list.columns.email"), value: (user) => user.email },
+    { header: t("adminPeople.users.list.columns.role"), value: (user) => user.roles.join(", ") },
+    {
+      header: t("adminPeople.users.list.columns.status"),
+      value: (user) => statusLabel(user.status),
+    },
+    {
+      header: t("adminPeople.users.list.columns.lastActive"),
+      value: (user) => user.last_login_at,
+    },
+  ];
+
   return (
     <>
       <div className="users-list__header">
@@ -172,7 +191,19 @@ export default function UsersListPage() {
           <h1>{t("adminPeople.users.list.title")}</h1>
           <p>{t("adminPeople.users.list.description")}</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>{t("adminPeople.users.list.newUser")}</Button>
+        <div className="users-list__header-actions">
+          <ExportCsvButton
+            filename="users"
+            columns={exportColumns}
+            getRows={() =>
+              collectCursorPages(async (pageCursor) => {
+                const page = await fetchUsersPage(filters, pageCursor, PAGINATION_MAX_LIMIT);
+                return { items: page.users, nextCursor: page.next_cursor };
+              })
+            }
+          />
+          <Button onClick={() => setCreateOpen(true)}>{t("adminPeople.users.list.newUser")}</Button>
+        </div>
       </div>
 
       <div className="users-list__toolbar">

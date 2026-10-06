@@ -342,6 +342,10 @@
       "viewThisPrompt": "<expenseLink>اعرض هذا المصروف</expenseLink> لفتح إيصاله، إن كان مرفقًا.",
       "recordAnother": "تسجيل مصروف آخر",
       "viewAll": "عرض المصروفات"
+    },
+    "import": {
+      "title": "استيراد المصروفات",
+      "amountPositive": "يجب أن يكون المبلغ أكبر من صفر."
     }
   },
   "invoiceStatus": {

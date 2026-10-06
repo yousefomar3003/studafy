@@ -1,12 +1,16 @@
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, Chip, DataGrid, Select, useCursorPagination } from "@studafy/ui";
 import { useCallback, useState } from "react";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { collectCursorPages } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { fetchAnnouncementsPage } from "./queries";
 import { AUDIENCE_TYPE_LABEL_KEYS, roleLabelKey } from "./schema";
 
 import type { Announcement, AnnouncementStatus } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 import type { TFunction } from "i18next";
 
@@ -128,6 +132,39 @@ export function AnnouncementHistoryTable({ refreshToken }: AnnouncementHistoryTa
     },
   ];
 
+  // Same headers as the grid, with reach split into its two raw counts and "when" as an ISO timestamp.
+  const exportColumns: ExportColumn<Announcement>[] = [
+    { header: t("adminSchool.announcements.history.columns.title"), value: (a) => a.title },
+    { header: t("adminSchool.announcements.history.mandatory"), value: (a) => a.mandatory },
+    {
+      header: t("adminSchool.announcements.history.columns.audience"),
+      value: (a) => audienceLabel(a, t),
+    },
+    {
+      header: t("adminSchool.announcements.history.columns.status"),
+      value: (a) =>
+        a.status === "published"
+          ? t("adminSchool.announcements.history.status.published")
+          : t("adminSchool.announcements.history.status.scheduled"),
+    },
+    {
+      header: t("adminSchool.announcements.history.columns.when"),
+      value: (a) => (a.status === "published" && a.published_at ? a.published_at : a.scheduled_at),
+    },
+    {
+      header: t("adminSchool.announcements.history.export.recipients"),
+      value: (a) => a.recipient_count,
+    },
+    {
+      header: t("adminSchool.announcements.history.export.notified"),
+      value: (a) => a.notified_count,
+    },
+    {
+      header: t("adminSchool.announcements.history.columns.sentBy"),
+      value: (a) => a.created_by_name,
+    },
+  ];
+
   return (
     <>
       <div className="announcements-history__toolbar">
@@ -136,6 +173,19 @@ export function AnnouncementHistoryTable({ refreshToken }: AnnouncementHistoryTa
           options={statusOptions}
           value={status}
           onChange={(value) => setStatus(value)}
+        />
+        <ExportCsvButton
+          filename="announcements"
+          columns={exportColumns}
+          getRows={() =>
+            collectCursorPages((cursor) =>
+              fetchAnnouncementsPage(
+                cursor,
+                status === "" ? undefined : status,
+                PAGINATION_MAX_LIMIT,
+              ),
+            )
+          }
         />
       </div>
 

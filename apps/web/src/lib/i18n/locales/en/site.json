@@ -467,7 +467,10 @@
         "status": "Status",
         "amountDue": "Amount due",
         "amountPaid": "Amount paid",
-        "documents": "Documents"
+        "documents": "Documents",
+        "periodStart": "Period start",
+        "periodEnd": "Period end",
+        "currency": "Currency"
       },
       "periodRange": "{{start}} – {{end}}",
       "status": {

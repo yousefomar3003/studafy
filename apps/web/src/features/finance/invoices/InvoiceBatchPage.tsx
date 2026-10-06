@@ -1,9 +1,12 @@
 import { ApiError } from "@studafy/api-client";
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, Card, DataGrid, Select, useToast } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { collectCursorPages } from "../../../lib/data-transfer";
 import { useTranslation } from "../../../lib/i18n";
 import { fetchActiveClasses } from "../../admin/announcements/queries";
 import { fetchFeeStructures } from "../fees/queries";
@@ -19,6 +22,7 @@ import { fetchInvoiceBatch, fetchInvoiceBatchItemsPage, invoiceBatchQueryKey } f
 import "./invoices.css";
 
 import type { InvoiceBatch, InvoiceBatchItem, InvoiceBatchItemStatus } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { ClassOption } from "../../admin/announcements/queries";
 import type { FeeStructure } from "../fees/queries";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
@@ -320,6 +324,19 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
     },
   ];
 
+  const exportColumns: ExportColumn<InvoiceBatchItem>[] = [
+    { header: t("finance.common.student"), value: (row) => row.student_name },
+    { header: t("finance.common.admissionNumber"), value: (row) => row.admission_number },
+    {
+      header: t("finance.common.status"),
+      value: (row) => invoiceBatchItemStatusLabel(row.status, t),
+    },
+    {
+      header: t("finance.invoices.batch.result"),
+      value: (row) => row.erpnext_docname ?? row.error_message,
+    },
+  ];
+
   return (
     <>
       {batch ? (
@@ -385,6 +402,21 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
             setCursor(undefined);
             setCursorHistory([]);
           }}
+        />
+        <ExportCsvButton
+          filename="invoice-batch-items"
+          columns={exportColumns}
+          getRows={() =>
+            collectCursorPages(async (pageCursor) => {
+              const page = await fetchInvoiceBatchItemsPage(
+                batchId,
+                pageCursor,
+                statusFilter,
+                PAGINATION_MAX_LIMIT,
+              );
+              return { items: page.items, nextCursor: page.next_cursor };
+            })
+          }
         />
       </div>
 

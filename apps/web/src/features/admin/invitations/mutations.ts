@@ -59,18 +59,22 @@ function invalidateInvitationLists(queryClient: QueryClient): void {
 // Create
 // ---------------------------------------------------------------------------
 
-/** `POST /api/invitations` — issues a token, returned exactly once in the response. */
+/** `POST /api/invitations` — issues a token, returned exactly once in the response. Also the
+ * per-row create behind the invitations board's CSV import, which invalidates the lists once at the
+ * end rather than after every row. */
+export async function createInvitation(values: CreateInvitationValues) {
+  const { data } = await api.POST("/api/invitations", {
+    body: { email: values.email, role: values.role, expiry_days: values.expiry_days },
+  });
+  if (!data) throw new Error("Invitation creation returned no data.");
+  return data;
+}
+
 export function useCreateInvitation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (values: CreateInvitationValues) => {
-      const { data } = await api.POST("/api/invitations", {
-        body: { email: values.email, role: values.role, expiry_days: values.expiry_days },
-      });
-      if (!data) throw new Error("Invitation creation returned no data.");
-      return data;
-    },
+    mutationFn: createInvitation,
     onSuccess: () => invalidateInvitationLists(queryClient),
   });
 }

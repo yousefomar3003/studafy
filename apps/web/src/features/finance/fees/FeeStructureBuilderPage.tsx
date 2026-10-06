@@ -2,6 +2,8 @@ import { Button, Select } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { allRows } from "../../../lib/data-transfer";
 import { useTranslation } from "../../../lib/i18n";
 
 import { FeeStructureForm } from "./FeeStructureForm";
@@ -15,7 +17,8 @@ import {
 
 import "./fee-structure-builder.css";
 
-import type { AcademicYear } from "./queries";
+import type { AcademicYear, FeeStructure } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { SelectOption } from "@studafy/ui";
 
 /**
@@ -50,6 +53,19 @@ export default function FeeStructureBuilderPage() {
     setSelectedErpnextName(null);
   }
 
+  // The list is already loaded whole for the selected year, so export is just these rows.
+  const exportColumns: ExportColumn<FeeStructure>[] = [
+    { header: t("finance.fees.builder.colTitle"), value: (row) => row.title },
+    { header: t("finance.fees.builder.colProgram"), value: (row) => row.program },
+    { header: t("finance.common.total"), value: (row) => row.total_amount },
+    { header: t("finance.common.currency"), value: (row) => row.currency },
+    {
+      header: t("finance.common.status"),
+      value: (row) => feeStructureStatusLabel(row.erpnext_status, t),
+    },
+    { header: t("finance.common.erpnextDocument"), value: (row) => row.erpnext_name },
+  ];
+
   return (
     <>
       <div className="fee-builder__header">
@@ -57,9 +73,17 @@ export default function FeeStructureBuilderPage() {
           <h1>{t("finance.fees.builder.title")}</h1>
           <p>{t("finance.fees.builder.intro")}</p>
         </div>
-        <Button variant="secondary" onClick={() => setSelectedErpnextName(null)}>
-          {t("finance.fees.builder.newStructure")}
-        </Button>
+        <div className="fee-builder__header-actions">
+          <ExportCsvButton
+            filename="fee-structures"
+            columns={exportColumns}
+            getRows={() => Promise.resolve(allRows(structures))}
+            disabled={structuresQuery.isPending}
+          />
+          <Button variant="secondary" onClick={() => setSelectedErpnextName(null)}>
+            {t("finance.fees.builder.newStructure")}
+          </Button>
+        </div>
       </div>
 
       <div className="fee-builder__filter">

@@ -13,6 +13,7 @@ import {
 import type { AcademicYear, Class, Term } from "../../admin/timetable/queries";
 import type { components } from "@studafy/api-client";
 
+export type Course = components["schemas"]["Course"];
 export type Exam = components["schemas"]["Exam"];
 export type Gradebook = components["schemas"]["Gradebook"];
 export type GradeSubmission = components["schemas"]["GradeSubmission"];
@@ -59,6 +60,45 @@ async function fetchClassesForTerm(termId: string): Promise<Class[]> {
   return classes;
 }
 
+/** Every course in the catalog. Courses are listed per subject, so this walks the subjects first —
+ * used to resolve course codes in the classes CSV import. */
+async function fetchCourses(): Promise<Course[]> {
+  const subjectIds: string[] = [];
+  for (let page = 0; page < MAX_CLASS_PAGES; page += 1) {
+    const { data } = await api.GET("/api/academics/subjects", {
+      params: { query: { limit: CLASS_PAGE_SIZE, offset: page * CLASS_PAGE_SIZE } },
+    });
+    const rows = (data?.subjects ?? []) as components["schemas"]["Subject"][];
+    subjectIds.push(...rows.map((subject) => subject.id));
+    if (rows.length < CLASS_PAGE_SIZE || subjectIds.length >= (data?.total ?? 0)) break;
+  }
+  const perSubject = await Promise.all(
+    subjectIds.map(async (subjectId) => {
+      const courses: Course[] = [];
+      for (let page = 0; page < MAX_CLASS_PAGES; page += 1) {
+        const { data } = await api.GET("/api/academics/subjects/{subjectId}/courses", {
+          params: {
+            path: { subjectId },
+            query: { limit: CLASS_PAGE_SIZE, offset: page * CLASS_PAGE_SIZE },
+          },
+        });
+        const rows = (data?.courses ?? []) as Course[];
+        courses.push(...rows);
+        if (rows.length < CLASS_PAGE_SIZE || courses.length >= (data?.total ?? 0)) break;
+      }
+      return courses;
+    }),
+  );
+  return perSubject.flat();
+}
+
+export function useCourses(enabled = true) {
+  return useQuery({ queryKey: [KEY, "courses"], queryFn: fetchCourses, enabled });
+}
+
+/** Prefix of every per-term class list's query key — invalidate this after creating classes. */
+export const CLASSES_KEY_ROOT = [KEY, "classes"] as const;
+
 export function useAcademicYears() {
   return useQuery({ queryKey: [KEY, "years"], queryFn: fetchAcademicYears });
 }
@@ -73,7 +113,7 @@ export function useTerms(yearId: string | undefined) {
 
 export function useClassesForTerm(termId: string | undefined) {
   return useQuery({
-    queryKey: [KEY, "classes", termId],
+    queryKey: [...CLASSES_KEY_ROOT, termId],
     queryFn: () => fetchClassesForTerm(termId!),
     enabled: termId !== undefined,
   });
@@ -102,7 +142,7 @@ export function useTermsForYears(yearIds: readonly string[]) {
 export function useClassesForTerms(termIds: readonly string[]) {
   return useQueries({
     queries: termIds.map((termId) => ({
-      queryKey: [KEY, "classes", termId],
+      queryKey: [...CLASSES_KEY_ROOT, termId],
       queryFn: () => fetchClassesForTerm(termId),
     })),
     combine: (results) => results.flatMap((result) => result.data ?? []),
@@ -243,8 +283,11 @@ export function useExamsForClasses(classes: readonly Class[]) {
   });
 }
 
+/** Prefix of every school-events window's query key — invalidate this after creating events. */
+export const SCHOOL_EVENTS_KEY_ROOT = [KEY, "events"] as const;
+
 export function schoolEventsKey(from: string, to: string) {
-  return [KEY, "events", from, to] as const;
+  return [...SCHOOL_EVENTS_KEY_ROOT, from, to] as const;
 }
 
 export function useSchoolEvents(from: string, to: string) {
@@ -262,7 +305,7 @@ export function useSchoolEvents(from: string, to: string) {
 
 function useInvalidateEvents() {
   const client = useQueryClient();
-  return () => client.invalidateQueries({ queryKey: [KEY, "events"] });
+  return () => client.invalidateQueries({ queryKey: SCHOOL_EVENTS_KEY_ROOT });
 }
 
 export function useCreateSchoolEvent() {

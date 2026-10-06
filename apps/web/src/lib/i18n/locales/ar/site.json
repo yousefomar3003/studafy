@@ -471,7 +471,10 @@
         "status": "الحالة",
         "amountDue": "المبلغ المستحق",
         "amountPaid": "المبلغ المدفوع",
-        "documents": "المستندات"
+        "documents": "المستندات",
+        "periodStart": "بداية الفترة",
+        "periodEnd": "نهاية الفترة",
+        "currency": "العملة"
       },
       "periodRange": "{{start}} – {{end}}",
       "status": {

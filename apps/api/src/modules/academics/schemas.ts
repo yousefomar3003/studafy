@@ -669,8 +669,12 @@ export const studentIdParamSchema = z
 // ---------------------------------------------------------------------------
 
 export const timetableVersionStatusSchema = z
-  .enum(["draft", "pending", "approved"])
-  .openapi({ description: "Lifecycle state of a timetable version." });
+  .enum(["draft", "pending", "approved", "archived"])
+  .openapi({
+    description:
+      "Lifecycle state of a timetable version. `approved` is the term's live timetable (at most one " +
+      "per term); `archived` is a previously live version superseded by a newer approval.",
+  });
 
 export type TimetableVersionStatus = z.infer<typeof timetableVersionStatusSchema>;
 
@@ -862,6 +866,53 @@ export const rejectTimetableBodySchema = z
   .openapi("RejectTimetableBody");
 
 export type RejectTimetableBody = z.infer<typeof rejectTimetableBodySchema>;
+
+export const deleteTimetableVersionQuerySchema = z
+  .object({
+    discard_slots: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) => value === "true")
+      .openapi({
+        description:
+          "Also delete the draft's slots (discarding unpublished edits). Without it a draft that " +
+          "still has slots is refused with 409.",
+        example: "true",
+      }),
+  })
+  .openapi("DeleteTimetableVersionQuery");
+
+// ---------------------------------------------------------------------------
+// Timetable: School week settings
+// ---------------------------------------------------------------------------
+
+const schoolDaysSchema = z
+  .array(z.number().int().min(1).max(7))
+  .min(1)
+  .max(7)
+  .refine((days) => new Set(days).size === days.length, { message: "Days must be unique." })
+  .openapi({
+    description: "Teaching weekdays in display order, 1=Mon..7=Sun (same numbering as slots).",
+    example: [7, 1, 2, 3, 4],
+  });
+
+export const timetableSettingsSchema = z
+  .object({
+    school_days: schoolDaysSchema,
+    periods_per_day: z
+      .number()
+      .int()
+      .min(1)
+      .max(16)
+      .openapi({ description: "Number of periods in a teaching day.", example: 8 }),
+  })
+  .openapi("TimetableSettings");
+
+export type TimetableSettings = z.infer<typeof timetableSettingsSchema>;
+
+export const updateTimetableSettingsBodySchema = timetableSettingsSchema.openapi(
+  "UpdateTimetableSettingsBody",
+);
 
 // ---------------------------------------------------------------------------
 // Timetable: Conflict payload (extension of ProblemDetails for 409)

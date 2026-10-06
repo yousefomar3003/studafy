@@ -1,6 +1,10 @@
-import { api } from "../../../lib/api";
-import { fetchOpenDisciplineIncidents } from "../queries";
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 
+import { api } from "../../../lib/api";
+import { collectOffsetPages, MAX_EXPORT_ROWS } from "../../../lib/data-transfer";
+import { fetchOpenDisciplineIncidents, OPEN_DISCIPLINE_STATUSES } from "../queries";
+
+import type { CollectedRows } from "../../../lib/data-transfer";
 import type { DisciplineIncident, DisciplineIncidentStatus } from "../queries";
 import type { components } from "@studafy/api-client";
 
@@ -32,19 +36,44 @@ export async function fetchIncidentsByFilter(
     const { items } = await fetchOpenDisciplineIncidents(LIST_LIMIT);
     return items;
   }
+  const { items } = await fetchIncidentsPage(filter === "all" ? undefined : filter, 0);
+  return items;
+}
+
+/** One offset page of incidents, optionally narrowed to one exact status. */
+async function fetchIncidentsPage(
+  status: DisciplineIncidentStatus | undefined,
+  offset: number,
+  limit: number = LIST_LIMIT,
+): Promise<{ items: DisciplineIncident[]; total: number }> {
   const { data } = await api.GET("/api/discipline/incidents", {
-    params: {
-      query: {
-        limit: LIST_LIMIT,
-        offset: 0,
-        ...(filter === "all" ? {} : { status: filter }),
-      },
-    },
+    params: { query: { limit, offset, ...(status ? { status } : {}) } },
   });
   // `readonly DisciplineIncident[]` loses its array prototype through the generated response type
   // here — the same pre-existing `@studafy/api-client` typing gap `NotificationBell.tsx` documents
   // for `notifications`. The annotation restores it without widening to `any`.
-  return (data?.incidents ?? []) as DisciplineIncident[];
+  return { items: (data?.incidents ?? []) as DisciplineIncident[], total: data?.total ?? 0 };
+}
+
+/** Every incident matching a list filter, walking all pages (the CSV export). "open" walks each
+ * open status separately and merges newest first, like the on-screen list. */
+export async function collectIncidentsByFilter(
+  filter: IncidentListFilter,
+): Promise<CollectedRows<DisciplineIncident>> {
+  const statuses: (DisciplineIncidentStatus | undefined)[] =
+    filter === "open" ? [...OPEN_DISCIPLINE_STATUSES] : [filter === "all" ? undefined : filter];
+  const pages = await Promise.all(
+    statuses.map((status) =>
+      collectOffsetPages((offset) => fetchIncidentsPage(status, offset, PAGINATION_MAX_LIMIT)),
+    ),
+  );
+  const rows = pages
+    .flatMap((page) => page.rows)
+    .sort((a, b) => b.incident_at.localeCompare(a.incident_at));
+  return {
+    rows: rows.slice(0, MAX_EXPORT_ROWS),
+    truncated: rows.length > MAX_EXPORT_ROWS || pages.some((page) => page.truncated),
+  };
 }
 
 export async function fetchIncident(incidentId: string): Promise<DisciplineIncident> {

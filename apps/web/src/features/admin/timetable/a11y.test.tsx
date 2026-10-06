@@ -11,9 +11,9 @@ import { expectNoA11yViolations } from "../../../lib/test/axe";
 import type { SessionTokens } from "../../../lib/auth";
 import type { ComponentType } from "react";
 
-/** Automated accessibility audit for the timetable builder, mirroring `admin/students/a11y.test.tsx`
- * — one render per representative state: empty, the create-draft dialog, a draft grid with a slot
- * already placed, and that slot's edit dialog. */
+/** Automated accessibility audit for the timetable workspace, mirroring `admin/students/a11y.test.tsx`
+ * — one render per representative state: a term with no timetable, a draft grid with a lesson
+ * already placed, that lesson's edit dialog, the add-lesson dialog, and the school week dialog. */
 
 const YEAR = {
   id: "year-1",
@@ -146,6 +146,11 @@ function getMockImplementation(withVersion: boolean, withSlot: boolean) {
         data: { timetable_slots: withSlot ? [SLOT_A] : [], total: withSlot ? 1 : 0 },
       });
     }
+    if (path === "/api/academics/timetable-settings") {
+      return Promise.resolve<unknown>({
+        data: { school_days: [7, 1, 2, 3, 4], periods_per_day: 4 },
+      });
+    }
     if (path === "/api/academics/classes") {
       return Promise.resolve<unknown>({ data: { classes: [CLASS_A], total: 1 } });
     }
@@ -221,29 +226,16 @@ afterEach(() => {
   deleteMock.mockClear();
 });
 
-describe("timetable builder accessibility", () => {
-  test("no versions yet", async () => {
+describe("timetable workspace accessibility", () => {
+  test("no timetable yet", async () => {
     getMock.mockImplementation(getMockImplementation(false, false));
     const { container } = await renderAsOrgAdmin(await loadPage());
-    await screen.findByText("Create a draft version to start building this term's schedule.");
+    await screen.findByText("No timetable for this term yet");
 
     await expectNoA11yViolations(container);
   });
 
-  test("new-draft modal open", async () => {
-    getMock.mockImplementation(getMockImplementation(false, false));
-    const { container } = await renderAsOrgAdmin(await loadPage());
-    // Waiting for this text (rather than just the button's presence) guarantees the term has
-    // finished auto-selecting and the "New draft" button is no longer disabled.
-    await screen.findByText("Create a draft version to start building this term's schedule.");
-
-    fireEvent.click(screen.getByRole("button", { name: "New draft" }));
-    await screen.findByRole("dialog", { name: "New draft timetable" });
-
-    await expectNoA11yViolations(container);
-  });
-
-  test("draft grid with a placed slot", async () => {
+  test("draft grid with a placed lesson", async () => {
     getMock.mockImplementation(getMockImplementation(true, true));
     const { container } = await renderAsOrgAdmin(await loadPage());
     await screen.findByRole("button", { name: /MATH-101, Monday period 1/ });
@@ -251,13 +243,34 @@ describe("timetable builder accessibility", () => {
     await expectNoA11yViolations(container);
   });
 
-  test("edit-slot modal open", async () => {
+  test("edit-lesson modal open", async () => {
     getMock.mockImplementation(getMockImplementation(true, true));
     const { container } = await renderAsOrgAdmin(await loadPage());
     const slotButton = await screen.findByRole("button", { name: /MATH-101, Monday period 1/ });
 
     fireEvent.click(slotButton);
     await screen.findByRole("dialog", { name: "Edit slot" });
+
+    await expectNoA11yViolations(container);
+  });
+
+  test("add-lesson modal open", async () => {
+    getMock.mockImplementation(getMockImplementation(true, true));
+    const { container } = await renderAsOrgAdmin(await loadPage());
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add a lesson on Tuesday period 2" }),
+    );
+    await screen.findByRole("dialog", { name: "Add lesson" });
+
+    await expectNoA11yViolations(container);
+  });
+
+  test("school week modal open", async () => {
+    getMock.mockImplementation(getMockImplementation(true, true));
+    const { container } = await renderAsOrgAdmin(await loadPage());
+    await screen.findByRole("table");
+    fireEvent.click(screen.getByRole("button", { name: "School week" }));
+    await screen.findByRole("dialog", { name: "School week" });
 
     await expectNoA11yViolations(container);
   });

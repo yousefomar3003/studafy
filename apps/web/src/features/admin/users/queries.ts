@@ -36,11 +36,15 @@ export function usersListQueryKey(filters: UsersFilters, cursor: string | undefi
 
 const PAGE_SIZE = 25;
 
-export async function fetchUsersPage(filters: UsersFilters, cursor: string | undefined) {
+export async function fetchUsersPage(
+  filters: UsersFilters,
+  cursor: string | undefined,
+  limit: number = PAGE_SIZE,
+) {
   const { data } = await api.GET("/api/users", {
     params: {
       query: {
-        limit: PAGE_SIZE,
+        limit,
         cursor,
         role: filters.role || undefined,
         status: filters.status || undefined,

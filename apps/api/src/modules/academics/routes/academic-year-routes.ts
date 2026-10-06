@@ -249,7 +249,7 @@ export function academicYearRoutes(database: Database): OpenAPIHono<AppEnv> {
       deleteAcademicYear(tx, auth.schoolId, yearId),
     );
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   routes.openapi(rolloverYearRoute, async (c) => {

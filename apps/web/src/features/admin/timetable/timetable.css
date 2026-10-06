@@ -1,79 +1,166 @@
 /**
- * Timetable builder screens. Loaded only when `/portal/admin/timetable` is, matching the rest of the
- * admin feature set (see `admin/students/students.css`'s doc comment for why each feature owns its
- * own stylesheet rather than a shared one).
+ * Timetable screens — the shared `TimetableWorkspace` rendered by `/portal/admin/timetable` and
+ * `/portal/principal/timetable`. Loaded only with those routes, matching the rest of the admin
+ * feature set (see `admin/students/students.css`'s doc comment for why each feature owns its own
+ * stylesheet rather than a shared one).
  */
 
-.timetable-builder__header {
+/* Lesson colours, one per course (assigned in TimetableGrid). Pastel fills under the regular
+ * foreground colour keep text contrast well above 4.5:1; the stronger edge colour carries the hue.
+ * The app is light-only (see styles/global.css), so there is no dark variant. */
+.timetable-workspace {
+  --tt-tone-0-bg: #e8f0fe;
+  --tt-tone-0-edge: #3b6fd8;
+  --tt-tone-1-bg: #e4f5ea;
+  --tt-tone-1-edge: #2f9e5b;
+  --tt-tone-2-bg: #fcf1d8;
+  --tt-tone-2-edge: #c98a12;
+  --tt-tone-3-bg: #efe8fc;
+  --tt-tone-3-edge: #7c4fd6;
+  --tt-tone-4-bg: #fce7ed;
+  --tt-tone-4-edge: #d1456f;
+  --tt-tone-5-bg: #dff4f4;
+  --tt-tone-5-edge: #1f9a9a;
+  --tt-tone-6-bg: #fdecdf;
+  --tt-tone-6-edge: #d9711f;
+  --tt-tone-7-bg: #edf0f4;
+  --tt-tone-7-edge: #64748b;
+
   display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* --- Header, filters, status --- */
+
+.timetable-workspace__header {
+  display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-16);
-  margin-bottom: var(--space-16);
 }
 
-.timetable-builder__selectors {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-16);
-  margin-bottom: var(--space-16);
+.timetable-workspace__header h1 {
+  margin: 0 0 var(--space-4);
 }
 
-.timetable-builder__version-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-12);
-  margin-bottom: var(--space-16);
-}
-
-.timetable-builder__readonly-note {
+.timetable-workspace__intro {
+  margin: 0;
   color: var(--color-muted-foreground);
-  font-size: var(--font-size-sm);
-  margin: 0;
 }
 
-.timetable-builder__rejected-note {
-  color: var(--color-danger-subtle-foreground);
-  background-color: var(--color-danger-subtle-bg);
-  border-radius: var(--radius-md);
-  padding: var(--space-4) var(--space-12);
-  font-size: var(--font-size-sm);
-  margin: 0;
+.timetable-workspace__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
 }
 
-/* Status pill — draft/submitted/approved must read as visually distinct states at a glance. */
-.timetable-builder__status-pill {
-  display: inline-block;
-  padding: var(--space-4) var(--space-12);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+.timetable-workspace__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-12) var(--space-16);
+  padding: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
   background-color: var(--color-surface);
 }
 
-.timetable-builder__status-pill[data-status="draft"] {
-  background-color: var(--color-warning-subtle-bg);
-  color: var(--color-warning-subtle-foreground);
+.timetable-workspace__summary {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
 }
 
-.timetable-builder__status-pill[data-status="pending"] {
-  background-color: var(--color-accent-subtle-bg);
-  color: var(--color-accent-subtle-foreground);
+.timetable-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
 }
 
-.timetable-builder__status-pill[data-status="approved"] {
+.timetable-status[data-tone="live"] {
   background-color: var(--color-success-subtle-bg);
+  border-color: var(--color-success-100);
+}
+
+.timetable-status[data-tone="draft"] {
+  background-color: var(--color-warning-subtle-bg);
+  border-color: var(--color-warning-100);
+}
+
+.timetable-status[data-tone="pending"] {
+  background-color: var(--color-accent-subtle-bg);
+  border-color: var(--color-accent-100);
+}
+
+.timetable-status__pill {
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background-color: var(--color-background);
+}
+
+.timetable-status[data-tone="live"] .timetable-status__pill {
   color: var(--color-success-subtle-foreground);
 }
 
-/* --- Grid editor --- */
+.timetable-status[data-tone="draft"] .timetable-status__pill {
+  color: var(--color-warning-subtle-foreground);
+}
+
+.timetable-status[data-tone="pending"] .timetable-status__pill {
+  color: var(--color-accent-subtle-foreground);
+}
+
+.timetable-status__text {
+  flex: 1 1 280px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.timetable-status__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.timetable-status__hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.timetable-empty {
+  padding: var(--space-48) var(--space-24);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.timetable-empty h2 {
+  margin: 0 0 var(--space-8);
+  font-size: var(--font-size-lg);
+}
+
+.timetable-empty p {
+  margin: 0 auto var(--space-16);
+  max-width: 48ch;
+  color: var(--color-muted-foreground);
+}
+
+/* --- Grid --- */
 
 .timetable-grid {
   display: flex;
   flex-direction: column;
-  gap: var(--space-16);
+  gap: var(--space-12);
 }
 
 .timetable-grid__conflict {
@@ -88,14 +175,31 @@
   font-size: var(--font-size-sm);
 }
 
+.timetable-grid__palette {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-background);
+}
+
+.timetable-grid__palette-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4) var(--space-12);
+}
+
 .timetable-grid__palette h2 {
-  margin: 0 0 var(--space-4);
+  margin: 0;
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
 }
 
 .timetable-grid__palette-status {
-  margin: 0 0 var(--space-8);
+  margin: 0;
   color: var(--color-muted-foreground);
   font-size: var(--font-size-xs);
 }
@@ -116,18 +220,18 @@
 
 .timetable-grid__chip {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  background-color: var(--color-background);
+  border-inline-start: 4px solid var(--tt-edge, var(--color-border));
+  border-radius: var(--radius-md);
+  background-color: var(--tt-bg, var(--color-background));
   color: var(--color-foreground);
   padding: var(--space-4) var(--space-12);
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   cursor: grab;
 }
 
 .timetable-grid__chip[aria-pressed="true"] {
-  border-color: var(--color-accent);
-  background-color: var(--color-accent-subtle-bg);
-  color: var(--color-accent-subtle-foreground);
+  box-shadow: 0 0 0 2px var(--tt-edge, var(--color-accent));
 }
 
 .timetable-grid__chip:focus-visible {
@@ -135,78 +239,129 @@
   outline-offset: var(--focus-ring-offset);
 }
 
+/* Scrolls sideways on narrow screens instead of crushing columns below a readable width. */
+.timetable-grid__scroller {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-background);
+}
+
 .timetable-grid__table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 640px;
+  border-collapse: separate;
+  border-spacing: 0;
+  /* Fixed layout gives every day the same width, however full its column is. */
+  table-layout: fixed;
+}
+
+.timetable-grid__period-col {
+  width: 64px;
 }
 
 .timetable-grid__table th,
 .timetable-grid__table td {
-  border: 1px solid var(--color-border);
-  padding: var(--space-4);
-  text-align: center;
-  vertical-align: middle;
+  border-inline-end: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0;
+  vertical-align: top;
+}
+
+.timetable-grid__table tr > :last-child {
+  border-inline-end: none;
+}
+
+.timetable-grid__table tbody tr:last-child > * {
+  border-bottom: none;
 }
 
 .timetable-grid__table thead th {
+  padding: var(--space-12) var(--space-8);
   background-color: var(--color-surface);
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
 }
 
-.timetable-grid__table tbody th {
+.timetable-grid__table thead abbr {
+  text-decoration: none;
+}
+
+.timetable-grid__table thead th[data-today="true"] {
+  color: var(--color-accent-subtle-foreground);
+  box-shadow: inset 0 -3px 0 var(--color-accent);
+}
+
+.timetable-grid__table thead th[data-off-week="true"] {
+  color: var(--color-muted-foreground);
+  font-style: italic;
+}
+
+.timetable-grid__table td[data-today="true"] {
+  background-color: color-mix(in srgb, var(--color-accent-subtle-bg) 35%, transparent);
+}
+
+.timetable-grid__corner {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-medium) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.timetable-grid__period {
   background-color: var(--color-surface);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  vertical-align: middle !important;
 }
 
-/* Wraps zero or more slot chips plus (when editable) a trailing drop target — a cell is a school-wide
- * time slot, not a single class's seat, so it can hold several concurrent classes at once. */
+/* A cell is a school-wide time slot, not a single class's seat, so it stacks every concurrent
+ * lesson plus (when editable) a trailing "+" target. */
 .timetable-grid__cell {
-  width: 100%;
-  min-height: 48px;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-height: 72px;
   padding: var(--space-4);
-}
-
-.timetable-grid__drop-target {
-  width: 100%;
-  min-height: 24px;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-sm);
-  background: none;
-  cursor: pointer;
-  color: var(--color-muted-foreground);
-}
-
-.timetable-grid__drop-target:hover,
-.timetable-grid__drop-target:focus-visible {
-  border-color: var(--color-accent);
-  background-color: var(--color-accent-subtle-bg);
-}
-
-.timetable-grid__drop-target:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
 }
 
 .timetable-grid__slot {
+  --tt-bg: var(--tt-tone-0-bg);
+  --tt-edge: var(--tt-tone-0-edge);
+
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
-  background-color: var(--color-accent-subtle-bg);
-  color: var(--color-accent-subtle-foreground);
-  padding: var(--space-4);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "class room"
+    "teacher teacher";
+  gap: 2px var(--space-8);
+  align-items: baseline;
+  border: none;
+  border-inline-start: 4px solid var(--tt-edge);
+  border-radius: var(--radius-md);
+  background-color: var(--tt-bg);
+  color: var(--color-foreground);
+  padding: var(--space-8);
+  text-align: start;
+  font: inherit;
   cursor: pointer;
+  transition:
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.timetable-grid__slot:not(:disabled):hover {
+  box-shadow: var(--elevation-2);
+  transform: translateY(-1px);
 }
 
 .timetable-grid__slot:disabled {
   cursor: default;
-  opacity: 0.85;
 }
 
 .timetable-grid__slot:focus-visible {
@@ -216,19 +371,181 @@
 
 .timetable-grid__slot[data-conflict="true"] {
   outline: var(--focus-ring-width) solid var(--color-danger);
-  outline-offset: -2px;
+  outline-offset: 1px;
 }
 
 .timetable-grid__slot-class {
-  font-weight: var(--font-weight-medium);
+  grid-area: class;
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.timetable-grid__slot-room {
+  grid-area: room;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  background-color: color-mix(in srgb, var(--color-background) 70%, transparent);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
 }
 
 .timetable-grid__slot-meta {
+  grid-area: teacher;
+  color: var(--color-muted-foreground);
   font-size: var(--font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.timetable-grid__period-controls {
+.timetable-grid__chip[data-tone="0"],
+.timetable-grid__slot[data-tone="0"] {
+  --tt-bg: var(--tt-tone-0-bg);
+  --tt-edge: var(--tt-tone-0-edge);
+}
+
+.timetable-grid__chip[data-tone="1"],
+.timetable-grid__slot[data-tone="1"] {
+  --tt-bg: var(--tt-tone-1-bg);
+  --tt-edge: var(--tt-tone-1-edge);
+}
+
+.timetable-grid__chip[data-tone="2"],
+.timetable-grid__slot[data-tone="2"] {
+  --tt-bg: var(--tt-tone-2-bg);
+  --tt-edge: var(--tt-tone-2-edge);
+}
+
+.timetable-grid__chip[data-tone="3"],
+.timetable-grid__slot[data-tone="3"] {
+  --tt-bg: var(--tt-tone-3-bg);
+  --tt-edge: var(--tt-tone-3-edge);
+}
+
+.timetable-grid__chip[data-tone="4"],
+.timetable-grid__slot[data-tone="4"] {
+  --tt-bg: var(--tt-tone-4-bg);
+  --tt-edge: var(--tt-tone-4-edge);
+}
+
+.timetable-grid__chip[data-tone="5"],
+.timetable-grid__slot[data-tone="5"] {
+  --tt-bg: var(--tt-tone-5-bg);
+  --tt-edge: var(--tt-tone-5-edge);
+}
+
+.timetable-grid__chip[data-tone="6"],
+.timetable-grid__slot[data-tone="6"] {
+  --tt-bg: var(--tt-tone-6-bg);
+  --tt-edge: var(--tt-tone-6-edge);
+}
+
+.timetable-grid__chip[data-tone="7"],
+.timetable-grid__slot[data-tone="7"] {
+  --tt-bg: var(--tt-tone-7-bg);
+  --tt-edge: var(--tt-tone-7-edge);
+}
+
+/* "+": quiet until the cell is hovered or focused, so a full week still reads as a timetable rather
+ * than a wall of buttons; always visible while a class is picked for placing. */
+.timetable-grid__drop-target {
+  flex: 1;
+  width: 100%;
+  min-height: 32px;
+  border: 1px dashed transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.timetable-grid__cell:hover .timetable-grid__drop-target,
+.timetable-grid__drop-target:focus-visible,
+.timetable-grid__drop-target[data-picking="true"] {
+  opacity: 1;
+  border-color: var(--color-border);
+}
+
+.timetable-grid__drop-target:hover,
+.timetable-grid__drop-target:focus-visible {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+}
+
+.timetable-grid__drop-target:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (hover: none) {
+  .timetable-grid__drop-target {
+    opacity: 1;
+    border-color: var(--color-border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timetable-grid__slot,
+  .timetable-grid__drop-target {
+    transition: none;
+  }
+
+  .timetable-grid__slot:not(:disabled):hover {
+    transform: none;
+  }
+}
+
+/* --- Forms in modals --- */
+
+.timetable-slot-form,
+.timetable-week-form {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.timetable-slot-form__when {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-12);
+}
+
+.timetable-week-form__days {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-8);
+}
+
+.timetable-week-form__days legend {
+  margin-bottom: var(--space-4);
+  font-weight: var(--font-weight-medium);
+}
+
+.timetable-week-form__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.timetable-week-form__day-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--space-8);
+}
+
+.timetable-week-form__error {
+  margin: 0;
+  color: var(--color-danger-subtle-foreground);
+  font-size: var(--font-size-sm);
 }

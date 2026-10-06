@@ -1,0 +1,62 @@
+/**
+ * Shared CSV import dialog (`ImportCsvButton`). The modal supplies its own chrome; this only lays
+ * out the field list, file picker, issue list, and progress bar inside it.
+ */
+
+.data-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.data-transfer p {
+  margin: 0;
+}
+
+.data-transfer__fields,
+.data-transfer__issues {
+  margin: 0;
+  padding-inline-start: var(--space-16);
+  font-size: var(--font-size-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.data-transfer__pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.data-transfer__file-label {
+  font-weight: var(--font-weight-medium);
+}
+
+.data-transfer__muted {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.data-transfer__required {
+  color: var(--color-danger-subtle-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.data-transfer__line {
+  font-weight: var(--font-weight-semibold);
+}
+
+.data-transfer__error {
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.data-transfer__progress {
+  width: 100%;
+}

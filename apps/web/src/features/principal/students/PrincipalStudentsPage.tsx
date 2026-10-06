@@ -1,8 +1,13 @@
 import { Input, Select, Table } from "@studafy/ui";
 import { useState } from "react";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { allRows } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { studentDisplayName, useAllStudents } from "../school/queries";
+
+import type { ExportColumn } from "../../../lib/data-transfer";
+import type { StudentProfile } from "../school/queries";
 
 import "../school/principal-school.css";
 
@@ -45,6 +50,22 @@ export default function PrincipalStudentsPage() {
     )
     .sort((a, b) => studentDisplayName(a).localeCompare(studentDisplayName(b)));
 
+  const exportColumns: ExportColumn<StudentProfile>[] = [
+    { header: t("principal.students.columns.name"), value: studentDisplayName },
+    {
+      header: t("principal.students.columns.admissionNumber"),
+      value: (student) => student.admission_number,
+    },
+    {
+      header: t("principal.students.columns.dateOfBirth"),
+      value: (student) => student.date_of_birth?.slice(0, 10) ?? "",
+    },
+    {
+      header: t("principal.students.columns.status"),
+      value: (student) => t(`principal.students.status.${student.status}`, student.status),
+    },
+  ];
+
   return (
     <>
       <h1>{t("principal.students.title")}</h1>
@@ -66,6 +87,14 @@ export default function PrincipalStudentsPage() {
           value={status}
           onChange={setStatus}
         />
+        <div className="principal-school__actions">
+          <ExportCsvButton
+            filename="students"
+            columns={exportColumns}
+            getRows={() => Promise.resolve(allRows(rows))}
+            disabled={students.isPending}
+          />
+        </div>
       </div>
 
       <p className="principal-school__count">

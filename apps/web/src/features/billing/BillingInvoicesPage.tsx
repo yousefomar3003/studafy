@@ -1,6 +1,9 @@
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, DataGrid, useCursorPagination } from "@studafy/ui";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../components/ExportCsvButton";
+import { collectCursorPages } from "../../lib/data-transfer";
 import { useLocale, useTranslation } from "../../lib/i18n";
 
 import { formatIsoDate, formatMinorAmount } from "./format";
@@ -9,6 +12,7 @@ import { fetchInvoicesPage } from "./queries";
 import "./billing.css";
 
 import type { BillingInvoice } from "./queries";
+import type { ExportColumn } from "../../lib/data-transfer";
 import type { DataGridColumn } from "@studafy/ui";
 
 /** Translation keys for Stripe's invoice statuses; an unknown status renders as-is. */
@@ -91,6 +95,30 @@ export default function BillingInvoicesPage() {
     },
   ];
 
+  // Amounts as decimals (the API sends minor units, same /100 as `formatMinorAmount`). The hosted
+  // invoice and PDF links are left out: they are bearer links that open the invoice without signing in.
+  const exportColumns: ExportColumn<BillingInvoice>[] = [
+    { header: t("site.billing.invoices.columns.date"), value: (row) => row.created },
+    { header: t("site.billing.invoices.columns.periodStart"), value: (row) => row.periodStart },
+    { header: t("site.billing.invoices.columns.periodEnd"), value: (row) => row.periodEnd },
+    {
+      header: t("site.billing.invoices.columns.status"),
+      value: (row) => (row.status ? statusLabel(row.status) : null),
+    },
+    {
+      header: t("site.billing.invoices.columns.amountDue"),
+      value: (row) => (row.amountDue / 100).toFixed(2),
+    },
+    {
+      header: t("site.billing.invoices.columns.amountPaid"),
+      value: (row) => (row.amountPaid / 100).toFixed(2),
+    },
+    {
+      header: t("site.billing.invoices.columns.currency"),
+      value: (row) => row.currency.toUpperCase(),
+    },
+  ];
+
   return (
     <>
       <p className="billing-overview__caption">
@@ -98,8 +126,17 @@ export default function BillingInvoicesPage() {
       </p>
 
       <div className="billing-invoices__header">
-        <h1>{t("site.billing.invoices.title")}</h1>
-        <p>{t("site.billing.invoices.description")}</p>
+        <div>
+          <h1>{t("site.billing.invoices.title")}</h1>
+          <p>{t("site.billing.invoices.description")}</p>
+        </div>
+        <ExportCsvButton
+          filename="billing-invoices"
+          columns={exportColumns}
+          getRows={() =>
+            collectCursorPages((cursor) => fetchInvoicesPage(cursor, PAGINATION_MAX_LIMIT))
+          }
+        />
       </div>
 
       <DataGrid

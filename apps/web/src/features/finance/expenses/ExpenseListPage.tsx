@@ -1,11 +1,18 @@
+import { PERMISSIONS } from "@studafy/constants";
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, Card, DataGrid } from "@studafy/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { ImportCsvButton } from "../../../components/ImportCsvButton";
+import { usePermissions } from "../../../lib/auth";
+import { collectOffsetPages } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { EXPENSE_DOCUMENT_TYPE_LABEL_KEYS, expenseStatusLabel, expenseStatusTone } from "./labels";
+import { createExpense } from "./mutations";
 import {
   EXPENSES_PAGE_SIZE,
   expenseSummaryQueryKey,
@@ -15,10 +22,17 @@ import {
 
 import "./expenses.css";
 
-import type { Expense, ExpenseFilters } from "./queries";
+import type { CreateExpenseBody, Expense, ExpenseDocumentType, ExpenseFilters } from "./queries";
+import type { ExportColumn, ImportSpec } from "../../../lib/data-transfer";
 import type { DataGridColumn } from "@studafy/ui";
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+/** Same rules as `NewExpensePage`'s entry form. */
+const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+const EXPENSE_DOCUMENT_TYPES = Object.keys(
+  EXPENSE_DOCUMENT_TYPE_LABEL_KEYS,
+) as ExpenseDocumentType[];
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
@@ -40,6 +54,9 @@ function monthStart(month: string): Date {
 export default function ExpenseListPage() {
   const { t } = useTranslation();
   const { formatDate } = useFormatters();
+  const queryClient = useQueryClient();
+  // Same gate as the "Record expense" route (`finance/expenses/new`) and `POST /api/finance/expenses`.
+  const canCreate = usePermissions().has(PERMISSIONS.BILLING_UPDATE);
   const [categoryInput, setCategoryInput] = useState("");
   const [category, setCategory] = useState("");
   const [month, setMonth] = useState(currentMonth);
@@ -102,6 +119,97 @@ export default function ExpenseListPage() {
     },
   ];
 
+  const exportColumns: ExportColumn<Expense>[] = [
+    { header: t("finance.common.date"), value: (row) => row.expense_date },
+    {
+      header: t("finance.common.type"),
+      value: (row) => t(EXPENSE_DOCUMENT_TYPE_LABEL_KEYS[row.document_type]),
+    },
+    { header: t("finance.common.category"), value: (row) => row.category },
+    { header: t("finance.common.vendor"), value: (row) => row.vendor },
+    { header: t("finance.common.amount"), value: (row) => row.amount },
+    { header: t("finance.common.currency"), value: (row) => row.currency },
+    {
+      header: t("finance.common.status"),
+      value: (row) => expenseStatusLabel(row.erpnext_status, t),
+    },
+    { header: t("finance.common.erpnextDocument"), value: (row) => row.erpnext_name },
+    { header: t("finance.common.description"), value: (row) => row.description },
+  ];
+
+  // Mirrors `NewExpensePage`'s form: attachments go through the pre-signed upload flow and are not
+  // importable, so imported expenses are created without one.
+  const importSpec: ImportSpec<CreateExpenseBody> = {
+    templateName: "expenses-template",
+    fields: [
+      {
+        key: "document_type",
+        label: t("finance.expenses.new.documentType"),
+        required: true,
+        options: EXPENSE_DOCUMENT_TYPES,
+        example: "purchase_invoice",
+      },
+      {
+        key: "expense_date",
+        label: t("finance.expenses.new.expenseDate"),
+        type: "date",
+        example: "2026-09-15",
+      },
+      {
+        key: "category",
+        label: t("finance.common.category"),
+        required: true,
+        maxLength: 200,
+        example: "Office Supplies - SCH",
+      },
+      {
+        key: "vendor",
+        label: t("finance.common.vendor"),
+        required: true,
+        maxLength: 200,
+        example: "Stationery Co.",
+      },
+      {
+        key: "amount",
+        label: t("finance.common.amount"),
+        required: true,
+        type: "number",
+        example: "125.50",
+      },
+      {
+        key: "currency",
+        label: t("finance.common.currency"),
+        required: true,
+        maxLength: 3,
+        example: "JOD",
+      },
+      {
+        key: "description",
+        label: t("finance.common.description"),
+        maxLength: 1000,
+        example: "Printer paper",
+      },
+    ],
+    toRecord: (values) => {
+      const errors: string[] = [];
+      const amount = values.amount as number;
+      const currency = String(values.currency).toUpperCase();
+      if (!(amount > 0)) errors.push(t("finance.expenses.import.amountPositive"));
+      if (!CURRENCY_PATTERN.test(currency)) errors.push(t("finance.expenses.new.currencyInvalid"));
+      if (errors.length > 0) return { errors };
+      return {
+        document_type: values.document_type as ExpenseDocumentType,
+        category: String(values.category),
+        vendor: String(values.vendor),
+        amount,
+        currency,
+        description: values.description === null ? undefined : String(values.description),
+        expense_date: values.expense_date === null ? undefined : String(values.expense_date),
+      };
+    },
+    create: createExpense,
+  };
+
   return (
     <>
       <div className="expenses-list__header">
@@ -109,9 +217,29 @@ export default function ExpenseListPage() {
           <h1>{t("finance.expenses.list.title")}</h1>
           <p>{t("finance.expenses.list.intro")}</p>
         </div>
-        <Link to="/portal/finance/expenses/new">
-          <Button>{t("finance.common.recordExpense")}</Button>
-        </Link>
+        <div className="expenses-list__header-actions">
+          <ExportCsvButton
+            filename="expenses"
+            columns={exportColumns}
+            getRows={() =>
+              collectOffsetPages((pageOffset) =>
+                fetchExpensesPage(filters, pageOffset, PAGINATION_MAX_LIMIT),
+              )
+            }
+          />
+          {canCreate && (
+            <ImportCsvButton
+              spec={importSpec}
+              title={t("finance.expenses.import.title")}
+              onImported={() =>
+                void queryClient.invalidateQueries({ queryKey: ["finance", "expenses"] })
+              }
+            />
+          )}
+          <Link to="/portal/finance/expenses/new">
+            <Button>{t("finance.common.recordExpense")}</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="expenses-list__toolbar">

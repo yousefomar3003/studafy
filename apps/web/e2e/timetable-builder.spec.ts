@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
 /**
- * End-to-end coverage for the timetable builder (ST-191): build a draft (create it, drag-assign a
- * class into a cell) and submit it for approval, against a stubbed backend — same approach as
+ * End-to-end coverage for the timetable workspace (ST-191): create a term's first timetable,
+ * drag-assign a class into a cell, and publish it, against a stubbed backend — same approach as
  * `user-management.spec.ts`, no Postgres or `apps/api` process required.
  *
  * Placement uses the pick-then-place keyboard-equivalent path (click a class chip, then click a
@@ -223,50 +223,54 @@ async function stubTimetableBackend(page: Page): Promise<State> {
     return fulfillJson(route, 405, {});
   });
 
-  await page.route("**/api/academics/timetable-versions/*/submit", async (route) => {
-    state.versions = state.versions.map((version) => ({ ...version, status: "pending" }));
+  await page.route("**/api/academics/timetable-versions/*/publish", async (route) => {
+    state.versions = state.versions.map((version) => ({
+      ...version,
+      status: "approved",
+      submitted_at: NOW,
+      approved_at: NOW,
+    }));
     return fulfillJson(route, 200, state.versions[0]);
   });
+
+  await page.route("**/api/academics/timetable-settings*", (route) =>
+    fulfillJson(route, 200, { school_days: [7, 1, 2, 3, 4], periods_per_day: 6 }),
+  );
 
   return state;
 }
 
-test.describe("timetable builder", () => {
-  test("builds a draft and submits it for approval", async ({ page }) => {
+test.describe("timetable workspace", () => {
+  test("creates a term's first timetable and publishes it", async ({ page }) => {
     await stubPortalShellDefaults(page);
     await stubAuthenticatedSession(page);
     await stubTimetableBackend(page);
 
     await page.goto("/portal/admin/timetable");
 
-    await expect(page.getByRole("heading", { name: "Timetable builder" })).toBeVisible();
-    await expect(
-      page.getByText("Create a draft version to start building this term's schedule."),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Timetable", exact: true })).toBeVisible();
+    await expect(page.getByText("No timetable for this term yet")).toBeVisible();
 
-    // --- Draft versioning: create ---
-    await page.getByRole("button", { name: "New draft" }).click();
-    const createDialog = page.getByRole("dialog", { name: "New draft timetable" });
-    await createDialog.getByLabel("Draft name").fill("Term 1 Weekly Schedule");
-    await createDialog.getByRole("button", { name: "Create draft" }).click();
+    // --- Start the first draft ---
+    await page.getByRole("button", { name: "Create timetable" }).click();
+    await expect(page.locator('.timetable-status[data-tone="draft"]')).toBeVisible();
 
-    await expect(page.locator('[data-status="draft"]')).toBeVisible();
-    await expect(page.locator('[data-status="draft"]')).toHaveText("Draft");
-
-    // --- Drag-assign: pick MATH-101, place it on Monday period 1 ---
+    // --- Drag-assign: pick MATH-101, place it on Sunday period 1 ---
     await page.getByRole("button", { name: "MATH-101" }).click();
-    await page.getByRole("button", { name: "Place MATH-101 on Monday period 1" }).click();
+    await page.getByRole("button", { name: "Place MATH-101 on Sunday period 1" }).click();
 
-    await expect(page.getByRole("button", { name: /MATH-101, Monday period 1/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /MATH-101, Sunday period 1/ })).toBeVisible();
 
-    // --- Submit for approval ---
-    await page.getByRole("button", { name: "Submit for approval" }).click();
+    // --- Publish ---
+    await page.getByRole("button", { name: "Publish" }).click();
 
-    await expect(page.locator('[data-status="pending"]')).toBeVisible();
-    await expect(page.locator('[data-status="pending"]')).toHaveText("Submitted");
-    await expect(page.getByText("This version is submitted and read-only.")).toBeVisible();
-    // Read-only: the class palette used to build the draft is gone (the placed slot itself, whose
+    await expect(page.locator('.timetable-status[data-tone="live"]')).toBeVisible();
+    await expect(
+      page.getByText(/Teachers and students are following this timetable/),
+    ).toBeVisible();
+    // Read-only: the class palette used to build the draft is gone (the placed lesson itself, whose
     // accessible name contains "MATH-101" too, correctly remains — hence `exact` here).
     await expect(page.getByRole("button", { name: "MATH-101", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Edit timetable" })).toBeVisible();
   });
 });

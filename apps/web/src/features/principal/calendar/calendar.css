@@ -13,7 +13,8 @@
   margin-block: var(--space-16);
 }
 
-.principal-calendar__nav {
+.principal-calendar__nav,
+.principal-calendar__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

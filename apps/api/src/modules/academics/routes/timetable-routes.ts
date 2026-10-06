@@ -1,9 +1,12 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { apiProblemOpenApiSchema } from "../../../openapi/components";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
@@ -12,14 +15,17 @@ import {
   copyTimetableResponseSchema,
   createTimetableSlotBodySchema,
   createTimetableVersionBodySchema,
+  deleteTimetableVersionQuerySchema,
   rejectTimetableBodySchema,
   slotIdParamSchema,
   timetableSlotListSchema,
   timetableSlotQuerySchema,
+  timetableSettingsSchema,
   timetableSlotSchema,
   timetableVersionListSchema,
   timetableVersionQuerySchema,
   timetableVersionSchema,
+  updateTimetableSettingsBodySchema,
   updateTimetableSlotBodySchema,
   updateTimetableVersionBodySchema,
   versionIdParamSchema,
@@ -31,12 +37,15 @@ import {
   createTimetableVersion,
   deleteTimetableSlot,
   deleteTimetableVersion,
+  getTimetableSettings,
   getTimetableSlot,
   getTimetableVersion,
   listTimetableSlots,
   listTimetableVersions,
+  publishTimetableVersion,
   rejectTimetableVersion,
   submitTimetableVersion,
+  updateTimetableSettings,
   updateTimetableSlot,
   updateTimetableVersion,
 } from "../timetable-service";
@@ -173,9 +182,10 @@ const deleteVersionRoute = createRoute({
   operationId: "deleteTimetableVersion",
   summary: "Delete a timetable version",
   description:
-    "Deletes a draft timetable version. Only draft versions with no slots can be deleted.",
+    "Deletes a draft timetable version. A draft that still has slots is refused unless " +
+    "`discard_slots=true`, which deletes its slots too.",
   security: [{ bearerAuth: [] }],
-  request: { params: versionIdParamSchema },
+  request: { params: versionIdParamSchema, query: deleteTimetableVersionQuerySchema },
   responses: {
     204: { description: "Timetable version deleted.", headers: requestIdHeaders },
     ...standardResponses({}, [401, 403, 404, 409, 500]),
@@ -215,6 +225,28 @@ const approveVersionRoute = createRoute({
     {
       200: {
         description: "The approved timetable version.",
+        schema: timetableVersionSchema,
+      },
+    },
+    [401, 403, 404, 409, 500],
+  ),
+});
+
+const publishVersionRoute = createRoute({
+  method: "post",
+  path: "/api/academics/timetable-versions/{versionId}/publish",
+  tags: ["Timetable"],
+  operationId: "publishTimetableVersion",
+  summary: "Publish a draft timetable version",
+  description:
+    "Submits and approves a draft version in one atomic step, making it the live schedule for " +
+    "the term. For callers who both build and approve the timetable (timetable:manage).",
+  security: [{ bearerAuth: [] }],
+  request: { params: versionIdParamSchema },
+  responses: standardResponses(
+    {
+      200: {
+        description: "The published (approved) timetable version.",
         schema: timetableVersionSchema,
       },
     },
@@ -398,8 +430,64 @@ const deleteSlotRoute = createRoute({
 // Route factory
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Route definitions — School week settings
+// ---------------------------------------------------------------------------
+
+const getSettingsRoute = createRoute({
+  method: "get",
+  path: "/api/academics/timetable-settings",
+  tags: ["Timetable"],
+  operationId: "getTimetableSettings",
+  summary: "Get the school's teaching week",
+  description: "Teaching weekdays and periods per day that frame the timetable grid.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "The school's teaching week.", schema: timetableSettingsSchema } },
+    [401, 500],
+  ),
+});
+
+const updateSettingsRoute = createRoute({
+  method: "put",
+  path: "/api/academics/timetable-settings",
+  tags: ["Timetable"],
+  operationId: "updateTimetableSettings",
+  summary: "Update the school's teaching week",
+  description:
+    "Replaces the teaching weekdays and periods per day. Existing slots are not touched.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: updateTimetableSettingsBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "The updated teaching week.", schema: timetableSettingsSchema } },
+    [400, 401, 403, 500],
+  ),
+});
+
 export function timetableRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  // Permission guards. Every write needs timetable:manage (ORG_ADMIN, PRINCIPAL); reads stay open
+  // to any authenticated member of the school, since teachers and students read the live timetable.
+  const manage = requirePermission(PERMISSIONS.TIMETABLE_MANAGE);
+  routes.use("/api/academics/timetable-versions", onlyMethods(["POST"], manage));
+  routes.use("/api/academics/timetable-versions/copy", manage);
+  routes.use(
+    "/api/academics/timetable-versions/:versionId",
+    onlyMethods(["PATCH", "DELETE"], manage),
+  );
+  routes.use("/api/academics/timetable-versions/:versionId/submit", manage);
+  routes.use("/api/academics/timetable-versions/:versionId/approve", manage);
+  routes.use("/api/academics/timetable-versions/:versionId/reject", manage);
+  routes.use("/api/academics/timetable-versions/:versionId/publish", manage);
+  routes.use("/api/academics/timetable-versions/:versionId/slots", onlyMethods(["POST"], manage));
+  routes.use("/api/academics/slots/:slotId", onlyMethods(["PATCH", "DELETE"], manage));
+  routes.use("/api/academics/timetable-settings", onlyMethods(["PUT"], manage));
 
   // Audit declarations
   routes.use("/api/academics/timetable-versions", auditAction("insert", "timetable_versions"));
@@ -424,7 +512,15 @@ export function timetableRoutes(database: Database): OpenAPIHono<AppEnv> {
     "/api/academics/timetable-versions/:versionId/reject",
     auditAction("update", "timetable_versions"),
   );
+  routes.use(
+    "/api/academics/timetable-versions/:versionId/publish",
+    auditAction("update", "timetable_versions"),
+  );
   routes.use("/api/academics/timetable-versions/copy", auditAction("insert", "timetable_versions"));
+  routes.use(
+    "/api/academics/timetable-settings",
+    onlyMethods(["PUT"], auditAction("update", "school_settings")),
+  );
 
   // --- Versions ---
 
@@ -480,12 +576,13 @@ export function timetableRoutes(database: Database): OpenAPIHono<AppEnv> {
   routes.openapi(deleteVersionRoute, async (c) => {
     const auth = requireAuth(c);
     const { versionId } = c.req.valid("param");
+    const { discard_slots } = c.req.valid("query");
 
     await withTenantTx(database, tenantFrom(c), (tx) =>
-      deleteTimetableVersion(tx, auth.schoolId, versionId),
+      deleteTimetableVersion(tx, auth.schoolId, versionId, { discardSlots: discard_slots }),
     );
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   routes.openapi(submitVersionRoute, async (c) => {
@@ -505,6 +602,17 @@ export function timetableRoutes(database: Database): OpenAPIHono<AppEnv> {
 
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
       approveTimetableVersion(tx, auth.schoolId, versionId, auth.userId),
+    );
+
+    return c.json(row, 200);
+  });
+
+  routes.openapi(publishVersionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { versionId } = c.req.valid("param");
+
+    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
+      publishTimetableVersion(tx, auth.schoolId, versionId, auth.userId),
     );
 
     return c.json(row, 200);
@@ -594,7 +702,30 @@ export function timetableRoutes(database: Database): OpenAPIHono<AppEnv> {
       deleteTimetableSlot(tx, auth.schoolId, slotId),
     );
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
+  });
+
+  // --- School week settings ---
+
+  routes.openapi(getSettingsRoute, async (c) => {
+    const auth = requireAuth(c);
+
+    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
+      getTimetableSettings(tx, auth.schoolId),
+    );
+
+    return c.json(row, 200);
+  });
+
+  routes.openapi(updateSettingsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+
+    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
+      updateTimetableSettings(tx, auth.schoolId, body),
+    );
+
+    return c.json(row, 200);
   });
 
   return routes;

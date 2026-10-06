@@ -1,11 +1,14 @@
 import { ApiError } from "@studafy/api-client";
 import { PERMISSIONS } from "@studafy/constants";
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, DataGrid, Select, useToast } from "@studafy/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
 import { useAuth, usePermissions } from "../../../lib/auth";
+import { collectOffsetPages } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { AdjustmentConfirmDialog } from "./AdjustmentConfirmDialog";
@@ -19,6 +22,7 @@ import "./adjustments.css";
 
 import type { AuditTrailTarget } from "./AuditTrailModal";
 import type { Refund, RefundFilters, RefundStatus } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
 function apiErrorMessage(error: unknown, fallback: string): string {
@@ -176,6 +180,25 @@ export default function RefundsListPage() {
     },
   ];
 
+  const exportColumns: ExportColumn<Refund>[] = [
+    { header: t("financeReports.adjustments.common.created"), value: (row) => row.created_at },
+    {
+      header: t("financeReports.adjustments.common.invoice"),
+      value: (row) => row.erpnext_invoice_id,
+    },
+    { header: t("financeReports.adjustments.common.amount"), value: (row) => row.amount },
+    { header: t("finance.common.currency"), value: (row) => row.currency },
+    {
+      header: t("financeReports.adjustments.common.reason"),
+      value: (row) => t(REASON_CODE_LABEL_KEYS[row.reason_code]),
+    },
+    {
+      header: t("financeReports.adjustments.common.status"),
+      value: (row) => t(REFUND_STATUS_LABEL_KEYS[row.status]),
+    },
+    { header: t("finance.common.erpnextDocument"), value: (row) => row.erpnext_credit_note_id },
+  ];
+
   return (
     <>
       <div className="adjustments-list__header">
@@ -183,9 +206,20 @@ export default function RefundsListPage() {
           <h1>{t("financeReports.adjustments.refunds.title")}</h1>
           <p>{t("financeReports.adjustments.refunds.description")}</p>
         </div>
-        <Link to="/portal/finance/adjustments/refunds/new">
-          <Button>{t("financeReports.adjustments.refunds.requestRefund")}</Button>
-        </Link>
+        <div className="adjustments-list__header-actions">
+          <ExportCsvButton
+            filename="refunds"
+            columns={exportColumns}
+            getRows={() =>
+              collectOffsetPages((pageOffset) =>
+                fetchRefundsPage(filters, pageOffset, PAGINATION_MAX_LIMIT),
+              )
+            }
+          />
+          <Link to="/portal/finance/adjustments/refunds/new">
+            <Button>{t("financeReports.adjustments.refunds.requestRefund")}</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="adjustments-list__toolbar">

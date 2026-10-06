@@ -338,6 +338,10 @@
       "viewThisPrompt": "<expenseLink>View this expense</expenseLink> to open its receipt, if one was attached.",
       "recordAnother": "Record another expense",
       "viewAll": "View expenses"
+    },
+    "import": {
+      "title": "Import expenses",
+      "amountPositive": "Amount must be greater than zero."
     }
   },
   "invoiceStatus": {

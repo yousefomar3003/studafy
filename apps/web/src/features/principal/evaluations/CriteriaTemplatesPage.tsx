@@ -1,16 +1,27 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Table, useToast } from "@studafy/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { ImportCsvButton } from "../../../components/ImportCsvButton";
+import { api } from "../../../lib/api";
+import { allRows } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { CriteriaTemplateModal } from "./CriteriaTemplateModal";
 import { useDeactivateTemplate, useUpdateTemplate } from "./mutations";
-import { evaluationTemplatesListKey, fetchTemplates } from "./queries";
+import {
+  EVALUATION_TEMPLATES_KEY_ROOT,
+  evaluationTemplatesListKey,
+  fetchTemplates,
+} from "./queries";
 
+import type { CreateTemplateInput } from "./mutations";
 import type { EvaluationCriteriaTemplate } from "./queries";
+import type { ExportColumn, ImportSpec } from "../../../lib/data-transfer";
+import type { TFunction } from "i18next";
 
 import "./evaluations.css";
 
@@ -18,6 +29,55 @@ const COLUMN_COUNT = 5;
 
 function apiErrorDescription(error: unknown): string | undefined {
   return error instanceof ApiError ? (error.detail ?? error.title) : undefined;
+}
+
+/** Same defaults and rules as `CriteriaTemplateModal`: a title, a positive max score (10 when blank)
+ * and a non-negative sort order (0 when blank). */
+function templateImportSpec(t: TFunction): ImportSpec<CreateTemplateInput> {
+  return {
+    templateName: "criteria-templates",
+    fields: [
+      {
+        key: "title",
+        label: t("principal.evaluations.templateModal.title"),
+        required: true,
+        example: "Classroom management",
+      },
+      {
+        key: "description",
+        label: t("principal.evaluations.templateModal.description"),
+        example: "Keeps the class focused and on task.",
+      },
+      {
+        key: "max_score",
+        label: t("principal.evaluations.templateModal.maxScore"),
+        type: "number",
+        example: "10",
+      },
+      {
+        key: "sort_order",
+        label: t("principal.evaluations.templateModal.sortOrder"),
+        type: "integer",
+        example: "0",
+      },
+    ],
+    toRecord: (values) => {
+      const maxScore = typeof values.max_score === "number" ? values.max_score : 10;
+      const sortOrder = typeof values.sort_order === "number" ? values.sort_order : 0;
+      const errors: string[] = [];
+      if (maxScore <= 0) errors.push(t("principal.evaluations.templates.import.maxScorePositive"));
+      if (sortOrder < 0) errors.push(t("principal.evaluations.templates.import.sortOrderMin"));
+      if (errors.length > 0) return { errors };
+      const description = typeof values.description === "string" ? values.description : "";
+      return {
+        title: String(values.title),
+        ...(description ? { description } : {}),
+        max_score: maxScore,
+        sort_order: sortOrder,
+      };
+    },
+    create: (body) => api.POST("/api/evaluations/templates", { body }),
+  };
 }
 
 function ActivateButton({ template }: { template: EvaluationCriteriaTemplate }) {
@@ -97,6 +157,30 @@ export default function CriteriaTemplatesPage() {
   });
 
   const templates = templatesQuery.data ?? [];
+  const queryClient = useQueryClient();
+
+  const exportColumns: ExportColumn<EvaluationCriteriaTemplate>[] = [
+    { header: t("principal.evaluations.templates.columns.title"), value: (row) => row.title },
+    {
+      header: t("principal.evaluations.templateModal.description"),
+      value: (row) => row.description,
+    },
+    {
+      header: t("principal.evaluations.templates.columns.maxScore"),
+      value: (row) => row.max_score,
+    },
+    {
+      header: t("principal.evaluations.templates.columns.sortOrder"),
+      value: (row) => row.sort_order,
+    },
+    {
+      header: t("principal.evaluations.templates.columns.status"),
+      value: (row) =>
+        row.is_active
+          ? t("principal.evaluations.templates.active")
+          : t("principal.evaluations.templates.inactive"),
+    },
+  ];
 
   function openCreate() {
     setEditing(null);
@@ -119,9 +203,24 @@ export default function CriteriaTemplatesPage() {
           <h1>{t("principal.evaluations.templates.title")}</h1>
           <p>{t("principal.evaluations.templates.description")}</p>
         </div>
-        <Button type="button" variant="primary" onClick={openCreate}>
-          {t("principal.evaluations.templates.newTemplate")}
-        </Button>
+        <div className="evaluations-list__header-actions">
+          <ExportCsvButton
+            filename="criteria-templates"
+            columns={exportColumns}
+            getRows={() => Promise.resolve(allRows(templates))}
+            disabled={templatesQuery.isPending}
+          />
+          <ImportCsvButton
+            spec={templateImportSpec(t)}
+            title={t("principal.evaluations.templates.import.title")}
+            onImported={() =>
+              void queryClient.invalidateQueries({ queryKey: EVALUATION_TEMPLATES_KEY_ROOT })
+            }
+          />
+          <Button type="button" variant="primary" onClick={openCreate}>
+            {t("principal.evaluations.templates.newTemplate")}
+          </Button>
+        </div>
       </div>
 
       <Table caption={t("principal.evaluations.templates.caption")}>

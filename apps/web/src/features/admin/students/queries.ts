@@ -56,11 +56,15 @@ const PAGE_SIZE = 25;
 
 /** The directory's default fetch: server-side search, status, and date-range filtering over the
  * school's full student count, which is what keeps search fast at 5k+ students. */
-export async function fetchStudentsPage(filters: StudentsFilters, cursor: string | undefined) {
+export async function fetchStudentsPage(
+  filters: StudentsFilters,
+  cursor: string | undefined,
+  limit: number = PAGE_SIZE,
+) {
   const { data } = await api.GET("/api/students", {
     params: {
       query: {
-        limit: PAGE_SIZE,
+        limit,
         cursor,
         status: filters.status || undefined,
         search: filters.search || undefined,

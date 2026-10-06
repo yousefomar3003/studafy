@@ -188,6 +188,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/timetable-versions/{versionId}/slots",
   "PATCH /api/academics/slots/{slotId}",
   "DELETE /api/academics/slots/{slotId}",
+  "POST /api/academics/timetable-versions/{versionId}/publish",
+  "PUT /api/academics/timetable-settings",
   // Assignments (ST-103). Every mutation writes an app.audit_logs row from inside its own service
   // transaction — see modules/academics/assignments/assignment-service.ts and attachment-service.ts.
   "POST /api/academics/assignments",

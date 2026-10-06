@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { DATE_TIME_OPTIONS } from "../format";
 
@@ -11,9 +12,10 @@ import {
   DISCIPLINE_STATUS_LABEL_KEYS,
   DISCIPLINE_TYPE_LABEL_KEYS,
 } from "./labels";
-import { disciplineListKey, fetchIncidentsByFilter } from "./queries";
+import { collectIncidentsByFilter, disciplineListKey, fetchIncidentsByFilter } from "./queries";
 
 import type { DisciplineIncident, IncidentListFilter } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { SelectOption } from "@studafy/ui";
 
 import "./discipline.css";
@@ -103,6 +105,23 @@ export default function IncidentListPage() {
     queryFn: () => fetchIncidentsByFilter(allFilter),
   });
 
+  const exportColumns: ExportColumn<DisciplineIncident>[] = [
+    { header: t("principal.discipline.list.columns.title"), value: (row) => row.title },
+    {
+      header: t("principal.discipline.list.columns.type"),
+      value: (row) => t(DISCIPLINE_TYPE_LABEL_KEYS[row.incident_type]),
+    },
+    {
+      header: t("principal.discipline.list.columns.severity"),
+      value: (row) => t(DISCIPLINE_SEVERITY_LABEL_KEYS[row.severity]),
+    },
+    {
+      header: t("principal.discipline.list.columns.status"),
+      value: (row) => t(DISCIPLINE_STATUS_LABEL_KEYS[row.status]),
+    },
+    { header: t("principal.discipline.list.columns.reportedAt"), value: (row) => row.incident_at },
+  ];
+
   const allFilterOptions: SelectOption<IncidentListFilter>[] = ALL_FILTER_OPTION_KEYS.map(
     ({ value, labelKey }) => ({ value, label: t(labelKey) }),
   );
@@ -118,6 +137,12 @@ export default function IncidentListPage() {
             <Tabs.Tab value={INBOX_TAB}>{t("principal.discipline.list.inboxTab")}</Tabs.Tab>
             <Tabs.Tab value={ALL_TAB}>{t("principal.discipline.list.allTab")}</Tabs.Tab>
           </Tabs.List>
+          {/* Exports whichever tab is showing: the inbox, or "All" under its current filter. */}
+          <ExportCsvButton
+            filename="discipline-incidents"
+            columns={exportColumns}
+            getRows={() => collectIncidentsByFilter(tab === INBOX_TAB ? "reported" : allFilter)}
+          />
         </div>
 
         <Tabs.Panel value={INBOX_TAB}>

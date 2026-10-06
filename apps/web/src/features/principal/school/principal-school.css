@@ -28,3 +28,12 @@
 .principal-school__empty {
   color: var(--color-muted-foreground);
 }
+
+/* Export/import buttons at the end of the filter row, aligned with the selects' baseline. */
+.principal-school__filters > .principal-school__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-8);
+  min-inline-size: 0;
+  margin-inline-start: auto;
+}

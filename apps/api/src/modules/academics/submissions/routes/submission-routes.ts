@@ -590,7 +590,7 @@ export function submissionRoutes(
       deleteSubmissionAttachment(tx, auth.schoolId, submissionId, attachmentId),
     );
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   return routes;

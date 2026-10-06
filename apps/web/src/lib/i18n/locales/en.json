@@ -161,5 +161,54 @@
     "filterDateFrom": "From",
     "filterDateTo": "To",
     "filterClearAll": "Clear all"
+  },
+  "dataTransfer": {
+    "export": {
+      "button": "Export CSV",
+      "empty": "There are no rows to export.",
+      "done_one": "Exported {{count}} row.",
+      "done_other": "Exported {{count}} rows.",
+      "truncated": "Export limited to the first {{count}} rows. Narrow the filters to export the rest.",
+      "failed": "Export failed."
+    },
+    "import": {
+      "button": "Import CSV",
+      "intro": "Upload a CSV file with a header row using the columns below (up to {{max}} rows). Download the template to start from the right format.",
+      "required": "required",
+      "downloadTemplate": "Download template",
+      "chooseFile": "CSV file",
+      "chooseAnother": "Choose another file",
+      "emptyFile": "The file has no data rows.",
+      "missingColumns": "The file is missing required columns: {{columns}}.",
+      "tooManyRows": "The file has more than {{max}} rows. Split it into smaller files.",
+      "ignoredColumns": "These columns are not recognised and will be ignored: {{columns}}.",
+      "summary": "{{valid}} rows ready to import, {{invalid}} rows with errors (rows with errors are skipped).",
+      "line": "Line {{line}}:",
+      "moreIssues_one": "…and {{count}} more line.",
+      "moreIssues_other": "…and {{count}} more lines.",
+      "downloadReport": "Download error report",
+      "reportLine": "line",
+      "reportError": "error",
+      "confirm_one": "Import {{count}} row",
+      "confirm_other": "Import {{count}} rows",
+      "progress": "Importing {{done}} of {{total}}…",
+      "stop": "Stop",
+      "close": "Close",
+      "result": "{{created}} created, {{failed}} failed, {{skipped}} skipped.",
+      "created_one": "Imported {{count}} row.",
+      "created_other": "Imported {{count}} rows.",
+      "unknownError": "The server rejected this row.",
+      "issues": {
+        "required": "{{field}} is required.",
+        "invalidEmail": "{{field}} must be a valid email address.",
+        "invalidDate": "{{field}} must be a date in YYYY-MM-DD format.",
+        "invalidTime": "{{field}} must be a time in HH:MM format.",
+        "invalidNumber": "{{field}} must be a number.",
+        "invalidInteger": "{{field}} must be a whole number.",
+        "invalidBoolean": "{{field}} must be yes or no.",
+        "invalidOption": "{{field}} must be one of: {{options}}.",
+        "tooLong": "{{field}} must be at most {{max}} characters."
+      }
+    }
   }
 }

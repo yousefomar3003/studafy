@@ -2,6 +2,8 @@ import { Table } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { ExportCsvButton } from "../../components/ExportCsvButton";
+import { allRows } from "../../lib/data-transfer";
 import { useTranslation } from "../../lib/i18n";
 
 import {
@@ -10,6 +12,11 @@ import {
   overdueInstallments,
   todayIsoDate,
 } from "./queries";
+
+import "./finance-dashboard.css";
+
+import type { OverdueInstallment } from "./queries";
+import type { ExportColumn } from "../../lib/data-transfer";
 
 const COLUMN_COUNT = 4;
 
@@ -48,10 +55,28 @@ export default function FinanceOverdueInstallmentsPage() {
   // eslint-disable-next-line security/detect-object-injection
   const bucketLabelKey = bucket ? BUCKET_LABEL_KEYS[bucket] : undefined;
 
+  // Exports the rows on screen (the report is fetched whole), with the bucket filter applied.
+  const exportColumns: ExportColumn<OverdueInstallment>[] = [
+    { header: t("finance.overdue.columns.party"), value: (row) => row.partyName },
+    { header: t("finance.overdue.columns.reference"), value: (row) => row.reference },
+    { header: t("finance.overdue.columns.dueDate"), value: (row) => row.dueDate },
+    { header: t("finance.overdue.columns.outstanding"), value: (row) => row.outstandingValue },
+  ];
+
   return (
     <>
-      <h1>{t("finance.overdue.title")}</h1>
-      <p>{t("finance.overdue.intro")}</p>
+      <div className="finance-overdue__header">
+        <div>
+          <h1>{t("finance.overdue.title")}</h1>
+          <p>{t("finance.overdue.intro")}</p>
+        </div>
+        <ExportCsvButton
+          filename="overdue-installments"
+          columns={exportColumns}
+          getRows={() => Promise.resolve(allRows(installments))}
+          disabled={isPending}
+        />
+      </div>
 
       {bucket ? (
         <p>

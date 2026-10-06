@@ -41,6 +41,12 @@
   margin-bottom: var(--space-16);
 }
 
+.adjustments-list__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
 .adjustments-list__toolbar {
   display: flex;
   align-items: flex-end;

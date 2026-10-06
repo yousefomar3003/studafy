@@ -369,7 +369,7 @@ export function materialRoutes(
       deleteMaterial(tx, auth.schoolId, materialId),
     );
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   routes.openapi(toggleAiVisibleRoute, async (c) => {

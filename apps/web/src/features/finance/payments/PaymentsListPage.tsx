@@ -1,8 +1,11 @@
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, DataGrid, Select } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { collectOffsetPages } from "../../../lib/data-transfer";
 import { useTranslation } from "../../../lib/i18n";
 import { PAYMENT_MODE_LABEL_KEYS, PAYMENT_STATUS_LABEL_KEYS, paymentStatusTone } from "../labels";
 
@@ -11,6 +14,7 @@ import { PAYMENTS_PAGE_SIZE, fetchPaymentsPage } from "./queries";
 import "./payments.css";
 
 import type { Payment, PaymentFilters, PaymentStatus } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
 const STATUS_OPTION_KEYS: { value: PaymentStatus | ""; labelKey: string }[] = [
@@ -98,6 +102,24 @@ export default function PaymentsListPage() {
     },
   ];
 
+  const exportColumns: ExportColumn<Payment>[] = [
+    { header: t("finance.common.date"), value: (row) => row.payment_date },
+    { header: t("finance.common.invoice"), value: (row) => row.erpnext_invoice_id },
+    { header: t("finance.common.amount"), value: (row) => row.amount },
+    { header: t("finance.common.currency"), value: (row) => row.currency },
+    {
+      header: t("finance.common.method"),
+      value: (row) => (row.payment_mode ? t(PAYMENT_MODE_LABEL_KEYS[row.payment_mode]) : null),
+    },
+    {
+      header: t("finance.common.status"),
+      value: (row) => t(PAYMENT_STATUS_LABEL_KEYS[row.status]),
+    },
+    { header: t("finance.common.erpnextDocument"), value: (row) => row.erpnext_payment_entry_id },
+    // Never signed or credential-bearing (see `paymentSchema.receipt_url` in the API).
+    { header: t("finance.payments.list.receipt"), value: (row) => row.receipt_url },
+  ];
+
   return (
     <>
       <div className="payments-list__header">
@@ -105,9 +127,20 @@ export default function PaymentsListPage() {
           <h1>{t("finance.payments.list.title")}</h1>
           <p>{t("finance.payments.list.intro")}</p>
         </div>
-        <Link to="/portal/finance/payments/new">
-          <Button>{t("finance.common.recordPayment")}</Button>
-        </Link>
+        <div className="payments-list__header-actions">
+          <ExportCsvButton
+            filename="payments"
+            columns={exportColumns}
+            getRows={() =>
+              collectOffsetPages((pageOffset) =>
+                fetchPaymentsPage(filters, pageOffset, PAGINATION_MAX_LIMIT),
+              )
+            }
+          />
+          <Link to="/portal/finance/payments/new">
+            <Button>{t("finance.common.recordPayment")}</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="payments-list__toolbar">

@@ -80,6 +80,7 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `principalDashboard:view`        | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
 | `calendarEvent:read`             | ✅          | ✅        | ✅        |         | ✅         | ✅                 |         |        |       |               |
 | `calendarEvent:manage`           | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `timetable:manage`               | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
 | `auditLog:read`                  | ✅          | ✅        |           | ✅      |            |                    |         |        |       | ✅            |
 | `auditLog:export`                | ✅          | ✅        |           | ✅      |            |                    |         |        |       |               |
 | `privacy:manageDsr`              | ✅          | ✅        |           |         |            |                    |         |        |       |               |

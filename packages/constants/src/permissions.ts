@@ -101,6 +101,10 @@ export const PERMISSIONS = {
   CALENDAR_EVENT_READ: "calendarEvent:read",
   CALENDAR_EVENT_MANAGE: "calendarEvent:manage",
 
+  // Building and publishing the weekly timetable (versions, slots, school days). Reading the live
+  // timetable stays open to every authenticated school member -- teachers and students need it.
+  TIMETABLE_MANAGE: "timetable:manage",
+
   AUDIT_LOG_READ: "auditLog:read",
   AUDIT_LOG_EXPORT: "auditLog:export",
 
@@ -347,6 +351,7 @@ const PRINCIPAL_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW,
   PERMISSIONS.CALENDAR_EVENT_READ,
   PERMISSIONS.CALENDAR_EVENT_MANAGE,
+  PERMISSIONS.TIMETABLE_MANAGE,
   PERMISSIONS.APPROVAL_REVIEW,
   PERMISSIONS.ORGANIZATION_READ,
   PERMISSIONS.USER_READ,
