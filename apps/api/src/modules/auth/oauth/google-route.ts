@@ -3,20 +3,21 @@
  *
  * Two endpoints:
  *   GET /api/auth/oauth/google/start    — redirects to Google's authorization endpoint
- *   GET /api/auth/oauth/google/callback — exchanges the code, validates the id_token, issues tokens
+ *   GET /api/auth/oauth/google/callback — exchanges the code, validates the id_token, then finishes
+ *                                         whichever browser flow minted the state
  *
  * Both are public (no bearer token required). The start endpoint generates state, nonce, and PKCE
- * parameters and stores them in an ephemeral in-memory store keyed by state. The callback
- * validates the state, exchanges the authorization code, verifies the id_token against Google's
- * JWKS, finds the user via app.oauth_identities, and issues a token pair.
+ * parameters and stores them in the shared OAuth state store (state-store.ts) keyed by state.
+ *
+ * The callback is Google's one registered redirect URI, so it serves every browser flow that sends
+ * a user to Google — not just login. After validating the state, exchanging the code, and verifying
+ * the id_token, it dispatches on the entry's `flow`:
+ *   - `login`      — finds the user via app.oauth_identities and issues a token pair
+ *   - `activation` — activates the invitation the state was bound to (activation-oauth-routes.ts)
+ *   - `link`       — links Google to the signed-in user who started the link (provider-link-routes.ts)
  *
  * These are browser-redirect endpoints, not JSON API endpoints, so they use plain Hono routes
  * rather than OpenAPI-typed routes. The primary responses are HTTP redirects, not JSON bodies.
- * Errors are still thrown as HTTPException/CodedHttpException and handled by the global error
- * handler like every other route in the app.
- *
- * The state store is in-memory intentionally (KISS). This is fine for single-instance deployments
- * and the 5-minute TTL window. Multi-instance scaling needs a Redis-backed store — follow-up.
  */
 
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -27,6 +28,8 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { deliverTokenPair } from "../delivery";
+import { completeWebActivation } from "../routes/activation-oauth-routes";
+import { completeWebLink } from "../routes/provider-link-routes";
 import { findOAuthIdentity } from "../services/returning-user-login-service";
 import { issueTokenPair } from "../services/session-service";
 
@@ -39,8 +42,9 @@ import {
 import { oauthErrorUrl } from "./error-redirect";
 import { validateGoogleIdToken } from "./google-id-token";
 import { generateCodeChallenge, generateCodeVerifier, generateNonce, generateState } from "./pkce";
-import { createStateStore } from "./state-store";
+import { isBrowserFlow } from "./state-store";
 
+import type { StateStore } from "./state-store";
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -51,6 +55,8 @@ import type { SessionTokenConfig } from "../services/session-service";
 // ---------------------------------------------------------------------------
 
 export interface GoogleOAuthDependencies {
+  /** The process-wide OAuth state store, shared with every flow that returns through this callback. */
+  stateStore: StateStore;
   /** Config loader. Tests inject a stub so no process-wide module mock is needed. */
   getOAuthConfig?: typeof getGoogleOAuthConfig;
   /** id_token validator. Tests inject a stub to skip the JWKS round trip. */
@@ -61,12 +67,11 @@ export function googleOAuthRoutes(
   db: Database,
   config: SessionTokenConfig,
   logger: Logger,
-  deps: GoogleOAuthDependencies = {},
+  deps: GoogleOAuthDependencies,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  const stateStore = createStateStore();
-
+  const { stateStore } = deps;
   const getOAuthConfig = deps.getOAuthConfig ?? getGoogleOAuthConfig;
   const validateIdToken = deps.validateIdToken ?? validateGoogleIdToken;
 
@@ -83,7 +88,7 @@ export function googleOAuthRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    stateStore.set(state, { codeVerifier, nonce, createdAt: Date.now() });
+    await stateStore.set(state, { flow: "login", provider: "google", codeVerifier, nonce });
 
     const params = new URLSearchParams({
       client_id: oauthConfig.clientId,
@@ -101,8 +106,8 @@ export function googleOAuthRoutes(
   });
 
   // GET /api/auth/oauth/google/callback
-  // Google redirects here with code + state. We exchange the code, validate the id_token,
-  // find the user, issue tokens, and redirect to the frontend.
+  // Google redirects here with code + state. We exchange the code, validate the id_token, and
+  // finish the flow the state was minted for.
   routes.get("/api/auth/oauth/google/callback", async (c) => {
     const oauthConfig = getOAuthConfig();
     if (!oauthConfig) {
@@ -129,16 +134,15 @@ export function googleOAuthRoutes(
         );
       }
 
-      // 1. Validate state
-      const entry = stateStore.get(state);
-      if (!entry) {
+      // 1. Validate state — single use, and only a browser flow minted for Google.
+      const entry = await stateStore.take(state);
+      if (!entry || entry.provider !== "google" || !isBrowserFlow(entry.flow)) {
         throw new CodedHttpException(
           400,
           ERROR_CODES.OAUTH_STATE_INVALID,
           "Invalid or expired OAuth state",
         );
       }
-      stateStore.delete(state);
 
       // 2. Exchange authorization code for tokens
       const idToken = await exchangeCode(code, oauthConfig, entry.codeVerifier);
@@ -146,7 +150,36 @@ export function googleOAuthRoutes(
       // 3. Validate id_token
       const claims = await validateIdToken(idToken, oauthConfig.clientId, entry.nonce);
 
-      // 4. Find oauth identity
+      // 4. Finish the flow this state belongs to.
+      if (entry.flow === "activation" && entry.token) {
+        return await completeWebActivation(
+          c,
+          { db, sessionConfig: config, logger },
+          {
+            provider: "google",
+            token: entry.token,
+            identity: claims,
+            frontendUrl: oauthConfig.frontendUrl,
+          },
+        );
+      }
+      if (entry.flow === "link" && entry.userId && entry.schoolId) {
+        return await completeWebLink(c, db, logger, {
+          provider: "google",
+          userId: entry.userId,
+          schoolId: entry.schoolId,
+          identity: claims,
+          frontendUrl: oauthConfig.frontendUrl,
+        });
+      }
+      if (entry.flow !== "login") {
+        throw new CodedHttpException(
+          400,
+          ERROR_CODES.OAUTH_STATE_INVALID,
+          "Invalid or expired OAuth state",
+        );
+      }
+
       const identity = await findOAuthIdentity(db, "google", claims.sub);
       if (!identity) {
         logger.warn({ sub: claims.sub, email: claims.email }, "OAuth identity not found");

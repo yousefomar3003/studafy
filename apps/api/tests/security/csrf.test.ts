@@ -258,5 +258,35 @@ describe("CSRF middleware", () => {
         expect(res.status).not.toBe(403);
       }
     });
+
+    it("does not gate the native-app OAuth code exchanges, which carry no cookie to forge", async () => {
+      // A native client has no cookie jar to bootstrap a double-submit token from; its credential is
+      // the one-shot code plus the server-held state, and its tokens come back in the body.
+      const app = new Hono<AppEnv>();
+      app.use("*", requestIdMiddleware({ logger }));
+      app.use("/api/*", csrfMiddleware());
+      app.post("/api/auth/oauth/:provider/mobile-exchange", (c) => c.json({ handled: true }));
+      app.post("/api/auth/invitations/:token/oauth/:provider/mobile-exchange", (c) =>
+        c.json({ handled: true }),
+      );
+      app.post("/api/auth/invitations/:token/manage", (c) => c.json({ handled: true }));
+      app.onError(errorHandlerMiddleware(logger));
+
+      for (const path of [
+        "/api/auth/oauth/google/mobile-exchange",
+        `/api/auth/invitations/${"a".repeat(64)}/oauth/google/mobile-exchange`,
+      ]) {
+        const res = await app.request(`http://localhost${path}`, { method: "POST" });
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ handled: true });
+      }
+
+      // The exemption is the invitation's OAuth shape only, not the invitation subtree.
+      const sibling = await app.request(
+        `http://localhost/api/auth/invitations/${"a".repeat(64)}/manage`,
+        { method: "POST" },
+      );
+      expect(sibling.status).toBe(403);
+    });
   });
 });

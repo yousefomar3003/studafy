@@ -10,7 +10,9 @@
  * callback via a custom URI scheme, and posts the authorization code back here. The backend
  * performs the IdP code exchange, validates the id_token, and returns a TokenPair as JSON.
  *
- * The state store is shared with the browser-redirect routes (same in-memory TTL).
+ * The state store is the process-wide one (state-store.ts) — Redis-backed when the API has Redis —
+ * with every entry tagged `flow: "mobile-login"`, so a mobile state can never be redeemed by the
+ * browser callback, nor a browser state here.
  *
  * A third "mock" provider sits alongside Google and Microsoft (ST-247) — dev/E2E only, inert
  * unless `getMockOAuthConfig()` returns non-null (mock-config.ts's own production kill switch).
@@ -39,8 +41,9 @@ import { MOCK_JWKS_URI, getMockOAuthConfig } from "./mock-config";
 import { validateMockIdToken } from "./mock-id-token";
 import { exchangeCode as exchangeMockCode } from "./mock-route";
 import { generateCodeChallenge, generateCodeVerifier, generateNonce, generateState } from "./pkce";
-import { createStateStore } from "./state-store";
+import { takeStateFor } from "./state-store";
 
+import type { StateStore } from "./state-store";
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -143,14 +146,18 @@ function createMobileExchangeRoute(provider: string) {
 // Route group factory
 // ---------------------------------------------------------------------------
 
+export interface MobileOAuthDependencies {
+  /** The process-wide OAuth state store, so /mobile-start and /mobile-exchange may hit different instances. */
+  stateStore: StateStore;
+}
+
 export function mobileOAuthRoutes(
   db: Database,
   config: SessionTokenConfig,
   logger: Logger,
+  { stateStore }: MobileOAuthDependencies,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
-
-  const stateStore = createStateStore();
 
   // ----- Google mobile routes -----
 
@@ -165,7 +172,7 @@ export function mobileOAuthRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    stateStore.set(state, { codeVerifier, nonce, createdAt: Date.now() });
+    await stateStore.set(state, { flow: "mobile-login", provider: "google", codeVerifier, nonce });
 
     return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
   });
@@ -177,7 +184,7 @@ export function mobileOAuthRoutes(
       throw new HTTPException(404, { message: "Google OAuth is not configured" });
     }
 
-    const entry = stateStore.get(state);
+    const entry = await takeStateFor(stateStore, state, "mobile-login", "google");
     if (!entry) {
       throw new CodedHttpException(
         400,
@@ -185,7 +192,6 @@ export function mobileOAuthRoutes(
         "Invalid or expired OAuth state",
       );
     }
-    stateStore.delete(state);
 
     if (entry.nonce !== nonce) {
       throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
@@ -260,7 +266,12 @@ export function mobileOAuthRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    stateStore.set(state, { codeVerifier, nonce, createdAt: Date.now() });
+    await stateStore.set(state, {
+      flow: "mobile-login",
+      provider: "microsoft",
+      codeVerifier,
+      nonce,
+    });
 
     return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
   });
@@ -272,7 +283,7 @@ export function mobileOAuthRoutes(
       throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
     }
 
-    const entry = stateStore.get(state);
+    const entry = await takeStateFor(stateStore, state, "mobile-login", "microsoft");
     if (!entry) {
       throw new CodedHttpException(
         400,
@@ -280,7 +291,6 @@ export function mobileOAuthRoutes(
         "Invalid or expired OAuth state",
       );
     }
-    stateStore.delete(state);
 
     if (entry.nonce !== nonce) {
       throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
@@ -354,7 +364,7 @@ export function mobileOAuthRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    stateStore.set(state, { codeVerifier, nonce, createdAt: Date.now() });
+    await stateStore.set(state, { flow: "mobile-login", provider: "mock", codeVerifier, nonce });
 
     return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
   });
@@ -366,7 +376,7 @@ export function mobileOAuthRoutes(
       throw new HTTPException(404, { message: "Mock OAuth is not configured" });
     }
 
-    const entry = stateStore.get(state);
+    const entry = await takeStateFor(stateStore, state, "mobile-login", "mock");
     if (!entry) {
       throw new CodedHttpException(
         400,
@@ -374,7 +384,6 @@ export function mobileOAuthRoutes(
         "Invalid or expired OAuth state",
       );
     }
-    stateStore.delete(state);
 
     if (entry.nonce !== nonce) {
       throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");

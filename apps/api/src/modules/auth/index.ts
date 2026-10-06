@@ -116,6 +116,12 @@ export { googleOAuthRoutes } from "./oauth/google-route";
 export { microsoftOAuthRoutes } from "./oauth/microsoft-route";
 export { mockOAuthRoutes } from "./oauth/mock-route";
 export { mobileOAuthRoutes } from "./oauth/mobile-oauth-routes";
+export {
+  createMemoryStateStore,
+  createRedisStateStore,
+  OAUTH_STATE_KEY_PREFIX,
+  type StateStore,
+} from "./oauth/state-store";
 export { type DenylistEntry } from "./denylist";
 export type { AccessTokenClaims, JwtPayload, SignAccessTokenParams } from "./jwt/types";
 export {

@@ -123,7 +123,12 @@ approved_flexible_columns(table_name, column_name) AS (
     -- agreed -- write-once audit evidence of what was disclosed, never joined or filtered on. A new
     -- disclosure supersedes the row rather than editing it. The stable relational fields (tenant,
     -- user, disclosure version, provider and timestamps) remain normalized and constrained.
-    ('ai_data_sharing_consents', 'data_categories')
+    ('ai_data_sharing_consents', 'data_categories'),
+    -- Timetable week (000122): the school's teaching weekdays in display order. A closed set -- a CHECK
+    -- holds it to 1..7 with 1..7 entries -- whose order is the payload, read whole with the settings
+    -- row and never joined or filtered on, so a child table would add a join and an ordinal column to
+    -- store what the array already guarantees.
+    ('school_settings', 'school_days')
 ),
 relations AS (
   SELECT
