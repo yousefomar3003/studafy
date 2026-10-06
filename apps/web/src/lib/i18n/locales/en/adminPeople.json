@@ -10,6 +10,7 @@
   "roles": {
     "SUPER_ADMIN": "Super admin",
     "ORG_ADMIN": "Org admin",
+    "PRINCIPAL": "Principal",
     "FINANCE": "Finance",
     "INSTRUCTOR": "Instructor",
     "TEACHING_ASSISTANT": "Teaching assistant",

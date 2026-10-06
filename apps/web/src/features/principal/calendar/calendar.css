@@ -1,0 +1,254 @@
+/**
+ * School calendar month grid (SchoolCalendarPage). Each entry's colour comes from its `data-tone`:
+ * terms in the accent colour, exams and exam periods in warning, holidays in danger, events in
+ * success, meetings neutral. The same tones colour the legend and the agenda list's kind label.
+ */
+
+.principal-calendar__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  margin-block: var(--space-16);
+}
+
+.principal-calendar__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.principal-calendar__month {
+  min-inline-size: 11ch;
+  margin: 0;
+  font-size: var(--font-size-lg);
+  text-align: center;
+}
+
+/* Tones */
+
+[data-tone="term"] {
+  --tone-bg: var(--color-accent-subtle-bg);
+  --tone-fg: var(--color-accent-subtle-foreground);
+}
+
+[data-tone="exam"],
+[data-tone="exam_period"] {
+  --tone-bg: var(--color-warning-subtle-bg);
+  --tone-fg: var(--color-warning-subtle-foreground);
+}
+
+[data-tone="holiday"] {
+  --tone-bg: var(--color-danger-subtle-bg);
+  --tone-fg: var(--color-danger-subtle-foreground);
+}
+
+[data-tone="event"] {
+  --tone-bg: var(--color-success-subtle-bg);
+  --tone-fg: var(--color-success-subtle-foreground);
+}
+
+[data-tone="meeting"] {
+  --tone-bg: var(--color-surface);
+  --tone-fg: var(--color-foreground);
+}
+
+/* Legend */
+
+.principal-calendar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: 0 0 var(--space-12);
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-sm);
+}
+
+.principal-calendar__legend li {
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-full);
+  background-color: var(--tone-bg);
+  color: var(--tone-fg);
+}
+
+/* Month grid */
+
+.principal-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-block-start: 1px solid var(--color-border);
+  border-inline-start: 1px solid var(--color-border);
+}
+
+.principal-calendar__weekday {
+  padding: var(--space-8);
+  border-inline-end: 1px solid var(--color-border);
+  border-block-end: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.principal-calendar__day {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-block-size: 104px;
+  min-inline-size: 0;
+  padding: var(--space-4);
+  border-inline-end: 1px solid var(--color-border);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.principal-calendar__day[data-outside] {
+  background-color: var(--color-surface);
+}
+
+.principal-calendar__day[data-outside] .principal-calendar__date {
+  color: var(--color-muted-foreground);
+}
+
+.principal-calendar__date {
+  align-self: flex-start;
+  min-inline-size: 28px;
+  padding: 2px var(--space-4);
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+}
+
+.principal-calendar__date--action {
+  cursor: pointer;
+}
+
+.principal-calendar__date--action:hover {
+  background-color: var(--color-surface);
+}
+
+.principal-calendar__day[data-today] .principal-calendar__date {
+  background-color: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
+.principal-calendar__entry {
+  display: block;
+  overflow: hidden;
+  padding: 2px var(--space-4);
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: var(--tone-bg);
+  color: var(--tone-fg);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.principal-calendar__entry {
+  cursor: pointer;
+}
+
+button.principal-calendar__entry:hover {
+  filter: brightness(0.95);
+}
+
+/* Agenda (the accessible, date-ordered list of the month's entries) */
+
+.principal-calendar__agenda-title {
+  margin-block: var(--space-24) var(--space-8);
+  font-size: var(--font-size-lg);
+}
+
+.principal-calendar__agenda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.principal-calendar__agenda li {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) auto 1fr;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-inline-start: 4px solid var(--tone-fg);
+  border-radius: var(--radius-md);
+}
+
+.principal-calendar__agenda-date {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.principal-calendar__agenda-kind {
+  padding: 2px var(--space-8);
+  border-radius: var(--radius-full);
+  background-color: var(--tone-bg);
+  color: var(--tone-fg);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.principal-calendar__agenda-edit {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  text-align: start;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.principal-calendar__agenda-edit:focus-visible,
+.principal-calendar__date--action:focus-visible,
+button.principal-calendar__entry:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Event form */
+
+.principal-calendar__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.principal-calendar__form-error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+/* Narrow screens: the grid becomes too cramped to read, so the agenda list carries the month. */
+@media (max-width: 640px) {
+  .principal-calendar__day {
+    min-block-size: 56px;
+  }
+
+  .principal-calendar__entry {
+    font-size: 0;
+    min-block-size: 6px;
+    padding: 0;
+  }
+
+  .principal-calendar__agenda li {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+}

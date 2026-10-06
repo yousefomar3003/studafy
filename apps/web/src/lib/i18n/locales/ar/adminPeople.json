@@ -10,6 +10,7 @@
   "roles": {
     "SUPER_ADMIN": "مسؤول أعلى",
     "ORG_ADMIN": "مسؤول المدرسة",
+    "PRINCIPAL": "مدير المدرسة",
     "FINANCE": "الشؤون المالية",
     "INSTRUCTOR": "معلم",
     "TEACHING_ASSISTANT": "مساعد معلم",

@@ -204,6 +204,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/audit/logs/export",
   // ST-194. Announcement composition, gated on NOTIFICATION_MANAGE via requirePermission.
   "POST /api/announcements",
+  // School calendar entries (000121), gated on CALENDAR_EVENT_MANAGE via requirePermission.
+  "POST /api/school-events",
+  "PATCH /api/school-events/{eventId}",
+  "DELETE /api/school-events/{eventId}",
   // ST-122. Fee schedule generation gated on BILLING_UPDATE via requirePermission middleware.
   "POST /api/finance/fee-schedules/generate",
   // ST-122. Internal API-key-authenticated reconciliation job; listed here for inventory accuracy

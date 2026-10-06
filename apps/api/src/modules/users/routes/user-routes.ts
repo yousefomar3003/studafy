@@ -7,6 +7,7 @@ import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
@@ -247,10 +248,13 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
 
   // --- Permission guards ---
   routes.use("/api/users", requirePermission(PERMISSIONS.USER_READ));
-  routes.use("/api/users", requirePermission(PERMISSIONS.USER_CREATE));
+  routes.use("/api/users", onlyMethods(["POST"], requirePermission(PERMISSIONS.USER_CREATE)));
   routes.use("/api/users/status-counts", requirePermission(PERMISSIONS.USER_READ));
   routes.use("/api/users/:userId", requirePermission(PERMISSIONS.USER_READ));
-  routes.use("/api/users/:userId", requirePermission(PERMISSIONS.USER_UPDATE));
+  routes.use(
+    "/api/users/:userId",
+    onlyMethods(["PATCH"], requirePermission(PERMISSIONS.USER_UPDATE)),
+  );
   routes.use("/api/users/:userId/role", requirePermission(PERMISSIONS.ROLE_ASSIGN));
   routes.use("/api/users/:userId/deactivate", requirePermission(PERMISSIONS.USER_SUSPEND));
 

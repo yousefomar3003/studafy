@@ -22,7 +22,7 @@ claim:
 
 | Scope       | Derived from                                                                                             | Sees                                                                                                                   |
 | ----------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Admin**   | `app.user_roles.role IN ('ORG_ADMIN','SUPER_ADMIN')`                                                     | every row in the school (escape hatch)                                                                                 |
+| **Admin**   | `app.user_roles.role IN ('ORG_ADMIN','SUPER_ADMIN','PRINCIPAL')` (PRINCIPAL since migration 000120)      | every row in the school (escape hatch)                                                                                 |
 | **Teacher** | `app.teachers` row, matched to a class via `classes.lead_teacher_id` **or** `timetable_slots.teacher_id` | their classes and those classes' students, materials, assessments, grades, attendance                                  |
 | **Student** | `app.students.user_id`                                                                                   | their own profile, enrollments, submissions, released grades/results, attendance; their classes' materials/assessments |
 | **Parent**  | `app.parent_child_links.parent_user_id`                                                                  | the same, for each linked child                                                                                        |

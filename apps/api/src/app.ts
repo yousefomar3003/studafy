@@ -117,6 +117,7 @@ import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobil
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { privacyRoutes } from "./modules/privacy";
 import { childComparisonRoutes } from "./modules/reports";
+import { schoolEventRoutes } from "./modules/school-events";
 import { searchRoutes } from "./modules/search";
 import { storageRoutes } from "./modules/storage";
 import {
@@ -916,6 +917,12 @@ export function createApp({
   // reach stats off app.announcement_recipients. Gated on NOTIFICATION_MANAGE.
   if (database) {
     app.route("/", announcementRoutes(database));
+  }
+
+  // School calendar entries (holidays, events, meetings, exam periods) shown beside terms and class
+  // exams. Read on calendarEvent:read, managed on calendarEvent:manage (PRINCIPAL, ORG_ADMIN).
+  if (database) {
+    app.route("/", schoolEventRoutes(database));
   }
 
   // Discipline incidents and actions: teacher reporting, principal management (actions,

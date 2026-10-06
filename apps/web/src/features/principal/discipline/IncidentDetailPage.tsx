@@ -171,16 +171,18 @@ export default function IncidentDetailPage() {
           <dt>{t("principal.discipline.detail.resolvedAt")}</dt>
           <dd>{incident.resolved_at ? formatDateTime(incident.resolved_at) : "—"}</dd>
         </div>
-        <div>
-          <dt>{t("principal.discipline.detail.parentVisibility")}</dt>
-          <dd>
-            {parentVisible
-              ? t("principal.discipline.detail.visible")
-              : incident.status === "resolved"
-                ? t("principal.discipline.detail.notVisibleOff")
-                : t("principal.discipline.detail.notVisibleYet")}
-          </dd>
-        </div>
+        {visibilityQuery.data !== null && (
+          <div>
+            <dt>{t("principal.discipline.detail.parentVisibility")}</dt>
+            <dd>
+              {parentVisible
+                ? t("principal.discipline.detail.visible")
+                : incident.status === "resolved"
+                  ? t("principal.discipline.detail.notVisibleOff")
+                  : t("principal.discipline.detail.notVisibleYet")}
+            </dd>
+          </div>
+        )}
       </dl>
 
       {incident.description ? <p>{incident.description}</p> : null}

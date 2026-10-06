@@ -78,6 +78,8 @@ and drive both the seed and this table, so they cannot drift.
 | -------------------- | -------------- | ---------------------------------- |
 | `SUPER_ADMIN`        | Sana Al-Rashid | `superadmin@demo.studafy.test`     |
 | `ORG_ADMIN`          | Omar Haddad    | `admin@demo.studafy.test`          |
+| `PRINCIPAL`          | Samir Qasem    | `principal@demo.studafy.test`      |
+| `FINANCE`            | Reem Saadeh    | `finance@demo.studafy.test`        |
 | `INSTRUCTOR`         | Layla Nasser   | `layla.nasser@demo.studafy.test`   |
 | `INSTRUCTOR`         | Hassan Ibrahim | `hassan.ibrahim@demo.studafy.test` |
 | `INSTRUCTOR`         | Mona Farouk    | `mona.farouk@demo.studafy.test`    |

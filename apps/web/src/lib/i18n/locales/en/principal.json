@@ -5,7 +5,19 @@
   },
   "dashboard": {
     "title": "Principal",
-    "description": "A live snapshot of approvals, attendance, discipline, evaluations, and announcements."
+    "description": "Everything you oversee as principal: grades, the school calendar, timetable, classes and students, plus what needs your attention today.",
+    "links": {
+      "grades": "Grades →",
+      "calendar": "School calendar →",
+      "timetable": "Timetable →",
+      "classes": "Classes →",
+      "students": "Students →",
+      "attendance": "Attendance →",
+      "discipline": "Discipline →",
+      "evaluations": "Teacher evaluations →",
+      "approvals": "Approvals →",
+      "announcements": "Announcements →"
+    }
   },
   "tiles": {
     "pendingApprovals": {
@@ -518,6 +530,132 @@
       "alertCount_one": "{{count}} alert",
       "alertCount_other": "{{count}} alerts",
       "empty": "No threshold breaches in this view."
+    }
+  },
+  "school": {
+    "yearLabel": "Academic year",
+    "termLabel": "Term",
+    "classLabel": "Class",
+    "noYears": "No academic years set up yet",
+    "noTerms": "No terms in this year",
+    "noClasses": "No classes in this term."
+  },
+  "grades": {
+    "title": "Grades",
+    "description": "Each class's gradebook for the term: scores per assessment, every student's weighted average, and where their grades are in the approval workflow.",
+    "caption": "Gradebook for {{class}}",
+    "empty": "No grades have been entered for this class yet.",
+    "error": "Unable to load this class's gradebook.",
+    "reviewPending_one": "Review {{count}} pending submission →",
+    "reviewPending_other": "Review {{count}} pending submissions →",
+    "columns": {
+      "student": "Student",
+      "average": "Average",
+      "status": "Status"
+    },
+    "status": {
+      "draft": "Draft",
+      "submitted": "Awaiting approval",
+      "approved": "Approved",
+      "rejected": "Returned",
+      "published": "Published"
+    }
+  },
+  "timetable": {
+    "title": "Timetable",
+    "description": "The approved weekly timetable that is running this term. Narrow it to one class or one teacher.",
+    "teacherLabel": "Teacher",
+    "allClasses": "All classes",
+    "allTeachers": "All teachers",
+    "noApproved": "There is no approved timetable for this term yet.",
+    "error": "Unable to load the timetable."
+  },
+  "classes": {
+    "title": "Classes",
+    "description": "Every class running this term, with its lead teacher, room, and how full it is.",
+    "caption": "Classes this term",
+    "error": "Unable to load classes.",
+    "ofCapacity": "{{enrolled}} of {{capacity}}",
+    "columns": {
+      "class": "Class",
+      "teacher": "Lead teacher",
+      "room": "Room",
+      "enrolled": "Enrolled",
+      "status": "Status"
+    },
+    "status": {
+      "planned": "Planned",
+      "active": "Active",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    }
+  },
+  "students": {
+    "title": "Students",
+    "description": "The school's student roll. Search by name or filter by status.",
+    "search": "Search by name",
+    "statusLabel": "Status",
+    "allStatuses": "All statuses",
+    "caption": "Students",
+    "empty": "No students match.",
+    "error": "Unable to load students.",
+    "count_one": "{{count}} student",
+    "count_other": "{{count}} students",
+    "columns": {
+      "name": "Name",
+      "admissionNumber": "Admission no.",
+      "dateOfBirth": "Date of birth",
+      "status": "Status"
+    },
+    "status": {
+      "applicant": "Applicant",
+      "enrolled": "Enrolled",
+      "suspended": "Suspended",
+      "graduated": "Graduated",
+      "withdrawn": "Withdrawn",
+      "archived": "Archived"
+    }
+  },
+  "calendar": {
+    "title": "School calendar",
+    "description": "Term dates, every class's exams, and the school's holidays, events and meetings.",
+    "previous": "← Previous",
+    "next": "Next →",
+    "today": "Today",
+    "addEvent": "Add event",
+    "legend": "Legend",
+    "error": "Unable to load calendar events.",
+    "termStarts": "{{term}} starts",
+    "termEnds": "{{term}} ends",
+    "exam": "{{title}} ({{class}})",
+    "agenda": "This month",
+    "agendaEmpty": "Nothing on the calendar this month.",
+    "kinds": {
+      "term": "Term dates",
+      "exam": "Exam",
+      "holiday": "Holiday",
+      "event": "School event",
+      "meeting": "Meeting",
+      "exam_period": "Exam period"
+    },
+    "form": {
+      "addTitle": "Add calendar event",
+      "editTitle": "Edit calendar event",
+      "title": "Title",
+      "kind": "Type",
+      "startsOn": "Starts",
+      "endsOn": "Ends",
+      "description": "Details (optional)",
+      "save": "Save",
+      "cancel": "Cancel",
+      "remove": "Remove",
+      "saved": "Calendar updated",
+      "removed": "Event removed",
+      "saveFailed": "Couldn't save the event. Try again.",
+      "removeFailed": "Couldn't remove the event. Try again.",
+      "titleRequired": "Enter a title.",
+      "datesRequired": "Choose a start and end date.",
+      "endBeforeStart": "The end date can't be before the start date."
     }
   }
 }

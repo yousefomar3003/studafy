@@ -66,6 +66,7 @@ describe.each<[string, string[]]>([
     "ORG_ADMIN",
     ["Home", "Notifications", "Admin", "Principal", "Billing", "Finance", "Approvals", "Account"],
   ],
+  ["PRINCIPAL", ["Home", "Notifications", "Principal", "Approvals", "Account"]],
   ["INSTRUCTOR", ["Home", "Notifications", "Account"]],
   ["TEACHING_ASSISTANT", ["Home", "Notifications", "Account"]],
   ["STUDENT", ["Home", "Notifications", "Account"]],

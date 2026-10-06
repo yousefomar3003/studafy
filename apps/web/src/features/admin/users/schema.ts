@@ -21,6 +21,7 @@ export const ASSIGNABLE_ROLES = Object.values(ROLES).filter(
 export const ROLE_LABEL_KEYS: Record<Role, string> = {
   SUPER_ADMIN: "adminPeople.roles.SUPER_ADMIN",
   ORG_ADMIN: "adminPeople.roles.ORG_ADMIN",
+  PRINCIPAL: "adminPeople.roles.PRINCIPAL",
   FINANCE: "adminPeople.roles.FINANCE",
   INSTRUCTOR: "adminPeople.roles.INSTRUCTOR",
   TEACHING_ASSISTANT: "adminPeople.roles.TEACHING_ASSISTANT",

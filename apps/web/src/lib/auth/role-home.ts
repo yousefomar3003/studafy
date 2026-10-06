@@ -16,6 +16,7 @@ const DEFAULT_HOME = "/portal";
 
 const ROLE_HOME: Readonly<Record<string, string>> = {
   ORG_ADMIN: "/portal",
+  PRINCIPAL: "/portal",
   INSTRUCTOR: "/portal",
   TEACHING_ASSISTANT: "/portal",
   STUDENT: "/portal",
@@ -25,6 +26,7 @@ const ROLE_HOME: Readonly<Record<string, string>> = {
 /** Most- to least-privileged, matching `ROLE_HOME`'s keys. Only used to break ties on multi-role sessions. */
 const ROLE_PRIORITY: readonly string[] = [
   "ORG_ADMIN",
+  "PRINCIPAL",
   "INSTRUCTOR",
   "TEACHING_ASSISTANT",
   "STUDENT",

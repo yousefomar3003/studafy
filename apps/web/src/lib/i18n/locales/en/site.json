@@ -247,6 +247,8 @@
       "roles": {
         "superAdmin": "Super admin",
         "schoolAdmin": "School admin",
+        "principal": "Principal",
+        "finance": "Finance officer",
         "science": "Science",
         "math": "Math",
         "arts": "Arts",

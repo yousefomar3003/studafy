@@ -49,13 +49,13 @@
     "intro": "Collections vs due this term, receivables aging, overdue installments, and recent payments.",
     "readGuide": "Read the guide",
     "nav": {
-      "fees": "Fee structure builder",
-      "invoices": "Invoices",
-      "payments": "Payments",
-      "scholarships": "Scholarships",
-      "refunds": "Refunds",
-      "reports": "Reports",
-      "expenses": "Expenses"
+      "fees": "Fee structure builder →",
+      "invoices": "Invoices →",
+      "payments": "Payments →",
+      "scholarships": "Scholarships →",
+      "refunds": "Refunds →",
+      "reports": "Reports →",
+      "expenses": "Expenses →"
     }
   },
   "overdue": {

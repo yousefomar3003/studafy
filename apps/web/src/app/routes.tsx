@@ -105,6 +105,27 @@ const PrincipalDashboardPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/PrincipalDashboardPage"),
 );
+const PrincipalGradesPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/grades/PrincipalGradesPage"),
+);
+const SchoolCalendarPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/calendar/SchoolCalendarPage"),
+);
+// Also loads the admin catalog: the page reuses the admin timetable builder's grid, read-only.
+const PrincipalTimetablePage = lazyWithCatalogs(
+  [...PRINCIPAL_CATALOGS, ...ADMIN_CATALOGS],
+  () => import("../features/principal/timetable/PrincipalTimetablePage"),
+);
+const PrincipalClassesPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/classes/PrincipalClassesPage"),
+);
+const PrincipalStudentsPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/students/PrincipalStudentsPage"),
+);
 const IncidentListPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/discipline/IncidentListPage"),
@@ -405,12 +426,12 @@ export const routes: RouteObject[] = [
             ),
           },
           {
-            // Same gate as "Admin" — there is no distinct PRINCIPAL role/permission (see
-            // nav-items.ts). A leadership-facing view (approvals, attendance, discipline,
-            // announcements) alongside the ops-facing admin console, not a replacement for it.
+            // School leadership view (approvals, attendance, discipline, evaluations,
+            // announcements), held by PRINCIPAL and by ORG_ADMIN alongside its ops console. Gated on
+            // its own permission so a PRINCIPAL gets these pages without the admin console.
             path: "principal",
             element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <PrincipalDashboardPage />
               </RequirePermission>
             ),
@@ -418,7 +439,7 @@ export const routes: RouteObject[] = [
           {
             path: "principal/discipline",
             element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <IncidentListPage />
               </RequirePermission>
             ),
@@ -426,7 +447,7 @@ export const routes: RouteObject[] = [
           {
             path: "principal/discipline/:incidentId",
             element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <IncidentDetailPage />
               </RequirePermission>
             ),
@@ -434,7 +455,7 @@ export const routes: RouteObject[] = [
           {
             path: "principal/attendance",
             element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <AttendanceDashboardView />
               </RequirePermission>
             ),
@@ -442,7 +463,7 @@ export const routes: RouteObject[] = [
           {
             path: "principal/evaluations",
             element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <EvaluationListPage />
               </RequirePermission>
             ),
@@ -450,7 +471,7 @@ export const routes: RouteObject[] = [
           {
             path: "principal/evaluations/templates",
             element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <CriteriaTemplatesPage />
               </RequirePermission>
             ),
@@ -458,8 +479,48 @@ export const routes: RouteObject[] = [
           {
             path: "principal/evaluations/:evaluationId",
             element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <EvaluationDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/grades",
+            element: (
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
+                <PrincipalGradesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/calendar",
+            element: (
+              <RequirePermission permission={PERMISSIONS.CALENDAR_EVENT_READ}>
+                <SchoolCalendarPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/timetable",
+            element: (
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
+                <PrincipalTimetablePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/classes",
+            element: (
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
+                <PrincipalClassesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/students",
+            element: (
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
+                <PrincipalStudentsPage />
               </RequirePermission>
             ),
           },

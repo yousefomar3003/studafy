@@ -7,7 +7,7 @@
 
 .portal-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 248px 1fr;
   grid-template-rows: 64px 1fr;
   grid-template-areas: "header header" "sidebar content";
   min-height: 100vh;
@@ -45,17 +45,31 @@
   margin-inline-start: auto;
 }
 
-.portal-header__nav-toggle {
-  display: none;
-}
-
 /* Sidebar */
 
 .portal-sidebar {
   grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
   border-inline-end: 1px solid var(--color-border);
-  padding: var(--space-16) var(--space-8);
+  background-color: var(--color-surface);
+  padding: var(--space-12);
+  overflow-x: hidden;
   overflow-y: auto;
+}
+
+/* Desktop collapse toggle, at the top of the sidebar above the items. Lines up with the item icons
+   (both sit 10px in from the item's edge) so the rail reads as one column. */
+.portal-sidebar__toggle {
+  flex-shrink: 0;
+  color: var(--color-muted-foreground);
+  border-radius: var(--radius-md);
+}
+
+.portal-sidebar__toggle:hover {
+  color: var(--color-foreground);
+  background-color: var(--color-background);
 }
 
 .portal-nav {
@@ -72,17 +86,30 @@
 }
 
 .portal-nav__link {
-  display: block;
-  padding: var(--space-8) var(--space-12);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-block-size: 40px;
+  padding: 0 10px;
   border-radius: var(--radius-md);
-  color: var(--color-foreground);
+  color: var(--color-muted-foreground);
   text-decoration: none;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-fast) var(--easing-standard),
+    color var(--duration-fast) var(--easing-standard);
+}
+
+.portal-nav__icon {
+  flex-shrink: 0;
 }
 
 .portal-nav__link:hover {
-  background-color: var(--color-surface);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
 }
 
 .portal-nav__link:focus-visible {
@@ -90,16 +117,29 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-.portal-nav__link--active {
+.portal-nav__link--active,
+.portal-nav__link--active:hover {
   background-color: var(--color-accent-subtle-bg);
   color: var(--color-accent-subtle-foreground);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Accent bar on the leading edge of the current page's item. */
+.portal-nav__link--active::before {
+  content: "";
+  position: absolute;
+  inset-block: 10px;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
 }
 
 /* The pending-approvals count rides over the nav item rather than in flow, so it appearing or
    changing width never reflows the item list. */
 .portal-nav__item .approval-queue-badge {
   position: absolute;
-  inset-block-start: 2px;
+  inset-block-start: 10px;
   inset-inline-end: var(--space-8);
   font-size: var(--font-size-xs);
   color: var(--color-muted-foreground);
@@ -293,6 +333,11 @@
    which physical side it slides off, is exactly what flips between `dir="ltr"` and `dir="rtl"`. This
    animates `inset-inline-start` rather than `transform: translateX()` on purpose: a physical
    transform doesn't know about `dir` and would need its own `[dir="rtl"]` override to flip sign. */
+/* The header's toggle only drives the narrow drawer; on desktop the sidebar carries its own. */
+.portal-header__nav-toggle {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .portal-shell {
     grid-template-columns: 1fr;
@@ -309,17 +354,53 @@
     inset-inline-start: -100%;
     inline-size: 100%;
     z-index: var(--z-dropdown);
-    background-color: var(--color-background);
     transition: inset-inline-start var(--duration-base) var(--easing-standard);
   }
 
   .portal-sidebar[data-open] {
     inset-inline-start: 0;
   }
+
+  .portal-sidebar__toggle {
+    display: none;
+  }
+}
+
+/* Desktop collapsed: a 72px icon rail. Labels stay in the DOM, visually hidden, so every link keeps
+   its accessible name; the link's `title` (set in PortalSidebar) is the sighted tooltip. */
+@media (min-width: 769px) {
+  .portal-shell[data-nav-collapsed] {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .portal-sidebar[data-collapsed] .portal-nav__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .portal-sidebar[data-collapsed] .portal-nav__link {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .portal-sidebar[data-collapsed] .portal-sidebar__toggle {
+    align-self: center;
+  }
+
+  /* No room for the count beside a label: pin it to the icon's corner instead. */
+  .portal-sidebar[data-collapsed] .approval-queue-badge {
+    inset-block-start: 4px;
+    inset-inline-end: 6px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .portal-sidebar {
+  .portal-sidebar,
+  .portal-nav__link {
     transition: none;
   }
 }

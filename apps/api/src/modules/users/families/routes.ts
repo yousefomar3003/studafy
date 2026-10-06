@@ -6,6 +6,7 @@ import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { hasPermission, requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 
@@ -37,18 +38,11 @@ import {
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { Context, MiddlewareHandler } from "hono";
+import type { Context } from "hono";
 
 function tenantFrom(c: Context<AppEnv>) {
   const auth = requireAuth(c);
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
-}
-
-function onlyMethods(
-  methods: readonly string[],
-  middleware: MiddlewareHandler<AppEnv>,
-): MiddlewareHandler<AppEnv> {
-  return (c, next) => (methods.includes(c.req.method) ? middleware(c, next) : next());
 }
 
 function familyResponse<T extends FamilyRow | FamilyLinkRow>(row: T) {

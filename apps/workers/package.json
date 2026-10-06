@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --watch src/index.ts",
+    "dev": "bun --env-file=../../.env --watch src/index.ts",
     "build": "bun build ./src/index.ts --outdir dist --target bun",
     "build:ocr": "bun build node_modules/tesseract.js/src/worker-script/node/index.js --outdir dist/ocr --target bun && bun run scripts/copy-ocr-assets.ts",
     "check-types": "tsc --noEmit",

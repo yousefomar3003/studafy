@@ -5,137 +5,140 @@
 Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regenerate with
 `bun run docs:generate` after changing either export.
 
-| Permission                       | SUPER_ADMIN | ORG_ADMIN | FINANCE | INSTRUCTOR | TEACHING_ASSISTANT | STUDENT | PARENT | GUEST | SUPPORT_AGENT |
-| -------------------------------- | ----------- | --------- | ------- | ---------- | ------------------ | ------- | ------ | ----- | ------------- |
-| `user:create`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `user:read`                      | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
-| `user:update`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `user:delete`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `user:invite`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `user:suspend`                   | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `user:impersonate`               | ✅          |           |         |            |                    |         |        |       |               |
-| `role:read`                      | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `role:assign`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `role:revoke`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `organization:create`            | ✅          |           |         |            |                    |         |        |       |               |
-| `organization:read`              | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
-| `organization:update`            | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `organization:delete`            | ✅          |           |         |            |                    |         |        |       |               |
-| `organization:manageSettings`    | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `organization:manageBilling`     | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `course:create`                  | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `course:read`                    | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        | ✅    | ✅            |
-| `course:update`                  | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `course:delete`                  | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `course:publish`                 | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `course:archive`                 | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `course:duplicate`               | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `course:manageEnrollment`        | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `lesson:create`                  | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `lesson:read`                    | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        | ✅    |               |
-| `lesson:update`                  | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `lesson:delete`                  | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `lesson:publish`                 | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `lesson:reorder`                 | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `enrollment:create`              | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `enrollment:read`                | ✅          | ✅        |         | ✅         | ✅                 |         |        |       | ✅            |
-| `enrollment:update`              | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `enrollment:delete`              | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `enrollment:approve`             | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `enrollment:cancel`              | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `assignment:create`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `assignment:read`                | ✅          | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       |               |
-| `assignment:update`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `assignment:delete`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `assignment:publish`             | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `assignment:extendDeadline`      | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `submission:create`              | ✅          | ✅        |         |            |                    | ✅      |        |       |               |
-| `submission:read`                | ✅          | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       |               |
-| `submission:update`              | ✅          | ✅        |         |            |                    | ✅      |        |       |               |
-| `submission:delete`              | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `submission:grade`               | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
-| `submission:requestResubmission` | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
-| `grade:read`                     | ✅          | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       |               |
-| `grade:update`                   | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `grade:export`                   | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `grade:override`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `discussion:create`              | ✅          | ✅        |         | ✅         |                    | ✅      |        |       |               |
-| `discussion:read`                | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        |       |               |
-| `discussion:update`              | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        |       |               |
-| `discussion:delete`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `discussion:moderate`            | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
-| `discussion:pin`                 | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `notification:read`              | ✅          | ✅        | ✅      | ✅         | ✅                 | ✅      |        |       | ✅            |
-| `notification:send`              | ✅          | ✅        |         | ✅         |                    |         |        |       | ✅            |
-| `notification:manage`            | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `notification:delete`            | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `billing:read`                   | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
-| `billing:update`                 | ✅          | ✅        | ✅      |            |                    |         |        |       |               |
-| `billing:refund`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `billing:viewInvoices`           | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
-| `report:read`                    | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
-| `report:export`                  | ✅          | ✅        | ✅      |            |                    |         |        |       |               |
-| `report:viewFinancial`           | ✅          | ✅        | ✅      |            |                    |         |        |       |               |
-| `approval:review`                | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `auditLog:read`                  | ✅          | ✅        | ✅      |            |                    |         |        |       | ✅            |
-| `auditLog:export`                | ✅          | ✅        | ✅      |            |                    |         |        |       |               |
-| `privacy:manageDsr`              | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `apiKey:create`                  | ✅          |           |         |            |                    |         |        |       |               |
-| `apiKey:read`                    | ✅          |           |         |            |                    |         |        |       |               |
-| `apiKey:revoke`                  | ✅          |           |         |            |                    |         |        |       |               |
-| `studyGroup:create`              | ✅          | ✅        |         | ✅         |                    | ✅      |        |       |               |
-| `studyGroup:read`                | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        |       |               |
-| `studyGroup:update`              | ✅          | ✅        |         | ✅         |                    | ✅      |        |       |               |
-| `studyGroup:delete`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `studyGroup:join`                | ✅          | ✅        |         | ✅         |                    | ✅      |        |       |               |
-| `studyGroup:moderate`            | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
-| `quiz:create`                    | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `quiz:read`                      | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        |       |               |
-| `quiz:update`                    | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `quiz:delete`                    | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `quiz:publish`                   | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `quiz:grade`                     | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
-| `certificate:issue`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `certificate:read`               | ✅          | ✅        |         | ✅         |                    | ✅      |        |       |               |
-| `certificate:revoke`             | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `student:create`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `student:read`                   | ✅          | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       | ✅            |
-| `student:update`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `student:import`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `teacher:create`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `teacher:read`                   | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `teacher:update`                 | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `material:create`                | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `material:read`                  | ✅          | ✅        |         | ✅         | ✅                 | ✅      |        |       |               |
-| `material:update`                | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `material:delete`                | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `material:manageAi`              | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `aiContent:moderate`             | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `attendance:record:create`       | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `attendance:record:read`         | ✅          | ✅        |         | ✅         | ✅                 |         |        |       |               |
-| `attendance:record:correct`      | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `attendance:report:read`         | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `attendance:report:export`       | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `attendance:correction:override` | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `parent:link`                    | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `parent:unlink`                  | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `disciplineIncident:create`      | ✅          | ✅        |         | ✅         |                    |         |        |       |               |
-| `disciplineIncident:read`        | ✅          | ✅        |         | ✅         |                    |         | ✅     |       | ✅            |
-| `disciplineIncident:update`      | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `disciplineIncident:resolve`     | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `disciplineAction:create`        | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `disciplineAction:read`          | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `disciplineAction:update`        | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluationTemplate:create`      | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluationTemplate:read`        | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluationTemplate:update`      | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluationTemplate:delete`      | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluation:create`              | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluation:read`                | ✅          | ✅        |         |            | ✅                 |         |        |       |               |
-| `evaluation:update`              | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluation:submit`              | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluation:share`               | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluationScore:create`         | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluationScore:read`           | ✅          | ✅        |         |            | ✅                 |         |        |       |               |
-| `evaluationScore:update`         | ✅          | ✅        |         |            |                    |         |        |       |               |
-| `evaluationScore:delete`         | ✅          | ✅        |         |            |                    |         |        |       |               |
+| Permission                       | SUPER_ADMIN | ORG_ADMIN | PRINCIPAL | FINANCE | INSTRUCTOR | TEACHING_ASSISTANT | STUDENT | PARENT | GUEST | SUPPORT_AGENT |
+| -------------------------------- | ----------- | --------- | --------- | ------- | ---------- | ------------------ | ------- | ------ | ----- | ------------- |
+| `user:create`                    | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `user:read`                      | ✅          | ✅        | ✅        | ✅      |            |                    |         |        |       | ✅            |
+| `user:update`                    | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `user:delete`                    | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `user:invite`                    | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `user:suspend`                   | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `user:impersonate`               | ✅          |           |           |         |            |                    |         |        |       |               |
+| `role:read`                      | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `role:assign`                    | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `role:revoke`                    | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `organization:create`            | ✅          |           |           |         |            |                    |         |        |       |               |
+| `organization:read`              | ✅          | ✅        | ✅        | ✅      |            |                    |         |        |       | ✅            |
+| `organization:update`            | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `organization:delete`            | ✅          |           |           |         |            |                    |         |        |       |               |
+| `organization:manageSettings`    | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `organization:manageBilling`     | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `course:create`                  | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `course:read`                    | ✅          | ✅        | ✅        |         | ✅         | ✅                 | ✅      |        | ✅    | ✅            |
+| `course:update`                  | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `course:delete`                  | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `course:publish`                 | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `course:archive`                 | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `course:duplicate`               | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `course:manageEnrollment`        | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `lesson:create`                  | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `lesson:read`                    | ✅          | ✅        |           |         | ✅         | ✅                 | ✅      |        | ✅    |               |
+| `lesson:update`                  | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `lesson:delete`                  | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `lesson:publish`                 | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `lesson:reorder`                 | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `enrollment:create`              | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `enrollment:read`                | ✅          | ✅        | ✅        |         | ✅         | ✅                 |         |        |       | ✅            |
+| `enrollment:update`              | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `enrollment:delete`              | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `enrollment:approve`             | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `enrollment:cancel`              | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `assignment:create`              | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `assignment:read`                | ✅          | ✅        |           |         | ✅         | ✅                 | ✅      | ✅     |       |               |
+| `assignment:update`              | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `assignment:delete`              | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `assignment:publish`             | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `assignment:extendDeadline`      | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `submission:create`              | ✅          | ✅        |           |         |            |                    | ✅      |        |       |               |
+| `submission:read`                | ✅          | ✅        |           |         | ✅         | ✅                 | ✅      | ✅     |       |               |
+| `submission:update`              | ✅          | ✅        |           |         |            |                    | ✅      |        |       |               |
+| `submission:delete`              | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `submission:grade`               | ✅          | ✅        |           |         | ✅         | ✅                 |         |        |       |               |
+| `submission:requestResubmission` | ✅          | ✅        |           |         | ✅         | ✅                 |         |        |       |               |
+| `grade:read`                     | ✅          | ✅        | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       |               |
+| `grade:update`                   | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `grade:export`                   | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `grade:override`                 | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `discussion:create`              | ✅          | ✅        |           |         | ✅         |                    | ✅      |        |       |               |
+| `discussion:read`                | ✅          | ✅        |           |         | ✅         | ✅                 | ✅      |        |       |               |
+| `discussion:update`              | ✅          | ✅        |           |         | ✅         | ✅                 | ✅      |        |       |               |
+| `discussion:delete`              | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `discussion:moderate`            | ✅          | ✅        |           |         | ✅         | ✅                 |         |        |       |               |
+| `discussion:pin`                 | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `notification:read`              | ✅          | ✅        | ✅        | ✅      | ✅         | ✅                 | ✅      |        |       | ✅            |
+| `notification:send`              | ✅          | ✅        | ✅        |         | ✅         |                    |         |        |       | ✅            |
+| `notification:manage`            | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `notification:delete`            | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `billing:read`                   | ✅          | ✅        |           | ✅      |            |                    |         |        |       | ✅            |
+| `billing:update`                 | ✅          | ✅        |           | ✅      |            |                    |         |        |       |               |
+| `billing:refund`                 | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `billing:viewInvoices`           | ✅          | ✅        |           | ✅      |            |                    |         |        |       | ✅            |
+| `report:read`                    | ✅          | ✅        | ✅        | ✅      |            |                    |         |        |       | ✅            |
+| `report:export`                  | ✅          | ✅        |           | ✅      |            |                    |         |        |       |               |
+| `report:viewFinancial`           | ✅          | ✅        |           | ✅      |            |                    |         |        |       |               |
+| `approval:review`                | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `principalDashboard:view`        | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `calendarEvent:read`             | ✅          | ✅        | ✅        |         | ✅         | ✅                 |         |        |       |               |
+| `calendarEvent:manage`           | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `auditLog:read`                  | ✅          | ✅        |           | ✅      |            |                    |         |        |       | ✅            |
+| `auditLog:export`                | ✅          | ✅        |           | ✅      |            |                    |         |        |       |               |
+| `privacy:manageDsr`              | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `apiKey:create`                  | ✅          |           |           |         |            |                    |         |        |       |               |
+| `apiKey:read`                    | ✅          |           |           |         |            |                    |         |        |       |               |
+| `apiKey:revoke`                  | ✅          |           |           |         |            |                    |         |        |       |               |
+| `studyGroup:create`              | ✅          | ✅        |           |         | ✅         |                    | ✅      |        |       |               |
+| `studyGroup:read`                | ✅          | ✅        |           |         | ✅         | ✅                 | ✅      |        |       |               |
+| `studyGroup:update`              | ✅          | ✅        |           |         | ✅         |                    | ✅      |        |       |               |
+| `studyGroup:delete`              | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `studyGroup:join`                | ✅          | ✅        |           |         | ✅         |                    | ✅      |        |       |               |
+| `studyGroup:moderate`            | ✅          | ✅        |           |         | ✅         | ✅                 |         |        |       |               |
+| `quiz:create`                    | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `quiz:read`                      | ✅          | ✅        |           |         | ✅         | ✅                 | ✅      |        |       |               |
+| `quiz:update`                    | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `quiz:delete`                    | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `quiz:publish`                   | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `quiz:grade`                     | ✅          | ✅        |           |         | ✅         | ✅                 |         |        |       |               |
+| `certificate:issue`              | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `certificate:read`               | ✅          | ✅        |           |         | ✅         |                    | ✅      |        |       |               |
+| `certificate:revoke`             | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `student:create`                 | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `student:read`                   | ✅          | ✅        | ✅        |         | ✅         | ✅                 | ✅      | ✅     |       | ✅            |
+| `student:update`                 | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `student:import`                 | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `teacher:create`                 | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `teacher:read`                   | ✅          | ✅        | ✅        |         | ✅         |                    |         |        |       |               |
+| `teacher:update`                 | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `material:create`                | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `material:read`                  | ✅          | ✅        |           |         | ✅         | ✅                 | ✅      |        |       |               |
+| `material:update`                | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `material:delete`                | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `material:manageAi`              | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `aiContent:moderate`             | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `attendance:record:create`       | ✅          | ✅        |           |         | ✅         |                    |         |        |       |               |
+| `attendance:record:read`         | ✅          | ✅        | ✅        |         | ✅         | ✅                 |         |        |       |               |
+| `attendance:record:correct`      | ✅          | ✅        | ✅        |         | ✅         |                    |         |        |       |               |
+| `attendance:report:read`         | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `attendance:report:export`       | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `attendance:correction:override` | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `parent:link`                    | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `parent:unlink`                  | ✅          | ✅        |           |         |            |                    |         |        |       |               |
+| `disciplineIncident:create`      | ✅          | ✅        | ✅        |         | ✅         |                    |         |        |       |               |
+| `disciplineIncident:read`        | ✅          | ✅        | ✅        |         | ✅         |                    |         | ✅     |       | ✅            |
+| `disciplineIncident:update`      | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `disciplineIncident:resolve`     | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `disciplineAction:create`        | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `disciplineAction:read`          | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `disciplineAction:update`        | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluationTemplate:create`      | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluationTemplate:read`        | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluationTemplate:update`      | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluationTemplate:delete`      | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluation:create`              | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluation:read`                | ✅          | ✅        | ✅        |         |            | ✅                 |         |        |       |               |
+| `evaluation:update`              | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluation:submit`              | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluation:share`               | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluationScore:create`         | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluationScore:read`           | ✅          | ✅        | ✅        |         |            | ✅                 |         |        |       |               |
+| `evaluationScore:update`         | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |
+| `evaluationScore:delete`         | ✅          | ✅        | ✅        |         |            |                    |         |        |       |               |

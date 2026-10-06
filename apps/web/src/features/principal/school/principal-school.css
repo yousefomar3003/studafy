@@ -1,0 +1,30 @@
+/**
+ * Shared layout for the principal's school-oversight pages (grades, timetable, classes, students,
+ * calendar): the filter row above each page's content and its summary line.
+ */
+
+.principal-school__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-block: var(--space-16);
+}
+
+.principal-school__filters > * {
+  min-inline-size: 200px;
+  flex: 0 1 240px;
+}
+
+.principal-school__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  margin-block-end: var(--space-16);
+}
+
+.principal-school__count,
+.principal-school__empty {
+  color: var(--color-muted-foreground);
+}

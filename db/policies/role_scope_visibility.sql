@@ -12,7 +12,8 @@
 -- caller's role/relationship grants access.
 --
 -- ROLE MODEL (no PARENT role exists)
---   * Admin   -> app.user_roles.role IN ('ORG_ADMIN','SUPER_ADMIN'); full school-wide read access.
+--   * Admin   -> app.user_roles.role IN ('ORG_ADMIN','SUPER_ADMIN','PRINCIPAL'); full school-wide read
+--                access (PRINCIPAL added by 000120).
 --   * Teacher -> app.teachers row; scoped to classes they lead (classes.lead_teacher_id) or teach via
 --                a timetable slot (timetable_slots.teacher_id).
 --   * Student -> app.students row; scoped to their own records and their classes.
@@ -39,7 +40,7 @@
 
 -- Helper predicates (bodies in migration 000037):
 --   app.scope_user_id()                     -> uuid    NULLIF(current_setting('app.user_id', true),'')::uuid
---   app.current_user_is_school_admin()      -> boolean ORG_ADMIN/SUPER_ADMIN in the current school
+--   app.current_user_is_school_admin()      -> boolean ORG_ADMIN/SUPER_ADMIN/PRINCIPAL in the current school
 --   app.current_user_teacher_id()           -> uuid    the caller's teacher id, or NULL
 --   app.teaches_class(class_id)             -> boolean lead teacher or timetable-slot teacher
 --   app.is_related_to_student(student_id)   -> boolean caller is the student, or a linked parent

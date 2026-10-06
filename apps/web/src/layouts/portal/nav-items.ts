@@ -30,15 +30,13 @@ export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
     requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS,
   },
   {
-    // Same audience as "Admin" (there is no distinct PRINCIPAL role — see
-    // ATTENDANCE_CORRECTION_OVERRIDE's doc comment in packages/constants/src/permissions.ts, which
-    // already calls ORG_ADMIN "a principal's administrative override"). A separate leadership-facing
-    // view — approvals, attendance, discipline, announcements — rather than the ops-facing admin
-    // console (users/invitations/timetable/settings).
+    // School leadership view — approvals, attendance, discipline, evaluations, announcements —
+    // rather than the ops-facing admin console (users/invitations/timetable/settings). Held by
+    // PRINCIPAL and ORG_ADMIN; gated on the same permission as every /portal/principal route.
     id: "principal",
     labelKey: "nav.principal",
     to: "/portal/principal",
-    requiredPermission: PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS,
+    requiredPermission: PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW,
   },
   {
     // The school's own Studafy subscription (plan, seats, invoices, cancellation) — distinct from

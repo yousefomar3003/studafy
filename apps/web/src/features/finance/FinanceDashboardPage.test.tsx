@@ -4,6 +4,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { AuthProvider, createSessionStore } from "../../lib/auth";
+
+import type { SessionTokens } from "../../lib/auth";
 import type { ComponentType } from "react";
 
 function emptyReport(reportName: string) {
@@ -56,16 +59,43 @@ mock.module("../../lib/api", () => ({ api: { GET: getMock } }));
 const loadFinanceDashboardPage = async (): Promise<ComponentType> =>
   (await import("./FinanceDashboardPage")).default;
 
-function renderPage(Page: ComponentType) {
+function fakeJwt(payload: unknown): string {
+  const segment = (value: unknown) =>
+    btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
+}
+
+async function renderPage(Page: ComponentType, role = "FINANCE") {
+  const store = createSessionStore({
+    refreshClient: {
+      refresh: async (): Promise<SessionTokens> => ({
+        accessToken: fakeJwt({ roles: [role] }),
+        expiresAt: Date.now() + 3_600_000,
+        sessionId: "session-1",
+      }),
+      logout: async () => undefined,
+    },
+  });
+  await store.restore();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <Page />
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <Page />
+        </MemoryRouter>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
+
+const MANAGEMENT_LINKS = [
+  "Fee structure builder →",
+  "Invoices →",
+  "Payments →",
+  "Scholarships →",
+  "Expenses →",
+];
 
 afterEach(() => {
   cleanup();
@@ -140,7 +170,7 @@ describe("FinanceDashboardPage", () => {
       }
     });
 
-    renderPage(await loadFinanceDashboardPage());
+    await renderPage(await loadFinanceDashboardPage());
 
     expect(await screen.findByText("Total Collected")).toBeTruthy();
     expect(screen.getByText("5000.000")).toBeTruthy();
@@ -153,11 +183,34 @@ describe("FinanceDashboardPage", () => {
   test("renders each tile's empty state when there is nothing to show yet", async () => {
     getMock.mockImplementation(emptyResponsesFor);
 
-    renderPage(await loadFinanceDashboardPage());
+    await renderPage(await loadFinanceDashboardPage());
 
     expect(await screen.findByText("No collections summary for this term yet.")).toBeTruthy();
     expect(screen.getByText("No outstanding receivables to age.")).toBeTruthy();
     expect(screen.getByText("Nothing is overdue.")).toBeTruthy();
     expect(screen.getByText("No payments recorded yet.")).toBeTruthy();
+  });
+
+  test("gives the FINANCE role every management link", async () => {
+    getMock.mockImplementation(emptyResponsesFor);
+
+    await renderPage(await loadFinanceDashboardPage(), "FINANCE");
+
+    for (const name of [...MANAGEMENT_LINKS, "Refunds →", "Reports →"]) {
+      expect(screen.getByRole("link", { name })).toBeTruthy();
+    }
+  });
+
+  test("gives a school admin a read-only overview with refunds and reports only", async () => {
+    getMock.mockImplementation(emptyResponsesFor);
+
+    await renderPage(await loadFinanceDashboardPage(), "ORG_ADMIN");
+
+    expect(screen.getByRole("link", { name: "Refunds →" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Reports →" })).toBeTruthy();
+    for (const name of MANAGEMENT_LINKS) {
+      expect(screen.queryByRole("link", { name })).toBeNull();
+    }
+    expect(await screen.findByText("No payments recorded yet.")).toBeTruthy();
   });
 });

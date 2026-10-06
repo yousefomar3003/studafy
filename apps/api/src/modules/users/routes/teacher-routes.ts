@@ -7,6 +7,7 @@ import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
@@ -204,7 +205,7 @@ export function teacherRoutes(database: Database): OpenAPIHono<AppEnv> {
   // --- Permission guards ---
   // /api/teachers (list + create) — list requires READ, create requires CREATE
   routes.use("/api/teachers", requirePermission(PERMISSIONS.TEACHER_READ));
-  routes.use("/api/teachers", requirePermission(PERMISSIONS.TEACHER_CREATE));
+  routes.use("/api/teachers", onlyMethods(["POST"], requirePermission(PERMISSIONS.TEACHER_CREATE)));
   // /api/teachers/{teacherId} (get + update) — get requires READ, update requires UPDATE
   routes.use(
     "/api/teachers/:teacherId{[0-9a-fA-F-]{36}}",
@@ -212,7 +213,7 @@ export function teacherRoutes(database: Database): OpenAPIHono<AppEnv> {
   );
   routes.use(
     "/api/teachers/:teacherId{[0-9a-fA-F-]{36}}",
-    requirePermission(PERMISSIONS.TEACHER_UPDATE),
+    onlyMethods(["PATCH"], requirePermission(PERMISSIONS.TEACHER_UPDATE)),
   );
 
   // --- Audit declarations ---

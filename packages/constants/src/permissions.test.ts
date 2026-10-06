@@ -45,7 +45,7 @@ describe("ROLE_PERMISSIONS", () => {
     }
   });
 
-  test("attendance reporting permissions are admin-only", () => {
+  test("attendance reporting permissions are limited to school leadership", () => {
     for (const permission of [
       PERMISSIONS.ATTENDANCE_REPORT_READ,
       PERMISSIONS.ATTENDANCE_REPORT_EXPORT,
@@ -54,7 +54,7 @@ describe("ROLE_PERMISSIONS", () => {
         .filter(([, permissions]) => permissions.includes(permission))
         .map(([role]) => role)
         .sort();
-      expect(roles).toEqual([ROLES.ORG_ADMIN, ROLES.SUPER_ADMIN].sort());
+      expect(roles).toEqual([ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort());
     }
   });
 });

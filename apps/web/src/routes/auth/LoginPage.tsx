@@ -47,6 +47,16 @@ const DEMO_PERSONA_GROUPS: readonly {
         name: "Omar Haddad",
         roleKey: "site.login.dev.roles.schoolAdmin",
       },
+      {
+        email: "principal@demo.studafy.test",
+        name: "Samir Qasem",
+        roleKey: "site.login.dev.roles.principal",
+      },
+      {
+        email: "finance@demo.studafy.test",
+        name: "Reem Saadeh",
+        roleKey: "site.login.dev.roles.finance",
+      },
     ],
   },
   {
@@ -195,7 +205,7 @@ export default function LoginPage() {
     <div className="login">
       <section className="login__card" aria-labelledby="login-heading">
         <Link to="/" className="login__brand" aria-label={t("shell.homeLink")}>
-          <BrandLogo size="lg" badge />
+          <BrandLogo size="lg" tone="navy" />
         </Link>
 
         <header className="login__header">

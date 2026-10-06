@@ -251,6 +251,8 @@
       "roles": {
         "superAdmin": "مسؤول أعلى",
         "schoolAdmin": "مسؤول المدرسة",
+        "principal": "مدير المدرسة",
+        "finance": "مسؤول المالية",
         "science": "العلوم",
         "math": "الرياضيات",
         "arts": "الفنون",

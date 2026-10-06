@@ -10,7 +10,10 @@ import { MARKETING_NAV_ITEMS } from "./marketing/nav-items";
 
 import "./root-shell.css";
 
+// Every route that renders inside `MarketingLayout` (see `app/routes.tsx`): the nav pages plus the
+// public legal pages, which are linked from the footer and app-store listings rather than the nav.
 const MARKETING_PATHS = new Set(MARKETING_NAV_ITEMS.map((item) => item.to));
+const MARKETING_PATH_PREFIXES = ["/privacy", "/legal/"];
 
 /**
  * Shared shell wrapping every route group: skip link, primary navigation, and the main landmark.
@@ -25,7 +28,9 @@ const MARKETING_PATHS = new Set(MARKETING_NAV_ITEMS.map((item) => item.to));
 export function RootLayout() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const isMarketing = MARKETING_PATHS.has(pathname);
+  const isMarketing =
+    MARKETING_PATHS.has(pathname) ||
+    MARKETING_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   const isHelp = pathname.startsWith("/help");
   // The sign-in pages are a designed, self-contained screen; the placeholder nav would sit on top.
   const isAuth = pathname.startsWith("/auth");

@@ -165,4 +165,21 @@ describe("PrincipalDashboardPage", () => {
     expect(screen.getByText("No open incidents.")).toBeTruthy();
     expect(screen.getByText("No announcements published yet.")).toBeTruthy();
   });
+
+  test("links to every area of the principal's work", async () => {
+    getMock.mockImplementation(emptyResponsesFor);
+
+    renderPage(await loadPrincipalDashboardPage());
+
+    for (const [name, href] of [
+      ["Grades →", "/portal/principal/grades"],
+      ["School calendar →", "/portal/principal/calendar"],
+      ["Timetable →", "/portal/principal/timetable"],
+      ["Classes →", "/portal/principal/classes"],
+      ["Students →", "/portal/principal/students"],
+      ["Approvals →", "/portal/approvals"],
+    ] as const) {
+      expect(screen.getByRole("link", { name }).getAttribute("href")).toBe(href);
+    }
+  });
 });

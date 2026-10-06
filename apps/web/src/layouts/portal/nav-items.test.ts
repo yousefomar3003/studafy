@@ -19,6 +19,7 @@ describe("visiblePortalNavItems", () => {
       "ORG_ADMIN",
       ["home", "notifications", "admin", "principal", "billing", "finance", "approvals", "account"],
     ],
+    ["PRINCIPAL", ["home", "notifications", "principal", "approvals", "account"]],
     ["FINANCE", ["home", "notifications", "finance", "account"]],
     ["INSTRUCTOR", ["home", "notifications", "account"]],
     ["TEACHING_ASSISTANT", ["home", "notifications", "account"]],

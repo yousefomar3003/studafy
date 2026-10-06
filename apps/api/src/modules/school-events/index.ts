@@ -1,0 +1,1 @@
+export { schoolEventRoutes } from "./routes";

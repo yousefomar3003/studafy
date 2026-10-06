@@ -14,6 +14,7 @@ export { fieldErrors, ROLE_LABEL_KEYS };
  */
 export const INVITATION_ROLES = [
   "ORG_ADMIN",
+  "PRINCIPAL",
   "INSTRUCTOR",
   "TEACHING_ASSISTANT",
   "STUDENT",

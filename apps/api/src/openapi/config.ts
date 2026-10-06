@@ -184,6 +184,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "from the school, stops AI add-on billing and files the erasure request.",
     },
     {
+      name: "School calendar",
+      description:
+        "The school calendar's own entries -- holidays, events, meetings and exam periods -- listed " +
+        "by date window and managed by school leadership. Terms and class exams live under the " +
+        "academics endpoints. Authenticated and permission-gated.",
+    },
+    {
       name: "Announcements",
       description:
         "Compose and publish school/role/class-targeted announcements, with an optional mandatory " +

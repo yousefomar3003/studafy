@@ -11,6 +11,8 @@
 export type MockRole =
   | "SUPER_ADMIN"
   | "ORG_ADMIN"
+  | "PRINCIPAL"
+  | "FINANCE"
   | "INSTRUCTOR"
   | "TEACHING_ASSISTANT"
   | "STUDENT"
@@ -115,6 +117,22 @@ const staff: MockPersona[] = [
     firstName: "Omar",
     lastName: "Haddad",
     email: `admin@${MOCK_EMAIL_DOMAIN}`,
+  },
+  {
+    key: "principal",
+    group: "admin",
+    role: "PRINCIPAL",
+    firstName: "Samir",
+    lastName: "Qasem",
+    email: `principal@${MOCK_EMAIL_DOMAIN}`,
+  },
+  {
+    key: "finance-officer",
+    group: "admin",
+    role: "FINANCE",
+    firstName: "Reem",
+    lastName: "Saadeh",
+    email: `finance@${MOCK_EMAIL_DOMAIN}`,
   },
   {
     key: "instructor-science",

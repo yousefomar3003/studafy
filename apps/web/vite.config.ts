@@ -19,6 +19,8 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const sentryReleaseUploadEnabled = Boolean(process.env.SENTRY_AUTH_TOKEN);
 
 export default defineConfig({
+  // VITE_* keys live in the repo-root `.env` alongside every other service's (see lib/config.ts).
+  envDir: "../..",
   plugins: [
     react(),
     ...(sentryReleaseUploadEnabled

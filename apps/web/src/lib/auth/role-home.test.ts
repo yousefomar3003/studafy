@@ -4,12 +4,16 @@ import { describe, expect, test } from "bun:test";
 import { resolveRoleHome } from "./role-home";
 
 describe("resolveRoleHome", () => {
-  test.each([["ORG_ADMIN"], ["INSTRUCTOR"], ["TEACHING_ASSISTANT"], ["STUDENT"], ["GUEST"]])(
-    "routes a %s session to the portal",
-    (role) => {
-      expect(resolveRoleHome([role])).toBe("/portal");
-    },
-  );
+  test.each([
+    ["ORG_ADMIN"],
+    ["PRINCIPAL"],
+    ["INSTRUCTOR"],
+    ["TEACHING_ASSISTANT"],
+    ["STUDENT"],
+    ["GUEST"],
+  ])("routes a %s session to the portal", (role) => {
+    expect(resolveRoleHome([role])).toBe("/portal");
+  });
 
   test("falls back to the portal for an unrecognized role", () => {
     expect(resolveRoleHome(["SOME_FUTURE_ROLE"])).toBe("/portal");

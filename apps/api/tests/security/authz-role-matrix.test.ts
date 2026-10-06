@@ -66,6 +66,7 @@ let database: TestDatabase | undefined;
 let sql: Sql;
 let tenant: TenantFixture;
 let financeUserId: string;
+let principalUserId: string;
 let app: OpenAPIHono<AppEnv>;
 let keyStore: KeyStore;
 
@@ -90,6 +91,14 @@ beforeAll(async () => {
   });
   await assignRole(sql, tenant.schoolId, financeUser.id, ROLES.FINANCE);
   financeUserId = financeUser.id;
+
+  // PRINCIPAL is newer still; seeded the same way for the same reason.
+  const principalUser = await createUser(sql, tenant.schoolId, {
+    email: `principal@test-${tenant.schoolSlug}.local`,
+    displayName: "PRINCIPAL User",
+  });
+  await assignRole(sql, tenant.schoolId, principalUser.id, ROLES.PRINCIPAL);
+  principalUserId = principalUser.id;
 
   // Tier A hits every route including the three webhook endpoints; without these two vars they'd
   // each hit their own "not configured" 500 before ever reaching signature verification, which
@@ -121,6 +130,7 @@ afterAll(async () => {
 const ALL_ROLES: Role[] = [
   ROLES.SUPER_ADMIN,
   ROLES.ORG_ADMIN,
+  ROLES.PRINCIPAL,
   ROLES.FINANCE,
   ROLES.INSTRUCTOR,
   ROLES.TEACHING_ASSISTANT,
@@ -131,7 +141,9 @@ const ALL_ROLES: Role[] = [
 ];
 
 function userIdFor(role: Role): string {
-  return role === ROLES.FINANCE ? financeUserId : tenant.users[role].id;
+  if (role === ROLES.FINANCE) return financeUserId;
+  if (role === ROLES.PRINCIPAL) return principalUserId;
+  return tenant.users[role].id;
 }
 
 async function tokenFor(role: Role): Promise<string> {

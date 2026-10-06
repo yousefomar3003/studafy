@@ -4,8 +4,10 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { AuthProvider, createSessionStore } from "../../lib/auth";
 import { expectNoA11yViolations } from "../../lib/test/axe";
 
+import type { SessionTokens } from "../../lib/auth";
 import type { ComponentType } from "react";
 
 /**
@@ -51,16 +53,35 @@ const loadFinanceDashboardPage = async (): Promise<ComponentType> =>
 const loadFinanceOverdueInstallmentsPage = async (): Promise<ComponentType> =>
   (await import("./FinanceOverdueInstallmentsPage")).default;
 
-function renderInPortal(Page: ComponentType) {
+function fakeJwt(payload: unknown): string {
+  const segment = (value: unknown) =>
+    btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
+}
+
+async function renderInPortal(Page: ComponentType) {
+  const store = createSessionStore({
+    refreshClient: {
+      refresh: async (): Promise<SessionTokens> => ({
+        accessToken: fakeJwt({ roles: ["FINANCE"] }),
+        expiresAt: Date.now() + 3_600_000,
+        sessionId: "session-1",
+      }),
+      logout: async () => undefined,
+    },
+  });
+  await store.restore();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <main>
-          <Page />
-        </main>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <main>
+            <Page />
+          </main>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -84,7 +105,7 @@ describe("finance dashboard accessibility", () => {
       return Promise.resolve({ data: undefined });
     });
 
-    const { container } = renderInPortal(await loadFinanceDashboardPage());
+    const { container } = await renderInPortal(await loadFinanceDashboardPage());
     await screen.findByRole("heading", { name: "Finance" });
 
     await expectNoA11yViolations(container);
@@ -98,7 +119,7 @@ describe("finance dashboard accessibility", () => {
       return Promise.resolve({ data: undefined });
     });
 
-    const { container } = renderInPortal(await loadFinanceOverdueInstallmentsPage());
+    const { container } = await renderInPortal(await loadFinanceOverdueInstallmentsPage());
     await screen.findByRole("heading", { name: "Overdue installments" });
 
     await expectNoA11yViolations(container);

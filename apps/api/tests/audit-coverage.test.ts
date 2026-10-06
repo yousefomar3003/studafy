@@ -267,6 +267,11 @@ const EXPECTED_MUTATING_ROUTES = [
   // emitAuditLog writes the row inside the compose/publish transaction in announcements/service.ts
   // (ST-238), tagged restrict_to_taught_class for the scoped teacher path.
   "POST /api/announcements",
+  // School calendar entries (000121). auditAction declares each intent; emitAuditLog writes the row
+  // inside the same transaction in school-events/service.ts.
+  "POST /api/school-events",
+  "PATCH /api/school-events/{eventId}",
+  "DELETE /api/school-events/{eventId}",
   // Fee schedule generation (ST-122). Per-student installments derived from a fee structure.
   // Audit row written by auditAction middleware in installments/routes.ts.
   "POST /api/finance/fee-schedules/generate",

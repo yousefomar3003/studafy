@@ -66,7 +66,9 @@ export async function fetchIncidentActions(incidentId: string): Promise<Discipli
  * Settings page) gating whether a *resolved* incident becomes visible to the student's parent —
  * not a per-incident flag. Fetched directly rather than through `features/admin/settings/queries`
  * to avoid coupling this module to that page's file layout for the sake of one boolean. */
-export async function fetchParentDisciplineVisibility(): Promise<boolean> {
+export async function fetchParentDisciplineVisibility(): Promise<boolean | null> {
   const { data } = await api.GET("/api/schools/current/settings");
-  return data?.parent_discipline_visibility ?? false;
+  // `null` when the settings aren't readable — they need `organization:manageSettings`, which a
+  // PRINCIPAL deliberately lacks — so the page can omit the row instead of guessing "off".
+  return data === undefined ? null : (data.parent_discipline_visibility ?? false);
 }

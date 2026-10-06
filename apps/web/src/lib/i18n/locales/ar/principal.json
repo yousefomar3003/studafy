@@ -5,7 +5,19 @@
   },
   "dashboard": {
     "title": "المدير",
-    "description": "لمحة مباشرة عن الموافقات والحضور والانضباط والتقييمات والإعلانات."
+    "description": "كل ما تشرف عليه بصفتك مديرًا للمدرسة: الدرجات والتقويم المدرسي والجدول الدراسي والصفوف والطلاب، إلى جانب ما يحتاج إلى اهتمامك اليوم.",
+    "links": {
+      "grades": "الدرجات ←",
+      "calendar": "التقويم المدرسي ←",
+      "timetable": "الجدول الدراسي ←",
+      "classes": "الصفوف ←",
+      "students": "الطلاب ←",
+      "attendance": "الحضور ←",
+      "discipline": "الانضباط ←",
+      "evaluations": "تقييم المعلمين ←",
+      "approvals": "الموافقات ←",
+      "announcements": "الإعلانات ←"
+    }
   },
   "tiles": {
     "pendingApprovals": {
@@ -546,6 +558,140 @@
       "alertCount_many": "{{count}} تنبيهًا",
       "alertCount_other": "{{count}} تنبيه",
       "empty": "لا توجد تجاوزات للحد في هذا العرض."
+    }
+  },
+  "school": {
+    "yearLabel": "العام الدراسي",
+    "termLabel": "الفصل الدراسي",
+    "classLabel": "الصف",
+    "noYears": "لم يتم إعداد أي عام دراسي بعد",
+    "noTerms": "لا توجد فصول دراسية في هذا العام",
+    "noClasses": "لا توجد صفوف في هذا الفصل الدراسي."
+  },
+  "grades": {
+    "title": "الدرجات",
+    "description": "سجل درجات كل صف لهذا الفصل: الدرجات لكل تقييم، والمعدل الموزون لكل طالب، وموقع درجاته في مسار الاعتماد.",
+    "caption": "سجل درجات {{class}}",
+    "empty": "لم تُدخل أي درجات لهذا الصف بعد.",
+    "error": "تعذّر تحميل سجل درجات هذا الصف.",
+    "reviewPending_zero": "مراجعة الطلبات المعلّقة ←",
+    "reviewPending_one": "مراجعة طلب معلّق واحد ←",
+    "reviewPending_two": "مراجعة طلبين معلّقين ←",
+    "reviewPending_few": "مراجعة {{count}} طلبات معلّقة ←",
+    "reviewPending_many": "مراجعة {{count}} طلبًا معلّقًا ←",
+    "reviewPending_other": "مراجعة {{count}} طلب معلّق ←",
+    "columns": {
+      "student": "الطالب",
+      "average": "المعدل",
+      "status": "الحالة"
+    },
+    "status": {
+      "draft": "مسودة",
+      "submitted": "بانتظار الاعتماد",
+      "approved": "معتمدة",
+      "rejected": "مُعادة",
+      "published": "منشورة"
+    }
+  },
+  "timetable": {
+    "title": "الجدول الدراسي",
+    "description": "الجدول الأسبوعي المعتمد المعمول به في هذا الفصل. يمكنك عرضه لصف واحد أو لمعلم واحد.",
+    "teacherLabel": "المعلم",
+    "allClasses": "جميع الصفوف",
+    "allTeachers": "جميع المعلمين",
+    "noApproved": "لا يوجد جدول دراسي معتمد لهذا الفصل بعد.",
+    "error": "تعذّر تحميل الجدول الدراسي."
+  },
+  "classes": {
+    "title": "الصفوف",
+    "description": "جميع الصفوف القائمة في هذا الفصل مع المعلم المسؤول والقاعة ونسبة الامتلاء.",
+    "caption": "صفوف هذا الفصل",
+    "error": "تعذّر تحميل الصفوف.",
+    "ofCapacity": "{{enrolled}} من {{capacity}}",
+    "columns": {
+      "class": "الصف",
+      "teacher": "المعلم المسؤول",
+      "room": "القاعة",
+      "enrolled": "المسجّلون",
+      "status": "الحالة"
+    },
+    "status": {
+      "planned": "مخطط",
+      "active": "نشط",
+      "completed": "مكتمل",
+      "cancelled": "ملغى"
+    }
+  },
+  "students": {
+    "title": "الطلاب",
+    "description": "سجل طلاب المدرسة. ابحث بالاسم أو صفِّ حسب الحالة.",
+    "search": "البحث بالاسم",
+    "statusLabel": "الحالة",
+    "allStatuses": "جميع الحالات",
+    "caption": "الطلاب",
+    "empty": "لا يوجد طلاب مطابقون.",
+    "error": "تعذّر تحميل الطلاب.",
+    "count_zero": "لا يوجد طلاب",
+    "count_one": "طالب واحد",
+    "count_two": "طالبان",
+    "count_few": "{{count}} طلاب",
+    "count_many": "{{count}} طالبًا",
+    "count_other": "{{count}} طالب",
+    "columns": {
+      "name": "الاسم",
+      "admissionNumber": "رقم القبول",
+      "dateOfBirth": "تاريخ الميلاد",
+      "status": "الحالة"
+    },
+    "status": {
+      "applicant": "متقدّم",
+      "enrolled": "مسجّل",
+      "suspended": "موقوف",
+      "graduated": "متخرّج",
+      "withdrawn": "منسحب",
+      "archived": "مؤرشف"
+    }
+  },
+  "calendar": {
+    "title": "التقويم المدرسي",
+    "description": "مواعيد الفصول الدراسية واختبارات كل صف وعطلات المدرسة وفعالياتها واجتماعاتها.",
+    "previous": "→ السابق",
+    "next": "التالي ←",
+    "today": "اليوم",
+    "addEvent": "إضافة حدث",
+    "legend": "دليل الألوان",
+    "error": "تعذّر تحميل أحداث التقويم.",
+    "termStarts": "بداية {{term}}",
+    "termEnds": "نهاية {{term}}",
+    "exam": "{{title}} ({{class}})",
+    "agenda": "هذا الشهر",
+    "agendaEmpty": "لا يوجد شيء في التقويم هذا الشهر.",
+    "kinds": {
+      "term": "مواعيد الفصل الدراسي",
+      "exam": "اختبار",
+      "holiday": "عطلة",
+      "event": "فعالية مدرسية",
+      "meeting": "اجتماع",
+      "exam_period": "فترة الاختبارات"
+    },
+    "form": {
+      "addTitle": "إضافة حدث إلى التقويم",
+      "editTitle": "تعديل حدث في التقويم",
+      "title": "العنوان",
+      "kind": "النوع",
+      "startsOn": "يبدأ",
+      "endsOn": "ينتهي",
+      "description": "التفاصيل (اختياري)",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "remove": "حذف",
+      "saved": "تم تحديث التقويم",
+      "removed": "تم حذف الحدث",
+      "saveFailed": "تعذّر حفظ الحدث. حاول مرة أخرى.",
+      "removeFailed": "تعذّر حذف الحدث. حاول مرة أخرى.",
+      "titleRequired": "أدخل عنوانًا.",
+      "datesRequired": "اختر تاريخ البداية والنهاية.",
+      "endBeforeStart": "لا يمكن أن يكون تاريخ النهاية قبل تاريخ البداية."
     }
   }
 }

@@ -7,6 +7,7 @@ import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { hasPermission, requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses, requestIdHeaders } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
@@ -276,11 +277,17 @@ export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   // --- Permission guards ---
   routes.use("/api/students", requirePermission(PERMISSIONS.STUDENT_READ));
-  routes.use("/api/students", requirePermission(PERMISSIONS.STUDENT_CREATE));
+  routes.use("/api/students", onlyMethods(["POST"], requirePermission(PERMISSIONS.STUDENT_CREATE)));
   routes.use("/api/students/:studentId", requirePermission(PERMISSIONS.STUDENT_READ));
-  routes.use("/api/students/:studentId", requirePermission(PERMISSIONS.STUDENT_UPDATE));
+  routes.use(
+    "/api/students/:studentId",
+    onlyMethods(["PATCH"], requirePermission(PERMISSIONS.STUDENT_UPDATE)),
+  );
   routes.use("/api/students/:studentId/guardians", requirePermission(PERMISSIONS.STUDENT_READ));
-  routes.use("/api/students/:studentId/guardians", requirePermission(PERMISSIONS.STUDENT_UPDATE));
+  routes.use(
+    "/api/students/:studentId/guardians",
+    onlyMethods(["POST"], requirePermission(PERMISSIONS.STUDENT_UPDATE)),
+  );
   routes.use(
     "/api/students/:studentId/guardians/:userId",
     requirePermission(PERMISSIONS.STUDENT_UPDATE),
