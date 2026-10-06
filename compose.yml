@@ -1,0 +1,167 @@
+# Full local Studafy stack, built from the same infra/docker/*.Dockerfile images CI scans and
+# release.yml ships:
+#
+#   docker compose up -d --build --wait          # postgres, redis, migrations, api, realtime, workers, web
+#   docker compose --profile seed run --rm seed  # optional: load the demo tenant (db/seeds/seed.ts)
+#   docker compose down                          # stop (add -v to drop the database volume)
+#
+# Then open http://localhost:8080 and use "Continue with Mock" to sign in.
+#
+# Separate from db/compose.yml on purpose: that file is the disposable tmpfs database the test suite
+# creates/drops databases in, while this one keeps data in a named volume across restarts. The two
+# use different project names ("studafy" here, "studafy-test" there) and host ports, so they can
+# run side by side -- sharing a name would let `db:up` replace this stack's postgres/redis with the
+# tmpfs test ones, since both files define services by those names.
+#
+# The services run with NODE_ENV=development: the images default to production, whose env schemas
+# require an RDS CA cert, a read replica, Stripe, and ClamAV (apps/api/src/env.ts,
+# apps/workers/src/env.ts) -- none of which exist locally. Optional integrations (ERPNext, Stripe,
+# Tap, Anthropic, S3, SES, FCM) stay unset unless added to a root .env, which compose reads for the
+# ${...} values below. Not included: the ERPNext plane (its own MariaDB/bench stack, see
+# infra/docker/README.md) and the observability images, whose configs target ECS/S3.
+
+name: studafy
+
+x-db-env: &db-env
+  DATABASE_HOST: postgres
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: studafy
+  DATABASE_USER: studafy
+  DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-studafy_local}
+  DATABASE_SSL_MODE: disable
+
+x-app-env: &app-env
+  <<: *db-env
+  NODE_ENV: development
+  APP_ENV: development
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  REDIS_URL: redis://redis:6379
+
+services:
+  postgres:
+    # Same image and preload as db/compose.yml -- the migrations need pgvector and
+    # pg_stat_statements.
+    image: pgvector/pgvector:pg16
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    environment:
+      POSTGRES_USER: studafy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studafy_local}
+      POSTGRES_DB: studafy
+    ports:
+      - "127.0.0.1:54330:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    shm_size: 1gb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studafy -d studafy"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6391:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  migrations:
+    build:
+      context: .
+      dockerfile: infra/docker/migrations.Dockerfile
+    image: studafy/migrations:local
+    environment:
+      <<: *db-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    image: studafy/api:local
+    environment:
+      <<: *app-env
+      FRONTEND_URL: http://localhost:8080
+      CORS_ALLOWED_ORIGINS: http://localhost:8080
+      # The mock identity provider is served by the API itself; both URLs are what the browser
+      # follows, so they use the published host port.
+      MOCK_OAUTH_ISSUER_URL: http://localhost:3000/mock-idp
+      MOCK_OAUTH_REDIRECT_URI: http://localhost:3000/api/auth/oauth/mock/callback
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  realtime:
+    build:
+      context: .
+      dockerfile: infra/docker/realtime.Dockerfile
+    image: studafy/realtime:local
+    environment:
+      NODE_ENV: development
+      REDIS_URL: redis://redis:6379
+      WS_JWT_SECRET: ${WS_JWT_SECRET:-dev-insecure-secret-change-me}
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  workers:
+    build:
+      context: .
+      dockerfile: infra/docker/workers.Dockerfile
+    image: studafy/workers:local
+    environment:
+      <<: *app-env
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        # Inlined into the static bundle at build time -- these are the URLs the *browser* calls.
+        VITE_API_BASE_URL: http://localhost:3000
+        VITE_REALTIME_BASE_URL: ws://localhost:3001
+        VITE_ENABLE_MOCK_AUTH: "true"
+        VITE_RELEASE_VERSION: local
+    image: studafy/web:local
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # One-shot demo data loader. Runs from the migrations image's build stage, which still carries the
+  # full workspace source and node_modules the seed script imports. db/seeds/guard.ts already allows
+  # the "postgres" compose host.
+  seed:
+    profiles: ["seed"]
+    build:
+      context: .
+      dockerfile: infra/docker/migrations.Dockerfile
+      target: build
+    image: studafy/seed:local
+    entrypoint: ["bun", "db/seeds/seed.ts"]
+    environment:
+      <<: *app-env
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-data:

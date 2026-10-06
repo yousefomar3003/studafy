@@ -1,4 +1,4 @@
-name: studafy
+name: studafy-test
 
 services:
   redis:

@@ -39,6 +39,20 @@ All four Dockerfiles need `bun.lock` and the `packages/*` workspace members to r
 every one of them, and the four `docker build` invocations above are what CI should actually run —
 this doc corrects that example; see "Known gaps" for the actual line changed.
 
+## Running the whole stack locally
+
+The root `compose.yml` builds these same images and runs them together with Postgres and Redis:
+
+```bash
+docker compose up -d --build --wait          # postgres, redis, migrations, api, realtime, workers, web
+docker compose --profile seed run --rm seed  # optional demo data
+```
+
+Web is on http://localhost:8080 (sign in with "Continue with Mock"), the API on :3000, realtime
+on :3001. Services run with `NODE_ENV=development` because the production env schemas require
+AWS-only dependencies. ERPNext and the observability images are not part of it. See the header of
+`compose.yml` for details.
+
 ## How each image is built
 
 All three Bun services follow the same two-stage shape:

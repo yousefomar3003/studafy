@@ -72,6 +72,8 @@ const EXPECTED_PATHS = [
   "/api/account/deletion-requests",
   "/api/account/deletion-requests/confirm",
   "/api/announcements",
+  "/api/school-events",
+  "/api/school-events/{eventId}",
   "/api/auth/refresh",
   "/api/auth/logout",
   "/api/auth/invitations/{token}/activate",
