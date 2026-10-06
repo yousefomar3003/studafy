@@ -1,8 +1,10 @@
 export default {
   extends: ["@commitlint/config-conventional"],
   rules: {
-    // Body/footer wrapping is cosmetic; long bullet lines (often from generated messages)
-    // shouldn't block a commit. The header length limit still applies.
+    // Line length is cosmetic; long headers or bullet lines (often from generated messages)
+    // shouldn't block a commit. Type and format rules still apply. Aim for headers under ~72
+    // characters anyway -- GitHub truncates longer ones in commit lists.
+    "header-max-length": [0],
     "body-max-line-length": [0],
     "footer-max-line-length": [0],
     "type-enum": [
