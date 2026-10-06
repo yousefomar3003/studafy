@@ -11,8 +11,8 @@
  * itself against these two JSON endpoints — mirroring `mobile-oauth-routes.ts`'s split from the
  * browser-redirect login routes.
  *
- *   1. `/mobile-start` mints PKCE + nonce + state, binds the invitation token to that state (same
- *      state store shape `activation-oauth-routes.ts` uses, `purpose: "activation"`), and returns
+ *   1. `/mobile-start` mints PKCE + nonce + state, binds the invitation token to that state (in the
+ *      process-wide store, `flow: "mobile-activation"` — see oauth/state-store.ts), and returns
  *      them as JSON so the app can open a system browser (ASWebAuthenticationSession / Custom Tabs)
  *      against the provider's authorization endpoint itself.
  *   2. The app captures the provider's redirect via its `studafy://auth/callback` deep link and
@@ -55,7 +55,7 @@ import {
   generateNonce,
   generateState,
 } from "../oauth/pkce";
-import { createStateStore } from "../oauth/state-store";
+import { takeStateFor } from "../oauth/state-store";
 import { activateAccount } from "../services/activation-service";
 
 import { activationPathParams, activationResponseSchema } from "./activation-schemas";
@@ -63,13 +63,12 @@ import { activationPathParams, activationResponseSchema } from "./activation-sch
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { StateStore } from "../oauth/state-store";
 import type { ActivationProvider } from "../services/activation-service";
 import type { SessionTokenConfig } from "../services/session-service";
 import type { Context } from "hono";
 
 type Provider = ActivationProvider;
-
-const ACTIVATION_STATE_TTL_MS = 5 * 60 * 1000;
 
 interface OAuthConfig {
   clientId: string;
@@ -205,22 +204,21 @@ async function runMobileExchange(
   c: Context<AppEnv>,
   db: Database,
   sessionConfig: SessionTokenConfig,
-  stateStore: ReturnType<typeof createStateStore>,
+  stateStore: StateStore,
   provider: Provider,
   logger: Logger,
   input: ExchangeInput,
 ): Promise<ExchangeSuccessBody> {
   const oauthConfig = providerConfig(provider);
 
-  const entry = stateStore.get(input.state);
-  if (!entry || entry.purpose !== "activation" || entry.token !== input.token) {
+  const entry = await takeStateFor(stateStore, input.state, "mobile-activation", provider);
+  if (!entry || entry.token !== input.token) {
     throw new CodedHttpException(
       400,
       ERROR_CODES.OAUTH_STATE_INVALID,
       "Invalid or expired activation state",
     );
   }
-  stateStore.delete(input.state);
 
   if (entry.nonce !== input.nonce) {
     throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
@@ -281,20 +279,21 @@ async function runMobileExchange(
 /**
  * Build the mobile invitation-activation route group.
  *
- * Requires a database and a session-token config, like the browser-redirect activation routes it
- * sits beside. Public — the invitation token in the path is the credential.
+ * Requires a database, a session-token config, and the process-wide OAuth state store (so
+ * /mobile-start and /mobile-exchange may land on different API instances). Public — the invitation
+ * token in the path is the credential.
  */
 export function mobileActivationOAuthRoutes(
   db: Database,
   config: SessionTokenConfig,
   logger: Logger,
+  { stateStore }: { stateStore: StateStore },
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
-  const stateStore = createStateStore(ACTIVATION_STATE_TTL_MS);
 
   // ----- Google -----
 
-  routes.openapi(createInvitationMobileStartRoute("google"), (c) => {
+  routes.openapi(createInvitationMobileStartRoute("google"), async (c) => {
     const { token } = c.req.valid("param");
     providerConfig("google");
 
@@ -303,11 +302,11 @@ export function mobileActivationOAuthRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    stateStore.set(state, {
+    await stateStore.set(state, {
+      flow: "mobile-activation",
+      provider: "google",
       codeVerifier,
       nonce,
-      createdAt: Date.now(),
-      purpose: "activation",
       token,
     });
 
@@ -328,7 +327,7 @@ export function mobileActivationOAuthRoutes(
 
   // ----- Microsoft -----
 
-  routes.openapi(createInvitationMobileStartRoute("microsoft"), (c) => {
+  routes.openapi(createInvitationMobileStartRoute("microsoft"), async (c) => {
     const { token } = c.req.valid("param");
     providerConfig("microsoft");
 
@@ -337,11 +336,11 @@ export function mobileActivationOAuthRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    stateStore.set(state, {
+    await stateStore.set(state, {
+      flow: "mobile-activation",
+      provider: "microsoft",
       codeVerifier,
       nonce,
-      createdAt: Date.now(),
-      purpose: "activation",
       token,
     });
 
@@ -362,7 +361,7 @@ export function mobileActivationOAuthRoutes(
 
   // ----- Mock (dev/E2E only, see file header) -----
 
-  routes.openapi(createInvitationMobileStartRoute("mock"), (c) => {
+  routes.openapi(createInvitationMobileStartRoute("mock"), async (c) => {
     const { token } = c.req.valid("param");
     if (!getMockOAuthConfig()) {
       throw new HTTPException(404, { message: "mock OAuth is not configured" });
@@ -373,11 +372,11 @@ export function mobileActivationOAuthRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    stateStore.set(state, {
+    await stateStore.set(state, {
+      flow: "mobile-activation",
+      provider: "mock",
       codeVerifier,
       nonce,
-      createdAt: Date.now(),
-      purpose: "activation",
       token,
     });
 
@@ -392,15 +391,14 @@ export function mobileActivationOAuthRoutes(
       throw new HTTPException(404, { message: "mock OAuth is not configured" });
     }
 
-    const entry = stateStore.get(state);
-    if (!entry || entry.purpose !== "activation" || entry.token !== token) {
+    const entry = await takeStateFor(stateStore, state, "mobile-activation", "mock");
+    if (!entry || entry.token !== token) {
       throw new CodedHttpException(
         400,
         ERROR_CODES.OAUTH_STATE_INVALID,
         "Invalid or expired activation state",
       );
     }
-    stateStore.delete(state);
 
     if (entry.nonce !== nonce) {
       throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");

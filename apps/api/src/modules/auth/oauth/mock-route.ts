@@ -3,7 +3,9 @@
  *
  * Two endpoints, mirroring google-route.ts:
  *   GET /api/auth/oauth/mock/start    — redirects to the mock IdP's authorization endpoint
- *   GET /api/auth/oauth/mock/callback — exchanges the code, validates the token, issues tokens
+ *   GET /api/auth/oauth/mock/callback — exchanges the code, validates the token, then finishes the
+ *                                       login or invitation activation that minted the state (the
+ *                                       mock provider has no link flow)
  *
  * Both 404 when `getMockOAuthConfig()` is null — unset `MOCK_OAUTH_ISSUER_URL`, or a
  * staging/production environment (mock-config.ts) — the same inert-by-default posture Google and
@@ -23,6 +25,7 @@ import { withTenantTx } from "../../../db/tenant-tx";
 import { createMockIdp } from "../../../dev/mock-idp";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { deliverTokenPair } from "../delivery";
+import { completeWebActivation } from "../routes/activation-oauth-routes";
 import { findOAuthIdentity } from "../services/returning-user-login-service";
 import { issueTokenPair } from "../services/session-service";
 
@@ -37,17 +40,24 @@ import {
 } from "./mock-config";
 import { validateMockIdToken } from "./mock-id-token";
 import { generateCodeChallenge, generateCodeVerifier, generateNonce, generateState } from "./pkce";
-import { createStateStore } from "./state-store";
+import { isBrowserFlow } from "./state-store";
 
+import type { StateStore } from "./state-store";
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { SessionTokenConfig } from "../services/session-service";
 
+export interface MockOAuthDependencies {
+  /** The process-wide OAuth state store, shared with every flow that returns through this callback. */
+  stateStore: StateStore;
+}
+
 export function mockOAuthRoutes(
   db: Database,
   config: SessionTokenConfig,
   logger: Logger,
+  { stateStore }: MockOAuthDependencies,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
@@ -62,8 +72,6 @@ export function mockOAuthRoutes(
     routes.route("/mock-idp", createMockIdp({ issuer: idpConfig.issuer }));
   }
 
-  const stateStore = createStateStore();
-
   // GET /api/auth/oauth/mock/start
   routes.get("/api/auth/oauth/mock/start", async (c) => {
     const oauthConfig = getMockOAuthConfig();
@@ -77,7 +85,7 @@ export function mockOAuthRoutes(
     const codeChallenge = generateCodeChallenge(codeVerifier);
     const loginHint = c.req.query("login_hint");
 
-    stateStore.set(state, { codeVerifier, nonce, createdAt: Date.now() });
+    await stateStore.set(state, { flow: "login", provider: "mock", codeVerifier, nonce });
 
     const params = new URLSearchParams({
       client_id: MOCK_OAUTH_CLIENT_ID,
@@ -118,15 +126,14 @@ export function mockOAuthRoutes(
         );
       }
 
-      const entry = stateStore.get(state);
-      if (!entry) {
+      const entry = await stateStore.take(state);
+      if (!entry || entry.provider !== "mock" || !isBrowserFlow(entry.flow)) {
         throw new CodedHttpException(
           400,
           ERROR_CODES.OAUTH_STATE_INVALID,
           "Invalid or expired OAuth state",
         );
       }
-      stateStore.delete(state);
 
       const accessToken = await exchangeCode(oauthConfig.issuer, code, entry.codeVerifier);
       const claims = await validateMockIdToken(
@@ -135,6 +142,26 @@ export function mockOAuthRoutes(
         entry.nonce,
         MOCK_JWKS_URI(oauthConfig.issuer),
       );
+
+      if (entry.flow === "activation" && entry.token) {
+        return await completeWebActivation(
+          c,
+          { db, sessionConfig: config, logger },
+          {
+            provider: "mock",
+            token: entry.token,
+            identity: claims,
+            frontendUrl: oauthConfig.frontendUrl,
+          },
+        );
+      }
+      if (entry.flow !== "login") {
+        throw new CodedHttpException(
+          400,
+          ERROR_CODES.OAUTH_STATE_INVALID,
+          "Invalid or expired OAuth state",
+        );
+      }
 
       const identity = await findOAuthIdentity(db, "mock", claims.sub);
       if (!identity) {

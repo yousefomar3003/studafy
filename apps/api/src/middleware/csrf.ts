@@ -32,6 +32,7 @@ import { getSecurityConfig } from "../config/security";
 import { generateCsrfToken, validateCsrfToken } from "../lib/security/csrf";
 import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
 
+import { isInvitationOAuthPath } from "./jwtAuth";
 import { extractClientIp } from "./rateLimiter";
 
 import type { SecurityEventSink, SecurityEventType } from "../lib/security/securityEventSink";
@@ -100,6 +101,15 @@ const EXEMPT_PATHS = [
   // Bearer header) a cross-site page could forge; the token arrives as a one-shot credential,
   // identical in security posture to the activation endpoint above.
   "/api/auth/login",
+  // Native-app OAuth code exchange (POST .../oauth/{provider}/mobile-exchange). Same posture as
+  // /api/auth/login: the credential is the one-shot authorization code plus a single-use, server-held
+  // `state` — no cookie or header a cross-site page could ride on — and the mobile channel returns
+  // its tokens in the response body, never as a cookie, so a forged call can plant no session in the
+  // victim's browser either. Native clients have no cookie jar to bootstrap a double-submit token
+  // from, so without this entry every mobile sign-in is rejected. The browser callbacks under this
+  // prefix are GETs, which the check below never inspects anyway. The invitation-activation
+  // counterpart (.../invitations/{token}/oauth/...) is matched structurally below.
+  "/api/auth/oauth",
   // Stripe billing webhook (ST-132). Same posture as the ERPNext entry above — authenticated by an
   // HMAC signature over the raw request body, with no cookie to forge and no way to read one — but
   // it needs naming explicitly because it lives under /api/ rather than at a top-level path like
@@ -161,7 +171,11 @@ export function csrfMiddleware(options?: CsrfOptions): MiddlewareHandler {
     const path = c.req.path;
     const method = c.req.method;
 
-    if (isInvitationActivationPath(path) || exemptPaths.some((exempt) => path.startsWith(exempt))) {
+    if (
+      isInvitationActivationPath(path) ||
+      isInvitationOAuthPath(path) ||
+      exemptPaths.some((exempt) => path.startsWith(exempt))
+    ) {
       await next();
       return;
     }

@@ -211,6 +211,12 @@ export async function createProbeApp(
     calls += 1;
     return c.json({ handled: true });
   });
+  // Every action under an invitation's oauth segment, exempt or not, so a 401 is the boundary
+  // speaking rather than a missing route.
+  app.all("/api/auth/invitations/:token/oauth/:provider/*", (c) => {
+    calls += 1;
+    return c.json({ handled: true });
+  });
   app.onError(errorHandlerMiddleware(logger));
 
   return {

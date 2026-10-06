@@ -74,6 +74,8 @@ import {
   adminDeviceRoutes,
   configureRefreshCookie,
   createJtiDenylist,
+  createMemoryStateStore,
+  createRedisStateStore,
   googleOAuthRoutes,
   jwksRoutes,
   microsoftOAuthRoutes,
@@ -384,6 +386,14 @@ export function createApp({
   // boundary to drift onto different connections or key prefixes.
   const jtiDenylist = redis ? createJtiDenylist(redis) : null;
 
+  // OAuth state (PKCE verifier + nonce, keyed by `state`), shared by every OAuth flow below. One
+  // instance because the browser flows — login, invitation activation, provider linking — all
+  // return through each provider's single registered callback, which must see whatever state the
+  // flow's start minted. Redis-backed whenever Redis exists, because production runs several API
+  // instances and a flow's start and callback routinely land on different ones; in-memory only for
+  // a process with no Redis (bare tests, the OpenAPI generator).
+  const oauthStateStore = redis ? createRedisStateStore(redis) : createMemoryStateStore();
+
   // The entitlement service (ST-133). Shared between the JWT middleware's staleness check and any
   // route that needs to resolve entitlements, for the same reason the denylist is shared: one
   // instance makes it structurally impossible for the two sides to drift onto different key
@@ -573,6 +583,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+        { stateStore: oauthStateStore },
       ),
     );
   }
@@ -593,6 +604,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+        { stateStore: oauthStateStore },
       ),
     );
   }
@@ -616,6 +628,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+        { stateStore: oauthStateStore },
       ),
     );
   }
@@ -635,6 +648,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+        { stateStore: oauthStateStore },
       ),
     );
   }
@@ -662,11 +676,16 @@ export function createApp({
     );
     // Browser-redirect arm of the same flow: /start + /invitation/callback give an invited user the
     // full-page OAuth round trip and run activation server-side (see activation-oauth-routes.ts).
-    app.route("/", activationOAuthRoutes(database, sessionTokenConfig, logger));
+    app.route("/", activationOAuthRoutes({ stateStore: oauthStateStore }));
     // Mobile arm (ST-215): the native app drives the same PKCE exchange itself and gets the
     // result as JSON with channel=mobile, instead of a redirect + HttpOnly cookie (see
     // mobile-activation-oauth-routes.ts).
-    app.route("/", mobileActivationOAuthRoutes(database, sessionTokenConfig, logger));
+    app.route(
+      "/",
+      mobileActivationOAuthRoutes(database, sessionTokenConfig, logger, {
+        stateStore: oauthStateStore,
+      }),
+    );
   }
 
   // Returning-user OAuth login (ST-079). Authenticates an active user via a verified Microsoft
@@ -713,20 +732,7 @@ export function createApp({
   // resilience, and admins unlink providers. Needs database for identity CRUD and the state store
   // for the linking OAuth flow.
   if (database && keyStore) {
-    app.route(
-      "/",
-      providerLinkRoutes(
-        database,
-        {
-          keyStore,
-          issuer: jwtIssuer,
-          audience: jwtAudience,
-          accessTtlSeconds: jwtAccessTtlSeconds,
-          refreshTtlSeconds: jwtRefreshTtlSeconds,
-        },
-        logger,
-      ),
-    );
+    app.route("/", providerLinkRoutes(database, { stateStore: oauthStateStore }));
   }
 
   // Administrative device revocation (ST-072). Needs only a database — it revokes and denylists but

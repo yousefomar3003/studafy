@@ -3,20 +3,18 @@
  *
  * Two endpoints:
  *   GET /api/auth/oauth/microsoft/start    — redirects to Microsoft's authorization endpoint
- *   GET /api/auth/oauth/microsoft/callback — exchanges the code, validates the id_token, issues tokens
+ *   GET /api/auth/oauth/microsoft/callback — exchanges the code, validates the id_token, then
+ *                                            finishes whichever browser flow minted the state
  *
  * Both are public (no bearer token required). The start endpoint generates state, nonce, and PKCE
- * parameters and stores them in an ephemeral in-memory store keyed by state. The callback
- * validates the state, exchanges the authorization code, verifies the id_token against Microsoft's
- * JWKS, finds the user via app.oauth_identities, and issues a token pair.
+ * parameters and stores them in the shared OAuth state store (state-store.ts) keyed by state.
+ *
+ * The callback is Microsoft's one registered redirect URI, so it serves every browser flow — login,
+ * invitation activation, and provider linking — dispatching on the state entry's `flow` exactly as
+ * google-route.ts does.
  *
  * These are browser-redirect endpoints, not JSON API endpoints, so they use plain Hono routes
  * rather than OpenAPI-typed routes. The primary responses are HTTP redirects, not JSON bodies.
- * Errors are still thrown as HTTPException/CodedHttpException and handled by the global error
- * handler like every other route in the app.
- *
- * The state store is in-memory intentionally (KISS). This is fine for single-instance deployments
- * and the 5-minute TTL window. Multi-instance scaling needs a Redis-backed store — follow-up.
  */
 
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -27,6 +25,8 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { deliverTokenPair } from "../delivery";
+import { completeWebActivation } from "../routes/activation-oauth-routes";
+import { completeWebLink } from "../routes/provider-link-routes";
 import { findOAuthIdentity } from "../services/returning-user-login-service";
 import { issueTokenPair } from "../services/session-service";
 
@@ -39,8 +39,9 @@ import {
 } from "./microsoft-config";
 import { validateMicrosoftIdToken } from "./microsoft-id-token";
 import { generateCodeChallenge, generateCodeVerifier, generateNonce, generateState } from "./pkce";
-import { createStateStore } from "./state-store";
+import { isBrowserFlow } from "./state-store";
 
+import type { StateStore } from "./state-store";
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -51,6 +52,8 @@ import type { SessionTokenConfig } from "../services/session-service";
 // ---------------------------------------------------------------------------
 
 export interface MicrosoftOAuthDependencies {
+  /** The process-wide OAuth state store, shared with every flow that returns through this callback. */
+  stateStore: StateStore;
   /** Config loader. Tests inject a stub so no process-wide module mock is needed. */
   getOAuthConfig?: typeof getMicrosoftOAuthConfig;
   /** id_token validator. Tests inject a stub to skip the JWKS round trip. */
@@ -61,12 +64,11 @@ export function microsoftOAuthRoutes(
   db: Database,
   config: SessionTokenConfig,
   logger: Logger,
-  deps: MicrosoftOAuthDependencies = {},
+  deps: MicrosoftOAuthDependencies,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  const stateStore = createStateStore();
-
+  const { stateStore } = deps;
   const getOAuthConfig = deps.getOAuthConfig ?? getMicrosoftOAuthConfig;
   const validateIdToken = deps.validateIdToken ?? validateMicrosoftIdToken;
 
@@ -83,7 +85,7 @@ export function microsoftOAuthRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    stateStore.set(state, { codeVerifier, nonce, createdAt: Date.now() });
+    await stateStore.set(state, { flow: "login", provider: "microsoft", codeVerifier, nonce });
 
     const params = new URLSearchParams({
       client_id: oauthConfig.clientId,
@@ -101,8 +103,8 @@ export function microsoftOAuthRoutes(
   });
 
   // GET /api/auth/oauth/microsoft/callback
-  // Microsoft redirects here with code + state. We exchange the code, validate the id_token,
-  // find the user, issue tokens, and redirect to the frontend.
+  // Microsoft redirects here with code + state. We exchange the code, validate the id_token, and
+  // finish the flow the state was minted for.
   routes.get("/api/auth/oauth/microsoft/callback", async (c) => {
     const oauthConfig = getOAuthConfig();
     if (!oauthConfig) {
@@ -129,16 +131,15 @@ export function microsoftOAuthRoutes(
         );
       }
 
-      // 1. Validate state
-      const entry = stateStore.get(state);
-      if (!entry) {
+      // 1. Validate state — single use, and only a browser flow minted for Microsoft.
+      const entry = await stateStore.take(state);
+      if (!entry || entry.provider !== "microsoft" || !isBrowserFlow(entry.flow)) {
         throw new CodedHttpException(
           400,
           ERROR_CODES.OAUTH_STATE_INVALID,
           "Invalid or expired OAuth state",
         );
       }
-      stateStore.delete(state);
 
       // 2. Exchange authorization code for tokens
       const idToken = await exchangeCode(code, oauthConfig, entry.codeVerifier);
@@ -146,7 +147,36 @@ export function microsoftOAuthRoutes(
       // 3. Validate id_token
       const claims = await validateIdToken(idToken, oauthConfig.clientId, entry.nonce);
 
-      // 4. Find oauth identity
+      // 4. Finish the flow this state belongs to.
+      if (entry.flow === "activation" && entry.token) {
+        return await completeWebActivation(
+          c,
+          { db, sessionConfig: config, logger },
+          {
+            provider: "microsoft",
+            token: entry.token,
+            identity: claims,
+            frontendUrl: oauthConfig.frontendUrl,
+          },
+        );
+      }
+      if (entry.flow === "link" && entry.userId && entry.schoolId) {
+        return await completeWebLink(c, db, logger, {
+          provider: "microsoft",
+          userId: entry.userId,
+          schoolId: entry.schoolId,
+          identity: claims,
+          frontendUrl: oauthConfig.frontendUrl,
+        });
+      }
+      if (entry.flow !== "login") {
+        throw new CodedHttpException(
+          400,
+          ERROR_CODES.OAUTH_STATE_INVALID,
+          "Invalid or expired OAuth state",
+        );
+      }
+
       const identity = await findOAuthIdentity(db, "microsoft", claims.sub);
       if (!identity) {
         logger.warn({ sub: claims.sub, email: claims.email }, "OAuth identity not found");
