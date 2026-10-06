@@ -1,7 +1,10 @@
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, DataGrid, Select, useCursorPagination } from "@studafy/ui";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { collectCursorPages } from "../../../lib/data-transfer";
 import { useTranslation } from "../../../lib/i18n";
 
 import { invoiceStatusLabel, invoiceStatusTone } from "./labels";
@@ -10,6 +13,7 @@ import { fetchInvoicesPage } from "./queries";
 import "./invoices.css";
 
 import type { Invoice, InvoiceFilters } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -102,6 +106,22 @@ export default function InvoiceListPage() {
     { id: "due_date", header: t("finance.common.due"), renderCell: (row) => row.due_date ?? "—" },
   ];
 
+  // Same headers as the grid; amounts and currency as separate raw columns so a spreadsheet can sum them.
+  const exportColumns: ExportColumn<Invoice>[] = [
+    { header: t("finance.invoices.list.invoiceNumber"), value: (row) => row.erpnext_docname },
+    { header: t("finance.common.student"), value: (row) => row.student_name },
+    { header: t("finance.common.admissionNumber"), value: (row) => row.admission_number },
+    {
+      header: t("finance.common.status"),
+      value: (row) => invoiceStatusLabel(row.erpnext_status, t),
+    },
+    { header: t("finance.common.total"), value: (row) => row.total_amount },
+    { header: t("finance.common.outstanding"), value: (row) => row.outstanding_amount },
+    { header: t("finance.common.currency"), value: (row) => row.currency },
+    { header: t("finance.common.issued"), value: (row) => row.issued_date },
+    { header: t("finance.common.due"), value: (row) => row.due_date },
+  ];
+
   return (
     <>
       <div className="invoices-list__header">
@@ -109,9 +129,20 @@ export default function InvoiceListPage() {
           <h1>{t("finance.invoices.list.title")}</h1>
           <p>{t("finance.invoices.list.intro")}</p>
         </div>
-        <Link to="/portal/finance/invoices/batches/new">
-          <Button variant="secondary">{t("finance.invoices.list.generate")}</Button>
-        </Link>
+        <div className="invoices-list__header-actions">
+          <ExportCsvButton
+            filename="invoices"
+            columns={exportColumns}
+            getRows={() =>
+              collectCursorPages((cursor) =>
+                fetchInvoicesPage(filters, cursor, PAGINATION_MAX_LIMIT),
+              )
+            }
+          />
+          <Link to="/portal/finance/invoices/batches/new">
+            <Button variant="secondary">{t("finance.invoices.list.generate")}</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="invoices-list__toolbar">

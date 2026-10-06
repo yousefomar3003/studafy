@@ -1,10 +1,17 @@
 import { PERMISSIONS } from "@studafy/constants";
 import { Button } from "@studafy/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { ImportCsvButton } from "../../../components/ImportCsvButton";
+import { api } from "../../../lib/api";
 import { usePermissions } from "../../../lib/auth";
+import { allRows } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import {
+  SCHOOL_EVENT_KINDS,
+  SCHOOL_EVENTS_KEY_ROOT,
   todayIso,
   useAcademicYears,
   useClassesForTerms,
@@ -15,7 +22,9 @@ import {
 
 import { EventFormModal } from "./EventFormModal";
 
-import type { SchoolEvent } from "../school/queries";
+import type { ExportColumn, ImportSpec } from "../../../lib/data-transfer";
+import type { SchoolEvent, SchoolEventInput, SchoolEventKind } from "../school/queries";
+import type { TFunction } from "i18next";
 
 import "../school/principal-school.css";
 import "./calendar.css";
@@ -64,6 +73,60 @@ function daysInRange(from: string, to: string, windowStart: string, windowEnd: s
   return days;
 }
 
+/** CSV import of school events, with `EventFormModal`'s rules: a title, a start date, and an end
+ * date (defaulting to the start) on or after it. A blank kind means "event", as in the form. */
+function eventImportSpec(t: TFunction): ImportSpec<SchoolEventInput> {
+  return {
+    templateName: "calendar-events",
+    fields: [
+      {
+        key: "title",
+        label: t("principal.calendar.form.title"),
+        required: true,
+        maxLength: 200,
+        example: "Founders' day",
+      },
+      {
+        key: "kind",
+        label: t("principal.calendar.form.kind"),
+        options: SCHOOL_EVENT_KINDS,
+        example: "holiday",
+      },
+      {
+        key: "starts_on",
+        label: t("principal.calendar.form.startsOn"),
+        required: true,
+        type: "date",
+        example: "2026-11-02",
+      },
+      {
+        key: "ends_on",
+        label: t("principal.calendar.form.endsOn"),
+        type: "date",
+        example: "2026-11-03",
+      },
+      {
+        key: "description",
+        label: t("principal.calendar.form.description"),
+        maxLength: 2000,
+      },
+    ],
+    toRecord: (values) => {
+      const startsOn = String(values.starts_on);
+      const endsOn = typeof values.ends_on === "string" ? values.ends_on : startsOn;
+      if (endsOn < startsOn) return { errors: [t("principal.calendar.form.endBeforeStart")] };
+      return {
+        title: String(values.title),
+        kind: typeof values.kind === "string" ? (values.kind as SchoolEventKind) : "event",
+        starts_on: startsOn,
+        ends_on: endsOn,
+        description: typeof values.description === "string" ? values.description : null,
+      };
+    },
+    create: (body) => api.POST("/api/school-events", { body }),
+  };
+}
+
 /**
  * School calendar (`/portal/principal/calendar`): one month of the school year on a grid — term
  * start and end dates, every class's exams, and the school's own holidays, events, meetings and exam
@@ -75,6 +138,7 @@ export default function SchoolCalendarPage() {
   const { t } = useTranslation();
   const { formatDate } = useFormatters();
   const canManage = usePermissions().has(PERMISSIONS.CALENDAR_EVENT_MANAGE);
+  const queryClient = useQueryClient();
   const today = todayIso();
 
   const [month, setMonth] = useState(() => {
@@ -163,6 +227,21 @@ export default function SchoolCalendarPage() {
     setForm({ date, ...(event ? { event } : {}), key: Date.now() });
   const shiftMonth = (delta: number) =>
     setMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  // Export: the school's own events overlapping the month on screen, in date order. Kind stays the
+  // API code so the file re-imports as-is.
+  const monthStart = `${monthPrefix}-01`;
+  const monthEnd = `${monthPrefix}-31`;
+  const monthEvents = (events.data ?? [])
+    .filter((event) => event.starts_on <= monthEnd && event.ends_on >= monthStart)
+    .sort((a, b) => a.starts_on.localeCompare(b.starts_on) || a.title.localeCompare(b.title));
+  const exportColumns: ExportColumn<SchoolEvent>[] = [
+    { header: t("principal.calendar.form.title"), value: (event) => event.title },
+    { header: t("principal.calendar.form.kind"), value: (event) => event.kind },
+    { header: t("principal.calendar.form.startsOn"), value: (event) => event.starts_on },
+    { header: t("principal.calendar.form.endsOn"), value: (event) => event.ends_on },
+    { header: t("principal.calendar.form.description"), value: (event) => event.description },
+  ];
+
   const weekdays = grid.slice(0, 7).map((day) => formatDate(parseIso(day), { weekday: "short" }));
   const loadFailed = events.isError;
 
@@ -193,11 +272,28 @@ export default function SchoolCalendarPage() {
             {t("principal.calendar.today")}
           </Button>
         </div>
-        {canManage ? (
-          <Button type="button" variant="primary" onClick={() => openForm(today)}>
-            {t("principal.calendar.addEvent")}
-          </Button>
-        ) : null}
+        <div className="principal-calendar__actions">
+          <ExportCsvButton
+            filename="calendar-events"
+            columns={exportColumns}
+            getRows={() => Promise.resolve(allRows(monthEvents))}
+            disabled={events.isPending}
+          />
+          {canManage ? (
+            <>
+              <ImportCsvButton
+                spec={eventImportSpec(t)}
+                title={t("principal.calendar.import.title")}
+                onImported={() =>
+                  void queryClient.invalidateQueries({ queryKey: SCHOOL_EVENTS_KEY_ROOT })
+                }
+              />
+              <Button type="button" variant="primary" onClick={() => openForm(today)}>
+                {t("principal.calendar.addEvent")}
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <ul className="principal-calendar__legend" aria-label={t("principal.calendar.legend")}>

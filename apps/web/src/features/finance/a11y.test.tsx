@@ -1,3 +1,4 @@
+import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
@@ -75,11 +76,13 @@ async function renderInPortal(Page: ComponentType) {
   return render(
     <AuthProvider store={store}>
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <main>
-            <Page />
-          </main>
-        </MemoryRouter>
+        <ToastProvider>
+          <MemoryRouter>
+            <main>
+              <Page />
+            </main>
+          </MemoryRouter>
+        </ToastProvider>
       </QueryClientProvider>
     </AuthProvider>,
   );

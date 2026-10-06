@@ -342,6 +342,20 @@ export async function createTimetableVersion(
     throw new HTTPException(404, { message: "Term not found for the given academic year" });
   }
 
+  // uq_timetable_versions_school_term_name: checked up front so a reused name is a clear 409
+  // rather than a unique-violation 500 (copy goes through here too).
+  const [duplicate] = await tx<{ id: string }[]>`
+    SELECT id FROM app.timetable_versions
+    WHERE school_id = ${schoolId} AND term_id = ${params.term_id} AND name = ${params.name}
+  `;
+  if (duplicate) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.CONFLICT_DUPLICATE_ENTRY,
+      "A timetable version with this name already exists for the term",
+    );
+  }
+
   const [row] = await tx<TimetableVersionRow[]>`
     INSERT INTO app.timetable_versions (school_id, academic_year_id, term_id, name, status)
     VALUES (${schoolId}, ${params.academic_year_id}, ${params.term_id}, ${params.name}, 'draft')
@@ -411,6 +425,7 @@ export async function deleteTimetableVersion(
   tx: TransactionSql,
   schoolId: string,
   versionId: string,
+  options: { discardSlots?: boolean } = {},
 ): Promise<void> {
   const existing = await getVersion(tx, schoolId, versionId);
   if (!existing) {
@@ -429,7 +444,20 @@ export async function deleteTimetableVersion(
     FROM app.timetable_slots
     WHERE timetable_version_id = ${versionId} AND school_id = ${schoolId}
   `;
-  if (Number(count) > 0) {
+  if (Number(count) > 0 && options.discardSlots) {
+    // Discarding an unpublished draft: its slots are not referenced by anything (attendance keys on
+    // class and period, never on a slot), so they go with it. One audit entry records how many.
+    await tx`
+      DELETE FROM app.timetable_slots
+      WHERE timetable_version_id = ${versionId} AND school_id = ${schoolId}
+    `;
+    await emitAuditLog(tx, {
+      action: "delete",
+      targetTable: "timetable_slots",
+      targetId: versionId,
+      oldValues: { timetable_version_id: versionId, slot_count: Number(count) },
+    });
+  } else if (Number(count) > 0) {
     throw new CodedHttpException(
       409,
       ERROR_CODES.CONFLICT_STATE_MISMATCH,
@@ -519,6 +547,26 @@ export async function approveTimetableVersion(
       ERROR_CODES.CONFLICT_STATE_MISMATCH,
       "Only pending versions can be approved",
     );
+  }
+
+  // uq_timetable_versions_one_approved_per_term: the term's current live version (if any) steps
+  // down to archived in the same transaction, so the term is never without — or with two — live
+  // timetables.
+  const superseded = await tx<{ id: string }[]>`
+    UPDATE app.timetable_versions
+    SET status = 'archived'
+    WHERE school_id = ${schoolId} AND term_id = ${existing.term_id}
+      AND status = 'approved' AND id <> ${versionId}
+    RETURNING id
+  `;
+  for (const { id } of superseded) {
+    await emitAuditLog(tx, {
+      action: "update",
+      targetTable: "timetable_versions",
+      targetId: id,
+      oldValues: { status: "approved" },
+      newValues: { status: "archived", superseded_by: versionId },
+    });
   }
 
   const [row] = await tx<TimetableVersionRow[]>`
@@ -613,6 +661,92 @@ export async function rejectTimetableVersion(
 }
 
 // ---------------------------------------------------------------------------
+// Publish (draft → approved in one step)
+// ---------------------------------------------------------------------------
+
+/**
+ * Makes a draft the live timetable in one atomic step for a caller who is both its author and its
+ * approver (timetable:manage). It walks the same draft → pending → approved transitions as the
+ * two-step review flow, inside one transaction, so the version's submitted/approved stamps, audit
+ * entries and domain events are exactly what submit followed by approve would have produced — and
+ * a failure at either step leaves the draft untouched.
+ *
+ * The term's previously live version is archived by the approval step, so the published draft
+ * becomes the one live timetable while the old one is kept as history.
+ */
+export async function publishTimetableVersion(
+  tx: TransactionSql,
+  schoolId: string,
+  versionId: string,
+  userId: string,
+): Promise<TimetableVersionRow> {
+  await submitTimetableVersion(tx, schoolId, versionId, userId);
+  return approveTimetableVersion(tx, schoolId, versionId, userId);
+}
+
+// ---------------------------------------------------------------------------
+// School week settings
+// ---------------------------------------------------------------------------
+
+export interface TimetableSettingsRow {
+  school_days: number[];
+  periods_per_day: number;
+}
+
+/** Mirrors the column defaults in migration 000122, for a school whose settings row doesn't exist yet. */
+const DEFAULT_TIMETABLE_SETTINGS: TimetableSettingsRow = {
+  school_days: [7, 1, 2, 3, 4],
+  periods_per_day: 8,
+};
+
+/** Reads the school's teaching week. A plain read — any school member calls this, so it never
+ * lazily creates the settings row; a school without one gets the column defaults. */
+export async function getTimetableSettings(
+  tx: TransactionSql,
+  schoolId: string,
+): Promise<TimetableSettingsRow> {
+  const [row] = await tx<TimetableSettingsRow[]>`
+    SELECT school_days::int[] AS school_days, periods_per_day
+    FROM app.school_settings
+    WHERE school_id = ${schoolId}::uuid
+  `;
+  return row ?? { ...DEFAULT_TIMETABLE_SETTINGS };
+}
+
+export async function updateTimetableSettings(
+  tx: TransactionSql,
+  schoolId: string,
+  settings: TimetableSettingsRow,
+): Promise<TimetableSettingsRow> {
+  const before = await getTimetableSettings(tx, schoolId);
+  await tx`
+    INSERT INTO app.school_settings (school_id)
+    VALUES (${schoolId}::uuid)
+    ON CONFLICT (school_id) DO NOTHING
+  `;
+  const [row] = await tx<TimetableSettingsRow[]>`
+    UPDATE app.school_settings
+    SET school_days = ${settings.school_days}::smallint[],
+        periods_per_day = ${settings.periods_per_day}
+    WHERE school_id = ${schoolId}::uuid
+    RETURNING school_days::int[] AS school_days, periods_per_day
+  `;
+  if (!row) {
+    throw new HTTPException(500, { message: "Failed to update timetable settings." });
+  }
+
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "school_settings",
+    targetId: schoolId,
+    oldValues: { ...before },
+    newValues: { ...row },
+  });
+
+  return row;
+}
+
+// ---------------------------------------------------------------------------
 // Copy from previous term
 // ---------------------------------------------------------------------------
 
@@ -666,6 +800,7 @@ export async function copyTimetableVersion(
         AND cl.term_id = ${params.term_id}
         AND cl.academic_year_id = ${params.academic_year_id}
       ON CONFLICT DO NOTHING
+      RETURNING id
     )
     SELECT count(*)::int AS inserted FROM inserted
   `;

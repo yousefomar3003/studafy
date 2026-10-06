@@ -1,11 +1,14 @@
 import { ApiError } from "@studafy/api-client";
 import { PERMISSIONS } from "@studafy/constants";
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, DataGrid, Select, useToast } from "@studafy/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
 import { useAuth, usePermissions } from "../../../lib/auth";
+import { collectOffsetPages } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { AdjustmentConfirmDialog } from "./AdjustmentConfirmDialog";
@@ -23,6 +26,7 @@ import "./adjustments.css";
 
 import type { AuditTrailTarget } from "./AuditTrailModal";
 import type { Award, AwardFilters, AwardStatus } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
 function apiErrorMessage(error: unknown, fallback: string): string {
@@ -168,6 +172,27 @@ export default function ScholarshipAwardsListPage() {
     },
   ];
 
+  const exportColumns: ExportColumn<Award>[] = [
+    { header: t("financeReports.adjustments.common.created"), value: (row) => row.created_at },
+    { header: t("financeReports.adjustments.common.student"), value: (row) => row.student_id },
+    {
+      header: t("financeReports.adjustments.common.scholarshipDiscount"),
+      value: (row) => row.scholarship_discount_title,
+    },
+    {
+      header: t("financeReports.adjustments.common.effect"),
+      value: (row) => {
+        const discount = discountsById.get(row.scholarship_discount_id);
+        return discount ? discountEffectLine(discount, t) : null;
+      },
+    },
+    {
+      header: t("financeReports.adjustments.common.status"),
+      value: (row) => t(AWARD_STATUS_LABEL_KEYS[row.award_status]),
+    },
+    { header: t("finance.common.erpnextDocument"), value: (row) => row.erpnext_docname },
+  ];
+
   return (
     <>
       <div className="adjustments-list__header">
@@ -175,9 +200,20 @@ export default function ScholarshipAwardsListPage() {
           <h1>{t("financeReports.adjustments.scholarships.title")}</h1>
           <p>{t("financeReports.adjustments.scholarships.description")}</p>
         </div>
-        <Link to="/portal/finance/adjustments/scholarships/new">
-          <Button>{t("financeReports.adjustments.scholarships.awardScholarship")}</Button>
-        </Link>
+        <div className="adjustments-list__header-actions">
+          <ExportCsvButton
+            filename="scholarship-awards"
+            columns={exportColumns}
+            getRows={() =>
+              collectOffsetPages((pageOffset) =>
+                fetchAwardsPage(filters, pageOffset, PAGINATION_MAX_LIMIT),
+              )
+            }
+          />
+          <Link to="/portal/finance/adjustments/scholarships/new">
+            <Button>{t("financeReports.adjustments.scholarships.awardScholarship")}</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="adjustments-list__toolbar">

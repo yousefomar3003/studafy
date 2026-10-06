@@ -128,8 +128,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",
-  // Timetable (ST-101). Tenant-scoped CRUD protected by requireAuth; school-level
-  // catalog data with no cross-user row-level permission.
+  // Timetable (ST-101). Every write guarded by requirePermission(TIMETABLE_MANAGE), method-scoped
+  // with onlyMethods() where a path also serves reads.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",
   "DELETE /api/academics/timetable-versions/{versionId}",
@@ -140,6 +140,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/timetable-versions/{versionId}/slots",
   "PATCH /api/academics/slots/{slotId}",
   "DELETE /api/academics/slots/{slotId}",
+  "POST /api/academics/timetable-versions/{versionId}/publish",
+  "PUT /api/academics/timetable-settings",
   // Assignments (ST-103). Guarded per method by requirePermission() on ASSIGNMENT_CREATE,
   // ASSIGNMENT_UPDATE, and ASSIGNMENT_DELETE — see permissionByMethod() in the route file. These
   // are genuinely row-level: a teacher may only act on classes they teach, so unlike the rest of
@@ -429,18 +431,6 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",
-  // Timetable (ST-101) — tenant-scoped school-level catalog data protected by
-  // requireAuth; no cross-user row-level permission to check.
-  "POST /api/academics/timetable-versions",
-  "PATCH /api/academics/timetable-versions/{versionId}",
-  "DELETE /api/academics/timetable-versions/{versionId}",
-  "POST /api/academics/timetable-versions/{versionId}/submit",
-  "POST /api/academics/timetable-versions/{versionId}/approve",
-  "POST /api/academics/timetable-versions/{versionId}/reject",
-  "POST /api/academics/timetable-versions/copy",
-  "POST /api/academics/timetable-versions/{versionId}/slots",
-  "PATCH /api/academics/slots/{slotId}",
-  "DELETE /api/academics/slots/{slotId}",
   // Exam scheduling (ST-102) — tenant-scoped school-level catalog data protected by
   // requireAuth; no cross-user row-level permission to check.
   "POST /api/academics/exams",

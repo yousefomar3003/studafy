@@ -530,7 +530,7 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
     await withTenantTx(database, tenantFrom(c), (tx) =>
       deleteMapping(tx, auth.schoolId, mappingId),
     );
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   routes.openapi(updateStudentImportMappingRoute, async (c) => {

@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { allRows } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { CreateEvaluationModal } from "./CreateEvaluationModal";
@@ -18,7 +20,8 @@ import {
   TEACHER_CONTACTS_KEY,
 } from "./queries";
 
-import type { EvaluationStatus } from "./queries";
+import type { EvaluationStatus, EvaluationWithScores } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { SelectOption } from "@studafy/ui";
 
 import "./evaluations.css";
@@ -84,6 +87,36 @@ export default function EvaluationListPage() {
 
   const evaluations = evaluationsQuery.data ?? [];
 
+  const exportColumns: ExportColumn<EvaluationWithScores>[] = [
+    {
+      header: t("principal.evaluations.list.columns.teacher"),
+      value: (row) => teacherNameById.get(row.teacher_id) ?? row.teacher_id,
+    },
+    {
+      header: t("principal.evaluations.list.columns.type"),
+      value: (row) => t(EVALUATION_TYPE_LABEL_KEYS[row.evaluation_type]),
+    },
+    {
+      header: t("principal.evaluations.list.columns.status"),
+      value: (row) => t(EVALUATION_STATUS_LABEL_KEYS[row.status]),
+    },
+    {
+      header: t("principal.evaluations.list.columns.rating"),
+      value: (row) => (row.rating ? t(EVALUATION_RATING_LABEL_KEYS[row.rating]) : ""),
+    },
+    {
+      header: t("principal.evaluations.list.columns.shared"),
+      value: (row) =>
+        row.shared_with_teacher
+          ? t("principal.evaluations.list.shared")
+          : t("principal.evaluations.list.notShared"),
+    },
+    {
+      header: t("principal.evaluations.list.columns.evaluatedAt"),
+      value: (row) => row.evaluated_at,
+    },
+  ];
+
   return (
     <>
       <div className="evaluations-list__header">
@@ -98,6 +131,12 @@ export default function EvaluationListPage() {
           >
             {t("principal.evaluations.list.manageTemplates")}
           </Link>
+          <ExportCsvButton
+            filename="teacher-evaluations"
+            columns={exportColumns}
+            getRows={() => Promise.resolve(allRows(evaluations))}
+            disabled={evaluationsQuery.isPending}
+          />
           <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
             {t("principal.evaluations.list.newEvaluation")}
           </Button>

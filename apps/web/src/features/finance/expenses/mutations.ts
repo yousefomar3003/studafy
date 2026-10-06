@@ -36,12 +36,13 @@ export async function uploadFileToPresignedUrl(uploadUrl: string, file: File): P
   }
 }
 
+/** `POST /api/finance/expenses` — shared by the entry form and `ExpenseListPage`'s CSV import. */
+export async function createExpense(body: CreateExpenseBody): Promise<Expense> {
+  const { data } = await api.POST("/api/finance/expenses", { body });
+  if (!data) throw new Error("Expense creation returned no data.");
+  return data as Expense;
+}
+
 export function useCreateExpense() {
-  return useMutation({
-    mutationFn: async (body: CreateExpenseBody) => {
-      const { data } = await api.POST("/api/finance/expenses", { body });
-      if (!data) throw new Error("Expense creation returned no data.");
-      return data as Expense;
-    },
-  });
+  return useMutation({ mutationFn: createExpense });
 }

@@ -167,7 +167,8 @@
         "expires": "Expires",
         "sent": "Sent",
         "actions": "Actions"
-      }
+      },
+      "importTitle": "Import invitations"
     },
     "create": {
       "title": "New invitation",

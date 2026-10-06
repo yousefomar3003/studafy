@@ -1,21 +1,32 @@
 import { ApiError } from "@studafy/api-client";
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, DataGrid, FilterBar, Select, useToast } from "@studafy/ui";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { ImportCsvButton } from "../../../components/ImportCsvButton";
+import { collectCursorPages } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
-import { useResendInvitation } from "./mutations";
+import { createInvitation, useResendInvitation } from "./mutations";
 import {
   EMPTY_INVITATIONS_FILTERS,
   fetchInvitationsPage,
+  INVITATIONS_LIST_KEY,
   invitationsListQueryKey,
 } from "./queries";
-import { INVITATION_ROLES, INVITATION_STATUS_LABEL_KEYS, ROLE_LABEL_KEYS } from "./schema";
+import {
+  createInvitationSchema,
+  INVITATION_ROLES,
+  INVITATION_STATUS_LABEL_KEYS,
+  ROLE_LABEL_KEYS,
+} from "./schema";
 
 import type { InviteLinkDetails } from "./InviteLinkDialog";
 import type { InvitationsFilters, InvitationWithStatus } from "./queries";
-import type { InvitationRole } from "./schema";
+import type { CreateInvitationValues, InvitationRole } from "./schema";
+import type { ExportColumn, ImportSpec } from "../../../lib/data-transfer";
 import type { Role } from "@studafy/constants";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
@@ -49,6 +60,7 @@ export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBo
   const { t } = useTranslation();
   const { formatDate } = useFormatters();
   const { show } = useToast();
+  const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [role, setRole] = useState<InvitationsFilters["role"]>("");
@@ -167,11 +179,84 @@ export function InvitationsBoard({ onCreate, onRevoke, onResent }: InvitationsBo
     },
   ];
 
+  // Same headers as the grid; role as its stable code and timestamps as ISO strings. The invite
+  // token is never part of the list response, so nothing secret can leak into the file.
+  const exportColumns: ExportColumn<InvitationWithStatus>[] = [
+    { header: t("adminPeople.invitations.board.columns.email"), value: (row) => row.email },
+    { header: t("adminPeople.invitations.board.columns.role"), value: (row) => row.role },
+    {
+      header: t("adminPeople.invitations.board.columns.status"),
+      value: (row) => t(INVITATION_STATUS_LABEL_KEYS[row.status]),
+    },
+    { header: t("adminPeople.invitations.board.columns.expires"), value: (row) => row.expires_at },
+    { header: t("adminPeople.invitations.board.columns.sent"), value: (row) => row.created_at },
+  ];
+
+  // One `POST /api/invitations` per row rather than a bulk batch: a batch carries a single role for
+  // every recipient, while a CSV can mix roles per line (the Bulk invites tab covers the
+  // same-role paste-a-list case). Each row is re-checked against the create modal's schema.
+  const importSpec: ImportSpec<CreateInvitationValues> = {
+    templateName: "invitations-template",
+    fields: [
+      {
+        key: "email",
+        label: t("adminPeople.invitations.form.email"),
+        required: true,
+        type: "email",
+        maxLength: 320,
+        example: "teacher@example.edu",
+      },
+      {
+        key: "role",
+        label: t("adminPeople.invitations.form.role"),
+        required: true,
+        options: INVITATION_ROLES,
+        example: "INSTRUCTOR",
+      },
+      {
+        key: "expiry_days",
+        label: t("adminPeople.invitations.form.expiresAfter"),
+        type: "integer",
+        example: "7",
+      },
+    ],
+    toRecord: (values) => {
+      const result = createInvitationSchema.safeParse({
+        email: values.email,
+        role: values.role,
+        expiry_days: values.expiry_days ?? undefined,
+      });
+      return result.success
+        ? result.data
+        : { errors: result.error.issues.map((issue) => t(issue.message)) };
+    },
+    create: createInvitation,
+  };
+
   return (
     <>
       <div className="invitations-board__header">
         <p>{t("adminPeople.invitations.board.description")}</p>
-        <Button onClick={onCreate}>{t("adminPeople.invitations.board.newInvitation")}</Button>
+        <div className="invitations-board__header-actions">
+          <ExportCsvButton
+            filename="invitations"
+            columns={exportColumns}
+            getRows={() =>
+              collectCursorPages(async (pageCursor) => {
+                const page = await fetchInvitationsPage(filters, pageCursor, PAGINATION_MAX_LIMIT);
+                return { items: page.invitations, nextCursor: page.next_cursor };
+              })
+            }
+          />
+          <ImportCsvButton
+            spec={importSpec}
+            title={t("adminPeople.invitations.board.importTitle")}
+            onImported={() =>
+              void queryClient.invalidateQueries({ queryKey: INVITATIONS_LIST_KEY })
+            }
+          />
+          <Button onClick={onCreate}>{t("adminPeople.invitations.board.newInvitation")}</Button>
+        </div>
       </div>
 
       <div className="invitations-board__toolbar">

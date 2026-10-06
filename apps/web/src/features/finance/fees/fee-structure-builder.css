@@ -12,6 +12,12 @@
   margin-bottom: var(--space-16);
 }
 
+.fee-builder__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
 .fee-builder__filter {
   margin-bottom: var(--space-16);
   max-width: 320px;

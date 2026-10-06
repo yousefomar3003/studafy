@@ -1,67 +1,90 @@
 ---
-title: "Timetable builder"
-description: "How to build a weekly schedule: pick a term, create a draft, place classes, resolve conflicts, and submit for approval."
-keywords: ["timetable", "schedule", "draft", "approval", "conflict", "period", "slot", "grid"]
+title: "Timetable"
+description: "How to build and change the weekly timetable: set the school week, edit a draft, add lessons, resolve clashes, and publish."
+keywords:
+  [
+    "timetable",
+    "schedule",
+    "draft",
+    "publish",
+    "conflict",
+    "period",
+    "lesson",
+    "school week",
+    "grid",
+  ]
 order: 1
 ---
 
-# Timetable builder
+# Timetable
 
-The timetable is built per term in Admin → Timetable builder. It is a
-three-level drill-down: academic year, then term, then a draft version of that
-term's schedule. You build on a grid of school days against periods, submit
-for approval, and the approved version becomes the live schedule.
+The weekly timetable lives in Admin → Timetable, and principals have the same
+screen under Principal → Timetable. Pick an **Academic year** and a **Term**;
+the current ones are selected automatically. Everyone sees the term's live
+timetable, and you can narrow it to one **Class** or one **Teacher**.
 
-## Version lifecycle
+Org admins and principals can change it. Other roles see it read-only.
 
-A timetable has one or more versions per term. Non-draft versions are
-read-only.
+## How changes reach teachers and students
 
-| State       | What it means                                   | Can you edit? |
-| ----------- | ----------------------------------------------- | ------------- |
-| `Draft`     | Working copy. Editable. Delete it or submit it. | Yes           |
-| `Submitted` | Sent for review. Read-only.                     | No            |
-| `Approved`  | Reviewed and live for the term. Read-only.      | No            |
+You never edit the live timetable directly. Changes go through a draft:
 
-A reviewed draft that is not accepted is sent back to `Draft` with a note
-("Sent back: …") so you can fix it and resubmit.
+1. Click `Edit timetable`. Studafy opens a draft copy of the live timetable.
+2. Add, move, change, or remove lessons. Teachers and students keep seeing the
+   live timetable while you work.
+3. Click `Publish`. The draft becomes the live timetable straight away.
 
-## Building a schedule
+`Discard draft` throws away every unpublished change and leaves the live
+timetable as it is. If you leave and come back, `Continue editing` reopens the
+same draft.
 
-1. Pick an **Academic year**, then a **Term**. The current year and term are
-   selected automatically.
-2. If no draft exists, click `New draft`, name it, and `Create draft`.
-   (The setup wizard's timetable step also creates a draft version.)
-3. Place classes on the grid — see below.
-4. When the schedule is complete, `Submit for approval`.
+A term with no timetable yet shows `Create timetable`, which starts an empty
+draft.
 
-## Placing classes
+## School week
 
-The grid shows school days as columns and periods as rows. The `Classes`
-palette lists every schedulable class in the term.
+`School week` sets the days your school teaches and the number of periods in a
+day. The grid shows exactly those days as columns and those periods as rows.
+The default is Sunday to Thursday; use the presets or tick the days yourself.
 
-- Drag a class chip onto a cell. A cell can hold several classes at once
-  (multiple rooms running in parallel).
-- Keyboard: press Enter/Space on a class chip to pick it up, then Enter/Space
-  on a cell's `+` target to place it. Escape cancels the pick.
-- Click a placed slot to change its **Teacher** and **Room** in `Edit slot`,
-  or remove it. A slot always needs both a teacher and a room.
-- Use `Add period` to extend the day and `Remove empty period` to trim the
-  last row when it is empty.
+Changing the school week never deletes lessons. If a day you remove still has
+lessons, its column stays visible (in italics) until they are moved.
 
-## Conflicts
+## Adding and changing lessons
 
-Before a slot is placed, Studafy checks that the teacher and the room are not
-double-booked at the same day and period. A collision raises an alert, for
-example:
+While editing a draft:
+
+- **Add a lesson:** hover a cell and click `+`, then choose the **Class**. Its
+  usual teacher and room are filled in; change them if needed, and `Add lesson`.
+- **Drag a class:** drag a chip from the `Classes` palette onto a cell. It is
+  placed with the class's usual teacher and room.
+- **Keyboard:** press Enter/Space on a class chip to pick it up, then
+  Enter/Space on a cell's `+` to place it. Escape cancels the pick.
+- **Change or move a lesson:** click it to open `Edit slot`. You can change the
+  class, teacher, room, day, or period, or `Remove` the lesson.
+
+A cell can hold several lessons at once, for classes running in parallel in
+different rooms. Lessons for the same course share a colour, and today's column
+is highlighted.
+
+## Clashes
+
+Before a lesson is saved, Studafy checks that the teacher and the room are not
+already booked at that day and period. A clash raises an alert, for example:
 
 > Teacher "Alex Davis" is already scheduled for class "MATH-A1" on Monday, period 2.
 
-Dismiss the alert and place the class elsewhere, or change the conflicting
-slot, then try again. Teacher conflicts are reported before room conflicts.
+The lesson it clashes with is outlined in red. Dismiss the alert, then move one
+of the two lessons or change its teacher or room. Teacher clashes are reported
+before room clashes.
 
-## After approval
+## Submitted timetables
 
-An `Approved` version is the term's live schedule and is read-only. To change
-it, create a new draft from the version bar and submit that for review. Do not
-edit a live timetable directly.
+Timetables submitted for review through the older two-step flow show as
+`Submitted`. Use `Approve and publish` to make one live, or `Send back to draft`
+to keep editing it.
+
+## Export
+
+`Export CSV` downloads the lessons on screen (day, period, class, teacher,
+employee number, room), respecting the class and teacher filters.

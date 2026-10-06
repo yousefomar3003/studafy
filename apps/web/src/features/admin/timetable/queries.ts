@@ -8,6 +8,7 @@ export type TimetableVersion = components["schemas"]["TimetableVersion"];
 export type TimetableSlot = components["schemas"]["TimetableSlot"];
 export type Class = components["schemas"]["Class"];
 export type Room = components["schemas"]["Room"];
+export type TimetableSettings = components["schemas"]["TimetableSettings"];
 
 /** A teacher, joined with the display name their linked user account carries — `TeacherProfile`
  * itself has no name, only an employee number (see `fetchTeacherContacts` below). */
@@ -37,6 +38,7 @@ export function classesForTermQueryKey(termId: string) {
 }
 export const TEACHER_CONTACTS_KEY = ["timetable", "teacher-contacts"] as const;
 export const ROOMS_KEY = ["timetable", "rooms"] as const;
+export const TIMETABLE_SETTINGS_KEY = ["timetable", "settings"] as const;
 
 // ---------------------------------------------------------------------------
 // Pagination fan-outs
@@ -117,6 +119,38 @@ export async function fetchVersions(termId: string): Promise<TimetableVersion[]>
       total: data?.total ?? 0,
     };
   });
+}
+
+/**
+ * The version teachers and students are following. The database keeps at most one approved version
+ * per term (publishing archives the previous one); sorting by approval time just makes the pick
+ * deterministic either way.
+ */
+export function pickLiveVersion(
+  versions: readonly TimetableVersion[],
+): TimetableVersion | undefined {
+  return versions
+    .filter((version) => version.status === "approved")
+    .sort((a, b) => (b.approved_at ?? "").localeCompare(a.approved_at ?? ""))[0];
+}
+
+/** The unpublished draft (or submitted version) being worked on, newest first. */
+export function pickWorkingVersion(
+  versions: readonly TimetableVersion[],
+): TimetableVersion | undefined {
+  return versions
+    .filter((version) => version.status === "draft" || version.status === "pending")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+}
+
+// ---------------------------------------------------------------------------
+// School week
+// ---------------------------------------------------------------------------
+
+export async function fetchTimetableSettings(): Promise<TimetableSettings> {
+  const { data } = await api.GET("/api/academics/timetable-settings");
+  if (!data) throw new Error("Timetable settings fetch returned no data.");
+  return data as TimetableSettings;
 }
 
 // ---------------------------------------------------------------------------

@@ -5,8 +5,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, mock, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { AuthProvider, createSessionStore } from "../../../lib/auth";
 import { expectNoA11yViolations } from "../../../lib/test/axe";
 
+import type { SessionTokens } from "../../../lib/auth";
 import type { ComponentType } from "react";
 
 /** Automated accessibility audit for the expense screens, mirroring `payments/a11y.test.tsx`. */
@@ -61,20 +63,41 @@ const postMock = mock((path: string) => {
 
 mock.module("../../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }));
 
-function renderInPortal(Page: ComponentType, initialPath: string, routePath: string) {
+function fakeJwt(payload: unknown): string {
+  const segment = (value: unknown) =>
+    btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
+}
+
+/** Signed in as FINANCE (`billing:update`), so the list's CSV import button is audited too. */
+async function renderInPortal(Page: ComponentType, initialPath: string, routePath: string) {
+  const store = createSessionStore({
+    refreshClient: {
+      refresh: async (): Promise<SessionTokens> => ({
+        accessToken: fakeJwt({ roles: ["FINANCE"], sub: "user-current" }),
+        expiresAt: Date.now() + 3_600_000,
+        sessionId: "session-1",
+      }),
+      logout: async () => undefined,
+    },
+  });
+  await store.restore();
+
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <MemoryRouter initialEntries={[initialPath]}>
-          <main>
-            <Routes>
-              <Route path={routePath} element={<Page />} />
-            </Routes>
-          </main>
-        </MemoryRouter>
-      </ToastProvider>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={[initialPath]}>
+            <main>
+              <Routes>
+                <Route path={routePath} element={<Page />} />
+              </Routes>
+            </main>
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -87,7 +110,7 @@ afterEach(() => {
 describe("expense screens accessibility", () => {
   test("expense list, populated with the monthly summary", async () => {
     const Page = (await import("./ExpenseListPage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/expenses",
       "/portal/finance/expenses",
@@ -101,7 +124,7 @@ describe("expense screens accessibility", () => {
 
   test("new expense form, filled out", async () => {
     const Page = (await import("./NewExpensePage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/expenses/new",
       "/portal/finance/expenses/new",
@@ -125,7 +148,7 @@ describe("expense screens accessibility", () => {
 
   test("expense recorded, success panel", async () => {
     const Page = (await import("./NewExpensePage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/expenses/new",
       "/portal/finance/expenses/new",
@@ -152,7 +175,7 @@ describe("expense screens accessibility", () => {
 
   test("expense detail, with a receipt attached", async () => {
     const Page = (await import("./ExpenseDetailPage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/expenses/expense-1",
       "/portal/finance/expenses/:expenseId",

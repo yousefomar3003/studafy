@@ -12,6 +12,12 @@
   margin: var(--space-16) 0;
 }
 
+.invitations-board__header-actions {
+  display: flex;
+  gap: var(--space-8);
+  flex-shrink: 0;
+}
+
 .invitations-board__toolbar {
   display: flex;
   flex-wrap: wrap;

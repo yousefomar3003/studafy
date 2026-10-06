@@ -80,19 +80,22 @@ export function lastNDaysRange(days: number): DateRange {
   return { startDate: dateString(start), endDate: dateString(end) };
 }
 
-/** Per-class attendance summary for a date range — backs both the heat map tile and its detail
- * page. `group_by: "class"` items are the only kind the discriminated union can return here. */
-export async function fetchClassAttendanceSummary(
+/** One page of the per-class attendance summary for a date range. `group_by: "class"` items are the
+ * only kind the discriminated union can return here. */
+export async function fetchClassAttendanceSummaryPage(
   range: DateRange,
-  classId?: string,
-): Promise<ClassAttendanceSummaryItem[]> {
+  classId: string | undefined,
+  offset: number,
+  limit: number,
+): Promise<{ items: ClassAttendanceSummaryItem[]; total: number }> {
   const { data } = await api.GET("/api/attendance/reports/summary", {
     params: {
       query: {
         start_date: range.startDate,
         end_date: range.endDate,
         group_by: "class",
-        limit: 100,
+        limit,
+        offset,
         ...(classId ? { class_id: classId } : {}),
       },
     },
@@ -101,5 +104,15 @@ export async function fetchClassAttendanceSummary(
   // same pre-existing `@studafy/api-client` typing gap `NotificationBell.tsx` documents for
   // `notifications`. The annotation restores it without widening to `any`.
   const items = (data?.items ?? []) as ClassAttendanceSummaryItem[];
+  return { items, total: data?.pagination.total ?? items.length };
+}
+
+/** Per-class attendance summary for a date range (first page) — backs both the heat map tile and
+ * its detail page. */
+export async function fetchClassAttendanceSummary(
+  range: DateRange,
+  classId?: string,
+): Promise<ClassAttendanceSummaryItem[]> {
+  const { items } = await fetchClassAttendanceSummaryPage(range, classId, 0, 100);
   return items;
 }

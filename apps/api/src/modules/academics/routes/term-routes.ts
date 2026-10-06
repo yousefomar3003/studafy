@@ -217,7 +217,7 @@ export function termRoutes(database: Database): OpenAPIHono<AppEnv> {
 
     await withTenantTx(database, tenantFrom(c), (tx) => deleteTerm(tx, auth.schoolId, termId));
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   return routes;

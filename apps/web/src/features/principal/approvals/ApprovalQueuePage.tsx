@@ -3,6 +3,8 @@ import { Button, Table, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
+import { allRows } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { DATE_TIME_OPTIONS } from "../format";
 
@@ -13,6 +15,7 @@ import { APPROVAL_QUEUE_KEY, fetchApprovalQueue } from "./queries";
 import { RejectReasonModal } from "./RejectReasonModal";
 
 import type { ApprovalQueueItem, BulkDecisionEntry, BulkDecisionResult } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { ToastOptions } from "@studafy/ui";
 
 import "./approvals.css";
@@ -55,6 +58,19 @@ export default function ApprovalQueuePage() {
     queryFn: fetchApprovalQueue,
   });
   const items = data?.items ?? [];
+
+  const exportColumns: ExportColumn<ApprovalQueueItem>[] = [
+    {
+      header: t("principal.approvals.columns.type"),
+      value: (item) => t(ITEM_TYPE_LABEL_KEYS[item.item_type]),
+    },
+    { header: t("principal.approvals.columns.summary"), value: (item) => item.summary },
+    {
+      header: t("principal.approvals.columns.requestedBy"),
+      value: (item) => item.requested_by_display_name,
+    },
+    { header: t("principal.approvals.columns.requestedAt"), value: (item) => item.requested_at },
+  ];
 
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [viewingItem, setViewingItem] = useState<ApprovalQueueItem | null>(null);
@@ -227,6 +243,12 @@ export default function ApprovalQueuePage() {
       <p>{t("principal.approvals.description")}</p>
 
       <div className="approvals-queue__toolbar">
+        <ExportCsvButton
+          filename="approvals"
+          columns={exportColumns}
+          getRows={() => Promise.resolve(allRows(items))}
+          disabled={isPending}
+        />
         <Button
           variant="secondary"
           disabled={selectedIds.size === 0}

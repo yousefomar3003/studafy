@@ -30,11 +30,12 @@ export interface InvoiceFilters {
 export async function fetchInvoicesPage(
   filters: InvoiceFilters,
   cursor: string | undefined,
+  limit: number = PAGE_SIZE,
 ): Promise<CursorPage<Invoice>> {
   const { data } = await api.GET("/api/finance/invoices", {
     params: {
       query: {
-        limit: PAGE_SIZE,
+        limit,
         cursor,
         status: (filters.status || undefined) as "draft" | "submitted" | "cancelled" | undefined,
         search: filters.search || undefined,
@@ -86,12 +87,13 @@ export async function fetchInvoiceBatchItemsPage(
   batchId: string,
   cursor: string | undefined,
   status: InvoiceBatchItemStatus | "",
+  limit: number = BATCH_ITEMS_PAGE_SIZE,
 ): Promise<{ items: InvoiceBatchItem[]; next_cursor: string | null }> {
   const { data } = await api.GET("/api/finance/invoices/batches/{batchId}/items", {
     params: {
       path: { batchId },
       query: {
-        limit: BATCH_ITEMS_PAGE_SIZE,
+        limit,
         cursor,
         status: (status || undefined) as InvoiceBatchItemStatus | undefined,
       },

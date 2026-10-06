@@ -1,10 +1,13 @@
 import { PERMISSIONS } from "@studafy/constants";
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, DataGrid, FilterBar, Select } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { ExportCsvButton } from "../../../components/ExportCsvButton";
 import { usePermissions } from "../../../lib/auth";
+import { allRows, collectCursorPages } from "../../../lib/data-transfer";
 import { useTranslation } from "../../../lib/i18n";
 
 import { CreateStudentModal } from "./CreateStudentModal";
@@ -20,6 +23,7 @@ import { STATUS_LABEL_KEYS } from "./schema";
 import "./students.css";
 
 import type { StudentProfile, StudentsFilters } from "./queries";
+import type { ExportColumn } from "../../../lib/data-transfer";
 import type { DateRangeValue, SelectOption } from "@studafy/ui";
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -154,6 +158,59 @@ export default function StudentsListPage() {
     },
   ];
 
+  // Name parts as separate raw columns; admission data stays behind the same permission as the grid.
+  const exportColumns: ExportColumn<StudentProfile>[] = [
+    ...(canViewAdmissionData
+      ? [
+          {
+            header: t("adminPeople.students.list.columns.admissionNumber"),
+            value: (student: StudentProfile) => student.admission_number,
+          },
+        ]
+      : []),
+    {
+      header: t("adminPeople.students.import.fields.first_name"),
+      value: (student) => student.first_name,
+    },
+    {
+      header: t("adminPeople.students.import.fields.middle_name"),
+      value: (student) => student.middle_name,
+    },
+    {
+      header: t("adminPeople.students.import.fields.last_name"),
+      value: (student) => student.last_name,
+    },
+    {
+      header: t("adminPeople.students.import.fields.preferred_name"),
+      value: (student) => student.preferred_name,
+    },
+    {
+      header: t("adminPeople.students.list.columns.status"),
+      value: (student) => t(STATUS_LABEL_KEYS[student.status]),
+    },
+    {
+      header: t("adminPeople.students.list.columns.dateOfBirth"),
+      value: (student) => student.date_of_birth,
+    },
+    ...(canViewAdmissionData
+      ? [
+          {
+            header: t("adminPeople.students.form.admissionDate"),
+            value: (student: StudentProfile) => student.admission_date,
+          },
+        ]
+      : []),
+  ];
+
+  // Mirrors the on-screen data source: the class filter has no cursor (see `fetchStudentsInClass`).
+  const getExportRows = async () =>
+    isClassFiltered
+      ? allRows(await fetchStudentsInClass(filters.classId, filters))
+      : collectCursorPages(async (pageCursor) => {
+          const page = await fetchStudentsPage(filters, pageCursor, PAGINATION_MAX_LIMIT);
+          return { items: page.students, nextCursor: page.next_cursor };
+        });
+
   return (
     <>
       <div className="students-list__header">
@@ -162,6 +219,7 @@ export default function StudentsListPage() {
           <p>{t("adminPeople.students.list.description")}</p>
         </div>
         <div className="students-list__header-actions">
+          <ExportCsvButton filename="students" columns={exportColumns} getRows={getExportRows} />
           {canImport ? (
             <Button variant="secondary" onClick={() => navigate("/portal/admin/students/import")}>
               {t("adminPeople.students.list.importCsv")}

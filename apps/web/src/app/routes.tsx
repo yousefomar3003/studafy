@@ -113,7 +113,7 @@ const SchoolCalendarPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/calendar/SchoolCalendarPage"),
 );
-// Also loads the admin catalog: the page reuses the admin timetable builder's grid, read-only.
+// Also loads the admin catalog: the page renders the shared admin `TimetableWorkspace`.
 const PrincipalTimetablePage = lazyWithCatalogs(
   [...PRINCIPAL_CATALOGS, ...ADMIN_CATALOGS],
   () => import("../features/principal/timetable/PrincipalTimetablePage"),

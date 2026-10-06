@@ -344,7 +344,12 @@
       "reactivated": "Template reactivated",
       "reactivateFailed": "Couldn't reactivate template",
       "deactivated": "Template deactivated",
-      "deactivateFailed": "Couldn't deactivate template"
+      "deactivateFailed": "Couldn't deactivate template",
+      "import": {
+        "title": "Import criteria templates",
+        "maxScorePositive": "Max score must be greater than 0.",
+        "sortOrderMin": "Sort order can't be negative."
+      }
     },
     "templateModal": {
       "editTitle": "Edit criteria template",
@@ -563,12 +568,7 @@
   },
   "timetable": {
     "title": "Timetable",
-    "description": "The approved weekly timetable that is running this term. Narrow it to one class or one teacher.",
-    "teacherLabel": "Teacher",
-    "allClasses": "All classes",
-    "allTeachers": "All teachers",
-    "noApproved": "There is no approved timetable for this term yet.",
-    "error": "Unable to load the timetable."
+    "description": "The weekly timetable for each term. Narrow it to one class or teacher, or edit a draft and publish it."
   },
   "classes": {
     "title": "Classes",
@@ -588,6 +588,25 @@
       "active": "Active",
       "completed": "Completed",
       "cancelled": "Cancelled"
+    },
+    "capacity": "Capacity",
+    "import": {
+      "title": "Import classes",
+      "fields": {
+        "code": "Class code",
+        "course": "Course code",
+        "term": "Term (code or name; blank = selected term)",
+        "teacher": "Lead teacher employee number",
+        "room": "Room code",
+        "capacity": "Capacity",
+        "status": "Status"
+      },
+      "unknownCourse": "No course with code \"{{value}}\".",
+      "unknownTerm": "No term \"{{value}}\" in the selected year.",
+      "noTerm": "No term is selected; add a term to the row.",
+      "unknownTeacher": "No teacher with employee number \"{{value}}\".",
+      "unknownRoom": "No room with code \"{{value}}\".",
+      "capacityMin": "Capacity must be at least 1."
     }
   },
   "students": {
@@ -656,6 +675,9 @@
       "titleRequired": "Enter a title.",
       "datesRequired": "Choose a start and end date.",
       "endBeforeStart": "The end date can't be before the start date."
+    },
+    "import": {
+      "title": "Import calendar events"
     }
   }
 }

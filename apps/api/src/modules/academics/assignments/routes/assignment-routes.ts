@@ -506,7 +506,7 @@ export function assignmentRoutes(
       deleteAssignment(tx, auth.schoolId, auth.userId, assignmentId),
     );
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   // --- Attachments ---
@@ -552,7 +552,7 @@ export function assignmentRoutes(
       deleteAttachment(tx, auth.schoolId, assignmentId, attachmentId),
     );
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   return routes;

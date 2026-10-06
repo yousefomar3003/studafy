@@ -45,6 +45,12 @@
   margin-bottom: var(--space-16);
 }
 
+.invoices-list__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
 .invoices-list__toolbar {
   display: flex;
   align-items: flex-end;

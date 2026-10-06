@@ -144,7 +144,11 @@
       "loadError": "تعذّر تحميل الإعلانات.",
       "empty": "لا توجد إعلانات بعد.",
       "previous": "السابق",
-      "next": "التالي"
+      "next": "التالي",
+      "export": {
+        "recipients": "المستلمون",
+        "notified": "تم إشعارهم"
+      }
     }
   },
   "audit": {
@@ -329,48 +333,27 @@
       "pending": "مُرسَل للمراجعة",
       "approved": "معتمد"
     },
-    "readOnlyNote": {
-      "draft": "هذه النسخة مسودة وللقراءة فقط.",
-      "pending": "هذه النسخة مُرسَلة للمراجعة وللقراءة فقط.",
-      "approved": "هذه النسخة معتمدة وللقراءة فقط."
-    },
-    "title": "منشئ الجدول الدراسي",
-    "intro": "أنشئ جدولًا أسبوعيًا، وعالج تعارضات الجدولة، ثم أرسله للمراجعة.",
+    "title": "الجدول الدراسي",
+    "intro": "الجدول الأسبوعي لكل فصل دراسي. عدّل نسخة مسودة، ثم انشرها عندما تصبح جاهزة.",
     "guide": "اقرأ الدليل",
     "academicYear": "العام الدراسي",
     "term": "الفصل الدراسي",
-    "draftVersion": "نسخة المسودة",
-    "selectVersion": "اختر نسخة",
-    "noVersions": "لا توجد نسخ بعد",
-    "versionOption": "{{name}} — {{status}}",
-    "newDraft": "مسودة جديدة",
-    "deleteDraft": "حذف المسودة",
-    "submitForApproval": "إرسال للاعتماد",
     "sentBack": "أُعيدت للمراجعة: {{reason}}",
     "selectTerm": "اختر فصلًا دراسيًا لإعداد جدوله.",
     "loading": "جارٍ التحميل…",
-    "noVersion": "أنشئ نسخة مسودة لبدء إعداد جدول هذا الفصل الدراسي.",
     "toast": {
-      "submitted": "تم إرسال \"{{name}}\" للمراجعة",
-      "submitFailed": "تعذّر الإرسال للاعتماد",
-      "deleted": "تم حذف المسودة \"{{name}}\"",
-      "deleteFailed": "تعذّر حذف المسودة",
-      "created": "تم إنشاء المسودة \"{{name}}\"",
-      "createFailed": "تعذّر إنشاء المسودة",
       "slotUpdated": "تم تحديث الحصة",
       "slotUpdateFailed": "تعذّر تحديث الحصة",
       "slotRemoved": "تمت إزالة الحصة",
       "slotRemoveFailed": "تعذّرت إزالة الحصة",
-      "placeFailed": "تعذّر وضع الحصة"
-    },
-    "createModal": {
-      "title": "جدول دراسي مسودة جديد",
-      "description": "ابدأ نسخة مسودة جديدة لهذا الفصل الدراسي.",
-      "name": "اسم المسودة",
-      "namePlaceholder": "الجدول الأسبوعي للفصل الأول",
-      "nameRequired": "الاسم مطلوب",
-      "cancel": "إلغاء",
-      "create": "إنشاء المسودة"
+      "placeFailed": "تعذّر وضع الحصة",
+      "slotAdded": "تمت إضافة الحصة",
+      "editFailed": "تعذّر فتح مسودة للتعديل",
+      "published": "تم نشر الجدول",
+      "publishFailed": "تعذّر نشر الجدول",
+      "discarded": "تم تجاهل المسودة",
+      "discardFailed": "تعذّر تجاهل المسودة",
+      "returnFailed": "تعذّرت إعادة الجدول إلى مسودة"
     },
     "editModal": {
       "title": "تعديل الحصة",
@@ -398,15 +381,75 @@
       "period": "الحصة",
       "slotLabel": "{{classCode}}، {{day}} الحصة {{period}}، يدرّسها {{teacher}} في {{room}}. فعّلها للتعديل.",
       "placeLabel": "ضع {{code}} يوم {{day}} الحصة {{period}}",
-      "cellEmpty": "{{day}} الحصة {{period}}، فارغة",
-      "cellScheduled_zero": "{{day}} الحصة {{period}}، لا توجد حصص مجدولة",
-      "cellScheduled_one": "{{day}} الحصة {{period}}، حصة واحدة مجدولة",
-      "cellScheduled_two": "{{day}} الحصة {{period}}، حصتان مجدولتان",
-      "cellScheduled_few": "{{day}} الحصة {{period}}، {{count}} حصص مجدولة",
-      "cellScheduled_many": "{{day}} الحصة {{period}}، {{count}} حصة مجدولة",
-      "cellScheduled_other": "{{day}} الحصة {{period}}، {{count}} حصة مجدولة",
-      "addPeriod": "إضافة حصة",
-      "removePeriod": "إزالة الحصة الفارغة"
+      "addLabel": "إضافة حصة يوم {{day}} الحصة {{period}}"
+    },
+    "export": {
+      "day": "اليوم",
+      "class": "الصف",
+      "employeeNumber": "الرقم الوظيفي"
+    },
+    "slotModal": {
+      "addTitle": "إضافة حصة",
+      "addDescription": "{{day}}، الحصة {{period}}",
+      "class": "الصف",
+      "classPlaceholder": "اختر صفًا",
+      "day": "اليوم",
+      "periodOption": "الحصة {{period}}",
+      "add": "إضافة الحصة"
+    },
+    "schoolWeek": {
+      "title": "أيام الدراسة",
+      "description": "اختر أيام الدراسة وعدد الحصص في كل يوم. لا تُحذف أي حصص مجدولة مسبقًا.",
+      "days": "أيام الدراسة",
+      "presets": {
+        "sunThu": "الأحد–الخميس",
+        "monFri": "الاثنين–الجمعة"
+      },
+      "daysRequired": "اختر يومًا واحدًا على الأقل.",
+      "periods": "عدد الحصص في اليوم",
+      "periodsInvalid": "أدخل عددًا صحيحًا من 1 إلى {{max}}.",
+      "save": "حفظ أيام الدراسة",
+      "saved": "تم حفظ أيام الدراسة",
+      "saveFailed": "تعذّر حفظ أيام الدراسة"
+    },
+    "workspace": {
+      "live": "منشور",
+      "liveSince": "يتبع المعلمون والطلاب هذا الجدول. نُشر في {{date}}.",
+      "liveNote": "يتبع المعلمون والطلاب هذا الجدول.",
+      "draftWaiting": "لديك تغييرات غير منشورة في مسودة.",
+      "pendingWaiting": "هناك جدول بانتظار المراجعة.",
+      "review": "مراجعة",
+      "continueEditing": "متابعة التعديل",
+      "edit": "تعديل الجدول",
+      "create": "إنشاء الجدول",
+      "pendingNote": "تم إرسال هذا الجدول للمراجعة. اعتمده لنشره، أو أعده إلى مسودة لمتابعة التعديل.",
+      "viewLive": "عرض الجدول المنشور",
+      "returnToDraft": "إعادة إلى مسودة",
+      "approve": "اعتماد ونشر",
+      "draft": "مسودة",
+      "draftNote": "أنت تعدّل مسودة. يستمر المعلمون والطلاب في رؤية الجدول المنشور حتى تنشر التغييرات.",
+      "draftNoteFirst": "أنت تنشئ أول جدول لهذا الفصل الدراسي. لن يراه أحد حتى تنشره.",
+      "discard": "تجاهل المسودة",
+      "publish": "نشر",
+      "discardTitle": "تجاهل هذه المسودة؟",
+      "discardDescription": "ستُفقد جميع التغييرات غير المنشورة. يبقى الجدول المنشور كما هو.",
+      "discardConfirm": "تجاهل المسودة",
+      "loadError": "تعذّر تحميل الجدول.",
+      "emptyTitle": "لا يوجد جدول لهذا الفصل الدراسي بعد",
+      "emptyManage": "أنشئ الجدول وأضف الحصص، ثم انشره للمعلمين والطلاب.",
+      "emptyView": "لم يُنشر جدول هذا الفصل الدراسي بعد.",
+      "schoolWeek": "أيام الدراسة",
+      "classFilter": "الصف",
+      "allClasses": "كل الصفوف",
+      "teacherFilter": "المعلم",
+      "allTeachers": "كل المعلمين",
+      "summary_zero": "لا توجد حصص أسبوعيًا · {{classes}} صف",
+      "summary_one": "حصة واحدة أسبوعيًا · {{classes}} صف",
+      "summary_two": "حصتان أسبوعيًا · {{classes}} صف",
+      "summary_few": "{{count}} حصص أسبوعيًا · {{classes}} صف",
+      "summary_many": "{{count}} حصة أسبوعيًا · {{classes}} صف",
+      "summary_other": "{{count}} حصة أسبوعيًا · {{classes}} صف",
+      "defaultName": "جدول {{term}}"
     }
   }
 }

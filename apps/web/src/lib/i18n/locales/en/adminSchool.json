@@ -140,7 +140,11 @@
       "loadError": "Unable to load announcements.",
       "empty": "No announcements yet.",
       "previous": "Previous",
-      "next": "Next"
+      "next": "Next",
+      "export": {
+        "recipients": "Recipients",
+        "notified": "Notified"
+      }
     }
   },
   "audit": {
@@ -325,48 +329,27 @@
       "pending": "Submitted",
       "approved": "Approved"
     },
-    "readOnlyNote": {
-      "draft": "This version is draft and read-only.",
-      "pending": "This version is submitted and read-only.",
-      "approved": "This version is approved and read-only."
-    },
-    "title": "Timetable builder",
-    "intro": "Build a weekly schedule, resolve scheduling conflicts, and submit it for review.",
+    "title": "Timetable",
+    "intro": "The weekly timetable for each term. Edit a draft copy, then publish it when it's ready.",
     "guide": "Read the guide",
     "academicYear": "Academic year",
     "term": "Term",
-    "draftVersion": "Draft version",
-    "selectVersion": "Select a version",
-    "noVersions": "No versions yet",
-    "versionOption": "{{name}} — {{status}}",
-    "newDraft": "New draft",
-    "deleteDraft": "Delete draft",
-    "submitForApproval": "Submit for approval",
     "sentBack": "Sent back: {{reason}}",
     "selectTerm": "Select a term to build its timetable.",
     "loading": "Loading…",
-    "noVersion": "Create a draft version to start building this term's schedule.",
     "toast": {
-      "submitted": "Submitted \"{{name}}\" for review",
-      "submitFailed": "Couldn't submit for approval",
-      "deleted": "Deleted draft \"{{name}}\"",
-      "deleteFailed": "Couldn't delete draft",
-      "created": "Created draft \"{{name}}\"",
-      "createFailed": "Couldn't create draft",
       "slotUpdated": "Slot updated",
       "slotUpdateFailed": "Couldn't update slot",
       "slotRemoved": "Slot removed",
       "slotRemoveFailed": "Couldn't remove slot",
-      "placeFailed": "Couldn't place slot"
-    },
-    "createModal": {
-      "title": "New draft timetable",
-      "description": "Start a new draft version for this term.",
-      "name": "Draft name",
-      "namePlaceholder": "Term 1 Weekly Schedule",
-      "nameRequired": "Name is required",
-      "cancel": "Cancel",
-      "create": "Create draft"
+      "placeFailed": "Couldn't place slot",
+      "slotAdded": "Lesson added",
+      "editFailed": "Couldn't open a draft to edit",
+      "published": "Timetable published",
+      "publishFailed": "Couldn't publish the timetable",
+      "discarded": "Draft discarded",
+      "discardFailed": "Couldn't discard the draft",
+      "returnFailed": "Couldn't send the timetable back to draft"
     },
     "editModal": {
       "title": "Edit slot",
@@ -394,11 +377,71 @@
       "period": "Period",
       "slotLabel": "{{classCode}}, {{day}} period {{period}}, taught by {{teacher}} in {{room}}. Activate to edit.",
       "placeLabel": "Place {{code}} on {{day}} period {{period}}",
-      "cellEmpty": "{{day}} period {{period}}, empty",
-      "cellScheduled_one": "{{day}} period {{period}}, {{count}} scheduled",
-      "cellScheduled_other": "{{day}} period {{period}}, {{count}} scheduled",
-      "addPeriod": "Add period",
-      "removePeriod": "Remove empty period"
+      "addLabel": "Add a lesson on {{day}} period {{period}}"
+    },
+    "export": {
+      "day": "Day",
+      "class": "Class",
+      "employeeNumber": "Employee number"
+    },
+    "slotModal": {
+      "addTitle": "Add lesson",
+      "addDescription": "{{day}}, period {{period}}",
+      "class": "Class",
+      "classPlaceholder": "Choose a class",
+      "day": "Day",
+      "periodOption": "Period {{period}}",
+      "add": "Add lesson"
+    },
+    "schoolWeek": {
+      "title": "School week",
+      "description": "Choose the days the school teaches and how many periods each day has. Lessons already scheduled are never removed.",
+      "days": "Teaching days",
+      "presets": {
+        "sunThu": "Sunday–Thursday",
+        "monFri": "Monday–Friday"
+      },
+      "daysRequired": "Choose at least one day.",
+      "periods": "Periods per day",
+      "periodsInvalid": "Enter a whole number from 1 to {{max}}.",
+      "save": "Save school week",
+      "saved": "School week saved",
+      "saveFailed": "Couldn't save the school week"
+    },
+    "workspace": {
+      "live": "Live",
+      "liveSince": "Teachers and students are following this timetable. Published {{date}}.",
+      "liveNote": "Teachers and students are following this timetable.",
+      "draftWaiting": "You have unpublished changes in a draft.",
+      "pendingWaiting": "A timetable is waiting for review.",
+      "review": "Review",
+      "continueEditing": "Continue editing",
+      "edit": "Edit timetable",
+      "create": "Create timetable",
+      "pendingNote": "This timetable was submitted for review. Approve it to make it live, or send it back to draft to keep editing.",
+      "viewLive": "View live timetable",
+      "returnToDraft": "Send back to draft",
+      "approve": "Approve and publish",
+      "draft": "Draft",
+      "draftNote": "You're editing a draft. Teachers and students keep seeing the live timetable until you publish.",
+      "draftNoteFirst": "You're building this term's first timetable. Nobody sees it until you publish.",
+      "discard": "Discard draft",
+      "publish": "Publish",
+      "discardTitle": "Discard this draft?",
+      "discardDescription": "All unpublished changes will be lost. The live timetable stays as it is.",
+      "discardConfirm": "Discard draft",
+      "loadError": "Unable to load the timetable.",
+      "emptyTitle": "No timetable for this term yet",
+      "emptyManage": "Create the timetable, add lessons, then publish it for teachers and students.",
+      "emptyView": "The timetable for this term hasn't been published yet.",
+      "schoolWeek": "School week",
+      "classFilter": "Class",
+      "allClasses": "All classes",
+      "teacherFilter": "Teacher",
+      "allTeachers": "All teachers",
+      "summary_one": "{{count}} lesson a week · {{classes}} classes",
+      "summary_other": "{{count}} lessons a week · {{classes}} classes",
+      "defaultName": "{{term}} timetable"
     }
   }
 }

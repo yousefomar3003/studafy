@@ -35,11 +35,15 @@ export interface AwardsPage {
   total: number;
 }
 
-export async function fetchAwardsPage(filters: AwardFilters, offset: number): Promise<AwardsPage> {
+export async function fetchAwardsPage(
+  filters: AwardFilters,
+  offset: number,
+  limit: number = PAGE_SIZE,
+): Promise<AwardsPage> {
   const { data } = await api.GET("/api/finance/scholarship-discounts/awards", {
     params: {
       query: {
-        limit: PAGE_SIZE,
+        limit,
         offset,
         status: (filters.status || undefined) as AwardStatus | undefined,
       },
@@ -99,11 +103,12 @@ export interface RefundsPage {
 export async function fetchRefundsPage(
   filters: RefundFilters,
   offset: number,
+  limit: number = PAGE_SIZE,
 ): Promise<RefundsPage> {
   const { data } = await api.GET("/api/finance/refunds", {
     params: {
       query: {
-        limit: PAGE_SIZE,
+        limit,
         offset,
         status: (filters.status || undefined) as RefundStatus | undefined,
       },

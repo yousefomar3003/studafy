@@ -30,11 +30,12 @@ const PAGE_SIZE = 25;
 export async function fetchInvitationsPage(
   filters: InvitationsFilters,
   cursor: string | undefined,
+  limit: number = PAGE_SIZE,
 ) {
   const { data } = await api.GET("/api/invitations", {
     params: {
       query: {
-        limit: PAGE_SIZE,
+        limit,
         cursor,
         role: filters.role || undefined,
         status: filters.status || undefined,
@@ -59,9 +60,12 @@ export function bulkInvitesListQueryKey(cursor: string | undefined) {
 
 const BULK_PAGE_SIZE = 20;
 
-export async function fetchBulkInvitesPage(cursor: string | undefined) {
+export async function fetchBulkInvitesPage(
+  cursor: string | undefined,
+  limit: number = BULK_PAGE_SIZE,
+) {
   const { data } = await api.GET("/api/invitations/bulk", {
-    params: { query: { limit: BULK_PAGE_SIZE, cursor } },
+    params: { query: { limit, cursor } },
   });
   return {
     bulkInvites: (data?.bulk_invites ?? []) as BulkInvite[],

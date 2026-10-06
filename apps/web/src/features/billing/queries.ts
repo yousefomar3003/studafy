@@ -69,9 +69,10 @@ const INVOICES_PAGE_SIZE = 10;
 
 export async function fetchInvoicesPage(
   cursor: string | undefined,
+  limit: number = INVOICES_PAGE_SIZE,
 ): Promise<CursorPage<BillingInvoice>> {
   const { data } = await api.GET("/api/subscriptions/current/invoices", {
-    params: { query: { limit: INVOICES_PAGE_SIZE, startingAfter: cursor } },
+    params: { query: { limit, startingAfter: cursor } },
   });
   const invoices = (data?.invoices ?? []) as BillingInvoice[];
   const last = invoices.at(-1);

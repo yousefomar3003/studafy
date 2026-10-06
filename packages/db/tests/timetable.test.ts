@@ -201,7 +201,7 @@ integrationTest(
         WHERE n.nspname = 'app' AND t.typname = 'timetable_version_status'
         GROUP BY t.typname
       `;
-      expect(enumRow[0]!.values).toEqual(["draft", "pending", "approved"]);
+      expect(enumRow[0]!.values).toEqual(["draft", "pending", "approved", "archived"]);
 
       const tables = await database.sql<
         { name: string; owner: string; rls: boolean; forced: boolean; appCrud: boolean }[]
@@ -510,6 +510,34 @@ integrationTest(
         `UPDATE app.timetable_versions
          SET status = 'approved', approved_by_user_id = '${fixture.user}'
          WHERE id = '${otherVersion}'`,
+        fixture.school,
+      );
+
+      // Archiving the live version (000124) frees the term for the next approval, keeps the
+      // approval stamps, and is terminal.
+      await asRole(database, "studafy_app", async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${fixture.school}, true)`;
+        await tx`UPDATE app.timetable_versions SET status = 'archived' WHERE id = ${fixture.version}`;
+        await tx`
+          UPDATE app.timetable_versions
+          SET status = 'approved', approved_by_user_id = ${fixture.user}
+          WHERE id = ${otherVersion}
+        `;
+      });
+      const [archived] = await database.sql<{ status: string; approved_at: Date | null }[]>`
+        SELECT status::text AS status, approved_at FROM app.timetable_versions
+        WHERE id = ${fixture.version}
+      `;
+      expect(archived!.status).toBe("archived");
+      expect(archived!.approved_at).not.toBeNull();
+      await expectDenied(
+        database,
+        `UPDATE app.timetable_versions SET status = 'approved' WHERE id = '${fixture.version}'`,
+        fixture.school,
+      );
+      await expectDenied(
+        database,
+        `UPDATE app.timetable_versions SET status = 'draft' WHERE id = '${fixture.version}'`,
         fixture.school,
       );
     } finally {

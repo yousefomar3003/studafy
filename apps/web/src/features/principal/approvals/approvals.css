@@ -6,7 +6,9 @@
 
 .approvals-queue__toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: var(--space-8);
   margin-bottom: var(--space-16);
 }
 

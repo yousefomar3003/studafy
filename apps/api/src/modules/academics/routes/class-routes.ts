@@ -211,7 +211,7 @@ export function classRoutes(database: Database): OpenAPIHono<AppEnv> {
 
     await withTenantTx(database, tenantFrom(c), (tx) => deleteClass(tx, auth.schoolId, classId));
 
-    return new Response(null, { status: 204 });
+    return c.body(null, 204);
   });
 
   return routes;
