@@ -142,6 +142,14 @@ class AuthNotifier extends Notifier<AuthStatus> {
 
   Future<bool> handleAuthFailure() => _session.handleAuthFailure();
 
+  /// The page the system browser opens: the API's `/mobile-authorize`, which redirects to the
+  /// provider with the server's own registered client and redirect URI. The provider returns to
+  /// the server's callback, which verifies the identity and sends the browser back to
+  /// `studafy://auth/callback` with a one-time code for [MobileAuthClient.exchangeCode] — see
+  /// `apps/api/src/modules/auth/oauth/mobile-handoff.ts`. The app never sends a provider its own
+  /// redirect URI: the providers' web clients refuse custom schemes.
+  ///
+  /// [loginHint] only affects the `mock` provider (dev/E2E, ST-247), whose IdP has no account picker.
   Uri _buildAuthorizationUrl({
     required String provider,
     required String state,
@@ -149,68 +157,17 @@ class AuthNotifier extends Notifier<AuthStatus> {
     required String codeChallenge,
     String? loginHint,
   }) {
-    final browser = ref.read(oAuthBrowserProvider);
-    final redirectUri = browser.redirectUri;
-
-    if (provider == 'mock') {
-      // Dev/E2E only (ST-247) — the mock IdP is mounted on the API's own origin at `/mock-idp`
-      // (mock-config.ts's `issuer`), so this derives the authorization endpoint from the already-
-      // known API base URL rather than a separate build-time constant. The endpoint 404s outside
-      // dev/test (mock-config.ts's `isMockOAuthSafeEnvironment`), so this branch is inert wherever
-      // it's reached in a real deployment.
-      final apiBaseUrl = ref.read(appConfigProvider).apiBaseUrl;
-      return apiBaseUrl.replace(
-        path: '/mock-idp/authorize',
-        queryParameters: {
-          'client_id': 'studafy-e2e',
-          'redirect_uri': redirectUri.toString(),
-          'response_type': 'code',
-          'scope': 'openid email profile',
-          'state': state,
-          'nonce': nonce,
-          'code_challenge': codeChallenge,
-          'code_challenge_method': 'S256',
-          'login_hint': ?loginHint,
-        },
-      );
-    }
-
-    if (provider == 'google') {
-      return Uri.https('accounts.google.com', '/o/oauth2/v2/auth', {
-        'client_id': _googleClientId,
-        'redirect_uri': redirectUri.toString(),
-        'response_type': 'code',
-        'scope': 'openid email profile',
+    final apiBaseUrl = ref.read(appConfigProvider).apiBaseUrl;
+    return apiBaseUrl.replace(
+      path: '/api/auth/oauth/$provider/mobile-authorize',
+      queryParameters: {
         'state': state,
         'nonce': nonce,
         'code_challenge': codeChallenge,
-        'code_challenge_method': 'S256',
-        'access_type': 'offline',
-      });
-    }
-
-    return Uri.https(
-      'login.microsoftonline.com',
-      '/common/oauth2/v2.0/authorize',
-      {
-        'client_id': _microsoftClientId,
-        'redirect_uri': redirectUri.toString(),
-        'response_type': 'code',
-        'scope': 'openid email profile',
-        'state': state,
-        'nonce': nonce,
-        'code_challenge': codeChallenge,
-        'code_challenge_method': 'S256',
-        'response_mode': 'query',
+        'login_hint': ?loginHint,
       },
     );
   }
-
-  String get _googleClientId =>
-      const String.fromEnvironment('GOOGLE_CLIENT_ID');
-
-  String get _microsoftClientId =>
-      const String.fromEnvironment('MICROSOFT_CLIENT_ID');
 }
 
 final authNotifierProvider =

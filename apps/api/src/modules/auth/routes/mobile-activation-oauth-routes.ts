@@ -13,13 +13,16 @@
  *
  *   1. `/mobile-start` mints PKCE + nonce + state, binds the invitation token to that state (in the
  *      process-wide store, `flow: "mobile-activation"` — see oauth/state-store.ts), and returns
- *      them as JSON so the app can open a system browser (ASWebAuthenticationSession / Custom Tabs)
- *      against the provider's authorization endpoint itself.
- *   2. The app captures the provider's redirect via its `studafy://auth/callback` deep link and
- *      posts `code` + `state` to `/mobile-exchange`, which validates the state, exchanges the code
- *      for an id_token, verifies it, and runs the same `activateAccount` transaction the web flow
- *      uses — with `channel: "mobile"`, so `deliverTokenPair` returns the refresh token in the JSON
- *      body instead of an HttpOnly cookie the app could never read.
+ *      them as JSON.
+ *   2. The app opens its system browser at `/api/auth/oauth/{provider}/mobile-authorize`, which
+ *      redirects to the provider with the server's own client and redirect URI. The provider
+ *      returns to the server's callback, which exchanges the code, verifies the id_token, and hands
+ *      the verified identity to the app as a one-time code via `studafy://auth/callback` (see
+ *      oauth/mobile-handoff.ts).
+ *   3. The app posts that code + state + nonce to `/mobile-exchange`, which redeems the handoff and
+ *      runs the same `activateAccount` transaction the web flow uses — with `channel: "mobile"`, so
+ *      `deliverTokenPair` returns the refresh token in the JSON body instead of an HttpOnly cookie
+ *      the app could never read.
  *
  * A lifecycle rejection (expired/revoked/consumed/suspended invitation, duplicate identity) and an
  * email-divergence REQUIRES_ADMIN_APPROVAL both surface as ordinary problem+json — there is no
@@ -41,21 +44,16 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../channels";
 import { deliverTokenPair } from "../delivery";
-import { GOOGLE_TOKEN_ENDPOINT, getGoogleOAuthConfig } from "../oauth/config";
-import { validateGoogleIdToken } from "../oauth/google-id-token";
-import { MICROSOFT_TOKEN_ENDPOINT, getMicrosoftOAuthConfig } from "../oauth/microsoft-config";
-import { validateMicrosoftIdToken } from "../oauth/microsoft-id-token";
-import { MOBILE_OAUTH_REDIRECT_URI } from "../oauth/mobile-redirect";
-import { MOCK_JWKS_URI, getMockOAuthConfig } from "../oauth/mock-config";
-import { validateMockIdToken } from "../oauth/mock-id-token";
-import { exchangeCode as exchangeMockCode } from "../oauth/mock-route";
+import { getGoogleOAuthConfig } from "../oauth/config";
+import { getMicrosoftOAuthConfig } from "../oauth/microsoft-config";
+import { redeemHandoff } from "../oauth/mobile-handoff";
+import { getMockOAuthConfig } from "../oauth/mock-config";
 import {
   generateCodeChallenge,
   generateCodeVerifier,
   generateNonce,
   generateState,
 } from "../oauth/pkce";
-import { takeStateFor } from "../oauth/state-store";
 import { activateAccount } from "../services/activation-service";
 
 import { activationPathParams, activationResponseSchema } from "./activation-schemas";
@@ -69,21 +67,6 @@ import type { SessionTokenConfig } from "../services/session-service";
 import type { Context } from "hono";
 
 type Provider = ActivationProvider;
-
-interface OAuthConfig {
-  clientId: string;
-  clientSecret: string;
-  redirectUri: string;
-  frontendUrl: string | undefined;
-}
-
-function providerConfig(provider: Provider): OAuthConfig {
-  const config = provider === "google" ? getGoogleOAuthConfig() : getMicrosoftOAuthConfig();
-  if (!config) {
-    throw new HTTPException(404, { message: `${provider} OAuth is not configured` });
-  }
-  return config;
-}
 
 // ---------------------------------------------------------------------------
 // Schemas — distinct component names from mobile-oauth-routes.ts's login shapes even though the
@@ -180,8 +163,7 @@ function createInvitationMobileExchangeRoute(provider: Provider) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared exchange logic — takes plain values rather than a Hono Context so both providers' typed
-// handlers (each with their own route-specific `c.req.valid()` shape) can delegate to one place.
+// Shared exchange logic
 // ---------------------------------------------------------------------------
 
 interface ExchangeInput {
@@ -200,6 +182,11 @@ interface ExchangeSuccessBody {
   refresh_token?: string;
 }
 
+/**
+ * Redeem the one-time handoff the provider callback gave the app (oauth/mobile-handoff.ts) and run
+ * the activation. The provider's code was already exchanged and its id_token verified by that
+ * callback; this checks the handoff answers this app's state, nonce and invitation token.
+ */
 async function runMobileExchange(
   c: Context<AppEnv>,
   db: Database,
@@ -209,10 +196,16 @@ async function runMobileExchange(
   logger: Logger,
   input: ExchangeInput,
 ): Promise<ExchangeSuccessBody> {
-  const oauthConfig = providerConfig(provider);
+  assertProviderConfigured(provider);
 
-  const entry = await takeStateFor(stateStore, input.state, "mobile-activation", provider);
-  if (!entry || entry.token !== input.token) {
+  const handoff = await redeemHandoff(stateStore, {
+    code: input.code,
+    state: input.state,
+    nonce: input.nonce,
+    provider,
+    purpose: "activation",
+  });
+  if (!handoff || handoff.token !== input.token) {
     throw new CodedHttpException(
       400,
       ERROR_CODES.OAUTH_STATE_INVALID,
@@ -220,56 +213,25 @@ async function runMobileExchange(
     );
   }
 
-  if (entry.nonce !== input.nonce) {
-    throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
-  }
+  const result = await activateAccount(db, sessionConfig, {
+    rawToken: input.token,
+    identity: { provider, subject: handoff.identity.sub, email: handoff.identity.email },
+    channel: AUTH_CHANNELS.MOBILE,
+    device: { userAgent: c.req.header("user-agent") ?? null },
+    requestId: c.get("requestId"),
+    logger,
+  });
 
-  try {
-    // The verifier never left the server (the client only ever saw its S256 hash, sent to the IdP
-    // as code_challenge at /mobile-start), so the exchange uses the one this state entry was
-    // minted with rather than trusting anything the client could supply.
-    const idToken = await exchangeCode(
-      provider === "google" ? GOOGLE_TOKEN_ENDPOINT : MICROSOFT_TOKEN_ENDPOINT,
-      { ...oauthConfig, redirectUri: MOBILE_OAUTH_REDIRECT_URI },
-      input.code,
-      entry.codeVerifier,
+  if (result.outcome === "REQUIRES_ADMIN_APPROVAL") {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.REQUIRES_ADMIN_APPROVAL,
+      "Activation requires administrator approval.",
     );
-
-    const claims =
-      provider === "google"
-        ? await validateGoogleIdToken(idToken, oauthConfig.clientId, input.nonce)
-        : await validateMicrosoftIdToken(idToken, oauthConfig.clientId, input.nonce);
-
-    const result = await activateAccount(db, sessionConfig, {
-      rawToken: input.token,
-      identity: { provider, subject: claims.sub, email: claims.email },
-      channel: AUTH_CHANNELS.MOBILE,
-      device: { userAgent: c.req.header("user-agent") ?? null },
-      requestId: c.get("requestId"),
-      logger,
-    });
-
-    if (result.outcome === "REQUIRES_ADMIN_APPROVAL") {
-      throw new CodedHttpException(
-        403,
-        ERROR_CODES.REQUIRES_ADMIN_APPROVAL,
-        "Activation requires administrator approval.",
-      );
-    }
-
-    const body = deliverTokenPair(c, result.tokens);
-    return { status: "active" as const, ...body };
-  } catch (error) {
-    if (error instanceof CodedHttpException) throw error;
-    if (error instanceof HTTPException) {
-      throw new CodedHttpException(
-        502,
-        ERROR_CODES.OAUTH_PROVIDER_ERROR,
-        `Failed to exchange authorization code with ${provider}`,
-      );
-    }
-    throw error;
   }
+
+  const body = deliverTokenPair(c, result.tokens);
+  return { status: "active" as const, ...body };
 }
 
 // ---------------------------------------------------------------------------
@@ -280,8 +242,8 @@ async function runMobileExchange(
  * Build the mobile invitation-activation route group.
  *
  * Requires a database, a session-token config, and the process-wide OAuth state store (so
- * /mobile-start and /mobile-exchange may land on different API instances). Public — the invitation
- * token in the path is the credential.
+ * /mobile-start, the provider callback and /mobile-exchange may land on different API instances).
+ * Public — the invitation token in the path is the credential.
  */
 export function mobileActivationOAuthRoutes(
   db: Database,
@@ -291,162 +253,39 @@ export function mobileActivationOAuthRoutes(
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  // ----- Google -----
+  for (const provider of ["google", "microsoft", "mock"] as const) {
+    routes.openapi(createInvitationMobileStartRoute(provider), async (c) => {
+      const { token } = c.req.valid("param");
+      assertProviderConfigured(provider);
 
-  routes.openapi(createInvitationMobileStartRoute("google"), async (c) => {
-    const { token } = c.req.valid("param");
-    providerConfig("google");
+      const state = generateState();
+      const nonce = generateNonce();
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    const state = generateState();
-    const nonce = generateNonce();
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
-
-    await stateStore.set(state, {
-      flow: "mobile-activation",
-      provider: "google",
-      codeVerifier,
-      nonce,
-      token,
-    });
-
-    return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
-  });
-
-  routes.openapi(createInvitationMobileExchangeRoute("google"), async (c) => {
-    const { token } = c.req.valid("param");
-    const { code, state, nonce } = c.req.valid("json");
-    const body = await runMobileExchange(c, db, config, stateStore, "google", logger, {
-      token,
-      code,
-      state,
-      nonce,
-    });
-    return c.json(body, 200);
-  });
-
-  // ----- Microsoft -----
-
-  routes.openapi(createInvitationMobileStartRoute("microsoft"), async (c) => {
-    const { token } = c.req.valid("param");
-    providerConfig("microsoft");
-
-    const state = generateState();
-    const nonce = generateNonce();
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
-
-    await stateStore.set(state, {
-      flow: "mobile-activation",
-      provider: "microsoft",
-      codeVerifier,
-      nonce,
-      token,
-    });
-
-    return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
-  });
-
-  routes.openapi(createInvitationMobileExchangeRoute("microsoft"), async (c) => {
-    const { token } = c.req.valid("param");
-    const { code, state, nonce } = c.req.valid("json");
-    const body = await runMobileExchange(c, db, config, stateStore, "microsoft", logger, {
-      token,
-      code,
-      state,
-      nonce,
-    });
-    return c.json(body, 200);
-  });
-
-  // ----- Mock (dev/E2E only, see file header) -----
-
-  routes.openapi(createInvitationMobileStartRoute("mock"), async (c) => {
-    const { token } = c.req.valid("param");
-    if (!getMockOAuthConfig()) {
-      throw new HTTPException(404, { message: "mock OAuth is not configured" });
-    }
-
-    const state = generateState();
-    const nonce = generateNonce();
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
-
-    await stateStore.set(state, {
-      flow: "mobile-activation",
-      provider: "mock",
-      codeVerifier,
-      nonce,
-      token,
-    });
-
-    return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
-  });
-
-  routes.openapi(createInvitationMobileExchangeRoute("mock"), async (c) => {
-    const { token } = c.req.valid("param");
-    const { code, state, nonce } = c.req.valid("json");
-    const mockConfig = getMockOAuthConfig();
-    if (!mockConfig) {
-      throw new HTTPException(404, { message: "mock OAuth is not configured" });
-    }
-
-    const entry = await takeStateFor(stateStore, state, "mobile-activation", "mock");
-    if (!entry || entry.token !== token) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.OAUTH_STATE_INVALID,
-        "Invalid or expired activation state",
-      );
-    }
-
-    if (entry.nonce !== nonce) {
-      throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
-    }
-
-    try {
-      // The mock IdP's /token returns `access_token`, not `id_token` — see mock-route.ts's file
-      // header — so this gets its own exchange+validate pair rather than runMobileExchange's
-      // google/microsoft id_token flow.
-      const accessToken = await exchangeMockCode(mockConfig.issuer, code, entry.codeVerifier);
-      const claims = await validateMockIdToken(
-        accessToken,
-        mockConfig.issuer,
+      await stateStore.set(state, {
+        flow: "mobile-activation",
+        provider,
+        codeVerifier,
         nonce,
-        MOCK_JWKS_URI(mockConfig.issuer),
-      );
-
-      const result = await activateAccount(db, config, {
-        rawToken: token,
-        identity: { provider: "mock", subject: claims.sub, email: claims.email },
-        channel: AUTH_CHANNELS.MOBILE,
-        device: { userAgent: c.req.header("user-agent") ?? null },
-        requestId: c.get("requestId"),
-        logger,
+        token,
       });
 
-      if (result.outcome === "REQUIRES_ADMIN_APPROVAL") {
-        throw new CodedHttpException(
-          403,
-          ERROR_CODES.REQUIRES_ADMIN_APPROVAL,
-          "Activation requires administrator approval.",
-        );
-      }
+      return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
+    });
 
-      const body = deliverTokenPair(c, result.tokens);
-      return c.json({ status: "active" as const, ...body }, 200);
-    } catch (error) {
-      if (error instanceof CodedHttpException) throw error;
-      if (error instanceof HTTPException) {
-        throw new CodedHttpException(
-          502,
-          ERROR_CODES.OAUTH_PROVIDER_ERROR,
-          "Failed to exchange authorization code with the mock provider",
-        );
-      }
-      throw error;
-    }
-  });
+    routes.openapi(createInvitationMobileExchangeRoute(provider), async (c) => {
+      const { token } = c.req.valid("param");
+      const { code, state, nonce } = c.req.valid("json");
+      const body = await runMobileExchange(c, db, config, stateStore, provider, logger, {
+        token,
+        code,
+        state,
+        nonce,
+      });
+      return c.json(body, 200);
+    });
+  }
 
   return routes;
 }
@@ -455,38 +294,14 @@ export function mobileActivationOAuthRoutes(
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function exchangeCode(
-  tokenEndpoint: string,
-  oauthConfig: OAuthConfig,
-  code: string,
-  codeVerifier: string,
-): Promise<string> {
-  let tokenResponse: Response;
-  try {
-    tokenResponse = await fetch(tokenEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: oauthConfig.clientId,
-        client_secret: oauthConfig.clientSecret,
-        redirect_uri: oauthConfig.redirectUri,
-        grant_type: "authorization_code",
-        code_verifier: codeVerifier,
-      }).toString(),
-    });
-  } catch {
-    throw new HTTPException(502, { message: "Failed to reach OAuth token endpoint" });
+function assertProviderConfigured(provider: Provider): void {
+  const configured =
+    provider === "google"
+      ? getGoogleOAuthConfig()
+      : provider === "microsoft"
+        ? getMicrosoftOAuthConfig()
+        : getMockOAuthConfig();
+  if (!configured) {
+    throw new HTTPException(404, { message: `${provider} OAuth is not configured` });
   }
-
-  if (!tokenResponse.ok) {
-    throw new HTTPException(502, { message: "Failed to exchange authorization code" });
-  }
-
-  const tokenData = (await tokenResponse.json()) as { id_token?: string };
-  if (!tokenData.id_token) {
-    throw new HTTPException(502, { message: "OAuth provider did not return an id_token" });
-  }
-
-  return tokenData.id_token;
 }

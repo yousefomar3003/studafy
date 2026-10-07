@@ -4,8 +4,8 @@
  * Two endpoints, mirroring google-route.ts:
  *   GET /api/auth/oauth/mock/start    — redirects to the mock IdP's authorization endpoint
  *   GET /api/auth/oauth/mock/callback — exchanges the code, validates the token, then finishes the
- *                                       login or invitation activation that minted the state (the
- *                                       mock provider has no link flow)
+ *                                       login, invitation activation, or native-app sign-in that
+ *                                       minted the state (the mock provider has no link flow)
  *
  * Both 404 when `getMockOAuthConfig()` is null — unset `MOCK_OAUTH_ISSUER_URL`, or a
  * staging/production environment (mock-config.ts) — the same inert-by-default posture Google and
@@ -25,11 +25,15 @@ import { withTenantTx } from "../../../db/tenant-tx";
 import { createMockIdp } from "../../../dev/mock-idp";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { deliverTokenPair } from "../delivery";
-import { completeWebActivation } from "../routes/activation-oauth-routes";
 import { findOAuthIdentity } from "../services/returning-user-login-service";
 import { issueTokenPair } from "../services/session-service";
 
-import { oauthErrorUrl } from "./error-redirect";
+import {
+  cancelledRedirect,
+  failureRedirect,
+  finishFlow,
+  takeAuthorization,
+} from "./callback-flows";
 import {
   MOCK_AUTH_ENDPOINT,
   MOCK_JWKS_URI,
@@ -40,9 +44,9 @@ import {
 } from "./mock-config";
 import { validateMockIdToken } from "./mock-id-token";
 import { generateCodeChallenge, generateCodeVerifier, generateNonce, generateState } from "./pkce";
-import { isBrowserFlow } from "./state-store";
 
-import type { StateStore } from "./state-store";
+import type { CallbackContext } from "./callback-flows";
+import type { AuthorizationEntry, StateStore } from "./state-store";
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -108,12 +112,18 @@ export function mockOAuthRoutes(
     if (!oauthConfig) {
       throw new HTTPException(404, { message: "Mock OAuth is not configured" });
     }
-    const frontendUrl = oauthConfig.frontendUrl ?? "/";
+    const ctx: CallbackContext = {
+      db,
+      sessionConfig: config,
+      logger,
+      stateStore,
+      provider: "mock",
+      frontendUrl: oauthConfig.frontendUrl,
+    };
 
-    if (c.req.query("error")) {
-      return c.redirect(oauthErrorUrl(frontendUrl, ERROR_CODES.OAUTH_CANCELLED), 302);
-    }
+    if (c.req.query("error")) return cancelledRedirect(c, ctx);
 
+    let entry: AuthorizationEntry | undefined;
     try {
       const code = c.req.query("code");
       const state = c.req.query("state");
@@ -126,14 +136,7 @@ export function mockOAuthRoutes(
         );
       }
 
-      const entry = await stateStore.take(state);
-      if (!entry || entry.provider !== "mock" || !isBrowserFlow(entry.flow)) {
-        throw new CodedHttpException(
-          400,
-          ERROR_CODES.OAUTH_STATE_INVALID,
-          "Invalid or expired OAuth state",
-        );
-      }
+      entry = await takeAuthorization(ctx, state);
 
       const accessToken = await exchangeCode(oauthConfig.issuer, code, entry.codeVerifier);
       const claims = await validateMockIdToken(
@@ -143,25 +146,9 @@ export function mockOAuthRoutes(
         MOCK_JWKS_URI(oauthConfig.issuer),
       );
 
-      if (entry.flow === "activation" && entry.token) {
-        return await completeWebActivation(
-          c,
-          { db, sessionConfig: config, logger },
-          {
-            provider: "mock",
-            token: entry.token,
-            identity: claims,
-            frontendUrl: oauthConfig.frontendUrl,
-          },
-        );
-      }
-      if (entry.flow !== "login") {
-        throw new CodedHttpException(
-          400,
-          ERROR_CODES.OAUTH_STATE_INVALID,
-          "Invalid or expired OAuth state",
-        );
-      }
+      // An invitation or a native-app sign-in finishes here; a browser login continues below.
+      const finished = await finishFlow(c, ctx, entry, state, claims);
+      if (finished) return finished;
 
       const identity = await findOAuthIdentity(db, "mock", claims.sub);
       if (!identity) {
@@ -185,21 +172,11 @@ export function mockOAuthRoutes(
       );
 
       deliverTokenPair(c, issued);
-      return c.redirect(new URL("/auth/callback", frontendUrl).toString(), 302);
+      return c.redirect(new URL("/auth/callback", oauthConfig.frontendUrl ?? "/").toString(), 302);
     } catch (error) {
-      if (error instanceof CodedHttpException) {
-        return c.redirect(oauthErrorUrl(oauthConfig.frontendUrl ?? "/", error.code), 302);
-      }
-      if (error instanceof HTTPException) {
-        return c.redirect(
-          oauthErrorUrl(oauthConfig.frontendUrl ?? "/", ERROR_CODES.OAUTH_PROVIDER_ERROR),
-          302,
-        );
-      }
-      throw error;
+      return failureRedirect(c, ctx, entry, error);
     }
   });
-
   return routes;
 }
 

@@ -33,15 +33,19 @@ export const OAUTH_STATE_KEY_PREFIX = "auth:oauth:state:";
 export type OAuthStateProvider = "google" | "microsoft" | "mock";
 
 /**
- * Which flow minted a state — and therefore which handler may consume it.
+ * Which flow minted an authorization state — and therefore what the provider callback does with it.
  *
- * The browser flows (`login`, `activation`, `link`) all return through the provider's single
- * callback, which dispatches on this. The mobile flows are redeemed at their own JSON exchange
- * endpoints and must never be accepted by the browser callback, nor the reverse.
+ * Every flow sends the browser to the provider with the server's own registered redirect URI, so
+ * every flow returns through the provider's single callback, which dispatches on this:
+ *   - `login`, `activation`, `link` — browser flows, finished in that browser tab.
+ *   - `mobile-login`, `mobile-activation` — native-app flows. The callback verifies the identity
+ *     and hands it to the app as a one-time {@link HandoffEntry} through the app's deep link; the
+ *     app redeems it at its JSON `/mobile-exchange` endpoint.
  */
 export type OAuthFlow = "login" | "activation" | "link" | "mobile-login" | "mobile-activation";
 
-export interface StateEntry {
+/** An authorization in flight: minted at a flow's start, consumed by the provider callback. */
+export interface AuthorizationEntry {
   flow: OAuthFlow;
   provider: OAuthStateProvider;
   codeVerifier: string;
@@ -53,15 +57,44 @@ export interface StateEntry {
   token?: string;
 }
 
+/**
+ * A provider-verified identity waiting for the native app to redeem it, keyed by a one-time code
+ * the callback hands the app through its deep link.
+ *
+ * The app must present the original `state` and `nonce` alongside the code. The nonce never
+ * appears in the deep link, so another app that intercepts `studafy://auth/callback` holds the code
+ * and state but cannot redeem them.
+ */
+export interface HandoffEntry {
+  flow: "mobile-handoff";
+  provider: OAuthStateProvider;
+  /** Which mobile flow minted the authorization this handoff completes. */
+  purpose: "login" | "activation";
+  /** The authorization `state` this handoff answers, and the nonce it was minted with. */
+  state: string;
+  nonce: string;
+  identity: { sub: string; email: string };
+  /** `activation` only: the invitation bearer token. */
+  token?: string;
+}
+
+export type StateEntry = AuthorizationEntry | HandoffEntry;
+type StateFlow = StateEntry["flow"];
+
 export interface StateStore {
   set(state: string, entry: StateEntry): Promise<void>;
   /** Read and remove an entry in one step. Undefined when missing, expired, or already taken. */
   take(state: string): Promise<StateEntry | undefined>;
 }
 
-/** The flows that return through a provider's browser-redirect callback (not the mobile JSON ones). */
-export function isBrowserFlow(flow: OAuthFlow): boolean {
-  return flow === "login" || flow === "activation" || flow === "link";
+/** Whether an entry is an authorization the provider callback may redeem (not a mobile handoff). */
+export function isAuthorizationEntry(entry: StateEntry): entry is AuthorizationEntry {
+  return entry.flow !== "mobile-handoff";
+}
+
+/** The native-app flows, whose callback ends in a handoff to the app rather than in the browser. */
+export function isMobileFlow(flow: StateFlow): flow is "mobile-login" | "mobile-activation" {
+  return flow === "mobile-login" || flow === "mobile-activation";
 }
 
 /**
@@ -70,16 +103,18 @@ export function isBrowserFlow(flow: OAuthFlow): boolean {
  * A mismatched entry is still consumed: a state presented to the wrong endpoint is either forged
  * or misrouted, and leaving it redeemable elsewhere would serve neither case.
  */
-export async function takeStateFor(
+export async function takeStateFor<F extends StateFlow>(
   store: StateStore,
   state: string,
-  flow: OAuthFlow,
+  flow: F,
   provider: OAuthStateProvider,
-): Promise<StateEntry | undefined> {
+): Promise<EntryFor<F> | undefined> {
   const entry = await store.take(state);
   if (!entry || entry.flow !== flow || entry.provider !== provider) return undefined;
-  return entry;
+  return entry as EntryFor<F>;
 }
+
+type EntryFor<F extends StateFlow> = F extends "mobile-handoff" ? HandoffEntry : AuthorizationEntry;
 
 /** In-process store for a process with no Redis. Not shared across instances. */
 export function createMemoryStateStore(ttlMs = DEFAULT_TTL_MS): StateStore {
