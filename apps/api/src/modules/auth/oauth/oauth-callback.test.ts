@@ -3,6 +3,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { googleOAuthRoutes } from "./google-route";
 import { microsoftOAuthRoutes } from "./microsoft-route";
+import { redeemHandoff } from "./mobile-handoff";
 import { createMemoryStateStore } from "./state-store";
 
 import type { GoogleOAuthDependencies } from "./google-route";
@@ -182,16 +183,114 @@ describe("OAuth callback flow dispatch", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  test("a mobile-login state is refused by the browser callback without calling the provider", async () => {
+  test("a mobile-login state is handed to the app as a one-time code, redeemable once", async () => {
+    stubTokenEndpoint();
+    // What /mobile-start writes. The app opened /mobile-authorize, so Google returned here.
     await stateStore.set("mobile-state", {
+      flow: "mobile-login",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "mobile-nonce",
+    });
+
+    const res = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=mobile-state",
+    );
+
+    // Back to the app's deep link with a fresh code — never Google's own code — and the state.
+    expect(res.status).toBe(302);
+    const deepLink = new URL(res.headers.get("location")!);
+    expect(`${deepLink.protocol}//${deepLink.host}${deepLink.pathname}`).toBe(
+      "studafy://auth/callback",
+    );
+    expect(deepLink.searchParams.get("state")).toBe("mobile-state");
+    const handoffCode = deepLink.searchParams.get("code")!;
+    expect(handoffCode).not.toBe("fake-code");
+
+    // The verified identity waits under that code, bound to the state and nonce.
+    const redeemed = await redeemHandoff(stateStore, {
+      code: handoffCode,
+      state: "mobile-state",
+      nonce: "mobile-nonce",
+      provider: "google",
+      purpose: "login",
+    });
+    expect(redeemed?.identity).toEqual({ sub: "sub-1", email: "user@example.com" });
+    expect(
+      await redeemHandoff(stateStore, {
+        code: handoffCode,
+        state: "mobile-state",
+        nonce: "mobile-nonce",
+        provider: "google",
+        purpose: "login",
+      }),
+    ).toBeUndefined();
+  });
+
+  test("a handoff is refused without the app's nonce (an intercepted deep link is not enough)", async () => {
+    stubTokenEndpoint();
+    await stateStore.set("mobile-state-2", {
+      flow: "mobile-login",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "secret-nonce",
+    });
+    const res = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=mobile-state-2",
+    );
+    const handoffCode = new URL(res.headers.get("location")!).searchParams.get("code")!;
+
+    expect(
+      await redeemHandoff(stateStore, {
+        code: handoffCode,
+        state: "mobile-state-2",
+        nonce: "guessed-nonce",
+        provider: "google",
+        purpose: "login",
+      }),
+    ).toBeUndefined();
+  });
+
+  test("a failed mobile sign-in returns to the app, not the web error page", async () => {
+    await stateStore.set("mobile-cancel", {
       flow: "mobile-login",
       provider: "google",
       codeVerifier: "v",
       nonce: "n",
     });
+    const cancelled = await googleApp.request(
+      "/api/auth/oauth/google/callback?error=access_denied&state=mobile-cancel",
+    );
+    expect(cancelled.headers.get("location")).toBe("studafy://auth/callback?error=OAUTH_CANCELLED");
 
+    // A provider-level failure (token endpoint down) for a mobile flow lands in the app too.
+    fetchMock.mockImplementation(() => Promise.resolve(new Response("{}", { status: 500 })));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    await stateStore.set("mobile-fail", {
+      flow: "mobile-login",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "n",
+    });
+    const failed = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=mobile-fail",
+    );
+    expect(failed.headers.get("location")).toBe(
+      "studafy://auth/callback?error=OAUTH_PROVIDER_ERROR",
+    );
+  });
+
+  test("a handoff code is never accepted as an authorization state", async () => {
+    await stateStore.set("handoff-code", {
+      flow: "mobile-handoff",
+      provider: "google",
+      purpose: "login",
+      state: "s",
+      nonce: "n",
+      identity: { sub: "sub-1", email: "user@example.com" },
+    });
     const res = await googleApp.request(
-      "/api/auth/oauth/google/callback?code=fake-code&state=mobile-state",
+      "/api/auth/oauth/google/callback?code=fake-code&state=handoff-code",
     );
     expectRedirectToError(res, "OAUTH_STATE_INVALID");
     expect(fetchMock).not.toHaveBeenCalled();

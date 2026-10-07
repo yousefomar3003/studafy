@@ -1,18 +1,22 @@
 /**
  * Mobile OAuth routes — system-browser PKCE flow for native apps.
  *
- * Two endpoints per provider:
- *   GET  /api/auth/oauth/{provider}/mobile-start    — returns PKCE params as JSON
- *   POST /api/auth/oauth/{provider}/mobile-exchange  — exchanges code for session tokens
+ * Per provider:
+ *   GET  /api/auth/oauth/{provider}/mobile-start     — mints state + nonce + PKCE, returns them as JSON
+ *   GET  /api/auth/oauth/{provider}/mobile-authorize — where the app opens its system browser;
+ *                                                      redirects to the provider
+ *   POST /api/auth/oauth/{provider}/mobile-exchange  — redeems the one-time handoff code for a
+ *                                                      session token pair
  *
- * These mirror the browser-redirect flow but skip the server-side redirect: the mobile app
- * opens its own system browser (ASWebAuthenticationSession / Custom Tabs), captures the
- * callback via a custom URI scheme, and posts the authorization code back here. The backend
- * performs the IdP code exchange, validates the id_token, and returns a TokenPair as JSON.
+ * The provider returns to the server's own registered callback — the same one the browser flows
+ * use — not to the app: Google refuses custom-scheme redirect URIs on a web client, and the app
+ * has no client of its own. That callback exchanges the code and verifies the id_token, then hands
+ * the verified identity to the app through `studafy://auth/callback` as a one-time code (see
+ * mobile-handoff.ts for the whole sequence). The app posts that code here with the state and nonce
+ * from /mobile-start, and gets a TokenPair as JSON.
  *
- * The state store is the process-wide one (state-store.ts) — Redis-backed when the API has Redis —
- * with every entry tagged `flow: "mobile-login"`, so a mobile state can never be redeemed by the
- * browser callback, nor a browser state here.
+ * Entries live in the process-wide state store (state-store.ts), tagged `flow: "mobile-login"`
+ * and then `"mobile-handoff"`, so neither can be redeemed by a browser flow, nor the reverse.
  *
  * A third "mock" provider sits alongside Google and Microsoft (ST-247) — dev/E2E only, inert
  * unless `getMockOAuthConfig()` returns non-null (mock-config.ts's own production kill switch).
@@ -32,16 +36,20 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { loginReturningUser } from "../services/returning-user-login-service";
 
-import { GOOGLE_TOKEN_ENDPOINT, getGoogleOAuthConfig } from "./config";
-import { validateGoogleIdToken } from "./google-id-token";
-import { MICROSOFT_TOKEN_ENDPOINT, getMicrosoftOAuthConfig } from "./microsoft-config";
-import { validateMicrosoftIdToken } from "./microsoft-id-token";
-import { MOBILE_OAUTH_REDIRECT_URI } from "./mobile-redirect";
-import { MOCK_JWKS_URI, getMockOAuthConfig } from "./mock-config";
-import { validateMockIdToken } from "./mock-id-token";
-import { exchangeCode as exchangeMockCode } from "./mock-route";
+import { GOOGLE_AUTH_ENDPOINT, GOOGLE_SCOPES, getGoogleOAuthConfig } from "./config";
+import {
+  MICROSOFT_AUTH_ENDPOINT,
+  MICROSOFT_SCOPES,
+  getMicrosoftOAuthConfig,
+} from "./microsoft-config";
+import { redeemHandoff } from "./mobile-handoff";
+import {
+  MOCK_AUTH_ENDPOINT,
+  MOCK_OAUTH_CLIENT_ID,
+  MOCK_OAUTH_SCOPES,
+  getMockOAuthConfig,
+} from "./mock-config";
 import { generateCodeChallenge, generateCodeVerifier, generateNonce, generateState } from "./pkce";
-import { takeStateFor } from "./state-store";
 
 import type { StateStore } from "./state-store";
 import type { Database } from "../../../db";
@@ -159,173 +167,61 @@ export function mobileOAuthRoutes(
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
-  // ----- Google mobile routes -----
+  for (const provider of MOBILE_PROVIDERS) {
+    routes.openapi(createMobileStartRoute(provider), async (c) => {
+      assertProviderConfigured(provider);
 
-  routes.openapi(createMobileStartRoute("google"), async (c) => {
-    const oauthConfig = getGoogleOAuthConfig();
-    if (!oauthConfig) {
-      throw new HTTPException(404, { message: "Google OAuth is not configured" });
-    }
+      const state = generateState();
+      const nonce = generateNonce();
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    const state = generateState();
-    const nonce = generateNonce();
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
+      await stateStore.set(state, { flow: "mobile-login", provider, codeVerifier, nonce });
 
-    await stateStore.set(state, { flow: "mobile-login", provider: "google", codeVerifier, nonce });
-
-    return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
-  });
-
-  routes.openapi(createMobileExchangeRoute("google"), async (c) => {
-    const { code, state, nonce } = c.req.valid("json");
-    const oauthConfig = getGoogleOAuthConfig();
-    if (!oauthConfig) {
-      throw new HTTPException(404, { message: "Google OAuth is not configured" });
-    }
-
-    const entry = await takeStateFor(stateStore, state, "mobile-login", "google");
-    if (!entry) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.OAUTH_STATE_INVALID,
-        "Invalid or expired OAuth state",
-      );
-    }
-
-    if (entry.nonce !== nonce) {
-      throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
-    }
-
-    try {
-      // The verifier never left the server (the client only ever saw its S256 hash, sent to the
-      // IdP as code_challenge at /mobile-start), so the exchange uses the one this state entry was
-      // minted with rather than trusting anything the client could supply.
-      const idToken = await exchangeCode(
-        code,
-        GOOGLE_TOKEN_ENDPOINT,
-        { ...oauthConfig, redirectUri: MOBILE_OAUTH_REDIRECT_URI },
-        entry.codeVerifier,
-      );
-      const claims = await validateGoogleIdToken(idToken, oauthConfig.clientId, nonce);
-
-      const result = await loginReturningUser(db, config, {
-        subject: claims.sub,
-        provider: "google",
-        channel: "mobile",
-        logger,
-      });
-
-      switch (result.outcome) {
-        case "LOGIN_SUCCESS": {
-          const body = {
-            access_token: result.tokens.accessToken,
-            token_type: "Bearer" as const,
-            expires_in: result.tokens.accessExpiresInSeconds,
-            session_id: result.tokens.sessionId,
-            refresh_token: result.tokens.refreshToken,
-          };
-          return c.json(body, 200);
-        }
-        case "NO_ACCOUNT":
-          throw new CodedHttpException(
-            403,
-            ERROR_CODES.NO_ACCOUNT,
-            "No account found — ask your school admin for an invitation.",
-          );
-        case "SCHOOL_SUSPENDED":
-          throw new CodedHttpException(
-            403,
-            ERROR_CODES.SCHOOL_SUSPENDED,
-            "Your school's account has been suspended. Contact your administrator.",
-          );
-      }
-    } catch (error) {
-      if (error instanceof CodedHttpException) throw error;
-      if (error instanceof HTTPException) {
-        throw new CodedHttpException(
-          502,
-          ERROR_CODES.OAUTH_PROVIDER_ERROR,
-          "Failed to exchange authorization code with Google",
-        );
-      }
-      throw error;
-    }
-  });
-
-  // ----- Microsoft mobile routes -----
-
-  routes.openapi(createMobileStartRoute("microsoft"), async (c) => {
-    const oauthConfig = getMicrosoftOAuthConfig();
-    if (!oauthConfig) {
-      throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
-    }
-
-    const state = generateState();
-    const nonce = generateNonce();
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
-
-    await stateStore.set(state, {
-      flow: "mobile-login",
-      provider: "microsoft",
-      codeVerifier,
-      nonce,
+      return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
     });
 
-    return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
-  });
+    // The provider's code was already exchanged and its id_token verified by the server's own
+    // callback, which handed the app a one-time code through its deep link (mobile-handoff.ts).
+    // Redeeming it needs the state and nonce from /mobile-start, which only this app instance has.
+    routes.openapi(createMobileExchangeRoute(provider), async (c) => {
+      const { code, state, nonce } = c.req.valid("json");
+      assertProviderConfigured(provider);
 
-  routes.openapi(createMobileExchangeRoute("microsoft"), async (c) => {
-    const { code, state, nonce } = c.req.valid("json");
-    const oauthConfig = getMicrosoftOAuthConfig();
-    if (!oauthConfig) {
-      throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
-    }
-
-    const entry = await takeStateFor(stateStore, state, "mobile-login", "microsoft");
-    if (!entry) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.OAUTH_STATE_INVALID,
-        "Invalid or expired OAuth state",
-      );
-    }
-
-    if (entry.nonce !== nonce) {
-      throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
-    }
-
-    try {
-      // The verifier never left the server (the client only ever saw its S256 hash, sent to the
-      // IdP as code_challenge at /mobile-start), so the exchange uses the one this state entry was
-      // minted with rather than trusting anything the client could supply.
-      const idToken = await exchangeCode(
+      const handoff = await redeemHandoff(stateStore, {
         code,
-        MICROSOFT_TOKEN_ENDPOINT,
-        { ...oauthConfig, redirectUri: MOBILE_OAUTH_REDIRECT_URI },
-        entry.codeVerifier,
-      );
-      const claims = await validateMicrosoftIdToken(idToken, oauthConfig.clientId, nonce);
+        state,
+        nonce,
+        provider,
+        purpose: "login",
+      });
+      if (!handoff) {
+        throw new CodedHttpException(
+          400,
+          ERROR_CODES.OAUTH_STATE_INVALID,
+          "Invalid or expired OAuth state",
+        );
+      }
 
       const result = await loginReturningUser(db, config, {
-        subject: claims.sub,
-        provider: "microsoft",
+        subject: handoff.identity.sub,
+        provider,
         channel: "mobile",
         logger,
       });
 
       switch (result.outcome) {
-        case "LOGIN_SUCCESS": {
-          const body = {
-            access_token: result.tokens.accessToken,
-            token_type: "Bearer" as const,
-            expires_in: result.tokens.accessExpiresInSeconds,
-            session_id: result.tokens.sessionId,
-            refresh_token: result.tokens.refreshToken,
-          };
-          return c.json(body, 200);
-        }
+        case "LOGIN_SUCCESS":
+          return c.json(
+            {
+              access_token: result.tokens.accessToken,
+              token_type: "Bearer" as const,
+              expires_in: result.tokens.accessExpiresInSeconds,
+              session_id: result.tokens.sessionId,
+              refresh_token: result.tokens.refreshToken,
+            },
+            200,
+          );
         case "NO_ACCOUNT":
           throw new CodedHttpException(
             403,
@@ -339,110 +235,40 @@ export function mobileOAuthRoutes(
             "Your school's account has been suspended. Contact your administrator.",
           );
       }
-    } catch (error) {
-      if (error instanceof CodedHttpException) throw error;
-      if (error instanceof HTTPException) {
-        throw new CodedHttpException(
-          502,
-          ERROR_CODES.OAUTH_PROVIDER_ERROR,
-          "Failed to exchange authorization code with Microsoft",
-        );
-      }
-      throw error;
+    });
+  }
+
+  // GET /api/auth/oauth/{provider}/mobile-authorize?state=&nonce=&code_challenge=[&login_hint=]
+  // Where the native app opens its system browser, for sign-in and invitation activation alike. The
+  // server — not the app — knows the registered client and redirect URI, so it builds the provider
+  // URL here; the provider then returns to the server's callback, which finishes the flow the state
+  // was minted for. A plain redirect route, not part of the OpenAPI contract. Nothing here is
+  // trusted: a mismatched state, nonce or challenge simply fails at the callback.
+  routes.get("/api/auth/oauth/:provider/mobile-authorize", (c) => {
+    const provider = c.req.param("provider");
+    if (!isMobileProvider(provider)) {
+      throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Unknown OAuth provider");
     }
-  });
-
-  // ----- Mock mobile routes (dev/E2E only, see file header) -----
-
-  routes.openapi(createMobileStartRoute("mock"), async (c) => {
-    if (!getMockOAuthConfig()) {
-      throw new HTTPException(404, { message: "Mock OAuth is not configured" });
-    }
-
-    const state = generateState();
-    const nonce = generateNonce();
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
-
-    await stateStore.set(state, { flow: "mobile-login", provider: "mock", codeVerifier, nonce });
-
-    return c.json({ state, nonce, code_challenge: codeChallenge }, 200);
-  });
-
-  routes.openapi(createMobileExchangeRoute("mock"), async (c) => {
-    const { code, state, nonce } = c.req.valid("json");
-    const mockConfig = getMockOAuthConfig();
-    if (!mockConfig) {
-      throw new HTTPException(404, { message: "Mock OAuth is not configured" });
-    }
-
-    const entry = await takeStateFor(stateStore, state, "mobile-login", "mock");
-    if (!entry) {
+    const state = c.req.query("state");
+    const nonce = c.req.query("nonce");
+    const codeChallenge = c.req.query("code_challenge");
+    if (!state || !nonce || !codeChallenge) {
       throw new CodedHttpException(
         400,
         ERROR_CODES.OAUTH_STATE_INVALID,
-        "Invalid or expired OAuth state",
+        "Missing state, nonce or code_challenge",
       );
     }
 
-    if (entry.nonce !== nonce) {
-      throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Nonce does not match");
-    }
-
-    try {
-      // The mock IdP's /token returns `access_token`, not `id_token` (see mock-route.ts's file
-      // header), so it gets its own exchange+validate pair rather than the google/microsoft
-      // id_token flow above.
-      const accessToken = await exchangeMockCode(mockConfig.issuer, code, entry.codeVerifier);
-      const claims = await validateMockIdToken(
-        accessToken,
-        mockConfig.issuer,
-        entry.nonce,
-        MOCK_JWKS_URI(mockConfig.issuer),
-      );
-
-      const result = await loginReturningUser(db, config, {
-        subject: claims.sub,
-        provider: "mock",
-        channel: "mobile",
-        logger,
-      });
-
-      switch (result.outcome) {
-        case "LOGIN_SUCCESS": {
-          const body = {
-            access_token: result.tokens.accessToken,
-            token_type: "Bearer" as const,
-            expires_in: result.tokens.accessExpiresInSeconds,
-            session_id: result.tokens.sessionId,
-            refresh_token: result.tokens.refreshToken,
-          };
-          return c.json(body, 200);
-        }
-        case "NO_ACCOUNT":
-          throw new CodedHttpException(
-            403,
-            ERROR_CODES.NO_ACCOUNT,
-            "No account found — ask your school admin for an invitation.",
-          );
-        case "SCHOOL_SUSPENDED":
-          throw new CodedHttpException(
-            403,
-            ERROR_CODES.SCHOOL_SUSPENDED,
-            "Your school's account has been suspended. Contact your administrator.",
-          );
-      }
-    } catch (error) {
-      if (error instanceof CodedHttpException) throw error;
-      if (error instanceof HTTPException) {
-        throw new CodedHttpException(
-          502,
-          ERROR_CODES.OAUTH_PROVIDER_ERROR,
-          "Failed to exchange authorization code with the mock provider",
-        );
-      }
-      throw error;
-    }
+    return c.redirect(
+      providerAuthorizationUrl(provider, {
+        state,
+        nonce,
+        codeChallenge,
+        loginHint: c.req.query("login_hint"),
+      }),
+      302,
+    );
   });
 
   return routes;
@@ -452,44 +278,75 @@ export function mobileOAuthRoutes(
 // Helpers
 // ---------------------------------------------------------------------------
 
-interface TokenExchangeConfig {
-  clientId: string;
-  clientSecret: string;
-  redirectUri: string;
+const MOBILE_PROVIDERS = ["google", "microsoft", "mock"] as const;
+type MobileProvider = (typeof MOBILE_PROVIDERS)[number];
+
+function isMobileProvider(provider: string): provider is MobileProvider {
+  return (MOBILE_PROVIDERS as readonly string[]).includes(provider);
 }
 
-async function exchangeCode(
-  code: string,
-  tokenEndpoint: string,
-  oauthConfig: TokenExchangeConfig,
-  codeVerifier: string,
-): Promise<string> {
-  let tokenResponse: Response;
-  try {
-    tokenResponse = await fetch(tokenEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: oauthConfig.clientId,
-        client_secret: oauthConfig.clientSecret,
-        redirect_uri: oauthConfig.redirectUri,
-        grant_type: "authorization_code",
-        code_verifier: codeVerifier,
-      }).toString(),
+function assertProviderConfigured(provider: MobileProvider): void {
+  const configured =
+    provider === "google"
+      ? getGoogleOAuthConfig()
+      : provider === "microsoft"
+        ? getMicrosoftOAuthConfig()
+        : getMockOAuthConfig();
+  if (!configured) {
+    throw new HTTPException(404, { message: `${provider} OAuth is not configured` });
+  }
+}
+
+/**
+ * The provider authorization URL for a native-app flow: the server's own client and registered
+ * redirect URI, so the provider returns to the server's callback (see mobile-handoff.ts).
+ */
+export function providerAuthorizationUrl(
+  provider: MobileProvider,
+  params: { state: string; nonce: string; codeChallenge: string; loginHint?: string | undefined },
+): string {
+  const shared = {
+    response_type: "code",
+    state: params.state,
+    nonce: params.nonce,
+    code_challenge: params.codeChallenge,
+    code_challenge_method: "S256",
+  };
+
+  if (provider === "google") {
+    const config = getGoogleOAuthConfig();
+    if (!config) throw new HTTPException(404, { message: "google OAuth is not configured" });
+    const query = new URLSearchParams({
+      ...shared,
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
+      scope: GOOGLE_SCOPES,
     });
-  } catch {
-    throw new HTTPException(502, { message: "Failed to reach IdP token endpoint" });
+    return `${GOOGLE_AUTH_ENDPOINT}?${query.toString()}`;
   }
 
-  if (!tokenResponse.ok) {
-    throw new HTTPException(502, { message: "Failed to exchange authorization code" });
+  if (provider === "microsoft") {
+    const config = getMicrosoftOAuthConfig();
+    if (!config) throw new HTTPException(404, { message: "microsoft OAuth is not configured" });
+    const query = new URLSearchParams({
+      ...shared,
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
+      scope: MICROSOFT_SCOPES,
+      response_mode: "query",
+    });
+    return `${MICROSOFT_AUTH_ENDPOINT}?${query.toString()}`;
   }
 
-  const tokenData = (await tokenResponse.json()) as { id_token?: string };
-  if (!tokenData.id_token) {
-    throw new HTTPException(502, { message: "IdP did not return an id_token" });
-  }
-
-  return tokenData.id_token;
+  const config = getMockOAuthConfig();
+  if (!config) throw new HTTPException(404, { message: "mock OAuth is not configured" });
+  const query = new URLSearchParams({
+    ...shared,
+    client_id: MOCK_OAUTH_CLIENT_ID,
+    redirect_uri: config.redirectUri,
+    scope: MOCK_OAUTH_SCOPES,
+  });
+  // The mock IdP has no account picker: login_hint selects which seeded persona signs in (dev/E2E).
+  if (params.loginHint) query.set("login_hint", params.loginHint);
+  return `${MOCK_AUTH_ENDPOINT(config.issuer)}?${query.toString()}`;
 }

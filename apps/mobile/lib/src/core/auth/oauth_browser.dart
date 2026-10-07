@@ -17,8 +17,9 @@ const _callbackPath = '/callback';
 /// filter brings the user back. Never an embedded webview, which Google and
 /// Microsoft both refuse to sign in.
 ///
-/// The redirect URI sent to the IdP must be `studafy://auth/callback` — the
-/// same scheme+host+path the listener expects.
+/// The IdP never sees `studafy://auth/callback`: it returns to the API's own
+/// callback, which then redirects the browser here with a one-time code (see
+/// `apps/api/src/modules/auth/oauth/mobile-handoff.ts`).
 class OAuthBrowser {
   OAuthBrowser({AppLinks? appLinks})
       : _appLinks = appLinks ?? AppLinks();
@@ -27,7 +28,7 @@ class OAuthBrowser {
 
   Completer<OAuthCallback>? _pending;
 
-  /// The redirect URI registered with the IdP.
+  /// The deep link the API's callback sends the browser back to.
   Uri get redirectUri => Uri(
         scheme: _callbackScheme,
         host: _callbackHost,

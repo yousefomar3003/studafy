@@ -9,12 +9,14 @@
  * Both are public (no bearer token required). The start endpoint generates state, nonce, and PKCE
  * parameters and stores them in the shared OAuth state store (state-store.ts) keyed by state.
  *
- * The callback is Google's one registered redirect URI, so it serves every browser flow that sends
- * a user to Google — not just login. After validating the state, exchanging the code, and verifying
- * the id_token, it dispatches on the entry's `flow`:
+ * The callback is Google's one registered redirect URI, so it serves every flow that sends a user
+ * to Google — not just login. After validating the state, exchanging the code, and verifying the
+ * id_token, it dispatches on the entry's `flow` (callback-flows.ts):
  *   - `login`      — finds the user via app.oauth_identities and issues a token pair
  *   - `activation` — activates the invitation the state was bound to (activation-oauth-routes.ts)
  *   - `link`       — links Google to the signed-in user who started the link (provider-link-routes.ts)
+ *   - `mobile-login` / `mobile-activation` — hands the verified identity to the native app through
+ *     its deep link (mobile-handoff.ts)
  *
  * These are browser-redirect endpoints, not JSON API endpoints, so they use plain Hono routes
  * rather than OpenAPI-typed routes. The primary responses are HTTP redirects, not JSON bodies.
@@ -28,23 +30,26 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { deliverTokenPair } from "../delivery";
-import { completeWebActivation } from "../routes/activation-oauth-routes";
-import { completeWebLink } from "../routes/provider-link-routes";
 import { findOAuthIdentity } from "../services/returning-user-login-service";
 import { issueTokenPair } from "../services/session-service";
 
+import {
+  cancelledRedirect,
+  failureRedirect,
+  finishFlow,
+  takeAuthorization,
+} from "./callback-flows";
 import {
   GOOGLE_AUTH_ENDPOINT,
   GOOGLE_TOKEN_ENDPOINT,
   GOOGLE_SCOPES,
   getGoogleOAuthConfig,
 } from "./config";
-import { oauthErrorUrl } from "./error-redirect";
 import { validateGoogleIdToken } from "./google-id-token";
 import { generateCodeChallenge, generateCodeVerifier, generateNonce, generateState } from "./pkce";
-import { isBrowserFlow } from "./state-store";
 
-import type { StateStore } from "./state-store";
+import type { CallbackContext } from "./callback-flows";
+import type { AuthorizationEntry, StateStore } from "./state-store";
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -107,21 +112,24 @@ export function googleOAuthRoutes(
 
   // GET /api/auth/oauth/google/callback
   // Google redirects here with code + state. We exchange the code, validate the id_token, and
-  // finish the flow the state was minted for.
+  // finish the flow the state was minted for (callback-flows.ts).
   routes.get("/api/auth/oauth/google/callback", async (c) => {
     const oauthConfig = getOAuthConfig();
     if (!oauthConfig) {
       throw new HTTPException(404, { message: "Google OAuth is not configured" });
     }
-    const frontendUrl = oauthConfig.frontendUrl ?? "/";
+    const ctx: CallbackContext = {
+      db,
+      sessionConfig: config,
+      logger,
+      stateStore,
+      provider: "google",
+      frontendUrl: oauthConfig.frontendUrl,
+    };
 
-    // The user declined Google's consent screen: Google bounces back with `error` and no `code`.
-    // Nothing is broken, so redirect to the frontend's friendly "cancelled" state rather than an
-    // error page.
-    if (c.req.query("error")) {
-      return c.redirect(oauthErrorUrl(frontendUrl, ERROR_CODES.OAUTH_CANCELLED), 302);
-    }
+    if (c.req.query("error")) return cancelledRedirect(c, ctx);
 
+    let entry: AuthorizationEntry | undefined;
     try {
       const code = c.req.query("code");
       const state = c.req.query("state");
@@ -134,15 +142,8 @@ export function googleOAuthRoutes(
         );
       }
 
-      // 1. Validate state — single use, and only a browser flow minted for Google.
-      const entry = await stateStore.take(state);
-      if (!entry || entry.provider !== "google" || !isBrowserFlow(entry.flow)) {
-        throw new CodedHttpException(
-          400,
-          ERROR_CODES.OAUTH_STATE_INVALID,
-          "Invalid or expired OAuth state",
-        );
-      }
+      // 1. Validate state — single use, and only an authorization minted for Google.
+      entry = await takeAuthorization(ctx, state);
 
       // 2. Exchange authorization code for tokens
       const idToken = await exchangeCode(code, oauthConfig, entry.codeVerifier);
@@ -150,35 +151,9 @@ export function googleOAuthRoutes(
       // 3. Validate id_token
       const claims = await validateIdToken(idToken, oauthConfig.clientId, entry.nonce);
 
-      // 4. Finish the flow this state belongs to.
-      if (entry.flow === "activation" && entry.token) {
-        return await completeWebActivation(
-          c,
-          { db, sessionConfig: config, logger },
-          {
-            provider: "google",
-            token: entry.token,
-            identity: claims,
-            frontendUrl: oauthConfig.frontendUrl,
-          },
-        );
-      }
-      if (entry.flow === "link" && entry.userId && entry.schoolId) {
-        return await completeWebLink(c, db, logger, {
-          provider: "google",
-          userId: entry.userId,
-          schoolId: entry.schoolId,
-          identity: claims,
-          frontendUrl: oauthConfig.frontendUrl,
-        });
-      }
-      if (entry.flow !== "login") {
-        throw new CodedHttpException(
-          400,
-          ERROR_CODES.OAUTH_STATE_INVALID,
-          "Invalid or expired OAuth state",
-        );
-      }
+      // 4. Finish an invitation, a link, or a native-app sign-in; a browser login continues below.
+      const finished = await finishFlow(c, ctx, entry, state, claims);
+      if (finished) return finished;
 
       const identity = await findOAuthIdentity(db, "google", claims.sub);
       if (!identity) {
@@ -204,24 +179,11 @@ export function googleOAuthRoutes(
 
       // 6. Set refresh cookie and redirect to frontend
       deliverTokenPair(c, issued);
-      const redirectUrl = new URL("/auth/callback", frontendUrl);
-
-      return c.redirect(redirectUrl.toString(), 302);
+      return c.redirect(new URL("/auth/callback", oauthConfig.frontendUrl ?? "/").toString(), 302);
     } catch (error) {
-      // The browser is mid-round-trip on a real tab: an authored failure (bad state, unknown
-      // account, unverified email, …) and an exchange-level failure (unreachable provider) both
-      // redirect to the frontend error page so the user sees guidance, never raw JSON at the API
-      // origin. Anything unexpected still propagates to the global error handler.
-      if (error instanceof CodedHttpException) {
-        return c.redirect(oauthErrorUrl(frontendUrl, error.code), 302);
-      }
-      if (error instanceof HTTPException) {
-        return c.redirect(oauthErrorUrl(frontendUrl, ERROR_CODES.OAUTH_PROVIDER_ERROR), 302);
-      }
-      throw error;
+      return failureRedirect(c, ctx, entry, error);
     }
   });
-
   return routes;
 }
 
