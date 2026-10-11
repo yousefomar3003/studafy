@@ -151,3 +151,34 @@ describe("production readiness of the ECS task definitions", () => {
     expect(prod).toMatch(/^API_ORIGIN=https:\/\/api\.studafy\.com$/m);
   });
 });
+
+describe("task-role storage permissions cover what the apps do", () => {
+  // Without these grants the feature fails only in a deployed tier (local S3 credentials are
+  // all-powerful), so a regression would surface as "Access Denied" in production, not in CI.
+  async function policyBlock(name: string): Promise<string> {
+    const tf = await readFile(
+      join(import.meta.dir, "..", "terraform", "modules", "compute", "main.tf"),
+      "utf8",
+    );
+    const start = tf.indexOf(`data "aws_iam_policy_document" "${name}"`);
+    expect(start).toBeGreaterThan(-1);
+    const end = tf.indexOf('\nresource "', start);
+    return tf.slice(start, end);
+  }
+
+  test("workers can scan, quarantine, derive, export and reconcile", async () => {
+    const policy = await policyBlock("workers_reports");
+    for (const prefix of ["permanent/*", "quarantine/*", "reports/*", "tenant-*/reports/*"]) {
+      expect(policy).toContain(`/${prefix}"`);
+    }
+    for (const action of ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]) {
+      expect(policy).toContain(`"${action}"`);
+    }
+  });
+
+  test("the API can download finance reports and count storage", async () => {
+    const policy = await policyBlock("api_storage");
+    expect(policy).toContain('/tenant-*/reports/*"');
+    expect(policy).toContain('"s3:ListBucket"');
+  });
+});
