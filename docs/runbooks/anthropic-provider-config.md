@@ -17,7 +17,8 @@ Code: `apps/api/src/modules/ai/llm/provider.ts`, `apps/api/src/modules/ai/llm/ro
 | Variable                    | Default                    | Purpose                                                                                                                                                                                                                  |
 | --------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `AI_LLM_ENABLED`            | `false`                    | Kill switch. `false` = the provider is **not constructed**, and every generate request answers `503 AI_LLM_DISABLED`.                                                                                                    |
-| `ANTHROPIC_API_KEY`         | —                          | Provider auth. Required when `AI_LLM_ENABLED=true` — the config refinement rejects the mismatch either way (key without the switch, switch without the key).                                                             |
+| `AI_LLM_PROVIDER`           | `anthropic`                | `anthropic` or `openai-compatible` (Together AI and the like). See [OpenAI-compatible providers](#openai-compatible-providers-together-ai).                                                                              |
+| `ANTHROPIC_API_KEY`         | —                          | Provider auth for `AI_LLM_PROVIDER=anthropic`. Required when `AI_LLM_ENABLED=true` — the config refinement rejects the mismatch either way (key without the switch, switch without the key).                             |
 | `AI_LLM_TIMEOUT_MS`         | `60_000`                   | Per-attempt HTTP timeout (range 1,000–300,000). Long-form large-tier generations (exam answers) can take tens of seconds; the default leaves headroom while staying far under the reverse proxy's 5-minute idle ceiling. |
 | `AI_LLM_MAX_ATTEMPTS`       | `3`                        | Total attempts per request (1 initial + retries) over transient failures (timeouts, network failures, 5xx, 429). A 4xx is never retried.                                                                                 |
 | `AI_LLM_MAX_TOKENS`         | `4,096`                    | Default output-token ceiling a `generate` call uses when the caller passes no `maxTokens` (range 1–16,384; the route always passes one).                                                                                 |
@@ -29,6 +30,37 @@ Code: `apps/api/src/modules/ai/llm/provider.ts`, `apps/api/src/modules/ai/llm/ro
 The model overrides accept a **partial** map: `AI_LLM_SMALL_MODEL=claude-haiku-4-5`
 re-tiers only the small tier, and an unset large tier stays on its catalog default. Set both when a
 deployment pins a specific Anthropic release for parity across surfaces.
+
+## OpenAI-compatible providers (Together AI)
+
+Deployed tiers run on **Together AI** (`infra/deploy/environments/<tier>.env`), not Anthropic:
+
+```bash
+AI_LLM_ENABLED=true
+AI_LLM_PROVIDER=openai-compatible        # default: anthropic
+AI_LLM_BASE_URL=https://api.together.xyz/v1
+AI_LLM_API_KEY=<Together AI key>         # api AND workers app secrets
+AI_LLM_SMALL_MODEL=Qwen/Qwen3.5-9B       # both required: the defaults are Claude ids
+AI_LLM_LARGE_MODEL=Qwen/Qwen3.5-9B
+```
+
+With `openai-compatible` the api and the exam-generation worker call `POST <base>/chat/completions`
+with a bearer token instead of `POST <base>/messages`; the retry loop, circuit breaker, failure
+taxonomy and secret scrubbing are unchanged (`apps/api/src/modules/ai/llm/openai-compatible.ts`).
+Differences to know about:
+
+- **Reasoning is switched off** (`reasoning: {enabled: false}`). Qwen 3.5 thinks by default, those
+  tokens count against `max_tokens`, and every surface's ceiling was sized for a direct answer. Any
+  `<think>` block that still comes back is dropped from the answer.
+- **No user identifier is sent**, so `AI_LLM_ZERO_RETENTION` has nothing to omit. Data retention is
+  whatever the Together AI account's privacy settings say
+  (`docs/compliance/childrens-data-dossier.md`, open item 7).
+- **Streamed usage** comes from the last chunk (`stream_options.include_usage`). If a provider never
+  reports it, the answer is metered at an estimate of four characters per token rather than zero.
+- **Cost figures** on the AI metrics dashboard and the cost report still use Claude prices
+  (`AI_COST_*` in `apps/api/src/modules/ai/config.ts`), so they overstate Together AI spend.
+- `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` are ignored. Switching back is
+  `AI_LLM_PROVIDER=anthropic` plus an Anthropic key; no code change.
 
 Circuit-breaker thresholds have **no env knobs** — they are constants in
 `apps/api/src/lib/circuit-breaker.ts` (default cooldown 30s), shared with the ERPNext client. The

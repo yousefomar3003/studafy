@@ -7,15 +7,15 @@ third-party AI, and obtain explicit permission before doing so.
 
 ## Who receives what
 
-Studafy's AI features are served by **Anthropic** (the only model provider: `apps/api`'s
+Studafy's AI features are served by **Together AI** (Qwen models, `AI_LLM_PROVIDER=openai-compatible`; the code can also call Anthropic, which is switched off: `apps/api`'s
 `modules/ai/llm/provider.ts`, and the exam-generation worker's `anthropic-client.ts`). The app never
-calls Anthropic directly — the API does, on the user's behalf. What reaches Anthropic:
+calls the provider directly — the API does, on the user's behalf. What reaches the provider:
 
 | Category (`AI_DATA_CATEGORIES`) | What it is                                                                                                   | Sent by                                                   |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
 | `questions`                     | Text the user types: Ask AI questions, `/generate` prompts                                                   | ask, generate                                             |
 | `study_materials`               | Extracted text of the materials a feature runs on (plus the title, for summaries) — may contain names or other personal details | summarize, concepts, explain, quizzes, decks, exams       |
-| `account_identifier`            | The user's opaque Studafy user id as `metadata.user_id` (abuse monitoring); never a name or email. Not sent when the deployment runs zero-retention (`AI_LLM_ZERO_RETENTION`, see `docs/runbooks/anthropic-provider-config.md`) | every model call |
+| `account_identifier`            | The user's opaque Studafy user id as `metadata.user_id` (abuse monitoring); never a name or email. Only sent to Anthropic, never to Together AI, and not when the deployment runs zero-retention (`AI_LLM_ZERO_RETENTION`, see `docs/runbooks/anthropic-provider-config.md`) | every model call |
 
 No prompt includes the student's name, email, grades, or attendance programmatically. Hybrid search
 (`/search`) uses a local deterministic embedder and never leaves Studafy.
@@ -60,7 +60,7 @@ other `app.*` table.
 
 ## Known limits
 
-- **Withdrawal is not retroactive.** Inputs already sent to Anthropic are not recalled, and Ask AI
+- **Withdrawal is not retroactive.** Inputs already sent to the AI provider are not recalled, and Ask AI
   history Studafy stores itself (`app.ai_messages`, 90-day retention) is not deleted on withdrawal.
   The withdrawal dialog says the first; deleting stored history is the DSR/account-deletion path.
 - **Consent is per user, given by that user.** There is no parental-consent step for minors. Whether

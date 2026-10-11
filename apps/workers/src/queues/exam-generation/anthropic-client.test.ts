@@ -82,6 +82,76 @@ describe("AnthropicClient.generate", () => {
   });
 });
 
+describe("AnthropicClient.generate with apiFormat: openai-compatible", () => {
+  const QWEN = "Qwen/Qwen3.5-9B";
+
+  test("requires a baseUrl", () => {
+    expect(() =>
+      createAnthropicClient({ apiKey: API_KEY, apiFormat: "openai-compatible" }),
+    ).toThrow(/baseUrl/);
+  });
+
+  test("posts a chat completion and returns the answer without any <think> block", async () => {
+    const { fetch, calls } = stubFetch(() =>
+      jsonResponse(
+        {
+          model: QWEN,
+          choices: [{ message: { content: '<think>hmm</think>\n{"items":[]}' } }],
+          usage: { prompt_tokens: 100, completion_tokens: 40 },
+        },
+        200,
+      ),
+    );
+    const client = createAnthropicClient({
+      apiKey: API_KEY,
+      apiFormat: "openai-compatible",
+      baseUrl: "https://api.together.xyz/v1/",
+      fetch,
+    });
+
+    const result = await client.generate({
+      model: QWEN,
+      system: "sys",
+      prompt: "go",
+      maxTokens: 900,
+    });
+
+    expect(result).toEqual({
+      content: '{"items":[]}',
+      usage: { inputTokens: 100, outputTokens: 40, totalTokens: 140 },
+    });
+    expect(calls[0]!.url).toBe("https://api.together.xyz/v1/chat/completions");
+    expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe(
+      `Bearer ${API_KEY}`,
+    );
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
+      model: QWEN,
+      max_tokens: 900,
+      messages: [
+        { role: "system", content: "sys" },
+        { role: "user", content: "go" },
+      ],
+      reasoning: { enabled: false },
+    });
+  });
+
+  test("keeps the failure taxonomy", async () => {
+    const { fetch } = stubFetch(() => jsonResponse({ error: { message: "busy" } }, 503));
+    const client = createAnthropicClient({
+      apiKey: API_KEY,
+      apiFormat: "openai-compatible",
+      baseUrl: "https://api.together.xyz/v1",
+      fetch,
+    });
+
+    const error = await client.generate({ model: QWEN, system: "s", prompt: "p" }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(AnthropicClientError);
+    expect(error.message).toBe("busy");
+    expect(isTransientAnthropicFailure(error)).toBe(true);
+  });
+});
+
 describe("isTransientAnthropicFailure", () => {
   test("treats timeout, network, 5xx and 429 as transient", () => {
     expect(isTransientAnthropicFailure(new AnthropicClientError("x", 504, "timeout"))).toBe(true);

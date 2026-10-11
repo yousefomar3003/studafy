@@ -109,12 +109,16 @@ const tapProvider =
 // which case the whole AI surface is already unmounted): the generate route still registers and
 // answers 503 AI_LLM_DISABLED. The per-school circuit breaker lives on `cb:ai` keys, is named for
 // its logs, and shares the provider's failure predicate so the breaker and the retry loop cannot
-// disagree on what "a failure" means.
+// disagree on what "a failure" means. AI_LLM_PROVIDER picks the wire format and with it which
+// credential and endpoint apply; env.ts has already required the matching pair.
+const aiLlmOpenAiCompatible = env.AI_LLM_PROVIDER === "openai-compatible";
+const aiLlmApiKey = aiLlmOpenAiCompatible ? env.AI_LLM_API_KEY : env.ANTHROPIC_API_KEY;
 const aiLlmProvider: LlmProvider | null =
-  env.AI_LLM_ENABLED && redis && env.ANTHROPIC_API_KEY
+  env.AI_LLM_ENABLED && redis && aiLlmApiKey
     ? createAnthropicProvider({
-        apiKey: env.ANTHROPIC_API_KEY,
-        baseUrl: env.ANTHROPIC_BASE_URL,
+        apiKey: aiLlmApiKey,
+        apiFormat: env.AI_LLM_PROVIDER,
+        baseUrl: aiLlmOpenAiCompatible ? env.AI_LLM_BASE_URL : env.ANTHROPIC_BASE_URL,
         timeoutMs: env.AI_LLM_TIMEOUT_MS,
         defaultMaxTokens: env.AI_LLM_MAX_TOKENS,
         zeroRetention: env.AI_LLM_ZERO_RETENTION,

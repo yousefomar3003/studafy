@@ -14,6 +14,11 @@
  * this "does a second service need apps/api's infra" question: its header comment explains that
  * extracting a shared logging package was deliberately left as a follow-up ticket rather than a
  * side effect of the feature that first needed it. See docs/rag/exam-mode.md.
+ *
+ * Like the API provider it also speaks an OpenAI-compatible chat-completions API (Together AI and the
+ * like) when `apiFormat` is "openai-compatible" (`AI_LLM_PROVIDER`): same request, same failure
+ * taxonomy, different wire format -- see apps/api/src/modules/ai/llm/openai-compatible.ts for why
+ * reasoning is switched off and why no user identifier is sent.
  */
 
 const DEFAULT_BASE_URL = "https://api.anthropic.com/v1";
@@ -63,6 +68,8 @@ export function isTransientAnthropicFailure(error: unknown): boolean {
 
 export interface AnthropicClientOptions {
   apiKey: string;
+  /** Wire format. Default "anthropic"; "openai-compatible" requires baseUrl. */
+  apiFormat?: "anthropic" | "openai-compatible";
   baseUrl?: string;
   timeoutMs?: number;
   fetch?: typeof globalThis.fetch;
@@ -87,6 +94,22 @@ function extractText(response: AnthropicMessageResponse): string {
     .join("");
 }
 
+interface OpenAiChatResponse {
+  choices?: { message?: { content?: string | null } }[];
+  usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
+}
+
+function openAiGeneration(response: OpenAiChatResponse): AnthropicGeneration {
+  const inputTokens = response.usage?.prompt_tokens ?? 0;
+  const outputTokens = response.usage?.completion_tokens ?? 0;
+  // Drop any inline <think> block a reasoning model left in front of its answer.
+  const content = (response.choices?.[0]?.message?.content ?? "").replace(
+    /^\s*<think>[\s\S]*?<\/think>\s*/,
+    "",
+  );
+  return { content, usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens } };
+}
+
 function extractErrorMessage(data: unknown): string {
   if (data && typeof data === "object") {
     const obj = data as { error?: { message?: unknown } };
@@ -96,6 +119,10 @@ function extractErrorMessage(data: unknown): string {
 }
 
 export function createAnthropicClient(options: AnthropicClientOptions) {
+  const openAiCompatible = options.apiFormat === "openai-compatible";
+  if (openAiCompatible && !options.baseUrl) {
+    throw new Error("An OpenAI-compatible LLM client needs a baseUrl");
+  }
   const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis);
@@ -106,21 +133,38 @@ export function createAnthropicClient(options: AnthropicClientOptions) {
 
     let response: Response;
     try {
-      response = await fetchFn(`${baseUrl}/messages`, {
-        method: "POST",
-        headers: {
-          "x-api-key": options.apiKey,
-          "anthropic-version": API_VERSION,
-          "content-type": "application/json",
+      response = await fetchFn(
+        openAiCompatible ? `${baseUrl}/chat/completions` : `${baseUrl}/messages`,
+        {
+          method: "POST",
+          headers: openAiCompatible
+            ? { authorization: `Bearer ${options.apiKey}`, "content-type": "application/json" }
+            : {
+                "x-api-key": options.apiKey,
+                "anthropic-version": API_VERSION,
+                "content-type": "application/json",
+              },
+          body: JSON.stringify(
+            openAiCompatible
+              ? {
+                  model: input.model,
+                  max_tokens: input.maxTokens ?? DEFAULT_MAX_TOKENS,
+                  messages: [
+                    { role: "system", content: input.system },
+                    { role: "user", content: input.prompt },
+                  ],
+                  reasoning: { enabled: false },
+                }
+              : {
+                  model: input.model,
+                  max_tokens: input.maxTokens ?? DEFAULT_MAX_TOKENS,
+                  system: input.system,
+                  messages: [{ role: "user", content: input.prompt }],
+                },
+          ),
+          signal: controller.signal,
         },
-        body: JSON.stringify({
-          model: input.model,
-          max_tokens: input.maxTokens ?? DEFAULT_MAX_TOKENS,
-          system: input.system,
-          messages: [{ role: "user", content: input.prompt }],
-        }),
-        signal: controller.signal,
-      });
+      );
     } catch (error) {
       clearTimeout(timeoutId);
       const aborted =
@@ -145,13 +189,15 @@ export function createAnthropicClient(options: AnthropicClientOptions) {
       throw new AnthropicClientError(extractErrorMessage(data), response.status, "http");
     }
 
-    let data: AnthropicMessageResponse;
+    let json: unknown;
     try {
-      data = (await response.json()) as AnthropicMessageResponse;
+      json = await response.json();
     } catch {
       throw new AnthropicClientError("AI provider returned an unreadable response", 503, "network");
     }
 
+    if (openAiCompatible) return openAiGeneration(json as OpenAiChatResponse);
+    const data = json as AnthropicMessageResponse;
     return { content: extractText(data), usage: usageFrom(data.usage) };
   }
 

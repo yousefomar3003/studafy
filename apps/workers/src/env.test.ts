@@ -25,6 +25,7 @@ describe("loadEnv", () => {
       ENTITLEMENT_BATCH_SIZE: 100,
       OCR_LOW_CONFIDENCE_THRESHOLD: 60,
       INGESTION_MAX_CONCURRENCY_PER_SCHOOL: 2,
+      AI_LLM_PROVIDER: "anthropic",
     });
   });
 
@@ -55,6 +56,7 @@ describe("loadEnv", () => {
       ENTITLEMENT_BATCH_SIZE: 100,
       OCR_LOW_CONFIDENCE_THRESHOLD: 60,
       INGESTION_MAX_CONCURRENCY_PER_SCHOOL: 2,
+      AI_LLM_PROVIDER: "anthropic",
     });
   });
 

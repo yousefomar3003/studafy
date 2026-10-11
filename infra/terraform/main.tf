@@ -180,8 +180,9 @@ module "secrets" {
       MICROSOFT_OAUTH_CLIENT_ID     = ""
       MICROSOFT_OAUTH_CLIENT_SECRET = ""
       TURNSTILE_SECRET_KEY          = ""
+      AI_LLM_API_KEY                = ""
     }
-    workers = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "" }
+    workers = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", AI_LLM_API_KEY = "" }
   }
 
   postgres_connection_secret_arn = module.postgres.connection_secret_arn

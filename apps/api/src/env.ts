@@ -214,15 +214,27 @@ export const envSchema = z
       .enum(["true", "false"])
       .optional()
       .transform((value) => value === "true"),
-    // Anthropic API key for the LLM gateway. Required by the refinement below when AI_LLM_ENABLED.
-    // Treated as a credential: never logged, and error payloads are scrubbed for its literal value.
-    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    // Which API the LLM gateway speaks: the Anthropic Messages API (ANTHROPIC_* below), or an
+    // OpenAI-compatible chat-completions host such as Together AI (AI_LLM_API_KEY / AI_LLM_BASE_URL).
+    // See docs/runbooks/anthropic-provider-config.md.
+    AI_LLM_PROVIDER: z.preprocess(
+      emptyAsUnset,
+      z.enum(["anthropic", "openai-compatible"]).default("anthropic"),
+    ),
+    // Anthropic API key for the LLM gateway. Required by the refinement below when AI_LLM_ENABLED
+    // with the anthropic provider. Treated as a credential: never logged, and error payloads are
+    // scrubbed for its literal value. The same holds for AI_LLM_API_KEY.
+    ANTHROPIC_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Override the Anthropic API endpoint (gateway/proxy). Defaults to https://api.anthropic.com/v1.
-    ANTHROPIC_BASE_URL: z.string().url().optional(),
+    ANTHROPIC_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Credential and API root (…/v1) for AI_LLM_PROVIDER=openai-compatible.
+    AI_LLM_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    AI_LLM_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
     // Model ids for the small and large routing tiers. Defaults are the catalog ids current when
-    // ST-164 shipped (modules/ai/config.ts); see docs/runbooks/anthropic-provider-config.md.
-    AI_LLM_SMALL_MODEL: z.string().min(1).optional(),
-    AI_LLM_LARGE_MODEL: z.string().min(1).optional(),
+    // ST-164 shipped (modules/ai/config.ts); see docs/runbooks/anthropic-provider-config.md. Those
+    // defaults are Claude ids, so the openai-compatible provider requires both to be set.
+    AI_LLM_SMALL_MODEL: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    AI_LLM_LARGE_MODEL: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Server default for max_tokens when a request omits it. Bounded to the route's ceiling so the
     // reservation math in config.ts (AI_LLM_MAX_RESERVE_TOKENS) stays valid.
     AI_LLM_MAX_TOKENS: z.coerce.number().int().min(1).max(16_384).optional(),
@@ -395,19 +407,34 @@ export const envSchema = z
     // LLM gateway: the kill switch is opt-in, but it must never be armed without a credential to
     // call — that would mount a route that only ever answers 503 AI_LLM_DISABLED while claiming to
     // be enabled.
-    if (env.AI_LLM_ENABLED && env.ANTHROPIC_API_KEY === undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["ANTHROPIC_API_KEY"],
-        message: "ANTHROPIC_API_KEY is required when AI_LLM_ENABLED is true",
-      });
+    const requiredForProvider =
+      env.AI_LLM_PROVIDER === "openai-compatible"
+        ? ([
+            "AI_LLM_API_KEY",
+            "AI_LLM_BASE_URL",
+            "AI_LLM_SMALL_MODEL",
+            "AI_LLM_LARGE_MODEL",
+          ] as const)
+        : (["ANTHROPIC_API_KEY"] as const);
+    if (env.AI_LLM_ENABLED) {
+      for (const key of requiredForProvider) {
+        if (env[key] === undefined) {
+          context.addIssue({
+            code: "custom",
+            path: [key],
+            message: `${key} is required when AI_LLM_ENABLED is true with AI_LLM_PROVIDER=${env.AI_LLM_PROVIDER}`,
+          });
+        }
+      }
     }
-    if (!env.AI_LLM_ENABLED && env.ANTHROPIC_API_KEY !== undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["ANTHROPIC_API_KEY"],
-        message: "ANTHROPIC_API_KEY is set but AI_LLM_ENABLED is not true",
-      });
+    for (const key of ["ANTHROPIC_API_KEY", "AI_LLM_API_KEY"] as const) {
+      if (!env.AI_LLM_ENABLED && env[key] !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is set but AI_LLM_ENABLED is not true`,
+        });
+      }
     }
 
     // Bucket and region activate storage. Access keys are optional because production uses an ECS

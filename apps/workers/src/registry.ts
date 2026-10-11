@@ -216,12 +216,23 @@ let anthropicClientInstance: AnthropicClient | null | undefined;
 
 function examAnthropicClient(): AnthropicClient | null {
   if (anthropicClientInstance === undefined) {
-    anthropicClientInstance = workerEnv.ANTHROPIC_API_KEY
-      ? createAnthropicClient({
-          apiKey: workerEnv.ANTHROPIC_API_KEY,
-          baseUrl: workerEnv.ANTHROPIC_BASE_URL,
-        })
-      : null;
+    if (workerEnv.AI_LLM_PROVIDER === "openai-compatible") {
+      anthropicClientInstance =
+        workerEnv.AI_LLM_API_KEY && workerEnv.AI_LLM_BASE_URL
+          ? createAnthropicClient({
+              apiKey: workerEnv.AI_LLM_API_KEY,
+              apiFormat: "openai-compatible",
+              baseUrl: workerEnv.AI_LLM_BASE_URL,
+            })
+          : null;
+    } else {
+      anthropicClientInstance = workerEnv.ANTHROPIC_API_KEY
+        ? createAnthropicClient({
+            apiKey: workerEnv.ANTHROPIC_API_KEY,
+            baseUrl: workerEnv.ANTHROPIC_BASE_URL,
+          })
+        : null;
+    }
   }
   return anthropicClientInstance;
 }

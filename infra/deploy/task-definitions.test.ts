@@ -119,6 +119,50 @@ describe("production readiness of the ECS task definitions", () => {
     }
   });
 
+  test("the API and workers get the AI provider settings and its key from their app secrets", async () => {
+    const api = (await renderNamed("api")).containerDefinitions[0]!;
+    expect(values(api.environment!)).toMatchObject({
+      AI_LLM_ENABLED: "<AI_LLM_ENABLED>",
+      AI_LLM_PROVIDER: "<AI_LLM_PROVIDER>",
+      AI_LLM_BASE_URL: "<AI_LLM_BASE_URL>",
+      AI_LLM_SMALL_MODEL: "<AI_LLM_SMALL_MODEL>",
+      AI_LLM_LARGE_MODEL: "<AI_LLM_LARGE_MODEL>",
+    });
+    expect(api.secrets).toContainEqual({
+      name: "AI_LLM_API_KEY",
+      valueFrom: "<API_APP_SECRETS_ARN>:AI_LLM_API_KEY::",
+    });
+
+    const workers = (await renderNamed("workers")).containerDefinitions.find(
+      (c) => c.name === "workers",
+    )!;
+    expect(values(workers.environment!)).toMatchObject({
+      AI_LLM_PROVIDER: "<AI_LLM_PROVIDER>",
+      AI_LLM_BASE_URL: "<AI_LLM_BASE_URL>",
+    });
+    expect(workers.secrets).toContainEqual({
+      name: "AI_LLM_API_KEY",
+      valueFrom: "<WORKERS_APP_SECRETS_ARN>:AI_LLM_API_KEY::",
+    });
+    const mainTf = await readFile(join(import.meta.dir, "..", "terraform", "main.tf"), "utf8");
+    expect(mainTf).toMatch(/workers = \{[^}]*\bAI_LLM_API_KEY = ""/);
+  });
+
+  test("every deploy tier sets each AI variable the task definitions reference", async () => {
+    for (const tier of ["dev", "staging", "prod"]) {
+      const env = await readFile(join(import.meta.dir, "environments", `${tier}.env`), "utf8");
+      for (const key of [
+        "AI_LLM_ENABLED",
+        "AI_LLM_PROVIDER",
+        "AI_LLM_BASE_URL",
+        "AI_LLM_SMALL_MODEL",
+        "AI_LLM_LARGE_MODEL",
+      ]) {
+        expect(env).toMatch(new RegExp(`^${key}=\\S+`, "m"));
+      }
+    }
+  });
+
   test("workers link emails to the web origin and scan through a healthy ClamAV sidecar", async () => {
     const task = await renderNamed("workers");
     const workers = task.containerDefinitions.find((c) => c.name === "workers")!;

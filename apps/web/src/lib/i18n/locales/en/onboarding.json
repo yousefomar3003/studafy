@@ -280,7 +280,7 @@
       "collectDiagnostics": "<strong>Crash and performance diagnostics.</strong> If the app crashes or performs poorly, technical details (device type, OS version, a stack trace) are sent to our crash-reporting vendors, identified only by your internal account id — never your name or email.",
       "collectContent": "<strong>Content you or your school upload.</strong> Photos taken for teaching materials, uploaded documents, and assignment submissions.",
       "collectBilling": "<strong>Billing history</strong> (parents/guardians only), if your school bills you through Studafy: invoice amounts and payment status. Card details are entered on our payment processor’s own page, never stored by Studafy.",
-      "collectAi": "<strong>Questions to the AI study tools</strong> (students), only after you agree to the in-app notice: your question and the related study material are sent to our AI provider, Anthropic, which processes them on our behalf to answer you.",
+      "collectAi": "<strong>Questions to the AI study tools</strong> (students), only after you agree to the in-app notice: your question and the related study material are sent to our AI provider, Together AI, which processes them on our behalf to answer you.",
       "collectContact": "Your name and email address come from your school, which sets up your account, and from your identity provider when you sign in. We use your email address to recognise your account at sign-in and to send account messages, such as a deletion confirmation. We do not collect your phone number.",
       "rightsHeading": "Your rights",
       "rightsIntro": "You can request a copy of your data, or request that it be deleted, at any time:",

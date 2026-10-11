@@ -27,7 +27,9 @@
         { "name": "S3_APP_FILES_BUCKET", "value": "${S3_APP_FILES_BUCKET}" },
         { "name": "AWS_REGION", "value": "${AWS_REGION}" },
         { "name": "FRONTEND_URL", "value": "${WEB_ORIGIN}" },
-        { "name": "CLAMAV_HOST", "value": "127.0.0.1" }
+        { "name": "CLAMAV_HOST", "value": "127.0.0.1" },
+        { "name": "AI_LLM_PROVIDER", "value": "${AI_LLM_PROVIDER}" },
+        { "name": "AI_LLM_BASE_URL", "value": "${AI_LLM_BASE_URL}" }
       ],
       "dependsOn": [{ "containerName": "clamav", "condition": "HEALTHY" }],
       "secrets": [
@@ -37,7 +39,8 @@
         { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" },
         { "name": "STRIPE_SECRET_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:STRIPE_SECRET_KEY::" },
         { "name": "TAP_SECRET_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_SECRET_KEY::" },
-        { "name": "TAP_WEBHOOK_URL", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" }
+        { "name": "TAP_WEBHOOK_URL", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" },
+        { "name": "AI_LLM_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:AI_LLM_API_KEY::" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "bun healthcheck.ts"],

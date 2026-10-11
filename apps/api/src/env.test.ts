@@ -26,6 +26,7 @@ describe("loadEnv", () => {
       AI_RERANK_ENABLED: false,
       AI_LLM_ENABLED: false,
       AI_LLM_ZERO_RETENTION: false,
+      AI_LLM_PROVIDER: "anthropic",
     });
   });
 
@@ -65,6 +66,7 @@ describe("loadEnv", () => {
       AI_RERANK_ENABLED: false,
       AI_LLM_ENABLED: false,
       AI_LLM_ZERO_RETENTION: false,
+      AI_LLM_PROVIDER: "anthropic",
     });
   });
 
@@ -243,6 +245,46 @@ describe("loadEnv", () => {
 
   test("rejects an ANTHROPIC_API_KEY that is set while the gateway is disabled", () => {
     expect(() => loadEnv({ ANTHROPIC_API_KEY: "sk-test" })).toThrow(EnvValidationError);
+  });
+
+  test("treats empty AI credentials as unset, as a deployment template injects them", () => {
+    const env = loadEnv({ ANTHROPIC_API_KEY: "", AI_LLM_API_KEY: "", AI_LLM_PROVIDER: "" });
+    expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(env.AI_LLM_API_KEY).toBeUndefined();
+    expect(env.AI_LLM_PROVIDER).toBe("anthropic");
+  });
+
+  describe("AI_LLM_PROVIDER=openai-compatible", () => {
+    const together = {
+      AI_LLM_ENABLED: "true",
+      AI_LLM_PROVIDER: "openai-compatible",
+      AI_LLM_API_KEY: "together-test-key",
+      AI_LLM_BASE_URL: "https://api.together.xyz/v1",
+      AI_LLM_SMALL_MODEL: "Qwen/Qwen3.5-9B",
+      AI_LLM_LARGE_MODEL: "Qwen/Qwen3.5-9B",
+    };
+
+    test("accepts a key, endpoint, and both model ids without an Anthropic key", () => {
+      const env = loadEnv(together);
+      expect(env.AI_LLM_PROVIDER).toBe("openai-compatible");
+      expect(env.AI_LLM_BASE_URL).toBe("https://api.together.xyz/v1");
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+    });
+
+    test.each(["AI_LLM_API_KEY", "AI_LLM_BASE_URL", "AI_LLM_SMALL_MODEL", "AI_LLM_LARGE_MODEL"])(
+      "requires %s once enabled (the default model ids are Claude ids)",
+      (key) => {
+        expect(() => loadEnv({ ...together, [key]: undefined })).toThrow(EnvValidationError);
+      },
+    );
+
+    test("rejects an AI_LLM_API_KEY that is set while the gateway is disabled", () => {
+      expect(() => loadEnv({ ...together, AI_LLM_ENABLED: "false" })).toThrow(EnvValidationError);
+    });
+
+    test("rejects an unknown provider", () => {
+      expect(() => loadEnv({ ...together, AI_LLM_PROVIDER: "openai" })).toThrow(EnvValidationError);
+    });
   });
 
   test("parses LLM gateway tuning variables", () => {

@@ -216,6 +216,7 @@ export {
   isTransientLlmFailure,
   LlmProviderError,
   type AnthropicProviderOptions,
+  type LlmApiFormat,
   type LlmFailureKind,
   type LlmGenerateInput,
   type LlmGeneration,

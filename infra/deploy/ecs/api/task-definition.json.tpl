@@ -37,7 +37,12 @@
         { "name": "FRONTEND_URL", "value": "${WEB_ORIGIN}" },
         { "name": "CORS_ALLOWED_ORIGINS", "value": "${WEB_ORIGIN}" },
         { "name": "GOOGLE_OAUTH_REDIRECT_URI", "value": "${API_ORIGIN}/api/auth/oauth/google/callback" },
-        { "name": "MICROSOFT_OAUTH_REDIRECT_URI", "value": "${API_ORIGIN}/api/auth/oauth/microsoft/callback" }
+        { "name": "MICROSOFT_OAUTH_REDIRECT_URI", "value": "${API_ORIGIN}/api/auth/oauth/microsoft/callback" },
+        { "name": "AI_LLM_ENABLED", "value": "${AI_LLM_ENABLED}" },
+        { "name": "AI_LLM_PROVIDER", "value": "${AI_LLM_PROVIDER}" },
+        { "name": "AI_LLM_BASE_URL", "value": "${AI_LLM_BASE_URL}" },
+        { "name": "AI_LLM_SMALL_MODEL", "value": "${AI_LLM_SMALL_MODEL}" },
+        { "name": "AI_LLM_LARGE_MODEL", "value": "${AI_LLM_LARGE_MODEL}" }
       ],
       "secrets": [
         { "name": "DATABASE_USER", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_username::" },
@@ -50,7 +55,8 @@
         { "name": "GOOGLE_OAUTH_CLIENT_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:GOOGLE_OAUTH_CLIENT_SECRET::" },
         { "name": "MICROSOFT_OAUTH_CLIENT_ID", "valueFrom": "${API_APP_SECRETS_ARN}:MICROSOFT_OAUTH_CLIENT_ID::" },
         { "name": "MICROSOFT_OAUTH_CLIENT_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:MICROSOFT_OAUTH_CLIENT_SECRET::" },
-        { "name": "TURNSTILE_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:TURNSTILE_SECRET_KEY::" }
+        { "name": "TURNSTILE_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:TURNSTILE_SECRET_KEY::" },
+        { "name": "AI_LLM_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:AI_LLM_API_KEY::" }
       ],
       "healthCheck": {
         "command": [

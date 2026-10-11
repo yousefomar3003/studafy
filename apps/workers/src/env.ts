@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+function emptyAsUnset(value: unknown): unknown {
+  return value === "" ? undefined : value;
+}
+
 /**
  * Environment configuration for the workers process. Parsed and validated once at bootstrap so
  * that an invalid environment fails fast — before any Redis connection is opened — with a named,
@@ -102,8 +106,17 @@ export const envSchema = z
     // specific generation job closed (app.exam_sessions marked 'failed' with a clear reason) the
     // same way a missing CLAMAV_HOST fails a scan job closed, just without CLAMAV_HOST's
     // production-required check -- there is no safety property at stake in leaving this feature off.
-    ANTHROPIC_API_KEY: z.string().min(1).optional(),
-    ANTHROPIC_BASE_URL: z.string().url().optional(),
+    // Empty counts as unset: the deployment template always injects these keys.
+    ANTHROPIC_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    ANTHROPIC_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // AI_LLM_PROVIDER=openai-compatible (Together AI and the like) uses AI_LLM_API_KEY and
+    // AI_LLM_BASE_URL instead -- the same variables, and the same provider, as apps/api.
+    AI_LLM_PROVIDER: z.preprocess(
+      emptyAsUnset,
+      z.enum(["anthropic", "openai-compatible"]).default("anthropic"),
+    ),
+    AI_LLM_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    AI_LLM_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;
