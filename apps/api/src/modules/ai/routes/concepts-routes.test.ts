@@ -397,10 +397,35 @@ describe("POST /api/ai/students/{studentId}/concepts", () => {
     expect(body.concepts[0]!.sources).toHaveLength(2);
   });
 
-  test("a concept the corpus does not contain answers 503 AI_CONCEPTS_GENERATION_FAILED", async () => {
+  test("a concept the corpus does not contain is dropped and the grounded rest is returned", async () => {
+    const content = JSON.stringify([
+      { name: "Photosynthesis", explanation: "Converts light energy.", source_ids: [1] },
+      { name: "Carbon dioxide fixation", explanation: "A paraphrase.", source_ids: [1] },
+      { name: "Cellular respiration", explanation: "Releases energy.", source_ids: [2] },
+    ]);
+    const handle = quotaHandle();
+    const app = buildConceptsApp({
+      provider: fakeProvider({ content }),
+      database: fakeDatabase({ material: readyMaterial, chunks: readyChunks() }).database,
+      handle,
+    });
+
+    const res = await postConcepts(app, { materialId: MATERIAL_ID });
+    const body = (await res.json()) as { concepts: { name: string }[] };
+
+    expect(res.status).toBe(200);
+    expect(body.concepts.map((concept) => concept.name)).toEqual([
+      "Photosynthesis",
+      "Cellular respiration",
+    ]);
+    expect(handle.commits).toHaveLength(1);
+  });
+
+  test("a generation mostly made of concepts the corpus does not contain answers 503 AI_CONCEPTS_GENERATION_FAILED", async () => {
     const content = JSON.stringify([
       { name: "Photosynthesis", explanation: "Converts light energy.", source_ids: [1] },
       { name: "Quantum entanglement", explanation: "Not in this material.", source_ids: [2] },
+      { name: "Plate tectonics", explanation: "Not in this material either.", source_ids: [1] },
     ]);
     const handle = quotaHandle();
     const app = buildConceptsApp({
