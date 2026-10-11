@@ -24,10 +24,16 @@ export const AI_QUOTA_PERIOD_GRACE_SECONDS = 300;
 /**
  * Default model ids for the LLM gateway (ST-164) small and large tiers. The routing table
  * (`llm/routing.ts`) owns the feature-to-tier mapping; these are the ids a deployment that sets no
- * `AI_LLM_SMALL_MODEL` / `AI_LLM_LARGE_MODEL` override gets. They are the catalog ids current when
- * ST-164 shipped — see docs/runbooks/anthropic-provider-config.md before changing them.
+ * `AI_LLM_SMALL_MODEL` / `AI_LLM_LARGE_MODEL` override gets — see
+ * docs/runbooks/anthropic-provider-config.md before changing them.
+ *
+ * Small tier: Claude Haiku 4.5, replacing Claude Haiku 3.5 (`claude-3-5-haiku-20241022`), which
+ * Anthropic retired on 2026-02-19. Haiku 4.5 does not think unless asked, so the small-tier
+ * features' output-token budgets carry over unchanged. Before moving the large tier to a model that
+ * always thinks (Claude Opus 5.5), re-size the large-tier budgets: thinking tokens count against
+ * `max_tokens`.
  */
-export const AI_LLM_DEFAULT_SMALL_MODEL = "claude-3-5-haiku-20241022";
+export const AI_LLM_DEFAULT_SMALL_MODEL = "claude-haiku-4-5";
 export const AI_LLM_DEFAULT_LARGE_MODEL = "claude-sonnet-4-20250514";
 
 /**
@@ -314,11 +320,11 @@ export const AI_EXAM_MAX_RESERVE_TOKENS = 25_000;
 // calculations; reconcile against the provider billing statement monthly.
 // ---------------------------------------------------------------------------
 
-/** Provider input cost per 1M tokens (USD) for the small tier (e.g. Claude 3.5 Haiku). */
-export const AI_COST_INPUT_PER_M_SMALL = 0.8;
+/** Provider input cost per 1M tokens (USD) for the small tier (Claude Haiku 4.5). */
+export const AI_COST_INPUT_PER_M_SMALL = 1.0;
 
 /** Provider output cost per 1M tokens (USD) for the small tier. */
-export const AI_COST_OUTPUT_PER_M_SMALL = 4.0;
+export const AI_COST_OUTPUT_PER_M_SMALL = 5.0;
 
 /** Provider input cost per 1M tokens (USD) for the large tier (e.g. Claude Sonnet 4). */
 export const AI_COST_INPUT_PER_M_LARGE = 3.0;

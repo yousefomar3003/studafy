@@ -3,27 +3,30 @@
 The provider is the wrapper around the Anthropic Messages API used by the LLM gateway
 (`docs/rag/llm-gateway-and-model-routing.md`). It owns the HTTP client shape, the retry loop, the
 per-school circuit breaker, and the zero-retention toggle. It talks to one region —
-`https://api.anthropic.com/v1` (version `2023-06-01`) — pinned at `claude-3-5-haiku-20241022`
-(small) / `claude-sonnet-4-20250514` (large) defaults.
+`https://api.anthropic.com/v1` (version `2023-06-01`) — pinned at `claude-haiku-4-5`
+(small) / `claude-sonnet-4-20250514` (large) defaults. The small tier moved off
+`claude-3-5-haiku-20241022` when Anthropic retired it (2026-02-19); the large tier is still on the
+deprecated Claude Sonnet 4 until its token budgets are re-sized for an always-thinking successor
+(see `AI_LLM_DEFAULT_SMALL_MODEL` in `config.ts`).
 
 Code: `apps/api/src/modules/ai/llm/provider.ts`, `apps/api/src/modules/ai/llm/routing.ts`,
 `apps/api/src/modules/ai/config.ts`.
 
 ## Environment variables
 
-| Variable                    | Default                     | Purpose                                                                                                                                                                                                                  |
-| --------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `AI_LLM_ENABLED`            | `false`                     | Kill switch. `false` = the provider is **not constructed**, and every generate request answers `503 AI_LLM_DISABLED`.                                                                                                    |
-| `ANTHROPIC_API_KEY`         | —                           | Provider auth. Required when `AI_LLM_ENABLED=true` — the config refinement rejects the mismatch either way (key without the switch, switch without the key).                                                             |
-| `AI_LLM_TIMEOUT_MS`         | `60_000`                    | Per-attempt HTTP timeout (range 1,000–300,000). Long-form large-tier generations (exam answers) can take tens of seconds; the default leaves headroom while staying far under the reverse proxy's 5-minute idle ceiling. |
-| `AI_LLM_MAX_ATTEMPTS`       | `3`                         | Total attempts per request (1 initial + retries) over transient failures (timeouts, network failures, 5xx, 429). A 4xx is never retried.                                                                                 |
-| `AI_LLM_MAX_TOKENS`         | `4,096`                     | Default output-token ceiling a `generate` call uses when the caller passes no `maxTokens` (range 1–16,384; the route always passes one).                                                                                 |
-| `AI_LLM_ZERO_RETENTION`     | `false`                     | When `true`, `metadata.user_id` is never sent — the one field Anthropic retains for abuse monitoring.                                                                                                                    |
-| `AI_LLM_SMALL_MODEL`        | `claude-3-5-haiku-20241022` | Overrides the small-tier model id.                                                                                                                                                                                       |
-| `AI_LLM_LARGE_MODEL`        | `claude-sonnet-4-20250514`  | Overrides the large-tier model id.                                                                                                                                                                                       |
-| `AI_LLM_MAX_RESERVE_TOKENS` | `24,000`                    | Quota reservation the generate route asks the gate to hold. See the gateway doc for the math.                                                                                                                            |
+| Variable                    | Default                    | Purpose                                                                                                                                                                                                                  |
+| --------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AI_LLM_ENABLED`            | `false`                    | Kill switch. `false` = the provider is **not constructed**, and every generate request answers `503 AI_LLM_DISABLED`.                                                                                                    |
+| `ANTHROPIC_API_KEY`         | —                          | Provider auth. Required when `AI_LLM_ENABLED=true` — the config refinement rejects the mismatch either way (key without the switch, switch without the key).                                                             |
+| `AI_LLM_TIMEOUT_MS`         | `60_000`                   | Per-attempt HTTP timeout (range 1,000–300,000). Long-form large-tier generations (exam answers) can take tens of seconds; the default leaves headroom while staying far under the reverse proxy's 5-minute idle ceiling. |
+| `AI_LLM_MAX_ATTEMPTS`       | `3`                        | Total attempts per request (1 initial + retries) over transient failures (timeouts, network failures, 5xx, 429). A 4xx is never retried.                                                                                 |
+| `AI_LLM_MAX_TOKENS`         | `4,096`                    | Default output-token ceiling a `generate` call uses when the caller passes no `maxTokens` (range 1–16,384; the route always passes one).                                                                                 |
+| `AI_LLM_ZERO_RETENTION`     | `false`                    | When `true`, `metadata.user_id` is never sent — the one field Anthropic retains for abuse monitoring.                                                                                                                    |
+| `AI_LLM_SMALL_MODEL`        | `claude-haiku-4-5`         | Overrides the small-tier model id.                                                                                                                                                                                       |
+| `AI_LLM_LARGE_MODEL`        | `claude-sonnet-4-20250514` | Overrides the large-tier model id.                                                                                                                                                                                       |
+| `AI_LLM_MAX_RESERVE_TOKENS` | `24,000`                   | Quota reservation the generate route asks the gate to hold. See the gateway doc for the math.                                                                                                                            |
 
-The model overrides accept a **partial** map: `AI_LLM_SMALL_MODEL=claude-haiku-4-5-20251001`
+The model overrides accept a **partial** map: `AI_LLM_SMALL_MODEL=claude-haiku-4-5`
 re-tiers only the small tier, and an unset large tier stays on its catalog default. Set both when a
 deployment pins a specific Anthropic release for parity across surfaces.
 
