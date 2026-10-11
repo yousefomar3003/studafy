@@ -66,7 +66,9 @@ jobs:
         with:
           terraform_version: 1.11.4
       - name: Read environment outputs
-        run: terraform init -reconfigure -backend-config=environments/${{ inputs.environment }}/backend.hcl
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+        run: terraform init -reconfigure -backend-config="environments/${DEPLOY_ENVIRONMENT}/backend.hcl"
         working-directory: infra/terraform
       - name: Build, push, and attest
         shell: bash
@@ -78,42 +80,54 @@ jobs:
           # sentryReleaseUploadEnabled (vite.config.ts) stays false and the build behaves exactly
           # like the unauthenticated containers.yml validation build.
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # Every workflow value the script below uses arrives as an environment variable and is
+          # only ever expanded inside double quotes -- never interpolated into the script text with
+          # ${{ }}, where a crafted value (an input, or an Environment variable anyone with settings
+          # access can edit) would be executed as shell (Semgrep run-shell-injection).
+          SERVICE: ${{ matrix.service }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          # Per-tier public endpoints and the Turnstile site key, baked into the static bundle.
+          # GitHub Environment variables, not secrets: all three end up in browser-visible JS. Left
+          # unset, the bundle would call http://localhost:3000 and show Cloudflare's always-pass test
+          # widget -- see infra/docker/web.Dockerfile and docs/runbooks/production-secrets.md.
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_REALTIME_BASE_URL: ${{ vars.VITE_REALTIME_BASE_URL }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
         run: |
-          repo=$(terraform -chdir=infra/terraform output -json registry_repository_urls | jq -r '.${{ matrix.service }}')
-          image="$repo:${{ inputs.tag }}"
+          repo=$(terraform -chdir=infra/terraform output -json registry_repository_urls | jq -r --arg s "$SERVICE" '.[$s]')
+          image="$repo:$RELEASE_TAG"
 
           # web's release build correlates every captured Sentry error to this same image tag and
           # uploads its source maps (see apps/web/src/lib/monitoring and infra/docker/web.Dockerfile);
           # no other service needs these build args.
           extra_build_args=()
-          if [ "${{ matrix.service }}" = "web" ]; then
+          if [ "$SERVICE" = "web" ]; then
             extra_build_args=(
-              --build-arg "VITE_RELEASE_VERSION=${{ inputs.tag }}"
-              --build-arg "VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}"
-              --build-arg "SENTRY_ORG=${{ vars.SENTRY_ORG }}"
-              --build-arg "SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}"
-              # Per-tier public endpoints and the Turnstile site key, baked into the static bundle.
-              # GitHub Environment variables, not secrets: all three end up in browser-visible JS.
-              # Left unset, the bundle would call http://localhost:3000 and show Cloudflare's
-              # always-pass test widget -- see infra/docker/web.Dockerfile and
-              # docs/runbooks/production-secrets.md.
-              --build-arg "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}"
-              --build-arg "VITE_REALTIME_BASE_URL=${{ vars.VITE_REALTIME_BASE_URL }}"
-              --build-arg "VITE_TURNSTILE_SITE_KEY=${{ vars.VITE_TURNSTILE_SITE_KEY }}"
+              --build-arg "VITE_RELEASE_VERSION=$RELEASE_TAG"
+              --build-arg "VITE_SENTRY_DSN=$VITE_SENTRY_DSN"
+              --build-arg "SENTRY_ORG=$SENTRY_ORG"
+              --build-arg "SENTRY_PROJECT=$SENTRY_PROJECT"
+              --build-arg "VITE_API_BASE_URL=$VITE_API_BASE_URL"
+              --build-arg "VITE_REALTIME_BASE_URL=$VITE_REALTIME_BASE_URL"
+              --build-arg "VITE_TURNSTILE_SITE_KEY=$VITE_TURNSTILE_SITE_KEY"
               --secret "id=sentry_auth_token,env=SENTRY_AUTH_TOKEN"
             )
           fi
 
           docker buildx build \
-            --file "infra/docker/${{ matrix.service }}.Dockerfile" \
+            --file "infra/docker/$SERVICE.Dockerfile" \
             --tag "$image" \
             --sbom=true \
             --provenance=mode=max \
             "${extra_build_args[@]}" \
             --push .
           digest=$(aws ecr describe-images \
-            --repository-name "studafy-${{ inputs.environment }}/${{ matrix.service }}" \
-            --image-ids imageTag=${{ inputs.tag }} \
+            --repository-name "studafy-$DEPLOY_ENVIRONMENT/$SERVICE" \
+            --image-ids "imageTag=$RELEASE_TAG" \
             --query 'imageDetails[0].imageDigest' --output text)
           key="awskms:///$(terraform -chdir=infra/terraform output -raw registry_signing_key_alias)"
           cosign sign --yes --key "$key" "$repo@$digest"
