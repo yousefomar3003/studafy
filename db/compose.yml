@@ -44,3 +44,48 @@ services:
     # large: 100,000 x 1536 float4 embeddings is ~600 MB of vectors before the HNSW graph is built.
     tmpfs:
       - /var/lib/postgresql/data:size=4g
+
+  # --- Local file uploads (profile "files") ---------------------------------------------------------
+  # Started by `bun run db:up` (which passes --profile files), not by CI's plain `docker compose up`,
+  # so the database/Redis CI jobs don't wait on a ClamAV signature load they never use.
+  # Production uses real S3 through the ECS task roles and a ClamAV sidecar in the workers task
+  # (infra/docker/clamav.Dockerfile); these two stand in for them on a developer machine.
+
+  # S3-compatible object storage for the app-files bucket. RustFS rather than MinIO: MinIO's free
+  # images are no longer published to Docker Hub or quay.io. The credentials are local-only and bound
+  # to 127.0.0.1 — they are deliberately committed, and the .env.example S3_* values match them.
+  # `bun run db:up` creates the studafy-files bucket and its browser CORS rule afterwards
+  # (apps/api/scripts/init-local-storage.ts).
+  s3:
+    image: rustfs/rustfs:1.0.1
+    profiles: ["files"]
+    environment:
+      RUSTFS_ACCESS_KEY: studafy-local
+      RUSTFS_SECRET_KEY: studafy-local-secret
+      RUSTFS_CONSOLE_ENABLE: "true"
+    ports:
+      - "127.0.0.1:9000:9000" # S3 API (S3_ENDPOINT)
+      - "127.0.0.1:9001:9001" # web console
+    volumes:
+      - s3-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # Malware scanner the workers' file-scan queue streams uploads through (CLAMAV_HOST=127.0.0.1).
+  # Same upstream version as the production sidecar image. The signature database is kept in a volume
+  # so only the first `db:up` downloads it; the upstream image's own healthcheck reports healthy once
+  # clamd has loaded it (about a minute the first time).
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["files"]
+    ports:
+      - "127.0.0.1:3310:3310"
+    volumes:
+      - clamav-db:/var/lib/clamav
+
+volumes:
+  s3-data:
+  clamav-db:

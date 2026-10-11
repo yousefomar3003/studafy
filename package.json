@@ -10,8 +10,8 @@
   "scripts": {
     "verify": "bun run format:check && bun run lint && bun run typecheck && bun run test && bun run build",
     "prepare": "lefthook install",
-    "db:up": "docker compose -f db/compose.yml up -d --wait",
-    "db:down": "docker compose -f db/compose.yml down",
+    "db:up": "docker compose -f db/compose.yml --profile files up -d --wait && bun apps/api/scripts/init-local-storage.ts",
+    "db:down": "docker compose -f db/compose.yml --profile files down",
     "ci:local": "bun run format:check && bunx turbo run lint check-types test build --filter=!@studafy/mobile && bash scripts/check-drift.sh",
     "ci:local:db": "bash scripts/ci-local-db.sh",
     "ci:local:containers": "bash scripts/ci-local-containers.sh",
