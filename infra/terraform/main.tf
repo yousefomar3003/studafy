@@ -164,8 +164,23 @@ module "secrets" {
   # the api and workers task definitions, so they must exist in both secrets. Empty means "Tap off"
   # (apps/api/src/env.ts, apps/workers' tap renewal job); supply real values through
   # TF_VAR_secrets_app_secret_values to turn Tap on. See docs/runbooks/tap-payments-setup.md.
+  #
+  # The sign-in and bot-check keys follow the same rule: the api task definition references all of
+  # them, so every key must exist even before a provider is set up. An empty client id means that
+  # provider's sign-in is off. TURNSTILE_SECRET_KEY is the exception in practice — apps/api refuses
+  # to boot with it empty when APP_ENV is staging or production, so a tier without a real Turnstile
+  # secret fails its deploy instead of silently accepting bots. Values come from the same
+  # TF_VAR_secrets_app_secret_values map; docs/runbooks/production-secrets.md lists them all.
   app_secret_defaults = {
-    api     = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "" }
+    api = {
+      TAP_SECRET_KEY                = ""
+      TAP_WEBHOOK_URL               = ""
+      GOOGLE_OAUTH_CLIENT_ID        = ""
+      GOOGLE_OAUTH_CLIENT_SECRET    = ""
+      MICROSOFT_OAUTH_CLIENT_ID     = ""
+      MICROSOFT_OAUTH_CLIENT_SECRET = ""
+      TURNSTILE_SECRET_KEY          = ""
+    }
     workers = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "" }
   }
 

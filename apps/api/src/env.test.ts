@@ -35,6 +35,7 @@ describe("loadEnv", () => {
         NODE_ENV: "test",
         APP_ENV: "staging",
         CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
+        TURNSTILE_SECRET_KEY: "turnstile-secret",
         PORT: "8080",
         HOST: "127.0.0.1",
         SHUTDOWN_TIMEOUT_MS: "5000",
@@ -46,6 +47,7 @@ describe("loadEnv", () => {
       NODE_ENV: "test",
       APP_ENV: "staging",
       CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
+      TURNSTILE_SECRET_KEY: "turnstile-secret",
       PORT: 8080,
       HOST: "127.0.0.1",
       METRICS_PORT: 9464,
@@ -122,9 +124,56 @@ describe("loadEnv", () => {
       loadEnv({
         APP_ENV: "production",
         CORS_ALLOWED_ORIGINS: " https://app.studafy.com , https://api.studafy.com ",
+        TURNSTILE_SECRET_KEY: "turnstile-secret",
         NODE_ENV: "development",
       }).CORS_ALLOWED_ORIGINS,
     ).toBe(" https://app.studafy.com , https://api.studafy.com ");
+  });
+
+  test("requires a Turnstile secret on every deployed tier, never in development", () => {
+    const deployed = { CORS_ALLOWED_ORIGINS: "https://app.studafy.com" };
+    expect(() => loadEnv({ ...deployed, APP_ENV: "staging" })).toThrow(EnvValidationError);
+    // The secret manager injects "" for a key nobody has supplied yet: still missing.
+    expect(() => loadEnv({ ...deployed, APP_ENV: "production", TURNSTILE_SECRET_KEY: "" })).toThrow(
+      EnvValidationError,
+    );
+    expect(
+      loadEnv({ ...deployed, APP_ENV: "production", TURNSTILE_SECRET_KEY: "s" })
+        .TURNSTILE_SECRET_KEY,
+    ).toBe("s");
+    expect(loadEnv({ APP_ENV: "development" }).TURNSTILE_SECRET_KEY).toBeUndefined();
+  });
+
+  test('treats a deployed tier with only OAuth redirect URIs as "provider off", not half-configured', () => {
+    // What a tier renders before anyone has pasted client credentials: redirect URIs from the API
+    // origin, and empty-string client id/secret from the secret manager defaults.
+    const env = loadEnv({
+      GOOGLE_OAUTH_REDIRECT_URI: "https://api.studafy.com/api/auth/oauth/google/callback",
+      GOOGLE_OAUTH_CLIENT_ID: "",
+      GOOGLE_OAUTH_CLIENT_SECRET: "",
+      MICROSOFT_OAUTH_REDIRECT_URI: "https://api.studafy.com/api/auth/oauth/microsoft/callback",
+      MICROSOFT_OAUTH_CLIENT_ID: "",
+      MICROSOFT_OAUTH_CLIENT_SECRET: "",
+    });
+    expect(env.GOOGLE_OAUTH_CLIENT_ID).toBeUndefined();
+    expect(env.MICROSOFT_OAUTH_CLIENT_SECRET).toBeUndefined();
+  });
+
+  test("requires all three OAuth values once a client id or secret is set", () => {
+    expect(() => loadEnv({ GOOGLE_OAUTH_CLIENT_ID: "id" })).toThrow(EnvValidationError);
+    expect(() =>
+      loadEnv({
+        MICROSOFT_OAUTH_CLIENT_SECRET: "secret",
+        MICROSOFT_OAUTH_REDIRECT_URI: "https://a.b/c",
+      }),
+    ).toThrow(EnvValidationError);
+    expect(
+      loadEnv({
+        GOOGLE_OAUTH_CLIENT_ID: "id",
+        GOOGLE_OAUTH_CLIENT_SECRET: "secret",
+        GOOGLE_OAUTH_REDIRECT_URI: "https://api.studafy.com/api/auth/oauth/google/callback",
+      }).GOOGLE_OAUTH_CLIENT_ID,
+    ).toBe("id");
   });
 
   test("throws for an unknown LOG_LEVEL", () => {

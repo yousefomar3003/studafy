@@ -80,4 +80,16 @@ export "${SERVICE_UPPER}_IMAGE=${REPO_URL}:${IMAGE_TAG}"
 export "${SERVICE_UPPER}_APP_SECRETS_ARN=${SECRET_ARN}"
 export "${SERVICE_UPPER}_METRICS_SD_ARN=${METRICS_SD_ARN}"
 
+# The workers task runs a ClamAV sidecar (infra/docker/clamav.Dockerfile) — release.yml builds and
+# pushes it under the same tag as every other image in the release, so it is rendered alongside the
+# workers image rather than pinned separately.
+if [ "$SERVICE" = "workers" ]; then
+  CLAMAV_REPO_URL="$(terraform -chdir="$TF_DIR" output -json registry_repository_urls | jq -r '.clamav')"
+  if [ "$CLAMAV_REPO_URL" = "null" ] || [ -z "$CLAMAV_REPO_URL" ]; then
+    echo "no ECR repository for 'clamav' in registry_repository_urls (needed by the workers sidecar)" >&2
+    exit 1
+  fi
+  export CLAMAV_IMAGE="${CLAMAV_REPO_URL}:${IMAGE_TAG}"
+fi
+
 envsubst < "$TEMPLATE"

@@ -55,3 +55,99 @@ describe("attendance report ECS task definitions", () => {
     expect(values(container.secrets)).toHaveProperty("DATABASE_CA_CERT");
   });
 });
+
+interface FullTaskDefinition {
+  containerDefinitions: {
+    name: string;
+    image?: string;
+    essential?: boolean;
+    environment?: { name: string; value: string }[];
+    secrets?: { name: string; valueFrom: string }[];
+    dependsOn?: { containerName: string; condition: string }[];
+    healthCheck?: { command: string[]; startPeriod?: number };
+  }[];
+}
+
+/** Renders like render.sh does: every ${VAR} replaced, here with its own name so values are traceable. */
+async function renderNamed(service: "api" | "workers"): Promise<FullTaskDefinition> {
+  const template = await readFile(
+    join(import.meta.dir, "ecs", service, "task-definition.json.tpl"),
+    "utf8",
+  );
+  return JSON.parse(
+    template.replaceAll(/\$\{([A-Z0-9_]+)\}/g, (_, name: string) => `<${name}>`),
+  ) as FullTaskDefinition;
+}
+
+describe("production readiness of the ECS task definitions", () => {
+  test("the API gets its tier, web origin, CORS allowlist and OAuth redirect URIs", async () => {
+    const api = (await renderNamed("api")).containerDefinitions[0]!;
+    expect(values(api.environment!)).toMatchObject({
+      APP_ENV: "<APP_ENV>",
+      FRONTEND_URL: "<WEB_ORIGIN>",
+      CORS_ALLOWED_ORIGINS: "<WEB_ORIGIN>",
+      GOOGLE_OAUTH_REDIRECT_URI: "<API_ORIGIN>/api/auth/oauth/google/callback",
+      MICROSOFT_OAUTH_REDIRECT_URI: "<API_ORIGIN>/api/auth/oauth/microsoft/callback",
+    });
+  });
+
+  test("the API reads sign-in and bot-check credentials from its app secret", async () => {
+    const api = (await renderNamed("api")).containerDefinitions[0]!;
+    const secrets = Object.fromEntries(api.secrets!.map((s) => [s.name, s.valueFrom]));
+    for (const key of [
+      "GOOGLE_OAUTH_CLIENT_ID",
+      "GOOGLE_OAUTH_CLIENT_SECRET",
+      "MICROSOFT_OAUTH_CLIENT_ID",
+      "MICROSOFT_OAUTH_CLIENT_SECRET",
+      "TURNSTILE_SECRET_KEY",
+    ]) {
+      expect(secrets[key]).toBe(`<API_APP_SECRETS_ARN>:${key}::`);
+    }
+  });
+
+  test("every key the API reads from its app secret exists there by default", async () => {
+    // ECS refuses to start a task whose secret references a JSON key that isn't present, so each
+    // key must be seeded by app_secret_defaults (or be deliberately required from TF_VAR).
+    const api = (await renderNamed("api")).containerDefinitions[0]!;
+    const keys = api
+      .secrets!.filter((s) => s.valueFrom.startsWith("<API_APP_SECRETS_ARN>:"))
+      .map((s) => s.valueFrom.split(":")[1]!);
+    const mainTf = await readFile(join(import.meta.dir, "..", "terraform", "main.tf"), "utf8");
+    const defaults = /app_secret_defaults = \{\s*api = \{([\s\S]*?)\}/.exec(mainTf)?.[1] ?? "";
+    for (const key of keys) {
+      expect(defaults).toMatch(new RegExp(`\\b${key}\\s*=\\s*""`));
+    }
+  });
+
+  test("workers link emails to the web origin and scan through a healthy ClamAV sidecar", async () => {
+    const task = await renderNamed("workers");
+    const workers = task.containerDefinitions.find((c) => c.name === "workers")!;
+    const clamav = task.containerDefinitions.find((c) => c.name === "clamav")!;
+
+    expect(values(workers.environment!)).toMatchObject({
+      FRONTEND_URL: "<WEB_ORIGIN>",
+      CLAMAV_HOST: "127.0.0.1",
+    });
+    // No scan may run before clamd has loaded its signatures.
+    expect(workers.dependsOn).toEqual([{ containerName: "clamav", condition: "HEALTHY" }]);
+
+    expect(clamav.image).toBe("<CLAMAV_IMAGE>");
+    expect(clamav.essential).toBe(true);
+    // The upstream clamdcheck.sh dials `localhost` (::1) and never sees clamd's 127.0.0.1 bind.
+    expect(clamav.healthCheck!.command).toEqual(["CMD-SHELL", "studafy-clamdcheck.sh"]);
+    expect(clamav.healthCheck!.startPeriod).toBeGreaterThanOrEqual(120);
+  });
+
+  test("every deploy tier defines the values these templates render", async () => {
+    for (const tier of ["dev", "staging", "prod"]) {
+      const env = await readFile(join(import.meta.dir, "environments", `${tier}.env`), "utf8");
+      for (const name of ["APP_ENV", "WEB_ORIGIN", "API_ORIGIN"]) {
+        expect(env).toMatch(new RegExp(`^${name}=\\S+`, "m"));
+      }
+    }
+    const prod = await readFile(join(import.meta.dir, "environments", "prod.env"), "utf8");
+    expect(prod).toMatch(/^APP_ENV=production$/m);
+    expect(prod).toMatch(/^WEB_ORIGIN=https:\/\/app\.studafy\.com$/m);
+    expect(prod).toMatch(/^API_ORIGIN=https:\/\/api\.studafy\.com$/m);
+  });
+});

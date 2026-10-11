@@ -27,12 +27,16 @@ ENV VITE_RELEASE_VERSION=${VITE_RELEASE_VERSION} \
     VITE_SENTRY_DSN=${VITE_SENTRY_DSN} \
     SENTRY_ORG=${SENTRY_ORG} \
     SENTRY_PROJECT=${SENTRY_PROJECT}
-# Endpoint/feature overrides for builds outside the ECS release path (the root compose.yml local
-# stack passes all three). Deliberately ARG-only, not ENV: apps/web/src/lib/config.ts falls back with
-# `??`, which an empty-string ENV would defeat, so the build RUN below unsets any left empty.
+# Endpoint/feature overrides. release.yml passes the API, realtime and Turnstile values per tier from
+# its GitHub Environment variables; the root compose.yml local stack passes the first three.
+# Deliberately ARG-only, not ENV: apps/web/src/lib/config.ts falls back with `??`, which an
+# empty-string ENV would defeat, so the build RUN below unsets any left empty. An unset
+# VITE_TURNSTILE_SITE_KEY falls back to Cloudflare's always-pass test key, which a deployed tier must
+# never ship: apps/api rejects that key's tokens once a real TURNSTILE_SECRET_KEY is set.
 ARG VITE_API_BASE_URL
 ARG VITE_REALTIME_BASE_URL
 ARG VITE_ENABLE_MOCK_AUTH
+ARG VITE_TURNSTILE_SITE_KEY
 
 # See infra/docker/api.Dockerfile for why this is a single COPY rather than a manifest-first split.
 COPY . .
@@ -74,6 +78,7 @@ RUN --mount=type=secret,id=sentry_auth_token \
     [ -n "$VITE_API_BASE_URL" ] || unset VITE_API_BASE_URL; \
     [ -n "$VITE_REALTIME_BASE_URL" ] || unset VITE_REALTIME_BASE_URL; \
     [ -n "$VITE_ENABLE_MOCK_AUTH" ] || unset VITE_ENABLE_MOCK_AUTH; \
+    [ -n "$VITE_TURNSTILE_SITE_KEY" ] || unset VITE_TURNSTILE_SITE_KEY; \
     bunx turbo run build --filter=@studafy/web
 
 FROM nginx:${NGINX_VERSION} AS runtime

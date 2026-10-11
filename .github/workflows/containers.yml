@@ -57,6 +57,14 @@ jobs:
             dockerfile: infra/docker/web.Dockerfile
             max_mb: 120
             trivy_exit_code: "1"
+          # The workers' malware-scanning sidecar: our clamd settings layered on the unmodified
+          # upstream clamav/clamav image, so -- like erpnext below -- its scan is report-only. The
+          # budget leaves room for the bundled signature database, which CI's overlay2 store
+          # measures larger than a local Docker Desktop build does.
+          - service: clamav
+            dockerfile: infra/docker/clamav.Dockerfile
+            max_mb: 600
+            trivy_exit_code: "0"
           # 3072 (not 2500) because the real image, as CI's classic overlay2 Docker measures it,
           # runs ~2683MB: full frappe/erpnext bench + the education app. Local Docker Desktop
           # builds under-report this (containerd snapshotter image store dedups/sizes differently
