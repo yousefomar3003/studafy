@@ -118,8 +118,8 @@ function tenantFrom(c: Context<AppEnv>) {
 }
 
 function status(consent: AiDataSharingConsent | null) {
-  const { dataCategories, ...disclosure } = AI_DATA_SHARING_DISCLOSURE;
-  return { disclosure: { ...disclosure, dataCategories: [...dataCategories] }, consent };
+  const { version, provider, dataCategories } = AI_DATA_SHARING_DISCLOSURE;
+  return { disclosure: { version, provider, dataCategories: [...dataCategories] }, consent };
 }
 
 export function aiConsentRoutes(deps: { database: Database }): OpenAPIHono<AppEnv> {

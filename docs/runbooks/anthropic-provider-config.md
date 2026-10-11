@@ -59,6 +59,10 @@ Differences to know about:
   alone — and the parsers unwrap it (`apps/api/src/modules/ai/llm/json-output.ts`). Verified live
   on 2026-10-11 with each surface's real prompt: 6/6 quiz questions, 8/8 cards, 10/10 exam items,
   every run.
+- **The AI consent notice names Together AI** (`apps/api/src/modules/ai/consent/disclosure.ts`,
+  version `2026-10-11`; every student is asked to agree again). Its `llmProvider` must match
+  `AI_LLM_PROVIDER` — the api refuses to boot with AI on otherwise — so switching provider means
+  a new disclosure and version.
 - **No user identifier is sent**, so `AI_LLM_ZERO_RETENTION` has nothing to omit. Data retention is
   whatever the Together AI account's privacy settings say
   (`docs/compliance/childrens-data-dossier.md`, open item 7).

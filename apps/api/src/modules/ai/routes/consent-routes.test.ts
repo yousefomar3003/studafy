@@ -103,7 +103,7 @@ function liveRow(version: string): ConsentRow {
   return {
     id: CONSENT_ID,
     disclosure_version: version,
-    provider: "anthropic",
+    provider: "together",
     data_categories: ["questions"],
     granted_at: new Date("2026-01-01T00:00:00Z"),
     withdrawn_at: null,
@@ -153,12 +153,9 @@ describe("GET /api/ai/consent", () => {
     expect(res.status).toBe(200);
     const body = await statusBody(res);
     expect(body.consent).toBeNull();
-    expect(body.disclosure.provider.name).toBe("Anthropic");
-    expect(body.disclosure.dataCategories).toEqual([
-      "questions",
-      "study_materials",
-      "account_identifier",
-    ]);
+    expect(body.disclosure.provider.name).toBe("Together AI");
+    expect(body.disclosure).not.toHaveProperty("llmProvider");
+    expect(body.disclosure.dataCategories).toEqual(["questions", "study_materials"]); // Together AI receives no user identifier;
   });
 
   test("treats a live consent to an older disclosure version as no consent", async () => {
@@ -182,7 +179,7 @@ describe("PUT /api/ai/consent", () => {
     expect(res.status).toBe(200);
     const body = await statusBody(res);
     expect(body.consent?.disclosureVersion).toBe(AI_DATA_SHARING_DISCLOSURE.version);
-    expect(body.consent?.provider).toBe("anthropic");
+    expect(body.consent?.provider).toBe("together");
     expect(rows).toHaveLength(1);
     expect(audits).toEqual([
       { action: "insert", table: "ai_data_sharing_consents", targetId: CONSENT_ID },

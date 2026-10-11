@@ -47,6 +47,22 @@ describe("isConceptGrounded", () => {
     expect(isConceptGrounded("photosynthesis converts", [1], [wrapped])).toBe(true);
   });
 
+  test("a concept named after its cited chunk's section heading is grounded", () => {
+    const headed = [
+      {
+        ...chunk(
+          "Net productivity depends on light intensity, temperature, and CO2 concentration.",
+        ),
+        sectionTitle: "Limiting Factors",
+      },
+    ];
+    expect(isConceptGrounded("Limiting factors", [1], headed)).toBe(true);
+    // The heading only grounds concepts that cite its own chunk.
+    expect(isConceptGrounded("Limiting factors", [2], [...headed, chunk("Other text.")])).toBe(
+      false,
+    );
+  });
+
   test("a citation outside the chunk set never grounds a concept", () => {
     expect(isConceptGrounded("Photosynthesis", [9], chunks)).toBe(false);
   });

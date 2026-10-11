@@ -9,6 +9,7 @@ import { createStorageService } from "./lib/storage";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
 import {
+  AI_DATA_SHARING_DISCLOSURE,
   createAnthropicProvider,
   isTransientLlmFailure,
   type AiModelTier,
@@ -111,6 +112,16 @@ const tapProvider =
 // its logs, and shares the provider's failure predicate so the breaker and the retry loop cannot
 // disagree on what "a failure" means. AI_LLM_PROVIDER picks the wire format and with it which
 // credential and endpoint apply; env.ts has already required the matching pair.
+// The consent modal names the company the inputs go to (modules/ai/consent/disclosure.ts). With AI on,
+// a provider the disclosure does not describe would have students agree to the wrong company, so
+// that is a boot failure, not a warning.
+if (env.AI_LLM_ENABLED && env.AI_LLM_PROVIDER !== AI_DATA_SHARING_DISCLOSURE.llmProvider) {
+  throw new Error(
+    `AI_LLM_PROVIDER=${env.AI_LLM_PROVIDER} but the AI consent disclosure describes ` +
+      `${AI_DATA_SHARING_DISCLOSURE.llmProvider} (${AI_DATA_SHARING_DISCLOSURE.provider.name}); ` +
+      "update modules/ai/consent/disclosure.ts and bump its version",
+  );
+}
 const aiLlmOpenAiCompatible = env.AI_LLM_PROVIDER === "openai-compatible";
 const aiLlmApiKey = aiLlmOpenAiCompatible ? env.AI_LLM_API_KEY : env.ANTHROPIC_API_KEY;
 const aiLlmProvider: LlmProvider | null =
