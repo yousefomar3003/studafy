@@ -20,6 +20,17 @@ export class ExamGenerationInvalidError extends Error {
   }
 }
 
+/**
+ * The prompt asks for a top-level array, but an OpenAI-compatible host in JSON mode only allows an
+ * object, so the model wraps the list under a key of its own (`{"items": [...]}`). Same rule as
+ * apps/api/src/modules/ai/llm/json-output.ts: a one-key object holding an array is read as that array.
+ */
+function unwrapJsonList(parsed: unknown): unknown {
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return parsed;
+  const values = Object.values(parsed);
+  return values.length === 1 && Array.isArray(values[0]) ? values[0] : parsed;
+}
+
 /** Strip a ```json fenced block if the model wrapped its answer in one despite being told not to. */
 function stripCodeFence(text: string): string {
   const trimmed = text.trim();
@@ -34,7 +45,7 @@ function stripCodeFence(text: string): string {
 export function parseExamGeneration(raw: string, sourceCount: number): ExamGeneration {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripCodeFence(raw));
+    parsed = unwrapJsonList(JSON.parse(stripCodeFence(raw)));
   } catch {
     throw new ExamGenerationInvalidError("exam generation response was not valid JSON");
   }

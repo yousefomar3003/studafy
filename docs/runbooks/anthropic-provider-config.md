@@ -52,6 +52,13 @@ Differences to know about:
 - **Reasoning is switched off** (`reasoning: {enabled: false}`). Qwen 3.5 thinks by default, those
   tokens count against `max_tokens`, and every surface's ceiling was sized for a direct answer. Any
   `<think>` block that still comes back is dropped from the answer.
+- **JSON mode for the JSON surfaces** (concepts, flashcards, quiz, exam: `json: true` on the
+  generate call). Unprompted, Qwen 3.5 dropped a closing bracket in about one answer in five; JSON
+  mode guarantees well-formed JSON. It only allows an object at the top level, so the user turn
+  asks for the array inside `{"items": [...]}` — without that Qwen answers with the first element
+  alone — and the parsers unwrap it (`apps/api/src/modules/ai/llm/json-output.ts`). Verified live
+  on 2026-10-11 with each surface's real prompt: 6/6 quiz questions, 8/8 cards, 10/10 exam items,
+  every run.
 - **No user identifier is sent**, so `AI_LLM_ZERO_RETENTION` has nothing to omit. Data retention is
   whatever the Together AI account's privacy settings say
   (`docs/compliance/childrens-data-dossier.md`, open item 7).

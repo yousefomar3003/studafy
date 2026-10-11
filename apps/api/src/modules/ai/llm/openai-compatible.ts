@@ -25,6 +25,15 @@ import type { LlmGenerateInput, LlmUsage } from "./provider";
 
 export const OPENAI_COMPATIBLE_PATH = "/chat/completions";
 
+/**
+ * Appended to the user turn in JSON mode. JSON mode only allows an object at the top level, and every
+ * JSON surface's prompt asks for an array; told nothing, Qwen 3.5 answers with the array's first
+ * element alone and silently drops the rest. Naming the envelope keeps the whole list, and
+ * ./json-output.ts unwraps it.
+ */
+export const JSON_MODE_ENVELOPE =
+  '\n\nReturn that array wrapped in a JSON object under the single key "items": {"items": [ ... ]}.';
+
 export interface OpenAiUsage {
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -54,7 +63,10 @@ export function openAiRequestBody(
 ): Record<string, unknown> {
   const messages: { role: "system" | "user"; content: string }[] = [];
   if (input.system) messages.push({ role: "system", content: input.system });
-  messages.push({ role: "user", content: input.prompt });
+  messages.push({
+    role: "user",
+    content: input.json ? input.prompt + JSON_MODE_ENVELOPE : input.prompt,
+  });
   return {
     model: input.model,
     max_tokens: maxTokens,
@@ -62,6 +74,8 @@ export function openAiRequestBody(
     stream,
     // Without this an OpenAI-compatible stream never reports token usage.
     ...(stream ? { stream_options: { include_usage: true } } : {}),
+    // A small model left to itself drops a closing bracket now and then; JSON mode rules that out.
+    ...(input.json ? { response_format: { type: "json_object" } } : {}),
     reasoning: { enabled: false },
   };
 }

@@ -25,6 +25,13 @@ const DEFAULT_BASE_URL = "https://api.anthropic.com/v1";
 const API_VERSION = "2023-06-01";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_TOKENS = 8192;
+/**
+ * Appended to the user turn in JSON mode, which only allows an object at the top level: told
+ * nothing, Qwen 3.5 answers an array-asking prompt with the first element alone. Same text as
+ * apps/api/src/modules/ai/llm/openai-compatible.ts; parser.ts unwraps the envelope.
+ */
+const JSON_MODE_ENVELOPE =
+  '\n\nReturn that array wrapped in a JSON object under the single key "items": {"items": [ ... ]}.';
 
 export interface AnthropicUsage {
   inputTokens: number;
@@ -37,6 +44,8 @@ export interface AnthropicGenerateInput {
   system: string;
   prompt: string;
   maxTokens?: number;
+  /** The answer is parsed as JSON: an OpenAI-compatible host is put in JSON mode (object at the top level). */
+  json?: boolean;
 }
 
 export interface AnthropicGeneration {
@@ -151,9 +160,13 @@ export function createAnthropicClient(options: AnthropicClientOptions) {
                   max_tokens: input.maxTokens ?? DEFAULT_MAX_TOKENS,
                   messages: [
                     { role: "system", content: input.system },
-                    { role: "user", content: input.prompt },
+                    {
+                      role: "user",
+                      content: input.json ? input.prompt + JSON_MODE_ENVELOPE : input.prompt,
+                    },
                   ],
                   reasoning: { enabled: false },
+                  ...(input.json ? { response_format: { type: "json_object" } } : {}),
                 }
               : {
                   model: input.model,

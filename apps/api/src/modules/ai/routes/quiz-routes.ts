@@ -412,6 +412,7 @@ export function aiQuizRoutes(deps: {
         prompt: prompt.user,
         system: prompt.system,
         maxTokens: quizMaxTokens(questionCount),
+        json: true,
         userId: auth.userId,
         circuitKey: auth.schoolId,
       });

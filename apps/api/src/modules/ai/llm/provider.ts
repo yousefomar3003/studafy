@@ -102,6 +102,12 @@ export interface LlmGenerateInput {
   /** Output-token ceiling for this call; defaults to the provider's configured ceiling. */
   maxTokens?: number;
   /**
+   * The caller parses the answer as JSON. An OpenAI-compatible host is then put in JSON mode, which
+   * guarantees well-formed JSON but only allows an object at the top level (see
+   * ./json-output.ts). The Anthropic Messages API has no such mode; the prompt alone carries it.
+   */
+  json?: boolean;
+  /**
    * Sent as `metadata.user_id` unless the deployment is zero-retention. The provider retains this
    * field for abuse monitoring; omitting it is the zero-retention posture.
    */

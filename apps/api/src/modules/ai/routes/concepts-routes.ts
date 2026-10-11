@@ -310,6 +310,7 @@ export function aiConceptsRoutes(deps: {
         prompt: prompt.user,
         system: prompt.system,
         maxTokens: conceptsMaxTokens(),
+        json: true,
         userId: auth.userId,
         circuitKey: auth.schoolId,
       });

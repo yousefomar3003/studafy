@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 
 import { CircuitOpenError } from "../../../lib/circuit-breaker";
 
+import { JSON_MODE_ENVELOPE } from "./openai-compatible";
 import {
   AnthropicProvider,
   AI_LLM_API_VERSION,
@@ -424,6 +425,27 @@ describe("apiFormat: openai-compatible", () => {
       stream: false,
       reasoning: { enabled: false },
     });
+  });
+
+  test("json: true turns on the host's JSON mode; the Anthropic format never sends it", async () => {
+    const { fetch, calls } = stubFetch(() => okChat("{}"));
+    await openAi(fetch).generate({ model: QWEN, prompt: "q", json: true });
+    await openAi(fetch).generate({ model: QWEN, prompt: "q" });
+    expect(JSON.parse(calls[0]!.init.body as string).response_format).toEqual({
+      type: "json_object",
+    });
+    expect(JSON.parse(calls[1]!.init.body as string)).not.toHaveProperty("response_format");
+    // JSON mode allows only an object, so the array the prompt asks for is requested in an envelope.
+    expect(JSON.parse(calls[0]!.init.body as string).messages.at(-1).content).toBe(
+      `q${JSON_MODE_ENVELOPE}`,
+    );
+    expect(JSON.parse(calls[1]!.init.body as string).messages.at(-1).content).toBe("q");
+
+    const anthropic = stubFetch(okGeneration);
+    await providerWith(anthropic.fetch).generate({ ...GENERATE_INPUT, json: true });
+    expect(JSON.parse(anthropic.calls[0]!.init.body as string)).not.toHaveProperty(
+      "response_format",
+    );
   });
 
   test("reads the answer, usage, and finish reason, dropping an inline <think> block", async () => {

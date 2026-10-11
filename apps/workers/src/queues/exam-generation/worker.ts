@@ -114,6 +114,7 @@ export async function processExamGeneration(
         system: prompt.system,
         prompt: prompt.user,
         maxTokens: data.maxTokens,
+        json: true,
       });
     } catch (error) {
       if (

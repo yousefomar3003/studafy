@@ -135,6 +135,24 @@ describe("AnthropicClient.generate with apiFormat: openai-compatible", () => {
     });
   });
 
+  test("json: true turns on the host's JSON mode", async () => {
+    const { fetch, calls } = stubFetch(() =>
+      jsonResponse({ choices: [{ message: { content: "{}" } }] }, 200),
+    );
+    const client = createAnthropicClient({
+      apiKey: API_KEY,
+      apiFormat: "openai-compatible",
+      baseUrl: "https://api.together.xyz/v1",
+      fetch,
+    });
+
+    await client.generate({ model: QWEN, system: "s", prompt: "p", json: true });
+
+    expect(JSON.parse(calls[0]!.init.body as string).response_format).toEqual({
+      type: "json_object",
+    });
+  });
+
   test("keeps the failure taxonomy", async () => {
     const { fetch } = stubFetch(() => jsonResponse({ error: { message: "busy" } }, 503));
     const client = createAnthropicClient({

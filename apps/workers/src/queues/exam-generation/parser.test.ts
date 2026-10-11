@@ -27,6 +27,12 @@ describe("parseExamGeneration", () => {
     expect(parsed).toHaveLength(1);
   });
 
+  test("reads a JSON-mode answer that wraps the array in a one-key object", () => {
+    expect(parseExamGeneration(JSON.stringify({ items: [mcqItem] }), 2)).toEqual(
+      parseExamGeneration(JSON.stringify([mcqItem]), 2),
+    );
+  });
+
   test("strips a plain ``` fenced block", () => {
     const fenced = "```\n" + JSON.stringify([mcqItem]) + "\n```";
     const parsed = parseExamGeneration(fenced, 2);
