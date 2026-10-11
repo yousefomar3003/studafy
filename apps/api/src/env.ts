@@ -144,14 +144,18 @@ export const envSchema = z
       .int()
       .positive()
       .default(7 * 24 * 60 * 60 * 1000),
-    // Google OAuth (OIDC). All optional — the feature activates only when all three are set.
-    GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
-    GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
-    GOOGLE_OAUTH_REDIRECT_URI: z.string().url().optional(),
-    // Microsoft OAuth (OIDC). All optional — the feature activates only when all three are set.
-    MICROSOFT_OAUTH_CLIENT_ID: z.string().min(1).optional(),
-    MICROSOFT_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
-    MICROSOFT_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // Google OAuth (OIDC). All optional — the feature activates only when the client id and secret
+    // are set, and then the redirect URI must be too (refinement below). Deployed tiers always render
+    // the redirect URI (derived from the tier's API origin) and inject the client id/secret from the
+    // secret manager, where an empty string means "not configured yet" — the same convention as
+    // TAP_SECRET_KEY. So an empty value is treated as unset, and a redirect URI alone means "off".
+    GOOGLE_OAUTH_CLIENT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_OAUTH_REDIRECT_URI: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Microsoft OAuth (OIDC). Same shape and conventions as Google above.
+    MICROSOFT_OAUTH_CLIENT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    MICROSOFT_OAUTH_CLIENT_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    MICROSOFT_OAUTH_REDIRECT_URI: z.preprocess(emptyAsUnset, z.string().url().optional()),
     // Mock OAuth (OIDC) — dev and E2E only (mock-config.ts, dev/mock-idp.ts). Both optional — the
     // "mock" login/activation provider activates only when both are set, and the refinement below
     // additionally refuses to boot at all with either set in a staging/production deployment, so a
@@ -170,9 +174,11 @@ export const envSchema = z
     // financial view (ST-127). Optional: when absent, pay_online_url comes back null and the client
     // simply has no redirect target to navigate to.
     PAYMENT_REDIRECT_BASE_URL: z.string().url().optional(),
-    // Cloudflare Turnstile secret key for captcha verification on public endpoints.
-    // When absent, captcha checks are skipped (development only).
-    TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+    // Cloudflare Turnstile secret key for captcha verification on public endpoints (school
+    // self-registration, public account-deletion requests). When absent, captcha checks are skipped —
+    // allowed only in development: the refinement below refuses to boot a staging/production tier
+    // without it. Empty means unset (secret-manager default, as with TAP_SECRET_KEY).
+    TURNSTILE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // S3-compatible object storage for the app-files bucket (ST-103). All optional and validated
     // as a group below: the feature activates only when the whole set is present, so dev and test
     // boot without object storage and attachment endpoints answer 503 instead of the app failing to
@@ -276,47 +282,48 @@ export const envSchema = z
       }
     }
 
-    // Google OAuth: all three must be present or all absent.
-    const googleVars = [
-      env.GOOGLE_OAUTH_CLIENT_ID,
-      env.GOOGLE_OAUTH_CLIENT_SECRET,
-      env.GOOGLE_OAUTH_REDIRECT_URI,
-    ];
-    const googleSetCount = googleVars.filter((v) => v !== undefined).length;
-    if (googleSetCount > 0 && googleSetCount < 3) {
+    // Google / Microsoft OAuth: a provider is configured once its client id or secret is set, and
+    // then all three values are required. A redirect URI on its own is not a half-configuration —
+    // deployed tiers always render it, and it simply goes unused until the credentials arrive.
+    for (const [label, prefix, clientId, clientSecret, redirectUri] of [
+      [
+        "Google",
+        "GOOGLE_OAUTH",
+        env.GOOGLE_OAUTH_CLIENT_ID,
+        env.GOOGLE_OAUTH_CLIENT_SECRET,
+        env.GOOGLE_OAUTH_REDIRECT_URI,
+      ],
+      [
+        "Microsoft",
+        "MICROSOFT_OAUTH",
+        env.MICROSOFT_OAUTH_CLIENT_ID,
+        env.MICROSOFT_OAUTH_CLIENT_SECRET,
+        env.MICROSOFT_OAUTH_REDIRECT_URI,
+      ],
+    ] as const) {
+      if (clientId === undefined && clientSecret === undefined) continue;
       const missing = [
-        !env.GOOGLE_OAUTH_CLIENT_ID && "GOOGLE_OAUTH_CLIENT_ID",
-        !env.GOOGLE_OAUTH_CLIENT_SECRET && "GOOGLE_OAUTH_CLIENT_SECRET",
-        !env.GOOGLE_OAUTH_REDIRECT_URI && "GOOGLE_OAUTH_REDIRECT_URI",
-      ]
-        .filter(Boolean)
-        .join(", ");
-      context.addIssue({
-        code: "custom",
-        path: ["GOOGLE_OAUTH_CLIENT_ID"],
-        message: `All Google OAuth variables must be set together. Missing: ${missing}`,
-      });
+        clientId === undefined && `${prefix}_CLIENT_ID`,
+        clientSecret === undefined && `${prefix}_CLIENT_SECRET`,
+        redirectUri === undefined && `${prefix}_REDIRECT_URI`,
+      ].filter(Boolean);
+      if (missing.length > 0) {
+        context.addIssue({
+          code: "custom",
+          path: [`${prefix}_CLIENT_ID`],
+          message: `All ${label} OAuth variables must be set together. Missing: ${missing.join(", ")}`,
+        });
+      }
     }
 
-    // Microsoft OAuth: all three must be present or all absent.
-    const microsoftVars = [
-      env.MICROSOFT_OAUTH_CLIENT_ID,
-      env.MICROSOFT_OAUTH_CLIENT_SECRET,
-      env.MICROSOFT_OAUTH_REDIRECT_URI,
-    ];
-    const microsoftSetCount = microsoftVars.filter((v) => v !== undefined).length;
-    if (microsoftSetCount > 0 && microsoftSetCount < 3) {
-      const missing = [
-        !env.MICROSOFT_OAUTH_CLIENT_ID && "MICROSOFT_OAUTH_CLIENT_ID",
-        !env.MICROSOFT_OAUTH_CLIENT_SECRET && "MICROSOFT_OAUTH_CLIENT_SECRET",
-        !env.MICROSOFT_OAUTH_REDIRECT_URI && "MICROSOFT_OAUTH_REDIRECT_URI",
-      ]
-        .filter(Boolean)
-        .join(", ");
+    // Bot protection on the public forms is not optional on a deployed tier: without a Turnstile
+    // secret, apps/api's captcha check passes every request (verifyCaptcha), so a staging or
+    // production deploy without one fails to boot instead of silently accepting scripted sign-ups.
+    if (env.APP_ENV !== "development" && env.TURNSTILE_SECRET_KEY === undefined) {
       context.addIssue({
         code: "custom",
-        path: ["MICROSOFT_OAUTH_CLIENT_ID"],
-        message: `All Microsoft OAuth variables must be set together. Missing: ${missing}`,
+        path: ["TURNSTILE_SECRET_KEY"],
+        message: `TURNSTILE_SECRET_KEY is required when APP_ENV is ${env.APP_ENV}`,
       });
     }
 

@@ -51,6 +51,7 @@ jobs:
             tempo,
             loki,
             vector,
+            clamav,
           ]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,6 +92,14 @@ jobs:
               --build-arg "VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}"
               --build-arg "SENTRY_ORG=${{ vars.SENTRY_ORG }}"
               --build-arg "SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}"
+              # Per-tier public endpoints and the Turnstile site key, baked into the static bundle.
+              # GitHub Environment variables, not secrets: all three end up in browser-visible JS.
+              # Left unset, the bundle would call http://localhost:3000 and show Cloudflare's
+              # always-pass test widget -- see infra/docker/web.Dockerfile and
+              # docs/runbooks/production-secrets.md.
+              --build-arg "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}"
+              --build-arg "VITE_REALTIME_BASE_URL=${{ vars.VITE_REALTIME_BASE_URL }}"
+              --build-arg "VITE_TURNSTILE_SITE_KEY=${{ vars.VITE_TURNSTILE_SITE_KEY }}"
               --secret "id=sentry_auth_token,env=SENTRY_AUTH_TOKEN"
             )
           fi

@@ -32,7 +32,12 @@
         { "name": "READ_DATABASE_NAME", "value": "api_read" },
         { "name": "S3_REGION", "value": "${AWS_REGION}" },
         { "name": "S3_APP_FILES_BUCKET", "value": "${S3_APP_FILES_BUCKET}" },
-        { "name": "S3_PRESIGN_TTL_SECONDS", "value": "900" }
+        { "name": "S3_PRESIGN_TTL_SECONDS", "value": "900" },
+        { "name": "APP_ENV", "value": "${APP_ENV}" },
+        { "name": "FRONTEND_URL", "value": "${WEB_ORIGIN}" },
+        { "name": "CORS_ALLOWED_ORIGINS", "value": "${WEB_ORIGIN}" },
+        { "name": "GOOGLE_OAUTH_REDIRECT_URI", "value": "${API_ORIGIN}/api/auth/oauth/google/callback" },
+        { "name": "MICROSOFT_OAUTH_REDIRECT_URI", "value": "${API_ORIGIN}/api/auth/oauth/microsoft/callback" }
       ],
       "secrets": [
         { "name": "DATABASE_USER", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_username::" },
@@ -40,7 +45,12 @@
         { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" },
         { "name": "REDIS_URL", "valueFrom": "${REDIS_SECRET_ARN}:queue_url::" },
         { "name": "TAP_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:TAP_SECRET_KEY::" },
-        { "name": "TAP_WEBHOOK_URL", "valueFrom": "${API_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" }
+        { "name": "TAP_WEBHOOK_URL", "valueFrom": "${API_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" },
+        { "name": "GOOGLE_OAUTH_CLIENT_ID", "valueFrom": "${API_APP_SECRETS_ARN}:GOOGLE_OAUTH_CLIENT_ID::" },
+        { "name": "GOOGLE_OAUTH_CLIENT_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:GOOGLE_OAUTH_CLIENT_SECRET::" },
+        { "name": "MICROSOFT_OAUTH_CLIENT_ID", "valueFrom": "${API_APP_SECRETS_ARN}:MICROSOFT_OAUTH_CLIENT_ID::" },
+        { "name": "MICROSOFT_OAUTH_CLIENT_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:MICROSOFT_OAUTH_CLIENT_SECRET::" },
+        { "name": "TURNSTILE_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:TURNSTILE_SECRET_KEY::" }
       ],
       "healthCheck": {
         "command": [
