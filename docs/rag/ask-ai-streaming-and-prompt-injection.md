@@ -58,6 +58,17 @@ leg under RRF) lands around 0.02 — so 0.02 is the floor for a real, grounded h
 the keyword-leg AND arm together mean the refusal path triggers on a genuinely ungrounded question
 without gating every answer.
 
+### General-knowledge answers (`ai.ask.general`)
+
+An ungrounded question is only refused when the school's `ai.ask.general` feature flag is off. It
+is on by default: the route then sends the question alone — no sources, so no school material — with
+a fixed general-tutor system prompt (`assembleGeneralPrompt` in `ask/prompt.ts`) pitched at the
+request's `level`. The model opens by saying the answer is not from the student's materials, keeps to
+learning help (it explains rather than writing graded work), and cites nothing. The stream is the
+normal answer path with `grounded: false` on `sources` (an empty list) and `done` (no citations), so
+a client can label the answer. Input and output moderation, persistence and quota are unchanged. A
+school that wants Ask AI kept strictly to its courses sets a `feature_flags` override to `false`.
+
 ## Prompt construction and the injection defenses
 
 The grounded prompt (`ask/prompt.ts`) is built in two parts. The **system prompt** is fixed and

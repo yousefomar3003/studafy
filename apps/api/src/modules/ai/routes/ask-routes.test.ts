@@ -15,6 +15,7 @@ import type { Database } from "../../../db/client";
 import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { FlagsService } from "../../flags";
 import type { AiQuotaHandle } from "../gate/entitlement-gate";
 import type { LlmProvider, LlmStreamEvent } from "../llm/provider";
 import type { TransactionSql } from "postgres";
@@ -179,6 +180,7 @@ function buildAskApp(
     database?: ReturnType<typeof fakeDatabase>;
     handle?: ReturnType<typeof quotaHandle>;
     modelOverrides?: Record<string, string>;
+    flags?: FlagsService;
   } = {},
 ): {
   app: OpenAPIHono<AppEnv>;
@@ -201,6 +203,7 @@ function buildAskApp(
       provider,
       embedder: createDeterministicQueryEmbedder(),
       modelOverrides: opts.modelOverrides,
+      flags: opts.flags,
     }),
   );
   app.onError(errorHandlerMiddleware(silentLogger));
@@ -340,6 +343,72 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
     expect(db.queries.some((q) => q.includes("INSERT INTO app.ai_messages"))).toBe(false);
     expect(quota.commits).toEqual([]);
     expect(quota.releases).toEqual([1]);
+  });
+
+  describe("a question the materials do not cover, by the school's ai.ask.general flag", () => {
+    const ungrounded = () =>
+      fakeDatabase({ hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })] });
+    const flagsWith = (general: boolean): FlagsService => ({
+      get: async (name) => (name === "ai.ask.general" ? general : true),
+    });
+
+    test("on: answers from general knowledge, ungrounded and uncited, and commits the tokens", async () => {
+      const db = ungrounded();
+      let prompt: { system?: string; prompt: string } | undefined;
+      const provider: LlmProvider = {
+        generate: async () => {
+          throw new Error("unused");
+        },
+        stream: (input) => {
+          prompt = input;
+          return answeredStream("This isn't from your study materials. ChatGPT is a chatbot.");
+        },
+      };
+      const { app, quota } = buildAskApp(provider, { database: db, flags: flagsWith(true) });
+
+      const res = await postAsk(app, { question: "Tell me about ChatGPT", level: "middle" });
+      const events = parseSse(await res.text());
+
+      expect(events[0]!.event).toBe("sources");
+      expect(events[0]!.data.grounded).toBe(false);
+      expect(events[0]!.data.sources).toEqual([]);
+      const done = events.at(-1)!;
+      expect(done.event).toBe("done");
+      expect(done.data.grounded).toBe(false);
+      expect(done.data.citations).toEqual([]);
+      expect(done.data.text).toBe("This isn't from your study materials. ChatGPT is a chatbot.");
+      // No school material reaches the general prompt; it is pitched at the asked level.
+      expect(prompt!.prompt).toBe("Student question: Tell me about ChatGPT");
+      expect(prompt!.system).toContain("middle-school student");
+      expect(prompt!.system).toContain("answer it from general knowledge");
+      expect(db.queries.some((q) => q.includes("INSERT INTO app.ai_messages"))).toBe(true);
+      expect(quota.commits).toEqual([30]);
+    });
+
+    test("off: refuses with the nearest topics, as without a flags service", async () => {
+      const { app, quota } = buildAskApp(fakeProvider(answeredStream()), {
+        database: ungrounded(),
+        flags: flagsWith(false),
+      });
+
+      const events = parseSse(
+        await (await postAsk(app, { question: "Tell me about ChatGPT" })).text(),
+      );
+
+      expect(events.map((event) => event.event)).toEqual(["refusal"]);
+      expect(quota.releases).toEqual([1]);
+    });
+
+    test("a grounded answer is marked grounded whatever the flag says", async () => {
+      const { app } = buildAskApp(fakeProvider(answeredStream()), { flags: flagsWith(true) });
+
+      const events = parseSse(
+        await (await postAsk(app, { question: "How does photosynthesis work?" })).text(),
+      );
+
+      expect(events[0]!.data.grounded).toBe(true);
+      expect(events.at(-1)!.data.grounded).toBe(true);
+    });
   });
 
   test("a below-threshold best hit is refused too", async () => {
