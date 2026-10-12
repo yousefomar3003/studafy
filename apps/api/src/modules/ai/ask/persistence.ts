@@ -102,6 +102,32 @@ export interface PersistAskMessageInput {
  *
  * @returns the new `app.ai_messages.id`.
  */
+/** One earlier question-and-answer turn of a conversation. */
+export interface ConversationTurn {
+  question: string;
+  answer: string;
+}
+
+/**
+ * The most recent turns of a conversation, oldest first, so a follow-up ("explain that more
+ * simply") is answered in context. Expired messages are excluded the same way every other read of
+ * a conversation excludes them.
+ */
+export async function loadRecentTurns(
+  tx: TransactionSql,
+  conversationId: string,
+  limit: number,
+): Promise<ConversationTurn[]> {
+  const rows = await tx<ConversationTurn[]>`
+    SELECT question, answer
+    FROM app.ai_messages
+    WHERE conversation_id = ${conversationId}::uuid AND expires_at > now()
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.reverse();
+}
+
 export async function persistAskMessage(
   tx: TransactionSql,
   input: PersistAskMessageInput,

@@ -11,10 +11,15 @@ import { getLocalizedMessage } from "../../../middleware/locale";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { resolveCitations, type Citation } from "../ask/citations";
-import { persistAskMessage, resolveConversation } from "../ask/persistence";
+import { loadRecentTurns, persistAskMessage, resolveConversation } from "../ask/persistence";
 import { assembleGeneralPrompt, assembleGroundedPrompt, toGroundedSources } from "../ask/prompt";
 import { assessGrounding, type NearestTopic } from "../ask/refusal";
-import { AI_ASK_QUESTION_MAX_CHARS, AI_ASK_SOURCE_LIMIT, AI_EXPLAIN_LEVELS } from "../config";
+import {
+  AI_ASK_HISTORY_TURNS,
+  AI_ASK_QUESTION_MAX_CHARS,
+  AI_ASK_SOURCE_LIMIT,
+  AI_EXPLAIN_LEVELS,
+} from "../config";
 import { getAiQuota } from "../gate/entitlement-gate";
 import { LlmProviderError } from "../llm/provider";
 import { AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
@@ -412,21 +417,29 @@ export function aiAskRoutes(deps: {
         model: routed.model,
         locale,
       });
-      return { search, conversationId };
+      // A continued conversation carries its recent turns, so a follow-up is answered in context.
+      const history = body.conversation_id
+        ? await loadRecentTurns(tx, conversationId, AI_ASK_HISTORY_TURNS)
+        : [];
+      return { search, conversationId, history };
     });
 
     const grounding = assessGrounding(preflight.search.hits);
-    // A question the materials do not cover is answered from general knowledge -- labelled, with
-    // no sources or citations -- when the school's `ai.ask.general` flag is on, and refused when it
-    // is off. Without a flags service (bare route tests) the route keeps the strict refusal.
-    const answerGenerally =
-      !grounding.grounded &&
-      flags !== null &&
-      (await flags.get("ai.ask.general", { schoolId: auth.schoolId }));
+    // The school's `ai.ask.general` flag (on by default) makes Ask AI a general study assistant:
+    // a message the materials do not cover is answered conversationally with no sources or
+    // citations (`grounded: false`), and a grounded answer may complete what its sources only
+    // partly cover. Off, or without a flags service (bare route tests), Ask AI keeps strictly to
+    // the materials and refuses the rest.
+    const allowGeneralKnowledge =
+      flags !== null && (await flags.get("ai.ask.general", { schoolId: auth.schoolId }));
+    const answerGenerally = !grounding.grounded && allowGeneralKnowledge;
     const sources = answerGenerally ? [] : toGroundedSources(preflight.search.hits);
     const prompt = answerGenerally
-      ? assembleGeneralPrompt(body.question, body.level)
-      : assembleGroundedPrompt(body.question, sources);
+      ? assembleGeneralPrompt(body.question, body.level, { history: preflight.history })
+      : assembleGroundedPrompt(body.question, sources, undefined, {
+          history: preflight.history,
+          allowGeneralKnowledge,
+        });
 
     return streamSSE(
       c,

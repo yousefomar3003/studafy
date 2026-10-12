@@ -76,6 +76,13 @@ export const AI_ASK_MIN_RELEVANCE_SCORE = 0.02;
 /** How many retrieval hits are handed to the model as numbered, citable sources. */
 export const AI_ASK_SOURCE_LIMIT = 6;
 
+/**
+ * How many earlier turns of a conversation are sent with a follow-up question. Each is clipped to
+ * a few hundred characters (`ask/prompt.ts`), so this bounds the added input at a few thousand
+ * tokens while keeping enough context for "explain that more simply".
+ */
+export const AI_ASK_HISTORY_TURNS = 6;
+
 /** Matches the 90-day retention `ai_messages.expires_at` documents (migration 000021). */
 export const AI_ASK_MESSAGE_RETENTION_DAYS = 90;
 

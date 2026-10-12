@@ -73,7 +73,11 @@ function groundedHit(over: Record<string, unknown> = {}): Record<string, unknown
  * database. Every query recorded so tests can assert what was (not) written.
  */
 function fakeDatabase(
-  opts: { hits?: Record<string, unknown>[]; conversationExists?: boolean } = {},
+  opts: {
+    hits?: Record<string, unknown>[];
+    conversationExists?: boolean;
+    history?: { question: string; answer: string }[];
+  } = {},
 ) {
   const queries: string[] = [];
   const hitRows = opts.hits ?? [groundedHit()];
@@ -94,6 +98,8 @@ function fakeDatabase(
     if (sql.includes("FROM app.ai_subscriptions")) return rows([{ id: "sub-1" }]);
     if (sql.includes("upsert_ai_usage_tokens")) return rows([]);
     if (sql.includes("INSERT INTO app.ai_messages")) return rows([{ id: MESSAGE_ID }]);
+    // loadRecentTurns reads newest first.
+    if (sql.includes("FROM app.ai_messages")) return rows([...(opts.history ?? [])].reverse());
     if (sql.includes("INSERT INTO app.ai_message_citations")) return rows([]);
     return rows([]);
   }) as unknown as TransactionSql;
@@ -361,7 +367,7 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
         },
         stream: (input) => {
           prompt = input;
-          return answeredStream("This isn't from your study materials. ChatGPT is a chatbot.");
+          return answeredStream("ChatGPT is a chatbot made by OpenAI.");
         },
       };
       const { app, quota } = buildAskApp(provider, { database: db, flags: flagsWith(true) });
@@ -376,11 +382,13 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
       expect(done.event).toBe("done");
       expect(done.data.grounded).toBe(false);
       expect(done.data.citations).toEqual([]);
-      expect(done.data.text).toBe("This isn't from your study materials. ChatGPT is a chatbot.");
+      expect(done.data.text).toBe("ChatGPT is a chatbot made by OpenAI.");
       // No school material reaches the general prompt; it is pitched at the asked level.
-      expect(prompt!.prompt).toBe("Student question: Tell me about ChatGPT");
+      expect(prompt!.prompt).toBe("Student: Tell me about ChatGPT");
       expect(prompt!.system).toContain("middle-school student");
-      expect(prompt!.system).toContain("answer it from general knowledge");
+      expect(prompt!.system).toContain("conversational tutor");
+      // No forced disclaimer: the UI labels general answers from `grounded: false`.
+      expect(prompt!.system).not.toContain("not from the student's study");
       expect(db.queries.some((q) => q.includes("INSERT INTO app.ai_messages"))).toBe(true);
       expect(quota.commits).toEqual([30]);
     });
@@ -397,6 +405,62 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
 
       expect(events.map((event) => event.event)).toEqual(["refusal"]);
       expect(quota.releases).toEqual([1]);
+    });
+
+    test("a follow-up in a conversation carries its earlier turns, oldest first", async () => {
+      const db = fakeDatabase({
+        hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })],
+        conversationExists: true,
+        history: [
+          { question: "What is ChatGPT?", answer: "A chatbot made by OpenAI." },
+          { question: "Who made it?", answer: "OpenAI." },
+        ],
+      });
+      let prompt = "";
+      const provider: LlmProvider = {
+        generate: async () => {
+          throw new Error("unused");
+        },
+        stream: (input) => {
+          prompt = input.prompt;
+          return answeredStream("Sure.");
+        },
+      };
+      const { app } = buildAskApp(provider, { database: db, flags: flagsWith(true) });
+
+      await (
+        await postAsk(app, {
+          question: "Explain that more simply",
+          conversation_id: CONVERSATION_ID,
+        })
+      ).text();
+
+      expect(prompt.indexOf("What is ChatGPT?")).toBeGreaterThan(-1);
+      expect(prompt.indexOf("What is ChatGPT?")).toBeLessThan(prompt.indexOf("Who made it?"));
+      expect(prompt.trimEnd().endsWith("Student: Explain that more simply")).toBe(true);
+      expect(prompt).toMatch(/<conversation-[0-9a-f]{12}>/);
+    });
+
+    test("a new conversation sends no history", async () => {
+      const db = fakeDatabase({
+        hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })],
+        history: [{ question: "Old question", answer: "Old answer" }],
+      });
+      let prompt = "";
+      const provider: LlmProvider = {
+        generate: async () => {
+          throw new Error("unused");
+        },
+        stream: (input) => {
+          prompt = input.prompt;
+          return answeredStream("Hi!");
+        },
+      };
+      const { app } = buildAskApp(provider, { database: db, flags: flagsWith(true) });
+
+      await (await postAsk(app, { question: "hi" })).text();
+
+      expect(prompt).toBe("Student: hi");
     });
 
     test("a grounded answer is marked grounded whatever the flag says", async () => {
