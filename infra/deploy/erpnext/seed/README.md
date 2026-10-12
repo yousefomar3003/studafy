@@ -1,9 +1,20 @@
-# ERPNext seed fixtures
+# ERPNext site setup and seed fixtures
 
-`fixtures.json` and `load_fixtures.py` are baked into `infra/docker/erpnext.Dockerfile`'s image
-(under `/home/frappe/frappe-bench/apps/erpnext_seed/`) and run by
-`infra/deploy/scripts/erpnext-new-site.sh <env> <hostname> --seed` after `bench new-site` — the
-concrete mechanism behind the "seed tenant usable end-to-end" acceptance criterion.
+This directory is baked into `infra/docker/erpnext.Dockerfile`'s image as the `erpnext_seed`
+package (`/home/frappe/frappe-bench/erpnext_seed/`, on PYTHONPATH). Run it as a module from the
+bench's `sites` directory -- `python -m erpnext_seed.provision <site> <step>` -- not through
+`bench execute`, which swallows the real exception and reports a misleading NameError instead.
+
+| Step       | What it does                                                                                                                                           | Run by                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `setup`    | ERPNext's setup wizard (the school's company) and the integration user with the shared `ERPNEXT_API_KEY` (from `STUDAFY_ERPNEXT_API_KEY`). Idempotent. | `erpnext-new-site.sh` for every school; `bun run erpnext:site` |
+| `fixtures` | The synthetic records below (`fixtures.json`, `load_fixtures.py`). Not idempotent.                                                                     | `erpnext-new-site.sh ... --seed` (a demo tenant only)          |
+| `demo`     | Sample tuition invoices and payments for the Finance dashboard. Local only. Idempotent.                                                                | `bun run erpnext:site`                                         |
+
+## Seed fixtures
+
+`fixtures.json` and `load_fixtures.py` are the concrete mechanism behind the "seed tenant usable
+end-to-end" acceptance criterion.
 
 **This is not anonymized production data.** This repo has no student records, school data, or any
 production dataset anywhere to anonymize — there is no pipeline in this repo that touches real
@@ -23,10 +34,8 @@ claim about anonymizing anything real.
 
 ## Known gaps
 
-- **Not exercised against a real bench.** `load_fixtures.py`'s `frappe.get_doc(...).insert()` calls
-  follow the Education app's documented doctype field names as of the version this module targets
-  — verify against the pinned `infra/docker/erpnext.Dockerfile` tag's actual schema before relying
-  on this against a real cluster.
+- **Exercised against the pinned image locally** (2026-10-12, `db/compose.yml`'s erpnext profile),
+  which is how the Student Group's required academic year and grouping basis were found missing.
 - **Not idempotent.** Re-running `--seed` against a site that already has these records will fail
   on the doctypes' own uniqueness constraints (e.g. `Student.student_email_id`), the same way
   `bench new-site` itself isn't idempotent against an existing site — this is meant to run once per

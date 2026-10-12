@@ -229,6 +229,9 @@ export function financeReportRoutes(
     const query = c.req.valid("query");
     const locale = c.get("locale") as SupportedLocale;
     const report = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      // Resolve the site first: it activates a school whose site is newly ready, which
+      // is what records the company id buildFilters reads.
+      const client = await erpnextFactory.forSchool(tx, auth.schoolId);
       const filters = await buildFilters(
         tx,
         auth.schoolId,
@@ -241,7 +244,6 @@ export function financeReportRoutes(
         },
         parseStudentIds(query.student_ids),
       );
-      const client = await erpnextFactory.forSchool(tx, auth.schoolId);
       return runFinanceReport(
         client,
         ERP_REPORT_NAMES.arAging,
@@ -258,6 +260,9 @@ export function financeReportRoutes(
     const query = c.req.valid("query");
     const locale = c.get("locale") as SupportedLocale;
     const report = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      // Resolve the site first: it activates a school whose site is newly ready, which
+      // is what records the company id buildFilters reads.
+      const client = await erpnextFactory.forSchool(tx, auth.schoolId);
       const filters = await buildFilters(
         tx,
         auth.schoolId,
@@ -270,7 +275,6 @@ export function financeReportRoutes(
         },
         parseStudentIds(query.student_ids),
       );
-      const client = await erpnextFactory.forSchool(tx, auth.schoolId);
       return runFinanceReport(
         client,
         ERP_REPORT_NAMES.generalLedger,
@@ -287,6 +291,9 @@ export function financeReportRoutes(
     const query = c.req.valid("query");
     const locale = c.get("locale") as SupportedLocale;
     const report = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      // Resolve the site first: it activates a school whose site is newly ready, which
+      // is what records the company id buildFilters reads.
+      const client = await erpnextFactory.forSchool(tx, auth.schoolId);
       const filters = await buildFilters(
         tx,
         auth.schoolId,
@@ -297,7 +304,6 @@ export function financeReportRoutes(
         },
         parseStudentIds(query.student_ids),
       );
-      const client = await erpnextFactory.forSchool(tx, auth.schoolId);
       return runFinanceReport(
         client,
         ERP_REPORT_NAMES.collections,
@@ -317,8 +323,10 @@ export function financeReportRoutes(
     const canViewAll = hasPermission(auth.roles, PERMISSIONS.REPORT_VIEW_FINANCIAL);
     const result = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const family = await familyCustomers(tx, auth.schoolId, familyId, auth.userId, canViewAll);
-      const companyFilters = await buildFilters(tx, auth.schoolId, {}, family.studentIds);
+      // Resolve the site first: it activates a school whose site is newly ready, which
+      // is what records the company id buildFilters reads.
       const client = await erpnextFactory.forSchool(tx, auth.schoolId);
+      const companyFilters = await buildFilters(tx, auth.schoolId, {}, family.studentIds);
       const accountsReceivable = await runFinanceReport(
         client,
         ERP_REPORT_NAMES.arAging,

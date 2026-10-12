@@ -221,3 +221,15 @@ follow.** `erpnext.paymentReceived` delegates to
 fee-schedule arms beside it still carry the original bugs — they pass currency codes and ERPNext
 party names into `uuid` columns and raw decimals into `*_minor` columns, and none of them can
 succeed on a real payload. Each wants the same treatment.
+
+## Known gaps against a real ERPNext (found 2026-10-12)
+
+Exercised end to end against the pinned ERPNext + Education image (`bun run erpnext:up`), fee
+reports, invoices and payments work. Two features call ERPNext doctypes that image does not have:
+
+- **Scholarships** read and write `Scholarship Award`, which neither ERPNext nor Frappe Education
+  defines, so every scholarship call answers 404 from ERPNext. It needs either a custom doctype
+  shipped with the erpnext image or a rework onto existing documents (e.g. a discount on the fee
+  invoice).
+- **Expenses** of type `expense_claim` use `Expense Claim`, which lives in the separate HRMS app the
+  image does not install. `purchase_invoice` and `journal_entry` expenses work.

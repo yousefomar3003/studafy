@@ -122,10 +122,10 @@ export const envSchema = z
     // absent, the webhook route answers 500 so a misconfigured topic cannot silently pass as secure.
     EMAIL_EVENTS_SNS_TOPIC_ARN: z.string().min(1).optional(),
     // ERPNext integration (ST-089). All optional — activates only when both are set.
-    ERPNEXT_API_URL: z.string().url().optional(),
-    ERPNEXT_API_KEY: z.string().min(1).optional(),
+    ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    ERPNEXT_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // ERPNext site domain for auto-provisioned sites (e.g., "erpnext.studafy.com").
-    ERPNEXT_SITE_DOMAIN: z.string().min(1).optional(),
+    ERPNEXT_SITE_DOMAIN: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // JWT access-token signing
     JWT_ISSUER: z.string().min(1).default("studafy"),
     JWT_AUDIENCE: z.string().min(1).default("studafy-api"),

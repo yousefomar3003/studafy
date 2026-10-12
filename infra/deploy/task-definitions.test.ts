@@ -148,6 +148,38 @@ describe("production readiness of the ECS task definitions", () => {
     expect(mainTf).toMatch(/workers = \{[^}]*\bAI_LLM_API_KEY = ""/);
   });
 
+  test("the API and workers reach ERPNext through the rendered URL and their app-secret key", async () => {
+    const api = (await renderNamed("api")).containerDefinitions[0]!;
+    expect(values(api.environment!)).toMatchObject({
+      ERPNEXT_API_URL: "<ERPNEXT_API_URL>",
+      ERPNEXT_SITE_DOMAIN: "<ERPNEXT_SITE_DOMAIN>",
+    });
+    expect(api.secrets).toContainEqual({
+      name: "ERPNEXT_API_KEY",
+      valueFrom: "<API_APP_SECRETS_ARN>:ERPNEXT_API_KEY::",
+    });
+
+    const workers = (await renderNamed("workers")).containerDefinitions.find(
+      (c) => c.name === "workers",
+    )!;
+    expect(values(workers.environment!)).toMatchObject({ ERPNEXT_API_URL: "<ERPNEXT_API_URL>" });
+    expect(workers.secrets).toContainEqual({
+      name: "ERPNEXT_API_KEY",
+      valueFrom: "<WORKERS_APP_SECRETS_ARN>:ERPNEXT_API_KEY::",
+    });
+    const mainTf = await readFile(join(import.meta.dir, "..", "terraform", "main.tf"), "utf8");
+    expect(mainTf).toMatch(/workers = \{[^}]*\bERPNEXT_API_KEY = ""/);
+
+    // render.sh derives the URL from the plane's internal ALB, empty (integration off) in dev.
+    const render = await readFile(join(import.meta.dir, "scripts", "render.sh"), "utf8");
+    expect(render).toContain("output -json erpnext_internal_alb_dns_name");
+    expect(render).toMatch(/export ERPNEXT_API_URL=/);
+    for (const tier of ["dev", "staging", "prod"]) {
+      const env = await readFile(join(import.meta.dir, "environments", `${tier}.env`), "utf8");
+      expect(env).toMatch(/^ERPNEXT_SITE_DOMAIN=\S+/m);
+    }
+  });
+
   test("every deploy tier sets each AI variable the task definitions reference", async () => {
     for (const tier of ["dev", "staging", "prod"]) {
       const env = await readFile(join(import.meta.dir, "environments", `${tier}.env`), "utf8");

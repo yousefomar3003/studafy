@@ -75,6 +75,12 @@ S3_APP_FILES_BUCKET="$(terraform -chdir="$TF_DIR" output -raw storage_app_files_
 export REDIS_SECRET_ARN PGBOUNCER_SECRET_ARN PGBOUNCER_HOST POSTGRES_SECRET_ARN
 export MIGRATIONS_EXECUTION_ROLE_ARN API_TASK_ROLE_ARN WORKERS_TASK_ROLE_ARN S3_APP_FILES_BUCKET
 
+# The ERPNext plane's internal ALB (staging/prod only; null in dev, which leaves the integration off --
+# an empty ERPNEXT_API_URL counts as unset). apps/api and the workers call it over plain HTTP inside the
+# VPC with the Host header picking each school's site (modules/erpnext/README.md).
+ERPNEXT_ALB_DNS="$(terraform -chdir="$TF_DIR" output -json erpnext_internal_alb_dns_name | jq -r '. // empty')"
+export ERPNEXT_API_URL="${ERPNEXT_ALB_DNS:+http://$ERPNEXT_ALB_DNS}"
+
 SERVICE_UPPER="$(echo "$SERVICE" | tr '[:lower:]' '[:upper:]')"
 export "${SERVICE_UPPER}_IMAGE=${REPO_URL}:${IMAGE_TAG}"
 export "${SERVICE_UPPER}_APP_SECRETS_ARN=${SECRET_ARN}"

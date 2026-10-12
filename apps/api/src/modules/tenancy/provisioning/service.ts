@@ -2,13 +2,12 @@ import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
-import { bootstrapErpNextSite, teardownErpNextSite } from "../../../erpnext/bootstrap";
-import { ErpNextClient } from "../../../erpnext/client";
 import { emit } from "../../../lib/events/emitter";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
 import type { Database } from "../../../db";
 import type { TenantContext } from "../../../db/tenant-tx";
+import type { ErpNextClient } from "../../../erpnext/client";
 import type { Logger } from "../../../logger";
 
 // ---------------------------------------------------------------------------
@@ -59,7 +58,8 @@ export interface ProvisioningStatusResult {
 
 /**
  * Provision a newly verified school: create trial subscription, seed platform
- * defaults, bootstrap ERPNext site/company, and emit school.created.
+ * defaults, register the school's ERPNext site (created by an operator, activated on first use),
+ * and emit school.created.
  *
  * Strictly idempotent — retrying with the same schoolId returns the existing
  * provisioned state without duplicating rows or ERPNext entities.
@@ -114,25 +114,23 @@ export async function provisionTenant(
     );
   }
 
-  // ── 3. ERPNext bootstrap (async-capable, outside withTenantTx) ──────────
+  // ── 3. ERPNext site registration ─────────────────────────────────────────
+  // Only where the integration is configured. The site itself is created by an operator
+  // (erpnext-new-site.sh) and activates on the school's first finance request -- see
+  // registerErpNextSite -- so a school's own provisioning never waits on, or fails with, ERPNext.
   if (!erpNextClient) {
-    logger.warn(
-      { school_id: schoolId },
-      "ERPNext client not configured, skipping ERPNext bootstrap",
-    );
-    await markCompleted(database, params, logger);
-    return { status: "completed", schoolId };
-  }
-
-  try {
-    await provisionErpNext(database, erpNextClient, params, logger);
-  } catch (error) {
-    await compensateErpNext(database, erpNextClient, schoolId, logger, error);
-    return {
-      status: "failed",
-      schoolId,
-      error: error instanceof Error ? error.message : "ERPNext bootstrap failed",
-    };
+    logger.warn({ school_id: schoolId }, "ERPNext not configured, skipping site registration");
+  } else {
+    try {
+      await registerErpNextSite(database, params, logger);
+    } catch (error) {
+      await markFailed(database, schoolId, logger, error);
+      throw new CodedHttpException(
+        500,
+        ERROR_CODES.PROVISIONING_FAILED,
+        "ERPNext site registration failed.",
+      );
+    }
   }
 
   // ── 4. Complete ─────────────────────────────────────────────────────────
@@ -291,19 +289,37 @@ async function provisionLocal(
 }
 
 // ---------------------------------------------------------------------------
-// Internal: ERPNext provisioning
+// Internal: ERPNext site registration
 // ---------------------------------------------------------------------------
 
-async function provisionErpNext(
+/**
+ * The site hostname a school's ERPNext site is created under: `<slug>.<ERPNEXT_SITE_DOMAIN>`.
+ * Production's domain is `erpnext.studafy.com`; locally it is `erpnext.localhost`.
+ */
+export function erpNextSiteName(slug: string): string {
+  return `${slug}.${process.env.ERPNEXT_SITE_DOMAIN || "erpnext.studafy.com"}`;
+}
+
+/**
+ * Record the school's ERPNext site as awaiting creation.
+ *
+ * A Frappe site can only be created by bench (`bench new-site`), never over the REST API, so the API
+ * cannot create one itself. An operator runs `infra/deploy/scripts/erpnext-new-site.sh <env>
+ * <site>`, which creates the site, finishes ERPNext's setup wizard (the school's company) and sets
+ * the integration key. The credential resolver (modules/finance/client/credential-resolver.ts)
+ * then notices the site answering on the school's next finance request and marks it 'completed'
+ * with its company -- so this row is all provisioning has to write.
+ */
+async function registerErpNextSite(
   database: Database,
-  client: ErpNextClient,
   params: ProvisionTenantParams,
   logger: Logger,
 ): Promise<void> {
-  // ── a. Create site config record (pending) ──────────────────────────────
-  const siteName = `${params.slug}.erpnext.studafy.com`;
-  const companyName = params.slug;
-  const companyAbbr = params.slug.slice(0, 4).toUpperCase();
+  const siteName = erpNextSiteName(params.slug);
+  const companyAbbr = params.slug
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(0, 4)
+    .toUpperCase();
 
   await withTenantTx(database, params.tenantContext, async (tx) => {
     await tx`
@@ -312,94 +328,18 @@ async function provisionErpNext(
       ) VALUES (
         ${params.schoolId}::uuid,
         ${siteName},
-        ${companyName},
+        ${params.schoolName},
         ${companyAbbr},
-        'in_progress'::app.provisioning_status
+        'pending'::app.provisioning_status
       )
-      ON CONFLICT (school_id) DO UPDATE SET
-        site_name = ${siteName},
-        company_name = ${companyName},
-        company_abbr = ${companyAbbr},
-        status = 'in_progress'::app.provisioning_status
-    `;
-  });
-
-  // ── b. Bootstrap ERPNext site and company ────────────────────────────────
-  const result = await bootstrapErpNextSite(client, {
-    schoolId: params.schoolId,
-    slug: params.slug,
-    country: params.country,
-    currency: params.currency,
-    adminEmail: params.adminEmail,
-  });
-
-  // ── c. Update site config with ERPNext IDs ───────────────────────────────
-  await withTenantTx(database, params.tenantContext, async (tx) => {
-    await tx`
-      UPDATE app.erpnext_site_configs
-      SET erpnext_site_id = ${result.siteName},
-          erpnext_company_id = ${result.companyId},
-          status = 'completed'::app.provisioning_status,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE school_id = ${params.schoolId}::uuid
+      ON CONFLICT (school_id) DO NOTHING
     `;
   });
 
   logger.info(
-    { school_id: params.schoolId, site_name: result.siteName, company_id: result.companyId },
-    "ERPNext site bootstrap completed",
+    { school_id: params.schoolId, site_name: siteName },
+    "ERPNext site registered; awaiting erpnext-new-site.sh",
   );
-}
-
-// ---------------------------------------------------------------------------
-// Internal: ERPNext compensation (rollback)
-// ---------------------------------------------------------------------------
-
-async function compensateErpNext(
-  database: Database,
-  client: ErpNextClient,
-  schoolId: string,
-  logger: Logger,
-  originalError: unknown,
-): Promise<void> {
-  const errorMsg = originalError instanceof Error ? originalError.message : "Unknown ERPNext error";
-
-  logger.error(
-    { school_id: schoolId, error: errorMsg },
-    "ERPNext bootstrap failed, attempting compensation",
-  );
-
-  // Try to read the site name for teardown.
-  const configs = await database<{ site_name: string }[]>`
-    SELECT site_name
-    FROM app.erpnext_site_configs
-    WHERE school_id = ${schoolId}::uuid
-    LIMIT 1
-  `;
-
-  if (configs.length > 0) {
-    try {
-      await teardownErpNextSite(client, configs[0].site_name);
-      logger.info({ school_id: schoolId }, "ERPNext site teardown completed");
-    } catch (teardownError) {
-      logger.error(
-        {
-          school_id: schoolId,
-          error: teardownError instanceof Error ? teardownError.message : "unknown",
-        },
-        "ERPNext site teardown failed during compensation",
-      );
-    }
-  }
-
-  // Mark site config as failed.
-  await database`
-    UPDATE app.erpnext_site_configs
-    SET status = 'failed'::app.provisioning_status,
-        last_error = ${errorMsg},
-        updated_at = CURRENT_TIMESTAMP
-    WHERE school_id = ${schoolId}::uuid
-  `;
 }
 
 // ---------------------------------------------------------------------------

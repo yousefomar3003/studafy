@@ -42,7 +42,9 @@
         { "name": "AI_LLM_PROVIDER", "value": "${AI_LLM_PROVIDER}" },
         { "name": "AI_LLM_BASE_URL", "value": "${AI_LLM_BASE_URL}" },
         { "name": "AI_LLM_SMALL_MODEL", "value": "${AI_LLM_SMALL_MODEL}" },
-        { "name": "AI_LLM_LARGE_MODEL", "value": "${AI_LLM_LARGE_MODEL}" }
+        { "name": "AI_LLM_LARGE_MODEL", "value": "${AI_LLM_LARGE_MODEL}" },
+        { "name": "ERPNEXT_API_URL", "value": "${ERPNEXT_API_URL}" },
+        { "name": "ERPNEXT_SITE_DOMAIN", "value": "${ERPNEXT_SITE_DOMAIN}" }
       ],
       "secrets": [
         { "name": "DATABASE_USER", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_username::" },
@@ -56,7 +58,8 @@
         { "name": "MICROSOFT_OAUTH_CLIENT_ID", "valueFrom": "${API_APP_SECRETS_ARN}:MICROSOFT_OAUTH_CLIENT_ID::" },
         { "name": "MICROSOFT_OAUTH_CLIENT_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:MICROSOFT_OAUTH_CLIENT_SECRET::" },
         { "name": "TURNSTILE_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:TURNSTILE_SECRET_KEY::" },
-        { "name": "AI_LLM_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:AI_LLM_API_KEY::" }
+        { "name": "AI_LLM_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:AI_LLM_API_KEY::" },
+        { "name": "ERPNEXT_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:ERPNEXT_API_KEY::" }
       ],
       "healthCheck": {
         "command": [

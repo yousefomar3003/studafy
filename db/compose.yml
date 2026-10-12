@@ -86,6 +86,132 @@ services:
     volumes:
       - clamav-db:/var/lib/clamav
 
+  # --- Local ERPNext (profile "erpnext") -------------------------------------------------------------
+  # The accounting plane behind /api/finance/* and the Finance dashboard, in the shape
+  # infra/terraform/modules/erpnext runs it on ECS: one bench (this repo's infra/docker/erpnext
+  # image -- ERPNext + Frappe Education), MariaDB, two Redis, and backend/websocket/queue/scheduler
+  # roles behind an nginx frontend that picks the Frappe site from the Host header (one site per
+  # school). Opt-in and heavy (~2-3 GB RAM, first build ~4 GB): `bun run erpnext:up` starts it and
+  # `bun run erpnext:site` creates the demo school's site. Local-only credentials, bound to
+  # 127.0.0.1. ERPNEXT_API_URL=http://127.0.0.1:8080.
+  erpnext-db:
+    image: mariadb:10.6
+    profiles: ["erpnext"]
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    environment:
+      MYSQL_ROOT_PASSWORD: studafy-local-erp
+    volumes:
+      - erpnext-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pstudafy-local-erp"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  erpnext-redis-cache:
+    image: redis:7-alpine
+    profiles: ["erpnext"]
+
+  erpnext-redis-queue:
+    image: redis:7-alpine
+    profiles: ["erpnext"]
+    volumes:
+      - erpnext-redis-queue:/data
+
+  # One-shot: points the bench's common_site_config at the services above, then exits.
+  erpnext-configurator:
+    image: studafy/erpnext:local
+    build: &erpnext-build
+      context: ..
+      dockerfile: infra/docker/erpnext.Dockerfile
+    profiles: ["erpnext"]
+    entrypoint: ["bash", "-c"]
+    command:
+      - >
+        bench set-config -g db_host erpnext-db &&
+        bench set-config -gp db_port 3306 &&
+        bench set-config -g redis_cache redis://erpnext-redis-cache:6379 &&
+        bench set-config -g redis_queue redis://erpnext-redis-queue:6379 &&
+        bench set-config -g redis_socketio redis://erpnext-redis-queue:6379 &&
+        bench set-config -gp socketio_port 9000
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    depends_on:
+      erpnext-db:
+        condition: service_healthy
+
+  erpnext-backend:
+    image: studafy/erpnext:local
+    build: *erpnext-build
+    profiles: ["erpnext"]
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    depends_on: &erpnext-ready
+      erpnext-configurator:
+        condition: service_completed_successfully
+      erpnext-redis-cache:
+        condition: service_started
+      erpnext-redis-queue:
+        condition: service_started
+
+  erpnext-websocket:
+    image: studafy/erpnext:local
+    build: *erpnext-build
+    profiles: ["erpnext"]
+    command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    depends_on: *erpnext-ready
+
+  erpnext-queue:
+    image: studafy/erpnext:local
+    build: *erpnext-build
+    profiles: ["erpnext"]
+    command: ["bench", "worker", "--queue", "long,default,short"]
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    depends_on: *erpnext-ready
+
+  erpnext-scheduler:
+    image: studafy/erpnext:local
+    build: *erpnext-build
+    profiles: ["erpnext"]
+    command: ["bench", "schedule"]
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    depends_on: *erpnext-ready
+
+  erpnext-frontend:
+    image: studafy/erpnext:local
+    build: *erpnext-build
+    profiles: ["erpnext"]
+    command: ["nginx-entrypoint.sh"]
+    environment:
+      BACKEND: erpnext-backend:8000
+      SOCKETIO: erpnext-websocket:9000
+      # The literal `$host`: nginx forwards whatever Host header the caller sent, and bench serves
+      # the matching site -- the same site-per-school routing as production.
+      FRAPPE_SITE_NAME_HEADER: $$host
+      UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      PROXY_READ_TIMEOUT: 120
+      CLIENT_MAX_BODY_SIZE: 50m
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - erpnext-sites:/home/frappe/frappe-bench/sites
+    depends_on:
+      - erpnext-backend
+      - erpnext-websocket
+
 volumes:
   s3-data:
   clamav-db:
+  erpnext-db:
+  erpnext-redis-queue:
+  erpnext-sites:
