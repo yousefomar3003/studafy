@@ -55,6 +55,7 @@ import {
   aiRetrievalRoutes,
   aiSummaryRoutes,
   aiUsageRoutes,
+  databaseStudentIdResolver,
   createAiTokenMeter,
   createConceptsCache,
   createDeterministicQueryEmbedder,
@@ -1057,7 +1058,14 @@ export function createApp({
         },
       }),
     );
-    app.route("/", aiUsageRoutes({ entitlements, meter: aiMeter }));
+    app.route(
+      "/",
+      aiUsageRoutes({
+        entitlements,
+        meter: aiMeter,
+        studentIdFor: databaseStudentIdResolver(database),
+      }),
+    );
     // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Passed through by
     // both gates -- it never reaches the provider, and withdrawal must work without an add-on.
     app.route("/", aiConsentRoutes({ database }));

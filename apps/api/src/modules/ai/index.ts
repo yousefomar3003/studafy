@@ -34,7 +34,11 @@ export {
   type AiQuotaGateOptions,
   type AiQuotaHandle,
 } from "./gate/entitlement-gate";
-export { aiUsageRoutes } from "./routes/usage-routes";
+export {
+  aiUsageRoutes,
+  databaseStudentIdResolver,
+  type StudentIdResolver,
+} from "./routes/usage-routes";
 export { aiConsentGate } from "./gate/consent-gate";
 export { aiConsentRoutes } from "./routes/consent-routes";
 export {

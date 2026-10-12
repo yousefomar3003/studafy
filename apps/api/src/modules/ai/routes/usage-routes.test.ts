@@ -8,6 +8,7 @@ import { AUTH_CHANNELS } from "../../auth/channels";
 
 import { aiUsageRoutes } from "./usage-routes";
 
+import type { StudentIdResolver } from "./usage-routes";
 import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -68,9 +69,14 @@ function aiEntitlement(active: boolean, hasPeriod = true): AiEntitlement {
 }
 
 function fakeEntitlements(school: SchoolEntitlement, ai: AiEntitlement) {
+  const aiCalls: string[] = [];
   return {
+    aiCalls,
     school: async () => school,
-    ai: async () => ai,
+    ai: async (_schoolId: string, studentId: string) => {
+      aiCalls.push(studentId);
+      return ai;
+    },
   };
 }
 
@@ -96,6 +102,7 @@ const SNAPSHOT: AiUsageSnapshot = {
 function buildUsageApp(
   entitlements: ReturnType<typeof fakeEntitlements>,
   meter: AiTokenMeter,
+  studentIdFor: StudentIdResolver = async () => STUDENT_ID,
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 
@@ -104,7 +111,7 @@ function buildUsageApp(
     c.set("locale", "en");
     await next();
   });
-  app.route("/", aiUsageRoutes({ entitlements, meter }));
+  app.route("/", aiUsageRoutes({ entitlements, meter, studentIdFor }));
   app.onError(errorHandlerMiddleware(silentLogger));
   return app;
 }
@@ -121,6 +128,33 @@ describe("GET /api/ai/usage", () => {
 
     expect(res.status).toBe(200);
     expect(body).toEqual(SNAPSHOT);
+  });
+
+  test("checks the add-on of the caller's student record, not their user id", async () => {
+    const entitlements = fakeEntitlements(schoolEntitlement(true), aiEntitlement(true));
+    const resolved: string[] = [];
+    const app = buildUsageApp(entitlements, snapshotMeter(SNAPSHOT), async (who) => {
+      resolved.push(who.userId);
+      return STUDENT_ID;
+    });
+
+    const res = await app.request("/api/ai/usage");
+
+    expect(res.status).toBe(200);
+    expect(resolved).toEqual([USER_ID]);
+    expect(entitlements.aiCalls).toEqual([STUDENT_ID]);
+  });
+
+  test("answers 402 AI_SUBSCRIPTION_INACTIVE to a caller with no student record", async () => {
+    const entitlements = fakeEntitlements(schoolEntitlement(true), aiEntitlement(true));
+    const app = buildUsageApp(entitlements, snapshotMeter(SNAPSHOT), async () => null);
+
+    const res = await app.request("/api/ai/usage");
+    const body = (await res.json()) as { code: string };
+
+    expect(res.status).toBe(402);
+    expect(body.code).toBe(ERROR_CODES.AI_SUBSCRIPTION_INACTIVE);
+    expect(entitlements.aiCalls).toEqual([]);
   });
 
   test("refuses an inactive school with 403 AI_SCHOOL_INACTIVE", async () => {
