@@ -30,7 +30,8 @@
         { "name": "CLAMAV_HOST", "value": "127.0.0.1" },
         { "name": "AI_LLM_PROVIDER", "value": "${AI_LLM_PROVIDER}" },
         { "name": "AI_LLM_BASE_URL", "value": "${AI_LLM_BASE_URL}" },
-        { "name": "ERPNEXT_API_URL", "value": "${ERPNEXT_API_URL}" }
+        { "name": "ERPNEXT_API_URL", "value": "${ERPNEXT_API_URL}" },
+        { "name": "API_BASE_URL", "value": "${API_ORIGIN}" }
       ],
       "dependsOn": [{ "containerName": "clamav", "condition": "HEALTHY" }],
       "secrets": [
@@ -42,7 +43,8 @@
         { "name": "TAP_SECRET_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_SECRET_KEY::" },
         { "name": "TAP_WEBHOOK_URL", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" },
         { "name": "AI_LLM_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:AI_LLM_API_KEY::" },
-        { "name": "ERPNEXT_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:ERPNEXT_API_KEY::" }
+        { "name": "ERPNEXT_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:ERPNEXT_API_KEY::" },
+        { "name": "RECONCILIATION_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:RECONCILIATION_API_KEY::" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "bun healthcheck.ts"],

@@ -170,6 +170,23 @@ describe("production readiness of the ECS task definitions", () => {
     const mainTf = await readFile(join(import.meta.dir, "..", "terraform", "main.tf"), "utf8");
     expect(mainTf).toMatch(/workers = \{[^}]*\bERPNEXT_API_KEY = ""/);
 
+    // ERPNext's webhooks are verified by the API; the daily reconciliation is triggered by the
+    // workers calling the API with the shared service key.
+    expect(api.secrets).toContainEqual({
+      name: "ERPNEXT_WEBHOOK_SECRET",
+      valueFrom: "<API_APP_SECRETS_ARN>:ERPNEXT_WEBHOOK_SECRET::",
+    });
+    expect(api.secrets).toContainEqual({
+      name: "RECONCILIATION_API_KEY",
+      valueFrom: "<API_APP_SECRETS_ARN>:RECONCILIATION_API_KEY::",
+    });
+    expect(values(workers.environment!)).toMatchObject({ API_BASE_URL: "<API_ORIGIN>" });
+    expect(workers.secrets).toContainEqual({
+      name: "RECONCILIATION_API_KEY",
+      valueFrom: "<WORKERS_APP_SECRETS_ARN>:RECONCILIATION_API_KEY::",
+    });
+    expect(mainTf).toMatch(/workers = \{[^}]*\bRECONCILIATION_API_KEY = ""/);
+
     // render.sh derives the URL from the plane's internal ALB, empty (integration off) in dev.
     const render = await readFile(join(import.meta.dir, "scripts", "render.sh"), "utf8");
     expect(render).toContain("output -json erpnext_internal_alb_dns_name");

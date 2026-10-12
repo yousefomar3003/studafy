@@ -18,6 +18,9 @@ import { $ } from "bun";
 const apiUrl = process.env.ERPNEXT_API_URL ?? "http://127.0.0.1:8080";
 const credential = process.env.ERPNEXT_API_KEY ?? "studafylocalkey01:studafy-local-erpnext-secret";
 const domain = process.env.ERPNEXT_SITE_DOMAIN ?? "erpnext.localhost";
+const webhookSecret = process.env.ERPNEXT_WEBHOOK_SECRET ?? "studafy-local-erpnext-webhook";
+// Where the ERPNext containers reach the API running on this machine (Docker Desktop's host alias).
+const apiForWebhooks = `http://host.docker.internal:${process.env.PORT ?? 3000}`;
 
 const { hostname } = new URL(apiUrl);
 if (!["127.0.0.1", "localhost"].includes(hostname)) {
@@ -39,18 +42,18 @@ const psql = [
 
 /** Run bench-side python from the sites directory, as erpnext-new-site.sh does on ECS. */
 async function provision(site: string, ...args: string[]): Promise<void> {
-  await $`${compose} exec -T -e STUDAFY_ERPNEXT_API_KEY=${credential} erpnext-backend bash -c ${'cd sites && exec ../env/bin/python -m erpnext_seed.provision "$@"'} provision ${site} ${args}`;
+  await $`${compose} exec -T -e STUDAFY_ERPNEXT_API_KEY=${credential} -e STUDAFY_ERPNEXT_WEBHOOK_SECRET=${webhookSecret} erpnext-backend bash -c ${'cd sites && exec ../env/bin/python -m erpnext_seed.provision "$@"'} provision ${site} ${args}`;
 }
 
 const schools = (
-  await $`${psql} ${"SELECT slug || '|' || name FROM app.schools ORDER BY slug"}`.text()
+  await $`${psql} ${"SELECT id || '|' || slug || '|' || name FROM app.schools ORDER BY slug"}`.text()
 )
   .trim()
   .split("\n")
   .filter(Boolean)
   .map((line) => {
-    const [slug, name] = line.split("|") as [string, string];
-    return { slug, name };
+    const [id, slug, name] = line.split("|") as [string, string, string];
+    return { id, slug, name };
   });
 
 const existing = new Set(
@@ -73,7 +76,18 @@ for (const school of schools) {
     console.log("creating the site (a few minutes)…");
     await $`${compose} exec -T erpnext-backend bench new-site ${site} --mariadb-user-host-login-scope=% --db-root-password studafy-local-erp --admin-password studafy-local-admin --install-app erpnext --install-app education`.quiet();
   }
-  await provision(site, "setup", "--company", school.name, "--abbr", abbr);
+  await provision(
+    site,
+    "setup",
+    "--company",
+    school.name,
+    "--abbr",
+    abbr,
+    "--school-id",
+    school.id,
+    "--api-url",
+    apiForWebhooks,
+  );
   await provision(site, "demo");
 
   await $`${psql} ${`INSERT INTO app.erpnext_site_configs (school_id, site_name, company_name, company_abbr, status)

@@ -26,7 +26,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
-import { verifyWebhookSignature } from "../../../erpnext/signature";
+import { verifyWebhookSignature, webhookSignatureFrom } from "../../../erpnext/signature";
 import { auditAction, emitAuditLog } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
@@ -107,7 +107,7 @@ export function paymentWebhookRoutes(database: Database, logger: Logger): OpenAP
     // covers the exact bytes ERPNext sent, which is why this must be the raw text and never a
     // re-serialization of a parsed object.
     const rawBody = await c.req.text();
-    const signature = c.req.header("x-erpnext-signature") ?? null;
+    const signature = webhookSignatureFrom((name) => c.req.header(name));
 
     if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
       logger.warn({ path: WEBHOOK_PATH }, "payment webhook signature verification failed");

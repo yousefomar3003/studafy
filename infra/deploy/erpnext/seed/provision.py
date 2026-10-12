@@ -100,6 +100,91 @@ def set_integration_key(api_key, api_secret):
     print(f"integration key set on {INTEGRATION_USER}")
 
 
+# The document events apps/api projects (ERPNEXT_DOC_EVENT_MAP in packages/constants/src/events.ts):
+# `<doctype>-<action>`, where a submitted Sales Invoice that is a return is a credit note.
+WEBHOOK_EVENTS = ("Sales Invoice", "Payment Entry", "Fee Schedule", "Fee Structure")
+
+# The body apps/api's POST /erpnext/webhooks expects. The site has no notion of which Studafy school
+# it belongs to, so the school id is baked into each site's template at setup and spliced in front
+# of the document's own JSON. No method calls: webhooks render in Frappe's restricted Jinja sandbox,
+# where `doc.as_dict()` and `dict.update()` are not callable.
+WEBHOOK_TEMPLATE = (
+    '{"event_id": "{{ doc.doctype }}:{{ doc.name }}:{{ doc.modified }}",'
+    ' "doctype": "{{ doc.doctype }}",'
+    ' "action": "{% if doc.is_return %}return{% else %}submitted{% endif %}",'
+    ' "data": {"school_id": "__SCHOOL_ID__", {{ (doc | json)[1:] }}}'
+)
+
+
+def install_webhooks(school_id, api_url, secret):
+    """One Frappe Webhook per projected doctype, posting to apps/api signed with the shared secret.
+
+    Frappe signs each request body (base64 HMAC-SHA256 in X-Frappe-Webhook-Signature), which
+    apps/api verifies with ERPNEXT_WEBHOOK_SECRET. Idempotent: an existing hook is updated in place.
+    """
+    url = api_url.rstrip("/") + "/erpnext/webhooks"
+    template = WEBHOOK_TEMPLATE.replace("__SCHOOL_ID__", school_id)
+    for doctype in WEBHOOK_EVENTS:
+        if not frappe.db.exists("DocType", doctype):
+            continue
+        name = f"Studafy {doctype}"
+        if frappe.db.exists("Webhook", name):
+            hook = frappe.get_doc("Webhook", name)
+        else:
+            hook = frappe.new_doc("Webhook")
+            hook.set("__newname", name)  # Webhook names are set by hand ("Prompt")
+        hook.update(
+            {
+                "webhook_doctype": doctype,
+                "webhook_docevent": "on_submit",
+                "enabled": 1,
+                "request_url": url,
+                "request_method": "POST",
+                "request_structure": "JSON",
+                "webhook_json": template,
+                "enable_security": 1,
+                "webhook_secret": secret,
+            }
+        )
+        hook.set("webhook_headers", [{"key": "Content-Type", "value": "application/json"}])
+        hook.save(ignore_permissions=True)
+    frappe.db.commit()
+    print(f"webhooks installed -> {url}")
+
+
+def ensure_scholarship_award_doctype():
+    """`Scholarship Award`, which apps/api's scholarships module records awards in.
+
+    Neither ERPNext nor Frappe Education defines it, so each site gets it as a custom doctype: a
+    record of the confirmed award (the Studafy student, the scholarship/discount, the school).
+    Idempotent.
+    """
+    if frappe.db.exists("DocType", "Scholarship Award"):
+        return
+    frappe.get_doc(
+        {
+            "doctype": "DocType",
+            "name": "Scholarship Award",
+            "module": "Education",
+            "custom": 1,
+            "autoname": "hash",
+            "track_changes": 1,
+            "fields": [
+                {"fieldname": "student", "label": "Student", "fieldtype": "Data", "reqd": 1, "in_list_view": 1},
+                {"fieldname": "scholarship_discount", "label": "Scholarship / Discount", "fieldtype": "Data", "in_list_view": 1},
+                {"fieldname": "award_status", "label": "Award Status", "fieldtype": "Data", "in_list_view": 1},
+                {"fieldname": "custom_school_id", "label": "Studafy School", "fieldtype": "Data"},
+            ],
+            "permissions": [
+                {"role": role, "read": 1, "write": 1, "create": 1, "delete": 1}
+                for role in ("System Manager", "Accounts Manager", "Accounts User")
+            ],
+        }
+    ).insert(ignore_permissions=True)
+    frappe.db.commit()
+    print("Scholarship Award doctype created")
+
+
 DEMO_FAMILIES = (
     # (customer, invoice amount, days ago issued, days until due, amount paid)
     ("Yara Khalil", 1200, 95, 30, 1200),
@@ -183,6 +268,8 @@ def main(argv=None):
     parser.add_argument("--abbr", help="setup: a short company abbreviation, e.g. SDA")
     parser.add_argument("--currency", default="JOD")
     parser.add_argument("--country", default="Jordan")
+    parser.add_argument("--school-id", help="setup: the Studafy school id, stamped on webhooks")
+    parser.add_argument("--api-url", help="setup: apps/api's base URL the webhooks post to")
     args = parser.parse_args(argv)
 
     frappe.init(site=args.site, sites_path=".")
@@ -196,8 +283,16 @@ def main(argv=None):
             api_key, _, api_secret = credential.partition(":")
             if not api_key or not api_secret:
                 parser.error("STUDAFY_ERPNEXT_API_KEY must be set to <api_key>:<api_secret>")
+            webhook_secret = os.environ.get("STUDAFY_ERPNEXT_WEBHOOK_SECRET", "")
+            if not args.school_id or not args.api_url or not webhook_secret:
+                parser.error(
+                    "setup needs --school-id, --api-url and STUDAFY_ERPNEXT_WEBHOOK_SECRET "
+                    "(the webhooks apps/api projects invoices and payments from)"
+                )
             company = complete_setup(args.company, args.abbr, args.currency, args.country)
             set_integration_key(api_key, api_secret)
+            ensure_scholarship_award_doctype()
+            install_webhooks(args.school_id, args.api_url, webhook_secret)
             print(f"STUDAFY_COMPANY={company}")
         elif args.step == "fixtures":
             from erpnext_seed.load_fixtures import load_fixtures

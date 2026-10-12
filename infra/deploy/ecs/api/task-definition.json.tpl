@@ -59,7 +59,9 @@
         { "name": "MICROSOFT_OAUTH_CLIENT_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:MICROSOFT_OAUTH_CLIENT_SECRET::" },
         { "name": "TURNSTILE_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:TURNSTILE_SECRET_KEY::" },
         { "name": "AI_LLM_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:AI_LLM_API_KEY::" },
-        { "name": "ERPNEXT_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:ERPNEXT_API_KEY::" }
+        { "name": "ERPNEXT_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:ERPNEXT_API_KEY::" },
+        { "name": "ERPNEXT_WEBHOOK_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:ERPNEXT_WEBHOOK_SECRET::" },
+        { "name": "RECONCILIATION_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:RECONCILIATION_API_KEY::" }
       ],
       "healthCheck": {
         "command": [

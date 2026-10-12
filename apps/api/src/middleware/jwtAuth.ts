@@ -105,6 +105,10 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/lookups/currencies",
   "/api/subscriptions/webhook/stripe",
   "/api/subscriptions/webhook/tap",
+  // Authenticated by their own HMAC signature (ERPNext finance webhooks) and X-Api-Key service key
+  // (reconciliation, called by the workers' scheduler) rather than a user token -- see csrf.ts.
+  "/api/finance/webhooks/erpnext",
+  "/api/finance/reconciliation/run",
   // Plan/price listing is pre-signup content (the marketing pricing page reads it anonymously) and
   // the query is not school-scoped — see getActivePlans in subscription-service.ts.
   "/api/subscriptions/plans",

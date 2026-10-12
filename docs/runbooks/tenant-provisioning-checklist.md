@@ -29,8 +29,8 @@ This document describes the tenant provisioning pipeline that runs after a schoo
       - Mark provisioning_status = 'completed'
       - Emit school.created event to outbox
 
-5. Operator: infra/deploy/scripts/erpnext-new-site.sh <env> <site> --company "<name>" --abbr <ABBR>
-   → bench new-site, ERPNext setup wizard (the school's company), integration key
+5. Operator: infra/deploy/scripts/erpnext-new-site.sh <env> <site> --school-id <id> --company "<name>" --abbr <ABBR>
+   → bench new-site, ERPNext setup wizard (the school's company), integration key, webhooks
 
 6. The school's first finance request
    → the API finds the site answering with its company and marks it 'completed'
@@ -57,13 +57,14 @@ This document describes the tenant provisioning pipeline that runs after a schoo
 
 ### Creating a school's site
 
-1. Read the school's row: `SELECT site_name, company_name, company_abbr FROM app.erpnext_site_configs
-WHERE school_id = ...` (status `pending`).
-2. Run `infra/deploy/scripts/erpnext-new-site.sh <staging|prod> <site_name> --company "<company_name>"
---abbr <company_abbr> [--currency JOD] [--country Jordan]`. It creates the site with erpnext +
-   education, finishes ERPNext's setup wizard (company, chart of accounts, fiscal year, currency) and
-   sets the shared integration key on the site's integration user
-   (`infra/deploy/erpnext/seed/provision.py`).
+1. Read the school's row: `SELECT school_id, site_name, company_name, company_abbr FROM
+app.erpnext_site_configs WHERE status = 'pending'`.
+2. Run `infra/deploy/scripts/erpnext-new-site.sh <staging|prod> <site_name> --school-id <school_id>
+--company "<company_name>" --abbr <company_abbr> [--currency JOD] [--country Jordan]`. It creates
+   the site with erpnext + education, finishes ERPNext's setup wizard (company, chart of accounts,
+   fiscal year, currency), sets the shared integration key on the site's integration user, creates
+   the Scholarship Award doctype, and installs the webhooks that report submitted invoices,
+   payments and fees to the API (`infra/deploy/erpnext/seed/provision.py`).
 3. Nothing else: on the school's next finance request the credential resolver sees the site answer,
    records its company in `erpnext_company_id` and marks the row `completed`. Until then every
    finance route answers 503 `ERPNEXT_NOT_CONFIGURED`.

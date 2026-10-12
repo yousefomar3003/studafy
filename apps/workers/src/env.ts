@@ -45,6 +45,11 @@ export const envSchema = z
     // ERPNext integration — required for billing queue. Both must be set together.
     ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
     ERPNEXT_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Daily finance reconciliation (queues/billing/finance-reconciliation.ts): apps/api's base URL
+    // and the service key its POST /api/finance/reconciliation/run checks. Unset key = no ERPNext
+    // integration to reconcile, a logged skip.
+    API_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    RECONCILIATION_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Stripe seat reconciliation (ST-136). Optional because the seat-reconciliation job is not the
     // billing queue's only consumer: when unset, every other billing job still runs, the scheduled
     // reconciliation fails loudly rather than silently skipping, and the env validation below

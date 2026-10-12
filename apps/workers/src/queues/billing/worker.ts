@@ -9,6 +9,7 @@ import { workerLogger } from "../../log";
 import { retryBillingEvent } from "./billing-event.service";
 import { COST_METRIC_NAMESPACE, runCostReport } from "./cost-report";
 import { runDunningSweep } from "./dunning-sweep";
+import { runFinanceReconciliation } from "./finance-reconciliation";
 import { generateInvoice, generateBatchInvoices } from "./invoice.service";
 import {
   generateInvoiceSchema,
@@ -100,6 +101,25 @@ export async function processBillingJob(
   // skip, because a meter that never reconciles drifts without limit.
   if (job.name === JOB_NAMES.RUN_STORAGE_QUOTA_RECONCILIATION) {
     return processStorageQuotaReconciliation(databaseUrl, storageOptions);
+  }
+
+  // Daily finance reconciliation: triggers apps/api's run (finance-reconciliation.ts). Without a
+  // service key the deployment has no ERPNext integration to reconcile, so that is a logged skip;
+  // a key without the API's address is a thrown error, because then reconciliation silently never
+  // happens.
+  if (job.name === JOB_NAMES.RUN_FINANCE_RECONCILIATION) {
+    const apiKey = process.env.RECONCILIATION_API_KEY;
+    const apiBaseUrl = process.env.API_BASE_URL;
+    if (!apiKey) {
+      workerLogger.info({}, "RECONCILIATION_API_KEY not set; no finance reconciliation to run");
+      return { processed: false, reason: "finance reconciliation not configured" };
+    }
+    if (!apiBaseUrl) {
+      throw new Error("API_BASE_URL is required to run finance reconciliation");
+    }
+    const result = await runFinanceReconciliation({ apiBaseUrl, apiKey });
+    workerLogger.info({ ...result }, "finance reconciliation complete");
+    return result;
   }
 
   // Cost & budget reporting sweep (ST-293). Same no-payload-but-mode shape as the sweeps above,

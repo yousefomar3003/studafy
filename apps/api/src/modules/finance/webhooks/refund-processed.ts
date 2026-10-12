@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
-import { verifyWebhookSignature } from "../../../erpnext/signature";
+import { verifyWebhookSignature, webhookSignatureFrom } from "../../../erpnext/signature";
 import { auditAction, emitAuditLog } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
@@ -60,7 +60,7 @@ export function refundWebhookRoutes(database: Database, logger: Logger): OpenAPI
     }
 
     const rawBody = await c.req.text();
-    const signature = c.req.header("x-erpnext-signature") ?? null;
+    const signature = webhookSignatureFrom((name) => c.req.header(name));
 
     if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
       logger.warn({ path: WEBHOOK_PATH }, "refund webhook signature verification failed");

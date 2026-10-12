@@ -10,7 +10,7 @@ import { projectPaymentEntry } from "../modules/finance/payments/projection";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
 
-import { verifyWebhookSignature } from "./signature";
+import { verifyWebhookSignature, webhookSignatureFrom } from "./signature";
 
 import type { Database } from "../db";
 import type { Logger } from "../logger";
@@ -110,12 +110,25 @@ const webhookRoute = createRoute({
   // apply. Empty rather than omitted: this route *is* authenticated, just not by the app's scheme.
   security: [],
   request: {
+    // One of the two is required -- the signature middleware refuses a request with neither, before
+    // this validator runs -- so neither is marked required here.
     headers: z.object({
-      "x-erpnext-signature": z.string().openapi({
-        description:
-          "Hex-encoded HMAC-SHA256 of the raw request body, keyed with the shared webhook secret. " +
-          "Verified before the body is parsed; compared with a timing-safe equality.",
-      }),
+      "x-frappe-webhook-signature": z
+        .string()
+        .optional()
+        .openapi({
+          description:
+            "Base64 HMAC-SHA256 of the raw request body, keyed with the shared webhook secret: what " +
+            "Frappe's Webhook doctype sends. Verified before the body is parsed, timing-safe.",
+        }),
+      "x-erpnext-signature": z
+        .string()
+        .optional()
+        .openapi({
+          description:
+            "The same HMAC, hex-encoded, for callers that are not a Frappe Webhook. Either header " +
+            "is accepted.",
+        }),
     }),
     body: {
       required: true,
@@ -180,7 +193,7 @@ export function erpNextWebhookRoutes(db: Database, logger: Logger): OpenAPIHono<
     }
 
     const rawBody = await c.req.text();
-    const signature = c.req.header("x-erpnext-signature") ?? null;
+    const signature = webhookSignatureFrom((name) => c.req.header(name));
 
     if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
       logger.warn({ signature }, "webhook signature verification failed");

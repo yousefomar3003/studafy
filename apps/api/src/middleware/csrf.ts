@@ -119,6 +119,12 @@ const EXEMPT_PATHS = [
   "/api/subscriptions/webhook/stripe",
   // Tap billing webhook (ST-298). Same posture: authenticated by the `hashstring` HMAC, no cookie.
   "/api/subscriptions/webhook/tap",
+  // The dedicated ERPNext finance webhooks (payment-confirmed, refund-processed): the same HMAC over
+  // the raw body as /erpnext/webhooks, but under /api/, so they need naming like Stripe and Tap.
+  "/api/finance/webhooks/erpnext",
+  // Daily finance reconciliation, called by the workers' scheduler with the X-Api-Key service key --
+  // no cookie or user session, so nothing a cross-site page could forge.
+  "/api/finance/reconciliation/run",
   // School self-registration (ST-184), same posture as /api/auth/login above: no ambient authority
   // (cookie or Bearer header) a cross-site page could forge — a forged POST here accomplishes
   // nothing an attacker could not already do by calling the endpoint directly. Without this entry a

@@ -5,18 +5,21 @@
 # never over the REST API, so apps/api cannot do this itself.
 #
 # Usage:
-#   erpnext-new-site.sh <staging|prod> <site-hostname> --company "<name>" --abbr <ABBR> \
-#     [--currency JOD] [--country Jordan] [--seed]
+#   erpnext-new-site.sh <staging|prod> <site-hostname> --school-id <uuid> --company "<name>" \
+#     --abbr <ABBR> [--currency JOD] [--country Jordan] [--seed]
 #
-# The school's site hostname, company name and abbreviation are on its app.erpnext_site_configs row,
+# The school's id, site hostname, company name and abbreviation are on its app.erpnext_site_configs row,
 # which provisioning writes as 'pending' when the school verifies its email
 # (<slug>.<ERPNEXT_SITE_DOMAIN>). Three steps, each its own one-shot task:
 #
 #   1. `bench new-site` with erpnext + education installed.
 #   2. `python -m erpnext_seed.provision <site> setup` (infra/deploy/erpnext/seed/provision.py):
 #      finishes ERPNext's setup wizard -- the school's Company, chart of accounts, fiscal year and
-#      currency -- and gives the integration user the shared credential apps/api uses for every
-#      site (ERPNEXT_API_KEY in the api app secret, passed in as an environment variable).
+#      currency -- gives the integration user the shared credential apps/api uses for every site
+#      (ERPNEXT_API_KEY), creates the Scholarship Award doctype, and installs the webhooks that tell
+#      apps/api about submitted invoices, payments and fees: posted to the tier's API_ORIGIN, stamped
+#      with the school id, signed with ERPNEXT_WEBHOOK_SECRET (both secrets from the api app secret,
+#      passed in as environment variables).
 #   3. With --seed only: the synthetic fixtures in infra/deploy/erpnext/seed/ (a demo tenant, never a
 #      real school).
 #
@@ -30,11 +33,12 @@
 # own equivalent access, since this script reads those secrets directly to pass them to the task.
 set -euo pipefail
 
-USAGE='usage: erpnext-new-site.sh <staging|prod> <site-hostname> --company "<name>" --abbr <ABBR> [--currency JOD] [--country Jordan] [--seed]'
+USAGE='usage: erpnext-new-site.sh <staging|prod> <site-hostname> --school-id <uuid> --company "<name>" --abbr <ABBR> [--currency JOD] [--country Jordan] [--seed]'
 ENVIRONMENT="${1:?$USAGE}"
 SITE_HOSTNAME="${2:?$USAGE}"
 shift 2
 
+SCHOOL_ID=""
 COMPANY=""
 ABBR=""
 CURRENCY="JOD"
@@ -42,6 +46,7 @@ COUNTRY="Jordan"
 SEED=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --school-id) SCHOOL_ID="${2:?$USAGE}"; shift 2 ;;
     --company) COMPANY="${2:?$USAGE}"; shift 2 ;;
     --abbr) ABBR="${2:?$USAGE}"; shift 2 ;;
     --currency) CURRENCY="${2:?$USAGE}"; shift 2 ;;
@@ -50,7 +55,7 @@ while [ $# -gt 0 ]; do
     *) echo "$USAGE" >&2; exit 1 ;;
   esac
 done
-if [ -z "$COMPANY" ] || [ -z "$ABBR" ]; then
+if [ -z "$SCHOOL_ID" ] || [ -z "$COMPANY" ] || [ -z "$ABBR" ]; then
   echo "$USAGE" >&2
   exit 1
 fi
@@ -83,6 +88,9 @@ MARIADB_ROOT_USER="$(secret_field "$MARIADB_SECRET_ARN" username)"
 MARIADB_ROOT_PASSWORD="$(secret_field "$MARIADB_SECRET_ARN" password)"
 ADMIN_PASSWORD="$(secret_field "$(jq -r '.erpnext' <<<"$SECRET_ARNS_JSON")" ADMIN_PASSWORD)"
 INTEGRATION_KEY="$(secret_field "$(jq -r '.api' <<<"$SECRET_ARNS_JSON")" ERPNEXT_API_KEY)"
+WEBHOOK_SECRET="$(secret_field "$(jq -r '.api' <<<"$SECRET_ARNS_JSON")" ERPNEXT_WEBHOOK_SECRET)"
+# The public API address the site's webhooks post to (its tier's API_ORIGIN).
+API_ORIGIN="$(sed -n 's/^API_ORIGIN=//p' "$ROOT/infra/deploy/environments/$ENVIRONMENT.env")"
 
 case "$INTEGRATION_KEY" in
   ?*:?*) ;;
@@ -91,6 +99,10 @@ case "$INTEGRATION_KEY" in
     exit 1
     ;;
 esac
+if [ -z "$WEBHOOK_SECRET" ] || [ -z "$API_ORIGIN" ]; then
+  echo "the api app secret needs ERPNEXT_WEBHOOK_SECRET and environments/$ENVIRONMENT.env an API_ORIGIN — the site's webhooks post to it (docs/runbooks/production-secrets.md)" >&2
+  exit 1
+fi
 
 # Runs the site-setup task with the given container overrides (JSON) and fails on a non-zero exit.
 # Credentials travel in the run-task overrides (visible in that API call's parameters / CloudTrail,
@@ -144,13 +156,19 @@ run_site_task "site setup" "$(jq -n \
   --arg currency "$CURRENCY" \
   --arg country "$COUNTRY" \
   --arg key "$INTEGRATION_KEY" \
+  --arg webhook_secret "$WEBHOOK_SECRET" \
+  --arg school_id "$SCHOOL_ID" \
+  --arg api_url "$API_ORIGIN" \
   '{
     containerOverrides: [{
       name: "site-setup",
-      environment: [{name: "STUDAFY_ERPNEXT_API_KEY", value: $key}],
+      environment: [
+        {name: "STUDAFY_ERPNEXT_API_KEY", value: $key},
+        {name: "STUDAFY_ERPNEXT_WEBHOOK_SECRET", value: $webhook_secret}
+      ],
       command: ["bash", "-c",
-                "cd sites && exec ../env/bin/python -m erpnext_seed.provision \"$0\" setup --company \"$1\" --abbr \"$2\" --currency \"$3\" --country \"$4\"",
-                $site, $company, $abbr, $currency, $country]
+                "cd sites && exec ../env/bin/python -m erpnext_seed.provision \"$0\" setup --company \"$1\" --abbr \"$2\" --currency \"$3\" --country \"$4\" --school-id \"$5\" --api-url \"$6\"",
+                $site, $company, $abbr, $currency, $country, $school_id, $api_url]
     }]
   }')"
 
