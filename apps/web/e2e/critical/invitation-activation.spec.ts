@@ -7,7 +7,7 @@ import { PERSONAS } from "./support/personas";
 import { API_BASE_URL } from "./support/ports";
 
 /**
- * Journey 2/7: invitation activation.
+ * Journey 2/6: invitation activation.
  *
  * A real `SUPER_ADMIN`/`ORG_ADMIN` bearer token creates a real invitation (`POST /api/invitations`),
  * whose raw one-time activation token is returned directly in that response — the same way an E2E

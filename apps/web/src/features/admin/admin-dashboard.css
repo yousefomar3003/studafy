@@ -4,10 +4,6 @@
  * this file — this stylesheet only holds the layout classes specific to this page.
  */
 
-.admin-dashboard-banner {
-  margin-bottom: var(--space-16);
-}
-
 .admin-dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

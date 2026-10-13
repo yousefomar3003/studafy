@@ -60,12 +60,9 @@ afterEach(() => {
 describe.each<[string, string[]]>([
   [
     "SUPER_ADMIN",
-    ["Home", "Notifications", "Admin", "Principal", "Billing", "Finance", "Approvals", "Account"],
+    ["Home", "Notifications", "Admin", "Principal", "Finance", "Approvals", "Account"],
   ],
-  [
-    "ORG_ADMIN",
-    ["Home", "Notifications", "Admin", "Principal", "Billing", "Finance", "Approvals", "Account"],
-  ],
+  ["ORG_ADMIN", ["Home", "Notifications", "Admin", "Principal", "Finance", "Approvals", "Account"]],
   ["PRINCIPAL", ["Home", "Notifications", "Principal", "Approvals", "Account"]],
   ["INSTRUCTOR", ["Home", "Notifications", "Account"]],
   ["TEACHING_ASSISTANT", ["Home", "Notifications", "Account"]],

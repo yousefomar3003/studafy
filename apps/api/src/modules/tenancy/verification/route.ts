@@ -30,9 +30,9 @@ const verifyEmailRoute = createRoute({
   summary: "Verify a school's email address",
   description:
     "Verifies the school contact email using a one-time token. On success the token is consumed, " +
-    "email_verified_at is set, and the school status moves from 'registered' to 'active' (trial). " +
+    "email_verified_at is set, and the school status moves from 'registered' to 'active'. " +
     "The school must be active before the admin invitation can be activated. " +
-    "Triggers async tenant provisioning (trial subscription, ERPNext bootstrap).",
+    "Triggers async tenant provisioning (free plan, ERPNext site registration).",
   security: [],
   request: { params: verifyEmailPathParams },
   responses: standardResponses(

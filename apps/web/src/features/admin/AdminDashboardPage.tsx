@@ -6,7 +6,6 @@ import { ActivationFunnelTile } from "./tiles/ActivationFunnelTile";
 import { AttendanceTodayTile } from "./tiles/AttendanceTodayTile";
 import { PendingApprovalsTile } from "./tiles/PendingApprovalsTile";
 import { StorageUsageTile } from "./tiles/StorageUsageTile";
-import { SubscriptionStatusBanner } from "./tiles/SubscriptionStatusBanner";
 
 import "../../components/dashboard-tile.css";
 import "./admin-dashboard.css";
@@ -62,10 +61,6 @@ export default function AdminDashboardPage() {
           </Link>
         </li>
       </ul>
-
-      <div className="admin-dashboard-banner">
-        <SubscriptionStatusBanner />
-      </div>
 
       <div className="admin-dashboard-grid">
         <ActivationFunnelTile />

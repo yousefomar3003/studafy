@@ -42,7 +42,7 @@ function formatBytes(
   });
 }
 
-/** Storage usage against the plan's cap — one call, shared with `SubscriptionStatusBanner`. */
+/** Storage usage against the plan's cap. */
 export function StorageUsageTile() {
   const { t } = useTranslation();
   const { formatNumber } = useFormatters();

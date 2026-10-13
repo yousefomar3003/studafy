@@ -12,12 +12,12 @@ This document describes the tenant provisioning pipeline that runs after a schoo
    → Returns verification_token + invitation_token (once only)
 
 2. GET /api/schools/verify-email/{token}  (public)
-   → Consumes token, sets email_verified_at, status='active' (trial begins)
+   → Consumes token, sets email_verified_at, status='active'
    → Triggers async provisioning (fire-and-forget)
 
 3. Provisioning Pipeline (async)
    a. Local Postgres Provisioning
-      - Create trial subscription (50 students, 14-day expiry)
+      - Put the school on the free plan (active, never ends — migration 000126)
       - Seed notification preferences for admin user
       - Confirm ORG_ADMIN role
 
@@ -39,12 +39,12 @@ This document describes the tenant provisioning pipeline that runs after a schoo
    → Consumes invitation, activates user, issues JWT tokens
 ```
 
-## Trial Limits
+## School plan
 
-| Limit          | Value   | Enforcement                                                      |
-| -------------- | ------- | ---------------------------------------------------------------- |
-| Student cap    | 50      | `app.subscriptions.student_cap` column, application-level check  |
-| Trial duration | 14 days | `app.subscriptions.trial_expires_at` column, set at provisioning |
+Studafy is free for schools: every school is on the `free` plan (`app.plans.code = 'free'`),
+`status = 'active'`, `current_period_end = 9999-12-31`, with no trial and no expiry (migration
+000126). `student_cap` (50) is stored but not enforced. The only paid products are per-student
+add-ons, such as the AI add-on.
 
 ## ERPNext site
 
@@ -140,26 +140,6 @@ WHERE s.provisioning_status = 'failed'
 ORDER BY s.created_at DESC;
 ```
 
-### Trial Expiry Monitoring
-
-```sql
-SELECT
-  s.slug,
-  s.name,
-  sub.trial_expires_at,
-  sub.student_cap,
-  sub.status AS subscription_status,
-  CASE
-    WHEN sub.trial_expires_at < NOW() THEN 'expired'
-    WHEN sub.trial_expires_at < NOW() + INTERVAL '3 days' THEN 'expiring_soon'
-    ELSE 'active'
-  END AS trial_status
-FROM app.subscriptions sub
-JOIN app.schools s ON s.id = sub.school_id
-WHERE sub.status = 'trialing'
-ORDER BY sub.trial_expires_at ASC;
-```
-
 ## API Endpoints
 
 ### Provisioning Status
@@ -187,10 +167,3 @@ Manually triggers the full provisioning pipeline. Idempotent on retries.
 3. `pending`: the site has not been created, or it does not answer yet. Run (or re-check)
    erpnext-new-site.sh; from inside the VPC, `GET /api/resource/Company` with the site as the Host
    header and the integration key must answer 200 with the company.
-
-### Trial expired but subscription not updated
-
-1. Check `app.subscriptions.trial_expires_at` value
-2. The subscription status transition from 'trialing' to 'expired' is handled by
-   a background worker (not part of ST-089)
-3. Manually update if needed: `UPDATE app.subscriptions SET status = 'expired' WHERE ...`

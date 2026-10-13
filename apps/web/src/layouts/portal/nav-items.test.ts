@@ -13,11 +13,11 @@ describe("visiblePortalNavItems", () => {
   test.each<[string, string[]]>([
     [
       "SUPER_ADMIN",
-      ["home", "notifications", "admin", "principal", "billing", "finance", "approvals", "account"],
+      ["home", "notifications", "admin", "principal", "finance", "approvals", "account"],
     ],
     [
       "ORG_ADMIN",
-      ["home", "notifications", "admin", "principal", "billing", "finance", "approvals", "account"],
+      ["home", "notifications", "admin", "principal", "finance", "approvals", "account"],
     ],
     ["PRINCIPAL", ["home", "notifications", "principal", "approvals", "account"]],
     ["FINANCE", ["home", "notifications", "finance", "account"]],
@@ -41,7 +41,6 @@ describe("visiblePortalNavItems", () => {
       "notifications",
       "admin",
       "principal",
-      "billing",
       "finance",
       "approvals",
       "account",

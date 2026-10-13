@@ -62,7 +62,11 @@ describe("app shell", () => {
   test("resolves the lazy /pricing route", async () => {
     renderAt("/pricing");
     expect(
-      await screen.findByRole("heading", { name: /pricing/i, level: 1 }, { timeout: 5000 }),
+      await screen.findByRole(
+        "heading",
+        { name: /free for schools/i, level: 1 },
+        { timeout: 5000 },
+      ),
     ).toBeTruthy();
   });
 

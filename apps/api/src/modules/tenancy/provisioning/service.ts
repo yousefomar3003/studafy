@@ -14,7 +14,13 @@ import type { Logger } from "../../../logger";
 // Constants
 // ---------------------------------------------------------------------------
 
-const TRIAL_DURATION_DAYS = 14;
+/**
+ * Studafy is free for schools: every school is on the `free` plan (migration 000126), active and
+ * never ending. The only paid products are per-student add-ons such as the AI add-on.
+ */
+export const FREE_PLAN_CODE = "free";
+/** "Never": the column is NOT NULL and must lie after the period start. */
+export const FREE_PLAN_PERIOD_END = "9999-12-31T00:00:00Z";
 const DEFAULT_STUDENT_CAP = 50;
 
 // ---------------------------------------------------------------------------
@@ -57,7 +63,7 @@ export interface ProvisioningStatusResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Provision a newly verified school: create trial subscription, seed platform
+ * Provision a newly verified school: put it on the free plan, seed platform
  * defaults, register the school's ERPNext site (created by an operator, activated on first use),
  * and emit school.created.
  *
@@ -199,12 +205,9 @@ async function provisionLocal(
   logger: Logger,
 ): Promise<void> {
   await withTenantTx(database, params.tenantContext, async (tx) => {
-    // ── a. Create trial subscription with limits ────────────────────────────
-    const trialExpiresAt = new Date(Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
-
-    // Find the default trial plan (or any active plan).
+    // ── a. Put the school on the free plan ─────────────────────────────────
     const plans = await tx<{ id: string }[]>`
-      SELECT id FROM app.plans WHERE is_active = true LIMIT 1
+      SELECT id FROM app.plans WHERE code = ${FREE_PLAN_CODE} LIMIT 1
     `;
     const planId = plans.length > 0 ? plans[0].id : null;
 
@@ -215,16 +218,14 @@ async function provisionLocal(
       ) VALUES (
         ${params.schoolId}::uuid,
         ${planId}::uuid,
-        'trialing'::app.subscription_status,
+        'active'::app.subscription_status,
         ${DEFAULT_STUDENT_CAP},
-        ${trialExpiresAt.toISOString()}::timestamptz,
+        NULL,
         CURRENT_TIMESTAMP,
-        ${trialExpiresAt.toISOString()}::timestamptz,
+        ${FREE_PLAN_PERIOD_END}::timestamptz,
         'in_progress'::app.provisioning_status
       )
       ON CONFLICT (school_id) DO UPDATE SET
-        student_cap = ${DEFAULT_STUDENT_CAP},
-        trial_expires_at = ${trialExpiresAt.toISOString()}::timestamptz,
         provisioning_status = 'in_progress'::app.provisioning_status
     `;
 
@@ -275,14 +276,14 @@ async function provisionLocal(
       targetTable: "subscriptions",
       targetId: params.schoolId,
       newValues: {
-        status: "trialing",
+        status: "active",
+        plan: FREE_PLAN_CODE,
         student_cap: DEFAULT_STUDENT_CAP,
-        trial_expires_at: trialExpiresAt.toISOString(),
       },
     });
 
     logger.info(
-      { school_id: params.schoolId, trial_expires_at: trialExpiresAt.toISOString() },
+      { school_id: params.schoolId, plan: FREE_PLAN_CODE },
       "local provisioning completed",
     );
   });

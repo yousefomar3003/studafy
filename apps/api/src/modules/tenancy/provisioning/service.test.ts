@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test"; // eslint-disable-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 
-import { provisionTenant, getProvisioningStatus, type ProvisionTenantParams } from "./service";
+import {
+  FREE_PLAN_CODE,
+  FREE_PLAN_PERIOD_END,
+  provisionTenant,
+  getProvisioningStatus,
+  type ProvisionTenantParams,
+} from "./service";
 
 // ---------------------------------------------------------------------------
 // Unit tests (no DB required)
@@ -17,14 +23,9 @@ describe("Provisioning service exports", () => {
 });
 
 describe("Provisioning constants", () => {
-  test("TRIAL_DURATION_DAYS is 14", () => {
-    // The constant is defined inside the service module. We verify the behavior
-    // by checking that a date 14 days from now is used.
-    const now = Date.now();
-    const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
-    const trialExpiry = new Date(now + fourteenDaysMs);
-    const diffDays = Math.round((trialExpiry.getTime() - now) / (24 * 60 * 60 * 1000));
-    expect(diffDays).toBe(14);
+  test("schools go on the free plan, which never ends", () => {
+    expect(FREE_PLAN_CODE).toBe("free");
+    expect(new Date(FREE_PLAN_PERIOD_END).getUTCFullYear()).toBe(9999);
   });
 
   test("DEFAULT_STUDENT_CAP is 50", () => {

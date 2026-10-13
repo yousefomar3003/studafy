@@ -139,8 +139,6 @@ describe("AdminDashboardPage", () => {
     expect(screen.getByText("12")).toBeTruthy();
     expect(screen.getByText("80%")).toBeTruthy();
     expect(screen.getByText("8 present of 10 records")).toBeTruthy();
-    expect(screen.getByText("Past due")).toBeTruthy();
-    expect(screen.getByText("Studafy Growth · 7/20 seats")).toBeTruthy();
     expect(screen.getByText("500.0 MB of 1000.0 MB used")).toBeTruthy();
   });
 

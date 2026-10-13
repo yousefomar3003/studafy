@@ -1,3 +1,4 @@
+import { LIVE_STATUSES } from "@studafy/billing";
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
@@ -8,6 +9,7 @@ import type { Database } from "../../../db";
 import type { TenantContext } from "../../../db/tenant-tx";
 import type { PaymentProviderRegistry, SelectedPaymentProvider } from "../payment-provider-routing";
 import type { PaymentProviderPort } from "../ports/payment-provider";
+import type { SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
 export interface CheckoutParams {
@@ -346,7 +348,9 @@ export async function createAiCheckoutSession(
       LIMIT 1
     `;
 
-    if (!sub || sub.status !== "active") {
+    // The same "school is live" rule the AI entitlement gate applies (LIVE_STATUSES): a school in
+    // grace or past due keeps its students' AI, so it does not stop them buying it either.
+    if (!sub || !LIVE_STATUSES.has(sub.status as SubscriptionStatus)) {
       throw new CodedHttpException(
         400,
         ERROR_CODES.AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE,

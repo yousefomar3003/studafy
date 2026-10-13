@@ -37,7 +37,7 @@ export function useUnreadCountQuery() {
 
 // ---------------------------------------------------------------------------
 // Inbox list — cursor-paginated with `@studafy/ui`'s `useCursorPagination`, the same contract
-// `finance/invoices/InvoiceListPage` and `billing/BillingInvoicesPage` use.
+// `finance/invoices/InvoiceListPage` uses.
 // ---------------------------------------------------------------------------
 
 const INBOX_PAGE_SIZE = 20;

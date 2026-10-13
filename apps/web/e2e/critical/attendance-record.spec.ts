@@ -7,7 +7,7 @@ import { PERSONAS } from "./support/personas";
 import { API_BASE_URL } from "./support/ports";
 
 /**
- * Journey 3/7: attendance record.
+ * Journey 3/6: attendance record.
  *
  * The web app has no "take attendance" screen at all — opening a session and marking a roster is
  * teacher-only and exists only in the Flutter mobile app (see the ST-246 journey catalog). This spec

@@ -9,7 +9,7 @@ const PROVISIONING_TIMEOUT_MS = 60_000;
 const INVOICE_BATCH_TIMEOUT_MS = 60_000;
 
 /**
- * Journey 5/7: invoice → payment.
+ * Journey 5/6: invoice → payment.
  *
  * Runs against the real ERPNext sandbox configured in this environment (`ERPNEXT_API_URL`/
  * `ERPNEXT_API_KEY` — confirmed a disposable target safe for repeated automated writes, unlike the

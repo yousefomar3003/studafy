@@ -19,18 +19,7 @@ import type { ComponentType } from "react";
  * <page>`), since the header's nav and footer are part of every marketing route's accessible tree.
  */
 
-const PLAN = {
-  id: "plan-1",
-  code: "growth",
-  displayName: "Studafy Growth",
-  description: "For growing schools.",
-  prices: [
-    { billingInterval: "monthly", currencyCode: "USD", amountMinor: 9900 },
-    { billingInterval: "yearly", currencyCode: "USD", amountMinor: 99000 },
-  ],
-};
-
-const getMock = mock((_path: string) => Promise.resolve<unknown>({ data: [PLAN] }));
+const getMock = mock((_path: string) => Promise.resolve<unknown>({ data: undefined }));
 mock.module("../../lib/api", () => ({ api: { GET: getMock } }));
 // Cloudflare's script does not load in happy-dom; the delete-account form renders the widget.
 mock.module("../../components/TurnstileWidget", () => ({
@@ -97,9 +86,9 @@ describe("marketing site accessibility", () => {
     await expectNoA11yViolations(container);
   });
 
-  test("pricing page, plans loaded", async () => {
+  test("pricing page", async () => {
     const { container } = renderPage(await loadPricingPage());
-    await screen.findByText("Studafy Growth");
+    await screen.findByText("Free for schools");
     await expectNoA11yViolations(container);
   });
 

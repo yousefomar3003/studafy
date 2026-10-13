@@ -28,7 +28,7 @@ const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
  * of role, so there is no permission to check.
  *
  * Cursor-paginated with the same `useCursorPagination` contract `finance/invoices/InvoiceListPage`
- * and `billing/BillingInvoicesPage` use. Switching the All/Unread filter changes `fetchPage`'s
+ * uses. Switching the All/Unread filter changes `fetchPage`'s
  * identity (the hook's cache key), which resets back to the first page by design — see the hook's
  * own doc comment.
  *
