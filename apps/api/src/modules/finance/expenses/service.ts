@@ -10,17 +10,17 @@ import type { StorageService } from "../../../lib/storage";
 import type { TenantErpNext } from "../client/tenant-client";
 import type { JSONValue, TransactionSql } from "postgres";
 
-export type ExpenseDocumentType = "purchase_invoice" | "expense_claim" | "journal_entry";
+// No "expense_claim": ERPNext's Expense Claim lives in the separate HRMS app, which the erpnext image
+// does not install, so expenses go in as supplier bills or journal entries.
+export type ExpenseDocumentType = "purchase_invoice" | "journal_entry";
 
 const ERPNEXT_RESOURCES: Record<ExpenseDocumentType, string> = {
   purchase_invoice: "/api/resource/Purchase%20Invoice",
-  expense_claim: "/api/resource/Expense%20Claim",
   journal_entry: "/api/resource/Journal%20Entry",
 };
 
 const ERPNEXT_DOCTYPES: Record<ExpenseDocumentType, string> = {
   purchase_invoice: "Purchase Invoice",
-  expense_claim: "Expense Claim",
   journal_entry: "Journal Entry",
 };
 
@@ -154,21 +154,6 @@ function toErpNextPayload(
             qty: 1,
             rate: amount,
             amount,
-          },
-        ],
-      };
-
-    case "expense_claim":
-      return {
-        employee: vendor,
-        currency,
-        total_claimed_amount: amount,
-        custom_school_id: schoolId,
-        expenses: [
-          {
-            expense_type: category,
-            amount,
-            description: description ?? null,
           },
         ],
       };

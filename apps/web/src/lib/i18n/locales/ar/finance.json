@@ -290,19 +290,16 @@
     "back": "→ العودة إلى المصروفات",
     "documentType": {
       "purchase_invoice": "فاتورة شراء",
-      "expense_claim": "مطالبة مصروفات",
       "journal_entry": "قيد يومية"
     },
     "categoryField": {
       "default": "الفئة",
       "purchase_invoice": "حساب المصروف",
-      "expense_claim": "نوع المصروف",
       "journal_entry": "الحساب"
     },
     "vendorField": {
       "default": "المورّد",
       "purchase_invoice": "المورّد",
-      "expense_claim": "الموظف",
       "journal_entry": "المرجع"
     },
     "list": {

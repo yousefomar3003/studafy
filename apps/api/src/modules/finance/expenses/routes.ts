@@ -100,7 +100,7 @@ const createRouteDef = createRoute({
   operationId: "createExpense",
   summary: "Create an expense",
   description:
-    "Forwards the expense to ERPNext as a Purchase Invoice, Expense Claim, or Journal Entry " +
+    "Forwards the expense to ERPNext as a Purchase Invoice or Journal Entry " +
     "depending on document_type. ERPNext owns validation, category existence, and currency rules. " +
     "Send an Idempotency-Key to make retries safe.",
   security: [{ bearerAuth: [] }],

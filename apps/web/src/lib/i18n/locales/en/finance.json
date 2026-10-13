@@ -286,19 +286,16 @@
     "back": "← Back to expenses",
     "documentType": {
       "purchase_invoice": "Purchase invoice",
-      "expense_claim": "Expense claim",
       "journal_entry": "Journal entry"
     },
     "categoryField": {
       "default": "Category",
       "purchase_invoice": "Expense account",
-      "expense_claim": "Expense type",
       "journal_entry": "Account"
     },
     "vendorField": {
       "default": "Vendor",
       "purchase_invoice": "Supplier",
-      "expense_claim": "Employee",
       "journal_entry": "Reference"
     },
     "list": {

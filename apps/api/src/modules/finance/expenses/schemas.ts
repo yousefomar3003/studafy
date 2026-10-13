@@ -2,7 +2,7 @@ import { z } from "@hono/zod-openapi";
 import { uuidSchema, dateTimeSchema } from "@studafy/shared-schemas";
 
 export const expenseDocumentTypeSchema = z
-  .enum(["purchase_invoice", "expense_claim", "journal_entry"])
+  .enum(["purchase_invoice", "journal_entry"])
   .openapi("ExpenseDocumentType");
 
 export const expenseIdParamSchema = z
@@ -84,12 +84,11 @@ export const createExpenseBodySchema = z
       .max(200)
       .openapi({
         description:
-          "ERPNext category: expense account docname (Purchase Invoice), expense claim type docname " +
-          "(Expense Claim), or account docname (Journal Entry).",
+          "ERPNext category: expense account docname (Purchase Invoice) or account docname " +
+          "(Journal Entry).",
       }),
     vendor: z.string().trim().min(1).max(200).openapi({
-      description:
-        "Supplier name (Purchase Invoice), employee (Expense Claim), or reference (Journal Entry).",
+      description: "Supplier name (Purchase Invoice) or reference (Journal Entry).",
     }),
     amount: z
       .number()

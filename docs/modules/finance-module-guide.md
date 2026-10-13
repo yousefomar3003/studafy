@@ -238,7 +238,8 @@ the daily reconciliation all work. What each school's site needs is set up by
 - **Reconciliation.** `POST /api/finance/reconciliation/run` is called daily at 02:30 UTC by the
   workers (`queues/billing/finance-reconciliation.ts`) with `RECONCILIATION_API_KEY`.
 
-### Known gap
+### Expenses
 
-- **Expenses** of type `expense_claim` use `Expense Claim`, which lives in the separate HRMS app the
-  image does not install. `purchase_invoice` and `journal_entry` expenses work.
+An expense is posted as a Purchase Invoice (a supplier bill) or a Journal Entry. There is no
+`expense_claim` type: ERPNext's Expense Claim lives in the separate HRMS app, which the erpnext image
+does not install (it would add payroll, leave and attendance to every school's site).

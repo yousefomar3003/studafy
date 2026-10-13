@@ -1477,19 +1477,16 @@
       "back": "[← Βáçķ ţó éx̃ρéñšéš ǝɥʇ ʞɔı]",
       "documentType": {
         "purchase_invoice": "[Ρúŕçħášé íñṽóíçé ǝɥʇ ʞɔ]",
-        "expense_claim": "[Éx̃ρéñšé çĺáíɱ ǝɥʇ ʞ]",
         "journal_entry": "[Ĵóúŕñáĺ éñţŕý ǝɥʇ ʞ]"
       },
       "categoryField": {
         "default": "[Çáţéğóŕý ǝɥʇ]",
         "purchase_invoice": "[Éx̃ρéñšé áççóúñţ ǝɥʇ ʞɔ]",
-        "expense_claim": "[Éx̃ρéñšé ţýρé ǝɥʇ ʞ]",
         "journal_entry": "[Áççóúñţ ǝɥʇ]"
       },
       "vendorField": {
         "default": "[Ṽéñđóŕ ǝɥʇ]",
         "purchase_invoice": "[Šúρρĺíéŕ ǝɥʇ]",
-        "expense_claim": "[Éɱρĺóýéé ǝɥʇ]",
         "journal_entry": "[Ŕéƒéŕéñçé ǝɥʇ ]"
       },
       "list": {

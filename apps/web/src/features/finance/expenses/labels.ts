@@ -4,7 +4,6 @@ import type { TFunction } from "i18next";
 /** Translation keys (resolved with `t` at render time) for each ERPNext document type. */
 export const EXPENSE_DOCUMENT_TYPE_LABEL_KEYS: Record<ExpenseDocumentType, string> = {
   purchase_invoice: "finance.expenses.documentType.purchase_invoice",
-  expense_claim: "finance.expenses.documentType.expense_claim",
   journal_entry: "finance.expenses.documentType.journal_entry",
 };
 
@@ -15,7 +14,6 @@ export const EXPENSE_DOCUMENT_TYPE_LABEL_KEYS: Record<ExpenseDocumentType, strin
  * text has to resolve against for the selected document type. */
 const CATEGORY_FIELD_LABEL_KEYS: Record<ExpenseDocumentType, string> = {
   purchase_invoice: "finance.expenses.categoryField.purchase_invoice",
-  expense_claim: "finance.expenses.categoryField.expense_claim",
   journal_entry: "finance.expenses.categoryField.journal_entry",
 };
 
@@ -29,7 +27,6 @@ export function categoryFieldLabel(documentType: ExpenseDocumentType | "", t: TF
 /** What "vendor" refers to for each ERPNext document type, same source as `CATEGORY_FIELD_LABEL_KEYS`. */
 const VENDOR_FIELD_LABEL_KEYS: Record<ExpenseDocumentType, string> = {
   purchase_invoice: "finance.expenses.vendorField.purchase_invoice",
-  expense_claim: "finance.expenses.vendorField.expense_claim",
   journal_entry: "finance.expenses.vendorField.journal_entry",
 };
 
