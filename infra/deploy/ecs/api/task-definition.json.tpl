@@ -44,7 +44,11 @@
         { "name": "AI_LLM_SMALL_MODEL", "value": "${AI_LLM_SMALL_MODEL}" },
         { "name": "AI_LLM_LARGE_MODEL", "value": "${AI_LLM_LARGE_MODEL}" },
         { "name": "ERPNEXT_API_URL", "value": "${ERPNEXT_API_URL}" },
-        { "name": "ERPNEXT_SITE_DOMAIN", "value": "${ERPNEXT_SITE_DOMAIN}" }
+        { "name": "ERPNEXT_SITE_DOMAIN", "value": "${ERPNEXT_SITE_DOMAIN}" },
+        { "name": "AI_STORE_PRODUCT_ID", "value": "${AI_STORE_PRODUCT_ID}" },
+        { "name": "APPLE_IAP_BUNDLE_ID", "value": "${APPLE_IAP_BUNDLE_ID}" },
+        { "name": "APPLE_IAP_APP_APPLE_ID", "value": "${APPLE_IAP_APP_APPLE_ID}" },
+        { "name": "GOOGLE_PLAY_PACKAGE_NAME", "value": "${GOOGLE_PLAY_PACKAGE_NAME}" }
       ],
       "secrets": [
         { "name": "DATABASE_USER", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_username::" },
@@ -63,7 +67,9 @@
         { "name": "ERPNEXT_WEBHOOK_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:ERPNEXT_WEBHOOK_SECRET::" },
         { "name": "RECONCILIATION_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:RECONCILIATION_API_KEY::" },
         { "name": "STRIPE_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:STRIPE_SECRET_KEY::" },
-        { "name": "STRIPE_WEBHOOK_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:STRIPE_WEBHOOK_SECRET::" }
+        { "name": "STRIPE_WEBHOOK_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:STRIPE_WEBHOOK_SECRET::" },
+        { "name": "GOOGLE_PLAY_SERVICE_ACCOUNT", "valueFrom": "${API_APP_SECRETS_ARN}:GOOGLE_PLAY_SERVICE_ACCOUNT::" },
+        { "name": "GOOGLE_PLAY_RTDN_TOKEN", "valueFrom": "${API_APP_SECRETS_ARN}:GOOGLE_PLAY_RTDN_TOKEN::" }
       ],
       "healthCheck": {
         "command": [

@@ -7,6 +7,7 @@ import '../../../core/router/route_paths.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/ai_hub_providers.dart';
 import '../domain/ai_hub_status.dart';
+import '../store/ai_store_offer_card.dart';
 import 'widgets/ai_feature_grid.dart';
 import 'widgets/ai_hub_message.dart';
 import 'widgets/ai_school_inactive_notice.dart';
@@ -14,9 +15,10 @@ import 'widgets/ai_not_active_card.dart';
 import 'widgets/ai_state_page.dart';
 import 'widgets/ai_usage_meter.dart';
 
-/// The AI tab: subscribed feature hub, a neutral "not active" notice, or school-inactive messaging
-/// — see [AiHubStatus] for the state each renders and `apps/mobile/docs/store_payment_routing.md`
-/// for why this app never links to, or mentions, a way to buy the add-on.
+/// The AI tab: subscribed feature hub, a "not active" notice with the App Store / Google Play
+/// offer under it ([AiStoreOfferCard]), or school-inactive messaging — see [AiHubStatus] for the
+/// state each renders and `apps/mobile/docs/store_payment_routing.md` for why the add-on is sold
+/// here only through the store's own billing.
 ///
 /// Re-checks entitlement on every app resume (not just first load): an add-on activated outside
 /// the app has no way to call back into it, so "entitlement reflected without reinstall" depends
@@ -88,7 +90,12 @@ class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingOb
               icon: Icons.info_outline,
             ),
             AiHubSchoolInactive() => const AiStatePage(child: AiSchoolInactiveNotice()),
-            AiHubUnsubscribed() => const AiStatePage(child: AiNotActiveCard()),
+            AiHubUnsubscribed() => const AiStatePage(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [AiNotActiveCard(), AiStoreOfferCard()],
+              ),
+            ),
             AiHubSubscribed(:final usage) => AiStatePage(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

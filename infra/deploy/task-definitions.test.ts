@@ -197,6 +197,31 @@ describe("production readiness of the ECS task definitions", () => {
     }
   });
 
+  test("the API gets the in-app purchase ids from its tier and the Play secrets from its app secret", async () => {
+    const api = (await renderNamed("api")).containerDefinitions[0]!;
+    const ids = [
+      "AI_STORE_PRODUCT_ID",
+      "APPLE_IAP_BUNDLE_ID",
+      "APPLE_IAP_APP_APPLE_ID",
+      "GOOGLE_PLAY_PACKAGE_NAME",
+    ];
+    expect(values(api.environment!)).toMatchObject(
+      Object.fromEntries(ids.map((name) => [name, `<${name}>`])),
+    );
+    for (const key of ["GOOGLE_PLAY_SERVICE_ACCOUNT", "GOOGLE_PLAY_RTDN_TOKEN"]) {
+      expect(api.secrets).toContainEqual({
+        name: key,
+        valueFrom: `<API_APP_SECRETS_ARN>:${key}::`,
+      });
+    }
+    // Every tier defines each id (empty = that store is off), so envsubst never renders a stale shell
+    // value into the task definition.
+    for (const tier of ["dev", "staging", "prod"]) {
+      const env = await readFile(join(import.meta.dir, "environments", `${tier}.env`), "utf8");
+      for (const name of ids) expect(env).toMatch(new RegExp(`^${name}=`, "m"));
+    }
+  });
+
   test("every deploy tier sets each AI variable the task definitions reference", async () => {
     for (const tier of ["dev", "staging", "prod"]) {
       const env = await readFile(join(import.meta.dir, "environments", `${tier}.env`), "utf8");

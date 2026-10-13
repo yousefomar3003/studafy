@@ -23,7 +23,12 @@ export {
   MAX_LAST_ERROR_LENGTH,
   truncateError,
 } from "./billing-event-store";
-export type { BillingProvider, ClaimInput, HistoricalEvent } from "./billing-event-store";
+export type {
+  BillingEventSource,
+  BillingProvider,
+  ClaimInput,
+  HistoricalEvent,
+} from "./billing-event-store";
 
 export { addBillingInterval, isBillingInterval } from "./billing-period";
 export type { BillingInterval } from "./billing-period";

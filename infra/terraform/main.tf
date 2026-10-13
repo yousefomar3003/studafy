@@ -186,6 +186,8 @@ module "secrets" {
       RECONCILIATION_API_KEY        = ""
       STRIPE_SECRET_KEY             = ""
       STRIPE_WEBHOOK_SECRET         = ""
+      GOOGLE_PLAY_SERVICE_ACCOUNT   = ""
+      GOOGLE_PLAY_RTDN_TOKEN        = ""
     }
     workers = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", AI_LLM_API_KEY = "", ERPNEXT_API_KEY = "", RECONCILIATION_API_KEY = "", STRIPE_SECRET_KEY = "" }
   }

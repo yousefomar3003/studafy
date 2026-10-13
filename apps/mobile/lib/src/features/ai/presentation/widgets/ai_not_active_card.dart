@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import '../../../../design/tokens/app_radius_tokens.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 
-/// The unsubscribed state: says the AI add-on isn't active for this account and what it includes,
-/// and nothing else. The add-on is a digital subscription sold on the web only, and both stores
-/// forbid a native app from linking or otherwise steering to a purchase outside their own in-app
-/// purchase — so there is deliberately no button, link, price or "get it on the website" copy here
-/// (ST-304; see `apps/mobile/docs/store_payment_routing.md`, pinned by
+/// The unsubscribed state: says the AI add-on isn't active for this account and what it includes.
+/// Where the store sells it to this student, `AiStoreOfferCard` (`../../store/`) follows with the
+/// App Store / Google Play purchase; this card itself carries no button, link, price or mention
+/// of the website — both stores forbid steering to a purchase outside their own billing (ST-304;
+/// see `apps/mobile/docs/store_payment_routing.md`, pinned by
 /// `test/store_compliance/payment_routing_test.dart`). An add-on activated elsewhere shows up on
 /// the next resume or pull-to-refresh (`AiHubScreen`).
 class AiNotActiveCard extends StatelessWidget {

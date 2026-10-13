@@ -39,6 +39,8 @@ dependencies:
   image_picker: ^1.1.2
   mime: ^2.0.0
   flutter_pdfview: ^1.4.5
+  in_app_purchase: ^3.3.1
+  in_app_purchase_android: ^0.5.3
 
 dev_dependencies:
   flutter_test:

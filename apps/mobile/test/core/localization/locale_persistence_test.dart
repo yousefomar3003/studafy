@@ -1,5 +1,8 @@
 // `intl` (re-exported by easy_localization) declares its own `TextDirection`, which would
 // otherwise shadow Flutter's — this test only wants Flutter's, for `Directionality`.
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +23,7 @@ void main() {
       EasyLocalization(
         supportedLocales: AppLocales.supported,
         path: AppLocales.translationsPath,
+        assetLoader: const _FileAssetLoader(),
         fallbackLocale: AppLocales.fallback,
         child: const _LocaleProbe(),
       ),
@@ -43,6 +47,7 @@ void main() {
         child: EasyLocalization(
           supportedLocales: AppLocales.supported,
           path: AppLocales.translationsPath,
+          assetLoader: const _FileAssetLoader(),
           fallbackLocale: AppLocales.fallback,
           child: const _LocaleProbe(),
         ),
@@ -52,6 +57,19 @@ void main() {
 
     expect(find.text('ar'), findsOneWidget);
   });
+}
+
+/// Reads the translation files straight from disk. rootBundle decodes an asset over 50 KB on a
+/// background isolate, which never completes under testWidgets' fake async, and ar.json is past
+/// that size. What this test checks is persistence, not asset loading.
+class _FileAssetLoader extends AssetLoader {
+  const _FileAssetLoader();
+
+  @override
+  Future<Map<String, dynamic>> load(String path, Locale locale) async {
+    final file = File('$path/${locale.languageCode}.json');
+    return jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+  }
 }
 
 class _LocaleProbe extends StatelessWidget {

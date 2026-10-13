@@ -381,3 +381,82 @@ describe("Tap Payments configuration (ST-298)", () => {
     );
   });
 });
+
+describe("in-app purchase configuration", () => {
+  const google = {
+    AI_STORE_PRODUCT_ID: "studafy_ai_monthly",
+    GOOGLE_PLAY_PACKAGE_NAME: "com.studafy.studafy_mobile",
+    GOOGLE_PLAY_SERVICE_ACCOUNT: '{"type":"service_account"}',
+    GOOGLE_PLAY_RTDN_TOKEN: "rtdn-token-0123456789",
+  };
+
+  test("all empty means in-app purchase is off", () => {
+    const env = loadEnv({
+      AI_STORE_PRODUCT_ID: "",
+      APPLE_IAP_BUNDLE_ID: "",
+      APPLE_IAP_APP_APPLE_ID: "",
+      GOOGLE_PLAY_PACKAGE_NAME: "",
+      GOOGLE_PLAY_SERVICE_ACCOUNT: "",
+      GOOGLE_PLAY_RTDN_TOKEN: "",
+    });
+    expect(env.AI_STORE_PRODUCT_ID).toBeUndefined();
+    expect(env.APPLE_IAP_APP_APPLE_ID).toBeUndefined();
+  });
+
+  test("a complete Google Play setup loads", () => {
+    expect(loadEnv(google).GOOGLE_PLAY_PACKAGE_NAME).toBe("com.studafy.studafy_mobile");
+  });
+
+  test("Google Play's three values must come together", () => {
+    expect(() => loadEnv({ ...google, GOOGLE_PLAY_RTDN_TOKEN: "" })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ ...google, GOOGLE_PLAY_SERVICE_ACCOUNT: undefined })).toThrow(
+      EnvValidationError,
+    );
+  });
+
+  test("the service account must be its JSON key", () => {
+    expect(() => loadEnv({ ...google, GOOGLE_PLAY_SERVICE_ACCOUNT: "not json" })).toThrow(
+      EnvValidationError,
+    );
+  });
+
+  test("a store without the product id is refused", () => {
+    expect(() => loadEnv({ ...google, AI_STORE_PRODUCT_ID: "" })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ APPLE_IAP_BUNDLE_ID: "com.studafy.studafyMobile" })).toThrow(
+      EnvValidationError,
+    );
+  });
+
+  test("the Apple app id is a number, needed only in production", () => {
+    const apple = {
+      AI_STORE_PRODUCT_ID: "studafy_ai_monthly",
+      APPLE_IAP_BUNDLE_ID: "com.studafy.studafyMobile",
+    };
+    expect(loadEnv(apple).APPLE_IAP_APP_APPLE_ID).toBeUndefined();
+    expect(loadEnv({ ...apple, APPLE_IAP_APP_APPLE_ID: "6450000000" }).APPLE_IAP_APP_APPLE_ID).toBe(
+      6_450_000_000,
+    );
+    expect(() => loadEnv({ ...apple, APPLE_IAP_APP_APPLE_ID: "abc" })).toThrow(EnvValidationError);
+
+    const production = {
+      NODE_ENV: "production",
+      DATABASE_HOST: "db",
+      DATABASE_PORT: "6432",
+      DATABASE_NAME: "studafy",
+      DATABASE_USER: "studafy_app",
+      DATABASE_PASSWORD: "secret",
+      DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----",
+      READ_DATABASE_HOST: "db-read",
+      READ_DATABASE_NAME: "api_read",
+    };
+    const issues = () => {
+      try {
+        loadEnv({ ...production, ...apple });
+        return "";
+      } catch (error) {
+        return String((error as Error).message);
+      }
+    };
+    expect(issues()).toContain("APPLE_IAP_APP_APPLE_ID");
+  });
+});

@@ -105,6 +105,8 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/lookups/currencies",
   "/api/subscriptions/webhook/stripe",
   "/api/subscriptions/webhook/tap",
+  "/api/subscriptions/webhook/apple",
+  "/api/subscriptions/webhook/google",
   // Authenticated by their own HMAC signature (ERPNext finance webhooks) and X-Api-Key service key
   // (reconciliation, called by the workers' scheduler) rather than a user token -- see csrf.ts.
   "/api/finance/webhooks/erpnext",

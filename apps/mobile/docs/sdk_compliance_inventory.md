@@ -69,6 +69,8 @@ Status values:
 | `web_socket_channel` | 3.0.3 | Realtime gateway | Studafy realtime gateway only | Eligible |
 | `flutter_secure_storage` | 9.2.4 | Token storage (Keystore / Keychain) | None | Eligible, on-device only |
 | `app_links` | 6.4.1 | OAuth callback deep link | None | Eligible, on-device only |
+| `in_app_purchase` | 3.3.1 | Buying the AI add-on through the App Store / Google Play (StoreKit 2, Play Billing) | The purchase goes to Apple or Google, stamped with the student's Studafy id (an opaque UUID). Receipts go to Studafy's API only | Eligible |
+| `in_app_purchase_android` | 0.5.3 | Play Billing purchase parameters (the obfuscated account and profile ids) | As `in_app_purchase` | Eligible |
 | `url_launcher` | 6.3.2 | Opens the system browser (sign-in, downloads) | None. The browser makes the requests | Eligible |
 | `easy_localization` | 3.0.8 | Translations from bundled assets | None | Eligible, on-device only |
 | `intl` | 0.20.2 | Formatting | None | Eligible, on-device only |

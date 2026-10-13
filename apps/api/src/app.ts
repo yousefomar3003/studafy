@@ -135,6 +135,7 @@ import {
   cancellationRoutes,
   createEntitlementService,
 } from "./modules/subscriptions";
+import { aiStoreRoutes } from "./modules/subscriptions/store";
 import { lookupsRoutes } from "./modules/tenancy/lookups/route";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -156,6 +157,7 @@ import type { KeyStore } from "./modules/auth";
 import type { FlagsService } from "./modules/flags";
 import type { MobileReleaseConfig } from "./modules/mobile";
 import type { PaymentProviderPort } from "./modules/subscriptions";
+import type { StoreBilling } from "./modules/subscriptions/store";
 import type { RedisClient } from "./redis";
 
 export interface AppOptions {
@@ -270,6 +272,12 @@ export interface AppOptions {
    */
   tapProvider?: PaymentProviderPort | null;
   /**
+   * App Store / Google Play billing of the AI add-on bought in the mobile app
+   * (modules/subscriptions/store). Nullable on the same terms as the payment providers: the routes
+   * register regardless and answer 503 when it is absent.
+   */
+  storeBilling?: StoreBilling | null;
+  /**
    * Mobile release floor / latest versions served at `GET /api/mobile/config` (ST-257).
    *
    * Threaded from this service's environment by src/index.ts (`resolveMobileReleaseConfig`), so
@@ -313,6 +321,7 @@ export function createApp({
   storage = null,
   stripeProvider = null,
   tapProvider = null,
+  storeBilling = null,
   mobileReleaseConfig = EMPTY_MOBILE_RELEASE_CONFIG,
 }: AppOptions): OpenAPIHono<AppEnv> {
   const eventSink = securityEventSink ?? createNoopSecurityEventSink();
@@ -989,6 +998,8 @@ export function createApp({
     app.route("/", checkoutRoutes(database, paymentProviders));
     app.route("/", schoolCheckoutRoutes(database, paymentProviders));
     app.route("/", aiCheckoutRoutes(database, paymentProviders));
+    // The same add-on bought in the mobile app through Apple / Google, and their notifications.
+    app.route("/", aiStoreRoutes(database, storeBilling, logger));
     // The event sink is threaded in so a rejected webhook signature rides the same ST-082 alerting
     // path as a CSRF or rate-limit rejection, rather than a second one invented for billing.
     app.route(

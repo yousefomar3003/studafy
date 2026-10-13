@@ -201,6 +201,24 @@ export const envSchema = z
     // them to "" where Tap is off (module.secrets' app_secret_defaults).
     TAP_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().startsWith("sk_").optional()),
     TAP_WEBHOOK_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // In-app purchase of the AI add-on in the mobile app (Apple / Google require their own billing
+    // for digital goods there; the website keeps Tap/Stripe). AI_STORE_PRODUCT_ID is the
+    // subscription's product id, the same in App Store Connect and the Play Console. Each store is
+    // on only when its own values are set; an empty string means unset. See
+    // docs/runbooks/in-app-purchase-setup.md.
+    AI_STORE_PRODUCT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    APPLE_IAP_BUNDLE_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The app's numeric Apple id (App Store Connect > App Information). Apple needs it to verify
+    // production purchases, so production refuses an Apple setup without it.
+    APPLE_IAP_APP_APPLE_ID: z.preprocess(
+      emptyAsUnset,
+      z.coerce.number().int().positive().optional(),
+    ),
+    GOOGLE_PLAY_PACKAGE_NAME: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The Play Console service account's JSON key (a secret), and the secret `token` in the Pub/Sub
+    // push endpoint's URL that authenticates Google's notifications (a secret).
+    GOOGLE_PLAY_SERVICE_ACCOUNT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_PLAY_RTDN_TOKEN: z.preprocess(emptyAsUnset, z.string().min(16).optional()),
     // Cross-encoder re-ranking (ST-163) kill switch. Off by default: an unset or "false" value leaves
     // the retrieval route on the raw RRF ranking with zero re-ranking cost. Validated as an explicit
     // two-value string so a typo ("yes") fails bootstrap instead of silently flipping the feature on.
@@ -488,7 +506,54 @@ export const envSchema = z
       });
     }
 
+    // In-app purchase: a store needs the product id, and Google needs all three of its values.
+    const appleStore = env.APPLE_IAP_BUNDLE_ID !== undefined;
+    const googleValues = [
+      ["GOOGLE_PLAY_PACKAGE_NAME", env.GOOGLE_PLAY_PACKAGE_NAME],
+      ["GOOGLE_PLAY_SERVICE_ACCOUNT", env.GOOGLE_PLAY_SERVICE_ACCOUNT],
+      ["GOOGLE_PLAY_RTDN_TOKEN", env.GOOGLE_PLAY_RTDN_TOKEN],
+    ] as const;
+    const googleSet = googleValues.filter(([, value]) => value !== undefined).length;
+    if (googleSet > 0 && googleSet < googleValues.length) {
+      for (const [name, value] of googleValues) {
+        if (value === undefined) {
+          context.addIssue({
+            code: "custom",
+            path: [name],
+            message:
+              "GOOGLE_PLAY_PACKAGE_NAME, GOOGLE_PLAY_SERVICE_ACCOUNT and GOOGLE_PLAY_RTDN_TOKEN must be set together",
+          });
+        }
+      }
+    }
+    if (env.GOOGLE_PLAY_SERVICE_ACCOUNT !== undefined) {
+      try {
+        JSON.parse(env.GOOGLE_PLAY_SERVICE_ACCOUNT);
+      } catch {
+        context.addIssue({
+          code: "custom",
+          path: ["GOOGLE_PLAY_SERVICE_ACCOUNT"],
+          message: "GOOGLE_PLAY_SERVICE_ACCOUNT must be the service account's JSON key",
+        });
+      }
+    }
+    if ((appleStore || googleSet > 0) && env.AI_STORE_PRODUCT_ID === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["AI_STORE_PRODUCT_ID"],
+        message: "AI_STORE_PRODUCT_ID is required when App Store or Google Play billing is set",
+      });
+    }
+
     if (env.NODE_ENV !== "production") return;
+
+    if (appleStore && env.APPLE_IAP_APP_APPLE_ID === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["APPLE_IAP_APP_APPLE_ID"],
+        message: "APPLE_IAP_APP_APPLE_ID is required in production when APPLE_IAP_BUNDLE_ID is set",
+      });
+    }
 
     const requiredDatabaseValues = [
       ["DATABASE_HOST", env.DATABASE_HOST],

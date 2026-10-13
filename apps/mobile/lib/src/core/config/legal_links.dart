@@ -15,3 +15,10 @@ Uri buildAccountDeleteUrl({required Uri webBaseUrl}) {
 Uri buildPrivacyPolicyUrl({required Uri webBaseUrl}) {
   return webBaseUrl.replace(path: '/privacy');
 }
+
+/// Apple's standard licensed application end user license agreement — the terms of use an App
+/// Store subscription purchase screen must link to (App Review Guideline 3.1.2) when the app has
+/// no custom EULA of its own in App Store Connect.
+final appleStandardEulaUrl = Uri.parse(
+  'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
+);

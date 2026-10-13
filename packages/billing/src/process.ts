@@ -44,7 +44,7 @@ import {
 import { deriveIntent, foldStatus, LIVE_STATUSES, resolveAiCascade } from "./state-machine";
 
 import type { AttributionTarget } from "./attribution";
-import type { BillingProvider } from "./billing-event-store";
+import type { BillingEventSource } from "./billing-event-store";
 import type { SubscriptionKind } from "./state-machine";
 import type { SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -137,8 +137,8 @@ export interface BillingLogger {
 
 /** One verified provider event, envelope included. Mirrors `ParsedWebhookEvent` in apps/api's port. */
 export interface VerifiedBillingEvent {
-  /** Which provider signed it. Half of the idempotency key, and selects the customer-id column. */
-  provider: BillingProvider;
+  /** Which source signed it. Half of the idempotency key, and selects the customer-id column. */
+  provider: BillingEventSource;
   id: string;
   type: string;
   effectiveAt: Date;

@@ -119,6 +119,10 @@ const EXEMPT_PATHS = [
   "/api/subscriptions/webhook/stripe",
   // Tap billing webhook (ST-298). Same posture: authenticated by the `hashstring` HMAC, no cookie.
   "/api/subscriptions/webhook/tap",
+  // App Store and Google Play notifications for AI add-ons bought in the app: authenticated by
+  // Apple's signed payload and by the Pub/Sub push URL's secret token respectively, no cookie.
+  "/api/subscriptions/webhook/apple",
+  "/api/subscriptions/webhook/google",
   // The dedicated ERPNext finance webhooks (payment-confirmed, refund-processed): the same HMAC over
   // the raw body as /erpnext/webhooks, but under /api/, so they need naming like Stripe and Tap.
   "/api/finance/webhooks/erpnext",

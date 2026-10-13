@@ -24,8 +24,16 @@ export function truncateError(value: string): string {
  */
 export type BillingProvider = "stripe" | "tap";
 
+/**
+ * Every source whose events share this ledger: the two payment providers, plus the app stores, whose
+ * in-app purchases of the AI add-on (apps/api modules/subscriptions/store) are normalized into the
+ * same event vocabulary. Kept apart from `BillingProvider`, which also means "can run a checkout" --
+ * the stores never do; a purchase starts in the app.
+ */
+export type BillingEventSource = BillingProvider | "apple" | "google";
+
 export interface ClaimInput {
-  provider: BillingProvider;
+  provider: BillingEventSource;
   providerEventId: string;
   eventType: string;
   effectiveAt: Date;
@@ -132,7 +140,7 @@ export async function markDeadLettered(
  */
 export async function markFailed(
   tx: TransactionSql,
-  provider: BillingProvider,
+  provider: BillingEventSource,
   providerEventId: string,
   reason: string,
 ): Promise<void> {

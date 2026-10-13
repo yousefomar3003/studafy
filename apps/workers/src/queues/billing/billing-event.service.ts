@@ -33,7 +33,7 @@ import { describeError, isTerminalFailure } from "../notifications/dead-letter";
 import { publishEntitlementChange } from "./entitlement-change-publisher";
 
 import type { DeadLetterLogger, FailedHandler } from "../notifications/dead-letter";
-import type { BillingLogger, BillingProvider, ProcessOutcome } from "@studafy/billing";
+import type { BillingEventSource, BillingLogger, ProcessOutcome } from "@studafy/billing";
 
 /** The subset of the row a retry needs to reconstruct the event. */
 interface StoredEvent {
@@ -60,7 +60,7 @@ export interface ProcessBillingEventResult {
  * succeeded first.
  */
 export async function retryBillingEvent(
-  data: { provider: BillingProvider; providerEventId: string },
+  data: { provider: BillingEventSource; providerEventId: string },
   databaseUrl: string,
   log: BillingLogger,
 ): Promise<ProcessBillingEventResult> {
@@ -127,7 +127,7 @@ export async function retryBillingEvent(
  * a failure was terminal.
  */
 export async function deadLetterBillingEvent(
-  provider: BillingProvider,
+  provider: BillingEventSource,
   providerEventId: string,
   reason: string,
   databaseUrl: string,
@@ -150,6 +150,8 @@ export async function deadLetterBillingEvent(
     await sql.end({ timeout: 5 });
   }
 }
+
+const EVENT_SOURCES: readonly BillingEventSource[] = ["stripe", "tap", "apple", "google"];
 
 /**
  * The BullMQ `failed` listener for the billing queue.
@@ -176,7 +178,7 @@ export function billingDeadLetterListener(
     const jobData = job.data as { provider?: unknown; providerEventId?: unknown } | null;
     const providerEventId = jobData?.providerEventId;
     // Same default the job schema applies: a job enqueued before ST-298 is a Stripe event.
-    const provider: BillingProvider = jobData?.provider === "tap" ? "tap" : "stripe";
+    const provider = EVENT_SOURCES.find((source) => source === jobData?.provider) ?? "stripe";
     const { errorClass, message } = describeError(error);
 
     // Unconditional and first: it is the only alert path that does not depend on the database being

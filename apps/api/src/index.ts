@@ -24,6 +24,7 @@ import {
   StripeAdapter,
   TapAdapter,
 } from "./modules/subscriptions";
+import { createStoreBilling } from "./modules/subscriptions/store";
 import { createReadinessProbe } from "./readiness";
 import { closeRedis, createRedisClient } from "./redis";
 
@@ -103,6 +104,10 @@ const tapProvider =
   env.TAP_SECRET_KEY && env.TAP_WEBHOOK_URL
     ? new TapAdapter({ secretKey: env.TAP_SECRET_KEY, webhookUrl: env.TAP_WEBHOOK_URL })
     : null;
+
+// App Store / Google Play billing of the AI add-on bought in the mobile app. Null unless a store is
+// configured (env.ts checks the values come in complete sets).
+const storeBilling = createStoreBilling(env);
 
 // LLM gateway (ST-164). The provider is built here — the only place with the environment, the
 // logger, and Redis together — and handed to createApp as an option, so the app itself stays
@@ -197,6 +202,7 @@ const app = createApp({
   storage,
   stripeProvider,
   tapProvider,
+  storeBilling,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",
