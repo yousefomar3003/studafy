@@ -97,4 +97,16 @@ describe("loadEnv", () => {
       CLAMAV_HOST: "clamd.internal",
     });
   });
+
+  test("boots in production without Stripe, as a Tap-only deployment does", () => {
+    const env = loadEnv({
+      NODE_ENV: "production",
+      READ_DATABASE_HOST: "pgbouncer.internal",
+      READ_DATABASE_NAME: "workers_read",
+      CLAMAV_HOST: "clamd.internal",
+      // Injected empty by the task definition when the secret holds no Stripe key.
+      STRIPE_SECRET_KEY: "",
+    });
+    expect(env.STRIPE_SECRET_KEY).toBeUndefined();
+  });
 });

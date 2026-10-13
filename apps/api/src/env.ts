@@ -193,8 +193,8 @@ export const envSchema = z
     // enough that a leaked URL expires before it is useful, long enough to survive a slow upload.
     S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(900).max(3600).default(900),
     // Stripe billing integration. All optional — activates only when both are set.
-    STRIPE_SECRET_KEY: z.string().min(1).optional(),
-    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    STRIPE_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Tap Payments (ST-298), for schools in Tap's MENA countries. Optional; activates only when both
     // are set. TAP_WEBHOOK_URL is the public URL of POST /api/subscriptions/webhook/tap. An empty
     // string means unset: the ECS task definition always injects both keys, and Terraform defaults

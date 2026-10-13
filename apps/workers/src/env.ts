@@ -50,11 +50,11 @@ export const envSchema = z
     // integration to reconcile, a logged skip.
     API_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
     RECONCILIATION_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
-    // Stripe seat reconciliation (ST-136). Optional because the seat-reconciliation job is not the
-    // billing queue's only consumer: when unset, every other billing job still runs, the scheduled
-    // reconciliation fails loudly rather than silently skipping, and the env validation below
-    // rejects it outright in production — billing must never silently stop reconciling.
-    STRIPE_SECRET_KEY: z.string().min(1).optional(),
+    // Stripe (ST-136), optional: schools in Tap's markets (Jordan, the Gulf, Egypt) are billed
+    // through Tap, so a deployment serving only them has no Stripe account at all. Seat
+    // reconciliation still never stops silently -- without a key it fails loudly the moment any
+    // active subscription is billed through Stripe (queues/billing/worker.ts).
+    STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // SES transactional email (deliverability R-08). When SES_REGION is unset the email dispatcher
     // runs in dry-run mode: it renders, dedups, and records deliveries exactly as in production but
     // never calls AWS — the dev/test path, and a loud warning is logged at startup when a deployed
@@ -67,9 +67,8 @@ export const envSchema = z
     // warning is logged when a deployed worker has no service account.
     FIREBASE_SERVICE_ACCOUNT: z.string().min(1).optional(),
     // Malware scanning (file-scan queue). CLAMAV_HOST is optional in dev/test so the queue still
-    // boots and scans fail closed at job time; the production validation below makes it mandatory,
-    // the same reasoning as STRIPE_SECRET_KEY — silently serving un-scanned files is worse than a
-    // failed deploy. CLAMAV_PORT/CLAMAV_TIMEOUT_MS/CLAMAV_MAX_FILE_BYTES mirror clamd's ListenPort,
+    // boots and scans fail closed at job time; the production validation below makes it mandatory:
+    // silently serving un-scanned files is worse than a failed deploy. CLAMAV_PORT/CLAMAV_TIMEOUT_MS/CLAMAV_MAX_FILE_BYTES mirror clamd's ListenPort,
     // timeout and StreamMaxLength defaults.
     CLAMAV_HOST: z.string().min(1).optional(),
     CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
@@ -130,16 +129,6 @@ export const envSchema = z
         code: "custom",
         path: ["ERPNEXT_API_URL"],
         message: "ERPNEXT_API_URL and ERPNEXT_API_KEY must be set together",
-      });
-    }
-
-    // Seat reconciliation touches Stripe (ST-136). Silently skipping billing is worse than a
-    // failed deploy, so a deployed worker without the secret fails fast at bootstrap.
-    if (env.STRIPE_SECRET_KEY === undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["STRIPE_SECRET_KEY"],
-        message: "STRIPE_SECRET_KEY is required in production",
       });
     }
 

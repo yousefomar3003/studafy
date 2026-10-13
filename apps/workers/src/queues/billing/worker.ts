@@ -162,14 +162,33 @@ async function processTapRenewals(databaseUrl: string): Promise<unknown> {
 
 async function processSeatReconciliation(databaseUrl: string): Promise<unknown> {
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error("STRIPE_SECRET_KEY is required to run seat reconciliation");
-  }
-
   const sql = postgres(databaseUrl, { max: 2 });
 
   try {
-    return runSeatReconciliation(
+    // Seats are only reconciled against Stripe subscriptions; Tap-billed schools (Jordan, the Gulf,
+    // Egypt) have none. A deployment without Stripe therefore skips -- unless some subscription is
+    // billed through Stripe after all, which must never stop reconciling silently.
+    if (!secretKey) {
+      const [row] = await sql<{ count: number }[]>`
+        SELECT count(*)::int AS count
+        FROM app.subscriptions
+        WHERE status = 'active' AND stripe_subscription_id IS NOT NULL
+      `;
+      if ((row?.count ?? 0) > 0) {
+        throw new Error(
+          `STRIPE_SECRET_KEY is required: ${row!.count} active subscription(s) are billed through Stripe`,
+        );
+      }
+      workerLogger.info(
+        {},
+        "STRIPE_SECRET_KEY not set and no Stripe-billed subscriptions; skipping",
+      );
+      return { processed: false, reason: "no stripe-billed subscriptions" };
+    }
+
+    // Awaited, not returned bare: the finally below would otherwise close the connection while the
+    // reconciliation is still running on it.
+    return await runSeatReconciliation(
       sql,
       new StripeSeatSubscriptionProvider(secretKey),
       new Date(),

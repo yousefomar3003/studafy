@@ -36,7 +36,6 @@ export TF_VAR_secrets_app_secret_values='{
     "RECONCILIATION_API_KEY": "<generated, see below>"
   },
   "workers": {
-    "STRIPE_SECRET_KEY": "<Stripe → live secret key>",
     "AI_LLM_API_KEY": "<the same Together AI production key>",
     "ERPNEXT_API_KEY": "<the same generated ERPNext key>",
     "RECONCILIATION_API_KEY": "<the same generated reconciliation key>"
@@ -45,15 +44,15 @@ export TF_VAR_secrets_app_secret_values='{
 terraform apply -var-file=environments/prod/prod.tfvars
 ```
 
-| Key                                     | Service      | If missing                                                                                                                                |
-| --------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `TURNSTILE_SECRET_KEY`                  | api          | **api refuses to boot** on staging/prod (`apps/api/src/env.ts`) — deliberately: without it every captcha check passes                     |
-| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET`    | api          | Google sign-in off (button answers 404)                                                                                                   |
-| `MICROSOFT_OAUTH_CLIENT_ID` / `_SECRET` | api          | Microsoft sign-in off                                                                                                                     |
-| `STRIPE_SECRET_KEY`                     | workers      | **workers refuse to boot** in production (`apps/workers/src/env.ts`), and the task cannot start at all until the key exists in the secret |
-| `TAP_SECRET_KEY` / `TAP_WEBHOOK_URL`    | api, workers | Tap payments off (`docs/runbooks/tap-payments-setup.md`)                                                                                  |
-| `AI_LLM_API_KEY`                        | api, workers | **api refuses to boot** while the tier's `AI_LLM_ENABLED=true` (section 2); without the workers copy, exam generation jobs fail closed    |
-| `ERPNEXT_API_KEY`                       | api, workers | Finance (dashboard, invoices, payments, reports) answers 503 `ERPNEXT_NOT_CONFIGURED`; staging/prod only (no ERPNext plane in dev)        |
+| Key                                           | Service                   | If missing                                                                                                                                                                                                                                                                      |
+| --------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TURNSTILE_SECRET_KEY`                        | api                       | **api refuses to boot** on staging/prod (`apps/api/src/env.ts`) — deliberately: without it every captcha check passes                                                                                                                                                           |
+| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET`          | api                       | Google sign-in off (button answers 404)                                                                                                                                                                                                                                         |
+| `MICROSOFT_OAUTH_CLIENT_ID` / `_SECRET`       | api                       | Microsoft sign-in off                                                                                                                                                                                                                                                           |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | api (both), workers (key) | **Optional.** Only schools outside Tap's markets (Jordan, the Gulf, Egypt) are billed through Stripe; without them those schools' checkout answers 503 `STRIPE_NOT_CONFIGURED`, and the workers refuse to run seat reconciliation once any active subscription is Stripe-billed |
+| `TAP_SECRET_KEY` / `TAP_WEBHOOK_URL`          | api, workers              | Tap payments off (`docs/runbooks/tap-payments-setup.md`)                                                                                                                                                                                                                        |
+| `AI_LLM_API_KEY`                              | api, workers              | **api refuses to boot** while the tier's `AI_LLM_ENABLED=true` (section 2); without the workers copy, exam generation jobs fail closed                                                                                                                                          |
+| `ERPNEXT_API_KEY`                             | api, workers              | Finance (dashboard, invoices, payments, reports) answers 503 `ERPNEXT_NOT_CONFIGURED`; staging/prod only (no ERPNext plane in dev)                                                                                                                                              |
 
 `ERPNEXT_API_KEY`, `ERPNEXT_WEBHOOK_SECRET` and `RECONCILIATION_API_KEY` are not issued by any
 provider: generate each once per tier and keep them with the other production keys —

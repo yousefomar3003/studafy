@@ -61,7 +61,9 @@
         { "name": "AI_LLM_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:AI_LLM_API_KEY::" },
         { "name": "ERPNEXT_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:ERPNEXT_API_KEY::" },
         { "name": "ERPNEXT_WEBHOOK_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:ERPNEXT_WEBHOOK_SECRET::" },
-        { "name": "RECONCILIATION_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:RECONCILIATION_API_KEY::" }
+        { "name": "RECONCILIATION_API_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:RECONCILIATION_API_KEY::" },
+        { "name": "STRIPE_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:STRIPE_SECRET_KEY::" },
+        { "name": "STRIPE_WEBHOOK_SECRET", "valueFrom": "${API_APP_SECRETS_ARN}:STRIPE_WEBHOOK_SECRET::" }
       ],
       "healthCheck": {
         "command": [
