@@ -45,6 +45,7 @@
         { "name": "AI_LLM_LARGE_MODEL", "value": "${AI_LLM_LARGE_MODEL}" },
         { "name": "ERPNEXT_API_URL", "value": "${ERPNEXT_API_URL}" },
         { "name": "ERPNEXT_SITE_DOMAIN", "value": "${ERPNEXT_SITE_DOMAIN}" },
+        { "name": "TAP_COUNTRIES", "value": "${TAP_COUNTRIES}" },
         { "name": "AI_STORE_PRODUCT_ID", "value": "${AI_STORE_PRODUCT_ID}" },
         { "name": "APPLE_IAP_BUNDLE_ID", "value": "${APPLE_IAP_BUNDLE_ID}" },
         { "name": "APPLE_IAP_APP_APPLE_ID", "value": "${APPLE_IAP_APP_APPLE_ID}" },

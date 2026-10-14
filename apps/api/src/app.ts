@@ -271,6 +271,8 @@ export interface AppOptions {
    * `stripeProvider`: a Tap-region checkout or a Tap webhook answers 503 when it is absent.
    */
   tapProvider?: PaymentProviderPort | null;
+  /** Countries billed through Tap (`TAP_COUNTRIES`); every other school bills through Stripe. */
+  tapCountries?: ReadonlySet<string>;
   /**
    * App Store / Google Play billing of the AI add-on bought in the mobile app
    * (modules/subscriptions/store). Nullable on the same terms as the payment providers: the routes
@@ -321,6 +323,7 @@ export function createApp({
   storage = null,
   stripeProvider = null,
   tapProvider = null,
+  tapCountries = new Set(),
   storeBilling = null,
   mobileReleaseConfig = EMPTY_MOBILE_RELEASE_CONFIG,
 }: AppOptions): OpenAPIHono<AppEnv> {
@@ -506,7 +509,7 @@ export function createApp({
 
   // Both payment adapters, one slot per provider. Subscription checkout and online fee collection
   // pick between them by the school's region (ST-298); each provider's webhook has its own path.
-  const paymentProviders = { stripe: stripeProvider, tap: tapProvider };
+  const paymentProviders = { stripe: stripeProvider, tap: tapProvider, tapCountries };
 
   // Finance gateway (ST-119). A pass-through to each school's ERPNext site: ERPNext owns fee
   // validation, currency rules and totals, and this only routes, crosswalks ids, and maintains the

@@ -6,7 +6,7 @@ import {
   resolveProviderForCountry,
   selectPaymentProvider,
   selectPaymentProviderForSchool,
-  TAP_COUNTRY_CODES,
+  TAP_MARKETS,
 } from "../payment-provider-routing";
 import { retryJobId } from "../routes/webhook-routes";
 
@@ -16,7 +16,9 @@ import type { TransactionSql } from "postgres";
 
 const stripe = { name: "stripe-port" } as unknown as PaymentProviderPort;
 const tap = { name: "tap-port" } as unknown as PaymentProviderPort;
-const both: PaymentProviderRegistry = { stripe, tap };
+const MENA = new Set(["AE", "BH", "EG", "JO", "KW", "OM", "QA", "SA"]);
+/** Both providers configured, with Tap billing every Tap market. */
+const both: PaymentProviderRegistry = { stripe, tap, tapCountries: MENA };
 
 /** A transaction that answers every query with the given rows. */
 function txReturning(rows: unknown[]): TransactionSql {
@@ -33,20 +35,28 @@ function thrown(fn: () => unknown): CodedHttpException {
 }
 
 describe("resolveProviderForCountry", () => {
-  test.each(["JO", "KW", "SA", "BH", "AE", "QA", "OM", "EG"])("%s routes to Tap", (country) => {
-    expect(resolveProviderForCountry(country)).toBe("tap");
-  });
+  test.each(["JO", "KW", "SA", "BH", "AE", "QA", "OM", "EG"])(
+    "%s routes to Tap when listed",
+    (country) => {
+      expect(resolveProviderForCountry(country, MENA)).toBe("tap");
+    },
+  );
 
   test.each(["US", "GB", "DE", "TR", "LB"])("%s routes to Stripe", (country) => {
-    expect(resolveProviderForCountry(country)).toBe("stripe");
+    expect(resolveProviderForCountry(country, MENA)).toBe("stripe");
+  });
+
+  test("with no Tap countries configured, every school bills through Stripe", () => {
+    expect(resolveProviderForCountry("JO")).toBe("stripe");
+    expect(resolveProviderForCountry("JO", new Set())).toBe("stripe");
   });
 
   test("is case-insensitive", () => {
-    expect(resolveProviderForCountry("jo")).toBe("tap");
+    expect(resolveProviderForCountry("jo", MENA)).toBe("tap");
   });
 
-  test("the Tap list is exactly the eight MENA markets", () => {
-    expect([...TAP_COUNTRY_CODES].sort()).toEqual(["AE", "BH", "EG", "JO", "KW", "OM", "QA", "SA"]);
+  test("Tap's markets are exactly the eight MENA countries", () => {
+    expect([...TAP_MARKETS].sort()).toEqual(["AE", "BH", "EG", "JO", "KW", "OM", "QA", "SA"]);
   });
 });
 
@@ -57,7 +67,9 @@ describe("selectPaymentProvider", () => {
   });
 
   test("a Tap-region school with no Tap adapter is a 503, never a silent Stripe fallback", () => {
-    const error = thrown(() => selectPaymentProvider({ stripe, tap: null }, "JO"));
+    const error = thrown(() =>
+      selectPaymentProvider({ stripe, tap: null, tapCountries: MENA }, "JO"),
+    );
     expect(error).toBeInstanceOf(CodedHttpException);
     expect(error.status).toBe(503);
     expect(error.code).toBe("TAP_NOT_CONFIGURED");

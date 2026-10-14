@@ -16,7 +16,7 @@ export {
   resolveProviderForCountry,
   selectPaymentProvider,
   selectPaymentProviderForSchool,
-  TAP_COUNTRY_CODES,
+  TAP_MARKETS,
 } from "./payment-provider-routing";
 export type { PaymentProviderRegistry, SelectedPaymentProvider } from "./payment-provider-routing";
 export { handleBillingWebhook } from "./webhooks/webhook-processor";

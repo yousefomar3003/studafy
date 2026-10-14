@@ -202,6 +202,7 @@ const app = createApp({
   storage,
   stripeProvider,
   tapProvider,
+  tapCountries: env.TAP_COUNTRIES,
   storeBilling,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.

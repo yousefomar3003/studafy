@@ -34,7 +34,10 @@ Tap ─► POST /api/subscriptions/webhook/tap  (hashstring header)
          └─ otherwise ─► @studafy/billing (ledger claim, state machine, audit) — same as Stripe
 ```
 
-Routing is by `app.schools.country_id`. There is no fallback: a Tap-country school on a deployment
+Routing is by `app.schools.country_id`, and only countries listed in `TAP_COUNTRIES` go to Tap.
+Tap only signs up merchants registered in its own markets; Studafy's company is Irish, so the list is
+empty and every school bills through Stripe until a Jordan/Gulf entity holds a Tap account. There is
+no fallback: a Tap-country school on a deployment
 without Tap credentials gets `503 TAP_NOT_CONFIGURED`, never a Stripe checkout.
 
 ### Subscription lifecycle on Tap
@@ -66,10 +69,11 @@ The same flow runs on Stripe (Checkout `payment` mode) for non-Tap schools.
 
 ## 1. Configure
 
-| Variable          | Where        | Value                                                                    |
-| ----------------- | ------------ | ------------------------------------------------------------------------ |
-| `TAP_SECRET_KEY`  | api, workers | `sk_test_…` (staging) / `sk_live_…` (production), from the Tap dashboard |
-| `TAP_WEBHOOK_URL` | api, workers | Public URL of `POST /api/subscriptions/webhook/tap`                      |
+| Variable          | Where        | Value                                                                            |
+| ----------------- | ------------ | -------------------------------------------------------------------------------- |
+| `TAP_SECRET_KEY`  | api, workers | `sk_test_…` (staging) / `sk_live_…` (production), from the Tap dashboard         |
+| `TAP_WEBHOOK_URL` | api, workers | Public URL of `POST /api/subscriptions/webhook/tap`                              |
+| `TAP_COUNTRIES`   | api          | Countries billed through Tap, e.g. `JO` (empty: none — every school uses Stripe) |
 
 - Both or neither: `apps/api/src/env.ts` refuses one without the other; the worker skips renewals
   when the key is absent and fails the job when the key is present without the URL.

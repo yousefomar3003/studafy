@@ -2,13 +2,17 @@
  * Which payment provider bills a school (ST-298).
  *
  * Decided by the school's country (`app.schools.country_id` -> `app.countries.alpha2_code`), the one
- * region fact the schema already holds. Schools in Tap's MENA markets go through Tap, where mada,
- * KNET and Benefit are available; everyone else goes through Stripe. The same answer applies to
- * subscription checkout and to online fee collection, so both ask this module rather than each
- * keeping its own country list.
+ * region fact the schema already holds. Schools in the deployment's Tap countries (`TAP_COUNTRIES`)
+ * go through Tap, where mada, KNET and Benefit are available; everyone else goes through Stripe. The
+ * same answer applies to subscription checkout and to online fee collection, so both ask this module
+ * rather than each keeping its own country list.
  *
- * There is deliberately no fallback. A Jordanian school whose deployment has no Tap key gets a 503,
- * not a Stripe checkout: silently switching provider would put the school's customer, its
+ * Tap only signs up merchants registered in its own markets, so which countries use it depends on
+ * where the operating company is registered: none by default (Studafy's company is Irish, so every
+ * school bills through Stripe), and a deployment run by a company Tap accepts lists them.
+ *
+ * There is deliberately no fallback. A school in a Tap country whose deployment has no Tap key gets a
+ * 503, not a Stripe checkout: silently switching provider would put the school's customer, its
  * payments and its webhooks at a provider nobody configured for it, and hide the misconfiguration.
  */
 
@@ -22,10 +26,11 @@ import type { ErrorCode } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
 /**
- * ISO 3166-1 alpha-2 codes of the countries routed to Tap: the markets Tap acquires in. Confirm
- * against the Tap merchant account before adding a country -- see docs/runbooks/tap-payments-setup.md.
+ * ISO 3166-1 alpha-2 codes of the markets Tap acquires in: the only countries `TAP_COUNTRIES` may
+ * list. Confirm against the Tap merchant account before adding one -- see
+ * docs/runbooks/tap-payments-setup.md.
  */
-export const TAP_COUNTRY_CODES: ReadonlySet<string> = new Set([
+export const TAP_MARKETS: ReadonlySet<string> = new Set([
   "AE",
   "BH",
   "EG",
@@ -36,8 +41,13 @@ export const TAP_COUNTRY_CODES: ReadonlySet<string> = new Set([
   "SA",
 ]);
 
-/** The configured adapters, one slot per provider. `null` when that provider has no credentials. */
-export type PaymentProviderRegistry = Readonly<Record<BillingProvider, PaymentProviderPort | null>>;
+/** The configured adapters, one slot per provider (`null` when it has no credentials). */
+export interface PaymentProviderRegistry {
+  readonly stripe: PaymentProviderPort | null;
+  readonly tap: PaymentProviderPort | null;
+  /** Countries billed through Tap (a subset of {@link TAP_MARKETS}); absent or empty: none. */
+  readonly tapCountries?: ReadonlySet<string>;
+}
 
 export interface SelectedPaymentProvider {
   name: BillingProvider;
@@ -49,8 +59,11 @@ const NOT_CONFIGURED: Readonly<Record<BillingProvider, { code: ErrorCode; label:
   tap: { code: ERROR_CODES.TAP_NOT_CONFIGURED, label: "Tap Payments" },
 };
 
-export function resolveProviderForCountry(countryAlpha2: string): BillingProvider {
-  return TAP_COUNTRY_CODES.has(countryAlpha2.toUpperCase()) ? "tap" : "stripe";
+export function resolveProviderForCountry(
+  countryAlpha2: string,
+  tapCountries: ReadonlySet<string> = new Set(),
+): BillingProvider {
+  return tapCountries.has(countryAlpha2.toUpperCase()) ? "tap" : "stripe";
 }
 
 /** The named provider's adapter, or a 503 naming the provider that is missing. */
@@ -74,7 +87,10 @@ export function selectPaymentProvider(
   registry: PaymentProviderRegistry,
   countryAlpha2: string,
 ): SelectedPaymentProvider {
-  return requirePaymentProvider(registry, resolveProviderForCountry(countryAlpha2));
+  return requirePaymentProvider(
+    registry,
+    resolveProviderForCountry(countryAlpha2, registry.tapCountries),
+  );
 }
 
 /**

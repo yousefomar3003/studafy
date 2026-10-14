@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { LOG_LEVEL_NAMES } from "./logger";
+import { TAP_MARKETS } from "./modules/subscriptions/payment-provider-routing";
 
 /**
  * Split a comma-separated origin list into trimmed, non-empty entries.
@@ -201,6 +202,25 @@ export const envSchema = z
     // them to "" where Tap is off (module.secrets' app_secret_defaults).
     TAP_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().startsWith("sk_").optional()),
     TAP_WEBHOOK_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Countries whose schools are billed through Tap, comma separated (e.g. "JO,SA"); every other
+    // school is billed through Stripe. Empty (the default) means none: Tap only takes merchants
+    // registered in its own markets, and Studafy's company is Irish. Only Tap's markets may be
+    // listed (payment-provider-routing.ts TAP_MARKETS).
+    TAP_COUNTRIES: z.preprocess(
+      emptyAsUnset,
+      z
+        .string()
+        .optional()
+        .transform(
+          (value) =>
+            new Set(
+              (value ?? "")
+                .split(",")
+                .map((code) => code.trim().toUpperCase())
+                .filter(Boolean),
+            ),
+        ),
+    ),
     // In-app purchase of the AI add-on in the mobile app (Apple / Google require their own billing
     // for digital goods there; the website keeps Tap/Stripe). AI_STORE_PRODUCT_ID is the
     // subscription's product id, the same in App Store Connect and the Play Console. Each store is
@@ -495,6 +515,16 @@ export const envSchema = z
         path: ["STRIPE_SECRET_KEY"],
         message: "STRIPE_SECRET_KEY is required when STRIPE_WEBHOOK_SECRET is set",
       });
+    }
+
+    for (const country of env.TAP_COUNTRIES) {
+      if (!TAP_MARKETS.has(country)) {
+        context.addIssue({
+          code: "custom",
+          path: ["TAP_COUNTRIES"],
+          message: `${country} is not a Tap market (${[...TAP_MARKETS].join(", ")})`,
+        });
+      }
     }
 
     // Tap: same both-or-neither rule as Stripe.

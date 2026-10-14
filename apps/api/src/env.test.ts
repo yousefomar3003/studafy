@@ -27,6 +27,7 @@ describe("loadEnv", () => {
       AI_LLM_ENABLED: false,
       AI_LLM_ZERO_RETENTION: false,
       AI_LLM_PROVIDER: "anthropic",
+      TAP_COUNTRIES: new Set(),
     });
   });
 
@@ -67,6 +68,7 @@ describe("loadEnv", () => {
       AI_LLM_ENABLED: false,
       AI_LLM_ZERO_RETENTION: false,
       AI_LLM_PROVIDER: "anthropic",
+      TAP_COUNTRIES: new Set(),
     });
   });
 
@@ -373,6 +375,19 @@ describe("Tap Payments configuration (ST-298)", () => {
     expect(() => loadEnv({ TAP_SECRET_KEY: key })).toThrow(EnvValidationError);
     expect(() => loadEnv({ TAP_SECRET_KEY: key, TAP_WEBHOOK_URL: "" })).toThrow(EnvValidationError);
     expect(() => loadEnv({ TAP_SECRET_KEY: "", TAP_WEBHOOK_URL: url })).toThrow(EnvValidationError);
+  });
+
+  test("no Tap countries by default, so every school bills through Stripe", () => {
+    expect(loadEnv({}).TAP_COUNTRIES).toEqual(new Set());
+    expect(loadEnv({ TAP_COUNTRIES: "" }).TAP_COUNTRIES).toEqual(new Set());
+  });
+
+  test("TAP_COUNTRIES lists Tap markets, comma separated, in any case", () => {
+    expect(loadEnv({ TAP_COUNTRIES: "jo, SA" }).TAP_COUNTRIES).toEqual(new Set(["JO", "SA"]));
+  });
+
+  test("a country Tap does not serve is refused", () => {
+    expect(() => loadEnv({ TAP_COUNTRIES: "JO,IE" })).toThrow(EnvValidationError);
   });
 
   test("a key that is not a Tap secret key is refused", () => {
