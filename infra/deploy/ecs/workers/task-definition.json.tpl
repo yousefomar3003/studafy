@@ -31,7 +31,11 @@
         { "name": "AI_LLM_PROVIDER", "value": "${AI_LLM_PROVIDER}" },
         { "name": "AI_LLM_BASE_URL", "value": "${AI_LLM_BASE_URL}" },
         { "name": "ERPNEXT_API_URL", "value": "${ERPNEXT_API_URL}" },
-        { "name": "API_BASE_URL", "value": "${API_ORIGIN}" }
+        { "name": "API_BASE_URL", "value": "${API_ORIGIN}" },
+        { "name": "SES_REGION", "value": "${SES_REGION}" },
+        { "name": "SES_FROM_ADDRESS", "value": "${SES_FROM_ADDRESS}" },
+        { "name": "SES_CONFIGURATION_SET", "value": "${SES_CONFIGURATION_SET}" },
+        { "name": "EMAIL_DRY_RUN", "value": "${EMAIL_DRY_RUN}" }
       ],
       "dependsOn": [{ "containerName": "clamav", "condition": "HEALTHY" }],
       "secrets": [

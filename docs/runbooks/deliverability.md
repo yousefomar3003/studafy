@@ -6,10 +6,10 @@ conventions and acceptance-criteria verification steps that don't fit in the mod
 
 ## Why a dedicated sending subdomain
 
-Transactional email (invitations, password resets, notifications) is sent from `mail.studafy.com`
+Transactional email (invitations, password resets, notifications) is sent from `send.studafy.com`
 (`dns_ses_domain` in `prod.tfvars`), never from `studafy.com` itself. Sending reputation is
 per-domain: if the transactional stream ever gets flagged as spam (a compromised sender, a bad
-send loop, a scraped mailing list), only `mail.studafy.com`'s reputation takes the hit —
+send loop, a scraped mailing list), only `send.studafy.com`'s reputation takes the hit —
 `api.studafy.com`, `app.studafy.com`, and the apex stay unaffected. The bare apex additionally
 publishes `v=spf1 -all` and a `p=reject` DMARC record (when `dns_manage_zone` and
 `dns_protect_apex_from_spoofing` are both true) declaring it sends nothing at all — closing off
@@ -23,23 +23,23 @@ the inbox instead of spam:
 
 | Mechanism | What it proves                                                                       | Where it lives                                                 |
 | --------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| SPF       | The sending server is authorized to send for the envelope-from domain.               | TXT on `bounce.mail.studafy.com` (the custom MAIL FROM domain) |
-| DKIM      | The message wasn't altered in transit; signed by a key the domain published.         | 3× CNAME on `<token>._domainkey.mail.studafy.com` (Easy DKIM)  |
-| DMARC     | Ties SPF/DKIM to the visible From address and tells receivers what to do on failure. | TXT on `_dmarc.mail.studafy.com`                               |
+| SPF       | The sending server is authorized to send for the envelope-from domain.               | TXT on `bounce.send.studafy.com` (the custom MAIL FROM domain) |
+| DKIM      | The message wasn't altered in transit; signed by a key the domain published.         | 3× CNAME on `<token>._domainkey.send.studafy.com` (Easy DKIM)  |
+| DMARC     | Ties SPF/DKIM to the visible From address and tells receivers what to do on failure. | TXT on `_dmarc.send.studafy.com`                               |
 
 SPF alone is not enough — it's checked against the envelope-from (`Return-Path`) domain, which a
 forwarded or spoofed message can set to anything. DKIM alone is not enough either — a message can
 carry a valid signature from an unrelated domain. DMARC is what makes the other two mean
 something: it requires the domain that actually signed (DKIM) or actually sent (SPF) to match —
 under DMARC's default _relaxed_ alignment — the organizational domain in the visible `From:`
-header. That's why the custom MAIL FROM domain (`bounce.mail.studafy.com`) is a subdomain of
-`mail.studafy.com` rather than SES's own `amazonses.com`: relaxed alignment checks the
-organizational domain (`studafy.com`), and `bounce.mail.studafy.com` shares it with
-`mail.studafy.com`; `amazonses.com` does not.
+header. That's why the custom MAIL FROM domain (`bounce.send.studafy.com`) is a subdomain of
+`send.studafy.com` rather than SES's own `amazonses.com`: relaxed alignment checks the
+organizational domain (`studafy.com`), and `bounce.send.studafy.com` shares it with
+`send.studafy.com`; `amazonses.com` does not.
 
 ## `p=quarantine`, not `p=reject`
 
-This is the first DMARC policy `mail.studafy.com` has ever had. `quarantine` tells receivers to
+This is the first DMARC policy `send.studafy.com` has ever had. `quarantine` tells receivers to
 route a failing message to spam instead of accepting it outright — but not to drop it silently the
 way `reject` does. That distinction matters here specifically because `reject` failures are often
 invisible to the sender (no bounce, no report you'd notice quickly), while `quarantine` failures
@@ -58,7 +58,7 @@ is, verify the DNS side directly with a manual send through SES:
 # addresses that are themselves verified identities. Request production access first, or verify
 # the destination Gmail/Outlook address as a second SES identity for testing.
 aws ses send-email \
-  --from "invitations@mail.studafy.com" \
+  --from "no-reply@send.studafy.com" \
   --destination "ToAddresses=your-test-address@gmail.com" \
   --message "Subject={Data=Deliverability test},Body={Text={Data=test}}"
 ```
@@ -73,7 +73,7 @@ Then, in the received message:
 
 A `dkim=pass` with a mismatched `d=` domain, or an `spf=pass` that isn't followed by `dmarc=pass`,
 means alignment is broken even though the individual mechanisms technically passed — re-check that
-the `From:` address is actually `@mail.studafy.com` and not a different domain routed through the
+the `From:` address is actually `@send.studafy.com` and not a different domain routed through the
 same sender.
 
 ## Verifying "DMARC reports received"
@@ -83,14 +83,27 @@ don't expect one immediately after a single test send. Point `dns_dmarc_rua` at 
 DMARC report analyzer's ingestion address; this module provisions neither) and check it a few days
 after the first real send volume, not right after `terraform apply`.
 
+## How sending is wired
+
+- **Sender:** apps/workers (`queues/notifications/email/sender.ts`) sends as `"Studafy"
+<no-reply@send.studafy.com>` through SES in `SES_REGION`, using the configuration set in
+  `SES_CONFIGURATION_SET`. Per tier in `infra/deploy/environments/<tier>.env`; the configuration set
+  comes from Terraform output via `render.sh`.
+- **Never silent:** a production-mode worker refuses to boot without `SES_REGION` unless
+  `EMAIL_DRY_RUN=true` says on purpose that the tier only records emails (dev, staging — no
+  verified sending domain there).
+- **Permission:** `modules/email` grants the workers task role `ses:SendEmail`/`ses:SendRawEmail`
+  on exactly this identity and configuration set, and only from `*@send.studafy.com`.
+- **Bounces and complaints:** the configuration set publishes `BOUNCE` and `COMPLAINT` events to the
+  `<prefix>-email-events` SNS topic, subscribed to the API's `/email/webhooks/sns`, which verifies
+  the signature against `EMAIL_EVENTS_SNS_TOPIC_ARN`, confirms the subscription itself on first
+  deploy, and suppresses the address. SES's account-level suppression list is on as a backstop.
+
 ## Known gaps
 
 - **No mail-receiving infrastructure.** `dns_dmarc_rua` in `prod.tfvars` is currently a
   placeholder address (`dmarc-reports@studafy.com`) with no MX record or inbox behind it anywhere
   in this repo. DMARC reports will bounce, undetected, until that's wired to something real.
-- **No sender IAM role yet.** `module.dns` outputs `ses_domain_identity_arn` specifically so a
-  future compute-tier module can scope an `ses:SendEmail` policy to it — no role has that
-  permission today.
 - **SES sandbox.** A newly-verified SES identity starts in the sandbox (send only to other
   verified identities, low rate limit). Request production access before the invitation-email
   acceptance test needs to reach a real, unverified inbox at scale.

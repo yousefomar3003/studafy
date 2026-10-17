@@ -222,6 +222,43 @@ describe("production readiness of the ECS task definitions", () => {
     }
   });
 
+  test("workers send real email in prod and say so on purpose everywhere else", async () => {
+    const workers = (await renderNamed("workers")).containerDefinitions.find(
+      (c) => c.name === "workers",
+    )!;
+    expect(values(workers.environment!)).toMatchObject({
+      SES_REGION: "<SES_REGION>",
+      SES_FROM_ADDRESS: "<SES_FROM_ADDRESS>",
+      SES_CONFIGURATION_SET: "<SES_CONFIGURATION_SET>",
+      EMAIL_DRY_RUN: "<EMAIL_DRY_RUN>",
+    });
+    const api = (await renderNamed("api")).containerDefinitions[0]!;
+    expect(values(api.environment!)).toMatchObject({
+      EMAIL_EVENTS_SNS_TOPIC_ARN: "<EMAIL_EVENTS_SNS_TOPIC_ARN>",
+    });
+
+    const render = await readFile(join(import.meta.dir, "scripts", "render.sh"), "utf8");
+    expect(render).toContain("output -json email_configuration_set_name");
+    expect(render).toContain("output -json email_events_topic_arn");
+
+    const prod = await readFile(join(import.meta.dir, "environments", "prod.env"), "utf8");
+    expect(prod).toMatch(/^SES_REGION=\S+$/m);
+    // The verified sending domain (prod.tfvars dns_ses_domain).
+    expect(prod).toMatch(/^SES_FROM_ADDRESS=\S+@send\.studafy\.com$/m);
+    expect(prod).toMatch(/^EMAIL_DRY_RUN=false$/m);
+    for (const tier of ["dev", "staging"]) {
+      const env = await readFile(join(import.meta.dir, "environments", `${tier}.env`), "utf8");
+      expect(env).toMatch(/^EMAIL_DRY_RUN=true$/m);
+    }
+
+    const emailModule = await readFile(
+      join(import.meta.dir, "..", "terraform", "modules", "email", "main.tf"),
+      "utf8",
+    );
+    expect(emailModule).toContain('actions = ["ses:SendEmail", "ses:SendRawEmail"]');
+    expect(emailModule).toContain('matching_event_types = ["BOUNCE", "COMPLAINT"]');
+  });
+
   test("every deploy tier sets each AI variable the task definitions reference", async () => {
     for (const tier of ["dev", "staging", "prod"]) {
       const env = await readFile(join(import.meta.dir, "environments", `${tier}.env`), "utf8");

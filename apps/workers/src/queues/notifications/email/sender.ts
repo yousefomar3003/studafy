@@ -58,10 +58,20 @@ export function isRetryableSendError(err: unknown): boolean {
  * works in development and CI without AWS credentials.
  */
 export function createSesSender(
-  env: { SES_REGION?: string; SES_FROM_ADDRESS: string },
+  env: {
+    SES_REGION?: string;
+    SES_FROM_ADDRESS: string;
+    SES_FROM_NAME?: string;
+    SES_CONFIGURATION_SET?: string;
+  },
   logger: SenderLogger,
 ): EmailSender {
   const fromAddress = env.SES_FROM_ADDRESS;
+  // Display name and address, so inboxes show "Studafy" rather than a bare no-reply address. The
+  // name is quoted: it must not be able to inject another address.
+  const from = env.SES_FROM_NAME
+    ? `"${env.SES_FROM_NAME.replaceAll('"', "")}" <${fromAddress}>`
+    : fromAddress;
 
   if (env.SES_REGION === undefined) {
     logger.warn({ fromAddress }, "SES_REGION unset — email dispatcher running in dry-run mode");
@@ -78,7 +88,10 @@ export function createSesSender(
     async send(email: OutboundEmail): Promise<SentEmail> {
       const result = await client.send(
         new SendEmailCommand({
-          FromEmailAddress: fromAddress,
+          FromEmailAddress: from,
+          // Bounces and complaints are published through the configuration set's SNS destination
+          // to the API, which suppresses the address (apps/api/src/email/webhook.ts).
+          ConfigurationSetName: env.SES_CONFIGURATION_SET,
           Destination: { ToAddresses: [email.to] },
           Content: {
             Simple: {

@@ -57,10 +57,25 @@ export const envSchema = z
     STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // SES transactional email (deliverability R-08). When SES_REGION is unset the email dispatcher
     // runs in dry-run mode: it renders, dedups, and records deliveries exactly as in production but
-    // never calls AWS — the dev/test path, and a loud warning is logged at startup when a deployed
-    // worker has no region.
-    SES_REGION: z.string().min(1).optional(),
-    SES_FROM_ADDRESS: z.string().email().default("invitations@mail.studafy.com"),
+    // never calls AWS — the dev/test path. A production worker refuses to boot that way unless
+    // EMAIL_DRY_RUN=true says so on purpose (dev/staging, which have no verified sending domain), so
+    // a missing region can never silently stop every invitation and password email. SES_FROM_ADDRESS
+    // must be on the SES-verified domain (prod.tfvars `dns_ses_domain`); SES_CONFIGURATION_SET routes
+    // bounces and complaints to the API's /email/webhooks/sns (Terraform module.email).
+    SES_REGION: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    SES_FROM_ADDRESS: z.preprocess(
+      emptyAsUnset,
+      z.string().email().default("no-reply@send.studafy.com"),
+    ),
+    SES_FROM_NAME: z.preprocess(emptyAsUnset, z.string().min(1).default("Studafy")),
+    SES_CONFIGURATION_SET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    EMAIL_DRY_RUN: z.preprocess(
+      emptyAsUnset,
+      z
+        .enum(["true", "false"])
+        .optional()
+        .transform((value) => value === "true"),
+    ),
     // FCM push notifications (ST-139). A Google service-account JSON string. When unset the push
     // channel runs in dry-run mode: it resolves devices, applies the per-user cap and advances
     // dispatch logs exactly as in production but never calls FCM — the dev/test path, and a loud
@@ -129,6 +144,15 @@ export const envSchema = z
         code: "custom",
         path: ["ERPNEXT_API_URL"],
         message: "ERPNEXT_API_URL and ERPNEXT_API_KEY must be set together",
+      });
+    }
+
+    if (env.SES_REGION === undefined && !env.EMAIL_DRY_RUN) {
+      context.addIssue({
+        code: "custom",
+        path: ["SES_REGION"],
+        message:
+          "SES_REGION is required in production (set EMAIL_DRY_RUN=true to run without sending on purpose)",
       });
     }
 

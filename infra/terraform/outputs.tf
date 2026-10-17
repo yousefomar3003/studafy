@@ -203,6 +203,16 @@ output "dns_ses_mail_from_domain" {
   value       = module.dns.ses_mail_from_domain
 }
 
+output "email_configuration_set_name" {
+  description = "SES_CONFIGURATION_SET for apps/workers (rendered by infra/deploy/scripts/render.sh). Null where email is not enabled."
+  value       = module.email.configuration_set_name
+}
+
+output "email_events_topic_arn" {
+  description = "EMAIL_EVENTS_SNS_TOPIC_ARN for apps/api's SNS webhook (rendered by render.sh). Null where email is not enabled."
+  value       = module.email.events_topic_arn
+}
+
 output "edge_alb_dns_name" {
   description = "Default AWS DNS name of the load balancer — target for a TLS scan/testssl.sh run (see modules/edge/README.md)."
   value       = module.edge.alb_dns_name

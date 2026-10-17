@@ -81,6 +81,12 @@ export MIGRATIONS_EXECUTION_ROLE_ARN API_TASK_ROLE_ARN WORKERS_TASK_ROLE_ARN S3_
 ERPNEXT_ALB_DNS="$(terraform -chdir="$TF_DIR" output -json erpnext_internal_alb_dns_name | jq -r '. // empty')"
 export ERPNEXT_API_URL="${ERPNEXT_ALB_DNS:+http://$ERPNEXT_ALB_DNS}"
 
+# Transactional email (modules/email): the SES configuration set the workers send through, and the
+# bounce/complaint topic the API's /email/webhooks/sns verifies messages against. Both null (empty
+# here) where the tier has no sending domain -- that tier sets EMAIL_DRY_RUN=true.
+export SES_CONFIGURATION_SET="$(terraform -chdir="$TF_DIR" output -json email_configuration_set_name | jq -r '. // empty')"
+export EMAIL_EVENTS_SNS_TOPIC_ARN="$(terraform -chdir="$TF_DIR" output -json email_events_topic_arn | jq -r '. // empty')"
+
 SERVICE_UPPER="$(echo "$SERVICE" | tr '[:lower:]' '[:upper:]')"
 export "${SERVICE_UPPER}_IMAGE=${REPO_URL}:${IMAGE_TAG}"
 export "${SERVICE_UPPER}_APP_SECRETS_ARN=${SECRET_ARN}"

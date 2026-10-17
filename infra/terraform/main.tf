@@ -269,6 +269,19 @@ module "dns" {
   dmarc_ruf            = var.dns_dmarc_ruf
 }
 
+# SES configuration set, bounce/complaint topic subscribed to the API, and the workers' send grant
+# (see modules/email). Only where module.dns verifies a sending domain.
+module "email" {
+  source = "./modules/email"
+
+  enabled              = var.dns_create_email_records
+  name_prefix          = module.naming.name_prefix
+  ses_domain           = var.dns_ses_domain
+  ses_identity_arn     = module.dns.ses_domain_identity_arn
+  webhook_url          = "https://${var.edge_domain_name}/email/webhooks/sns"
+  workers_task_role_id = module.compute.workers_task_role_name
+}
+
 module "edge" {
   source = "./modules/edge"
 

@@ -13,7 +13,9 @@ describe("loadEnv", () => {
       SHUTDOWN_TIMEOUT_MS: 10_000,
       DATABASE_URL: "postgres://localhost:5432/studafy",
       SCHOOL_IDS: "",
-      SES_FROM_ADDRESS: "invitations@mail.studafy.com",
+      SES_FROM_ADDRESS: "no-reply@send.studafy.com",
+      SES_FROM_NAME: "Studafy",
+      EMAIL_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
       CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
@@ -44,7 +46,9 @@ describe("loadEnv", () => {
       SHUTDOWN_TIMEOUT_MS: 30_000,
       DATABASE_URL: "postgres://localhost:5432/studafy",
       SCHOOL_IDS: "",
-      SES_FROM_ADDRESS: "invitations@mail.studafy.com",
+      SES_FROM_ADDRESS: "no-reply@send.studafy.com",
+      SES_FROM_NAME: "Studafy",
+      EMAIL_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
       CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
@@ -89,6 +93,7 @@ describe("loadEnv", () => {
         READ_DATABASE_NAME: "workers_read",
         STRIPE_SECRET_KEY: "sk_test_prod",
         CLAMAV_HOST: "clamd.internal",
+        SES_REGION: "eu-central-1",
       }),
     ).toMatchObject({
       READ_DATABASE_HOST: "pgbouncer.internal",
@@ -104,9 +109,35 @@ describe("loadEnv", () => {
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
+      SES_REGION: "eu-central-1",
       // Injected empty by the task definition when the secret holds no Stripe key.
       STRIPE_SECRET_KEY: "",
     });
     expect(env.STRIPE_SECRET_KEY).toBeUndefined();
+  });
+
+  describe("email in production", () => {
+    const deployed = {
+      NODE_ENV: "production",
+      READ_DATABASE_HOST: "pgbouncer.internal",
+      READ_DATABASE_NAME: "workers_read",
+      CLAMAV_HOST: "clamd.internal",
+    };
+
+    test("refuses to boot without SES, so email can never silently stop", () => {
+      expect(() => loadEnv(deployed)).toThrow(EnvValidationError);
+      // The task definition always injects the key; empty must not count as set.
+      expect(() => loadEnv({ ...deployed, SES_REGION: "" })).toThrow(EnvValidationError);
+    });
+
+    test("boots without SES only when dry-run is chosen on purpose", () => {
+      expect(loadEnv({ ...deployed, EMAIL_DRY_RUN: "true" }).EMAIL_DRY_RUN).toBe(true);
+    });
+
+    test("sends from the verified domain by default", () => {
+      const env = loadEnv({ ...deployed, SES_REGION: "eu-central-1" });
+      expect(env.SES_FROM_ADDRESS).toBe("no-reply@send.studafy.com");
+      expect(env.SES_FROM_NAME).toBe("Studafy");
+    });
   });
 });
