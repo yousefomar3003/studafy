@@ -250,6 +250,7 @@
   "account": {
     "title": "Account",
     "description": "Manage your account settings.",
+    "aiLink": "AI Study Assistant",
     "sessionsLink": "Devices & sessions",
     "deleteLink": "Delete account"
   },

@@ -5,6 +5,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import { getAiOffer } from "../services/ai-offer-service";
 import { createAiCheckoutSession } from "../services/checkout-service";
 
 import type { Database } from "../../../db";
@@ -23,6 +24,37 @@ const AiCheckoutResponseSchema = z.object({
   sessionId: z.string(),
 });
 
+const AiOfferSchema = z
+  .object({
+    price: z
+      .object({
+        id: z.string().uuid(),
+        amountMinor: z.number().int(),
+        currency: z.string(),
+        interval: z.enum(["monthly", "yearly"]),
+      })
+      .nullable(),
+    students: z.array(z.object({ id: z.string().uuid(), name: z.string(), active: z.boolean() })),
+  })
+  .openapi("AiAddOnOffer");
+
+const aiOfferRoute = createRoute({
+  method: "get",
+  path: "/api/subscriptions/ai/offer",
+  tags: ["Subscriptions"],
+  operationId: "getAiAddOnOffer",
+  summary: "What the signed-in user can buy of the AI add-on",
+  description:
+    "The AI add-on's current price (null until one is set) and the students the caller may buy it " +
+    "for: themselves as a student, and the children they are linked to as a parent, each with " +
+    "whether the add-on is already active. Web-origin only, like the checkout it feeds.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "The offer", schema: AiOfferSchema } },
+    [401, 403],
+  ),
+});
+
 const aiCheckoutRoute = createRoute({
   method: "post",
   path: "/api/subscriptions/ai/checkout",
@@ -30,8 +62,8 @@ const aiCheckoutRoute = createRoute({
   operationId: "createAiCheckoutSession",
   summary: "Create an AI subscription checkout session",
   description:
-    "Creates a Stripe Checkout session for a student-level AI add-on. " +
-    "Requires the school subscription to be active. Web-origin only.",
+    "Creates a checkout session for a student-level AI add-on, for the student themselves or a " +
+    "linked parent (anyone else gets 404). Requires the school to be active. Web-origin only.",
   security: [{ bearerAuth: [] }],
   request: {
     body: { content: { "application/json": { schema: AiCheckoutRequestSchema } } },
@@ -54,6 +86,17 @@ export function aiCheckoutRoutes(
   const app = new OpenAPIHono<AppEnv>();
 
   app.use("/api/subscriptions/ai/checkout", requireChannel(AUTH_CHANNELS.WEB));
+  app.use("/api/subscriptions/ai/offer", requireChannel(AUTH_CHANNELS.WEB));
+
+  app.openapi(aiOfferRoute, async (c) => {
+    const auth = requireAuth(c);
+    const offer = await getAiOffer(database, {
+      schoolId: auth.schoolId,
+      userId: auth.userId,
+      requestId: c.get("requestId"),
+    });
+    return c.json(offer, 200);
+  });
 
   app.openapi(aiCheckoutRoute, async (c) => {
     const auth = requireAuth(c);

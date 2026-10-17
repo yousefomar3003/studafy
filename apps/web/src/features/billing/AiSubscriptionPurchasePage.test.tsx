@@ -11,40 +11,32 @@ import { AuthProvider, createSessionStore } from "../../lib/auth";
 import type { SessionTokens } from "../../lib/auth";
 import type { ComponentType } from "react";
 
-const STUDENT_ID = "11111111-1111-1111-1111-111111111111";
+const AMINA = "11111111-1111-1111-1111-111111111111";
+const OMAR = "33333333-3333-3333-3333-333333333333";
 const PRICE_ID = "22222222-2222-2222-2222-222222222222";
 
-function makeStudent(overrides: Record<string, unknown> = {}) {
+function makeOffer(overrides: Record<string, unknown> = {}) {
   return {
-    id: STUDENT_ID,
-    school_id: "school-1",
-    user_id: "user-1",
-    first_name: "Amina",
-    middle_name: null,
-    last_name: "Hassan",
-    preferred_name: null,
-    date_of_birth: null,
-    nationality_country_id: null,
-    status: "enrolled",
-    admission_number: "",
-    admission_date: null,
-    created_at: "2026-01-01T00:00:00.000Z",
-    updated_at: "2026-01-01T00:00:00.000Z",
+    price: { id: PRICE_ID, amountMinor: 499, currency: "USD", interval: "monthly" },
+    students: [
+      { id: AMINA, name: "Amina Hassan", active: false },
+      { id: OMAR, name: "Omar Hassan", active: true },
+    ],
     ...overrides,
   };
 }
 
-let currentStudent: Record<string, unknown> | undefined = makeStudent();
+let currentOffer: Record<string, unknown> | undefined = makeOffer();
 let checkoutError: ApiError | null = null;
 
 const getMock = mock((path: string) => {
-  if (path === "/api/students/{studentId}") {
-    return Promise.resolve({ data: currentStudent });
+  if (path === "/api/subscriptions/ai/offer") {
+    return Promise.resolve({ data: currentOffer });
   }
   return Promise.resolve({ data: undefined });
 });
 
-const postMock = mock((path: string) => {
+const postMock = mock((path: string, _init?: { body?: Record<string, unknown> }) => {
   if (path === "/api/subscriptions/ai/checkout") {
     if (checkoutError) {
       return Promise.reject(checkoutError);
@@ -58,8 +50,8 @@ const postMock = mock((path: string) => {
 
 mock.module("../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }));
 
-// `useStartAiCheckout` redirects via `window.location.assign` on success — stubbed the same way
-// `BillingOverviewPage.test.tsx` stubs it rather than letting happy-dom attempt a real navigation.
+// The checkout redirect goes through `window.location.assign`; stubbed so happy-dom doesn't attempt
+// a real navigation.
 const assignMock = mock((_url: string) => undefined);
 window.location.assign = assignMock;
 
@@ -72,7 +64,7 @@ function fakeJwt(payload: unknown): string {
   return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
 }
 
-async function renderPage(Page: ComponentType, initialPath: string) {
+async function renderPage(Page: ComponentType, initialPath = "/account/ai") {
   const store = createSessionStore({
     refreshClient: {
       refresh: async (): Promise<SessionTokens> => ({
@@ -104,33 +96,47 @@ afterEach(() => {
   getMock.mockClear();
   postMock.mockClear();
   assignMock.mockClear();
-  currentStudent = makeStudent();
+  currentOffer = makeOffer();
   checkoutError = null;
 });
 
 describe("AiSubscriptionPurchasePage", () => {
-  test("shows an invalid-link message when the deep link is missing studentId/priceId", async () => {
-    await renderPage(await loadPage(), "/account/ai");
+  test("shows the price and one purchase per student, with active students marked", async () => {
+    await renderPage(await loadPage());
 
-    await screen.findByText(/missing some information/);
-    expect(getMock).not.toHaveBeenCalled();
+    expect(await screen.findByText("$4.99 per month")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Get AI for Amina Hassan" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Get AI for Omar Hassan" })).toBeNull();
+    expect(screen.getByText("Active")).toBeTruthy();
   });
 
-  test("renders the plan explainer with the student's name and starts checkout on subscribe", async () => {
-    await renderPage(await loadPage(), `/account/ai?studentId=${STUDENT_ID}&priceId=${PRICE_ID}`);
+  test("buying starts checkout for that student and goes to the provider's page", async () => {
+    await renderPage(await loadPage());
 
-    await screen.findByText(/A personal AI tutor for Amina Hassan/);
+    fireEvent.click(await screen.findByRole("button", { name: "Get AI for Amina Hassan" }));
 
-    fireEvent.click(await screen.findByRole("button", { name: "Subscribe" }));
-
-    await screen.findByRole("button", { name: "Subscribe" });
-    expect(postMock).toHaveBeenCalledWith(
-      "/api/subscriptions/ai/checkout",
-      expect.objectContaining({
-        body: expect.objectContaining({ studentId: STUDENT_ID, priceId: PRICE_ID }),
-      }),
-    );
+    await screen.findByRole("button", { name: "Get AI for Amina Hassan" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const [path, init] = postMock.mock.calls[0]!;
+    expect(path).toBe("/api/subscriptions/ai/checkout");
+    expect(init?.body).toMatchObject({ studentId: AMINA, priceId: PRICE_ID });
+    expect(String(init?.body?.successUrl)).toContain("checkout=success");
     expect(assignMock).toHaveBeenCalledWith("https://checkout.stripe.com/session-123");
+  });
+
+  test("says the add-on is not for sale yet when it has no price", async () => {
+    currentOffer = makeOffer({ price: null });
+    await renderPage(await loadPage());
+
+    expect(await screen.findByText(/isn't available to buy yet/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Get AI/ })).toBeNull();
+  });
+
+  test("explains who can buy it to an account with no student to buy for", async () => {
+    currentOffer = makeOffer({ students: [] });
+    await renderPage(await loadPage());
+
+    expect(await screen.findByText(/bought for a student/)).toBeTruthy();
   });
 
   test("shows the inactive-school blocked state when checkout refuses with that code", async () => {
@@ -144,41 +150,24 @@ describe("AiSubscriptionPurchasePage", () => {
       request_id: null,
       problem: null,
     });
-    await renderPage(await loadPage(), `/account/ai?studentId=${STUDENT_ID}&priceId=${PRICE_ID}`);
+    await renderPage(await loadPage());
 
-    fireEvent.click(await screen.findByRole("button", { name: "Subscribe" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Get AI for Amina Hassan" }));
 
-    await screen.findByText("Purchase blocked");
-    expect(screen.getByText(/isn.t active right now/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Subscribe" })).toBeNull();
+    expect(await screen.findByText("Purchase blocked")).toBeTruthy();
+    expect(assignMock).not.toHaveBeenCalled();
   });
 
-  test("shows the success state instructing the parent to return to the app", async () => {
-    await renderPage(
-      await loadPage(),
-      `/account/ai?studentId=${STUDENT_ID}&priceId=${PRICE_ID}&checkout=success`,
-    );
+  test("shows the success state after returning from checkout", async () => {
+    await renderPage(await loadPage(), "/account/ai?checkout=success");
 
-    await screen.findByRole("heading", { name: /all set/ });
-    await screen.findByText(/Return to the Studafy app on your phone/);
-    expect(screen.queryByRole("button", { name: "Subscribe" })).toBeNull();
+    expect(await screen.findByRole("heading", { name: "You're all set" })).toBeTruthy();
   });
 
-  test("shows a cancelled notice and still offers to retry", async () => {
-    await renderPage(
-      await loadPage(),
-      `/account/ai?studentId=${STUDENT_ID}&priceId=${PRICE_ID}&checkout=cancelled`,
-    );
+  test("shows a cancelled notice and still offers to buy", async () => {
+    await renderPage(await loadPage(), "/account/ai?checkout=cancelled");
 
-    await screen.findByText("Checkout cancelled");
-    expect(await screen.findByRole("button", { name: "Subscribe" })).toBeTruthy();
-  });
-
-  test("shows an error when the student can't be found on this account", async () => {
-    currentStudent = undefined;
-    await renderPage(await loadPage(), `/account/ai?studentId=${STUDENT_ID}&priceId=${PRICE_ID}`);
-
-    await screen.findByText(/couldn.t find this student/);
-    expect(screen.queryByRole("button", { name: "Subscribe" })).toBeNull();
+    expect(await screen.findByText("Checkout cancelled")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Get AI for Amina Hassan" })).toBeTruthy();
   });
 });

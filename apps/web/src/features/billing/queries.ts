@@ -34,21 +34,18 @@ export function useBillingOverviewQuery() {
 }
 
 // ---------------------------------------------------------------------------
-// AI subscription purchase (ST-208) — the student named in the purchase page's own deep-link query
-// params. Reads `GET /api/students/{studentId}` directly rather than importing
-// `features/admin/students/queries.ts`'s `fetchStudent`: that module is the admin student directory
-// (CSV import, guardian links, enrollment history) that a parent/student session viewing this page
-// has no business pulling in for one profile lookup.
+// AI add-on purchase -- what the signed-in user can buy: the add-on's price and the students (self
+// or linked children) it can be bought for, each with whether it is already active.
 // ---------------------------------------------------------------------------
 
-export type AiCheckoutStudent = components["schemas"]["StudentProfile"];
+export type AiOffer = components["schemas"]["AiAddOnOffer"];
 
-export function aiCheckoutStudentQueryKey(studentId: string) {
-  return ["ai-checkout", "student", studentId] as const;
-}
+export const AI_OFFER_QUERY_KEY = ["ai-offer"];
 
-export async function fetchAiCheckoutStudent(studentId: string): Promise<AiCheckoutStudent> {
-  const { data } = await api.GET("/api/students/{studentId}", { params: { path: { studentId } } });
-  if (!data) throw new Error("Student not found.");
-  return data as AiCheckoutStudent;
+export async function fetchAiOffer(): Promise<AiOffer> {
+  const { data } = await api.GET("/api/subscriptions/ai/offer");
+  if (!data) throw new Error("The AI offer returned no data.");
+  // The generated response type drops `students`' Array prototype -- the same pre-existing
+  // `@studafy/api-client` typing gap other list responses cast around; the shape is unchanged.
+  return data as AiOffer;
 }

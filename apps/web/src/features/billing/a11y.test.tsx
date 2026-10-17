@@ -14,26 +14,17 @@ import type { ComponentType } from "react";
 /** Automated accessibility audit for the AI add-on purchase screen, mirroring
  * `finance/adjustments/a11y.test.tsx`. */
 
-const AI_STUDENT = {
-  id: "student-1",
-  school_id: "school-1",
-  user_id: "user-1",
-  first_name: "Amina",
-  middle_name: null,
-  last_name: "Hassan",
-  preferred_name: null,
-  date_of_birth: null,
-  nationality_country_id: null,
-  status: "enrolled",
-  admission_number: "",
-  admission_date: null,
-  created_at: "2026-01-01T00:00:00.000Z",
-  updated_at: "2026-01-01T00:00:00.000Z",
+const AI_OFFER = {
+  price: { id: "price-1", amountMinor: 499, currency: "USD", interval: "monthly" },
+  students: [
+    { id: "student-1", name: "Amina Hassan", active: false },
+    { id: "student-2", name: "Omar Hassan", active: true },
+  ],
 };
 
 const getMock = mock((path: string) => {
-  if (path === "/api/students/{studentId}") {
-    return Promise.resolve({ data: AI_STUDENT });
+  if (path === "/api/subscriptions/ai/offer") {
+    return Promise.resolve({ data: AI_OFFER });
   }
   return Promise.resolve({ data: undefined });
 });
@@ -84,25 +75,17 @@ afterEach(() => {
 });
 
 describe("AI purchase screen accessibility", () => {
-  test("AI subscription purchase, populated with the student's plan explainer", async () => {
+  test("AI subscription purchase, with the price and a student to buy for", async () => {
     const Page = (await import("./AiSubscriptionPurchasePage")).default;
-    const { container } = await renderInPortal(
-      Page,
-      "/account/ai?studentId=student-1&priceId=price-1",
-      "/account/ai",
-    );
-    await screen.findByText(/A personal AI tutor for Amina Hassan/);
+    const { container } = await renderInPortal(Page, "/account/ai", "/account/ai");
+    await screen.findByRole("button", { name: "Get AI for Amina Hassan" });
 
     await expectNoA11yViolations(container);
   });
 
   test("AI subscription purchase, success state", async () => {
     const Page = (await import("./AiSubscriptionPurchasePage")).default;
-    const { container } = await renderInPortal(
-      Page,
-      "/account/ai?studentId=student-1&priceId=price-1&checkout=success",
-      "/account/ai",
-    );
+    const { container } = await renderInPortal(Page, "/account/ai?checkout=success", "/account/ai");
     await screen.findByRole("heading", { name: /all set/ });
 
     await expectNoA11yViolations(container);
