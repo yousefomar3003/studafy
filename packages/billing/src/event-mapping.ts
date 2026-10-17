@@ -101,38 +101,49 @@ export function extractStudentIdHint(payload: Record<string, unknown>): string |
  * The billing period this event reports, if it reports one.
  *
  * Stripe sends Unix *seconds*; the ×1000 is what puts the result in this century. Returns `null`
- * unless both ends are present and well-ordered -- `ck_subscriptions_period` requires
+ * unless a complete, well-ordered pair is found -- `ck_subscriptions_period` requires
  * `current_period_end > current_period_start`, and a half-period or an inverted one would abort the
  * transaction that is applying an otherwise-correct status change. A missing period is not an
  * error; it just means this event says nothing about dates and the existing ones stand.
  *
- * `current_period_*` lives on the subscription object; the invoice equivalent is `period_*`, and on
- * the 2025+ API the authoritative pair is on the invoice's first line item.
+ * Where the pair lives depends on the object and the API version, so each place is tried as a whole
+ * pair, in order, and the first well-ordered one wins -- a start from one place is never paired
+ * with an end from another:
+ *
+ * 1. `current_period_*` on a subscription (API versions before 2025);
+ * 2. `items.data[0].current_period_*` on a subscription (2025+, where the period moved to items);
+ * 3. `lines.data[0].period` on an invoice -- the period the invoice actually bills;
+ * 4. `period_*` on an invoice (also what store and Tap events carry). On a subscription's first
+ *    invoice Stripe sets both to the creation time, a zero-length period, which is why the line
+ *    item is tried first.
  */
 export function extractPeriod(payload: Record<string, unknown>): { start: Date; end: Date } | null {
-  const lineItems = asRecord(payload.lines)?.data;
-  const firstLine = Array.isArray(lineItems) ? asRecord(lineItems[0]) : null;
-  const linePeriod = asRecord(firstLine?.period);
+  const firstOf = (value: unknown) => {
+    const data = asRecord(value)?.data;
+    return Array.isArray(data) ? asRecord(data[0]) : null;
+  };
+  const item = firstOf(payload.items);
+  const linePeriod = asRecord(firstOf(payload.lines)?.period);
 
-  const startSeconds = firstNumber([
-    payload.current_period_start,
-    payload.period_start,
-    linePeriod?.start,
-  ]);
-  const endSeconds = firstNumber([payload.current_period_end, payload.period_end, linePeriod?.end]);
+  const pairs: readonly (readonly [unknown, unknown])[] = [
+    [payload.current_period_start, payload.current_period_end],
+    [item?.current_period_start, item?.current_period_end],
+    [linePeriod?.start, linePeriod?.end],
+    [payload.period_start, payload.period_end],
+  ];
 
-  if (startSeconds === null || endSeconds === null || endSeconds <= startSeconds) return null;
-
-  return { start: new Date(startSeconds * 1000), end: new Date(endSeconds * 1000) };
-}
-
-function firstNumber(candidates: readonly unknown[]): number | null {
-  for (const candidate of candidates) {
-    if (typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0) {
-      return candidate;
+  for (const [start, end] of pairs) {
+    const startSeconds = unixSeconds(start);
+    const endSeconds = unixSeconds(end);
+    if (startSeconds !== null && endSeconds !== null && endSeconds > startSeconds) {
+      return { start: new Date(startSeconds * 1000), end: new Date(endSeconds * 1000) };
     }
   }
   return null;
+}
+
+function unixSeconds(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 /**
