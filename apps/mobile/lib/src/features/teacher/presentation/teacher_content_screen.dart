@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +18,7 @@ import '../../../core/api/generated/models/create_upload_url_body.dart';
 import '../../../core/api/generated/models/material.dart' as material_api;
 import '../../../core/api/generated/models/toggle_ai_visible_body.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/files/picked_file.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../student/domain/material_ready_state.dart';
 import '../../student/presentation/widgets/material_ready_state_pill.dart';
@@ -349,18 +349,13 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
   }
 
   Future<void> _pickFiles() async {
-    final selected = await FilePicker.pickFiles(
-      allowMultiple: true,
-      withData: false,
-    );
-    if (selected == null) {
+    final selected = await pickLocalFiles();
+    if (selected.isEmpty || !mounted) {
       return;
     }
     setState(
       () => _attachments.addAll(
-        selected.files
-            .where((f) => f.path != null)
-            .map((f) => _LocalFile(f.path!, f.name, f.size)),
+        selected.map((f) => _LocalFile(f.path, f.name, f.sizeBytes)),
       ),
     );
   }
@@ -557,14 +552,13 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
   }
 
   Future<void> _chooseFile() async {
-    final result = await FilePicker.pickFiles(withData: false);
-    if (result?.files.single.path != null) {
-      setState(() {
-        final file = result!.files.single;
-        _file = _LocalFile(file.path!, file.name, file.size);
-        _title.text = _title.text.isEmpty ? file.name : _title.text;
-      });
-    }
+    final picked = await pickLocalFiles(multiple: false);
+    if (picked.isEmpty || !mounted) return;
+    final file = picked.single;
+    setState(() {
+      _file = _LocalFile(file.path, file.name, file.sizeBytes);
+      _title.text = _title.text.isEmpty ? file.name : _title.text;
+    });
   }
 
   Future<void> _takePhoto() async {

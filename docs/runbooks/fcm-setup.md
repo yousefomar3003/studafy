@@ -31,13 +31,32 @@ secret and never belongs in the repo or in a plain ECS environment entry.
 4. No other Firebase admin SDK setup is needed. The SDK uses the service account for application
    default credential OAuth; there is no API key involved server-side.
 
-### Registration tokens (not in this repo yet)
+### Registration tokens
 
-The worker only _reads_ device tokens from `app.user_devices` (migration 000017), soft-revoking them
-when FCM says a token is unregistered. Nothing in this repo yet _writes_ those rows — token
-registration is the mobile/web clients' job, and the API endpoint to persist a token is an open
-follow-up. Until that exists the channel has devices only in tests, and everything downstream is
-exercised in dry-run.
+The mobile app registers its FCM token with `POST /api/auth/devices` after sign-in
+(`apps/mobile/lib/src/core/push/push_service.dart`), stored in `app.user_devices` (migration 000017).
+The worker reads those rows and soft-revokes a token when FCM says it is unregistered.
+
+## The mobile app's Firebase config
+
+The project is `studafy` (Spark plan, Google Analytics **off** -- the privacy labels declare no
+analytics). It has one Android app per build flavor: `com.studafy.studafy_mobile` (prod),
+`.dev` and `.staging`. Firebase -> Project settings -> Your apps -> **google-services.json** covers all
+three; it goes in `apps/mobile/android/app/google-services.json`. Without it the Android build fails
+(`processDevDebugGoogleServices`: "File google-services.json is missing").
+
+The file is gitignored because the repository is public. Each developer downloads it; CI writes it
+from the **`GOOGLE_SERVICES_JSON`** repository secret (the file's contents) in every Android build job
+of `mobile-release.yml` and `mobile-integration.yml`, and fails with a clear error when the secret is
+missing. iOS needs `GoogleService-Info.plist` and an APNs key from an Apple Developer account; not set
+up yet.
+
+## Dry run, on purpose only
+
+A production-mode worker refuses to boot without `FIREBASE_SERVICE_ACCOUNT` unless
+`PUSH_DRY_RUN=true` (per tier in `infra/deploy/environments/<tier>.env`): prod `false`, dev and
+staging `true` until they have their own service account. The secret lives in the workers app secret
+(`TF_VAR_secrets_app_secret_values` -> `workers.FIREBASE_SERVICE_ACCOUNT`).
 
 ## The push payload
 
@@ -98,8 +117,4 @@ outbox relay uses.
 
 ## Known gaps
 
-- **No token registration endpoint** — `app.user_devices` is populated by nothing in this repo yet.
-- **No client-side tap handling** — the deep-link navigation on tap is the mobile app's job.
-- **No ECS secret wiring** — `FIREBASE_SERVICE_ACCOUNT` must be added to the workers task's secret
-  container before a deployed worker leaves dry-run mode.
 - **No delivery-metrics exporter** — the counters exist in-process only.

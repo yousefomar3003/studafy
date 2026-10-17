@@ -1,9 +1,9 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/files/picked_file.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/assignment_detail_providers.dart';
 import '../application/assignment_list_providers.dart';
@@ -71,9 +71,9 @@ class _AssignmentSubmissionScreenState extends ConsumerState<AssignmentSubmissio
   }
 
   Future<void> _pickFiles() async {
-    final result = await FilePicker.pickFiles(allowMultiple: true, withData: false);
-    if (result == null) return;
-    _controller.addFiles(result.files);
+    final picked = await pickLocalFiles();
+    if (picked.isEmpty || !mounted) return;
+    _controller.addFiles(picked);
   }
 
   @override

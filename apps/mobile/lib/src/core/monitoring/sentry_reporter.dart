@@ -77,19 +77,20 @@ class SentryCrashReporter implements CrashReporter {
     await Sentry.captureException(details.exception, stackTrace: details.stack);
   }
 
+  // Sentry 9+ events and breadcrumbs are mutable (copyWith is gone): scrub them in place before
+  // they leave the device.
   SentryEvent _scrubEvent(SentryEvent event) {
     final user = event.user;
-    return event.copyWith(
-      extra: _scrubber.scrubMap(event.extra),
-      user: user == null ? null : SentryUser(id: user.id),
-    );
+    // ignore: deprecated_member_use -- `extra` is still sent; scrubbing it is the point.
+    event.extra = _scrubber.scrubMap(event.extra);
+    event.user = user == null ? null : SentryUser(id: user.id);
+    return event;
   }
 
   Breadcrumb _scrubBreadcrumb(Breadcrumb breadcrumb) {
     final message = breadcrumb.message;
-    return breadcrumb.copyWith(
-      message: message == null ? null : _scrubber.scrubText(message),
-      data: _scrubber.scrubMap(breadcrumb.data),
-    );
+    breadcrumb.message = message == null ? null : _scrubber.scrubText(message);
+    breadcrumb.data = _scrubber.scrubMap(breadcrumb.data);
+    return breadcrumb;
   }
 }

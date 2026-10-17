@@ -166,20 +166,20 @@ The `sqlite3` pod that `sqlite3_flutter_libs` adds is built from the same SQLite
 | Plugin | Manifest | Required-reason APIs declared |
 | --- | --- | --- |
 | `app_links` | Own | None |
-| `file_picker` | Own | None |
+| `file_picker_darwin` | Own | None |
 | `firebase_core` | None. Wrapper only: native code calls no required-reason API (checked) | Covered by the Firebase pods below |
 | `firebase_crashlytics` | None. Wrapper only (checked) | Covered by the Firebase pods below |
 | `firebase_messaging` | Own | UserDefaults `CA92.1` |
 | `flutter_local_notifications` | Own | UserDefaults `CA92.1` |
 | `flutter_pdfview` | Own | None |
-| `flutter_secure_storage` | Own | None |
+| `flutter_secure_storage_darwin` | Own | None |
 | `image_picker_ios` | Own | None |
+| `in_app_purchase_storekit` | Own | None |
 | `package_info_plus` | Own | None |
 | `path_provider_foundation` | No native target. Dart FFI through `objective_c`, calling only `NSFileManager` directory lookups | None needed |
 | `sentry_flutter` | None. Wrapper only (checked) | Covered by the `Sentry` pod |
 | `shared_preferences_foundation` | Own | UserDefaults `CA92.1` |
 | `sqlite3_flutter_libs` | None | Covered by the app manifest |
-| `in_app_purchase_storekit` | Own | None |
 | `url_launcher_ios` | Own | None |
 
 `shared_preferences_foundation` ships in release: `easy_localization` depends on

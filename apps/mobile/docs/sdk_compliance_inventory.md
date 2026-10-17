@@ -67,7 +67,7 @@ Status values:
 | `retrofit` | 4.10.0 | Typed API client | Studafy API only | Eligible |
 | `json_annotation` | 4.12.0 | JSON codegen annotations | None | Eligible, on-device only |
 | `web_socket_channel` | 3.0.3 | Realtime gateway | Studafy realtime gateway only | Eligible |
-| `flutter_secure_storage` | 9.2.4 | Token storage (Keystore / Keychain) | None | Eligible, on-device only |
+| `flutter_secure_storage` | 10.3.4 | Token storage (Keystore / Keychain) | None | Eligible, on-device only |
 | `app_links` | 6.4.1 | OAuth callback deep link | None | Eligible, on-device only |
 | `in_app_purchase` | 3.3.1 | Buying the AI add-on through the App Store / Google Play (StoreKit 2, Play Billing) | The purchase goes to Apple or Google, stamped with the student's Studafy id (an opaque UUID). Receipts go to Studafy's API only | Eligible |
 | `in_app_purchase_android` | 0.5.3 | Play Billing purchase parameters (the obfuscated account and profile ids) | As `in_app_purchase` | Eligible |
@@ -77,14 +77,14 @@ Status values:
 | `firebase_core` | 3.15.2 | Firebase bootstrap | Firebase Installation ID (FID), app-scoped | Eligible |
 | `firebase_messaging` | 15.2.10 | Push notifications | FCM token plus FID, created only after sign-in (auto-init off). The token is registered with Studafy's API | Eligible |
 | `firebase_crashlytics` | 4.3.10 | Crash reporting | Crash stack, device model, OS version, FID, Crashlytics installation UUID, app-assigned user UUID after sign-in. Firebase Sessions sends session start events. No AAID: Analytics is not linked | Eligible |
-| `sentry_flutter` | 8.14.2 | Crash and performance monitoring | Crash stack, device model, OS version, Sentry installation UUID, app-assigned user UUID. `sendDefaultPii = false`. Off when `SENTRY_DSN` is empty | Eligible. See open item 2 |
-| `package_info_plus` | 9.0.1 | Version for the Sentry release tag | None | Eligible, on-device only |
+| `sentry_flutter` | 9.30.1 | Crash and performance monitoring | Crash stack, device model, OS version, Sentry installation UUID, app-assigned user UUID. `sendDefaultPii = false`. Off when `SENTRY_DSN` is empty | Eligible. See open item 2 |
+| `package_info_plus` | 10.2.2 | Version for the Sentry release tag | None | Eligible, on-device only |
 | `flutter_local_notifications` | 18.0.1 | Shows foreground pushes | None | Eligible, on-device only |
 | `drift` | 2.34.3 | Offline cache (SQLite) | None | Eligible, on-device only |
 | `sqlite3_flutter_libs` | 0.5.42 | Bundled SQLite | None | Eligible, on-device only |
 | `path_provider` | 2.1.6 | App directories | None | Eligible, on-device only |
 | `path` | 1.9.1 | Path utilities | None | Eligible, on-device only |
-| `file_picker` | 11.0.3 | Material uploads through the system picker | None. Uploads go to Studafy's API | Eligible |
+| `file_picker` | 13.1.0 | Material uploads through the system picker | None. Uploads go to Studafy's API | Eligible |
 | `image_picker` | 1.2.3 | Camera capture for materials | None. Uploads go to Studafy's API | Eligible |
 | `mime` | 2.0.0 | MIME detection | None | Eligible, on-device only |
 | `flutter_pdfview` | 1.4.5 | PDF rendering (`AndroidPdfViewer` / PDFKit) | None | Eligible, on-device only |
@@ -129,10 +129,11 @@ The pods mirror the plugins above. No `FirebaseAnalytics` pod and no `AdSupport`
 `AppTrackingTransparency` usage means no IDFA. `Info.plist` sets
 `FirebaseMessagingAutoInitEnabled` to `false`. `NSUserTrackingUsageDescription` must stay absent.
 
-`ios/Podfile` compiles out `file_picker`'s media and audio pickers, but only in a CocoaPods build.
-The release build uses Swift Package Manager, where `file_picker`'s `Package.swift` always includes
-them, so the build also contains DKImagePickerController, DKPhotoGallery, SDWebImage and SwiftyGif.
-None of them handles identifiers or ads; they are image-gallery UI that the app never opens. The
+`file_picker` 13's iOS side (`file_picker_darwin`) uses Apple's own pickers (PhotosUI and the
+document picker); the third-party gallery pods file_picker 11 linked under Swift Package Manager
+(DKImagePickerController, DKPhotoGallery, SDWebImage, SwiftyGif) are gone. The `ios/Podfile`
+`PICKER_MEDIA`/`PICKER_AUDIO` flags and the SwiftPM finding in `docs/permission_purpose_strings.md`
+describe file_picker 11 and should be re-checked on the next iOS build. The
 privacy manifests for every plugin are inventoried in `store/privacy-labels.md` (ST-308); see
 `docs/permission_purpose_strings.md` (ST-310) for the SwiftPM finding.
 
