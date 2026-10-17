@@ -189,7 +189,7 @@ module "secrets" {
       GOOGLE_PLAY_SERVICE_ACCOUNT   = ""
       GOOGLE_PLAY_RTDN_TOKEN        = ""
     }
-    workers = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", AI_LLM_API_KEY = "", ERPNEXT_API_KEY = "", RECONCILIATION_API_KEY = "", STRIPE_SECRET_KEY = "" }
+    workers = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", AI_LLM_API_KEY = "", ERPNEXT_API_KEY = "", RECONCILIATION_API_KEY = "", STRIPE_SECRET_KEY = "", FIREBASE_SERVICE_ACCOUNT = "" }
   }
 
   postgres_connection_secret_arn = module.postgres.connection_secret_arn

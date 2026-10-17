@@ -78,9 +78,17 @@ export const envSchema = z
     ),
     // FCM push notifications (ST-139). A Google service-account JSON string. When unset the push
     // channel runs in dry-run mode: it resolves devices, applies the per-user cap and advances
-    // dispatch logs exactly as in production but never calls FCM — the dev/test path, and a loud
-    // warning is logged when a deployed worker has no service account.
-    FIREBASE_SERVICE_ACCOUNT: z.string().min(1).optional(),
+    // dispatch logs exactly as in production but never calls FCM — the dev/test path. A production
+    // worker refuses to boot that way unless PUSH_DRY_RUN=true says so on purpose, the same rule as
+    // EMAIL_DRY_RUN. Empty means unset: the task definition always injects the secret's key.
+    FIREBASE_SERVICE_ACCOUNT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    PUSH_DRY_RUN: z.preprocess(
+      emptyAsUnset,
+      z
+        .enum(["true", "false"])
+        .optional()
+        .transform((value) => value === "true"),
+    ),
     // Malware scanning (file-scan queue). CLAMAV_HOST is optional in dev/test so the queue still
     // boots and scans fail closed at job time; the production validation below makes it mandatory:
     // silently serving un-scanned files is worse than a failed deploy. CLAMAV_PORT/CLAMAV_TIMEOUT_MS/CLAMAV_MAX_FILE_BYTES mirror clamd's ListenPort,
@@ -153,6 +161,15 @@ export const envSchema = z
         path: ["SES_REGION"],
         message:
           "SES_REGION is required in production (set EMAIL_DRY_RUN=true to run without sending on purpose)",
+      });
+    }
+
+    if (env.FIREBASE_SERVICE_ACCOUNT === undefined && !env.PUSH_DRY_RUN) {
+      context.addIssue({
+        code: "custom",
+        path: ["FIREBASE_SERVICE_ACCOUNT"],
+        message:
+          "FIREBASE_SERVICE_ACCOUNT is required in production (set PUSH_DRY_RUN=true to run without sending on purpose)",
       });
     }
 

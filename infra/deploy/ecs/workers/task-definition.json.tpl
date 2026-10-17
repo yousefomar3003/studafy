@@ -35,7 +35,8 @@
         { "name": "SES_REGION", "value": "${SES_REGION}" },
         { "name": "SES_FROM_ADDRESS", "value": "${SES_FROM_ADDRESS}" },
         { "name": "SES_CONFIGURATION_SET", "value": "${SES_CONFIGURATION_SET}" },
-        { "name": "EMAIL_DRY_RUN", "value": "${EMAIL_DRY_RUN}" }
+        { "name": "EMAIL_DRY_RUN", "value": "${EMAIL_DRY_RUN}" },
+        { "name": "PUSH_DRY_RUN", "value": "${PUSH_DRY_RUN}" }
       ],
       "dependsOn": [{ "containerName": "clamav", "condition": "HEALTHY" }],
       "secrets": [
@@ -48,7 +49,8 @@
         { "name": "TAP_WEBHOOK_URL", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" },
         { "name": "AI_LLM_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:AI_LLM_API_KEY::" },
         { "name": "ERPNEXT_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:ERPNEXT_API_KEY::" },
-        { "name": "RECONCILIATION_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:RECONCILIATION_API_KEY::" }
+        { "name": "RECONCILIATION_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:RECONCILIATION_API_KEY::" },
+        { "name": "FIREBASE_SERVICE_ACCOUNT", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:FIREBASE_SERVICE_ACCOUNT::" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "bun healthcheck.ts"],

@@ -16,6 +16,7 @@ describe("loadEnv", () => {
       SES_FROM_ADDRESS: "no-reply@send.studafy.com",
       SES_FROM_NAME: "Studafy",
       EMAIL_DRY_RUN: false,
+      PUSH_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
       CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
@@ -49,6 +50,7 @@ describe("loadEnv", () => {
       SES_FROM_ADDRESS: "no-reply@send.studafy.com",
       SES_FROM_NAME: "Studafy",
       EMAIL_DRY_RUN: false,
+      PUSH_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
       CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
@@ -94,6 +96,7 @@ describe("loadEnv", () => {
         STRIPE_SECRET_KEY: "sk_test_prod",
         CLAMAV_HOST: "clamd.internal",
         SES_REGION: "eu-central-1",
+        FIREBASE_SERVICE_ACCOUNT: "{}",
       }),
     ).toMatchObject({
       READ_DATABASE_HOST: "pgbouncer.internal",
@@ -110,6 +113,7 @@ describe("loadEnv", () => {
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
       SES_REGION: "eu-central-1",
+      FIREBASE_SERVICE_ACCOUNT: "{}",
       // Injected empty by the task definition when the secret holds no Stripe key.
       STRIPE_SECRET_KEY: "",
     });
@@ -122,6 +126,7 @@ describe("loadEnv", () => {
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
+      PUSH_DRY_RUN: "true",
     };
 
     test("refuses to boot without SES, so email can never silently stop", () => {
@@ -138,6 +143,27 @@ describe("loadEnv", () => {
       const env = loadEnv({ ...deployed, SES_REGION: "eu-central-1" });
       expect(env.SES_FROM_ADDRESS).toBe("no-reply@send.studafy.com");
       expect(env.SES_FROM_NAME).toBe("Studafy");
+    });
+  });
+
+  describe("push in production", () => {
+    const deployed = {
+      NODE_ENV: "production",
+      READ_DATABASE_HOST: "pgbouncer.internal",
+      READ_DATABASE_NAME: "workers_read",
+      CLAMAV_HOST: "clamd.internal",
+      EMAIL_DRY_RUN: "true",
+    };
+
+    test("refuses to boot without a Firebase service account, so push can never silently stop", () => {
+      expect(() => loadEnv(deployed)).toThrow(EnvValidationError);
+      expect(() => loadEnv({ ...deployed, FIREBASE_SERVICE_ACCOUNT: "" })).toThrow(
+        EnvValidationError,
+      );
+    });
+
+    test("boots without one only when dry-run is chosen on purpose", () => {
+      expect(loadEnv({ ...deployed, PUSH_DRY_RUN: "true" }).PUSH_DRY_RUN).toBe(true);
     });
   });
 });
