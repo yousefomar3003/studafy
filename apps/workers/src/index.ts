@@ -1,4 +1,10 @@
-import { startMetricsServer, startQueueGauges, startTracing } from "@studafy/observability";
+import {
+  flushErrorTracking,
+  startErrorTracking,
+  startMetricsServer,
+  startQueueGauges,
+  startTracing,
+} from "@studafy/observability";
 import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
@@ -46,6 +52,15 @@ const tracing = startTracing({
   serviceName: env.SERVICE_NAME,
   // See apps/api/src/index.ts's own comment on this same `|| undefined`.
   otlpEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || undefined,
+});
+
+// Error tracking (Sentry): off unless SENTRY_DSN is set. A job is reported once it has given up
+// (worker.ts), not on every retried attempt.
+startErrorTracking({
+  dsn: env.SENTRY_DSN,
+  environment: env.SENTRY_ENVIRONMENT,
+  release: env.RELEASE_VERSION,
+  serviceName: env.SERVICE_NAME,
 });
 
 const connection = createRedisConnection(env);
@@ -263,6 +278,7 @@ const shutdown = (signal: string) => {
     await billingPipelineDb.end({ timeout: 5 });
     await metricsServer.shutdown();
     await tracing?.shutdown();
+    await flushErrorTracking();
     console.log("Shutdown complete.");
     process.exit(0);
   });

@@ -202,6 +202,9 @@ export const envSchema = z
     // them to "" where Tap is off (module.secrets' app_secret_defaults).
     TAP_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().startsWith("sk_").optional()),
     TAP_WEBHOOK_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Sentry error tracking (packages/observability errorTracking.ts). Off when unset. Not a secret:
+    // a DSN only lets a client submit events, so it is a plain per-tier value.
+    SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().url().optional()),
     // Countries whose schools are billed through Tap, comma separated (e.g. "JO,SA"); every other
     // school is billed through Stripe. Empty (the default) means none: Tap only takes merchants
     // registered in its own markets, and Studafy's company is Irish. Only Tap's markets may be

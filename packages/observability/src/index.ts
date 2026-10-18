@@ -15,3 +15,6 @@ export type { TracingMiddlewareOptions } from "./httpTracing";
 
 export { injectTraceContext, withClientSpan, withConsumerSpan } from "./queueTracing";
 export type { TraceContextCarrier } from "./queueTracing";
+
+export { captureError, flushErrorTracking, scrubEvent, startErrorTracking } from "./errorTracking";
+export type { ErrorTrackingOptions } from "./errorTracking";

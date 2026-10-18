@@ -1,4 +1,5 @@
 import { ERROR_CODES } from "@studafy/constants";
+import { captureError } from "@studafy/observability";
 import { problemDetailsSchema } from "@studafy/shared-schemas";
 import { HTTPException } from "hono/http-exception";
 import { z, ZodError } from "zod";
@@ -153,6 +154,10 @@ export function errorHandlerMiddleware(rootLogger: Logger): ErrorHandler<AppEnv>
     // Log the error with full details (never exposed to client)
     const emit = status >= 500 ? log.error : log.warn;
     emit({ err: error, status, code, locale }, "request failed");
+    // Only server faults go to error tracking: a 4xx is the caller's mistake, already logged.
+    if (status >= 500) {
+      captureError(error, { request_id: requestId, method: c.req.method, status, code });
+    }
 
     // Build the RFC 9457 response
     const problem = buildProblem(status, code, requestId, detail);

@@ -1,4 +1,9 @@
-import { startMetricsServer, startTracing } from "@studafy/observability";
+import {
+  flushErrorTracking,
+  startErrorTracking,
+  startMetricsServer,
+  startTracing,
+} from "@studafy/observability";
 
 import { createApp } from "./app";
 import { closeDatabasePools, createDatabase, createReadDatabase } from "./database";
@@ -44,6 +49,15 @@ const tracing = startTracing({
   // `|| undefined`, not the bare env value: dev's task definition sets this to "" rather than
   // omitting it (see env.ts's own comment), and startTracing() only treats undefined as "disabled".
   otlpEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || undefined,
+});
+
+// Error tracking (Sentry): off unless SENTRY_DSN is set. Server errors are reported from
+// errorHandlerMiddleware; uncaught exceptions and unhandled rejections by the SDK itself.
+startErrorTracking({
+  dsn: env.SENTRY_DSN,
+  environment: env.APP_ENV,
+  release: env.RELEASE_VERSION,
+  serviceName: env.SERVICE_NAME,
 });
 
 // The root logger. Every line this process writes descends from it, so stdout is uniformly NDJSON —
@@ -251,6 +265,7 @@ const shutdown = (signal: string) => {
     await closeDatabasePools(database, readDatabase);
     await metricsServer.shutdown();
     await tracing?.shutdown();
+    await flushErrorTracking();
     logger.info({ signal }, "shutdown complete");
     process.exit(0);
   });

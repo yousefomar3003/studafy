@@ -15,6 +15,9 @@
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
         { "name": "SERVICE_NAME", "value": "workers" },
+        { "name": "RELEASE_VERSION", "value": "${IMAGE_TAG}" },
+        { "name": "SENTRY_DSN", "value": "${SENTRY_DSN}" },
+        { "name": "SENTRY_ENVIRONMENT", "value": "${APP_ENV}" },
         { "name": "METRICS_PORT", "value": "9464" },
         { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "${OTEL_COLLECTOR_ENDPOINT}" },
         { "name": "DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },

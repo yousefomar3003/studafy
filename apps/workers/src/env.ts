@@ -13,6 +13,12 @@ export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     SERVICE_NAME: z.string().min(1).default("workers"),
+    // Sentry error tracking (packages/observability errorTracking.ts). Off when unset; not a secret.
+    // SENTRY_ENVIRONMENT is the deployment tier (the task definition passes APP_ENV), and
+    // RELEASE_VERSION the image tag, so an error is attributed to the release that shipped it.
+    SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    SENTRY_ENVIRONMENT: z.preprocess(emptyAsUnset, z.string().min(1).default("development")),
+    RELEASE_VERSION: z.preprocess(emptyAsUnset, z.string().min(1).default("unknown")),
     // apps/workers has no HTTP surface of its own (infra/docker/README.md), so unlike api/realtime
     // this is not "a separate port from PORT" — it is the *only* port this process listens on, and
     // it exists solely for @studafy/observability's Prometheus-format /metrics endpoint (ST-259).

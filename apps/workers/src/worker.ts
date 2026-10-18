@@ -1,4 +1,4 @@
-import { recordJobOutcome, withConsumerSpan } from "@studafy/observability";
+import { captureError, recordJobOutcome, withConsumerSpan } from "@studafy/observability";
 import { Worker } from "bullmq";
 
 import type { QueueDefinition } from "./registry";
@@ -61,6 +61,17 @@ export const createBullmqWorker: WorkerFactory = (definition, connection) => {
   };
   worker.on("completed", (job) => recordOutcome(job, "completed"));
   worker.on("failed", (job) => recordOutcome(job, "failed"));
+  // Error tracking: only a job that has given up (BullMQ sets finishedOn on the terminal failure),
+  // so a retry that later succeeds is not reported as an error.
+  worker.on("failed", (job, error) => {
+    if (job?.finishedOn === undefined) return;
+    captureError(error, {
+      queue: job.queueName,
+      job_name: job.name,
+      job_id: job.id,
+      attempts: job.attemptsMade,
+    });
+  });
 
   return worker;
 };
