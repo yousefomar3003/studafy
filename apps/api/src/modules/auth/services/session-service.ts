@@ -739,9 +739,12 @@ export async function registerDeviceToken(
     VALUES (${schoolId}::uuid, ${userId}::uuid, ${fcmToken}, ${platform}::app.device_platform)
     ON CONFLICT (user_id, fcm_token)
     DO UPDATE SET
-      last_seen  = CURRENT_TIMESTAMP,
+      -- GREATEST: CURRENT_TIMESTAMP is this transaction's start, which can predate the row when an
+      -- overlapping registration of the same token inserted it first (the app registers around
+      -- sign-in and the permission prompt); the timestamp checks require >= created_at.
+      last_seen  = GREATEST(CURRENT_TIMESTAMP, app.user_devices.created_at),
       platform   = EXCLUDED.platform,
-      updated_at = CURRENT_TIMESTAMP,
+      updated_at = GREATEST(CURRENT_TIMESTAMP, app.user_devices.created_at),
       revoked_at = NULL
     RETURNING id
   `;
