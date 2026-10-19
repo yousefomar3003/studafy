@@ -52,7 +52,8 @@ async function seedInvitation(
 ): Promise<InvitationSeed> {
   const token = randomToken();
   const email = options.email ?? `activate-${crypto.randomUUID()}@example.test`;
-  const role = options.role ?? "STUDENT";
+  // A web role: these suites activate over the web channel, which refuses mobile-only roles.
+  const role = options.role ?? "PRINCIPAL";
 
   await sql.begin(async (tx) => {
     await tx.unsafe("SET LOCAL ROLE studafy_admin");
@@ -237,7 +238,7 @@ describe("account activation", () => {
   integrationTest(
     "full lifecycle: links identity, activates user, consumes invitation, issues first session",
     async () => {
-      const { token, email } = await seedInvitation(activeSchool.id, { role: "INSTRUCTOR" });
+      const { token, email } = await seedInvitation(activeSchool.id, { role: "PRINCIPAL" });
       const subject = `sub-${crypto.randomUUID()}`;
       nextIdentity = { subject, email };
 
@@ -292,7 +293,7 @@ describe("account activation", () => {
 
       expect(state.userStatus).toBe("active");
       expect(state.identityCount).toBe(1);
-      expect(state.role).toBe("INSTRUCTOR");
+      expect(state.role).toBe("PRINCIPAL");
       expect(state.consumed).toBe(true);
       expect(state.sessions).toBe(1);
       expect(state.audits).toBeGreaterThanOrEqual(1);

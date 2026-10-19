@@ -219,7 +219,7 @@ describe("normal rotation", () => {
 
     try {
       const user = tenant.users.INSTRUCTOR;
-      const seed = await createRefreshSession(sql, tenant.schoolId, user.id);
+      const seed = await createRefreshSession(sql, tenant.schoolId, user.id, { channel: "mobile" });
       const failingConfig = {
         ...config,
         keyStore: {
@@ -344,6 +344,7 @@ describe("reuse detection", () => {
       const user = tenant.users.INSTRUCTOR;
       const device = await createUserDevice(sql, tenant.schoolId, user.id, { platform: "android" });
       const seed = await createRefreshSession(sql, tenant.schoolId, user.id, {
+        channel: "mobile",
         deviceId: device.id,
       });
 
@@ -439,7 +440,7 @@ describe("rejections", () => {
 
     try {
       const user = tenant.users.INSTRUCTOR;
-      const seed = await createRefreshSession(sql, tenant.schoolId, user.id);
+      const seed = await createRefreshSession(sql, tenant.schoolId, user.id, { channel: "mobile" });
       const secret = seed.token.split(".")[2]!;
       const unknownSecret = `${secret[0] === "A" ? "B" : "A"}${secret.slice(1)}`;
 

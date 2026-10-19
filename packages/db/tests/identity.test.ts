@@ -697,6 +697,8 @@ integrationTest(
         "idx_refresh_tokens_school_user_active",
         // Added by 000030 for ST-072: batch revocation with INCLUDE for access_jti/access_expires_at.
         "idx_refresh_tokens_school_user_device_active",
+        // Added by 000143: the daily sweep finds accounts whose deletion grace period has ended.
+        "idx_users_deletion_due",
         // Added by 000115 for ST-302: the public deletion request resolves an address to its
         // accounts across schools, which the (school_id, normalized_email) unique index can't serve.
         "idx_users_normalized_email",

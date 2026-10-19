@@ -563,6 +563,9 @@ async function tenantRelations(): Promise<TenantRelation[]> {
       LIMIT 1
     ) AS tenant_index ON true
     WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p')
+      -- A table the runtime role cannot read at all (e.g. member_code_counters, written only by a
+      -- SECURITY DEFINER function) cannot leak across tenants through it, and cannot be EXPLAINed.
+      AND pg_catalog.has_table_privilege('studafy_app', c.oid, 'SELECT')
     ORDER BY c.relname
   `;
 }

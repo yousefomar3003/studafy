@@ -335,10 +335,14 @@ integrationTest(
 integrationTest("platform settings require one typed non-secret value", async () => {
   const database = await migratedDatabase();
   try {
-    const [seeded] = await database.sql<{ count: string }[]>`
-      SELECT count(*)::text AS count FROM app.platform_settings
+    // The only seeded settings are the internal notification addresses (000125, 000139).
+    const seeded = await database.sql<{ key: string }[]>`
+      SELECT key FROM app.platform_settings ORDER BY key
     `;
-    expect(seeded?.count).toBe("0");
+    expect(seeded.map((row) => row.key)).toEqual([
+      "onboarding.application_notification_email",
+      "sales.inquiry_notification_email",
+    ]);
 
     await asRole(database, "studafy_admin", (tx) =>
       tx
