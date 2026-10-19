@@ -221,3 +221,25 @@ follow.** `erpnext.paymentReceived` delegates to
 fee-schedule arms beside it still carry the original bugs — they pass currency codes and ERPNext
 party names into `uuid` columns and raw decimals into `*_minor` columns, and none of them can
 succeed on a real payload. Each wants the same treatment.
+
+## Running against a real ERPNext
+
+Exercised end to end against the pinned ERPNext + Education image (`bun run erpnext:up` and
+`bun run erpnext:site`): fee reports, invoices, payments, scholarship awards, the ERPNext webhooks and
+the daily reconciliation all work. What each school's site needs is set up by
+`infra/deploy/erpnext/seed/provision.py` (via `erpnext-new-site.sh` in staging/prod):
+
+- **Webhooks.** One Frappe Webhook per projected doctype (Sales Invoice, Payment Entry, Fee
+  Schedule, Fee Structure) posts submitted documents to `POST /erpnext/webhooks`, with the school id
+  stamped into the body and signed with `ERPNEXT_WEBHOOK_SECRET` (Frappe's base64
+  `X-Frappe-Webhook-Signature`; the API also accepts the hex `X-ERPNext-Signature`).
+- **Scholarship Award.** Neither ERPNext nor Education defines the doctype the scholarships module
+  records confirmed awards in, so each site gets it as a custom doctype.
+- **Reconciliation.** `POST /api/finance/reconciliation/run` is called daily at 02:30 UTC by the
+  workers (`queues/billing/finance-reconciliation.ts`) with `RECONCILIATION_API_KEY`.
+
+### Expenses
+
+An expense is posted as a Purchase Invoice (a supplier bill) or a Journal Entry. There is no
+`expense_claim` type: ERPNext's Expense Claim lives in the separate HRMS app, which the erpnext image
+does not install (it would add payroll, leave and attendance to every school's site).

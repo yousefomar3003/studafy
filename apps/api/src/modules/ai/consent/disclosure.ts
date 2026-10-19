@@ -12,22 +12,29 @@
  *                         the material.
  *   - account_identifier: the user's opaque Studafy user id, sent as the provider's abuse-monitoring
  *                         `metadata.user_id` unless the deployment runs zero-retention. Never a name
- *                         or email.
+ *                         or email. Only the Anthropic API receives it; the OpenAI-compatible
+ *                         provider sends no user identifier (llm/openai-compatible.ts), so the
+ *                         current disclosure does not list it.
  *
  * Changing the provider or the categories changes what a user agreed to, so it MUST bump `version`:
  * the gate only honours a consent granted against the current version, which re-prompts everyone.
+ * `llmProvider` is the AI_LLM_PROVIDER this disclosure describes; src/index.ts refuses to boot with
+ * AI enabled against any other, so the modal can never name a company the inputs don't go to.
+ *
+ * History: 2026-09-28 named Anthropic (questions, study materials, account identifier).
  */
 export const AI_DATA_CATEGORIES = ["questions", "study_materials", "account_identifier"] as const;
 export type AiDataCategory = (typeof AI_DATA_CATEGORIES)[number];
 
 export const AI_DATA_SHARING_DISCLOSURE = {
-  version: "2026-09-28",
+  version: "2026-10-11",
+  llmProvider: "openai-compatible",
   provider: {
-    id: "anthropic",
-    name: "Anthropic",
-    privacyPolicyUrl: "https://www.anthropic.com/legal/privacy",
+    id: "together",
+    name: "Together AI",
+    privacyPolicyUrl: "https://www.together.ai/privacy",
   },
-  dataCategories: AI_DATA_CATEGORIES,
+  dataCategories: ["questions", "study_materials"] as const satisfies readonly AiDataCategory[],
 } as const;
 
 /**

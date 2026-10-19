@@ -57,10 +57,9 @@ edge_idle_timeout = 3600
 # via a data lookup, same as module.edge already did before this zone was Terraform-managed. If
 # studafy.com already resolves today (created by hand, pre-Terraform), see
 # modules/dns/README.md's import note before the first apply of this flag.
-# prod is the only environment with a transactional-email requirement recorded anywhere in this
-# repo so far (apps/workers/docs/queue-catalog.md's `notifications` queue is not yet wired to a
-# sender). mail.studafy.com is a placeholder subdomain, not a confirmed name — update it if a
-# different sending subdomain is chosen before this is first applied for real.
+# prod is the only environment that sends real email. send.studafy.com is the sending subdomain:
+# apps/workers sends from no-reply@send.studafy.com (infra/deploy/environments/prod.env), and
+# module.email scopes the workers' SES permission to it -- keep the three in step.
 dns_create_email_records = true
 dns_ses_domain           = "send.studafy.com"
 

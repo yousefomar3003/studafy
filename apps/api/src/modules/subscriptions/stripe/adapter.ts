@@ -145,7 +145,7 @@ export class StripeAdapter implements PaymentProviderPort {
   /**
    * Verify the Stripe signature over the *raw* bytes and normalize the envelope.
    *
-   * constructEvent both verifies and parses, in that order, which is the property that matters: the
+   * constructEventAsync both verifies and parses, in that order, which is the property that matters: the
    * signature covers the exact bytes Stripe sent, so `payload` must never be a re-serialization of
    * an already-parsed object. It throws on a bad or absent signature; callers turn that into a 400.
    *
@@ -154,7 +154,13 @@ export class StripeAdapter implements PaymentProviderPort {
    * out-of-order handling this timestamp exists to drive.
    */
   async parseWebhook(payload: Buffer, signature: string): Promise<ParsedWebhookEvent> {
-    const event = this.stripe.webhooks.constructEvent(payload, signature, this.webhookSecret);
+    // The async form: under Bun the Stripe SDK verifies with Web Crypto (SubtleCryptoProvider),
+    // which cannot run synchronously -- constructEvent() there throws on every webhook, valid or not.
+    const event = await this.stripe.webhooks.constructEventAsync(
+      payload,
+      signature,
+      this.webhookSecret,
+    );
     return {
       id: event.id,
       type: event.type,

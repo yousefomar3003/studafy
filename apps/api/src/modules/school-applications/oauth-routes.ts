@@ -54,7 +54,7 @@ import {
   generateNonce,
   generateState,
 } from "../auth/oauth/pkce";
-import { createStateStore } from "../auth/oauth/state-store";
+import { createMemoryStateStore, takeStateFor } from "../auth/oauth/state-store";
 import { findOAuthIdentity } from "../auth/services/returning-user-login-service";
 
 import { setApplicantCookie, signApplicantSession } from "./applicant-session";
@@ -67,7 +67,7 @@ import type {
 import type { Database } from "../../db";
 import type { Logger } from "../../logger";
 import type { AppEnv } from "../../middleware/requestId";
-import type { StateEntry } from "../auth/oauth/state-store";
+import type { AuthorizationEntry, StateStore } from "../auth/oauth/state-store";
 
 interface ProviderConfig {
   clientId: string;
@@ -84,11 +84,14 @@ export interface ApplicationOAuthDependencies {
   verifyIdentity?: (
     provider: ApplicantProvider,
     code: string,
-    entry: StateEntry,
+    entry: AuthorizationEntry,
     config: ProviderConfig,
   ) => Promise<{ sub: string; email: string; name?: string | null }>;
   /** Whether this identity already belongs to a user. Tests inject a stub. */
   identityExists?: (provider: ApplicantProvider, subject: string) => Promise<boolean>;
+  /** The process-wide OAuth state store (app.ts), so a start and its callback can land on
+   * different API instances. Defaults to an in-process store. */
+  stateStore?: StateStore;
 }
 
 export const APPLICATION_CALLBACK_PATH = (provider: string): string =>
@@ -171,7 +174,7 @@ async function exchangeCode(
 async function defaultVerifyIdentity(
   provider: ApplicantProvider,
   code: string,
-  entry: StateEntry,
+  entry: AuthorizationEntry,
   config: ProviderConfig,
 ): Promise<{ sub: string; email: string; name?: string | null }> {
   if (provider === "mock") {
@@ -204,14 +207,14 @@ export function schoolApplicationOAuthRoutes(
   deps: ApplicationOAuthDependencies = {},
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
-  const stateStore = createStateStore();
+  const stateStore = deps.stateStore ?? createMemoryStateStore();
   const getProviderConfig = deps.getProviderConfig ?? defaultProviderConfig;
   const verifyIdentity = deps.verifyIdentity ?? defaultVerifyIdentity;
   const identityExists =
     deps.identityExists ??
     (async (provider, subject) => (await findOAuthIdentity(db, provider, subject)) !== undefined);
 
-  routes.get("/api/auth/oauth/:provider/school-application/start", (c) => {
+  routes.get("/api/auth/oauth/:provider/school-application/start", async (c) => {
     const provider = c.req.param("provider");
     assertProvider(provider);
     const config = getProviderConfig(provider);
@@ -220,12 +223,7 @@ export function schoolApplicationOAuthRoutes(
     const state = generateState();
     const nonce = generateNonce();
     const codeVerifier = generateCodeVerifier();
-    stateStore.set(state, {
-      codeVerifier,
-      nonce,
-      createdAt: Date.now(),
-      purpose: "school-application",
-    });
+    await stateStore.set(state, { flow: "school-application", provider, codeVerifier, nonce });
 
     const params = new URLSearchParams({
       client_id: config.clientId,
@@ -261,16 +259,16 @@ export function schoolApplicationOAuthRoutes(
     try {
       const code = c.req.query("code");
       const state = c.req.query("state");
-      const entry = state ? stateStore.get(state) : undefined;
-      if (!code || !state || !entry || entry.purpose !== "school-application") {
+      const entry = state
+        ? await takeStateFor(stateStore, state, "school-application", provider)
+        : undefined;
+      if (!code || !state || !entry) {
         throw new CodedHttpException(
           400,
           ERROR_CODES.OAUTH_STATE_INVALID,
           "Invalid or expired OAuth state",
         );
       }
-      stateStore.delete(state);
-
       const claims = await verifyIdentity(provider, code, entry, config);
 
       // Someone who already has a Studafy account signs in; they do not apply for a second school

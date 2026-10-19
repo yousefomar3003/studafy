@@ -37,7 +37,7 @@ async function readSse(response: Response): Promise<SseEvent[]> {
 }
 
 /**
- * Journey 6/7: AI ask with citations.
+ * Journey 6/6: AI ask with citations.
  *
  * The web app has no Ask AI screen at all today — it exists only in the Flutter mobile app's
  * hand-written SSE client (see the ST-246 journey catalog). This spec is API/SSE-only rather than

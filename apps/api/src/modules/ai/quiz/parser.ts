@@ -1,3 +1,5 @@
+import { unwrapJsonList } from "../llm/json-output";
+
 import { quizGenerationSchema } from "./schema";
 
 import type { QuizGeneration } from "./schema";
@@ -5,7 +7,7 @@ import type { QuizGeneration } from "./schema";
 /**
  * Parse and validate the model's raw quiz-generation response (ST-167).
  *
- * The provider (`llm/provider.ts`) has no JSON mode or tool-use support -- `generate()` returns
+ * The provider (`llm/provider.ts`) has no tool-use support, and JSON mode only on an OpenAI-compatible host -- `generate()` returns
  * plain text -- so the model's compliance with the schema the prompt asked for is never guaranteed.
  * This is the enforcement point: a response that is not valid JSON, does not match
  * `quiz/schema.ts` (malformed options, a duplicate option id, a `correct_option_id` that does not
@@ -36,7 +38,7 @@ function stripCodeFence(text: string): string {
 export function parseQuizGeneration(raw: string, sourceCount: number): QuizGeneration {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripCodeFence(raw));
+    parsed = unwrapJsonList(JSON.parse(stripCodeFence(raw)));
   } catch {
     throw new QuizGenerationInvalidError("quiz generation response was not valid JSON");
   }

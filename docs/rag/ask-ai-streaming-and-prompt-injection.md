@@ -58,6 +58,33 @@ leg under RRF) lands around 0.02 — so 0.02 is the floor for a real, grounded h
 the keyword-leg AND arm together mean the refusal path triggers on a genuinely ungrounded question
 without gating every answer.
 
+### A general study assistant (`ai.ask.general`)
+
+The school's `ai.ask.general` feature flag, on by default, makes Ask AI a conversational study
+assistant rather than a strict question-answerer over the corpus:
+
+- **Ungrounded messages are answered, not refused.** A greeting, a general question, or a course
+  question the retrieval misses goes to the model with no sources — so no school material — under a
+  fixed conversational-tutor system prompt (`assembleGeneralPrompt` in `ask/prompt.ts`) pitched at
+  the request's `level`. It keeps to learning help (it explains rather than writing graded work) and
+  cites nothing. The stream is the normal answer path with `grounded: false` on `sources` (an empty
+  list) and `done` (no citations), so a client can tell the two kinds apart.
+- **Grounded answers may be completed.** The grounded prompt still puts the sources first and requires
+  a citation on everything taken from them, but may fill in what they only partly cover from general
+  knowledge — uncited, so the citations alone show what came from the material.
+
+With the flag off (a school's `feature_flags` override to `false`), Ask AI keeps strictly to the
+materials and refuses the rest, as before. Moderation, persistence and quota are the same either way.
+
+### Conversation memory
+
+A request that continues a conversation (`conversation_id`) sends the last `AI_ASK_HISTORY_TURNS`
+turns (`config.ts`) with the new question, oldest first, each side clipped to a few hundred
+characters (`loadRecentTurns` in `ask/persistence.ts`). Like a source, the history is untrusted text:
+it sits in a `<conversation-{boundary}>` block under the request's own boundary, with the same
+collision escaping, and both system prompts tell the model to treat it as data. A new conversation
+sends no history.
+
 ## Prompt construction and the injection defenses
 
 The grounded prompt (`ask/prompt.ts`) is built in two parts. The **system prompt** is fixed and

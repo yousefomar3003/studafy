@@ -21,6 +21,7 @@
         { "name": "SERVICE_NAME", "value": "realtime" },
         { "name": "RELEASE_VERSION", "value": "${IMAGE_TAG}" },
         { "name": "SENTRY_ENVIRONMENT", "value": "${SENTRY_ENVIRONMENT}" },
+        { "name": "SENTRY_DSN", "value": "${SENTRY_DSN}" },
         { "name": "METRICS_PORT", "value": "9464" },
         { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "${OTEL_COLLECTOR_ENDPOINT}" }
       ],
@@ -32,10 +33,6 @@
         {
           "name": "REDIS_URL",
           "valueFrom": "${REDIS_SECRET_ARN}:pubsub_url::"
-        },
-        {
-          "name": "SENTRY_DSN",
-          "valueFrom": "${REALTIME_APP_SECRETS_ARN}:SENTRY_DSN::"
         }
       ],
       "healthCheck": {

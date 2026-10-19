@@ -26,6 +26,8 @@ describe("loadEnv", () => {
       AI_RERANK_ENABLED: false,
       AI_LLM_ENABLED: false,
       AI_LLM_ZERO_RETENTION: false,
+      AI_LLM_PROVIDER: "anthropic",
+      TAP_COUNTRIES: new Set(),
     });
   });
 
@@ -35,6 +37,7 @@ describe("loadEnv", () => {
         NODE_ENV: "test",
         APP_ENV: "staging",
         CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
+        TURNSTILE_SECRET_KEY: "turnstile-secret",
         PORT: "8080",
         HOST: "127.0.0.1",
         SHUTDOWN_TIMEOUT_MS: "5000",
@@ -46,6 +49,7 @@ describe("loadEnv", () => {
       NODE_ENV: "test",
       APP_ENV: "staging",
       CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
+      TURNSTILE_SECRET_KEY: "turnstile-secret",
       PORT: 8080,
       HOST: "127.0.0.1",
       METRICS_PORT: 9464,
@@ -63,6 +67,8 @@ describe("loadEnv", () => {
       AI_RERANK_ENABLED: false,
       AI_LLM_ENABLED: false,
       AI_LLM_ZERO_RETENTION: false,
+      AI_LLM_PROVIDER: "anthropic",
+      TAP_COUNTRIES: new Set(),
     });
   });
 
@@ -122,9 +128,56 @@ describe("loadEnv", () => {
       loadEnv({
         APP_ENV: "production",
         CORS_ALLOWED_ORIGINS: " https://app.studafy.com , https://api.studafy.com ",
+        TURNSTILE_SECRET_KEY: "turnstile-secret",
         NODE_ENV: "development",
       }).CORS_ALLOWED_ORIGINS,
     ).toBe(" https://app.studafy.com , https://api.studafy.com ");
+  });
+
+  test("requires a Turnstile secret on every deployed tier, never in development", () => {
+    const deployed = { CORS_ALLOWED_ORIGINS: "https://app.studafy.com" };
+    expect(() => loadEnv({ ...deployed, APP_ENV: "staging" })).toThrow(EnvValidationError);
+    // The secret manager injects "" for a key nobody has supplied yet: still missing.
+    expect(() => loadEnv({ ...deployed, APP_ENV: "production", TURNSTILE_SECRET_KEY: "" })).toThrow(
+      EnvValidationError,
+    );
+    expect(
+      loadEnv({ ...deployed, APP_ENV: "production", TURNSTILE_SECRET_KEY: "s" })
+        .TURNSTILE_SECRET_KEY,
+    ).toBe("s");
+    expect(loadEnv({ APP_ENV: "development" }).TURNSTILE_SECRET_KEY).toBeUndefined();
+  });
+
+  test('treats a deployed tier with only OAuth redirect URIs as "provider off", not half-configured', () => {
+    // What a tier renders before anyone has pasted client credentials: redirect URIs from the API
+    // origin, and empty-string client id/secret from the secret manager defaults.
+    const env = loadEnv({
+      GOOGLE_OAUTH_REDIRECT_URI: "https://api.studafy.com/api/auth/oauth/google/callback",
+      GOOGLE_OAUTH_CLIENT_ID: "",
+      GOOGLE_OAUTH_CLIENT_SECRET: "",
+      MICROSOFT_OAUTH_REDIRECT_URI: "https://api.studafy.com/api/auth/oauth/microsoft/callback",
+      MICROSOFT_OAUTH_CLIENT_ID: "",
+      MICROSOFT_OAUTH_CLIENT_SECRET: "",
+    });
+    expect(env.GOOGLE_OAUTH_CLIENT_ID).toBeUndefined();
+    expect(env.MICROSOFT_OAUTH_CLIENT_SECRET).toBeUndefined();
+  });
+
+  test("requires all three OAuth values once a client id or secret is set", () => {
+    expect(() => loadEnv({ GOOGLE_OAUTH_CLIENT_ID: "id" })).toThrow(EnvValidationError);
+    expect(() =>
+      loadEnv({
+        MICROSOFT_OAUTH_CLIENT_SECRET: "secret",
+        MICROSOFT_OAUTH_REDIRECT_URI: "https://a.b/c",
+      }),
+    ).toThrow(EnvValidationError);
+    expect(
+      loadEnv({
+        GOOGLE_OAUTH_CLIENT_ID: "id",
+        GOOGLE_OAUTH_CLIENT_SECRET: "secret",
+        GOOGLE_OAUTH_REDIRECT_URI: "https://api.studafy.com/api/auth/oauth/google/callback",
+      }).GOOGLE_OAUTH_CLIENT_ID,
+    ).toBe("id");
   });
 
   test("throws for an unknown LOG_LEVEL", () => {
@@ -207,6 +260,46 @@ describe("loadEnv", () => {
 
   test("rejects an ANTHROPIC_API_KEY that is set while the gateway is disabled", () => {
     expect(() => loadEnv({ ANTHROPIC_API_KEY: "sk-test" })).toThrow(EnvValidationError);
+  });
+
+  test("treats empty AI credentials as unset, as a deployment template injects them", () => {
+    const env = loadEnv({ ANTHROPIC_API_KEY: "", AI_LLM_API_KEY: "", AI_LLM_PROVIDER: "" });
+    expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(env.AI_LLM_API_KEY).toBeUndefined();
+    expect(env.AI_LLM_PROVIDER).toBe("anthropic");
+  });
+
+  describe("AI_LLM_PROVIDER=openai-compatible", () => {
+    const together = {
+      AI_LLM_ENABLED: "true",
+      AI_LLM_PROVIDER: "openai-compatible",
+      AI_LLM_API_KEY: "together-test-key",
+      AI_LLM_BASE_URL: "https://api.together.xyz/v1",
+      AI_LLM_SMALL_MODEL: "Qwen/Qwen3.5-9B",
+      AI_LLM_LARGE_MODEL: "Qwen/Qwen3.5-9B",
+    };
+
+    test("accepts a key, endpoint, and both model ids without an Anthropic key", () => {
+      const env = loadEnv(together);
+      expect(env.AI_LLM_PROVIDER).toBe("openai-compatible");
+      expect(env.AI_LLM_BASE_URL).toBe("https://api.together.xyz/v1");
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+    });
+
+    test.each(["AI_LLM_API_KEY", "AI_LLM_BASE_URL", "AI_LLM_SMALL_MODEL", "AI_LLM_LARGE_MODEL"])(
+      "requires %s once enabled (the default model ids are Claude ids)",
+      (key) => {
+        expect(() => loadEnv({ ...together, [key]: undefined })).toThrow(EnvValidationError);
+      },
+    );
+
+    test("rejects an AI_LLM_API_KEY that is set while the gateway is disabled", () => {
+      expect(() => loadEnv({ ...together, AI_LLM_ENABLED: "false" })).toThrow(EnvValidationError);
+    });
+
+    test("rejects an unknown provider", () => {
+      expect(() => loadEnv({ ...together, AI_LLM_PROVIDER: "openai" })).toThrow(EnvValidationError);
+    });
   });
 
   test("parses LLM gateway tuning variables", () => {
@@ -297,9 +390,101 @@ describe("Tap Payments configuration (ST-298)", () => {
     expect(() => loadEnv({ TAP_SECRET_KEY: "", TAP_WEBHOOK_URL: url })).toThrow(EnvValidationError);
   });
 
+  test("no Tap countries by default, so every school bills through Stripe", () => {
+    expect(loadEnv({}).TAP_COUNTRIES).toEqual(new Set());
+    expect(loadEnv({ TAP_COUNTRIES: "" }).TAP_COUNTRIES).toEqual(new Set());
+  });
+
+  test("TAP_COUNTRIES lists Tap markets, comma separated, in any case", () => {
+    expect(loadEnv({ TAP_COUNTRIES: "jo, SA" }).TAP_COUNTRIES).toEqual(new Set(["JO", "SA"]));
+  });
+
+  test("a country Tap does not serve is refused", () => {
+    expect(() => loadEnv({ TAP_COUNTRIES: "JO,IE" })).toThrow(EnvValidationError);
+  });
+
   test("a key that is not a Tap secret key is refused", () => {
     expect(() => loadEnv({ TAP_SECRET_KEY: "pk_test_abc", TAP_WEBHOOK_URL: url })).toThrow(
       EnvValidationError,
     );
+  });
+});
+
+describe("in-app purchase configuration", () => {
+  const google = {
+    AI_STORE_PRODUCT_ID: "studafy_ai_monthly",
+    GOOGLE_PLAY_PACKAGE_NAME: "com.studafy.studafy_mobile",
+    GOOGLE_PLAY_SERVICE_ACCOUNT: '{"type":"service_account"}',
+    GOOGLE_PLAY_RTDN_TOKEN: "rtdn-token-0123456789",
+  };
+
+  test("all empty means in-app purchase is off", () => {
+    const env = loadEnv({
+      AI_STORE_PRODUCT_ID: "",
+      APPLE_IAP_BUNDLE_ID: "",
+      APPLE_IAP_APP_APPLE_ID: "",
+      GOOGLE_PLAY_PACKAGE_NAME: "",
+      GOOGLE_PLAY_SERVICE_ACCOUNT: "",
+      GOOGLE_PLAY_RTDN_TOKEN: "",
+    });
+    expect(env.AI_STORE_PRODUCT_ID).toBeUndefined();
+    expect(env.APPLE_IAP_APP_APPLE_ID).toBeUndefined();
+  });
+
+  test("a complete Google Play setup loads", () => {
+    expect(loadEnv(google).GOOGLE_PLAY_PACKAGE_NAME).toBe("com.studafy.studafy_mobile");
+  });
+
+  test("Google Play's three values must come together", () => {
+    expect(() => loadEnv({ ...google, GOOGLE_PLAY_RTDN_TOKEN: "" })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ ...google, GOOGLE_PLAY_SERVICE_ACCOUNT: undefined })).toThrow(
+      EnvValidationError,
+    );
+  });
+
+  test("the service account must be its JSON key", () => {
+    expect(() => loadEnv({ ...google, GOOGLE_PLAY_SERVICE_ACCOUNT: "not json" })).toThrow(
+      EnvValidationError,
+    );
+  });
+
+  test("a store without the product id is refused", () => {
+    expect(() => loadEnv({ ...google, AI_STORE_PRODUCT_ID: "" })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ APPLE_IAP_BUNDLE_ID: "com.studafy.studafyMobile" })).toThrow(
+      EnvValidationError,
+    );
+  });
+
+  test("the Apple app id is a number, needed only in production", () => {
+    const apple = {
+      AI_STORE_PRODUCT_ID: "studafy_ai_monthly",
+      APPLE_IAP_BUNDLE_ID: "com.studafy.studafyMobile",
+    };
+    expect(loadEnv(apple).APPLE_IAP_APP_APPLE_ID).toBeUndefined();
+    expect(loadEnv({ ...apple, APPLE_IAP_APP_APPLE_ID: "6450000000" }).APPLE_IAP_APP_APPLE_ID).toBe(
+      6_450_000_000,
+    );
+    expect(() => loadEnv({ ...apple, APPLE_IAP_APP_APPLE_ID: "abc" })).toThrow(EnvValidationError);
+
+    const production = {
+      NODE_ENV: "production",
+      DATABASE_HOST: "db",
+      DATABASE_PORT: "6432",
+      DATABASE_NAME: "studafy",
+      DATABASE_USER: "studafy_app",
+      DATABASE_PASSWORD: "secret",
+      DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----",
+      READ_DATABASE_HOST: "db-read",
+      READ_DATABASE_NAME: "api_read",
+    };
+    const issues = () => {
+      try {
+        loadEnv({ ...production, ...apple });
+        return "";
+      } catch (error) {
+        return String((error as Error).message);
+      }
+    };
+    expect(issues()).toContain("APPLE_IAP_APP_APPLE_ID");
   });
 });

@@ -287,6 +287,35 @@ describe("foldStatus", () => {
     expect(result.status).toBe("closed");
   });
 
+  test("an AI add-on bought again after it ended starts a new lifecycle", () => {
+    const result = foldStatus("ai", [
+      event("evt_1", "checkout.session.completed"),
+      event("evt_2", "customer.subscription.deleted"),
+      event("evt_3", "checkout.session.completed"),
+      event("evt_4", "invoice.paid"),
+    ]);
+    expect(result.status).toBe("active");
+    expect(result.skipped).toEqual([]);
+  });
+
+  test("after an AI add-on ended, only a new purchase restarts it -- a stray renewal is still rejected", () => {
+    const result = foldStatus("ai", [
+      event("evt_1", "checkout.session.completed"),
+      event("evt_2", "customer.subscription.deleted"),
+      event("evt_3", "invoice.paid"),
+    ]);
+    expect(result.status).toBe("canceled");
+    expect(result.skipped.map((step) => step.id)).toEqual(["evt_3"]);
+  });
+
+  test("a school subscription is not restarted by a new checkout after it ended", () => {
+    const result = foldStatus("school", [
+      event("evt_1", "customer.subscription.deleted"),
+      event("evt_2", "checkout.session.completed"),
+    ]);
+    expect(result.status).toBe("canceled");
+  });
+
   test("payment recovered inside the grace window returns to active", () => {
     const result = foldStatus("school", [
       event("evt_1", "invoice.paid"),

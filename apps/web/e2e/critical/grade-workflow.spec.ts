@@ -16,7 +16,7 @@ interface GradeSubmission {
 }
 
 /**
- * Journey 4/7: grade submit → approve → publish.
+ * Journey 4/6: grade submit → approve → publish.
  *
  * Grade entry and submission are teacher-only and have no web UI (mobile-only — see the ST-246
  * journey catalog), so this spec drives them through the real API. Approval is the one step the web

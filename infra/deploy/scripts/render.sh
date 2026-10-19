@@ -75,9 +75,33 @@ S3_APP_FILES_BUCKET="$(terraform -chdir="$TF_DIR" output -raw storage_app_files_
 export REDIS_SECRET_ARN PGBOUNCER_SECRET_ARN PGBOUNCER_HOST POSTGRES_SECRET_ARN
 export MIGRATIONS_EXECUTION_ROLE_ARN API_TASK_ROLE_ARN WORKERS_TASK_ROLE_ARN S3_APP_FILES_BUCKET
 
+# The ERPNext plane's internal ALB (staging/prod only; null in dev, which leaves the integration off --
+# an empty ERPNEXT_API_URL counts as unset). apps/api and the workers call it over plain HTTP inside the
+# VPC with the Host header picking each school's site (modules/erpnext/README.md).
+ERPNEXT_ALB_DNS="$(terraform -chdir="$TF_DIR" output -json erpnext_internal_alb_dns_name | jq -r '. // empty')"
+export ERPNEXT_API_URL="${ERPNEXT_ALB_DNS:+http://$ERPNEXT_ALB_DNS}"
+
+# Transactional email (modules/email): the SES configuration set the workers send through, and the
+# bounce/complaint topic the API's /email/webhooks/sns verifies messages against. Both null (empty
+# here) where the tier has no sending domain -- that tier sets EMAIL_DRY_RUN=true.
+export SES_CONFIGURATION_SET="$(terraform -chdir="$TF_DIR" output -json email_configuration_set_name | jq -r '. // empty')"
+export EMAIL_EVENTS_SNS_TOPIC_ARN="$(terraform -chdir="$TF_DIR" output -json email_events_topic_arn | jq -r '. // empty')"
+
 SERVICE_UPPER="$(echo "$SERVICE" | tr '[:lower:]' '[:upper:]')"
 export "${SERVICE_UPPER}_IMAGE=${REPO_URL}:${IMAGE_TAG}"
 export "${SERVICE_UPPER}_APP_SECRETS_ARN=${SECRET_ARN}"
 export "${SERVICE_UPPER}_METRICS_SD_ARN=${METRICS_SD_ARN}"
+
+# The workers task runs a ClamAV sidecar (infra/docker/clamav.Dockerfile) — release.yml builds and
+# pushes it under the same tag as every other image in the release, so it is rendered alongside the
+# workers image rather than pinned separately.
+if [ "$SERVICE" = "workers" ]; then
+  CLAMAV_REPO_URL="$(terraform -chdir="$TF_DIR" output -json registry_repository_urls | jq -r '.clamav')"
+  if [ "$CLAMAV_REPO_URL" = "null" ] || [ -z "$CLAMAV_REPO_URL" ]; then
+    echo "no ECR repository for 'clamav' in registry_repository_urls (needed by the workers sidecar)" >&2
+    exit 1
+  fi
+  export CLAMAV_IMAGE="${CLAMAV_REPO_URL}:${IMAGE_TAG}"
+fi
 
 envsubst < "$TEMPLATE"

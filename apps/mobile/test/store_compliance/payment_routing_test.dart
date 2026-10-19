@@ -5,13 +5,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Store-compliant payment routing, client half (ST-304) — see `docs/store_payment_routing.md`.
 ///
-/// Digital goods (the per-student AI add-on, the school's own Studafy plan) are sold on the web
-/// only, and both stores forbid a native app from linking or steering to a purchase outside their
-/// own in-app purchase. School fees are a real-world service, which both stores exempt, so the
-/// invoice "Pay on website" link is the one payment hand-off this app may make. These checks run
-/// against the source, not a widget tree, so a purchase route can't come back through a screen no
-/// widget test happens to render. The server half — every purchase route refuses a mobile session —
-/// is `apps/api/src/modules/subscriptions/__tests__/store-payment-channel.test.ts`.
+/// The per-student AI add-on is sold in this app only through the App Store / Google Play's own
+/// billing (`lib/src/features/ai/store/`); the school's Studafy plan is sold to schools on the web
+/// and is not in the app at all. Both stores forbid a native app from linking or steering to a
+/// purchase outside their billing. School fees are a real-world service, which both stores exempt,
+/// so the invoice "Pay on website" link is the one payment hand-off this app may make. These checks
+/// run against the source, not a widget tree, so a purchase route can't come back through a screen
+/// no widget test happens to render. The server half — web checkout refuses a mobile session, and
+/// store purchases are accepted only from one — is
+/// `apps/api/src/modules/subscriptions/__tests__/store-payment-channel.test.ts` and
+/// `store-routes.test.ts`.
 void main() {
   final handWritten = Directory('lib')
       .listSync(recursive: true)
@@ -45,6 +48,23 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
+  test('only the store module makes an in-app purchase', () {
+    // The two generated in-app purchase methods, and the purchase plugin itself, belong to
+    // lib/src/features/ai/store/ alone — the one place a purchase is made, verified and finished.
+    final storeCalls = RegExp(r'\.(getAiStoreConfig|registerAiStorePurchase)\s*\(');
+    final plugin = RegExp('package:in_app_purchase');
+    final outside = [
+      for (final file in handWritten)
+        if (!_normalize(file.path).startsWith('lib/src/features/ai/store/') &&
+            file.readAsLinesSync().any(
+              (line) => storeCalls.hasMatch(line) || plugin.hasMatch(line),
+            ))
+          _normalize(file.path),
+    ];
+
+    expect(outside, isEmpty, reason: outside.join('\n'));
+  });
+
   test('every outbound browser launch is a reviewed, non-purchase hand-off', () {
     // A new entry here needs a store-policy look first: a link to anything sold as a digital good
     // is a rejection, whatever the button says.
@@ -54,6 +74,8 @@ void main() {
       'lib/src/core/update/forced_update_screen.dart': 'store listing',
       'lib/src/features/ai/presentation/widgets/ai_consent_disclosure.dart':
           "AI provider's privacy policy — informational, nothing sold",
+      'lib/src/features/ai/store/ai_store_offer_card.dart':
+          'privacy policy and terms of use, required beside a store subscription (Apple 3.1.2)',
       'lib/src/features/parent/presentation/widgets/finance_invoice_tile.dart':
           'school fees — a real-world service, exempt from in-app purchase',
       'lib/src/features/shell/presentation/profile_tab_screen.dart':
@@ -76,10 +98,12 @@ void main() {
     expect(unreviewed, isEmpty, reason: 'Unreviewed launchUrl call sites:\n${unreviewed.join('\n')}');
   });
 
-  test('no in-app purchase or in-app browser dependency', () {
+  test("in-app purchase only through the stores' own billing, and no in-app browser", () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
+    // The official plugin talks to StoreKit / Play Billing directly. Third-party purchase SDKs
+    // (with their own servers, paywalls and web checkouts) are not used.
+    expect(RegExp(r'^\s+in_app_purchase:', multiLine: true).hasMatch(pubspec), isTrue);
     for (final package in [
-      'in_app_purchase',
       'purchases_flutter',
       'flutter_inapp_purchase',
       'webview_flutter',
@@ -111,6 +135,29 @@ void main() {
           caseSensitive: false,
         );
         expect(steering.allMatches(aiCopy).map((m) => m.group(0)).toList(), isEmpty);
+      }
+    }
+  });
+
+  test('the in-app purchase copy names no price and no way to pay outside the store', () {
+    for (final locale in ['en', 'ar']) {
+      final translations =
+          jsonDecode(File('assets/translations/$locale.json').readAsStringSync()) as Map;
+      final storeCopy = _strings(translations['aiStore']).join('\n');
+      expect(storeCopy, isNotEmpty, reason: locale);
+      // The price shown is always the store's own localized one, substituted for {price}.
+      expect((translations['aiStore'] as Map)['price'], contains('{price}'));
+      expect(
+        RegExp(r'[$€£]|\bUSD\b|\bJOD\b|\bSAR\b|د\.ا|ر\.س').hasMatch(storeCopy),
+        isFalse,
+        reason: '$locale: a currency in the purchase copy',
+      );
+      if (locale == 'en') {
+        final elsewhere = RegExp(
+          r'\b(website|web|online|studafy\.com|cheaper|discount)\b',
+          caseSensitive: false,
+        );
+        expect(elsewhere.allMatches(storeCopy).map((m) => m.group(0)).toList(), isEmpty);
       }
     }
   });

@@ -2,13 +2,26 @@ import { CircuitOpenError } from "../../../lib/circuit-breaker";
 import { scrubSecret } from "../../../lib/scrub-secret";
 import { redactPayload } from "../../../middleware/auditEmitter";
 
+import {
+  OPENAI_COMPATIBLE_PATH,
+  openAiHeaders,
+  openAiRequestBody,
+  openAiResponseText,
+  openAiStopReason,
+  openAiUsage,
+} from "./openai-compatible";
+
+import type { OpenAiChatResponse, OpenAiStreamChunk } from "./openai-compatible";
 import type { CircuitBreaker } from "../../../lib/circuit-breaker";
 import type { Logger } from "../../../logger";
 
 /**
  * Anthropic LLM provider (ST-164).
  *
- * The only place in the app that talks to the LLM plane. It mirrors the ERPNext client's shape
+ * The only place in the app that talks to the LLM plane. It speaks the Anthropic Messages API by
+ * default, or an OpenAI-compatible chat-completions API (Together AI and the like) when
+ * {@link AnthropicProviderOptions.apiFormat} is `"openai-compatible"` — only the wire format
+ * differs (see ./openai-compatible.ts); everything below applies to both. It mirrors the ERPNext client's shape
  * deliberately — same failure taxonomy, same retry policy, same circuit-breaker boundary — so the
  * two outbound HTTP planes agree on what "a failure" means and when to back off.
  *
@@ -89,6 +102,12 @@ export interface LlmGenerateInput {
   /** Output-token ceiling for this call; defaults to the provider's configured ceiling. */
   maxTokens?: number;
   /**
+   * The caller parses the answer as JSON. An OpenAI-compatible host is then put in JSON mode, which
+   * guarantees well-formed JSON but only allows an object at the top level (see
+   * ./json-output.ts). The Anthropic Messages API has no such mode; the prompt alone carries it.
+   */
+  json?: boolean;
+  /**
    * Sent as `metadata.user_id` unless the deployment is zero-retention. The provider retains this
    * field for abuse monitoring; omitting it is the zero-retention posture.
    */
@@ -116,9 +135,17 @@ export interface LlmProvider {
   stream(input: LlmGenerateInput): AsyncGenerator<LlmStreamEvent, void, unknown>;
 }
 
+/** Which HTTP API the provider speaks (`AI_LLM_PROVIDER`). */
+export type LlmApiFormat = "anthropic" | "openai-compatible";
+
 export interface AnthropicProviderOptions {
   apiKey: string;
-  /** Override the Anthropic API endpoint (gateway/proxy). Defaults to the public API. */
+  /** Wire format. Default `"anthropic"`. `"openai-compatible"` requires {@link baseUrl}. */
+  apiFormat?: LlmApiFormat;
+  /**
+   * API root the request path is appended to (`…/v1`). Defaults to the public Anthropic API; an
+   * OpenAI-compatible provider has no default and must name its own (e.g. https://api.together.xyz/v1).
+   */
   baseUrl?: string;
   /** Whole-call timeout: connect + wait + read. Default 60s. */
   timeoutMs?: number;
@@ -237,6 +264,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): LlmP
 
 export class AnthropicProvider implements LlmProvider {
   private readonly apiKey: string;
+  private readonly apiFormat: LlmApiFormat;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly defaultMaxTokens: number;
@@ -248,6 +276,10 @@ export class AnthropicProvider implements LlmProvider {
 
   constructor(options: AnthropicProviderOptions) {
     this.apiKey = options.apiKey;
+    this.apiFormat = options.apiFormat ?? "anthropic";
+    if (this.apiFormat === "openai-compatible" && !options.baseUrl) {
+      throw new Error("An OpenAI-compatible LLM provider needs a baseUrl");
+    }
     this.baseUrl = (options.baseUrl ?? AI_LLM_DEFAULT_BASE_URL).replace(/\/$/, "");
     this.timeoutMs = options.timeoutMs ?? AI_LLM_DEFAULT_TIMEOUT_MS;
     this.defaultMaxTokens = options.defaultMaxTokens ?? AI_LLM_DEFAULT_MAX_TOKENS;
@@ -310,7 +342,7 @@ export class AnthropicProvider implements LlmProvider {
 
     let response: Response;
     try {
-      response = await this.fetchFn(`${this.baseUrl}/messages`, {
+      response = await this.fetchFn(this.endpoint(), {
         method: "POST",
         headers: { ...this.headers(), accept: "text/event-stream" },
         body: JSON.stringify(this.body(input, true)),
@@ -327,10 +359,17 @@ export class AnthropicProvider implements LlmProvider {
       throw new LlmProviderError("AI provider returned an empty stream", 503, "network");
     }
 
-    yield* this.readSse(response.body);
+    yield* this.apiFormat === "openai-compatible"
+      ? this.readOpenAiSse(response.body, input)
+      : this.readSse(response.body);
+  }
+
+  private endpoint(): string {
+    return `${this.baseUrl}${this.apiFormat === "openai-compatible" ? OPENAI_COMPATIBLE_PATH : "/messages"}`;
   }
 
   private headers(): Record<string, string> {
+    if (this.apiFormat === "openai-compatible") return openAiHeaders(this.apiKey);
     return {
       "x-api-key": this.apiKey,
       "anthropic-version": AI_LLM_API_VERSION,
@@ -339,6 +378,9 @@ export class AnthropicProvider implements LlmProvider {
   }
 
   private body(input: LlmGenerateInput, stream: boolean): Record<string, unknown> {
+    if (this.apiFormat === "openai-compatible") {
+      return openAiRequestBody(input, input.maxTokens ?? this.defaultMaxTokens, stream);
+    }
     const body: Record<string, unknown> = {
       model: input.model,
       max_tokens: input.maxTokens ?? this.defaultMaxTokens,
@@ -360,7 +402,7 @@ export class AnthropicProvider implements LlmProvider {
 
     let response: Response;
     try {
-      response = await this.fetchFn(`${this.baseUrl}/messages`, {
+      response = await this.fetchFn(this.endpoint(), {
         method: "POST",
         headers: this.headers(),
         body: JSON.stringify(this.body(input, false)),
@@ -374,13 +416,24 @@ export class AnthropicProvider implements LlmProvider {
 
     if (!response.ok) throw await this.httpError(response);
 
-    let data: AnthropicMessageResponse;
+    let json: unknown;
     try {
-      data = (await response.json()) as AnthropicMessageResponse;
+      json = await response.json();
     } catch {
       throw new LlmProviderError("AI provider returned an unreadable response", 503, "network");
     }
 
+    if (this.apiFormat === "openai-compatible") {
+      const data = json as OpenAiChatResponse;
+      return {
+        content: openAiResponseText(data),
+        model: data.model ?? input.model,
+        usage: openAiUsage(data.usage),
+        stopReason: openAiStopReason(data),
+      };
+    }
+
+    const data = json as AnthropicMessageResponse;
     const usage = usageFrom(data.usage);
     return {
       content: extractText(data),
@@ -513,6 +566,83 @@ export class AnthropicProvider implements LlmProvider {
           model: model ?? "unknown",
         };
       }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  /**
+   * Parse an OpenAI-compatible SSE stream: `data: {chunk}` lines ending in `data: [DONE]`. Usage
+   * arrives on the last chunk (`stream_options.include_usage`). A provider that never reports it
+   * would let a streamed answer go un-metered, so the `done` event then falls back to a
+   * four-characters-per-token estimate rather than committing zero to the school's quota.
+   */
+  private async *readOpenAiSse(
+    body: ReadableStream<Uint8Array>,
+    input: LlmGenerateInput,
+  ): AsyncGenerator<LlmStreamEvent> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let text = "";
+    let usage: LlmUsage | null = null;
+    let stopReason: string | null = null;
+    let model: string | null = null;
+
+    const done = (): LlmStreamEvent => {
+      const estimate = (chars: number): number => Math.ceil(chars / 4);
+      const final = usage ?? {
+        inputTokens: estimate((input.system?.length ?? 0) + input.prompt.length),
+        outputTokens: estimate(text.length),
+        totalTokens: 0,
+      };
+      final.totalTokens = final.inputTokens + final.outputTokens;
+      return { type: "done", text, usage: final, stopReason, model: model ?? input.model };
+    };
+
+    try {
+      for (;;) {
+        const { done: ended, value } = await reader.read();
+        if (ended) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let newline: number;
+        while ((newline = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.slice(0, newline).trim();
+          buffer = buffer.slice(newline + 1);
+          if (!line.startsWith("data:")) continue;
+          const raw = line.slice("data:".length).trim();
+          if (!raw) continue;
+          if (raw === "[DONE]") {
+            yield done();
+            return;
+          }
+
+          let chunk: OpenAiStreamChunk;
+          try {
+            chunk = JSON.parse(raw) as OpenAiStreamChunk;
+          } catch {
+            continue;
+          }
+
+          if (chunk.error) {
+            const message = chunk.error.message ?? "AI provider stream error";
+            throw new LlmProviderError(message, 500, "http", chunk.error, this.apiKey);
+          }
+          model = chunk.model ?? model;
+          if (chunk.usage) usage = openAiUsage(chunk.usage);
+          const choice = chunk.choices?.[0];
+          stopReason = choice?.finish_reason ?? stopReason;
+          const delta = choice?.delta?.content ?? "";
+          if (delta) {
+            text += delta;
+            yield { type: "delta", delta, text };
+          }
+        }
+      }
+
+      // A truncated stream (no [DONE]) still yields what it received.
+      yield done();
     } finally {
       reader.releaseLock();
     }

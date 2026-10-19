@@ -21,6 +21,7 @@ changes. A stale label is a policy violation on both stores.
 | Studafy API (`api.studafy.com`, `dio` / `retrofit` / `web_socket_channel`) | Everything the user enters or uploads, the push token, and the sign-in exchange | First party |
 | Firebase (Google) | FCM token and Firebase Installation ID (`firebase_messaging`). Crash reports and session events (`firebase_crashlytics`, which pulls in FirebaseSessions) | Service provider |
 | Sentry | Crash and performance events (`sentry_flutter`), only when `SENTRY_DSN` is set | Service provider |
+| App Store / Google Play | The AI add-on purchase, made and paid for entirely in the store's own sheet (`in_app_purchase`). The app stamps it with the student's Studafy id, an opaque UUID, so the API can match the store's renewals and refunds to the account | Platform billing |
 | Anthropic, through the Studafy API and never from the device | AI questions and material text, after in-app consent (`../docs/ai_data_sharing_consent.md`) | Service provider |
 
 There is no ads, analytics, or attribution SDK. `docs/sdk_compliance_inventory.md` (ST-307) is the
@@ -43,6 +44,7 @@ used for tracking**. The only purpose is **App Functionality**. The manifest key
 | Identifiers → Device ID | `NSPrivacyCollectedDataTypeDeviceID` | The FCM token, registered to `POST /api/auth/devices` with the bearer token (`push_service.dart`). The token is created only after sign-in (ST-307). The Firebase Installation ID and the Crashlytics/Sentry installation UUIDs also fall here. |
 | User Content → Photos or Videos | `NSPrivacyCollectedDataTypePhotosorVideos` | Camera capture only (`teacher_content_screen.dart`, `ImageSource.camera`). There is no photo-library access. |
 | User Content → Other User Content | `NSPrivacyCollectedDataTypeOtherUserContent` | Uploaded files (`file_picker`), assignment and exam submissions, announcements, discipline incidents, attendance and grading entries, quiz attempts and flashcard reviews, AI questions, and AI content reports. |
+| Purchases → Purchase History | `NSPrivacyCollectedDataTypePurchaseHistory` | A student who buys the AI add-on in the app: the API verifies the store purchase and keeps its product, transaction id and paid period on the account to turn the add-on on and off (`ai_store_controller.dart`, `apps/api/src/modules/subscriptions/store/`). No card or payment details reach Studafy. |
 | Diagnostics → Crash Data | `NSPrivacyCollectedDataTypeCrashData` | Crashlytics and Sentry, tagged with the user ID. |
 | Diagnostics → Performance Data | `NSPrivacyCollectedDataTypePerformanceData` | Sentry performance monitoring. |
 | Diagnostics → Other Diagnostic Data | `NSPrivacyCollectedDataTypeOtherDiagnosticData` | Device model, OS version, breadcrumbs (Sentry), and session-start events (FirebaseSessions). |
@@ -52,9 +54,10 @@ used for tracking**. The only purpose is **App Functionality**. The manifest key
 - **Name and Phone Number.** The account holds the name the school entered, but the app never
   sends a name or phone number. The ID token's name claim is not stored. The API matches on `sub`
   only.
-- **Payment Info and Purchase History.** Parents only *view* invoices and receipts that the API
-  returns. Fees are paid on the school's page in the system browser, and nothing is bought in the
-  app (`docs/store_payment_routing.md`). Displaying data the server already holds is not collection
+- **Payment Info.** Card and bank details for the AI add-on are entered in Apple's or Google's own
+  purchase sheet and never reach the app or Studafy. Parents only *view* invoices and receipts the
+  API returns, and fees are paid on the school's page in the system browser
+  (`docs/store_payment_routing.md`). Displaying data the server already holds is not collection
   under either store's definition.
 - **Location, Contacts, Health, Sensitive Info, Browsing or Search History, Audio.** There is no
   code path or permission for any of them. `file_picker`'s audio picker is compiled into a
@@ -95,6 +98,7 @@ service providers as sharing), and **not ephemeral**.
 | Messages → Other in-app messages | Optional | App functionality | Class announcements |
 | App activity → Other user-generated content | Optional | App functionality | Submissions, AI questions, AI content reports |
 | App activity → Other actions | Optional | App functionality | Quiz attempts and flashcard reviews |
+| Financial info → Purchase history | Optional | App functionality | Purchase History |
 | App info and performance → Crash logs | Required | App functionality | Crash Data |
 | App info and performance → Diagnostics | Required | App functionality | Performance Data, Other Diagnostic Data |
 | Device or other IDs → Device or other IDs | Required | App functionality | Device ID |
@@ -162,15 +166,16 @@ The `sqlite3` pod that `sqlite3_flutter_libs` adds is built from the same SQLite
 | Plugin | Manifest | Required-reason APIs declared |
 | --- | --- | --- |
 | `app_links` | Own | None |
-| `file_picker` | Own | None |
+| `file_picker_darwin` | Own | None |
 | `firebase_core` | None. Wrapper only: native code calls no required-reason API (checked) | Covered by the Firebase pods below |
 | `firebase_crashlytics` | None. Wrapper only (checked) | Covered by the Firebase pods below |
 | `firebase_messaging` | Own | UserDefaults `CA92.1` |
 | `flutter_local_notifications` | Own | UserDefaults `CA92.1` |
 | `flutter_pdfview` | Own | None |
-| `flutter_secure_storage` | Own | None |
+| `flutter_secure_storage_darwin` | Own | None |
 | `flutter_web_auth_2` | None. Native code calls no required-reason API (checked) | None |
 | `image_picker_ios` | Own | None |
+| `in_app_purchase_storekit` | Own | None |
 | `package_info_plus` | Own | None |
 | `path_provider_foundation` | No native target. Dart FFI through `objective_c`, calling only `NSFileManager` directory lookups | None needed |
 | `sentry_flutter` | None. Wrapper only (checked) | Covered by the `Sentry` pod |

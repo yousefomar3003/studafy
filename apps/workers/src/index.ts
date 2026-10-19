@@ -17,6 +17,7 @@ import {
   scheduleTapRenewalJob,
   scheduleSeatReconciliationJob,
   scheduleStorageQuotaReconciliationJob,
+  scheduleFinanceReconciliationJob,
 } from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
 import { scheduleAbandonedImportSweepJob } from "./queues/imports";
@@ -197,6 +198,13 @@ void scheduleSeatReconciliationJob(seatReconciliationRedis).then(() =>
 const storageQuotaReconciliationRedis = createRedisConnection(env);
 void scheduleStorageQuotaReconciliationJob(storageQuotaReconciliationRedis).then(() =>
   storageQuotaReconciliationRedis.disconnect(),
+);
+
+// Finance reconciliation scheduler: idempotently register the daily 02:30 run of apps/api's
+// finance reconciliation (ERPNext vs installment_cache), before the school day and the billing sweeps.
+const financeReconciliationRedis = createRedisConnection(env);
+void scheduleFinanceReconciliationJob(financeReconciliationRedis).then(() =>
+  financeReconciliationRedis.disconnect(),
 );
 
 // Cost-report scheduler (ST-293): idempotently register the daily 06:15 cost-metric publish and

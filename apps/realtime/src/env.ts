@@ -22,7 +22,7 @@ export const envSchema = z.object({
   // Deployments set it from IMAGE_TAG.
   RELEASE_VERSION: z.string().min(1).default("unknown"),
   // Sentry error monitoring: see apps/api/src/env.ts's own SENTRY_DSN/SENTRY_ENVIRONMENT. Empty is
-  // unset, since the task definition always injects the key from the app-secrets container.
+  // unset, since the task definition always injects the key from the tier's env file.
   SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().url().optional()),
   SENTRY_ENVIRONMENT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
   // A separate port from PORT, on purpose (ST-259): the Prometheus-format /metrics endpoint

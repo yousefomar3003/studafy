@@ -6,7 +6,7 @@ import { API_BASE_URL } from "./support/ports";
 import { stubTurnstile } from "./support/turnstile";
 
 /**
- * Journey 1/7: registration → verification.
+ * Journey 1/6: registration → verification.
  *
  * Real backend end to end: `POST /api/schools/register` creates a real school, admin user, and
  * verification token against the live database (`/api/lookups/*` reference data is migration

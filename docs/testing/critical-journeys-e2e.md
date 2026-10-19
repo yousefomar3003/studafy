@@ -1,7 +1,8 @@
 # Critical-journeys E2E suite (ST-246)
 
-`apps/web/e2e/critical/` — a real-backend Playwright suite covering the seven journeys the ticket
-names, distinct from `apps/web/e2e/` (which stubs every API call and runs only `vite dev`, see that
+`apps/web/e2e/critical/` — a real-backend Playwright suite covering the six journeys the ticket
+names (a seventh, school-plan subscription checkout, was removed when schools stopped paying for
+Studafy — migration 000126), distinct from `apps/web/e2e/` (which stubs every API call and runs only `vite dev`, see that
 directory's own `playwright.config.ts`). Run it with `bun run e2e:critical` from `apps/web`, or the
 whole thing from the repo root via the `critical-journeys` job in
 `.github/workflows/e2e-critical.yml` (nightly + `workflow_dispatch`, the manual "pre-release" trigger
@@ -35,15 +36,14 @@ UI anywhere in `apps/web` — those roles' screens exist only in the Flutter mob
 about the product, not a gap this suite invented around; every journey below says plainly which of
 its steps a browser can reach and which it can't.
 
-| #   | Journey                           | Spec                                | Browser-driven                                                                                  | API-driven (no web UI exists)                                                                                                                                                     |
-| --- | --------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Registration → verification       | `registration-verification.spec.ts` | Full onboarding form; Turnstile alone is stubbed (see the spec's own comment)                   | Reading the verification token off the real network response (never rendered — email-only by design) and calling verify-email                                                     |
-| 2   | Invitation activation             | `invitation-activation.spec.ts`     | `/invite/:token` and the real mock-OAuth redirect round trip                                    | Creating the invitation (admin API) to get a raw token with no inbox to check                                                                                                     |
-| 3   | Attendance record                 | `attendance-record.spec.ts`         | Admin's attendance oversight dashboard (`/portal/principal/attendance`)                         | Opening a session and recording it (teacher-only, mobile-only)                                                                                                                    |
-| 4   | Grade submit → approve → publish  | `grade-workflow.spec.ts`            | Admin's approval queue (`/portal/approvals`) — approving _is_ publishing, one atomic transition | Grade entry and submit (teacher-only, mobile-only); the published-grade read (student/parent-only route, no web page at all)                                                      |
-| 5   | Invoice → payment                 | `invoice-payment.spec.ts`           | Recording the payment (`/portal/finance/payments/new`)                                          | Registering a fresh school (ERPNext-provisioning needs a real sandbox site, so the pre-seeded demo tenant can't be reused — see the spec), fee structure + invoice batch creation |
-| 6   | AI ask with citations             | `ai-ask-citations.spec.ts`          | **None** — no Ask AI screen exists in `apps/web`                                                | The entire journey: `POST /api/ai/students/{id}/ask`, asserted against the real SSE stream                                                                                        |
-| 7   | Subscription checkout (test mode) | `subscription-checkout.spec.ts`     | Full billing UI (`/portal/billing` → Change plan → Continue to checkout)                        | Syncing plan prices and delivering the confirmation webhook (nothing plays "Stripe" in a browser)                                                                                 |
+| #   | Journey                          | Spec                                | Browser-driven                                                                                  | API-driven (no web UI exists)                                                                                                                                                     |
+| --- | -------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Registration → verification      | `registration-verification.spec.ts` | Full onboarding form; Turnstile alone is stubbed (see the spec's own comment)                   | Reading the verification token off the real network response (never rendered — email-only by design) and calling verify-email                                                     |
+| 2   | Invitation activation            | `invitation-activation.spec.ts`     | `/invite/:token` and the real mock-OAuth redirect round trip                                    | Creating the invitation (admin API) to get a raw token with no inbox to check                                                                                                     |
+| 3   | Attendance record                | `attendance-record.spec.ts`         | Admin's attendance oversight dashboard (`/portal/principal/attendance`)                         | Opening a session and recording it (teacher-only, mobile-only)                                                                                                                    |
+| 4   | Grade submit → approve → publish | `grade-workflow.spec.ts`            | Admin's approval queue (`/portal/approvals`) — approving _is_ publishing, one atomic transition | Grade entry and submit (teacher-only, mobile-only); the published-grade read (student/parent-only route, no web page at all)                                                      |
+| 5   | Invoice → payment                | `invoice-payment.spec.ts`           | Recording the payment (`/portal/finance/payments/new`)                                          | Registering a fresh school (ERPNext-provisioning needs a real sandbox site, so the pre-seeded demo tenant can't be reused — see the spec), fee structure + invoice batch creation |
+| 6   | AI ask with citations            | `ai-ask-citations.spec.ts`          | **None** — no Ask AI screen exists in `apps/web`                                                | The entire journey: `POST /api/ai/students/{id}/ask`, asserted against the real SSE stream                                                                                        |
 
 ## Personas
 
@@ -58,11 +58,6 @@ its steps a browser can reach and which it can't.
   whole suite that has never been exercised against the real sandbox before (no prior integration
   test in this repo posts a Fee Structure to it) — expect the first real CI run to need a one-line
   adjustment here if the sandbox's master data differs.
-- **Subscription checkout's post-webhook assertion** stays deliberately modest (the webhook is
-  accepted and the billing page still renders) rather than asserting exactly which plan is now
-  active — whether `checkout.session.completed` alone flips `app.subscriptions.plan_id`, or whether
-  that needs a following `customer.subscription.*` event, wasn't fully resolved during research.
-  Worth tightening once observed against a real run.
 - Deeper UI assertions on the attendance and approvals dashboards (specific rows, specific counts)
   are intentionally light in this first version — enough to prove the real page renders against
   live data, not a pixel-level audit.

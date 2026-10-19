@@ -3,6 +3,8 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { googleOAuthRoutes } from "./google-route";
 import { microsoftOAuthRoutes } from "./microsoft-route";
+import { redeemHandoff } from "./mobile-handoff";
+import { createMemoryStateStore } from "./state-store";
 
 import type { GoogleOAuthDependencies } from "./google-route";
 import type { MicrosoftOAuthDependencies } from "./microsoft-route";
@@ -24,7 +26,11 @@ const MICROSOFT_CONFIG = {
   frontendUrl: "https://web.example",
 };
 
+// One store shared by both provider apps, as app.ts shares one across every OAuth route group.
+const stateStore = createMemoryStateStore();
+
 const googleDeps: GoogleOAuthDependencies = {
+  stateStore,
   getOAuthConfig: () => GOOGLE_CONFIG,
   validateIdToken: () =>
     Promise.resolve({
@@ -37,6 +43,7 @@ const googleDeps: GoogleOAuthDependencies = {
 };
 
 const microsoftDeps: MicrosoftOAuthDependencies = {
+  stateStore,
   getOAuthConfig: () => MICROSOFT_CONFIG,
   validateIdToken: () =>
     Promise.resolve({
@@ -132,5 +139,197 @@ describe("OAuth callback failure redirects", () => {
     );
     expectRedirectToError(callback, "AUTHZ_FORBIDDEN");
     expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Single use: replaying the same callback finds no state and never reaches the provider again.
+    const replay = await googleApp.request(
+      `/api/auth/oauth/google/callback?code=fake-code&state=${state}`,
+    );
+    expectRedirectToError(replay, "OAUTH_STATE_INVALID");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("OAuth callback flow dispatch", () => {
+  function stubTokenEndpoint(): void {
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ id_token: "anything" }), { status: 200 })),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+  }
+
+  test("an invitation-activation state is finished by the login callback, not rejected", async () => {
+    stubTokenEndpoint();
+    // What GET /api/auth/invitations/{token}/oauth/google/start writes. The provider returns the
+    // browser to the one registered redirect URI — this callback — so it must run activation.
+    await stateStore.set("activation-state", {
+      flow: "activation",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "n",
+      token: "not-a-real-invitation-token",
+    });
+
+    const res = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=activation-state",
+    );
+
+    // activateAccount rejects the malformed token before touching the database, and the activation
+    // arm bounces back to the invite page — proof the callback dispatched rather than treating the
+    // invitee as a returning user (which would have redirected to /auth/error).
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(
+      "https://web.example/invite/not-a-real-invitation-token",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("a mobile-login state is handed to the app as a one-time code, redeemable once", async () => {
+    stubTokenEndpoint();
+    // What /mobile-start writes. The app opened /mobile-authorize, so Google returned here.
+    await stateStore.set("mobile-state", {
+      flow: "mobile-login",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "mobile-nonce",
+    });
+
+    const res = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=mobile-state",
+    );
+
+    // Back to the app's deep link with a fresh code — never Google's own code — and the state.
+    expect(res.status).toBe(302);
+    const deepLink = new URL(res.headers.get("location")!);
+    expect(`${deepLink.protocol}//${deepLink.host}${deepLink.pathname}`).toBe(
+      "studafy://auth/callback",
+    );
+    expect(deepLink.searchParams.get("state")).toBe("mobile-state");
+    const handoffCode = deepLink.searchParams.get("code")!;
+    expect(handoffCode).not.toBe("fake-code");
+
+    // The verified identity waits under that code, bound to the state and nonce.
+    const redeemed = await redeemHandoff(stateStore, {
+      code: handoffCode,
+      state: "mobile-state",
+      nonce: "mobile-nonce",
+      provider: "google",
+      purpose: "login",
+    });
+    expect(redeemed?.identity).toEqual({ sub: "sub-1", email: "user@example.com" });
+    expect(
+      await redeemHandoff(stateStore, {
+        code: handoffCode,
+        state: "mobile-state",
+        nonce: "mobile-nonce",
+        provider: "google",
+        purpose: "login",
+      }),
+    ).toBeUndefined();
+  });
+
+  test("a handoff is refused without the app's nonce (an intercepted deep link is not enough)", async () => {
+    stubTokenEndpoint();
+    await stateStore.set("mobile-state-2", {
+      flow: "mobile-login",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "secret-nonce",
+    });
+    const res = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=mobile-state-2",
+    );
+    const handoffCode = new URL(res.headers.get("location")!).searchParams.get("code")!;
+
+    expect(
+      await redeemHandoff(stateStore, {
+        code: handoffCode,
+        state: "mobile-state-2",
+        nonce: "guessed-nonce",
+        provider: "google",
+        purpose: "login",
+      }),
+    ).toBeUndefined();
+  });
+
+  test("a failed mobile sign-in returns to the app, not the web error page", async () => {
+    await stateStore.set("mobile-cancel", {
+      flow: "mobile-login",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "n",
+    });
+    const cancelled = await googleApp.request(
+      "/api/auth/oauth/google/callback?error=access_denied&state=mobile-cancel",
+    );
+    expect(cancelled.headers.get("location")).toBe("studafy://auth/callback?error=OAUTH_CANCELLED");
+
+    // A provider-level failure (token endpoint down) for a mobile flow lands in the app too.
+    fetchMock.mockImplementation(() => Promise.resolve(new Response("{}", { status: 500 })));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    await stateStore.set("mobile-fail", {
+      flow: "mobile-login",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "n",
+    });
+    const failed = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=mobile-fail",
+    );
+    expect(failed.headers.get("location")).toBe(
+      "studafy://auth/callback?error=OAUTH_PROVIDER_ERROR",
+    );
+  });
+
+  test("a handoff code is never accepted as an authorization state", async () => {
+    await stateStore.set("handoff-code", {
+      flow: "mobile-handoff",
+      provider: "google",
+      purpose: "login",
+      state: "s",
+      nonce: "n",
+      identity: { sub: "sub-1", email: "user@example.com" },
+    });
+    const res = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=handoff-code",
+    );
+    expectRedirectToError(res, "OAUTH_STATE_INVALID");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("a state minted for another provider is refused", async () => {
+    const start = await microsoftApp.request("/api/auth/oauth/microsoft/start");
+    const state = new URL(start.headers.get("location")!).searchParams.get("state");
+
+    const res = await googleApp.request(
+      `/api/auth/oauth/google/callback?code=fake-code&state=${state}`,
+    );
+    expectRedirectToError(res, "OAUTH_STATE_INVALID");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("start and callback may run on different instances that share the store", async () => {
+    stubTokenEndpoint();
+    // Two route groups over the same store stand in for two API tasks behind the load balancer.
+    const instanceA = googleOAuthRoutes(
+      emptyDb,
+      {} as SessionTokenConfig,
+      silentLogger,
+      googleDeps,
+    );
+    const instanceB = googleOAuthRoutes(
+      emptyDb,
+      {} as SessionTokenConfig,
+      silentLogger,
+      googleDeps,
+    );
+
+    const start = await instanceA.request("/api/auth/oauth/google/start");
+    const state = new URL(start.headers.get("location")!).searchParams.get("state");
+
+    const callback = await instanceB.request(
+      `/api/auth/oauth/google/callback?code=fake-code&state=${state}`,
+    );
+    // Reaching the identity lookup (no account) means instance B found instance A's state.
+    expectRedirectToError(callback, "AUTHZ_FORBIDDEN");
   });
 });

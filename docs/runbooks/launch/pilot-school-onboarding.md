@@ -30,10 +30,8 @@ Selection criteria, all must hold:
   support pin, not a pilot.
 - **Staff roster on hand** — name + email per staff member to import, in a file with an
   audited count. >0 staff is non-negotiable; the roster is the activation-rate denominator.
-- **Fits the current trial model in week 1** — school must fit the 50-student trial cap during
-  week 1 (`app.subscriptions.student_cap` / `trial_expires_at`, provisioned per
-  `tenant-provisioning-checklist.md`); converting to a paid plan is a week-2+ decision, not an
-  import prerequisite.
+- **No plan to choose** — Studafy is free for schools (every school is on the `free` plan, see
+  `tenant-provisioning-checklist.md`), so there is no seat cap or paid-plan conversion to plan for.
 - **ERPNext plane confirmed for the school** — country/currency exist in the school's Frappe
   Company bootstrap; the site `{school-slug}.erpnext.studafy.com` provisions cleanly.
 - **Class structure fits the academic model** — the school's classes/terms map to the existing
@@ -60,7 +58,7 @@ POST /api/schools/register            (public, captcha-protected)
     → returns verification_token + invitation_token (once only)
 
 GET /api/schools/verify-email/{token} (public)
-    → email verified, status='active', trial begins
+    → email verified, status='active'
     → async provisioning starts (fire-and-forget)
 ```
 
@@ -76,7 +74,7 @@ LEFT JOIN app.erpnext_site_configs ess      ON ess.school_id = s.id
 WHERE s.slug = :school_slug;
 ```
 
-Expected: `status='active'`, `provisioning_status='completed'`, trial subscription present,
+Expected: `status='active'`, `provisioning_status='completed'`, free-plan subscription present (`active`),
 `erpnext_status` healthy. Any `failed`/`in_progress` state → follow
 `tenant-provisioning-checklist.md`'s Troubleshooting section; do not import people into a school
 whose billing/ERP plane is not clean.

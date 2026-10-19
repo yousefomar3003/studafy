@@ -9,6 +9,7 @@ import { workerLogger } from "../../log";
 import { retryBillingEvent } from "./billing-event.service";
 import { COST_METRIC_NAMESPACE, runCostReport } from "./cost-report";
 import { runDunningSweep } from "./dunning-sweep";
+import { runFinanceReconciliation } from "./finance-reconciliation";
 import { generateInvoice, generateBatchInvoices } from "./invoice.service";
 import {
   generateInvoiceSchema,
@@ -102,6 +103,25 @@ export async function processBillingJob(
     return processStorageQuotaReconciliation(databaseUrl, storageOptions);
   }
 
+  // Daily finance reconciliation: triggers apps/api's run (finance-reconciliation.ts). Without a
+  // service key the deployment has no ERPNext integration to reconcile, so that is a logged skip;
+  // a key without the API's address is a thrown error, because then reconciliation silently never
+  // happens.
+  if (job.name === JOB_NAMES.RUN_FINANCE_RECONCILIATION) {
+    const apiKey = process.env.RECONCILIATION_API_KEY;
+    const apiBaseUrl = process.env.API_BASE_URL;
+    if (!apiKey) {
+      workerLogger.info({}, "RECONCILIATION_API_KEY not set; no finance reconciliation to run");
+      return { processed: false, reason: "finance reconciliation not configured" };
+    }
+    if (!apiBaseUrl) {
+      throw new Error("API_BASE_URL is required to run finance reconciliation");
+    }
+    const result = await runFinanceReconciliation({ apiBaseUrl, apiKey });
+    workerLogger.info({ ...result }, "finance reconciliation complete");
+    return result;
+  }
+
   // Cost & budget reporting sweep (ST-293). Same no-payload-but-mode shape as the sweeps above,
   // except a missing STRIPE_SECRET_KEY is a soft skip (logged, AI metrics still publish) rather
   // than a thrown error — unlike seat reconciliation this job never moves money, so a report
@@ -142,14 +162,33 @@ async function processTapRenewals(databaseUrl: string): Promise<unknown> {
 
 async function processSeatReconciliation(databaseUrl: string): Promise<unknown> {
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error("STRIPE_SECRET_KEY is required to run seat reconciliation");
-  }
-
   const sql = postgres(databaseUrl, { max: 2 });
 
   try {
-    return runSeatReconciliation(
+    // Seats are only reconciled against Stripe subscriptions; Tap-billed schools (Jordan, the Gulf,
+    // Egypt) have none. A deployment without Stripe therefore skips -- unless some subscription is
+    // billed through Stripe after all, which must never stop reconciling silently.
+    if (!secretKey) {
+      const [row] = await sql<{ count: number }[]>`
+        SELECT count(*)::int AS count
+        FROM app.subscriptions
+        WHERE status = 'active' AND stripe_subscription_id IS NOT NULL
+      `;
+      if ((row?.count ?? 0) > 0) {
+        throw new Error(
+          `STRIPE_SECRET_KEY is required: ${row!.count} active subscription(s) are billed through Stripe`,
+        );
+      }
+      workerLogger.info(
+        {},
+        "STRIPE_SECRET_KEY not set and no Stripe-billed subscriptions; skipping",
+      );
+      return { processed: false, reason: "no stripe-billed subscriptions" };
+    }
+
+    // Awaited, not returned bare: the finally below would otherwise close the connection while the
+    // reconciliation is still running on it.
+    return await runSeatReconciliation(
       sql,
       new StripeSeatSubscriptionProvider(secretKey),
       new Date(),

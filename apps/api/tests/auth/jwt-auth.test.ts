@@ -296,6 +296,22 @@ describe("public paths", () => {
     expect(verification.status).toBe(200);
     expect(sibling.status).toBe(401);
   });
+
+  it("exempts the invitation OAuth shapes an invitee reaches without an account", async () => {
+    // An invitee has no session yet, so the OAuth arms of activation (browser start, mobile
+    // start/exchange) must be reachable without a token, exactly like `.../activate`.
+    const base = `/api/auth/invitations/${"a".repeat(64)}/oauth/google`;
+    for (const action of ["start", "mobile-start"]) {
+      expect((await probe.app.request(`${base}/${action}`)).status).toBe(200);
+    }
+    expect((await probe.app.request(`${base}/mobile-exchange`, { method: "POST" })).status).toBe(
+      200,
+    );
+
+    // Nothing else under the invitation's oauth segment is opened.
+    expect((await probe.app.request(`${base}/callback`)).status).toBe(401);
+    expect((await probe.app.request(`${base}/start/extra`)).status).toBe(401);
+  });
 });
 
 describe("degraded key store", () => {

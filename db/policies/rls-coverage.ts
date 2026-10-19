@@ -132,8 +132,10 @@ approved_flexible_columns(table_name, column_name) AS (
     -- disclosure supersedes the row rather than editing it. The stable relational fields (tenant,
     -- user, disclosure version, provider and timestamps) remain normalized and constrained.
     ('ai_data_sharing_consents', 'data_categories'),
-    -- The school's teaching days (ISO weekday numbers). A small closed set bounded by
-    -- ck_school_settings_school_days (db/migrations/000122); read whole, never joined or filtered on.
+    -- Timetable week (000122): the school's teaching weekdays in display order. A closed set -- a CHECK
+    -- holds it to 1..7 with 1..7 entries -- whose order is the payload, read whole with the settings
+    -- row and never joined or filtered on, so a child table would add a join and an ordinal column to
+    -- store what the array already guarantees.
     ('school_settings', 'school_days')
 ),
 relations AS (

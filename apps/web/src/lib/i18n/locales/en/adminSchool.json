@@ -43,21 +43,19 @@
       "empty": "Nothing is waiting on your review.",
       "awaiting": "awaiting review"
     },
-    "subscription": {
-      "title": "Subscription",
-      "error": "Unable to load subscription status.",
-      "unknown": "Unknown",
-      "seats": "{{plan}} · {{used}}/{{cap}} seats",
-      "seatsCancelling": "{{plan}} · {{used}}/{{cap}} seats · cancels at period end",
-      "status": {
-        "trialing": "Trialing",
-        "active": "Active",
-        "past_due": "Past due",
-        "grace_period": "Grace period",
-        "canceled": "Canceled",
-        "expired": "Expired",
-        "closed": "Closed",
-        "paused": "Paused"
+    "storage": {
+      "title": "Storage usage",
+      "error": "Unable to load storage usage.",
+      "empty": "No storage data available.",
+      "meterLabel": "{{percent}} of storage used",
+      "noCap": "Storage cap not configured",
+      "usedOfCap": "{{used}} of {{cap}} used",
+      "usedNoCap": "{{used}} used · no cap configured",
+      "units": {
+        "b": "{{value}} B",
+        "kb": "{{value}} KB",
+        "mb": "{{value}} MB",
+        "gb": "{{value}} GB"
       }
     }
   },
@@ -361,8 +359,7 @@
       "approvals_one": "{{count}} grade approval is waiting on you",
       "approvals_other": "{{count}} grade approvals are waiting on you",
       "invited_one": "{{count}} invited user hasn't activated yet",
-      "invited_other": "{{count}} invited users haven't activated yet",
-      "billing": "the subscription needs attention"
+      "invited_other": "{{count}} invited users haven't activated yet"
     }
   }
 }

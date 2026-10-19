@@ -15,6 +15,7 @@ import { createStorageService } from "./lib/storage";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
 import { createLogger } from "./logger";
 import {
+  AI_DATA_SHARING_DISCLOSURE,
   createAnthropicProvider,
   isTransientLlmFailure,
   type AiModelTier,
@@ -29,6 +30,7 @@ import {
   StripeAdapter,
   TapAdapter,
 } from "./modules/subscriptions";
+import { createStoreBilling } from "./modules/subscriptions/store";
 import { createReadinessProbe } from "./readiness";
 import { closeRedis, createRedisClient } from "./redis";
 
@@ -127,18 +129,36 @@ const tapProvider =
     ? new TapAdapter({ secretKey: env.TAP_SECRET_KEY, webhookUrl: env.TAP_WEBHOOK_URL })
     : null;
 
+// App Store / Google Play billing of the AI add-on bought in the mobile app. Null unless a store is
+// configured (env.ts checks the values come in complete sets).
+const storeBilling = createStoreBilling(env);
+
 // LLM gateway (ST-164). The provider is built here — the only place with the environment, the
 // logger, and Redis together — and handed to createApp as an option, so the app itself stays
 // environment-free. It is null when the AI_LLM_ENABLED kill switch is off (or Redis is absent, in
 // which case the whole AI surface is already unmounted): the generate route still registers and
 // answers 503 AI_LLM_DISABLED. The per-school circuit breaker lives on `cb:ai` keys, is named for
 // its logs, and shares the provider's failure predicate so the breaker and the retry loop cannot
-// disagree on what "a failure" means.
+// disagree on what "a failure" means. AI_LLM_PROVIDER picks the wire format and with it which
+// credential and endpoint apply; env.ts has already required the matching pair.
+// The consent modal names the company the inputs go to (modules/ai/consent/disclosure.ts). With AI on,
+// a provider the disclosure does not describe would have students agree to the wrong company, so
+// that is a boot failure, not a warning.
+if (env.AI_LLM_ENABLED && env.AI_LLM_PROVIDER !== AI_DATA_SHARING_DISCLOSURE.llmProvider) {
+  throw new Error(
+    `AI_LLM_PROVIDER=${env.AI_LLM_PROVIDER} but the AI consent disclosure describes ` +
+      `${AI_DATA_SHARING_DISCLOSURE.llmProvider} (${AI_DATA_SHARING_DISCLOSURE.provider.name}); ` +
+      "update modules/ai/consent/disclosure.ts and bump its version",
+  );
+}
+const aiLlmOpenAiCompatible = env.AI_LLM_PROVIDER === "openai-compatible";
+const aiLlmApiKey = aiLlmOpenAiCompatible ? env.AI_LLM_API_KEY : env.ANTHROPIC_API_KEY;
 const aiLlmProvider: LlmProvider | null =
-  env.AI_LLM_ENABLED && redis && env.ANTHROPIC_API_KEY
+  env.AI_LLM_ENABLED && redis && aiLlmApiKey
     ? createAnthropicProvider({
-        apiKey: env.ANTHROPIC_API_KEY,
-        baseUrl: env.ANTHROPIC_BASE_URL,
+        apiKey: aiLlmApiKey,
+        apiFormat: env.AI_LLM_PROVIDER,
+        baseUrl: aiLlmOpenAiCompatible ? env.AI_LLM_BASE_URL : env.ANTHROPIC_BASE_URL,
         timeoutMs: env.AI_LLM_TIMEOUT_MS,
         defaultMaxTokens: env.AI_LLM_MAX_TOKENS,
         zeroRetention: env.AI_LLM_ZERO_RETENTION,
@@ -206,6 +226,8 @@ const app = createApp({
   storage,
   stripeProvider,
   tapProvider,
+  tapCountries: env.TAP_COUNTRIES,
+  storeBilling,
   // The reference site is a development and staging affordance. Production does not serve it: its
   // page loads a bundle from a CDN, and an API contract is not something production needs to render.
   docsEnabled: env.NODE_ENV !== "production",

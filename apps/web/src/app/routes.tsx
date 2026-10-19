@@ -246,8 +246,6 @@ const NotificationInboxPage = lazy(() => import("../features/notifications/Notif
 const NotificationPreferencesPage = lazy(
   () => import("../features/notifications/NotificationPreferencesPage"),
 );
-const BillingOverviewPage = lazy(() => import("../features/billing/BillingOverviewPage"));
-const BillingInvoicesPage = lazy(() => import("../features/billing/BillingInvoicesPage"));
 const FinanceDashboardPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/FinanceDashboardPage"),
@@ -718,26 +716,6 @@ export const routes: RouteObject[] = [
             // Same no-gate posture as above (see `notificationPreferencesRoutes`'s doc comment).
             path: "notifications/preferences",
             element: <NotificationPreferencesPage />,
-          },
-          {
-            // Gated on `organization:manageBilling`, the same permission every subscriptions route
-            // itself requires (apps/api/src/modules/subscriptions/routes/billing-overview-routes.ts
-            // and its siblings) — the school's own Studafy subscription, not its `finance/*` tuition
-            // billing to families (see nav-items.ts's own note on the distinction).
-            path: "billing",
-            element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_BILLING}>
-                <BillingOverviewPage />
-              </RequirePermission>
-            ),
-          },
-          {
-            path: "billing/invoices",
-            element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_BILLING}>
-                <BillingInvoicesPage />
-              </RequirePermission>
-            ),
           },
           {
             // Gated on the same permission the finance report endpoints themselves require

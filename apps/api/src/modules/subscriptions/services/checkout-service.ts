@@ -1,3 +1,4 @@
+import { LIVE_STATUSES } from "@studafy/billing";
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
@@ -8,6 +9,7 @@ import type { Database } from "../../../db";
 import type { TenantContext } from "../../../db/tenant-tx";
 import type { PaymentProviderRegistry, SelectedPaymentProvider } from "../payment-provider-routing";
 import type { PaymentProviderPort } from "../ports/payment-provider";
+import type { SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
 export interface CheckoutParams {
@@ -346,7 +348,9 @@ export async function createAiCheckoutSession(
       LIMIT 1
     `;
 
-    if (!sub || sub.status !== "active") {
+    // The same "school is live" rule the AI entitlement gate applies (LIVE_STATUSES): a school in
+    // grace or past due keeps its students' AI, so it does not stop them buying it either.
+    if (!sub || !LIVE_STATUSES.has(sub.status as SubscriptionStatus)) {
       throw new CodedHttpException(
         400,
         ERROR_CODES.AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE,
@@ -354,10 +358,24 @@ export async function createAiCheckoutSession(
       );
     }
 
+    // Bought by the student themselves or by a parent linked to them -- the same students
+    // GET /api/subscriptions/ai/offer lists (ai-offer-service.ts). Anyone else gets the same 404 as
+    // a student that does not exist: who is enrolled is not the caller's business.
     const [student] = await tx<{ id: string }[]>`
-      SELECT id
-      FROM app.students
-      WHERE id = ${studentId}::uuid AND school_id = ${schoolId}::uuid AND status = 'enrolled'
+      SELECT s.id
+      FROM app.students s
+      WHERE s.id = ${studentId}::uuid
+        AND s.school_id = ${schoolId}::uuid
+        AND s.status = 'enrolled'
+        AND (
+          s.user_id = ${tenantContext.userId ?? null}::uuid
+          OR EXISTS (
+            SELECT 1 FROM app.parent_child_links l
+            WHERE l.school_id = s.school_id
+              AND l.student_id = s.id
+              AND l.parent_user_id = ${tenantContext.userId ?? null}::uuid
+          )
+        )
       LIMIT 1
     `;
 

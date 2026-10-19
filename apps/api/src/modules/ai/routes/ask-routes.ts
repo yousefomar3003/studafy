@@ -11,10 +11,15 @@ import { getLocalizedMessage } from "../../../middleware/locale";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { resolveCitations, type Citation } from "../ask/citations";
-import { persistAskMessage, resolveConversation } from "../ask/persistence";
-import { assembleGroundedPrompt, toGroundedSources } from "../ask/prompt";
+import { loadRecentTurns, persistAskMessage, resolveConversation } from "../ask/persistence";
+import { assembleGeneralPrompt, assembleGroundedPrompt, toGroundedSources } from "../ask/prompt";
 import { assessGrounding, type NearestTopic } from "../ask/refusal";
-import { AI_ASK_QUESTION_MAX_CHARS, AI_ASK_SOURCE_LIMIT, AI_EXPLAIN_LEVELS } from "../config";
+import {
+  AI_ASK_HISTORY_TURNS,
+  AI_ASK_QUESTION_MAX_CHARS,
+  AI_ASK_SOURCE_LIMIT,
+  AI_EXPLAIN_LEVELS,
+} from "../config";
 import { getAiQuota } from "../gate/entitlement-gate";
 import { LlmProviderError } from "../llm/provider";
 import { AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
@@ -56,8 +61,11 @@ import type { Context } from "hono";
  * Two terminal events replace that sequence instead of erroring with an HTTP status, because the
  * stream has already started:
  *
- *   - `refusal` — retrieval fell below the grounding bar (`ask/refusal.ts`); carries the
- *     `AI_ASK_INSUFFICIENT_GROUNDING` code and the nearest-topics payload.
+ *   - `refusal` — retrieval fell below the grounding bar (`ask/refusal.ts`) and the school's
+ *     `ai.ask.general` flag is off; carries the `AI_ASK_INSUFFICIENT_GROUNDING` code and the
+ *     nearest-topics payload. With the flag on (the default) such a question is answered from
+ *     general knowledge instead (`ask/prompt.ts` assembleGeneralPrompt), with `grounded: false`
+ *     and no sources or citations.
  *   - `error` — a provider or network failure mid-stream; carries `AI_LLM_UNAVAILABLE` or
  *     `AI_LLM_REQUEST_REJECTED`. Nothing is persisted for a turn that never completed.
  *
@@ -102,6 +110,11 @@ const askSourcesEventSchema = z.object({
   conversation_id: z.string().uuid(),
   model: z.string(),
   tier: z.enum(AI_MODEL_TIERS),
+  /**
+   * False when the materials did not cover the question and the answer comes from general
+   * knowledge (`ai.ask.general`): `sources` is then empty and the answer carries no citations.
+   */
+  grounded: z.boolean(),
   sources: z.array(citationSchema),
 });
 
@@ -123,6 +136,8 @@ const askDoneEventSchema = z.object({
   text: z.string(),
   stop_reason: z.string().nullable(),
   usage: askUsageSchema,
+  /** Same as the `sources` event's: false for a general-knowledge answer with no citations. */
+  grounded: z.boolean(),
   citations: z.array(citationSchema),
 });
 
@@ -197,8 +212,10 @@ const askRoute = createRoute({
     "routed large-tier model's answer as Server-Sent Events, and persists the turn with its " +
     "citations. The stream's events are: `sources` (the numbered, citable chunks and the " +
     "conversation id), one `delta` per token chunk, and `done` (the complete answer, usage, and " +
-    "machine-readable citations). When retrieval cannot ground the question, the stream carries a " +
-    "single `refusal` event with the nearest topics instead of an answer. The question and the " +
+    "machine-readable citations). When retrieval cannot ground the question, the school's " +
+    "`ai.ask.general` flag decides: on (the default), the model answers from general knowledge, " +
+    "says so, and `sources`/`done` carry `grounded: false` with no citations; off, the stream " +
+    "carries a single `refusal` event with the nearest topics instead of an answer. The question and the " +
     "sources are treated strictly as data, never as instructions (see the prompting spec); the " +
     "conversation and message are persisted with a 90-day retention, and the tokens are recorded " +
     "durably and committed against this student's AI quota. Answers 503 AI_LLM_DISABLED when the " +
@@ -400,12 +417,29 @@ export function aiAskRoutes(deps: {
         model: routed.model,
         locale,
       });
-      return { search, conversationId };
+      // A continued conversation carries its recent turns, so a follow-up is answered in context.
+      const history = body.conversation_id
+        ? await loadRecentTurns(tx, conversationId, AI_ASK_HISTORY_TURNS)
+        : [];
+      return { search, conversationId, history };
     });
 
-    const sources = toGroundedSources(preflight.search.hits);
     const grounding = assessGrounding(preflight.search.hits);
-    const prompt = assembleGroundedPrompt(body.question, sources);
+    // The school's `ai.ask.general` flag (on by default) makes Ask AI a general study assistant:
+    // a message the materials do not cover is answered conversationally with no sources or
+    // citations (`grounded: false`), and a grounded answer may complete what its sources only
+    // partly cover. Off, or without a flags service (bare route tests), Ask AI keeps strictly to
+    // the materials and refuses the rest.
+    const allowGeneralKnowledge =
+      flags !== null && (await flags.get("ai.ask.general", { schoolId: auth.schoolId }));
+    const answerGenerally = !grounding.grounded && allowGeneralKnowledge;
+    const sources = answerGenerally ? [] : toGroundedSources(preflight.search.hits);
+    const prompt = answerGenerally
+      ? assembleGeneralPrompt(body.question, body.level, { history: preflight.history })
+      : assembleGroundedPrompt(body.question, sources, undefined, {
+          history: preflight.history,
+          allowGeneralKnowledge,
+        });
 
     return streamSSE(
       c,
@@ -415,7 +449,7 @@ export function aiAskRoutes(deps: {
         // runs when this handler returns) cannot release it before the stream produces anything.
         quota.detach();
 
-        if (!grounding.grounded) {
+        if (!grounding.grounded && !answerGenerally) {
           await stream.writeSSE({
             event: "refusal",
             data: JSON.stringify({
@@ -434,6 +468,7 @@ export function aiAskRoutes(deps: {
             conversation_id: preflight.conversationId,
             model: routed.model,
             tier: routed.tier,
+            grounded: !answerGenerally,
             sources: sources.map(citationAnchor),
           }),
         });
@@ -534,6 +569,7 @@ export function aiAskRoutes(deps: {
               text,
               stop_reason: stopReason,
               usage: usageAnchor(usage),
+              grounded: !answerGenerally,
               citations: citations.map(citationAnchor),
             }),
           });

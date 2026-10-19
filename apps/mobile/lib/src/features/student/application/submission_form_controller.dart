@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mime/mime.dart';
 
@@ -11,6 +10,7 @@ import '../../../core/api/generated/models/confirm_submission_attachment_body.da
 import '../../../core/api/generated/models/create_submission_body.dart';
 import '../../../core/api/generated/models/create_submission_upload_url_body.dart';
 import '../../../core/api/generated/submissions/submissions_client.dart';
+import '../../../core/files/picked_file.dart';
 import '../domain/pending_attachment.dart';
 
 /// Why the most recent [SubmissionFormController.submit] call didn't finish cleanly. The
@@ -136,17 +136,16 @@ class SubmissionFormController extends ChangeNotifier {
     _emit(_state.copyWith(content: value));
   }
 
-  void addFiles(Iterable<PlatformFile> files) {
+  void addFiles(Iterable<PickedFile> files) {
     final added = [
       for (final file in files)
-        if (file.path != null)
-          PendingAttachment(
-            localId: 'local-${_localIdSeq++}',
-            fileName: file.name,
-            sizeBytes: file.size,
-            filePath: file.path!,
-            contentType: lookupMimeType(file.path!) ?? 'application/octet-stream',
-          ),
+        PendingAttachment(
+          localId: 'local-${_localIdSeq++}',
+          fileName: file.name,
+          sizeBytes: file.sizeBytes,
+          filePath: file.path,
+          contentType: lookupMimeType(file.path) ?? 'application/octet-stream',
+        ),
     ];
     if (added.isEmpty) return;
     _emit(_state.copyWith(attachments: [..._state.attachments, ...added]));

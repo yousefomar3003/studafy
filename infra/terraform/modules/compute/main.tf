@@ -92,10 +92,28 @@ data "aws_iam_policy_document" "api_storage" {
     ]
   }
 
+  # Report downloads: the canonical reports/<schoolId>/... artifacts and the legacy finance-report
+  # keys under tenant-<schoolId>/reports/ (apps/api/src/modules/storage/download-service.ts).
+  statement {
+    effect  = "Allow"
+    actions = ["s3:GetObject"]
+    resources = [
+      "${var.app_files_bucket_arn}/reports/*",
+      "${var.app_files_bucket_arn}/tenant-*/reports/*",
+    ]
+  }
+
+  # Storage-quota sums (apps/api/src/modules/storage/quota-service.ts) list a school's counted
+  # prefixes. ListBucket is a bucket-level action, so it is scoped by the requested prefix instead.
   statement {
     effect    = "Allow"
-    actions   = ["s3:GetObject"]
-    resources = ["${var.app_files_bucket_arn}/reports/*"]
+    actions   = ["s3:ListBucket"]
+    resources = [var.app_files_bucket_arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["permanent/*", "reports/*", "tenant-*/reports/*"]
+    }
   }
 }
 
@@ -107,18 +125,65 @@ resource "aws_iam_role_policy" "api_storage" {
 
 resource "aws_iam_role" "workers_task" {
   name               = "${var.name_prefix}-workers-task"
-  description        = "Runtime role for attendance report artifact uploads."
+  description        = "Runtime role for worker object-storage operations: scans, derivations, ingestion, reports, quota."
   assume_role_policy = data.aws_iam_policy_document.execution_trust.json
 }
 
+# Every object operation apps/workers performs, scoped to the prefixes it touches.
 data "aws_iam_policy_document" "workers_reports" {
+  # Served material copies: malware scanning reads and, for an infected file, deletes them
+  # (queues/scan); AI ingestion reads them (queues/ai-ingestion); derivations read the original and
+  # write thumbnail/preview images beside it (queues/derivations). HeadObject is authorised by
+  # s3:GetObject, and the quarantine copy's source read by s3:GetObject here too.
   statement {
     effect = "Allow"
     actions = [
+      "s3:GetObject",
       "s3:PutObject",
+      "s3:DeleteObject",
+    ]
+    resources = ["${var.app_files_bucket_arn}/permanent/*"]
+  }
+
+  # Infected files are copied to quarantine/ before the served copy is deleted, and a retry
+  # re-scans the quarantine copy (queues/scan/scan-material.worker.ts). Never deleted by workers.
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+    ]
+    resources = ["${var.app_files_bucket_arn}/quarantine/*"]
+  }
+
+  # Report artifacts: written by the report workers, signed for download (the pre-signed GET runs
+  # with this role's credentials), and deleted by the expiry sweep — canonical reports/ keys and the
+  # legacy finance-export keys under tenant-<schoolId>/reports/ (queues/reports).
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject",
       "s3:AbortMultipartUpload",
     ]
-    resources = ["${var.app_files_bucket_arn}/reports/*"]
+    resources = [
+      "${var.app_files_bucket_arn}/reports/*",
+      "${var.app_files_bucket_arn}/tenant-*/reports/*",
+    ]
+  }
+
+  # The daily storage-quota reconciliation lists each school's counted prefixes
+  # (queues/billing/storage-quota-reconciliation.ts), the same three the API counts.
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [var.app_files_bucket_arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["permanent/*", "reports/*", "tenant-*/reports/*"]
+    }
   }
 }
 

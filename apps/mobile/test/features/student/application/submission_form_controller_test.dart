@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/api_exception.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/confirm_submission_attachment_body.dart';
@@ -204,7 +203,7 @@ void main() {
       addTearDown(controller.dispose);
       final file = _tempFile('pdf-bytes');
 
-      controller.addFiles([PlatformFile(name: 'homework.pdf', size: 9, path: file.path)]);
+      controller.addFiles([(path: file.path, name: 'homework.pdf', sizeBytes: 9)]);
       await controller.submit();
 
       expect(client.createSubmissionCalls, 1);
@@ -226,7 +225,7 @@ void main() {
     addTearDown(controller.dispose);
     final file = _tempFile('pdf-bytes');
 
-    controller.addFiles([PlatformFile(name: 'homework.pdf', size: 9, path: file.path)]);
+    controller.addFiles([(path: file.path, name: 'homework.pdf', sizeBytes: 9)]);
     await controller.submit();
 
     // The text step still succeeded — only the attachment failed.
@@ -252,7 +251,7 @@ void main() {
     addTearDown(controller.dispose);
     final file = _tempFile('pdf-bytes');
 
-    controller.addFiles([PlatformFile(name: 'homework.pdf', size: 9, path: file.path)]);
+    controller.addFiles([(path: file.path, name: 'homework.pdf', sizeBytes: 9)]);
     await controller.submit();
     expect(controller.state.attachments.single.status, UploadStatus.failed);
     expect(client.createUploadUrlCalls, 1);
@@ -292,7 +291,7 @@ void main() {
     addTearDown(controller.dispose);
     final file = _tempFile('pdf-bytes');
 
-    controller.addFiles([PlatformFile(name: 'homework.pdf', size: 9, path: file.path)]);
+    controller.addFiles([(path: file.path, name: 'homework.pdf', sizeBytes: 9)]);
     final localId = controller.state.attachments.single.localId;
     controller.removeAttachment(localId);
 

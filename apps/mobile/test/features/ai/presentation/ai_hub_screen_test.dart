@@ -12,8 +12,11 @@ import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_hub_messa
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_not_active_card.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_school_inactive_notice.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_usage_meter.dart';
+import 'package:studafy_mobile/src/features/ai/store/ai_store_controller.dart';
+import 'package:studafy_mobile/src/features/ai/store/ai_store_offer_card.dart';
 
 import '../../../support/wrap_with_localization.dart';
+import '../store/store_fakes.dart';
 
 Widget _screenApp() {
   return Builder(
@@ -61,24 +64,49 @@ void main() {
     expect(find.byType(AiSchoolInactiveNotice), findsNothing);
   });
 
-  testWidgets('unsubscribed state is a notice with no purchase route of any kind', (tester) async {
-    await _pump(
-      tester,
-      ProviderScope(
-        overrides: [aiHubStatusProvider.overrideWith((ref) async => const AiHubUnsubscribed())],
-        child: _screenApp(),
-      ),
-    );
+  // Builds the whole scope rather than an overrides list: riverpod 3.3.2's barrel doesn't export
+  // the `Override` type (same reasoning as `exams_screen_test.dart`).
+  ProviderScope unsubscribed({required bool sold}) => ProviderScope(
+    overrides: [
+      aiHubStatusProvider.overrideWith((ref) async => const AiHubUnsubscribed()),
+      storeGatewayProvider.overrideWithValue(FakeGateway()),
+      aiStoreBackendProvider.overrideWithValue(FakeBackend(storeSetup(purchasable: sold))),
+    ],
+    child: _screenApp(),
+  );
+
+  testWidgets('unsubscribed, where the store does not sell it: the notice and nothing to buy', (
+    tester,
+  ) async {
+    await _pump(tester, unsubscribed(sold: false));
 
     expect(find.byType(AiNotActiveCard), findsOneWidget);
-    // ST-304: a digital add-on sold on the web only — no control, link, price or steering copy in
-    // the body. (The app bar's one control is the ST-305 data-sharing page.)
+    // ST-304: no control, link, price or steering copy in the body. (The app bar's one control is
+    // the ST-305 data-sharing page.)
     final body = find.byType(RefreshIndicator);
     expect(find.descendant(of: body, matching: find.byType(ButtonStyleButton)), findsNothing);
     expect(find.descendant(of: body, matching: find.byType(InkWell)), findsNothing);
     for (final steering in [r'$', 'Subscribe', 'Buy', 'Upgrade', 'website', 'Billed']) {
       expect(find.textContaining(steering), findsNothing, reason: steering);
     }
+  });
+
+  testWidgets("unsubscribed, where the store sells it: the store's price and its purchase", (
+    tester,
+  ) async {
+    await _pump(tester, unsubscribed(sold: true));
+
+    expect(find.byType(AiNotActiveCard), findsOneWidget);
+    expect(find.byType(AiStoreOfferCard), findsOneWidget);
+    // The price is the store's localized string, verbatim.
+    expect(find.text('JOD 2.990 per month'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Subscribe'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Restore purchases'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Privacy policy'), findsOneWidget);
+    expect(find.textContaining('Google Play'), findsOneWidget);
+    // Never the way to pay outside the store.
+    expect(find.textContaining('website'), findsNothing);
+    expect(find.textContaining('studafy.com'), findsNothing);
   });
 
   testWidgets('school-inactive state shows the notice, not the not-active card', (tester) async {

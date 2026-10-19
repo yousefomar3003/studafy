@@ -113,6 +113,10 @@ export const JOB_NAMES = {
   // deletions, lifecycle expirations, orphaned objects) that event-driven increments cannot see.
   // Carries no payload: the sweep reads every school's usage and the S3 bucket directly.
   RUN_STORAGE_QUOTA_RECONCILIATION: "run-storage-quota-reconciliation",
+  // Daily finance reconciliation. Scheduled job: asks apps/api to reconcile every school's
+  // installment_cache against ERPNext (POST /api/finance/reconciliation/run, X-Api-Key) -- the API owns
+  // the per-school ERPNext clients, so the worker only triggers it. Carries no payload.
+  RUN_FINANCE_RECONCILIATION: "run-finance-reconciliation",
   // Malware scan of a confirmed material. Carries the material id, its permanent storage
   // key, and the user to notify if the verdict is not clean. One job per confirm, at most once:
   // the worker claims the material by its 'scanning' status and flips it to a terminal state.

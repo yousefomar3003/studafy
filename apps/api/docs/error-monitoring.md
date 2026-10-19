@@ -12,7 +12,7 @@ The moving parts:
 | API logs        | `apps/api/src/logger.ts` (`observer`), wired in `apps/api/src/index.ts`     | Forwards `warn`/`error`/`fatal` records                                                                               |
 | Workers         | `apps/workers/src/worker.ts` (`runMonitoredJob`), `apps/workers/src/log.ts` | Reports a job's final failed attempt; forwards `warn`/`error` logs                                                    |
 | Realtime        | `apps/realtime/src/app.ts` (`onError`, `monitored`)                         | Reports handshake/health-route 500s and throwing WebSocket handlers                                                   |
-| Deploy wiring   | `infra/deploy/ecs/*/task-definition.json.tpl`, `infra/terraform/main.tf`    | `SENTRY_DSN` from each service's app-secrets container, `SENTRY_ENVIRONMENT`/`RELEASE_VERSION` per deploy             |
+| Deploy wiring   | `infra/deploy/ecs/*/task-definition.json.tpl`, `infra/deploy/environments/` | `SENTRY_DSN`, `SENTRY_ENVIRONMENT` from each tier's env file, `RELEASE_VERSION` per deploy                            |
 
 SDK: `@sentry/bun` (all three services run on Bun — see `infra/docker/*.Dockerfile`), pinned to the
 same `10.70.0` release as the web client's `@sentry/react`.
@@ -80,17 +80,14 @@ always on, `BunServer`/`Http`/`NodeFetch` are removed, and no `tracesSampleRate`
 
 ## Env vars
 
-| Var                  | Services               | Set where                                                                     | Notes                                                                           |
-| -------------------- | ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `SENTRY_DSN`         | api, workers, realtime | `secrets` in each task definition, from `<name_prefix>/<service>/app-secrets` | Empty/unset disables monitoring. Defaults to `""` in `infra/terraform/main.tf`. |
-| `SENTRY_ENVIRONMENT` | api, workers, realtime | `environment` in each task definition, from `infra/deploy/environments/*.env` | Falls back to `APP_ENV` (api) or `NODE_ENV` (workers, realtime).                |
-| `RELEASE_VERSION`    | api, workers, realtime | `environment` in each task definition, `${IMAGE_TAG}`                         | The same immutable image tag the web build uses as its Sentry release.          |
+| Var                  | Services               | Set where                                                                     | Notes                                                                                         |
+| -------------------- | ---------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `SENTRY_DSN`         | api, workers, realtime | `environment` in each task definition, from `infra/deploy/environments/*.env` | Empty/unset disables monitoring. A DSN only lets a process send events: config, not a secret. |
+| `SENTRY_ENVIRONMENT` | api, workers, realtime | `environment` in each task definition, from `infra/deploy/environments/*.env` | Falls back to `APP_ENV` (api) or `NODE_ENV` (workers, realtime).                              |
+| `RELEASE_VERSION`    | api, workers, realtime | `environment` in each task definition, `${IMAGE_TAG}`                         | The same immutable image tag the web build uses as its Sentry release.                        |
 
-To turn monitoring on for an environment, supply the DSN through
-`TF_VAR_secrets_app_secret_values` (e.g. `{ api = { SENTRY_DSN = "https://…" }, workers = { … },
-realtime = { … } }`, alongside whatever values are already set there) and re-apply Terraform, then
-redeploy. Apply Terraform **before** rolling out task definitions that reference `SENTRY_DSN`: ECS
-refuses to start a task whose `valueFrom` names a key the secret does not hold yet.
+To turn monitoring on or off for an environment, set `SENTRY_DSN` in that tier's
+`infra/deploy/environments/<tier>.env` (empty turns it off) and redeploy.
 
 ## Verifying
 

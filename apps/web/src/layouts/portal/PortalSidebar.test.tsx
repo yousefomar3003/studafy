@@ -69,7 +69,6 @@ describe.each<[string, string[]]>([
       "School members",
       "Principal",
       "Attendance",
-      "Billing",
       "Finance",
       "Approvals",
       "Account",

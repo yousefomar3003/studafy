@@ -1,3 +1,5 @@
+import { unwrapJsonList } from "../llm/json-output";
+
 import { flashcardGenerationSchema } from "./schema";
 
 import type { FlashcardGeneration } from "./schema";
@@ -5,7 +7,7 @@ import type { FlashcardGeneration } from "./schema";
 /**
  * Parse and validate the model's raw flashcard-deck response (ST-168).
  *
- * The provider (`llm/provider.ts`) has no JSON mode or tool-use support -- `generate()` returns
+ * The provider (`llm/provider.ts`) has no tool-use support, and JSON mode only on an OpenAI-compatible host -- `generate()` returns
  * plain text -- so the model's compliance with the schema the prompt asked for is never guaranteed.
  * This is the enforcement point, on the same terms as `quiz/parser.ts`: a response that is not valid
  * JSON, does not match `flashcards/schema.ts` (a card with an empty face, a type other than
@@ -37,7 +39,7 @@ function stripCodeFence(text: string): string {
 export function parseFlashcardGeneration(raw: string, sourceCount: number): FlashcardGeneration {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripCodeFence(raw));
+    parsed = unwrapJsonList(JSON.parse(stripCodeFence(raw)));
   } catch {
     throw new FlashcardGenerationInvalidError("flashcard generation response was not valid JSON");
   }

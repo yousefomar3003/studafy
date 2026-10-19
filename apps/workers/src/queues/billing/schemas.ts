@@ -48,7 +48,7 @@ export const processBillingEventSchema = z.object({
   version: z.literal(1),
   // Defaulted rather than required: jobs enqueued before ST-298 carry no provider, and every one of
   // them is a Stripe event. Still version 1 because the shape only grew an optional field.
-  provider: z.enum(["stripe", "tap"]).default("stripe"),
+  provider: z.enum(["stripe", "tap", "apple", "google"]).default("stripe"),
   providerEventId: z.string().min(1),
 });
 

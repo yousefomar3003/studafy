@@ -7,18 +7,17 @@
  *   POST   /api/auth/providers/link/start                 — initiate linking OAuth flow
  *   DELETE /api/auth/providers/{provider}                 — unlink own provider
  *   DELETE /api/admin/users/{userId}/providers/{provider} — admin unlink
- *   GET    /api/auth/oauth/{provider}/link/callback       — OAuth callback for linking
  *
- * The callback is public (under /api/auth/oauth which is in DEFAULT_PUBLIC_PATHS) because it is
- * reached after a browser redirect from the OAuth provider — no bearer token is available. The
- * state parameter carries the user binding and purpose.
+ * Linking has no callback of its own. The provider returns the browser to its one registered
+ * redirect URI, `/api/auth/oauth/{provider}/callback` (public, under DEFAULT_PUBLIC_PATHS), whose
+ * state entry (`flow: "link"`) carries the user binding; that callback verifies the identity and
+ * finishes through {@link completeWebLink} below.
  */
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
+import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
-import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
@@ -28,20 +27,17 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../channels";
 import { getGoogleOAuthConfig, GOOGLE_AUTH_ENDPOINT, GOOGLE_SCOPES } from "../oauth/config";
-import { validateGoogleIdToken } from "../oauth/google-id-token";
 import {
   getMicrosoftOAuthConfig,
   MICROSOFT_AUTH_ENDPOINT,
   MICROSOFT_SCOPES,
 } from "../oauth/microsoft-config";
-import { validateMicrosoftIdToken } from "../oauth/microsoft-id-token";
 import {
   generateCodeChallenge,
   generateCodeVerifier,
   generateNonce,
   generateState,
 } from "../oauth/pkce";
-import { createStateStore } from "../oauth/state-store";
 import {
   completeProviderLink,
   listLinkedProviders,
@@ -60,6 +56,7 @@ import {
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { StateStore } from "../oauth/state-store";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -169,21 +166,23 @@ const adminUnlinkRoute = createRoute({
 // Route group factory
 // ---------------------------------------------------------------------------
 
+export interface ProviderLinkDependencies {
+  /** The process-wide OAuth state store, shared with the provider callbacks that redeem it. */
+  stateStore: StateStore;
+}
+
 /**
  * Build the provider-link route group.
  *
- * Requires a database, a session-token config (unused directly but keeps factory shape consistent),
- * and a logger.
+ * Requires a database and the shared OAuth state store. The link flow has no callback of its own:
+ * the provider returns to its one registered redirect URI (`/api/auth/oauth/{provider}/callback`),
+ * which sees `flow: "link"` on the state entry and finishes through {@link completeWebLink}.
  */
 export function providerLinkRoutes(
   db: Database,
-  _config: unknown,
-  logger: Logger,
+  { stateStore }: ProviderLinkDependencies,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
-
-  // Shared state store for the link OAuth flow. In-memory is fine for single-instance (KISS).
-  const stateStore = createStateStore();
 
   // --- List providers -------------------------------------------------------
 
@@ -219,11 +218,11 @@ export function providerLinkRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    stateStore.set(state, {
+    await stateStore.set(state, {
+      flow: "link",
+      provider,
       codeVerifier,
       nonce,
-      createdAt: Date.now(),
-      purpose: "link",
       userId: auth.userId,
       schoolId: auth.schoolId,
     });
@@ -329,175 +328,46 @@ export function providerLinkRoutes(
     return c.json({ provider }, 200);
   });
 
-  // --- Link callback (public, browser redirect) -----------------------------
-  // This is a plain Hono route like the existing Google/Microsoft OAuth callbacks, not an
-  // OpenAPI route: the response is a redirect, not a JSON body.
-  setupLinkCallback(routes, db, stateStore, logger);
-
   return routes;
 }
 
 // ---------------------------------------------------------------------------
-// Link callback
+// Link completion
 // ---------------------------------------------------------------------------
 
-function setupLinkCallback(
-  routes: OpenAPIHono<AppEnv>,
-  db: Database,
-  stateStore: ReturnType<typeof createStateStore>,
-  logger: Logger,
-): void {
-  // Google link callback
-  routes.get("/api/auth/oauth/google/link/callback", async (c) => {
-    await handleLinkCallback(c, db, stateStore, logger, "google");
-  });
-
-  // Microsoft link callback
-  routes.get("/api/auth/oauth/microsoft/link/callback", async (c) => {
-    await handleLinkCallback(c, db, stateStore, logger, "microsoft");
-  });
+export interface WebLinkInput {
+  provider: "google" | "microsoft";
+  /** The user and school the state entry was bound to at link start. */
+  userId: string;
+  schoolId: string;
+  /** The identity the provider callback has already verified (id_token signature, nonce, audience). */
+  identity: { sub: string; email: string };
+  frontendUrl: string | undefined;
 }
 
-async function handleLinkCallback(
+/**
+ * Finish a provider link once the provider callback has verified the identity.
+ *
+ * Errors propagate to the callback, which renders them as the frontend's OAuth error page.
+ */
+export async function completeWebLink(
   c: Context<AppEnv>,
   db: Database,
-  stateStore: ReturnType<typeof createStateStore>,
   logger: Logger,
-  provider: "google" | "microsoft",
+  { provider, userId, schoolId, identity, frontendUrl }: WebLinkInput,
 ): Promise<Response> {
-  const code = c.req.query("code");
-  const state = c.req.query("state");
-  const frontendUrl =
-    provider === "google"
-      ? (getGoogleOAuthConfig()?.frontendUrl ?? "/")
-      : (getMicrosoftOAuthConfig()?.frontendUrl ?? "/");
+  await withTenantTx(db, { schoolId, userId }, (tx) =>
+    completeProviderLink(tx, {
+      userId,
+      schoolId,
+      provider,
+      subject: identity.sub,
+      email: identity.email,
+      logger,
+    }),
+  );
 
-  if (!code || !state) {
-    throw new CodedHttpException(
-      400,
-      ERROR_CODES.OAUTH_STATE_INVALID,
-      "Missing code or state parameter",
-    );
-  }
-
-  // 1. Validate state
-  const entry = stateStore.get(state);
-  if (!entry || entry.purpose !== "link" || !entry.userId || !entry.schoolId) {
-    throw new CodedHttpException(
-      400,
-      ERROR_CODES.OAUTH_STATE_INVALID,
-      "Invalid or expired link state",
-    );
-  }
-  stateStore.delete(state);
-
-  const { userId, schoolId, codeVerifier, nonce } = entry;
-
-  // 2. Exchange authorization code for tokens
-  let idToken: string;
-  if (provider === "google") {
-    const oauthConfig = getGoogleOAuthConfig();
-    if (!oauthConfig) {
-      throw new HTTPException(404, { message: "Google OAuth is not configured" });
-    }
-    idToken = await exchangeCode(
-      "https://oauth2.googleapis.com/token",
-      oauthConfig.clientId,
-      oauthConfig.clientSecret,
-      oauthConfig.redirectUri,
-      code,
-      codeVerifier,
-    );
-
-    // 3. Validate id_token
-    const claims = await validateGoogleIdToken(idToken, oauthConfig.clientId, nonce);
-
-    // 4. Link identity
-    await withTenantTx(db, { schoolId, userId }, (tx) =>
-      completeProviderLink(tx, {
-        userId,
-        schoolId,
-        provider: "google",
-        subject: claims.sub,
-        email: claims.email,
-        logger,
-      }),
-    );
-  } else {
-    const oauthConfig = getMicrosoftOAuthConfig();
-    if (!oauthConfig) {
-      throw new HTTPException(404, { message: "Microsoft OAuth is not configured" });
-    }
-    idToken = await exchangeCode(
-      "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-      oauthConfig.clientId,
-      oauthConfig.clientSecret,
-      oauthConfig.redirectUri,
-      code,
-      codeVerifier,
-    );
-
-    // 3. Validate id_token
-    const claims = await validateMicrosoftIdToken(idToken, oauthConfig.clientId, nonce);
-
-    // 4. Link identity
-    await withTenantTx(db, { schoolId, userId }, (tx) =>
-      completeProviderLink(tx, {
-        userId,
-        schoolId,
-        provider: "microsoft",
-        subject: claims.sub,
-        email: claims.email,
-        logger,
-      }),
-    );
-  }
-
-  // 5. Redirect to frontend with success
-  const redirectUrl = new URL("/settings/security", frontendUrl);
+  const redirectUrl = new URL("/settings/security", frontendUrl ?? "/");
   redirectUrl.searchParams.set("provider_linked", provider);
-
   return c.redirect(redirectUrl.toString(), 302);
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function exchangeCode(
-  tokenEndpoint: string,
-  clientId: string,
-  clientSecret: string,
-  redirectUri: string,
-  code: string,
-  codeVerifier: string,
-): Promise<string> {
-  let tokenResponse: Response;
-  try {
-    tokenResponse = await fetch(tokenEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-        grant_type: "authorization_code",
-        code_verifier: codeVerifier,
-      }).toString(),
-    });
-  } catch {
-    throw new HTTPException(502, { message: "Failed to reach OAuth token endpoint" });
-  }
-
-  if (!tokenResponse.ok) {
-    throw new HTTPException(502, { message: "Failed to exchange authorization code" });
-  }
-
-  const tokenData = (await tokenResponse.json()) as { id_token?: string };
-  if (!tokenData.id_token) {
-    throw new HTTPException(502, { message: "OAuth provider did not return an id_token" });
-  }
-
-  return tokenData.id_token;
 }

@@ -58,3 +58,8 @@ app.*.map.json
 /fastlane/mobile-release-floor.env
 /fastlane/*.p8
 **/*.mobileprovision
+
+# Firebase client config (docs/runbooks/fcm-setup.md). Not a credential, but the repository is
+# public: each developer and CI writes it from the Firebase console / the GOOGLE_SERVICES_JSON secret.
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist

@@ -13,10 +13,20 @@ groups/listener rules `modules/edge`'s HTTPS listener was always designed to acc
 create-service`/`update-service` directly, written against exactly this baseline. Terraform
   owning the service resource _and_ a deploy script imperatively updating it would fight over the
   same resource on every deploy; this module deliberately stops one layer short.
-- **It creates no task role.** None of `api`/`realtime`/`workers`/`erpnext` calls an AWS SDK from
-  application code today — see `infra/deploy/README.md`'s "Known gaps" #4. The execution role this
-  module does create is a different IAM principal: Fargate's own control plane assumes it to pull
-  the image and resolve `secrets` entries at task launch, not application code at runtime.
+- **It creates the `api` and `workers` task roles, scoped to the app-files bucket prefixes each
+  service's code actually touches** (`main.tf`'s `api_storage` / `workers_reports` documents):
+  - `api`: read/write/delete `temp/` and `permanent/` (uploads and their promotion); read
+    `reports/` and the legacy `tenant-<schoolId>/reports/` finance keys (downloads); list the
+    counted prefixes for storage quota.
+  - `workers`: read/write/delete `permanent/` (malware scan, AI ingestion, thumbnail/preview
+    derivations); read/write `quarantine/` (infected files — never deleted by workers);
+    read/write/delete/abort-multipart `reports/` and `tenant-<schoolId>/reports/` (report exports,
+    signed downloads, expiry sweep); list the counted prefixes for the quota reconciliation.
+
+  `realtime` and `erpnext` call no AWS SDK and get no task role. The execution role is a different
+  IAM principal: Fargate's own control plane assumes it to pull the image and resolve `secrets`
+  entries at task launch, not application code at runtime.
+
 - **It does not touch `modules/edge`.** The HTTPS listener's `default_action` (fixed 404) is left
   exactly as `modules/edge` created it — `aws_lb_listener_rule` resources with a lower priority
   number always win, so the `/*` catch-all rule below makes that default action unreachable without

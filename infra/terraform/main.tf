@@ -95,7 +95,7 @@ locals {
   # requirement to exercise on a recurring, cost-bearing schedule. dev still gets module.backup's
   # Postgres restore-verify task definition itself (module.backup's own automation_enabled variable
   # only gates the recurring pieces, not the task definition), so
-  # infra/deploy/scripts/run-postgres-restore-verify.sh can demonstrate PITR there by hand.
+  # infra/deploy/scripts/postgres-restore-verify.sh can demonstrate PITR there by hand.
   backup_automation_enabled = var.environment != "dev"
   # Vector + Loki log-aggregation pipeline (ST-261) — same condition again: `aws logs tail` over
   # the per-service CloudWatch groups already covers a single-developer environment, and there is
@@ -145,17 +145,13 @@ module "secrets" {
   # asked of the caller, since module.secrets is the one canonical place that owns
   # "${name_prefix}/erpnext/app-secrets" (see modules/erpnext/README.md's "What this module does
   # not do" for why modules/erpnext itself must not also create a secret at that same path).
-  #
-  # merge() is shallow, so the generated realtime secret is merged per key: an operator supplying any
-  # realtime value (e.g. SENTRY_DSN) must add to WS_JWT_SECRET, not replace the whole realtime map.
   app_secret_values = merge(
-    var.secrets_app_secret_values,
     {
-      realtime = merge(
-        { WS_JWT_SECRET = random_password.realtime_jwt.result },
-        lookup(var.secrets_app_secret_values, "realtime", {}),
-      )
+      realtime = {
+        WS_JWT_SECRET = random_password.realtime_jwt.result
+      }
     },
+    var.secrets_app_secret_values,
     local.erpnext_plane_enabled ? {
       erpnext = {
         ADMIN_PASSWORD = random_password.erpnext_admin[0].result
@@ -169,13 +165,31 @@ module "secrets" {
   # (apps/api/src/env.ts, apps/workers' tap renewal job); supply real values through
   # TF_VAR_secrets_app_secret_values to turn Tap on. See docs/runbooks/tap-payments-setup.md.
   #
-  # SENTRY_DSN follows the same rule for all three app services: referenced unconditionally by their
-  # task definitions, empty means "error monitoring off" (each app's env.ts). See
-  # apps/api/docs/error-monitoring.md.
+  # The sign-in and bot-check keys follow the same rule: the api task definition references all of
+  # them, so every key must exist even before a provider is set up. An empty client id means that
+  # provider's sign-in is off. TURNSTILE_SECRET_KEY is the exception in practice — apps/api refuses
+  # to boot with it empty when APP_ENV is staging or production, so a tier without a real Turnstile
+  # secret fails its deploy instead of silently accepting bots. Values come from the same
+  # TF_VAR_secrets_app_secret_values map; docs/runbooks/production-secrets.md lists them all.
   app_secret_defaults = {
-    api      = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", SENTRY_DSN = "" }
-    workers  = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", SENTRY_DSN = "" }
-    realtime = { SENTRY_DSN = "" }
+    api = {
+      TAP_SECRET_KEY                = ""
+      TAP_WEBHOOK_URL               = ""
+      GOOGLE_OAUTH_CLIENT_ID        = ""
+      GOOGLE_OAUTH_CLIENT_SECRET    = ""
+      MICROSOFT_OAUTH_CLIENT_ID     = ""
+      MICROSOFT_OAUTH_CLIENT_SECRET = ""
+      TURNSTILE_SECRET_KEY          = ""
+      AI_LLM_API_KEY                = ""
+      ERPNEXT_API_KEY               = ""
+      ERPNEXT_WEBHOOK_SECRET        = ""
+      RECONCILIATION_API_KEY        = ""
+      STRIPE_SECRET_KEY             = ""
+      STRIPE_WEBHOOK_SECRET         = ""
+      GOOGLE_PLAY_SERVICE_ACCOUNT   = ""
+      GOOGLE_PLAY_RTDN_TOKEN        = ""
+    }
+    workers = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", AI_LLM_API_KEY = "", ERPNEXT_API_KEY = "", RECONCILIATION_API_KEY = "", STRIPE_SECRET_KEY = "", FIREBASE_SERVICE_ACCOUNT = "" }
   }
 
   postgres_connection_secret_arn = module.postgres.connection_secret_arn
@@ -255,6 +269,19 @@ module "dns" {
   dmarc_ruf            = var.dns_dmarc_ruf
 }
 
+# SES configuration set, bounce/complaint topic subscribed to the API, and the workers' send grant
+# (see modules/email). Only where module.dns verifies a sending domain.
+module "email" {
+  source = "./modules/email"
+
+  enabled              = var.dns_create_email_records
+  name_prefix          = module.naming.name_prefix
+  ses_domain           = var.dns_ses_domain
+  ses_identity_arn     = module.dns.ses_domain_identity_arn
+  webhook_url          = "https://${var.edge_domain_name}/email/webhooks/sns"
+  workers_task_role_id = module.compute.workers_task_role_name
+}
+
 module "edge" {
   source = "./modules/edge"
 
@@ -271,7 +298,7 @@ module "edge" {
 
 # Not instantiated for dev: the ticket this module implements ("Provision CDN for web assets")
 # scopes it to "staging/prod origins", and dev's web_origin is the local Vite dev server
-# (http://localhost:5180) — nothing built to put behind a CDN there yet.
+# (http://localhost:5173) — nothing built to put behind a CDN there yet.
 module "cdn" {
   source = "./modules/cdn"
   count  = var.environment == "dev" ? 0 : 1
@@ -353,6 +380,7 @@ module "monitoring" {
   execution_role_arn           = module.compute.execution_role_arn
   private_app_subnet_ids       = module.network.private_app_subnet_ids
   monitoring_security_group_id = module.network.monitoring_security_group_id
+  metrics_port                 = var.metrics_port
   grafana_port                 = var.grafana_port
   mariadb_exporter_enabled     = local.erpnext_plane_enabled
   # Empty string, never used, when monitoring is disabled (dev) — service_secret_arns has no
@@ -508,6 +536,7 @@ module "backup" {
   erpnext_plane_enabled = local.erpnext_plane_enabled
   dr_region             = var.backup_dr_region
 
+  vpc_id                    = module.network.vpc_id
   private_app_subnet_ids    = module.network.private_app_subnet_ids
   backup_security_group_id  = module.network.backup_security_group_id
   erpnext_security_group_id = local.erpnext_plane_enabled ? module.network.erpnext_security_group_id : null
@@ -517,6 +546,8 @@ module "backup" {
   log_retention_days = 30
 
   postgres_db_instance_id        = module.postgres.db_instance_id
+  postgres_address               = module.postgres.address
+  postgres_port                  = var.db_port
   postgres_connection_secret_arn = module.postgres.connection_secret_arn
   postgres_db_subnet_group_name  = module.network.db_subnet_group_name
   postgres_db_security_group_id  = module.network.db_security_group_id

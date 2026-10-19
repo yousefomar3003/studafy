@@ -2,11 +2,9 @@ import { useApprovalQueueQuery } from "../../components/ApprovalQueueBadge";
 import { HomeHeader, useSummarySentence } from "../../components/home/HomeHeader";
 import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip";
 import { useFormatters, useTranslation } from "../../lib/i18n";
-import { subscriptionStatusTone } from "../billing/labels";
-import { useBillingOverviewQuery } from "../billing/queries";
 
 import { useAttendanceTodayQuery, useUserStatusCountsQuery } from "./queries";
-import { SubscriptionStatusBanner } from "./tiles/SubscriptionStatusBanner";
+import { StorageUsageTile } from "./tiles/StorageUsageTile";
 
 import type { SummaryItem } from "../../components/home/SummaryStrip";
 import type { UseQueryResult } from "@tanstack/react-query";
@@ -30,7 +28,7 @@ const statusOf = (query: UseQueryResult) =>
  * Admin home (`/portal/admin`), gated by `organization:manageSettings` (see `RequirePermission`
  * in `app/routes.tsx`) — the same permission `SetupWizardPage` uses, since both are org-admin-only
  * surfaces. Opens with who is signed in, a one-line summary of what needs attention, and the
- * headline figures; the school subscription follows. Every figure owns its own
+ * headline figures; the school's storage use follows. Every figure owns its own
  * query and loading/error state, so one failing endpoint never blocks the others from rendering.
  */
 export default function AdminDashboardPage() {
@@ -39,16 +37,12 @@ export default function AdminDashboardPage() {
   const userCounts = useUserStatusCountsQuery();
   const attendance = useAttendanceTodayQuery();
   const approvals = useApprovalQueueQuery();
-  const billing = useBillingOverviewQuery();
 
   const invited = userCounts.data?.invited ?? 0;
   const active = userCounts.data?.active ?? 0;
   const pendingApprovals = approvals.data?.total ?? 0;
   const totals = attendance.data?.totals;
   const hasAttendance = Boolean(totals && totals.total_records > 0);
-  const subscriptionStatus = billing.data?.subscription.status;
-  const billingNeedsAttention =
-    subscriptionStatus !== undefined && subscriptionStatusTone(subscriptionStatus) !== "success";
 
   const summary = useSummarySentence(
     [
@@ -56,11 +50,10 @@ export default function AdminDashboardPage() {
         ? t("adminSchool.home.summary.approvals", { count: pendingApprovals })
         : null,
       invited > 0 ? t("adminSchool.home.summary.invited", { count: invited }) : null,
-      billingNeedsAttention ? t("adminSchool.home.summary.billing") : null,
     ],
     {
-      loading: userCounts.isPending || approvals.isPending || billing.isPending,
-      failed: userCounts.isError || approvals.isError || billing.isError,
+      loading: userCounts.isPending || approvals.isPending,
+      failed: userCounts.isError || approvals.isError,
     },
   );
 
@@ -135,7 +128,7 @@ export default function AdminDashboardPage() {
           {t("adminSchool.home.accountHeading")}
         </h2>
         <div className="admin-dashboard-grid">
-          <SubscriptionStatusBanner />
+          <StorageUsageTile />
         </div>
       </section>
     </>

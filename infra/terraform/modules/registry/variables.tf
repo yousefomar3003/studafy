@@ -40,7 +40,8 @@ variable "image_repository_names" {
     infra/docker/backup-verify.Dockerfile) — the one-off image modules/backup's weekly Postgres
     restore-verify task runs, its own image rather than a reuse of "migrations" because it never
     touches db/migrations and instead needs a psql/awscli toolchain "migrations"'s Bun runtime
-    doesn't carry. All of the rest are this repo's own config layered onto an upstream image, same
+    doesn't carry. "clamav" (infra/docker/clamav.Dockerfile) is the malware scanner that runs as a
+    sidecar in the workers task. All of the rest are this repo's own config layered onto an upstream image, same
     "third-party base, our config on top" shape as erpnext. apps/mobile is a native app and is
     intentionally excluded. A list is used because the deployable set can grow.
   EOT
@@ -48,7 +49,7 @@ variable "image_repository_names" {
   default = [
     "api", "realtime", "workers", "web", "erpnext", "migrations",
     "prometheus", "grafana", "alertmanager", "otel-collector", "tempo", "loki", "vector",
-    "backup-verify",
+    "backup-verify", "clamav",
   ]
 
   validation {

@@ -212,6 +212,63 @@ describeDb("credential resolver", () => {
     expect(error.code).toBe("ERPNEXT_NOT_CONFIGURED");
   });
 
+  test("activates a pending site the moment it answers with its company", async () => {
+    const school = await createSchool(db.sql);
+    const site = `${school.slug}.erp.test`;
+    await db.sql`
+      INSERT INTO app.erpnext_site_configs
+        (school_id, site_name, company_name, company_abbr, status)
+      VALUES (${school.id}::uuid, ${site}, 'Test Co', 'TC', 'pending')
+    `;
+    const probed: string[] = [];
+    const resolver = new EnvCredentialResolver({
+      baseUrl: "https://erp.test",
+      apiKey: "global-key",
+      probeSite: async (host) => {
+        probed.push(host);
+        return "Test Co Ltd";
+      },
+    });
+
+    const credentials = await withTx(school.id, (tx) => resolver.resolve(tx, school.id));
+
+    expect(probed).toEqual([site]);
+    expect(credentials.siteHost).toBe(site);
+    const [row] = await db.sql<
+      { status: string; erpnext_company_id: string; erpnext_site_id: string }[]
+    >`
+      SELECT status::text AS status, erpnext_company_id, erpnext_site_id
+      FROM app.erpnext_site_configs WHERE school_id = ${school.id}::uuid
+    `;
+    expect(row).toEqual({
+      status: "completed",
+      erpnext_company_id: "Test Co Ltd",
+      erpnext_site_id: site,
+    });
+  });
+
+  test("keeps refusing a pending site that is not answering yet", async () => {
+    const school = await createSchool(db.sql);
+    await db.sql`
+      INSERT INTO app.erpnext_site_configs
+        (school_id, site_name, company_name, company_abbr, status)
+      VALUES (${school.id}::uuid, ${`${school.slug}.erp.test`}, 'Test Co', 'TC', 'pending')
+    `;
+    const resolver = new EnvCredentialResolver({
+      baseUrl: "https://erp.test",
+      apiKey: "global-key",
+      probeSite: async () => null,
+    });
+
+    const error = (await resolveError(school.id, resolver)) as CodedHttpException;
+
+    expect(error.code).toBe("ERPNEXT_NOT_CONFIGURED");
+    const [row] = await db.sql<{ status: string }[]>`
+      SELECT status::text AS status FROM app.erpnext_site_configs WHERE school_id = ${school.id}::uuid
+    `;
+    expect(row!.status).toBe("pending");
+  });
+
   test("returns the school's own site name as the Host header once provisioned", async () => {
     const school = await createSchool(db.sql);
     await db.sql`

@@ -456,6 +456,7 @@ export function aiFlashcardRoutes(deps: {
         prompt: prompt.user,
         system: prompt.system,
         maxTokens: deckMaxTokens(cardCount),
+        json: true,
         userId: auth.userId,
         circuitKey: auth.schoolId,
       });

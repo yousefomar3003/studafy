@@ -1,4 +1,4 @@
-# Store-compliant payment routing (ST-304, supersedes R-07)
+# Store-compliant payment routing (ST-304, supersedes R-07; AI add-on in-app purchase)
 
 Which payments this app may hand off, and which it must not route to at all. Applies to the whole
 app, not only `features/ai`.
@@ -25,29 +25,40 @@ forbids, so ST-304 removed it.
 | What                                           | Kind                | In this app                                                                                   | Where it's bought                                               |
 | ---------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | School fees / invoices                         | Real-world service  | "Pay on website" on an outstanding invoice opens `pay_online_url` in the system browser       | The school's payment page (Tap / redirect), `FinanceInvoiceTile` |
-| Per-student AI add-on                          | Digital             | Entitlement is read (`GET /api/ai/usage`); unsubscribed shows `AiNotActiveCard`, no link/CTA | `apps/web` `/account/ai`, reached only from the web              |
+| Per-student AI add-on                          | Digital             | Unsubscribed shows `AiNotActiveCard`, then `AiStoreOfferCard`: App Store / Google Play in-app purchase with the store's own price | In the app through the store (`features/ai/store/`); on the web through Tap/Stripe at `/account/ai` |
 | School's Studafy plan (checkout, portal, cancel) | Digital (B2B)     | Not present                                                                                   | `apps/web` `/portal/billing`, org admins                         |
 
-Nothing is sold with an in-app purchase, so there is no store product to keep in sync.
+The AI add-on is one store product, `studafy_ai_monthly`, the same id in App Store Connect and the
+Play Console (`docs/runbooks/in-app-purchase-setup.md`). The app never shows a price of its own: it
+shows the store's localized price, and never mentions the web price or the website. A student who
+bought on the web sees the add-on active in the app, and the reverse — both feed the same
+`ai_subscriptions` entitlement.
 
 ## How it's enforced
 
-- **Server:** every route that starts, manages or cancels a paid subscription is
+- **Server:** every route that starts, manages or cancels a Tap/Stripe subscription is
   `requireChannel(AUTH_CHANNELS.WEB)` — a mobile token gets `403 CHANNEL_NOT_AUTHORIZED` whatever
   the client does. ST-304 closed the one that wasn't (`POST /api/subscriptions/checkout`). Pinned by
-  `apps/api/src/modules/subscriptions/__tests__/store-payment-channel.test.ts`; a new purchase route
-  belongs in its list.
+  `apps/api/src/modules/subscriptions/__tests__/store-payment-channel.test.ts`; a new web purchase
+  route belongs in its list. The reverse holds for the store: `POST
+  /api/subscriptions/ai/store/purchases` accepts only a mobile session, verifies the receipt with
+  Apple or Google, and only for the student whose id the purchase carries (`store-routes.test.ts`,
+  `store-purchase-processing.test.ts`).
 - **Client:** `test/store_compliance/payment_routing_test.dart` scans `lib/` (hand-written code) and
   fails on:
   - a reference to a digital purchase page or route (`/account/ai`, `/billing`, `/pricing`,
-    `/api/subscriptions`) or a call to a generated `SubscriptionsClient` purchase method;
+    `/api/subscriptions`) or a call to a generated `SubscriptionsClient` web-purchase method;
+  - the in-app purchase plugin or the two store methods (`getAiStoreConfig`,
+    `registerAiStorePurchase`) used anywhere but `lib/src/features/ai/store/`;
   - a `launchUrl` call site not on its reviewed allowlist (sign-in, store listing, school fees,
     account deletion, file downloads) — adding one means checking it isn't a purchase link first;
-  - an in-app-purchase or in-app webview dependency, `LaunchMode.inAppWebView` anywhere, or
+  - a missing `in_app_purchase` (the stores' own billing), a third-party purchase SDK, an in-app
+    webview dependency, `LaunchMode.inAppWebView` anywhere, or
     `LaunchMode.inAppBrowserView` outside sign-in (`oauth_browser.dart` uses it on iOS so login
     doesn't leave for Safari; ST-310);
   - currency or purchase-steering words ("subscribe", "buy", "website", "billed", …) in the `ai`
-    translation copy.
+    translation copy (the not-active notice), and a currency, or the website, in the `aiStore`
+    purchase copy — its one price is the store's, substituted for `{price}`.
 - **Widget and integration tests:** `ai_hub_screen_test.dart` asserts the unsubscribed state renders
   no button, tap target, price or steering copy; integration journey 5
   (`ai_not_active_round_trip_test.dart`) asserts tapping it launches nothing.
@@ -64,19 +75,22 @@ Re-run before every store submission, and whenever anything touching payments, `
 `features/parent`'s finance views changes:
 
 - [ ] `payment_routing_test.dart` and `store-payment-channel.test.ts` pass.
-- [ ] The unsubscribed AI state has no button, link, price, or copy about where or how to get the
-      add-on — in-app and in the store listing (`store/listing-metadata.md`).
+- [ ] The unsubscribed AI state offers the add-on only through the store sheet, with the store's
+      price, Restore purchases, the renewal terms and the privacy (and, on iOS, terms of use)
+      links — and nothing about the website, in-app or in the store listing
+      (`store/listing-metadata.md`).
+- [ ] The store product `studafy_ai_monthly` is approved / active in App Store Connect and the Play
+      Console, and the api's store values are set for the tier (`docs/runbooks/in-app-purchase-setup.md`).
 - [ ] The only payment hand-off is the school-fee invoice link, and it still points at the school's
       fee payment, never at anything digital.
-- [ ] Store metadata answers "in-app purchases: none" on both stores.
+- [ ] Store metadata lists the in-app purchase on both stores, and App Privacy / Data safety declare
+      purchase history (`store/privacy-labels.md`).
 
 ## Known follow-ups
 
-- The generated `SubscriptionsClient` (`core/api/generated/subscriptions/`) still carries the
-  purchase methods because the `Subscriptions` tag is generated for mobile. Nothing calls them (the
-  scan above fails if anything does) and the server refuses them, but excluding the tag in
-  `pubspec.yaml` would drop them from the binary. Left out of ST-304 to avoid a full client
-  regeneration.
-- If the business wants the AI add-on purchasable on phones, that means store in-app purchase
-  products (StoreKit / Play Billing) plus server-side receipt validation feeding the same
-  `ai_subscriptions` entitlement — a separate feature, not a routing change.
+- The generated `SubscriptionsClient` (`core/api/generated/subscriptions/`) also carries the web
+  purchase methods, because the `Subscriptions` tag is generated for mobile — and must stay, since
+  the two store methods live under it. Nothing calls the web ones (the scan above fails if anything
+  does) and the server refuses them from a mobile session.
+- A purchase the store delivers while the AI tab is closed is reported the next time the tab
+  opens (the store redelivers unfinished purchases). Listening at app start would report it sooner.

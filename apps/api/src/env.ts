@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { LOG_LEVEL_NAMES } from "./logger";
+import { TAP_MARKETS } from "./modules/subscriptions/payment-provider-routing";
 
 /**
  * Split a comma-separated origin list into trimmed, non-empty entries.
@@ -99,7 +100,7 @@ export const envSchema = z
     RELEASE_VERSION: z.string().min(1).default("unknown"),
     // Sentry error monitoring (@studafy/observability's initErrorMonitoring). Unset disables it —
     // the normal state in dev and test. Empty is unset: the task definition always injects the key
-    // from the app-secrets container, whose default is "" (infra/terraform/main.tf).
+    // from the tier's infra/deploy/environments/*.env, where empty turns monitoring off.
     SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().url().optional()),
     // The deploy tier events are grouped under. Falls back to APP_ENV (index.ts).
     SENTRY_ENVIRONMENT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
@@ -123,15 +124,15 @@ export const envSchema = z
     READ_DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
     READ_DATABASE_NAME: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1).optional(),
-    ERPNEXT_WEBHOOK_SECRET: z.string().min(1).optional(),
+    ERPNEXT_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // SNS topic ARN for SES email-event webhook ingestion (deliverability R-08). Optional: when
     // absent, the webhook route answers 500 so a misconfigured topic cannot silently pass as secure.
     EMAIL_EVENTS_SNS_TOPIC_ARN: z.string().min(1).optional(),
     // ERPNext integration (ST-089). All optional — activates only when both are set.
-    ERPNEXT_API_URL: z.string().url().optional(),
-    ERPNEXT_API_KEY: z.string().min(1).optional(),
+    ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    ERPNEXT_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // ERPNext site domain for auto-provisioned sites (e.g., "erpnext.studafy.com").
-    ERPNEXT_SITE_DOMAIN: z.string().min(1).optional(),
+    ERPNEXT_SITE_DOMAIN: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // JWT access-token signing
     JWT_ISSUER: z.string().min(1).default("studafy"),
     JWT_AUDIENCE: z.string().min(1).default("studafy-api"),
@@ -150,14 +151,18 @@ export const envSchema = z
       .int()
       .positive()
       .default(7 * 24 * 60 * 60 * 1000),
-    // Google OAuth (OIDC). All optional — the feature activates only when all three are set.
-    GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
-    GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
-    GOOGLE_OAUTH_REDIRECT_URI: z.string().url().optional(),
-    // Microsoft OAuth (OIDC). All optional — the feature activates only when all three are set.
-    MICROSOFT_OAUTH_CLIENT_ID: z.string().min(1).optional(),
-    MICROSOFT_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
-    MICROSOFT_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // Google OAuth (OIDC). All optional — the feature activates only when the client id and secret
+    // are set, and then the redirect URI must be too (refinement below). Deployed tiers always render
+    // the redirect URI (derived from the tier's API origin) and inject the client id/secret from the
+    // secret manager, where an empty string means "not configured yet" — the same convention as
+    // TAP_SECRET_KEY. So an empty value is treated as unset, and a redirect URI alone means "off".
+    GOOGLE_OAUTH_CLIENT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_OAUTH_REDIRECT_URI: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Microsoft OAuth (OIDC). Same shape and conventions as Google above.
+    MICROSOFT_OAUTH_CLIENT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    MICROSOFT_OAUTH_CLIENT_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    MICROSOFT_OAUTH_REDIRECT_URI: z.preprocess(emptyAsUnset, z.string().url().optional()),
     // Mock OAuth (OIDC) — dev and E2E only (mock-config.ts, dev/mock-idp.ts). Both optional — the
     // "mock" login/activation provider activates only when both are set, and the refinement below
     // additionally refuses to boot at all with either set in a staging/production deployment, so a
@@ -176,9 +181,11 @@ export const envSchema = z
     // financial view (ST-127). Optional: when absent, pay_online_url comes back null and the client
     // simply has no redirect target to navigate to.
     PAYMENT_REDIRECT_BASE_URL: z.string().url().optional(),
-    // Cloudflare Turnstile secret key for captcha verification on public endpoints.
-    // When absent, captcha checks are skipped (development only).
-    TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+    // Cloudflare Turnstile secret key for captcha verification on public endpoints (school
+    // self-registration, public account-deletion requests). When absent, captcha checks are skipped —
+    // allowed only in development: the refinement below refuses to boot a staging/production tier
+    // without it. Empty means unset (secret-manager default, as with TAP_SECRET_KEY).
+    TURNSTILE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // S3-compatible object storage for the app-files bucket (ST-103). All optional and validated
     // as a group below: the feature activates only when the whole set is present, so dev and test
     // boot without object storage and attachment endpoints answer 503 instead of the app failing to
@@ -193,14 +200,51 @@ export const envSchema = z
     // enough that a leaked URL expires before it is useful, long enough to survive a slow upload.
     S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(900).max(3600).default(900),
     // Stripe billing integration. All optional — activates only when both are set.
-    STRIPE_SECRET_KEY: z.string().min(1).optional(),
-    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    STRIPE_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Tap Payments (ST-298), for schools in Tap's MENA countries. Optional; activates only when both
     // are set. TAP_WEBHOOK_URL is the public URL of POST /api/subscriptions/webhook/tap. An empty
     // string means unset: the ECS task definition always injects both keys, and Terraform defaults
     // them to "" where Tap is off (module.secrets' app_secret_defaults).
     TAP_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().startsWith("sk_").optional()),
     TAP_WEBHOOK_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Countries whose schools are billed through Tap, comma separated (e.g. "JO,SA"); every other
+    // school is billed through Stripe. Empty (the default) means none: Tap only takes merchants
+    // registered in its own markets, and Studafy's company is Irish. Only Tap's markets may be
+    // listed (payment-provider-routing.ts TAP_MARKETS).
+    TAP_COUNTRIES: z.preprocess(
+      emptyAsUnset,
+      z
+        .string()
+        .optional()
+        .transform(
+          (value) =>
+            new Set(
+              (value ?? "")
+                .split(",")
+                .map((code) => code.trim().toUpperCase())
+                .filter(Boolean),
+            ),
+        ),
+    ),
+    // In-app purchase of the AI add-on in the mobile app (Apple / Google require their own billing
+    // for digital goods there; the website keeps Tap/Stripe). AI_STORE_PRODUCT_ID is the
+    // subscription's product id, the same in App Store Connect and the Play Console. Each store is
+    // on only when its own values are set; an empty string means unset. See
+    // docs/runbooks/in-app-purchase-setup.md.
+    AI_STORE_PRODUCT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    APPLE_IAP_BUNDLE_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The app's numeric Apple id (App Store Connect > App Information). Apple needs it to verify
+    // production purchases, so production refuses an Apple setup without it.
+    APPLE_IAP_APP_APPLE_ID: z.preprocess(
+      emptyAsUnset,
+      z.coerce.number().int().positive().optional(),
+    ),
+    GOOGLE_PLAY_PACKAGE_NAME: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The Play Console service account's JSON key (a secret), and the secret `token` in the Pub/Sub
+    // push endpoint's URL that authenticates Google's notifications (a secret).
+    GOOGLE_PLAY_SERVICE_ACCOUNT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_PLAY_RTDN_TOKEN: z.preprocess(emptyAsUnset, z.string().min(16).optional()),
     // Cross-encoder re-ranking (ST-163) kill switch. Off by default: an unset or "false" value leaves
     // the retrieval route on the raw RRF ranking with zero re-ranking cost. Validated as an explicit
     // two-value string so a typo ("yes") fails bootstrap instead of silently flipping the feature on.
@@ -214,15 +258,27 @@ export const envSchema = z
       .enum(["true", "false"])
       .optional()
       .transform((value) => value === "true"),
-    // Anthropic API key for the LLM gateway. Required by the refinement below when AI_LLM_ENABLED.
-    // Treated as a credential: never logged, and error payloads are scrubbed for its literal value.
-    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    // Which API the LLM gateway speaks: the Anthropic Messages API (ANTHROPIC_* below), or an
+    // OpenAI-compatible chat-completions host such as Together AI (AI_LLM_API_KEY / AI_LLM_BASE_URL).
+    // See docs/runbooks/anthropic-provider-config.md.
+    AI_LLM_PROVIDER: z.preprocess(
+      emptyAsUnset,
+      z.enum(["anthropic", "openai-compatible"]).default("anthropic"),
+    ),
+    // Anthropic API key for the LLM gateway. Required by the refinement below when AI_LLM_ENABLED
+    // with the anthropic provider. Treated as a credential: never logged, and error payloads are
+    // scrubbed for its literal value. The same holds for AI_LLM_API_KEY.
+    ANTHROPIC_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Override the Anthropic API endpoint (gateway/proxy). Defaults to https://api.anthropic.com/v1.
-    ANTHROPIC_BASE_URL: z.string().url().optional(),
+    ANTHROPIC_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Credential and API root (…/v1) for AI_LLM_PROVIDER=openai-compatible.
+    AI_LLM_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    AI_LLM_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
     // Model ids for the small and large routing tiers. Defaults are the catalog ids current when
-    // ST-164 shipped (modules/ai/config.ts); see docs/runbooks/anthropic-provider-config.md.
-    AI_LLM_SMALL_MODEL: z.string().min(1).optional(),
-    AI_LLM_LARGE_MODEL: z.string().min(1).optional(),
+    // ST-164 shipped (modules/ai/config.ts); see docs/runbooks/anthropic-provider-config.md. Those
+    // defaults are Claude ids, so the openai-compatible provider requires both to be set.
+    AI_LLM_SMALL_MODEL: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    AI_LLM_LARGE_MODEL: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Server default for max_tokens when a request omits it. Bounded to the route's ceiling so the
     // reservation math in config.ts (AI_LLM_MAX_RESERVE_TOKENS) stays valid.
     AI_LLM_MAX_TOKENS: z.coerce.number().int().min(1).max(16_384).optional(),
@@ -282,47 +338,48 @@ export const envSchema = z
       }
     }
 
-    // Google OAuth: all three must be present or all absent.
-    const googleVars = [
-      env.GOOGLE_OAUTH_CLIENT_ID,
-      env.GOOGLE_OAUTH_CLIENT_SECRET,
-      env.GOOGLE_OAUTH_REDIRECT_URI,
-    ];
-    const googleSetCount = googleVars.filter((v) => v !== undefined).length;
-    if (googleSetCount > 0 && googleSetCount < 3) {
+    // Google / Microsoft OAuth: a provider is configured once its client id or secret is set, and
+    // then all three values are required. A redirect URI on its own is not a half-configuration —
+    // deployed tiers always render it, and it simply goes unused until the credentials arrive.
+    for (const [label, prefix, clientId, clientSecret, redirectUri] of [
+      [
+        "Google",
+        "GOOGLE_OAUTH",
+        env.GOOGLE_OAUTH_CLIENT_ID,
+        env.GOOGLE_OAUTH_CLIENT_SECRET,
+        env.GOOGLE_OAUTH_REDIRECT_URI,
+      ],
+      [
+        "Microsoft",
+        "MICROSOFT_OAUTH",
+        env.MICROSOFT_OAUTH_CLIENT_ID,
+        env.MICROSOFT_OAUTH_CLIENT_SECRET,
+        env.MICROSOFT_OAUTH_REDIRECT_URI,
+      ],
+    ] as const) {
+      if (clientId === undefined && clientSecret === undefined) continue;
       const missing = [
-        !env.GOOGLE_OAUTH_CLIENT_ID && "GOOGLE_OAUTH_CLIENT_ID",
-        !env.GOOGLE_OAUTH_CLIENT_SECRET && "GOOGLE_OAUTH_CLIENT_SECRET",
-        !env.GOOGLE_OAUTH_REDIRECT_URI && "GOOGLE_OAUTH_REDIRECT_URI",
-      ]
-        .filter(Boolean)
-        .join(", ");
-      context.addIssue({
-        code: "custom",
-        path: ["GOOGLE_OAUTH_CLIENT_ID"],
-        message: `All Google OAuth variables must be set together. Missing: ${missing}`,
-      });
+        clientId === undefined && `${prefix}_CLIENT_ID`,
+        clientSecret === undefined && `${prefix}_CLIENT_SECRET`,
+        redirectUri === undefined && `${prefix}_REDIRECT_URI`,
+      ].filter(Boolean);
+      if (missing.length > 0) {
+        context.addIssue({
+          code: "custom",
+          path: [`${prefix}_CLIENT_ID`],
+          message: `All ${label} OAuth variables must be set together. Missing: ${missing.join(", ")}`,
+        });
+      }
     }
 
-    // Microsoft OAuth: all three must be present or all absent.
-    const microsoftVars = [
-      env.MICROSOFT_OAUTH_CLIENT_ID,
-      env.MICROSOFT_OAUTH_CLIENT_SECRET,
-      env.MICROSOFT_OAUTH_REDIRECT_URI,
-    ];
-    const microsoftSetCount = microsoftVars.filter((v) => v !== undefined).length;
-    if (microsoftSetCount > 0 && microsoftSetCount < 3) {
-      const missing = [
-        !env.MICROSOFT_OAUTH_CLIENT_ID && "MICROSOFT_OAUTH_CLIENT_ID",
-        !env.MICROSOFT_OAUTH_CLIENT_SECRET && "MICROSOFT_OAUTH_CLIENT_SECRET",
-        !env.MICROSOFT_OAUTH_REDIRECT_URI && "MICROSOFT_OAUTH_REDIRECT_URI",
-      ]
-        .filter(Boolean)
-        .join(", ");
+    // Bot protection on the public forms is not optional on a deployed tier: without a Turnstile
+    // secret, apps/api's captcha check passes every request (verifyCaptcha), so a staging or
+    // production deploy without one fails to boot instead of silently accepting scripted sign-ups.
+    if (env.APP_ENV !== "development" && env.TURNSTILE_SECRET_KEY === undefined) {
       context.addIssue({
         code: "custom",
-        path: ["MICROSOFT_OAUTH_CLIENT_ID"],
-        message: `All Microsoft OAuth variables must be set together. Missing: ${missing}`,
+        path: ["TURNSTILE_SECRET_KEY"],
+        message: `TURNSTILE_SECRET_KEY is required when APP_ENV is ${env.APP_ENV}`,
       });
     }
 
@@ -394,19 +451,34 @@ export const envSchema = z
     // LLM gateway: the kill switch is opt-in, but it must never be armed without a credential to
     // call — that would mount a route that only ever answers 503 AI_LLM_DISABLED while claiming to
     // be enabled.
-    if (env.AI_LLM_ENABLED && env.ANTHROPIC_API_KEY === undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["ANTHROPIC_API_KEY"],
-        message: "ANTHROPIC_API_KEY is required when AI_LLM_ENABLED is true",
-      });
+    const requiredForProvider =
+      env.AI_LLM_PROVIDER === "openai-compatible"
+        ? ([
+            "AI_LLM_API_KEY",
+            "AI_LLM_BASE_URL",
+            "AI_LLM_SMALL_MODEL",
+            "AI_LLM_LARGE_MODEL",
+          ] as const)
+        : (["ANTHROPIC_API_KEY"] as const);
+    if (env.AI_LLM_ENABLED) {
+      for (const key of requiredForProvider) {
+        if (env[key] === undefined) {
+          context.addIssue({
+            code: "custom",
+            path: [key],
+            message: `${key} is required when AI_LLM_ENABLED is true with AI_LLM_PROVIDER=${env.AI_LLM_PROVIDER}`,
+          });
+        }
+      }
     }
-    if (!env.AI_LLM_ENABLED && env.ANTHROPIC_API_KEY !== undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["ANTHROPIC_API_KEY"],
-        message: "ANTHROPIC_API_KEY is set but AI_LLM_ENABLED is not true",
-      });
+    for (const key of ["ANTHROPIC_API_KEY", "AI_LLM_API_KEY"] as const) {
+      if (!env.AI_LLM_ENABLED && env[key] !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is set but AI_LLM_ENABLED is not true`,
+        });
+      }
     }
 
     // Bucket and region activate storage. Access keys are optional because production uses an ECS
@@ -451,6 +523,16 @@ export const envSchema = z
       });
     }
 
+    for (const country of env.TAP_COUNTRIES) {
+      if (!TAP_MARKETS.has(country)) {
+        context.addIssue({
+          code: "custom",
+          path: ["TAP_COUNTRIES"],
+          message: `${country} is not a Tap market (${[...TAP_MARKETS].join(", ")})`,
+        });
+      }
+    }
+
     // Tap: same both-or-neither rule as Stripe.
     if ((env.TAP_SECRET_KEY === undefined) !== (env.TAP_WEBHOOK_URL === undefined)) {
       context.addIssue({
@@ -460,7 +542,54 @@ export const envSchema = z
       });
     }
 
+    // In-app purchase: a store needs the product id, and Google needs all three of its values.
+    const appleStore = env.APPLE_IAP_BUNDLE_ID !== undefined;
+    const googleValues = [
+      ["GOOGLE_PLAY_PACKAGE_NAME", env.GOOGLE_PLAY_PACKAGE_NAME],
+      ["GOOGLE_PLAY_SERVICE_ACCOUNT", env.GOOGLE_PLAY_SERVICE_ACCOUNT],
+      ["GOOGLE_PLAY_RTDN_TOKEN", env.GOOGLE_PLAY_RTDN_TOKEN],
+    ] as const;
+    const googleSet = googleValues.filter(([, value]) => value !== undefined).length;
+    if (googleSet > 0 && googleSet < googleValues.length) {
+      for (const [name, value] of googleValues) {
+        if (value === undefined) {
+          context.addIssue({
+            code: "custom",
+            path: [name],
+            message:
+              "GOOGLE_PLAY_PACKAGE_NAME, GOOGLE_PLAY_SERVICE_ACCOUNT and GOOGLE_PLAY_RTDN_TOKEN must be set together",
+          });
+        }
+      }
+    }
+    if (env.GOOGLE_PLAY_SERVICE_ACCOUNT !== undefined) {
+      try {
+        JSON.parse(env.GOOGLE_PLAY_SERVICE_ACCOUNT);
+      } catch {
+        context.addIssue({
+          code: "custom",
+          path: ["GOOGLE_PLAY_SERVICE_ACCOUNT"],
+          message: "GOOGLE_PLAY_SERVICE_ACCOUNT must be the service account's JSON key",
+        });
+      }
+    }
+    if ((appleStore || googleSet > 0) && env.AI_STORE_PRODUCT_ID === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["AI_STORE_PRODUCT_ID"],
+        message: "AI_STORE_PRODUCT_ID is required when App Store or Google Play billing is set",
+      });
+    }
+
     if (env.NODE_ENV !== "production") return;
+
+    if (appleStore && env.APPLE_IAP_APP_APPLE_ID === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["APPLE_IAP_APP_APPLE_ID"],
+        message: "APPLE_IAP_APP_APPLE_ID is required in production when APPLE_IAP_BUNDLE_ID is set",
+      });
+    }
 
     const requiredDatabaseValues = [
       ["DATABASE_HOST", env.DATABASE_HOST],

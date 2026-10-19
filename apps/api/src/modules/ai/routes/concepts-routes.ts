@@ -48,9 +48,9 @@ import type { Context } from "hono";
  * The model's JSON output is validated against the concepts schema (`concepts/schema.ts` via
  * `concepts/parser.ts`), name-equivalent duplicates are merged deterministically
  * (`concepts/merge.ts`), and every concept must pass the grounding validator (`concepts/grounding.ts`)
- * -- a concept whose name appears in none of the chunks it cites is a hallucination and rejects the
- * whole generation, the same posture a hallucinated citation gets on quiz and flashcard
- * generation.
+ * -- a concept whose name appears in none of the chunks it cites is dropped, never shown, and a
+ * generation where ungrounded concepts outnumber grounded ones is rejected whole, the posture a
+ * hallucinated citation gets on quiz and flashcard generation.
  *
  * Concepts are deterministic per material for a given student, so they are cached in Redis
  * (`concepts/cache.ts`): a repeat request is served from cache with a zero-token commit against
@@ -63,8 +63,8 @@ import type { Context } from "hono";
  * provider (kill switch off) -> 503 AI_LLM_DISABLED; a material the student's school cannot see
  * or that has no ingested text -> 404 RESOURCE_NOT_FOUND; a material still mid-ingestion ->
  * 422 VALIDATION_FAILED so a client can distinguish "try later" from "does not exist"; a model
- * response that fails schema validation, cites a source it was never given, or names a concept
- * that fails grounding -> 503 AI_CONCEPTS_GENERATION_FAILED with Retry-After (and, deliberately,
+ * response that fails schema validation, cites a source it was never given, or is mostly
+ * ungrounded concepts -> 503 AI_CONCEPTS_GENERATION_FAILED with Retry-After (and, deliberately,
  * not committed to quota -- see config.ts); and the shared provider failure taxonomy (503
  * AI_LLM_UNAVAILABLE / AI_LLM_REQUEST_REJECTED).
  *
@@ -148,7 +148,8 @@ const conceptsRoute = createRoute({
     "(fast, cheap) model tier, and returns the deduplicated concept list, each concept with a " +
     "one-line explanation and the source anchors it is grounded on. Every concept is validated " +
     "against the concepts schema, duplicate names are merged deterministically, and any concept " +
-    "whose name appears in none of its cited chunks rejects the whole generation. Concepts are " +
+    "whose name appears in none of its cited chunks is dropped; a generation that is mostly " +
+    "ungrounded is rejected. Concepts are " +
     "deterministic per student and material, so repeat requests are served from a Redis cache with " +
     "zero token cost. Consumes the same gate as every other AI surface (403/402/429). Refuses with " +
     "404 RESOURCE_NOT_FOUND for a material the school cannot see or with no ingested text, 422 " +
@@ -310,6 +311,7 @@ export function aiConceptsRoutes(deps: {
         prompt: prompt.user,
         system: prompt.system,
         maxTokens: conceptsMaxTokens(),
+        json: true,
         userId: auth.userId,
         circuitKey: auth.schoolId,
       });
@@ -317,11 +319,22 @@ export function aiConceptsRoutes(deps: {
       // Malformed model output is rejected here, before anything is committed to quota -- see
       // config.ts for why this does not retry server-side.
       const parsed = parseConceptGeneration(generation.content, loaded.material.chunks.length);
-      const concepts = mergeConcepts(parsed);
-      const ungrounded = ungroundedConcepts(concepts, loaded.material.chunks);
-      if (ungrounded.length > 0) {
+      const merged = mergeConcepts(parsed);
+      const ungrounded = ungroundedConcepts(merged, loaded.material.chunks);
+      const ungroundedNames = new Set(ungrounded.map((concept) => concept.name));
+      const concepts = merged.filter((concept) => !ungroundedNames.has(concept.name));
+      // An ungrounded concept is dropped, never shown: usually a paraphrased name ("Carbon dioxide
+      // fixation" for "fixes carbon dioxide"), not an invented topic. A generation that is mostly
+      // ungrounded is untrustworthy as a whole and still fails.
+      if (concepts.length === 0 || ungrounded.length > concepts.length) {
         throw new ConceptGenerationInvalidError(
           `concepts failed grounding: ${ungrounded.map((c) => `"${c.name}"`).join(", ")}`,
+        );
+      }
+      if (ungrounded.length > 0) {
+        c.get("log")?.info(
+          { school_id: auth.schoolId, dropped: ungrounded.map((concept) => concept.name) },
+          "dropped ungrounded concepts",
         );
       }
 

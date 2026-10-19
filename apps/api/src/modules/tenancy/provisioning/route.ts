@@ -29,7 +29,7 @@ const getProvisioningStatusRoute = createRoute({
   security: [{ bearerAuth: [] }],
   summary: "Get provisioning status for a school",
   description:
-    "Returns the current provisioning status including trial subscription details and " +
+    "Returns the current provisioning status including the school plan details and " +
     "ERPNext site/company configuration. Requires school admin privileges.",
   request: { params: provisioningStatusPathParams },
   responses: standardResponses(

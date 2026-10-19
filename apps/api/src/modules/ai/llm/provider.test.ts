@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 
 import { CircuitOpenError } from "../../../lib/circuit-breaker";
 
+import { JSON_MODE_ENVELOPE } from "./openai-compatible";
 import {
   AnthropicProvider,
   AI_LLM_API_VERSION,
@@ -361,6 +362,197 @@ describe("AnthropicProvider.stream", () => {
 
     expect(error).toBeInstanceOf(LlmProviderError);
     expect(error.status).toBe(500);
+  });
+});
+
+describe("apiFormat: openai-compatible", () => {
+  const BASE_URL = "https://api.together.xyz/v1";
+  const QWEN = "Qwen/Qwen3.5-9B";
+  const openAi = (fetch: typeof globalThis.fetch) =>
+    providerWith(fetch, { apiFormat: "openai-compatible", baseUrl: `${BASE_URL}/` });
+
+  function okChat(content: string) {
+    return jsonResponse(
+      {
+        id: "chat_1",
+        object: "chat.completion",
+        model: QWEN,
+        choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 12, completion_tokens: 4, total_tokens: 16 },
+      },
+      { status: 200 },
+    );
+  }
+
+  function sse(lines: string[]): Response {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream({
+      start(controller) {
+        for (const line of lines) controller.enqueue(encoder.encode(line));
+        controller.close();
+      },
+    });
+    return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+  }
+
+  test("requires a baseUrl", () => {
+    const { fetch } = stubFetch(() => okChat("x"));
+    expect(() => providerWith(fetch, { apiFormat: "openai-compatible" })).toThrow(/baseUrl/);
+  });
+
+  test("posts a chat completion with a bearer token, the system message first, and reasoning off", async () => {
+    const { fetch, calls } = stubFetch(() => okChat("42"));
+
+    await openAi(fetch).generate({
+      model: QWEN,
+      prompt: "Question?",
+      system: "Be brief.",
+      maxTokens: 300,
+      userId: "user-1",
+    });
+
+    expect(calls[0]!.url).toBe(`${BASE_URL}/chat/completions`);
+    const headers = calls[0]!.init.headers as Record<string, string>;
+    expect(headers.authorization).toBe(`Bearer ${API_KEY}`);
+    expect(headers["x-api-key"]).toBeUndefined();
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
+      model: QWEN,
+      max_tokens: 300,
+      messages: [
+        { role: "system", content: "Be brief." },
+        { role: "user", content: "Question?" },
+      ],
+      stream: false,
+      reasoning: { enabled: false },
+    });
+  });
+
+  test("json: true turns on the host's JSON mode; the Anthropic format never sends it", async () => {
+    const { fetch, calls } = stubFetch(() => okChat("{}"));
+    await openAi(fetch).generate({ model: QWEN, prompt: "q", json: true });
+    await openAi(fetch).generate({ model: QWEN, prompt: "q" });
+    expect(JSON.parse(calls[0]!.init.body as string).response_format).toEqual({
+      type: "json_object",
+    });
+    expect(JSON.parse(calls[1]!.init.body as string)).not.toHaveProperty("response_format");
+    // JSON mode allows only an object, so the array the prompt asks for is requested in an envelope.
+    expect(JSON.parse(calls[0]!.init.body as string).messages.at(-1).content).toBe(
+      `q${JSON_MODE_ENVELOPE}`,
+    );
+    expect(JSON.parse(calls[1]!.init.body as string).messages.at(-1).content).toBe("q");
+
+    const anthropic = stubFetch(okGeneration);
+    await providerWith(anthropic.fetch).generate({ ...GENERATE_INPUT, json: true });
+    expect(JSON.parse(anthropic.calls[0]!.init.body as string)).not.toHaveProperty(
+      "response_format",
+    );
+  });
+
+  test("reads the answer, usage, and finish reason, dropping an inline <think> block", async () => {
+    const { fetch } = stubFetch(() =>
+      okChat("<think>\nworking it out\n</think>\n\nThe answer is 42."),
+    );
+
+    const result = await openAi(fetch).generate({ model: QWEN, prompt: "q" });
+
+    expect(result).toEqual({
+      content: "The answer is 42.",
+      model: QWEN,
+      usage: { inputTokens: 12, outputTokens: 4, totalTokens: 16 },
+      stopReason: "stop",
+    });
+  });
+
+  test("keeps the error taxonomy: a 429 is retried, a 401 is not, and the key is scrubbed", async () => {
+    let calls = 0;
+    const { fetch } = stubFetch(() => {
+      calls += 1;
+      return jsonResponse(
+        { error: { message: `bad key ${API_KEY}`, type: "invalid_request_error" } },
+        { status: 401 },
+      );
+    });
+
+    const error = await openAi(fetch)
+      .generate({ model: QWEN, prompt: "q" })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(LlmProviderError);
+    expect(error.status).toBe(401);
+    expect(error.message).not.toContain(API_KEY);
+    expect(calls).toBe(1);
+
+    let attempts = 0;
+    const { fetch: busy } = stubFetch(() => {
+      attempts += 1;
+      return attempts < 2
+        ? jsonResponse({ error: { message: "rate limited" } }, { status: 429 })
+        : okChat("ok");
+    });
+    expect((await openAi(busy).generate({ model: QWEN, prompt: "q" })).content).toBe("ok");
+    expect(attempts).toBe(2);
+  });
+
+  test("streams content deltas and reports usage from the final chunk", async () => {
+    const { fetch, calls } = stubFetch(() =>
+      sse([
+        `data: {"model":"${QWEN}","choices":[{"delta":{"role":"assistant","content":"Hel"}}]}\n\n`,
+        `data: {"model":"${QWEN}","choices":[{"delta":{"content":"lo"},"finish_reason":"stop"}]}\n\n`,
+        `data: {"model":"${QWEN}","choices":[],"usage":{"prompt_tokens":7,"completion_tokens":2}}\n\n`,
+        "data: [DONE]\n\n",
+      ]),
+    );
+
+    const events = [];
+    for await (const event of openAi(fetch).stream({ model: QWEN, prompt: "hi" })) {
+      events.push(event);
+    }
+
+    expect(JSON.parse(calls[0]!.init.body as string)).toMatchObject({
+      stream: true,
+      stream_options: { include_usage: true },
+    });
+    expect(events).toEqual([
+      { type: "delta", delta: "Hel", text: "Hel" },
+      { type: "delta", delta: "lo", text: "Hello" },
+      {
+        type: "done",
+        text: "Hello",
+        usage: { inputTokens: 7, outputTokens: 2, totalTokens: 9 },
+        stopReason: "stop",
+        model: QWEN,
+      },
+    ]);
+  });
+
+  test("estimates usage when the stream never reports it, so the answer is still metered", async () => {
+    const { fetch } = stubFetch(() =>
+      sse([`data: {"choices":[{"delta":{"content":"12345678"}}]}\n\n`, "data: [DONE]\n\n"]),
+    );
+
+    const events = [];
+    for await (const event of openAi(fetch).stream({ model: QWEN, prompt: "abcd" })) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({
+      type: "done",
+      usage: { inputTokens: 1, outputTokens: 2, totalTokens: 3 },
+      model: QWEN,
+    });
+  });
+
+  test("an error chunk mid-stream throws", async () => {
+    const { fetch } = stubFetch(() => sse([`data: {"error":{"message":"overloaded"}}\n\n`]));
+
+    const error = await (async () => {
+      for await (const _event of openAi(fetch).stream({ model: QWEN, prompt: "q" })) {
+        // no-op
+      }
+    })().catch((e) => e);
+
+    expect(error).toBeInstanceOf(LlmProviderError);
+    expect(error.message).toBe("overloaded");
   });
 });
 

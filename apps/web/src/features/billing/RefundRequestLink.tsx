@@ -5,14 +5,10 @@ import { useId, useState } from "react";
 import { useLocale, useTranslation } from "../../lib/i18n";
 
 import { formatIsoDate, formatMinorAmount } from "./format";
-import { useCreateRefundRequest } from "./mutations";
-import { useRefundableInvoicesQuery, useRefundRequestsQuery } from "./queries";
+import { useCreateAiRefundRequest } from "./mutations";
+import { useAiRefundRequestsQuery } from "./queries";
 
-import type {
-  SubscriptionRefundReason,
-  SubscriptionRefundRequest,
-  SubscriptionRefundScope,
-} from "./queries";
+import type { SubscriptionRefundReason, SubscriptionRefundRequest } from "./queries";
 import type { SelectOption } from "@studafy/ui";
 import type { FormEvent } from "react";
 
@@ -34,19 +30,18 @@ function apiErrorMessage(error: unknown, fallback: string): string {
 }
 
 export interface RefundRequestLinkProps {
-  scope: SubscriptionRefundScope;
-  /** AI add-on only: the student whose add-on the request is about. */
-  studentId?: string;
+  /** The student whose AI add-on the request is about. */
+  studentId: string;
 }
 
 /**
  * The "Request a refund" entry point: a plain text link that opens a small form, and the status of
- * the latest request once one exists. Deliberately quiet — it sits under the subscription controls
- * it belongs with rather than being promoted anywhere — but always present on those surfaces, so a
- * customer who looks for it finds it. Studafy staff review every request in the platform console;
+ * the latest request once one exists. Deliberately quiet — it sits beside the active add-on it
+ * belongs with rather than being promoted anywhere — but always present there, so a customer who
+ * looks for it finds it. Studafy staff review every request in the platform console;
  * nothing is refunded until they approve it.
  */
-export function RefundRequestLink({ scope, studentId }: RefundRequestLinkProps) {
+export function RefundRequestLink({ studentId }: RefundRequestLinkProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -57,27 +52,21 @@ export function RefundRequestLink({ scope, studentId }: RefundRequestLinkProps) 
           {t("site.billing.refund.link")}
         </button>
       </p>
-      {open ? (
-        <RefundRequestModal scope={scope} studentId={studentId} onClose={() => setOpen(false)} />
-      ) : null}
+      {open ? <RefundRequestModal studentId={studentId} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
 
 function RefundRequestModal({
-  scope,
   studentId,
   onClose,
 }: RefundRequestLinkProps & { onClose: () => void }) {
   const { t } = useTranslation();
-  const { locale } = useLocale();
   const { show } = useToast();
-  const requestsQuery = useRefundRequestsQuery(scope, true);
-  const invoicesQuery = useRefundableInvoicesQuery(scope === "school");
-  const create = useCreateRefundRequest();
+  const requestsQuery = useAiRefundRequestsQuery(true);
+  const create = useCreateAiRefundRequest();
   const detailsId = useId();
   const [reason, setReason] = useState<SubscriptionRefundReason | "">("");
-  const [paymentReference, setPaymentReference] = useState("");
   const [details, setDetails] = useState("");
   const [reasonError, setReasonError] = useState(false);
 
@@ -88,16 +77,6 @@ function RefundRequestModal({
     value,
     label: t(`site.billing.refund.reasons.${value}`),
   }));
-  const paymentOptions: SelectOption[] = [
-    { value: "", label: t("site.billing.refund.paymentNone") },
-    ...(invoicesQuery.data ?? []).map((invoice) => ({
-      value: invoice.id,
-      label: t("site.billing.refund.paymentOption", {
-        date: formatIsoDate(invoice.created, locale),
-        amount: formatMinorAmount(invoice.amountPaid, invoice.currency, locale),
-      }),
-    })),
-  ];
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -106,13 +85,12 @@ function RefundRequestModal({
       return;
     }
     create.mutate(
-      { scope, studentId, paymentReference, reason, details: details.trim() },
+      { studentId, reason, details: details.trim() },
       {
         onSuccess: () => {
           show({ variant: "success", title: t("site.billing.refund.submittedToast") });
           setReason("");
           setDetails("");
-          setPaymentReference("");
         },
         onError: (error) =>
           show({
@@ -153,15 +131,6 @@ function RefundRequestModal({
                   setReasonError(false);
                 }}
               />
-              {scope === "school" ? (
-                <Select
-                  label={t("site.billing.refund.paymentLabel")}
-                  options={paymentOptions}
-                  value={paymentReference}
-                  disabled={invoicesQuery.isPending}
-                  onChange={setPaymentReference}
-                />
-              ) : null}
               <div className="sf-field">
                 <label className="sf-field__label" htmlFor={detailsId}>
                   {t("site.billing.refund.detailsLabel")}
@@ -179,7 +148,7 @@ function RefundRequestModal({
               </div>
             </>
           ) : (
-            <p className="billing-cancel__notice">{t("site.billing.refund.openNotice")}</p>
+            <p className="billing-overview__caption">{t("site.billing.refund.openNotice")}</p>
           )}
         </Modal.Body>
         <Modal.Footer>

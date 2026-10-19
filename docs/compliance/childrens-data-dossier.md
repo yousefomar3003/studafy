@@ -40,7 +40,7 @@ and never asks for it.
 | AWS (`eu-central-1`, Frankfurt; `infra/terraform/environments/prod`) | Sub-processor: hosting, database, file storage, email (SES) |                                                                                                                         |
 | Google Firebase                                                      | Sub-processor: push notifications, crash reports            | `sdk_compliance_inventory.md`                                                                                           |
 | Sentry                                                               | Sub-processor: crash and performance reports                | `sdk_compliance_inventory.md`                                                                                           |
-| Anthropic                                                            | Sub-processor: AI study tools, called by the API only       | `apps/mobile/docs/ai_data_sharing_consent.md`                                                                           |
+| Together AI                                                          | Sub-processor: AI study tools, called by the API only       | `apps/mobile/docs/ai_data_sharing_consent.md`                                                                           |
 | Stripe, Tap                                                          | Payment processors for parent payments, on their own pages  | `docs/store_payment_routing.md`                                                                                         |
 | Cloudflare Turnstile                                                 | Captcha on the public deletion page                         | `docs/modules/account-deletion.md`                                                                                      |
 
@@ -52,7 +52,7 @@ that identify a student by admission number. It is not a separate sub-processor.
 **Studafy operates in Jordan only.** The business confirmed this on 2026-10-02. Store distribution
 is limited to Jordan to match
 ([store answers](store-audience-and-age-ratings.md#countries-and-regions)). Production data is
-hosted outside Jordan, in AWS `eu-central-1` (Frankfurt). Firebase, Sentry and Anthropic process
+hosted outside Jordan, in AWS `eu-central-1` (Frankfurt). Firebase, Sentry and Together AI process
 data in the United States.
 
 **Jordan: Personal Data Protection Law No. 24 of 2023.** Engineering's working position, which
@@ -94,7 +94,7 @@ must decide each one before the working position above can be relied on.
 
 1. **AI study tools.** A student, of any age, agrees to the AI disclosure themselves
    (`ai_data_sharing_consent.md`). That modal is the Apple 5.1.2(i) disclosure. It is not verifiable
-   parental consent, and the API has no parental-consent step. The data goes to Anthropic as a
+   parental consent, and the API has no parental-consent step. The data goes to Together AI as a
    service provider. Question for counsel: does the school's basis cover AI processing, given that
    the school must have the AI feature active, or is a guardian's consent needed for minors?
 2. **The AI add-on is a paid product for individual students.** It is bought on the web at
@@ -149,7 +149,7 @@ data on that schedule today. Rows that are not enforced are open items, not poli
 | AI message text, submission text, uploaded files        | Should follow the account                                                                                                             | —                                                                                              | **No.** Erasure does not reach them (ST-301 known gap, `docs/modules/account-deletion.md`)       |
 | Student import staging                                  | 48 hours if not confirmed                                                                                                             | `abandoned-import-sweep.ts`                                                                    | Yes                                                                                              |
 | DSR export bundles                                      | Not defined                                                                                                                           | —                                                                                              | **No.** They are never purged (`docs/security/data_retention_and_dsr_policy.md`)                 |
-| AI inputs held by Anthropic                             | Per Anthropic's API terms. Zero retention only under a workspace agreement with `AI_LLM_ZERO_RETENTION=true`                          | `docs/runbooks/anthropic-provider-config.md`                                                   | Defaults to `false`. Whether an agreement exists is not recorded                                 |
+| AI inputs held by Together AI                           | Per Together AI's terms and the account's privacy settings (no user identifier is sent)                                               | `docs/runbooks/anthropic-provider-config.md`                                                   | **Not reviewed.** Record the account's retention and training settings                           |
 | Crash and diagnostic events (Firebase, Sentry)          | Each vendor's configured retention. Not deleted per user                                                                              | Vendor settings                                                                                | Record the configured values in the console checklist                                            |
 | Device cache                                            | Until sign-out                                                                                                                        | `apps/mobile/lib/src/core/offline/offline_providers.dart`                                      | Yes                                                                                              |
 
@@ -216,7 +216,7 @@ against this section.
 | 4   | Close the erasure gaps: AI message text, submission text and S3 files (ST-301), and DSR export bundles (ST-268)                                                                                                                                                          | Engineering                           |
 | 5   | Set end dates for audit-log and financial-record retention, and decide whether grades and attendance need a per-school period                                                                                                                                            | Counsel, then engineering             |
 | 6   | Decide the three items under [Where the school's basis may not reach](#where-the-schools-basis-may-not-reach)                                                                                                                                                            | Counsel and product                   |
-| 7   | Decide whether production runs with Anthropic zero retention, and record the agreement                                                                                                                                                                                   | Product and counsel                   |
+| 7   | Review Together AI's data terms, set the account to keep no prompts, and record the settings                                                                                                                                                                             | Product and counsel                   |
 | 8   | Vendor settings from ST-307: Sentry "Prevent Storing of IP Addresses", Firebase data-processing terms. Record each vendor's crash-data retention                                                                                                                         | Console owner                         |
 | 9   | Decide whether date of birth and nationality are needed at all (see [Data minimisation](#data-minimisation))                                                                                                                                                             | Product                               |
 

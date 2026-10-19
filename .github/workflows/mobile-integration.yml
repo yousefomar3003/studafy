@@ -110,6 +110,19 @@ jobs:
         run: bun run client:generate
         working-directory: apps/mobile
 
+      - name: Write the Firebase config (google-services.json)
+        working-directory: apps/mobile
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          # Gitignored (the repository is public); the Android build's google-services plugin fails
+          # without it. The secret holds the file from Firebase -> Project settings -> Your apps.
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON secret is not set (docs/runbooks/fcm-setup.md)"
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+
       - name: Enable KVM for the emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | \
@@ -246,6 +259,19 @@ jobs:
       - name: Generate the Dart API client (ST-062)
         run: bun run client:generate
         working-directory: apps/mobile
+
+      - name: Write the Firebase config (google-services.json)
+        working-directory: apps/mobile
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          # Gitignored (the repository is public); the Android build's google-services plugin fails
+          # without it. The secret holds the file from Firebase -> Project settings -> Your apps.
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON secret is not set (docs/runbooks/fcm-setup.md)"
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
       - id: auth
         uses: google-github-actions/auth@v2

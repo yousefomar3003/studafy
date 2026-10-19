@@ -54,7 +54,10 @@ harmless; reviewers do.
 | 5.1 | Children → Yara → Finance | Invoices, fee schedule and receipts load. Amounts are the school's fees. |
 | 5.2 | On an outstanding invoice, tap **Pay online** | The school's payment page opens in the system browser, not in the app. If no invoice shows the button, the seeded invoice has no `pay_online_url`; record that, since the reviewer won't see the button either. |
 | **6** | **In-app purchase** | |
-| 6.1 | Look for anything that sells, prices or links to the AI add-on or a plan, on every screen visited | Nothing. No price, no "subscribe", no link to the website. The not-active AI notice has no button or link. The app sells nothing, so there is no IAP to test. |
+| 6.1 | As a student **without** the AI add-on, open the AI tab | The not-active notice, then the store offer: the store's own price "per month", **Subscribe**, **Restore purchases**, the renewal and cancel text, Privacy policy (and Terms of use on iOS). No link to the website, no price anywhere else. If no offer shows, the tier's store setup is incomplete (`docs/runbooks/in-app-purchase-setup.md`). |
+| 6.2 | **Subscribe** with a sandbox (iOS) or license-tester (Android) account, confirm in the store sheet | The sheet shows the same price. After confirming, the AI tab switches to the feature hub with the usage meter within a few seconds. |
+| 6.3 | Delete and reinstall the app, sign in as the same student, AI tab | The feature hub. As a student without the add-on on the same device, **Restore purchases** says the purchase belongs to another account and turns nothing on. |
+| 6.4 | Every other screen visited | Nothing else sells, prices or links to the AI add-on or the school's plan. |
 | **7** | **Privacy policy in the app** | |
 | 7.1 | Profile → **Privacy policy** | Same URL as 1.2 opens in the system browser. |
 | **8** | **Account deletion** (disposable account only) | |

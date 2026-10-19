@@ -122,6 +122,12 @@ const DEFAULT_PUBLIC_PATHS = [
   "/api/lookups/currencies",
   "/api/subscriptions/webhook/stripe",
   "/api/subscriptions/webhook/tap",
+  "/api/subscriptions/webhook/apple",
+  "/api/subscriptions/webhook/google",
+  // Authenticated by their own HMAC signature (ERPNext finance webhooks) and X-Api-Key service key
+  // (reconciliation, called by the workers' scheduler) rather than a user token -- see csrf.ts.
+  "/api/finance/webhooks/erpnext",
+  "/api/finance/reconciliation/run",
   // Plan/price listing is pre-signup content (the marketing pricing page reads it anonymously) and
   // the query is not school-scoped — see getActivePlans in subscription-service.ts.
   "/api/subscriptions/plans",
@@ -159,6 +165,31 @@ function isInvitationVerificationPath(path: string): boolean {
 // rest of /api/auth stays protected.
 function isInvitationActivationPath(path: string): boolean {
   return isInvitationSubPath(path, "activate");
+}
+
+const INVITATION_OAUTH_ACTIONS = new Set(["start", "mobile-start", "mobile-exchange"]);
+
+/**
+ * The OAuth arms of the same activation (ST-078 browser, ST-215 mobile):
+ * `/api/auth/invitations/{token}/oauth/{provider}/{start|mobile-start|mobile-exchange}`.
+ *
+ * An invitee has no account and therefore no bearer token; the invitation token in the path plus
+ * the provider-verified identity are the credential, exactly as for `.../activate`. Scoped to those
+ * exact eight-segment shapes so nothing else under /api/auth/invitations is opened.
+ */
+export function isInvitationOAuthPath(path: string): boolean {
+  const segments = path.split("/");
+  return (
+    segments.length === 8 &&
+    segments[0] === "" &&
+    segments[1] === "api" &&
+    segments[2] === "auth" &&
+    segments[3] === "invitations" &&
+    segments[4] !== "" &&
+    segments[5] === "oauth" &&
+    segments[6] !== "" &&
+    INVITATION_OAUTH_ACTIONS.has(segments[7] ?? "")
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -238,6 +269,7 @@ function isPublicPath(path: string, publicPaths: readonly string[]): boolean {
   return (
     isInvitationVerificationPath(path) ||
     isInvitationActivationPath(path) ||
+    isInvitationOAuthPath(path) ||
     publicPaths.some((entry) => path === entry || path.startsWith(`${entry}/`))
   );
 }

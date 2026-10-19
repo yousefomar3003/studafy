@@ -42,10 +42,11 @@ which is worse than leaving the row open.
 
 ## Dependency gate
 
-| Dependency                                             | Status   | Evidence                                                                                                                                                                               |
-| ------------------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pilot school onboarding executed with a **Go** verdict | **Open** | [`pilot-completion-report.md`](pilot-completion-report.md) has no cohort filled in — the pilot has not run against a live prod                                                         |
-| Prod environment applied to real AWS and verified      | **Open** | `environment-matrix.md` — `infra/terraform/bootstrap` applied 2026-09-11 (state buckets, DNS zone, OIDC, IAM roles); network/data/app-tier modules for any environment still unapplied |
+| Dependency                                             | Status   | Evidence                                                                                                                                                                                                                    |
+| ------------------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pilot school onboarding executed with a **Go** verdict | **Open** | [`pilot-completion-report.md`](pilot-completion-report.md) has no cohort filled in — the pilot has not run against a live prod                                                                                              |
+| Prod environment applied to real AWS and verified      | **Open** | `environment-matrix.md` — `infra/terraform/bootstrap` applied 2026-09-11 (state buckets, DNS zone, OIDC, IAM roles); network/data/app-tier modules for any environment still unapplied                                      |
+| Production secrets and web build variables supplied    | **Open** | [`../production-secrets.md`](../production-secrets.md) — api refuses to boot on prod without `TURNSTILE_SECRET_KEY` (Stripe is optional for a Tap-only, Jordan-first launch); web bundle needs its three `VITE_*` variables |
 
 GA does not start from zero once these close — the pilot's own success-criteria queries, feedback
 loop, and incident handling are the same mechanisms this checklist's go/no-go review reuses. A

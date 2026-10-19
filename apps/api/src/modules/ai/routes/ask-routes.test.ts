@@ -15,6 +15,7 @@ import type { Database } from "../../../db/client";
 import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { FlagsService } from "../../flags";
 import type { AiQuotaHandle } from "../gate/entitlement-gate";
 import type { LlmProvider, LlmStreamEvent } from "../llm/provider";
 import type { TransactionSql } from "postgres";
@@ -72,7 +73,11 @@ function groundedHit(over: Record<string, unknown> = {}): Record<string, unknown
  * database. Every query recorded so tests can assert what was (not) written.
  */
 function fakeDatabase(
-  opts: { hits?: Record<string, unknown>[]; conversationExists?: boolean } = {},
+  opts: {
+    hits?: Record<string, unknown>[];
+    conversationExists?: boolean;
+    history?: { question: string; answer: string }[];
+  } = {},
 ) {
   const queries: string[] = [];
   const hitRows = opts.hits ?? [groundedHit()];
@@ -93,6 +98,8 @@ function fakeDatabase(
     if (sql.includes("FROM app.ai_subscriptions")) return rows([{ id: "sub-1" }]);
     if (sql.includes("upsert_ai_usage_tokens")) return rows([]);
     if (sql.includes("INSERT INTO app.ai_messages")) return rows([{ id: MESSAGE_ID }]);
+    // loadRecentTurns reads newest first.
+    if (sql.includes("FROM app.ai_messages")) return rows([...(opts.history ?? [])].reverse());
     if (sql.includes("INSERT INTO app.ai_message_citations")) return rows([]);
     return rows([]);
   }) as unknown as TransactionSql;
@@ -179,6 +186,7 @@ function buildAskApp(
     database?: ReturnType<typeof fakeDatabase>;
     handle?: ReturnType<typeof quotaHandle>;
     modelOverrides?: Record<string, string>;
+    flags?: FlagsService;
   } = {},
 ): {
   app: OpenAPIHono<AppEnv>;
@@ -201,6 +209,7 @@ function buildAskApp(
       provider,
       embedder: createDeterministicQueryEmbedder(),
       modelOverrides: opts.modelOverrides,
+      flags: opts.flags,
     }),
   );
   app.onError(errorHandlerMiddleware(silentLogger));
@@ -340,6 +349,130 @@ describe("POST /api/ai/students/{studentId}/ask", () => {
     expect(db.queries.some((q) => q.includes("INSERT INTO app.ai_messages"))).toBe(false);
     expect(quota.commits).toEqual([]);
     expect(quota.releases).toEqual([1]);
+  });
+
+  describe("a question the materials do not cover, by the school's ai.ask.general flag", () => {
+    const ungrounded = () =>
+      fakeDatabase({ hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })] });
+    const flagsWith = (general: boolean): FlagsService => ({
+      get: async (name) => (name === "ai.ask.general" ? general : true),
+    });
+
+    test("on: answers from general knowledge, ungrounded and uncited, and commits the tokens", async () => {
+      const db = ungrounded();
+      let prompt: { system?: string; prompt: string } | undefined;
+      const provider: LlmProvider = {
+        generate: async () => {
+          throw new Error("unused");
+        },
+        stream: (input) => {
+          prompt = input;
+          return answeredStream("ChatGPT is a chatbot made by OpenAI.");
+        },
+      };
+      const { app, quota } = buildAskApp(provider, { database: db, flags: flagsWith(true) });
+
+      const res = await postAsk(app, { question: "Tell me about ChatGPT", level: "middle" });
+      const events = parseSse(await res.text());
+
+      expect(events[0]!.event).toBe("sources");
+      expect(events[0]!.data.grounded).toBe(false);
+      expect(events[0]!.data.sources).toEqual([]);
+      const done = events.at(-1)!;
+      expect(done.event).toBe("done");
+      expect(done.data.grounded).toBe(false);
+      expect(done.data.citations).toEqual([]);
+      expect(done.data.text).toBe("ChatGPT is a chatbot made by OpenAI.");
+      // No school material reaches the general prompt; it is pitched at the asked level.
+      expect(prompt!.prompt).toBe("Student: Tell me about ChatGPT");
+      expect(prompt!.system).toContain("middle-school student");
+      expect(prompt!.system).toContain("conversational tutor");
+      // No forced disclaimer: the UI labels general answers from `grounded: false`.
+      expect(prompt!.system).not.toContain("not from the student's study");
+      expect(db.queries.some((q) => q.includes("INSERT INTO app.ai_messages"))).toBe(true);
+      expect(quota.commits).toEqual([30]);
+    });
+
+    test("off: refuses with the nearest topics, as without a flags service", async () => {
+      const { app, quota } = buildAskApp(fakeProvider(answeredStream()), {
+        database: ungrounded(),
+        flags: flagsWith(false),
+      });
+
+      const events = parseSse(
+        await (await postAsk(app, { question: "Tell me about ChatGPT" })).text(),
+      );
+
+      expect(events.map((event) => event.event)).toEqual(["refusal"]);
+      expect(quota.releases).toEqual([1]);
+    });
+
+    test("a follow-up in a conversation carries its earlier turns, oldest first", async () => {
+      const db = fakeDatabase({
+        hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })],
+        conversationExists: true,
+        history: [
+          { question: "What is ChatGPT?", answer: "A chatbot made by OpenAI." },
+          { question: "Who made it?", answer: "OpenAI." },
+        ],
+      });
+      let prompt = "";
+      const provider: LlmProvider = {
+        generate: async () => {
+          throw new Error("unused");
+        },
+        stream: (input) => {
+          prompt = input.prompt;
+          return answeredStream("Sure.");
+        },
+      };
+      const { app } = buildAskApp(provider, { database: db, flags: flagsWith(true) });
+
+      await (
+        await postAsk(app, {
+          question: "Explain that more simply",
+          conversation_id: CONVERSATION_ID,
+        })
+      ).text();
+
+      expect(prompt.indexOf("What is ChatGPT?")).toBeGreaterThan(-1);
+      expect(prompt.indexOf("What is ChatGPT?")).toBeLessThan(prompt.indexOf("Who made it?"));
+      expect(prompt.trimEnd().endsWith("Student: Explain that more simply")).toBe(true);
+      expect(prompt).toMatch(/<conversation-[0-9a-f]{12}>/);
+    });
+
+    test("a new conversation sends no history", async () => {
+      const db = fakeDatabase({
+        hits: [groundedHit({ keyword_rank: null, rrf_score: 0.05 })],
+        history: [{ question: "Old question", answer: "Old answer" }],
+      });
+      let prompt = "";
+      const provider: LlmProvider = {
+        generate: async () => {
+          throw new Error("unused");
+        },
+        stream: (input) => {
+          prompt = input.prompt;
+          return answeredStream("Hi!");
+        },
+      };
+      const { app } = buildAskApp(provider, { database: db, flags: flagsWith(true) });
+
+      await (await postAsk(app, { question: "hi" })).text();
+
+      expect(prompt).toBe("Student: hi");
+    });
+
+    test("a grounded answer is marked grounded whatever the flag says", async () => {
+      const { app } = buildAskApp(fakeProvider(answeredStream()), { flags: flagsWith(true) });
+
+      const events = parseSse(
+        await (await postAsk(app, { question: "How does photosynthesis work?" })).text(),
+      );
+
+      expect(events[0]!.data.grounded).toBe(true);
+      expect(events.at(-1)!.data.grounded).toBe(true);
+    });
   });
 
   test("a below-threshold best hit is refused too", async () => {

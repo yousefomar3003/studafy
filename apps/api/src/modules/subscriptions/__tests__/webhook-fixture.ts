@@ -113,6 +113,8 @@ export interface BillingFixture {
   db: TestDatabase;
   schoolId: string;
   studentId: string;
+  /** The student's user account, which signs in and owns in-app purchases. */
+  studentUserId: string;
   subscriptionId: string;
   stripeCustomerId: string;
   stripeSubscriptionId: string;
@@ -189,7 +191,12 @@ export async function createBillingFixture(db: TestDatabase): Promise<BillingFix
       RETURNING id
     `;
 
-    return { schoolId, subscriptionId: subscription!.id, studentId: student!.id };
+    return {
+      schoolId,
+      subscriptionId: subscription!.id,
+      studentId: student!.id,
+      studentUserId: user!.id,
+    };
   });
 
   return { db, ...seeded, stripeCustomerId, stripeSubscriptionId, tapCustomerId };

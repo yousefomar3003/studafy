@@ -21,7 +21,7 @@ export const envSchema = z
     // Deployments set it from IMAGE_TAG.
     RELEASE_VERSION: z.string().min(1).default("unknown"),
     // Sentry error monitoring: see apps/api/src/env.ts's own SENTRY_DSN/SENTRY_ENVIRONMENT. Empty is
-    // unset, since the task definition always injects the key from the app-secrets container.
+    // unset, since the task definition always injects the key from the tier's env file.
     SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().url().optional()),
     SENTRY_ENVIRONMENT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // apps/workers has no HTTP surface of its own (infra/docker/README.md), so unlike api/realtime
@@ -54,28 +54,55 @@ export const envSchema = z
     S3_APP_FILES_BUCKET: z.string().min(1).optional(),
     SCHOOL_IDS: z.string().min(1).default(""),
     // ERPNext integration — required for billing queue. Both must be set together.
-    ERPNEXT_API_URL: z.string().url().optional(),
-    ERPNEXT_API_KEY: z.string().min(1).optional(),
-    // Stripe seat reconciliation (ST-136). Optional because the seat-reconciliation job is not the
-    // billing queue's only consumer: when unset, every other billing job still runs, the scheduled
-    // reconciliation fails loudly rather than silently skipping, and the env validation below
-    // rejects it outright in production — billing must never silently stop reconciling.
-    STRIPE_SECRET_KEY: z.string().min(1).optional(),
+    ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    ERPNEXT_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Daily finance reconciliation (queues/billing/finance-reconciliation.ts): apps/api's base URL
+    // and the service key its POST /api/finance/reconciliation/run checks. Unset key = no ERPNext
+    // integration to reconcile, a logged skip.
+    API_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    RECONCILIATION_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Stripe (ST-136), optional: schools in Tap's markets (Jordan, the Gulf, Egypt) are billed
+    // through Tap, so a deployment serving only them has no Stripe account at all. Seat
+    // reconciliation still never stops silently -- without a key it fails loudly the moment any
+    // active subscription is billed through Stripe (queues/billing/worker.ts).
+    STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // SES transactional email (deliverability R-08). When SES_REGION is unset the email dispatcher
     // runs in dry-run mode: it renders, dedups, and records deliveries exactly as in production but
-    // never calls AWS — the dev/test path, and a loud warning is logged at startup when a deployed
-    // worker has no region.
-    SES_REGION: z.string().min(1).optional(),
-    SES_FROM_ADDRESS: z.string().email().default("invitations@mail.studafy.com"),
+    // never calls AWS — the dev/test path. A production worker refuses to boot that way unless
+    // EMAIL_DRY_RUN=true says so on purpose (dev/staging, which have no verified sending domain), so
+    // a missing region can never silently stop every invitation and password email. SES_FROM_ADDRESS
+    // must be on the SES-verified domain (prod.tfvars `dns_ses_domain`); SES_CONFIGURATION_SET routes
+    // bounces and complaints to the API's /email/webhooks/sns (Terraform module.email).
+    SES_REGION: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    SES_FROM_ADDRESS: z.preprocess(
+      emptyAsUnset,
+      z.string().email().default("no-reply@send.studafy.com"),
+    ),
+    SES_FROM_NAME: z.preprocess(emptyAsUnset, z.string().min(1).default("Studafy")),
+    SES_CONFIGURATION_SET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    EMAIL_DRY_RUN: z.preprocess(
+      emptyAsUnset,
+      z
+        .enum(["true", "false"])
+        .optional()
+        .transform((value) => value === "true"),
+    ),
     // FCM push notifications (ST-139). A Google service-account JSON string. When unset the push
     // channel runs in dry-run mode: it resolves devices, applies the per-user cap and advances
-    // dispatch logs exactly as in production but never calls FCM — the dev/test path, and a loud
-    // warning is logged when a deployed worker has no service account.
-    FIREBASE_SERVICE_ACCOUNT: z.string().min(1).optional(),
+    // dispatch logs exactly as in production but never calls FCM — the dev/test path. A production
+    // worker refuses to boot that way unless PUSH_DRY_RUN=true says so on purpose, the same rule as
+    // EMAIL_DRY_RUN. Empty means unset: the task definition always injects the secret's key.
+    FIREBASE_SERVICE_ACCOUNT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    PUSH_DRY_RUN: z.preprocess(
+      emptyAsUnset,
+      z
+        .enum(["true", "false"])
+        .optional()
+        .transform((value) => value === "true"),
+    ),
     // Malware scanning (file-scan queue). CLAMAV_HOST is optional in dev/test so the queue still
-    // boots and scans fail closed at job time; the production validation below makes it mandatory,
-    // the same reasoning as STRIPE_SECRET_KEY — silently serving un-scanned files is worse than a
-    // failed deploy. CLAMAV_PORT/CLAMAV_TIMEOUT_MS/CLAMAV_MAX_FILE_BYTES mirror clamd's ListenPort,
+    // boots and scans fail closed at job time; the production validation below makes it mandatory:
+    // silently serving un-scanned files is worse than a failed deploy. CLAMAV_PORT/CLAMAV_TIMEOUT_MS/CLAMAV_MAX_FILE_BYTES mirror clamd's ListenPort,
     // timeout and StreamMaxLength defaults.
     CLAMAV_HOST: z.string().min(1).optional(),
     CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
@@ -117,8 +144,17 @@ export const envSchema = z
     // specific generation job closed (app.exam_sessions marked 'failed' with a clear reason) the
     // same way a missing CLAMAV_HOST fails a scan job closed, just without CLAMAV_HOST's
     // production-required check -- there is no safety property at stake in leaving this feature off.
-    ANTHROPIC_API_KEY: z.string().min(1).optional(),
-    ANTHROPIC_BASE_URL: z.string().url().optional(),
+    // Empty counts as unset: the deployment template always injects these keys.
+    ANTHROPIC_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    ANTHROPIC_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // AI_LLM_PROVIDER=openai-compatible (Together AI and the like) uses AI_LLM_API_KEY and
+    // AI_LLM_BASE_URL instead -- the same variables, and the same provider, as apps/api.
+    AI_LLM_PROVIDER: z.preprocess(
+      emptyAsUnset,
+      z.enum(["anthropic", "openai-compatible"]).default("anthropic"),
+    ),
+    AI_LLM_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    AI_LLM_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== "production") return;
@@ -130,13 +166,21 @@ export const envSchema = z
       });
     }
 
-    // Seat reconciliation touches Stripe (ST-136). Silently skipping billing is worse than a
-    // failed deploy, so a deployed worker without the secret fails fast at bootstrap.
-    if (env.STRIPE_SECRET_KEY === undefined) {
+    if (env.SES_REGION === undefined && !env.EMAIL_DRY_RUN) {
       context.addIssue({
         code: "custom",
-        path: ["STRIPE_SECRET_KEY"],
-        message: "STRIPE_SECRET_KEY is required in production",
+        path: ["SES_REGION"],
+        message:
+          "SES_REGION is required in production (set EMAIL_DRY_RUN=true to run without sending on purpose)",
+      });
+    }
+
+    if (env.FIREBASE_SERVICE_ACCOUNT === undefined && !env.PUSH_DRY_RUN) {
+      context.addIssue({
+        code: "custom",
+        path: ["FIREBASE_SERVICE_ACCOUNT"],
+        message:
+          "FIREBASE_SERVICE_ACCOUNT is required in production (set PUSH_DRY_RUN=true to run without sending on purpose)",
       });
     }
 

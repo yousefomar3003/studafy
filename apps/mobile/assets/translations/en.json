@@ -435,6 +435,30 @@
       }
     }
   },
+  "aiStore": {
+    "title": "Studafy AI Study Assistant",
+    "price": "{price} per month",
+    "subscribe": "Subscribe",
+    "restore": {
+      "action": "Restore purchases",
+      "none": "No purchases to restore for this account."
+    },
+    "renewal": {
+      "apple": "Renews automatically every month until cancelled. Cancel anytime in your Apple account settings, at least 24 hours before the period ends.",
+      "google": "Renews automatically every month until cancelled. Cancel anytime in Google Play under Payments & subscriptions."
+    },
+    "links": {
+      "privacy": "Privacy policy",
+      "terms": "Terms of use"
+    },
+    "errors": {
+      "storeFailed": "The purchase didn't go through. You haven't been charged — please try again.",
+      "verifyLater": "Your purchase went through, but we couldn't confirm it yet. It will be confirmed automatically the next time you open the app.",
+      "otherAccount": "This purchase belongs to a different Studafy account.",
+      "notActive": "This purchase has ended. Subscribe again to continue.",
+      "invalid": "This purchase couldn't be verified."
+    }
+  },
   "exams": {
     "title": "Exams",
     "error": "Couldn't load your exams.",

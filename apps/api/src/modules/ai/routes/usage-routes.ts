@@ -1,11 +1,17 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { ERROR_CODES } from "@studafy/constants";
 import { z } from "zod";
 
+import { CodedHttpException } from "../../../coded-http-exception";
+import { withTenantTx } from "../../../db/tenant-tx";
 import { requireAuth } from "../../../middleware/authContext";
+import { getLocalizedMessage } from "../../../middleware/locale";
 import { standardResponses } from "../../../openapi/responses";
 import { AI_MONTHLY_TOKEN_BUDGET } from "../config";
 import { assertAiEntitled } from "../gate/entitlement-gate";
 
+import type { Database } from "../../../db/client";
+import type { AuthContext } from "../../../middleware/authContext";
 import type { SupportedLocale } from "../../../middleware/locale";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { EntitlementService } from "../../subscriptions/entitlements/service";
@@ -19,7 +25,28 @@ import type { AiTokenMeter } from "../usage/meter";
  * decision flow as the gate -- school active, AI add-on active -- so an unentitled caller gets the
  * same 403/402 codes as any other AI surface instead of a peek at someone else's budget. Reading
  * quota never draws on it.
+ *
+ * The route takes no studentId, so it looks up the caller's own `app.students` row: AI add-ons and
+ * meters are keyed by the student id, which is not the user id the session carries. A caller with
+ * no student record has no AI add-on and answers 402 AI_SUBSCRIPTION_INACTIVE.
  */
+
+/** The student record of a signed-in user, or null for a user who is not a student. */
+export type StudentIdResolver = (auth: AuthContext, requestId?: string) => Promise<string | null>;
+
+export function databaseStudentIdResolver(database: Database): StudentIdResolver {
+  return async (auth, requestId) =>
+    withTenantTx(
+      database,
+      { schoolId: auth.schoolId, userId: auth.userId, requestId },
+      async (tx) => {
+        const [row] = await tx<{ id: string }[]>`
+          SELECT id FROM app.students WHERE user_id = ${auth.userId}::uuid LIMIT 1
+        `;
+        return row?.id ?? null;
+      },
+    );
+}
 
 const AiUsageResponseSchema = z.object({
   /** False until something has been reserved or committed this period. */
@@ -63,18 +90,28 @@ const aiUsageRoute = createRoute({
 export function aiUsageRoutes(deps: {
   entitlements: Pick<EntitlementService, "school" | "ai">;
   meter: AiTokenMeter;
+  /** Maps the session's user to their student record (`databaseStudentIdResolver` in the app). */
+  studentIdFor: StudentIdResolver;
   monthlyTokenBudget?: number;
 }): OpenAPIHono<AppEnv> {
-  const { entitlements, meter, monthlyTokenBudget = AI_MONTHLY_TOKEN_BUDGET } = deps;
+  const { entitlements, meter, studentIdFor, monthlyTokenBudget = AI_MONTHLY_TOKEN_BUDGET } = deps;
   const app = new OpenAPIHono<AppEnv>();
 
   app.openapi(aiUsageRoute, async (c) => {
     const auth = requireAuth(c);
     const locale = (c.get("locale") ?? "en") as SupportedLocale;
+    const studentId = await studentIdFor(auth, c.get("requestId"));
+    if (!studentId) {
+      throw new CodedHttpException(
+        402,
+        ERROR_CODES.AI_SUBSCRIPTION_INACTIVE,
+        getLocalizedMessage(ERROR_CODES.AI_SUBSCRIPTION_INACTIVE, locale),
+      );
+    }
     const ctx = await assertAiEntitled(
       auth,
       { entitlements },
-      auth.userId,
+      studentId,
       monthlyTokenBudget,
       locale,
     );

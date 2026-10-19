@@ -32,6 +32,7 @@ import { getSecurityConfig } from "../config/security";
 import { generateCsrfToken, validateCsrfToken } from "../lib/security/csrf";
 import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
 
+import { isInvitationOAuthPath } from "./jwtAuth";
 import { extractClientIp } from "./rateLimiter";
 
 import type { SecurityEventSink, SecurityEventType } from "../lib/security/securityEventSink";
@@ -142,6 +143,16 @@ const EXEMPT_PATHS = [
   "/api/subscriptions/webhook/stripe",
   // Tap billing webhook (ST-298). Same posture: authenticated by the `hashstring` HMAC, no cookie.
   "/api/subscriptions/webhook/tap",
+  // App Store and Google Play notifications for AI add-ons bought in the app: authenticated by
+  // Apple's signed payload and by the Pub/Sub push URL's secret token respectively, no cookie.
+  "/api/subscriptions/webhook/apple",
+  "/api/subscriptions/webhook/google",
+  // The dedicated ERPNext finance webhooks (payment-confirmed, refund-processed): the same HMAC over
+  // the raw body as /erpnext/webhooks, but under /api/, so they need naming like Stripe and Tap.
+  "/api/finance/webhooks/erpnext",
+  // Daily finance reconciliation, called by the workers' scheduler with the X-Api-Key service key --
+  // no cookie or user session, so nothing a cross-site page could forge.
+  "/api/finance/reconciliation/run",
   // School self-registration (ST-184), same posture as /api/auth/login above: no ambient authority
   // (cookie or Bearer header) a cross-site page could forge — a forged POST here accomplishes
   // nothing an attacker could not already do by calling the endpoint directly. Without this entry a
@@ -205,6 +216,7 @@ export function csrfMiddleware(options?: CsrfOptions): MiddlewareHandler {
     if (
       isInvitationActivationPath(path) ||
       isMobileOAuthExchangePath(path) ||
+      isInvitationOAuthPath(path) ||
       exemptPaths.some((exempt) => path.startsWith(exempt))
     ) {
       await next();

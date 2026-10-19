@@ -19,6 +19,7 @@
     "openapi:generate": "bun run scripts/generate-openapi.ts && prettier --write openapi.json"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "3.1.0",
     "@aws-sdk/client-s3": "3.1097.0",
     "@aws-sdk/s3-request-presigner": "3.1097.0",
     "@hono/zod-openapi": "1.5.1",
@@ -27,8 +28,6 @@
     "@studafy/attendance-reporting": "workspace:*",
     "@studafy/audit-reporting": "workspace:*",
     "@studafy/billing": "workspace:*",
-    "@studafy/student-import": "workspace:*",
-    "@studafy/tap-payments": "workspace:*",
     "@studafy/constants": "workspace:*",
     "@studafy/finance-reporting": "workspace:*",
     "@studafy/grades-reporting": "workspace:*",
@@ -36,7 +35,10 @@
     "@studafy/observability": "workspace:*",
     "@studafy/sanitize": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
+    "@studafy/student-import": "workspace:*",
+    "@studafy/tap-payments": "workspace:*",
     "bullmq": "5.79.3",
+    "google-auth-library": "11.3.0",
     "hono": "4.12.34",
     "ioredis": "5.10.1",
     "jose": "6.2.3",

@@ -426,6 +426,19 @@ export function foldStatus(kind: SubscriptionKind, events: readonly FoldableEven
     const resolution = deriveIntent(event.eventType, event.payload);
     if (resolution.kind !== "transition") continue;
 
+    // A student whose AI add-on ended can buy it again, and that purchase begins a new lifecycle on
+    // the same (school, student) row. Without this the new checkout would meet an absorbing state and
+    // be parked, leaving a paying student locked out. Only a completed checkout restarts -- a stray
+    // renewal or failure after the end still hits the terminal state and is rejected -- and the rule
+    // depends only on the ordered sequence, so the fold stays a pure function of the event set.
+    if (
+      kind === "ai" &&
+      TERMINAL_STATUSES.has(status) &&
+      event.eventType === "checkout.session.completed"
+    ) {
+      status = GENESIS_STATUS;
+    }
+
     const next = resolveTransition(kind, status, resolution.intent);
     if (next === null) {
       skipped.push({

@@ -39,7 +39,7 @@ reviewed independently of that, but the actual "first submission" can't happen u
 - [`review-checklist.md`](review-checklist.md) — the pre-submission checklist: forms, policies and
   the review risks this app carries.
 - [`reviewer-walkthrough.md`](reviewer-walkthrough.md) — the clean-device run-through of the
-  submitted build (sign-in, core path, push, AI consent, fees, no IAP, privacy policy, deletion),
+  submitted build (sign-in, core path, push, AI consent, fees, the AI add-on in-app purchase, privacy policy, deletion),
   with the per-platform sign-off.
 
 ## Related

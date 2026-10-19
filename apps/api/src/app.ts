@@ -56,6 +56,7 @@ import {
   aiRetrievalRoutes,
   aiSummaryRoutes,
   aiUsageRoutes,
+  databaseStudentIdResolver,
   createAiTokenMeter,
   createConceptsCache,
   createDeterministicQueryEmbedder,
@@ -76,6 +77,8 @@ import {
   configureRefreshCookie,
   createJtiDenylist,
   createSchoolStatusReader,
+  createMemoryStateStore,
+  createRedisStateStore,
   googleOAuthRoutes,
   jwksRoutes,
   microsoftOAuthRoutes,
@@ -144,6 +147,7 @@ import {
   refundAdminRoutes,
   createEntitlementService,
 } from "./modules/subscriptions";
+import { aiStoreRoutes } from "./modules/subscriptions/store";
 import { schoolClosureRoutes } from "./modules/tenancy/closure/route";
 import { lookupsRoutes } from "./modules/tenancy/lookups/route";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
@@ -166,6 +170,7 @@ import type { KeyStore } from "./modules/auth";
 import type { FlagsService } from "./modules/flags";
 import type { MobileReleaseConfig } from "./modules/mobile";
 import type { PaymentProviderPort } from "./modules/subscriptions";
+import type { StoreBilling } from "./modules/subscriptions/store";
 import type { RedisClient } from "./redis";
 
 export interface AppOptions {
@@ -279,6 +284,14 @@ export interface AppOptions {
    * `stripeProvider`: a Tap-region checkout or a Tap webhook answers 503 when it is absent.
    */
   tapProvider?: PaymentProviderPort | null;
+  /** Countries billed through Tap (`TAP_COUNTRIES`); every other school bills through Stripe. */
+  tapCountries?: ReadonlySet<string>;
+  /**
+   * App Store / Google Play billing of the AI add-on bought in the mobile app
+   * (modules/subscriptions/store). Nullable on the same terms as the payment providers: the routes
+   * register regardless and answer 503 when it is absent.
+   */
+  storeBilling?: StoreBilling | null;
   /**
    * Mobile release floor / latest versions served at `GET /api/mobile/config` (ST-257).
    *
@@ -323,6 +336,8 @@ export function createApp({
   storage = null,
   stripeProvider = null,
   tapProvider = null,
+  tapCountries = new Set(),
+  storeBilling = null,
   mobileReleaseConfig = EMPTY_MOBILE_RELEASE_CONFIG,
 }: AppOptions): OpenAPIHono<AppEnv> {
   const eventSink = securityEventSink ?? createNoopSecurityEventSink();
@@ -396,6 +411,14 @@ export function createApp({
   // instance makes it structurally impossible for the read side and the write side of the revocation
   // boundary to drift onto different connections or key prefixes.
   const jtiDenylist = redis ? createJtiDenylist(redis) : null;
+
+  // OAuth state (PKCE verifier + nonce, keyed by `state`), shared by every OAuth flow below. One
+  // instance because the browser flows — login, invitation activation, provider linking — all
+  // return through each provider's single registered callback, which must see whatever state the
+  // flow's start minted. Redis-backed whenever Redis exists, because production runs several API
+  // instances and a flow's start and callback routinely land on different ones; in-memory only for
+  // a process with no Redis (bare tests, the OpenAPI generator).
+  const oauthStateStore = redis ? createRedisStateStore(redis) : createMemoryStateStore();
 
   // The entitlement service (ST-133). Shared between the JWT middleware's staleness check and any
   // route that needs to resolve entitlements, for the same reason the denylist is shared: one
@@ -513,7 +536,7 @@ export function createApp({
 
   // Both payment adapters, one slot per provider. Subscription checkout and online fee collection
   // pick between them by the school's region (ST-298); each provider's webhook has its own path.
-  const paymentProviders = { stripe: stripeProvider, tap: tapProvider };
+  const paymentProviders = { stripe: stripeProvider, tap: tapProvider, tapCountries };
 
   // Finance gateway (ST-119). A pass-through to each school's ERPNext site: ERPNext owns fee
   // validation, currency rules and totals, and this only routes, crosswalks ids, and maintains the
@@ -605,6 +628,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+        { stateStore: oauthStateStore },
       ),
     );
   }
@@ -625,6 +649,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+        { stateStore: oauthStateStore },
       ),
     );
   }
@@ -648,6 +673,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+        { stateStore: oauthStateStore },
       ),
     );
   }
@@ -659,7 +685,12 @@ export function createApp({
   // /api/school-applications/me authenticate by that cookie (jwtAuth.ts public, csrf.ts exempt).
   if (database && keyStore) {
     const applicantSession = { keyStore, issuer: jwtIssuer, audience: jwtAudience };
-    app.route("/", schoolApplicationOAuthRoutes(database, applicantSession, logger));
+    app.route(
+      "/",
+      schoolApplicationOAuthRoutes(database, applicantSession, logger, {
+        stateStore: oauthStateStore,
+      }),
+    );
     app.route("/", schoolApplicantRoutes(database, storage, applicantSession));
   }
 
@@ -678,6 +709,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         logger,
+        { stateStore: oauthStateStore },
       ),
     );
   }
@@ -705,11 +737,16 @@ export function createApp({
     );
     // Browser-redirect arm of the same flow: /start + /invitation/callback give an invited user the
     // full-page OAuth round trip and run activation server-side (see activation-oauth-routes.ts).
-    app.route("/", activationOAuthRoutes(database, sessionTokenConfig, logger));
+    app.route("/", activationOAuthRoutes({ stateStore: oauthStateStore }));
     // Mobile arm (ST-215): the native app drives the same PKCE exchange itself and gets the
     // result as JSON with channel=mobile, instead of a redirect + HttpOnly cookie (see
     // mobile-activation-oauth-routes.ts).
-    app.route("/", mobileActivationOAuthRoutes(database, sessionTokenConfig, logger));
+    app.route(
+      "/",
+      mobileActivationOAuthRoutes(database, sessionTokenConfig, logger, {
+        stateStore: oauthStateStore,
+      }),
+    );
   }
 
   // Returning-user OAuth login (ST-079). Authenticates an active user via a verified Microsoft
@@ -771,20 +808,7 @@ export function createApp({
   // resilience, and admins unlink providers. Needs database for identity CRUD and the state store
   // for the linking OAuth flow.
   if (database && keyStore) {
-    app.route(
-      "/",
-      providerLinkRoutes(
-        database,
-        {
-          keyStore,
-          issuer: jwtIssuer,
-          audience: jwtAudience,
-          accessTtlSeconds: jwtAccessTtlSeconds,
-          refreshTtlSeconds: jwtRefreshTtlSeconds,
-        },
-        logger,
-      ),
-    );
+    app.route("/", providerLinkRoutes(database, { stateStore: oauthStateStore }));
   }
 
   // Administrative device revocation (ST-072). Needs only a database — it revokes and denylists but
@@ -1059,6 +1083,8 @@ export function createApp({
     app.route("/", checkoutRoutes(database, paymentProviders));
     app.route("/", schoolCheckoutRoutes(database, paymentProviders));
     app.route("/", aiCheckoutRoutes(database, paymentProviders));
+    // The same add-on bought in the mobile app through Apple / Google, and their notifications.
+    app.route("/", aiStoreRoutes(database, storeBilling, logger));
     // The event sink is threaded in so a rejected webhook signature rides the same ST-082 alerting
     // path as a CSRF or rate-limit rejection, rather than a second one invented for billing.
     app.route(
@@ -1149,7 +1175,14 @@ export function createApp({
         },
       }),
     );
-    app.route("/", aiUsageRoutes({ entitlements, meter: aiMeter }));
+    app.route(
+      "/",
+      aiUsageRoutes({
+        entitlements,
+        meter: aiMeter,
+        studentIdFor: databaseStudentIdResolver(database),
+      }),
+    );
     // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Passed through by
     // both gates -- it never reaches the provider, and withdrawal must work without an add-on.
     app.route("/", aiConsentRoutes({ database }));

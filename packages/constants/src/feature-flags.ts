@@ -45,6 +45,18 @@ export const FEATURE_FLAGS = {
       "Cross-encoder re-ranking stage in hybrid retrieval. Off returns the fused RRF ranking untouched.",
     defaultValue: false,
   },
+  /**
+   * Ask AI's answer to a question the student's own materials do not cover. On, the model answers
+   * from general knowledge at the student's level, says so in its first sentence, and the answer
+   * carries no citations (`grounded: false` on the stream). Off, the route refuses with
+   * AI_ASK_INSUFFICIENT_GROUNDING and the nearest topics, keeping Ask AI strictly to the course.
+   * Moderation applies either way. A school can turn it off with a `feature_flags` row.
+   */
+  "ai.ask.general": {
+    description:
+      "Ask AI answers questions outside the student's materials from general knowledge, labelled as such. Off refuses them.",
+    defaultValue: true,
+  },
 } as const satisfies Readonly<Record<string, FeatureFlagDefinition>>;
 
 export type FlagName = keyof typeof FEATURE_FLAGS;

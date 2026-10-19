@@ -18,7 +18,7 @@
 
 import { extractStudentIdHint, extractSubscriptionId } from "./event-mapping";
 
-import type { BillingProvider } from "./billing-event-store";
+import type { BillingEventSource, BillingProvider } from "./billing-event-store";
 import type { SubscriptionKind } from "./state-machine";
 import type { SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -60,11 +60,12 @@ export interface AttributionTarget {
  */
 export async function resolveSchoolId(
   tx: TransactionSql,
-  provider: BillingProvider,
+  provider: BillingEventSource,
   customerId: string | null,
   schoolIdHint: string | null,
 ): Promise<string | null> {
-  if (customerId) {
+  // Only the payment providers have customers; an app-store purchase is attributed by its metadata.
+  if (customerId && (provider === "stripe" || provider === "tap")) {
     const rows = await findSchoolByCustomerId(tx, provider, customerId);
     if (rows.length > 0) return rows[0]!.id;
   }

@@ -31,8 +31,9 @@ Future<String> _flutterWebAuth2(Uri url, String callbackScheme) =>
 /// `studafy://auth/callback` intent filter brings the user back. Never an
 /// embedded webview, which Google and Microsoft both refuse to sign in.
 ///
-/// The redirect URI sent to the IdP must be `studafy://auth/callback` — the
-/// same scheme+host+path the callback is matched against.
+/// The IdP never sees `studafy://auth/callback`: it returns to the API's own
+/// callback, which then redirects the browser here with a one-time code (see
+/// `apps/api/src/modules/auth/oauth/mobile-handoff.ts`).
 class OAuthBrowser {
   OAuthBrowser({AppLinks? appLinks, WebAuthSession? webAuthSession})
     : _appLinks = appLinks ?? AppLinks(),
@@ -43,9 +44,12 @@ class OAuthBrowser {
 
   Completer<OAuthCallback>? _pending;
 
-  /// The redirect URI registered with the IdP.
-  Uri get redirectUri =>
-      Uri(scheme: _callbackScheme, host: _callbackHost, path: _callbackPath);
+  /// The deep link the API's callback sends the browser back to.
+  Uri get redirectUri => Uri(
+        scheme: _callbackScheme,
+        host: _callbackHost,
+        path: _callbackPath,
+      );
 
   /// Whether sign-in runs in an `ASWebAuthenticationSession` (iOS) rather than
   /// the browser app plus a deep link (Android).

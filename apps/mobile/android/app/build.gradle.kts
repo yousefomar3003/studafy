@@ -32,6 +32,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications uses java.time APIs newer than minSdk; its AAR metadata fails
+        // the build without core library desugaring.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
@@ -104,6 +107,8 @@ flutter {
 }
 
 dependencies {
+    // Backports the java.time APIs flutter_local_notifications needs (compileOptions above).
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     // ST-247: instrumentation-runner deps for the androidTest APK integration_test builds. Pinned
     // to the same androidx.test major line Flutter's own integration_test package targets.
     androidTestImplementation("androidx.test:runner:1.6.2")

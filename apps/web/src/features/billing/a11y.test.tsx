@@ -1,6 +1,6 @@
 import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, mock, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -11,100 +11,20 @@ import { expectNoA11yViolations } from "../../lib/test/axe";
 import type { SessionTokens } from "../../lib/auth";
 import type { ComponentType } from "react";
 
-/** Automated accessibility audit for the billing screens, mirroring
+/** Automated accessibility audit for the AI add-on purchase screen, mirroring
  * `finance/adjustments/a11y.test.tsx`. */
 
-const OVERVIEW = {
-  subscription: {
-    id: "sub-1",
-    status: "past_due",
-    currentPeriodStart: "2026-08-01T00:00:00.000Z",
-    currentPeriodEnd: "2026-09-01T00:00:00.000Z",
-    cancelAtPeriodEnd: false,
-    cancellationRequestedAt: null,
-    cancellationReason: null,
-    retentionState: "none",
-  },
-  plan: { id: "plan-1", code: "growth", displayName: "Studafy Growth" },
-  seats: { used: 7, cap: 20 },
-  storage: { usedBytes: 524_288_000, capBytes: 1_048_576_000, fractionUsed: 0.5 },
-};
-
-const PLANS = [
-  {
-    id: "plan-1",
-    code: "growth",
-    displayName: "Studafy Growth",
-    description: "Up to 500 students",
-    prices: [
-      {
-        id: "price-1",
-        currencyCode: "USD",
-        billingInterval: "monthly",
-        amountMinor: 4900,
-        stripePriceId: "price_1",
-      },
-    ],
-  },
-  {
-    id: "plan-2",
-    code: "scale",
-    displayName: "Studafy Scale",
-    description: "Up to 2000 students",
-    prices: [
-      {
-        id: "price-2",
-        currencyCode: "USD",
-        billingInterval: "monthly",
-        amountMinor: 9900,
-        stripePriceId: "price_2",
-      },
-    ],
-  },
-];
-
-const INVOICE = {
-  id: "in_1",
-  status: "paid",
-  amountDue: 4900,
-  amountPaid: 4900,
-  currency: "USD",
-  created: "2026-08-01T00:00:00.000Z",
-  periodStart: "2026-08-01T00:00:00.000Z",
-  periodEnd: "2026-09-01T00:00:00.000Z",
-  hostedInvoiceUrl: "https://invoice.example.com/in_1",
-  invoicePdf: "https://invoice.example.com/in_1.pdf",
-};
-
-const AI_STUDENT = {
-  id: "student-1",
-  school_id: "school-1",
-  user_id: "user-1",
-  first_name: "Amina",
-  middle_name: null,
-  last_name: "Hassan",
-  preferred_name: null,
-  date_of_birth: null,
-  nationality_country_id: null,
-  status: "enrolled",
-  admission_number: "",
-  admission_date: null,
-  created_at: "2026-01-01T00:00:00.000Z",
-  updated_at: "2026-01-01T00:00:00.000Z",
+const AI_OFFER = {
+  price: { id: "price-1", amountMinor: 499, currency: "USD", interval: "monthly" },
+  students: [
+    { id: "student-1", name: "Amina Hassan", active: false },
+    { id: "student-2", name: "Omar Hassan", active: true },
+  ],
 };
 
 const getMock = mock((path: string) => {
-  if (path === "/api/subscriptions/current") {
-    return Promise.resolve({ data: OVERVIEW });
-  }
-  if (path === "/api/subscriptions/plans") {
-    return Promise.resolve({ data: PLANS });
-  }
-  if (path === "/api/subscriptions/current/invoices") {
-    return Promise.resolve({ data: { invoices: [INVOICE], hasMore: false } });
-  }
-  if (path === "/api/students/{studentId}") {
-    return Promise.resolve({ data: AI_STUDENT });
+  if (path === "/api/subscriptions/ai/offer") {
+    return Promise.resolve({ data: AI_OFFER });
   }
   return Promise.resolve({ data: undefined });
 });
@@ -154,69 +74,18 @@ afterEach(() => {
   getMock.mockClear();
 });
 
-describe("billing screens accessibility", () => {
-  test("billing overview, populated with a past-due dunning banner", async () => {
-    const Page = (await import("./BillingOverviewPage")).default;
-    const { container } = await renderInPortal(Page, "/portal/billing", "/portal/billing");
-    await screen.findByRole("heading", { name: "Billing" });
-    await screen.findByText("Your last payment failed");
-
-    await expectNoA11yViolations(container);
-  });
-
-  test("change-plan dialog, open with the plan picker populated", async () => {
-    const Page = (await import("./BillingOverviewPage")).default;
-    const { container } = await renderInPortal(Page, "/portal/billing", "/portal/billing");
-    await screen.findByText("Studafy Growth");
-    fireEvent.click(screen.getByRole("button", { name: "Change plan" }));
-    await screen.findByRole("dialog", { name: "Change plan" });
-    await screen.findByText(/Studafy Scale/);
-
-    await expectNoA11yViolations(container);
-  });
-
-  test("cancel-subscription dialog, open with the reason field showing", async () => {
-    const Page = (await import("./BillingOverviewPage")).default;
-    const { container } = await renderInPortal(Page, "/portal/billing", "/portal/billing");
-    await screen.findByText("Studafy Growth");
-    fireEvent.click(screen.getByRole("button", { name: "Cancel subscription" }));
-    await screen.findByRole("dialog", { name: "Cancel subscription?" });
-
-    await expectNoA11yViolations(container);
-  });
-
-  test("invoice history, populated with a receipt row", async () => {
-    const Page = (await import("./BillingInvoicesPage")).default;
-    const { container } = await renderInPortal(
-      Page,
-      "/portal/billing/invoices",
-      "/portal/billing/invoices",
-    );
-    await screen.findByRole("heading", { name: "Invoices" });
-    await screen.findByText("paid");
-
-    await expectNoA11yViolations(container);
-  });
-
-  test("AI subscription purchase, populated with the student's plan explainer", async () => {
+describe("AI purchase screen accessibility", () => {
+  test("AI subscription purchase, with the price and a student to buy for", async () => {
     const Page = (await import("./AiSubscriptionPurchasePage")).default;
-    const { container } = await renderInPortal(
-      Page,
-      "/account/ai?studentId=student-1&priceId=price-1",
-      "/account/ai",
-    );
-    await screen.findByText(/A personal AI tutor for Amina Hassan/);
+    const { container } = await renderInPortal(Page, "/account/ai", "/account/ai");
+    await screen.findByRole("button", { name: "Get AI for Amina Hassan" });
 
     await expectNoA11yViolations(container);
   });
 
   test("AI subscription purchase, success state", async () => {
     const Page = (await import("./AiSubscriptionPurchasePage")).default;
-    const { container } = await renderInPortal(
-      Page,
-      "/account/ai?studentId=student-1&priceId=price-1&checkout=success",
-      "/account/ai",
-    );
+    const { container } = await renderInPortal(Page, "/account/ai?checkout=success", "/account/ai");
     await screen.findByRole("heading", { name: /all set/ });
 
     await expectNoA11yViolations(container);

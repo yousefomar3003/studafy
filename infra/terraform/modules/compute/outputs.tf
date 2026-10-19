@@ -23,6 +23,11 @@ output "workers_task_role_arn" {
   value       = aws_iam_role.workers_task.arn
 }
 
+output "workers_task_role_name" {
+  description = "Workers ECS task role name, for modules that attach their own scoped policies to it (module.email's SES send grant)."
+  value       = aws_iam_role.workers_task.name
+}
+
 output "migrations_execution_role_arn" {
   description = "Dedicated ECS execution role limited to the migration image and PostgreSQL secret."
   value       = aws_iam_role.migrations_execution.arn

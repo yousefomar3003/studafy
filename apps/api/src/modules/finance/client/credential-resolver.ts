@@ -41,6 +41,38 @@ export interface ErpNextCredentialResolver {
 export interface EnvCredentialResolverOptions {
   baseUrl: string | undefined;
   apiKey: string | undefined;
+  /**
+   * Asks a site that is not marked ready yet whether it is: returns its company name once the site
+   * exists, the integration key works on it and its setup wizard has created the company, else
+   * null. Defaults to a real `GET /api/resource/Company` against the site (Host header); injected
+   * in tests.
+   */
+  probeSite?: (siteHost: string) => Promise<string | null>;
+}
+
+/** How long a site probe may take before it counts as "not ready" -- it runs inside a request. */
+const SITE_PROBE_TIMEOUT_MS = 5_000;
+
+function companyProbe(
+  baseUrl: string,
+  apiKey: string,
+): (siteHost: string) => Promise<string | null> {
+  return async (siteHost) => {
+    try {
+      const response = await fetch(
+        `${baseUrl.replace(/\/$/, "")}/api/resource/Company?fields=${encodeURIComponent('["name"]')}&limit_page_length=1`,
+        {
+          headers: { Authorization: `token ${apiKey}`, Host: siteHost, Accept: "application/json" },
+          signal: AbortSignal.timeout(SITE_PROBE_TIMEOUT_MS),
+        },
+      );
+      if (!response.ok) return null;
+      const body = (await response.json()) as { data?: { name?: string }[] };
+      return body.data?.[0]?.name ?? null;
+    } catch {
+      return null;
+    }
+  };
 }
 
 /**
@@ -50,10 +82,16 @@ export interface EnvCredentialResolverOptions {
 export class EnvCredentialResolver implements ErpNextCredentialResolver {
   private readonly baseUrl: string | undefined;
   private readonly apiKey: string | undefined;
+  private readonly probeSite: ((siteHost: string) => Promise<string | null>) | undefined;
 
   constructor(options: EnvCredentialResolverOptions) {
     this.baseUrl = options.baseUrl;
     this.apiKey = options.apiKey;
+    this.probeSite =
+      options.probeSite ??
+      (options.baseUrl && options.apiKey
+        ? companyProbe(options.baseUrl, options.apiKey)
+        : undefined);
   }
 
   async resolve(tx: TransactionSql, schoolId: string): Promise<ErpNextTenantCredentials> {
@@ -74,16 +112,38 @@ export class EnvCredentialResolver implements ErpNextCredentialResolver {
       WHERE school_id = ${schoolId}::uuid
     `;
 
-    // A school with no site row has never been provisioned; one that is still 'pending' has a row
-    // but no site behind it. Both are the same answer to the caller — there is nothing to talk to
-    // yet — and both must be distinguishable from "ERPNext is down", which is why this is not a
-    // circuit-breaker concern.
-    if (!row || row.status !== "completed") {
+    // A school with no site row has never been provisioned: nothing to talk to, and that must stay
+    // distinguishable from "ERPNext is down", which is why this is not a circuit-breaker concern.
+    if (!row) {
       throw new CodedHttpException(
         503,
         ERROR_CODES.ERPNEXT_NOT_CONFIGURED,
         "This school's ERPNext site is not provisioned yet",
       );
+    }
+
+    // A row that is not 'completed' names a site that an operator creates out of band
+    // (infra/deploy/scripts/erpnext-new-site.sh -- a Frappe site can only be made by bench, never
+    // over the REST API). Ask the site itself: once it answers with its company, record that and
+    // carry on, so a school's finance switches on by itself the moment its site is ready.
+    if (row.status !== "completed") {
+      const company = this.probeSite ? await this.probeSite(row.site_name) : null;
+      if (!company) {
+        throw new CodedHttpException(
+          503,
+          ERROR_CODES.ERPNEXT_NOT_CONFIGURED,
+          "This school's ERPNext site is not provisioned yet",
+        );
+      }
+      await tx`
+        UPDATE app.erpnext_site_configs
+        SET status = 'completed'::app.provisioning_status,
+            erpnext_site_id = site_name,
+            erpnext_company_id = ${company},
+            last_error = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE school_id = ${schoolId}::uuid
+      `;
     }
 
     return { baseUrl: this.baseUrl, apiKey: this.apiKey, siteHost: row.site_name };
