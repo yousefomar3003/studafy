@@ -1,16 +1,42 @@
-# Image build doc: apps/api, apps/workers, apps/realtime, apps/web, ERPNext
+# Image build doc: every container image Studafy ships
 
-Five Dockerfiles, one per deployable, plus a `.dockerignore` at the repo root (Docker only reads
-`.dockerignore` from the build context root, and all four images build with the repo root as
-context — see "Why the build context is the repo root" below).
+Fourteen Dockerfiles live in this directory, plus a `.dockerignore` at the repo root (Docker only
+reads `.dockerignore` from the build context root, and every image builds with the repo root as
+context — see "Why the build context is the repo root" below). `release.yml` builds, attests, and
+signs all fourteen; the registry module (`infra/terraform/modules/registry`) has one ECR repository
+per image.
 
-| Service         | Dockerfile                         | Runtime base                | Listens on                       | Measured size\*                                           |
-| --------------- | ---------------------------------- | --------------------------- | -------------------------------- | --------------------------------------------------------- |
-| `apps/api`      | `infra/docker/api.Dockerfile`      | `oven/bun:1.3.14-alpine`    | 3000                             | 147MB                                                     |
-| `apps/workers`  | `infra/docker/workers.Dockerfile`  | `oven/bun:1.3.14-alpine`    | —                                | 148MB                                                     |
-| `apps/realtime` | `infra/docker/realtime.Dockerfile` | `oven/bun:1.3.14-alpine`    | 3001                             | 147MB                                                     |
-| `apps/web`      | `infra/docker/web.Dockerfile`      | `nginx:1.27-alpine`         | 8080                             | 93MB                                                      |
-| ERPNext plane   | `infra/docker/erpnext.Dockerfile`  | `frappe/erpnext:version-15` | none (role-dependent, see below) | not measured — not built in this ticket, see "Known gaps" |
+| Group         | Image            | Dockerfile                  | Config it bakes in / where it is deployed                                                                  |
+| ------------- | ---------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| App           | `api`            | `api.Dockerfile`            | Bun bundle of `apps/api`; ECS task def `infra/deploy/ecs/api`                                              |
+| App           | `realtime`       | `realtime.Dockerfile`       | Bun bundle of `apps/realtime`; `infra/deploy/ecs/realtime`                                                 |
+| App           | `workers`        | `workers.Dockerfile`        | Bun bundle of `apps/workers` + `workers/healthcheck.ts`; `infra/deploy/ecs/workers`                        |
+| App           | `web`            | `web.Dockerfile`            | Vite build of `apps/web` served by nginx with `web/nginx.conf`                                             |
+| DB tooling    | `migrations`     | `migrations.Dockerfile`     | `db/migrations` + the `@studafy/db` CLI; one-off task `infra/deploy/ecs/migrations`                        |
+| ERPNext       | `erpnext`        | `erpnext.Dockerfile`        | `frappe/erpnext` + Education app + `infra/deploy/erpnext/{seed,backup}`; `infra/terraform/modules/erpnext` |
+| Observability | `prometheus`     | `prometheus.Dockerfile`     | `prometheus/` (`prometheus.yml`, `rules/`); `infra/terraform/modules/monitoring`                           |
+| Observability | `grafana`        | `grafana.Dockerfile`        | `grafana/` (provisioning, dashboards); `modules/monitoring`                                                |
+| Observability | `alertmanager`   | `alertmanager.Dockerfile`   | `alertmanager/alertmanager.yml`; `modules/monitoring`                                                      |
+| Observability | `otel-collector` | `otel-collector.Dockerfile` | `otel-collector/config.yaml`; `modules/monitoring` (`tracing.tf`)                                          |
+| Observability | `tempo`          | `tempo.Dockerfile`          | `tempo/tempo.yaml`; `modules/monitoring` (`tracing.tf`)                                                    |
+| Observability | `loki`           | `loki.Dockerfile`           | `loki/loki-config.yml.tpl`; `infra/terraform/modules/logging`                                              |
+| Observability | `vector`         | `vector.Dockerfile`         | `vector/vector.yaml`; `modules/logging`                                                                    |
+| Backup        | `backup-verify`  | `backup-verify.Dockerfile`  | psql/aws-cli toolchain + `backup-verify/postgres-restore-verify.sh`; `infra/terraform/modules/backup`      |
+
+`containers.yml` builds, size-checks, and trivy-scans the four app images, `migrations`, and
+`erpnext` on every relevant PR (erpnext's scan is report-only; see the workflow's matrix comment).
+The observability images are third-party bases with this repo's config on top; each Dockerfile's
+header explains its config.
+
+The rest of this doc covers the four application images and ERPNext:
+
+| Service         | Dockerfile                         | Runtime base                | Listens on                       | Measured size\*                                                     |
+| --------------- | ---------------------------------- | --------------------------- | -------------------------------- | ------------------------------------------------------------------- |
+| `apps/api`      | `infra/docker/api.Dockerfile`      | `oven/bun:1.3.14-alpine`    | 3000                             | 147MB                                                               |
+| `apps/workers`  | `infra/docker/workers.Dockerfile`  | `oven/bun:1.3.14-alpine`    | —                                | 148MB                                                               |
+| `apps/realtime` | `infra/docker/realtime.Dockerfile` | `oven/bun:1.3.14-alpine`    | 3001                             | 147MB                                                               |
+| `apps/web`      | `infra/docker/web.Dockerfile`      | `nginx:1.27-alpine`         | 8080                             | 93MB                                                                |
+| ERPNext plane   | `infra/docker/erpnext.Dockerfile`  | `frappe/erpnext:version-15` | none (role-dependent, see below) | ~2.7GB on CI (`containers.yml` budget 3072MB); not measured locally |
 
 \* `docker images` size on this machine, x86_64, with the base images current as of 2026-07-10.
 Expect a few MB of drift as upstream Alpine/nginx/Bun patch releases land — see "Image size" below
@@ -197,25 +223,12 @@ upstream image (`frappe/erpnext-nginx`) instead, since nginx doesn't need the Ed
 
 ## Known gaps
 
-- **`infra/docker/erpnext.Dockerfile` has not been built or scanned.** Same "not exercised against
-  a live account" caveat as the Terraform modules that consume it
-  (`infra/terraform/modules/erpnext/README.md`) — no `docker build`, no trivy scan, no cosign
-  signing has been run against it in this ticket. Image size, the exact `bench get-app`/`bench
-build` output, and whether the pinned `version-15` tags of `frappe/erpnext` and
-  `frappe/education` are actually compatible with each other are all unverified.
-- **`apps/web` has no ECR repository.** `infra/terraform/modules/registry`'s
-  `image_repository_names` default is `["api", "realtime", "workers"]`, with an explicit comment
-  that `apps/web` "builds to a static bundle... so neither gets a repository here" — written
-  before this ticket, when no Dockerfile for `apps/web` existed yet. That reasoning assumed static
-  hosting (consistent with the CDN module `infra/terraform/modules/cdn` already provisions for web
-  assets), not a containerized nginx deploy. This ticket's acceptance criteria explicitly ask for
-  an `apps/web` Dockerfile ("web (static build → nginx)"), so it exists now — but there are two
-  live, uncommitted-to deployment shapes for `apps/web` in this repo (CDN-hosted static bundle vs.
-  containerized nginx), and only one has a registry repository to push to. This doc doesn't
-  resolve that; it's a real decision the registry module's `image_repository_names` will need once
-  it's made, not something a Dockerfile can decide on its own.
-- **No `.github/workflows` exists yet** to actually run any of the commands in this doc — same
-  status `docs/runbooks/supply-chain-security.md` already notes for the registry module itself.
+- **`infra/docker/erpnext.Dockerfile` is built but its scan does not gate.** `containers.yml`
+  builds and trivy-scans it on every relevant PR and `release.yml` signs it, but the scan is
+  report-only (`trivy_exit_code: "0"`) because its CVEs come from the unmodified upstream
+  `frappe/erpnext` base. Whether the pinned `version-15` tags of `frappe/erpnext` and
+  `frappe/education` behave correctly together is only proven by running the plane, not by the
+  build.
 - **`docs/runbooks/supply-chain-security.md`'s build example was corrected**: its
   `docker build -t "$DIGEST_TAG" apps/api` used a per-app build context, which — as explained
   above — only happens to work for `apps/api`. Updated to

@@ -400,7 +400,7 @@ export function submissionRoutes(
     permissionByMethod([["PATCH", PERMISSIONS.SUBMISSION_GRADE]]),
   );
   // submission:update rather than a permission of its own, and the choice does real work: only
-  // STUDENT and the admin roles hold it. INSTRUCTOR and TEACHING_ASSISTANT do not, which is exactly
+  // STUDENT and the admin roles hold it. INSTRUCTOR does not, which is exactly
   // right -- a submission attachment is the student's evidence and a teacher must not be able to
   // add to it or remove from it. The service asserts ownership as the second half of the same rule.
   routes.use(

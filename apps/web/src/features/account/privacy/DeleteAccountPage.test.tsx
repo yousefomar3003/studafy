@@ -13,11 +13,10 @@ const getMock = mock((_path: string) => Promise.resolve({ data: requests }));
 const postMock = mock((_path: string) =>
   Promise.resolve({
     data: {
-      request_id: "dsr-1",
-      status: "queued",
+      status: "scheduled",
       requested_at: "2026-09-22T09:00:00.000Z",
-      completes_by: "2026-10-22T09:00:00.000Z",
-      ai_subscriptions_canceled: 1,
+      scheduled_for: "2026-10-06T09:00:00.000Z",
+      completes_by: "2026-11-05T09:00:00.000Z",
       retained_records: [
         { category: "academic_grades", description: "d", legal_basis: "b" },
         { category: "attendance", description: "d", legal_basis: "b" },
@@ -80,17 +79,18 @@ describe("DeleteAccountPage", () => {
     expect(postMock).not.toHaveBeenCalled();
   });
 
-  test("confirming deletes the account and shows the timeframe and retained records", async () => {
+  test("confirming schedules the deletion and shows the dates and retained records", async () => {
     await renderPage();
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete my account" }));
     fireEvent.click(await screen.findByRole("button", { name: "Delete account" }));
 
-    expect(await screen.findByText("Your account is being deleted")).toBeTruthy();
+    expect(await screen.findByText("Your account deletion is scheduled")).toBeTruthy();
     expect(postMock).toHaveBeenCalledWith("/api/account/deletion", {});
-    const completesBy = new Date("2026-10-22T09:00:00.000Z").toLocaleDateString();
+    const scheduledFor = new Date("2026-10-06T09:00:00.000Z").toLocaleDateString();
+    const completesBy = new Date("2026-11-05T09:00:00.000Z").toLocaleDateString();
+    expect(screen.getByText(`deleted on ${scheduledFor}`, { exact: false })).toBeTruthy();
     expect(screen.getByText(`erased by ${completesBy}`, { exact: false })).toBeTruthy();
-    expect(screen.getByText("Your AI subscription won't renew.")).toBeTruthy();
     expect(screen.getByText("Grades, without your name or contact details")).toBeTruthy();
     expect(screen.getByText("Attendance, without your name or contact details")).toBeTruthy();
   });

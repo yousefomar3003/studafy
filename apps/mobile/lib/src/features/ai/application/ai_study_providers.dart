@@ -1,11 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_exception.dart';
 import '../../../core/api/auth_interceptor.dart';
 import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/di/app_providers.dart';
 import '../data/ai_study_client.dart';
+import '../domain/ai_hub_status.dart';
 import '../domain/ai_study.dart';
 import 'ask_ai_providers.dart';
 
@@ -22,11 +24,25 @@ final aiStudyClientProvider = Provider<AiStudyClient>((ref) {
   return AiStudyClient(dio);
 });
 
+/// The quota a student without AI access has: nothing budgeted, nothing spent. [AiQuotaMeter]
+/// hides itself for it (`hasBudget` is false).
+const noAiUsage = AiUsage(active: false, budget: 0, usedTokens: 0, heldTokens: 0, remaining: 0);
+
 /// The signed-in student's AI quota for the current billing period, feeding the quota meter under
 /// both study screens. Invalidated after a fresh (non-cached) generation so the meter reflects the
 /// spend. `autoDispose` — it's only alive while a study screen is.
-final aiUsageProvider = FutureProvider.autoDispose<AiUsage>((ref) {
-  return ref.watch(aiStudyClientProvider).usage();
+///
+/// `402 AI_SUBSCRIPTION_INACTIVE` / `403 AI_SCHOOL_INACTIVE` are expected answers for a student
+/// without the add-on (the same codes `aiHubStatusProvider` maps to its own states), not
+/// failures — they degrade to [noAiUsage] instead of surfacing as an error. Anything else still
+/// rethrows.
+final aiUsageProvider = FutureProvider.autoDispose<AiUsage>((ref) async {
+  try {
+    return await ref.watch(aiStudyClientProvider).usage();
+  } on DioException catch (error) {
+    if (aiHubStatusFromErrorCode(error.apiError?.code) != null) return noAiUsage;
+    rethrow;
+  }
 });
 
 /// The key concepts for one material, keyed by material id. One-shot (no preset), so a plain

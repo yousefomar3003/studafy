@@ -1,11 +1,13 @@
 /**
- * Self-service account deletion against a real database: what changes immediately, what is
- * queued, and that a failure before commit leaves the account exactly as it was.
+ * Self-service account deletion against a real database (000143's grace period): scheduling
+ * signs out and sets the due date without detaching anything, member-password accounts must
+ * re-enter their member ID and password, and cancelling clears the schedule.
  *
- * Skipped unless TEST_DATABASE_URL is set.
+ * Skipped unless TEST_DATABASE_URL is set. The detach/erasure that runs on the due date is the
+ * worker's account-deletion sweep, tested in apps/workers.
  */
 
-import { JOB_NAMES, ROLES } from "@studafy/constants";
+import { ERROR_CODES, ROLES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -13,18 +15,21 @@ import {
   assignRole,
   createRefreshSession,
   createSchool,
-  createStudent,
   createTestDatabase,
+  createUser,
   integrationEnabled,
   migrateDatabase,
 } from "../../../../tests/harness";
 import { CodedHttpException } from "../../../coded-http-exception";
-import { deleteAccount } from "../account-deletion-service";
+import {
+  cancelAccountDeletion,
+  DELETION_GRACE_DAYS,
+  scheduleAccountDeletion,
+} from "../account-deletion-service";
 
 import type { TestDatabase } from "../../../../tests/harness";
-import type { PaymentProviderPort } from "../../subscriptions/ports/payment-provider";
 import type { AccountDeletionDeps } from "../account-deletion-service";
-import type { Queue } from "bullmq";
+import type { Role } from "@studafy/constants";
 import type { Sql } from "postgres";
 
 const integrationTest = test.skipIf(!integrationEnabled);
@@ -54,172 +59,136 @@ async function asAdmin<T>(sql: Sql, fn: (tx: Sql) => Promise<T>): Promise<T> {
   return result!;
 }
 
-/** A signed-in student with a Microsoft identity, a live session and an AI subscription. */
-async function seedStudent(billing: "stripe" | "tap") {
+const deps = (): AccountDeletionDeps => ({ database: database!.sql as never, denylist: null });
+
+/** A signed-in user with the given roles; member-password roles get a member code. */
+async function seedUser(role: Role) {
   const sql = database!.sql;
-  const student = await createStudent(sql, schoolId);
-  await assignRole(sql, schoolId, student.userId, ROLES.STUDENT);
-  const session = await createRefreshSession(sql, schoolId, student.userId);
-  await asAdmin(sql, async (tx) => {
-    await tx`
-      INSERT INTO app.oauth_identities (school_id, user_id, provider, subject)
-      VALUES (${schoolId}, ${student.userId}, 'microsoft', ${crypto.randomUUID()})
-    `;
-    await tx`
-      INSERT INTO app.ai_subscriptions
-        (school_id, student_id, status, current_period_start, current_period_end,
-         stripe_subscription_id, tap_card_id, tap_payment_agreement_id)
-      VALUES (
-        ${schoolId}, ${student.id}, 'active', now() - interval '1 day', now() + interval '29 days',
-        ${billing === "stripe" ? `sub_${student.id}` : null},
-        ${billing === "tap" ? "card_1" : null},
-        ${billing === "tap" ? "agreement_1" : null}
-      )
-    `;
-  });
-  return { ...student, session };
+  const user = await createUser(sql, schoolId);
+  await assignRole(sql, schoolId, user.id, role);
+  await createRefreshSession(sql, schoolId, user.id);
+  const codes = await asAdmin(
+    sql,
+    (tx) => tx<{ code: string }[]>`SELECT code FROM app.member_codes WHERE user_id = ${user.id}`,
+  );
+  return { id: user.id, code: codes[0]?.code ?? null };
 }
 
-function fakeDeps(options: { failEnqueue?: boolean } = {}) {
-  const stripeCalls: string[] = [];
-  const jobs: { name: string; data: unknown; jobId: unknown }[] = [];
-  const deps: AccountDeletionDeps = {
-    database: database!.sql as never,
-    denylist: null,
-    paymentProviders: {
-      stripe: {
-        async scheduleCancellation(input: { providerSubscriptionId: string }) {
-          stripeCalls.push(input.providerSubscriptionId);
-        },
-      } as unknown as PaymentProviderPort,
-      tap: null,
-    },
-    maintenanceQueue: {
-      async add(name: string, data: unknown, opts: { jobId?: string }) {
-        if (options.failEnqueue) throw new Error("redis down");
-        jobs.push({ name, data, jobId: opts.jobId });
-      },
-    } as unknown as Queue,
-    siwa: null,
-  };
-  return { deps, stripeCalls, jobs };
-}
-
-async function accountState(userId: string, studentId: string) {
+async function accountState(userId: string) {
   return asAdmin(database!.sql, async (tx) => {
     const [row] = await tx<
-      {
-        status: string;
-        roles: number;
-        identities: number;
-        live_sessions: number;
-        erasure_requests: number;
-        tap_card_id: string | null;
-      }[]
+      { status: string; roles: number; due: Date | null; live_sessions: number }[]
     >`
       SELECT
         (SELECT status::text FROM app.users WHERE id = ${userId}) AS status,
         (SELECT count(*)::int FROM app.user_roles WHERE user_id = ${userId}) AS roles,
-        (SELECT count(*)::int FROM app.oauth_identities WHERE user_id = ${userId}) AS identities,
-        (SELECT count(*)::int FROM app.refresh_tokens WHERE user_id = ${userId} AND revoked_at IS NULL) AS live_sessions,
-        (SELECT count(*)::int FROM app.data_subject_requests
-          WHERE subject_user_id = ${userId} AND request_type = 'erasure') AS erasure_requests,
-        (SELECT tap_card_id FROM app.ai_subscriptions WHERE student_id = ${studentId}) AS tap_card_id
+        (SELECT deletion_due_at FROM app.users WHERE id = ${userId}) AS due,
+        (SELECT count(*)::int FROM app.refresh_tokens
+          WHERE user_id = ${userId} AND revoked_at IS NULL) AS live_sessions
     `;
     return row!;
   });
 }
 
-describe("deleteAccount", () => {
-  integrationTest(
-    "detaches, stops Stripe billing, audits, queues erasure and signs out",
-    async () => {
-      const student = await seedStudent("stripe");
-      const { deps, stripeCalls, jobs } = fakeDeps();
-
-      const result = await deleteAccount(deps, { schoolId, userId: student.userId });
-
-      expect(await accountState(student.userId, student.id)).toMatchObject({
-        status: "archived",
-        roles: 0,
-        identities: 0,
-        live_sessions: 0,
-        erasure_requests: 1,
-      });
-      expect(stripeCalls).toEqual([`sub_${student.id}`]);
-      expect(result.aiSubscriptionsCanceled).toBe(1);
-      expect(result.request.status).toBe("queued");
-      expect(result.request.slaDueAt.getTime()).toBeGreaterThan(Date.now());
-      expect(jobs).toEqual([
-        {
-          name: JOB_NAMES.RUN_DATA_SUBJECT_ERASURE,
-          data: { requestId: result.request.id, schoolId },
-          jobId: result.request.id,
-        },
-      ]);
-
-      const audit = await asAdmin(
-        database!.sql,
-        (tx) =>
-          tx<{ new_values: Record<string, unknown> }[]>`
-        SELECT new_values FROM app.audit_logs
-        WHERE target_table = 'users' AND target_id = ${student.userId}::uuid AND action = 'delete'
-      `,
-      );
-      expect(audit).toHaveLength(1);
-      expect(audit[0]!.new_values).toMatchObject({
-        reason: "account_deletion",
-        data_subject_request_id: result.request.id,
-        ai_subscriptions_canceled: 1,
-        retained_record_categories: [
-          "academic_grades",
-          "attendance",
-          "financial_records",
-          "audit_log",
-        ],
-      });
-    },
+async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
+  const error = await promise.then(
+    () => undefined,
+    (e: unknown) => e,
   );
+  return error instanceof CodedHttpException ? error.code : undefined;
+}
 
-  integrationTest("stops Tap billing by dropping the saved card", async () => {
-    const student = await seedStudent("tap");
-    const { deps, stripeCalls } = fakeDeps();
+describe("scheduleAccountDeletion", () => {
+  integrationTest("schedules 14 days out, signs out, and detaches nothing yet", async () => {
+    const admin = await seedUser(ROLES.ORG_ADMIN);
 
-    await deleteAccount(deps, { schoolId, userId: student.userId });
+    const result = await scheduleAccountDeletion(deps(), { schoolId, userId: admin.id });
 
-    expect((await accountState(student.userId, student.id)).tap_card_id).toBeNull();
-    expect(stripeCalls).toEqual([]);
+    const days = (result.scheduledFor.getTime() - result.requestedAt.getTime()) / 86_400_000;
+    expect(Math.round(days)).toBe(DELETION_GRACE_DAYS);
+    expect(result.completesBy.getTime()).toBeGreaterThan(result.scheduledFor.getTime());
+    expect(await accountState(admin.id)).toMatchObject({
+      status: "active",
+      roles: 1,
+      live_sessions: 0,
+    });
+    expect((await accountState(admin.id)).due).not.toBeNull();
   });
 
-  integrationTest("a second request while erasure is pending is a 409", async () => {
-    const student = await seedStudent("tap");
-    await deleteAccount(fakeDeps().deps, { schoolId, userId: student.userId });
+  integrationTest("a second schedule is a 409", async () => {
+    const admin = await seedUser(ROLES.ORG_ADMIN);
+    await scheduleAccountDeletion(deps(), { schoolId, userId: admin.id });
 
-    const error = await deleteAccount(fakeDeps().deps, { schoolId, userId: student.userId }).catch(
-      (e: unknown) => e,
+    expect(await codeOf(scheduleAccountDeletion(deps(), { schoolId, userId: admin.id }))).toBe(
+      ERROR_CODES.ACCOUNT_DELETION_ALREADY_SCHEDULED,
     );
-
-    expect(error).toBeInstanceOf(CodedHttpException);
-    expect((error as CodedHttpException).status).toBe(409);
   });
 
   integrationTest(
-    "a queue failure rolls everything back and leaves the user signed in",
+    "a member-password account must give its own member ID and password",
     async () => {
-      const student = await seedStudent("tap");
+      const parent = await seedUser(ROLES.PARENT);
+      expect(parent.code).not.toBeNull();
 
-      await expect(
-        deleteAccount(fakeDeps({ failEnqueue: true }).deps, { schoolId, userId: student.userId }),
-      ).rejects.toThrow("redis down");
+      expect(await codeOf(scheduleAccountDeletion(deps(), { schoolId, userId: parent.id }))).toBe(
+        ERROR_CODES.ACCOUNT_DELETION_VERIFICATION_FAILED,
+      );
+      expect(
+        await codeOf(
+          scheduleAccountDeletion(deps(), {
+            schoolId,
+            userId: parent.id,
+            memberId: "PAR-NOT-MINE",
+            password: "pass@1234",
+          }),
+        ),
+      ).toBe(ERROR_CODES.ACCOUNT_DELETION_VERIFICATION_FAILED);
+      expect(
+        await codeOf(
+          scheduleAccountDeletion(deps(), {
+            schoolId,
+            userId: parent.id,
+            memberId: parent.code!,
+            password: "wrong-password",
+          }),
+        ),
+      ).toBe(ERROR_CODES.ACCOUNT_DELETION_VERIFICATION_FAILED);
+      expect((await accountState(parent.id)).due).toBeNull();
 
-      expect(await accountState(student.userId, student.id)).toMatchObject({
-        status: "active",
-        roles: 1,
-        identities: 1,
-        live_sessions: 1,
-        erasure_requests: 0,
-        tap_card_id: "card_1",
+      // Never-changed accounts still have the default password; the member ID is case-insensitive.
+      await scheduleAccountDeletion(deps(), {
+        schoolId,
+        userId: parent.id,
+        memberId: ` ${parent.code!.toLowerCase()} `,
+        password: "pass@1234",
       });
+      expect((await accountState(parent.id)).due).not.toBeNull();
     },
   );
+
+  integrationTest("the emailed-link path does not ask for member credentials", async () => {
+    const parent = await seedUser(ROLES.PARENT);
+
+    await scheduleAccountDeletion(deps(), {
+      schoolId,
+      userId: parent.id,
+      source: "web_request",
+    });
+
+    expect((await accountState(parent.id)).due).not.toBeNull();
+  });
+});
+
+describe("cancelAccountDeletion", () => {
+  integrationTest("clears a scheduled deletion; a second cancel is a 409", async () => {
+    const admin = await seedUser(ROLES.ORG_ADMIN);
+    await scheduleAccountDeletion(deps(), { schoolId, userId: admin.id });
+
+    await cancelAccountDeletion(database!.sql as never, { schoolId, userId: admin.id });
+
+    expect((await accountState(admin.id)).due).toBeNull();
+    expect(
+      await codeOf(cancelAccountDeletion(database!.sql as never, { schoolId, userId: admin.id })),
+    ).toBe(ERROR_CODES.ACCOUNT_DELETION_NOT_SCHEDULED);
+  });
 });

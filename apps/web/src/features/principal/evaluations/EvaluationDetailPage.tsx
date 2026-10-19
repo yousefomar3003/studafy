@@ -529,16 +529,9 @@ export default function EvaluationDetailPage() {
     queryFn: fetchTeacherContacts,
   });
 
-  const backLink = (
-    <Link className="evaluations-detail__back" to="/portal/principal/evaluations">
-      {t("principal.evaluations.backToList")}
-    </Link>
-  );
-
   if (evaluationQuery.isPending || templatesQuery.isPending) {
     return (
       <>
-        {backLink}
         <p role="status">{t("principal.common.loading")}</p>
       </>
     );
@@ -547,7 +540,6 @@ export default function EvaluationDetailPage() {
   if (evaluationQuery.isError || !evaluationQuery.data) {
     return (
       <>
-        {backLink}
         <p role="alert">{t("principal.evaluations.detail.loadError")}</p>
       </>
     );
@@ -559,7 +551,6 @@ export default function EvaluationDetailPage() {
 
   return (
     <>
-      {backLink}
       <EvaluationWorkspace
         key={evaluationQuery.data.id}
         evaluation={evaluationQuery.data}

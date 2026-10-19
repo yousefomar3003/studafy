@@ -13,16 +13,42 @@ const PATHS: Readonly<Record<string, ReactNode>> = {
       <path d="M8.2 16.5a2 2 0 0 0 3.6 0" />
     </>
   ),
+  platform: (
+    <>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M3 10h14M10 3c2 2 2.8 4.4 2.8 7s-.8 5-2.8 7c-2-2-2.8-4.4-2.8-7S8 5 10 3Z" />
+    </>
+  ),
   admin: (
     <>
       <path d="M10 2.8 16 5v4.6c0 3.6-2.5 6.3-6 7.6-3.5-1.3-6-4-6-7.6V5Z" />
       <path d="m7.5 10 1.8 1.8 3.4-3.6" />
     </>
   ),
+  staff: (
+    <>
+      <circle cx="7.5" cy="7" r="2.75" />
+      <path d="M2.5 16.5a5 5 0 0 1 10 0" />
+      <path d="M12.5 4.5a2.75 2.75 0 0 1 0 5.2M14.5 12a5 5 0 0 1 3 4.5" />
+    </>
+  ),
+  members: (
+    <>
+      <rect x="3" y="4" width="14" height="12" rx="1.5" />
+      <circle cx="7.5" cy="9" r="1.75" />
+      <path d="M5 13.5a2.5 2.5 0 0 1 5 0M12 8.5h3M12 11.5h3" />
+    </>
+  ),
   principal: (
     <>
       <path d="M3 6.5h14v9.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />
       <path d="M7 6.5V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 11h14" />
+    </>
+  ),
+  attendance: (
+    <>
+      <rect x="3" y="4" width="14" height="13" rx="1.5" />
+      <path d="M3 8h14M7 2.5V5.5M13 2.5V5.5M7.5 12.5l1.8 1.8 3.4-3.6" />
     </>
   ),
   billing: (

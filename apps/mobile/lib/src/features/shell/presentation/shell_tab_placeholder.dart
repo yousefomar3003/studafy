@@ -25,7 +25,9 @@ class ShellTabPlaceholder extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'shell.placeholderBody'.tr(),
-              style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],

@@ -79,4 +79,10 @@ export interface NotificationTypeVars {
   MATERIAL_INGEST_FAILED: {
     fileName: string;
   };
+  // Parent<->teacher messaging (000126). Written by apps/api/src/modules/messaging directly into
+  // app.notifications for the other participant of a thread.
+  DIRECT_MESSAGE: {
+    senderName: string;
+    preview: string;
+  };
 }

@@ -14,10 +14,9 @@ void main() {
 
     test('a draft or open session is inProgress', () {
       expect(
-        SessionAttendanceState.fromSessions(
-          [attendanceSession(classId: 'c1', status: 'open', period: 2)],
-          2,
-        ),
+        SessionAttendanceState.fromSessions([
+          attendanceSession(classId: 'c1', status: 'open', period: 2),
+        ], 2),
         SessionAttendanceState.inProgress,
       );
     });
@@ -25,10 +24,9 @@ void main() {
     test('a submitted or locked session is recorded', () {
       for (final status in ['submitted', 'locked']) {
         expect(
-          SessionAttendanceState.fromSessions(
-            [attendanceSession(classId: 'c1', status: status, period: 2)],
-            2,
-          ),
+          SessionAttendanceState.fromSessions([
+            attendanceSession(classId: 'c1', status: status, period: 2),
+          ], 2),
           SessionAttendanceState.recorded,
           reason: status,
         );
@@ -37,38 +35,29 @@ void main() {
 
     test('a cancelled session is treated as notStarted', () {
       expect(
-        SessionAttendanceState.fromSessions(
-          [attendanceSession(classId: 'c1', status: 'cancelled', period: 2)],
-          2,
-        ),
+        SessionAttendanceState.fromSessions([
+          attendanceSession(classId: 'c1', status: 'cancelled', period: 2),
+        ], 2),
         SessionAttendanceState.notStarted,
       );
     });
 
     test('only a session matching the period counts', () {
       expect(
-        SessionAttendanceState.fromSessions(
-          [attendanceSession(classId: 'c1', status: 'submitted', period: 5)],
-          2,
-        ),
+        SessionAttendanceState.fromSessions([
+          attendanceSession(classId: 'c1', status: 'submitted', period: 5),
+        ], 2),
         SessionAttendanceState.notStarted,
       );
     });
 
     test('a whole-day session (null period) counts for any period', () {
       expect(
-        SessionAttendanceState.fromSessions(
-          [attendanceSession(classId: 'c1', status: 'submitted')],
-          2,
-        ),
+        SessionAttendanceState.fromSessions([
+          attendanceSession(classId: 'c1', status: 'submitted'),
+        ], 2),
         SessionAttendanceState.recorded,
       );
-    });
-
-    test('only recorded stops inviting action', () {
-      expect(SessionAttendanceState.notStarted.invitesAction, isTrue);
-      expect(SessionAttendanceState.inProgress.invitesAction, isTrue);
-      expect(SessionAttendanceState.recorded.invitesAction, isFalse);
     });
   });
 }

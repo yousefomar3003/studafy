@@ -1,6 +1,6 @@
 # Weekly (or, in dev, hand-run) Postgres restore-and-verify job (ST-265). The task definition is
 # created in every environment, unconditionally — cheap, since a registered-but-never-run task
-# definition costs nothing — so infra/deploy/scripts/postgres-restore-verify.sh can `aws ecs
+# definition costs nothing — so infra/deploy/scripts/run-postgres-restore-verify.sh can `aws ecs
 # run-task` it by hand in dev for the "PITR to arbitrary timestamp demonstrated in dev" acceptance
 # criterion. Only the recurring EventBridge Scheduler schedule at the bottom of this file is gated
 # on var.automation_enabled, mirroring modules/erpnext's own site_setup task (inert task definition,
@@ -117,7 +117,7 @@ resource "aws_ecs_task_definition" "postgres_restore_verify" {
         { name = "REPORT_BUCKET", value = var.backups_archive_bucket_name },
         { name = "REPORT_PREFIX", value = "reports/postgres/restore-verify" },
         { name = "NAME_PREFIX", value = var.name_prefix },
-        # RESTORE_TIME is deliberately absent here — infra/deploy/scripts/postgres-restore-verify.sh
+        # RESTORE_TIME is deliberately absent here — infra/deploy/scripts/run-postgres-restore-verify.sh
         # sets it via a `run-task --overrides` container override for the dev PITR demo; the
         # schedule below never overrides it, so the weekly run always takes the latest restorable
         # time.

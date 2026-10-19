@@ -17,15 +17,18 @@ import 'package:studafy_mobile/src/features/student/domain/grade_report.dart';
 
 const _studentId = 'student-1';
 
-/// `currentStudentIdProvider`'s doc comment describes its `ref.watch(authSessionProvider)` as a
-/// cheap, side-effect-free dependency touch — but `authSessionProvider`'s default body builds
-/// `authClientProvider`, which (since ST-247's fix to that client's hardcoded-localhost base URL)
-/// now reads `appConfigProvider`, whose own default throws `StateError` until something provides
-/// one. A bare `ProviderContainer()` needs this override for the same reason `pumpStudafyApp` and
-/// `pumpAppShell` already provide one.
+/// Anything reaching the auth chain (`authSessionProvider` -> `authClientProvider`) reads
+/// `appConfigProvider`, whose own default throws `StateError` until something provides one (since
+/// ST-247's fix to that client's hardcoded-localhost base URL). A bare `ProviderContainer()` needs
+/// this override for the same reason `pumpStudafyApp` and `pumpAppShell` already provide one.
 final _appConfigOverride = appConfigProvider.overrideWithValue(
   AppConfig.fromEnvironment(AppEnvironment.dev),
 );
+
+/// The signed-in student's context left unresolved — what `currentStudentIdProvider` yields while
+/// `GET /api/students/me` is loading, has failed, or 404s (not a student). Overridden rather than
+/// left to its default, which would reach the real auth session and secure storage.
+final _unresolvedStudent = currentStudentIdProvider.overrideWithValue(null);
 
 Term _term(String id, {required int sequence, required String status}) {
   return Term.fromJson({
@@ -191,7 +194,9 @@ void main() {
 
   group('gradeReportProvider', () {
     test('is unavailable when the student context is unresolved', () {
-      final container = ProviderContainer(overrides: [_appConfigOverride]);
+      final container = ProviderContainer(
+        overrides: [_appConfigOverride, _unresolvedStudent],
+      );
       addTearDown(container.dispose);
 
       final status = container.read(gradeReportProvider);

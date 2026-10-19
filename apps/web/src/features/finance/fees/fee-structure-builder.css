@@ -12,12 +12,6 @@
   margin-bottom: var(--space-16);
 }
 
-.fee-builder__header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-12);
-}
-
 .fee-builder__filter {
   margin-bottom: var(--space-16);
   max-width: 320px;
@@ -299,62 +293,4 @@
 .fee-builder__preview-total td {
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-base);
-}
-
-/* --- Student picker (mirrors admin/audit's actor picker) --- */
-
-.fee-builder__student-selected {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-}
-
-.fee-builder__student-selected p {
-  margin: 0;
-}
-
-.fee-builder__student-picker {
-  position: relative;
-}
-
-.fee-builder__student-results {
-  list-style: none;
-  margin: var(--space-4) 0 0;
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  max-height: 240px;
-  overflow-y: auto;
-  background-color: var(--color-background);
-}
-
-.fee-builder__student-result {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-4);
-  border: none;
-  background: none;
-  padding: var(--space-8) var(--space-12);
-  cursor: pointer;
-  font: inherit;
-  text-align: start;
-}
-
-.fee-builder__student-result:hover,
-.fee-builder__student-result:focus-visible {
-  background-color: var(--color-surface);
-}
-
-.fee-builder__student-result span {
-  color: var(--color-muted-foreground);
-  font-size: var(--font-size-xs);
-}
-
-.fee-builder__student-empty {
-  padding: var(--space-8) var(--space-12);
-  color: var(--color-muted-foreground);
-  font-size: var(--font-size-sm);
 }

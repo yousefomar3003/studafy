@@ -20,12 +20,14 @@ import {
   studentListQuerySchema,
   studentListSchema,
   studentProfileSchema,
+  studentSelfSchema,
   updateStudentBodySchema,
 } from "../schemas";
 import {
   createStudent as createStudentService,
   getStudent,
   getStudentGuardians,
+  getStudentSelfByUserId,
   linkParentToStudent,
   listStudents,
   unlinkParentFromStudent,
@@ -34,8 +36,8 @@ import {
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { StudentProfile } from "../schemas";
-import type { StudentRow } from "../student-service";
+import type { StudentProfile, StudentSelf } from "../schemas";
+import type { StudentRow, StudentSelfRow } from "../student-service";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -96,6 +98,23 @@ function projectStudent(row: StudentRow, c: Context<AppEnv>): StudentProfile {
   } satisfies StudentProfile;
 }
 
+/**
+ * Project the caller's own student record (GET /api/students/me). Deliberately minimal: identity,
+ * display name, lifecycle status, and current enrollments — never admission or date-of-birth data.
+ */
+function projectStudentSelf(row: StudentSelfRow): StudentSelf {
+  return {
+    id: row.id,
+    school_id: row.school_id,
+    user_id: row.user_id,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    preferred_name: row.preferred_name,
+    status: row.status,
+    enrolled_class_ids: row.enrolled_class_ids,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Route definitions
 // ---------------------------------------------------------------------------
@@ -119,6 +138,29 @@ const listStudentsRoute = createRoute({
       },
     },
     [400, 401, 403, 429, 500],
+  ),
+});
+
+const getStudentMeRoute = createRoute({
+  method: "get",
+  path: "/api/students/me",
+  tags: ["Students"],
+  operationId: "getStudentMe",
+  summary: "Get own student record",
+  description:
+    "Returns the authenticated user's own student record and the ids of the active classes they " +
+    "are actively enrolled in. Resolved from the session's user, so a student can load it on any " +
+    "channel without needing the STUDENT_READ permission. 404 when the caller has no student " +
+    "record in this school.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    {
+      200: {
+        description: "The caller's own student record.",
+        schema: studentSelfSchema,
+      },
+    },
+    [401, 404, 500],
   ),
 });
 
@@ -270,17 +312,24 @@ const unlinkGuardianRoute = createRoute({
 export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
+  // `:studentId` is constrained to a UUID in the guards below so none of them match
+  // `/api/students/me`, which is open on every channel and to a STUDENT without STUDENT_READ
+  // (see getStudentMeRoute) and is what the mobile student Today screen resolves first.
+
   // --- Channel guard: mutations restricted to web sessions ---
   const channelGuard = requireChannel(AUTH_CHANNELS.WEB);
   routes.use("/api/students", channelGuard);
-  routes.use("/api/students/:studentId", channelGuard);
+  routes.use("/api/students/:studentId{[0-9a-fA-F-]{36}}", channelGuard);
 
   // --- Permission guards ---
   routes.use("/api/students", requirePermission(PERMISSIONS.STUDENT_READ));
   routes.use("/api/students", onlyMethods(["POST"], requirePermission(PERMISSIONS.STUDENT_CREATE)));
-  routes.use("/api/students/:studentId", requirePermission(PERMISSIONS.STUDENT_READ));
   routes.use(
-    "/api/students/:studentId",
+    "/api/students/:studentId{[0-9a-fA-F-]{36}}",
+    requirePermission(PERMISSIONS.STUDENT_READ),
+  );
+  routes.use(
+    "/api/students/:studentId{[0-9a-fA-F-]{36}}",
     onlyMethods(["PATCH"], requirePermission(PERMISSIONS.STUDENT_UPDATE)),
   );
   routes.use("/api/students/:studentId/guardians", requirePermission(PERMISSIONS.STUDENT_READ));
@@ -295,7 +344,7 @@ export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   // --- Audit declarations ---
   routes.use("/api/students", auditAction("insert", "students"));
-  routes.use("/api/students/:studentId", auditAction("update", "students"));
+  routes.use("/api/students/:studentId{[0-9a-fA-F-]{36}}", auditAction("update", "students"));
   routes.use("/api/students/:studentId/guardians", auditAction("insert", "parent_child_links"));
   routes.use(
     "/api/students/:studentId/guardians/:userId",
@@ -317,6 +366,20 @@ export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
 
     const projected = rows.map((row) => projectStudent(row, c));
     return c.json({ students: projected, next_cursor }, 200);
+  });
+
+  routes.openapi(getStudentMeRoute, async (c) => {
+    const auth = requireAuth(c);
+
+    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
+      getStudentSelfByUserId(tx, auth.schoolId, auth.userId),
+    );
+
+    if (!row) {
+      throw new HTTPException(404, { message: "Student profile not found" });
+    }
+
+    return c.json(projectStudentSelf(row), 200);
   });
 
   routes.openapi(getStudentRoute, async (c) => {

@@ -23,10 +23,11 @@ class AttendanceStatusChip extends StatelessWidget {
     AttendanceMarkStatus.excused => 'attendance.status.excused',
   };
 
-  static StatusPillTone toneFor(AttendanceMarkStatus status) => switch (status) {
-    AttendanceMarkStatus.present => StatusPillTone.success,
-    AttendanceMarkStatus.absent => StatusPillTone.danger,
-    AttendanceMarkStatus.late => StatusPillTone.warning,
-    AttendanceMarkStatus.excused => StatusPillTone.neutral,
-  };
+  static StatusPillTone toneFor(AttendanceMarkStatus status) =>
+      switch (status) {
+        AttendanceMarkStatus.present => StatusPillTone.success,
+        AttendanceMarkStatus.absent => StatusPillTone.danger,
+        AttendanceMarkStatus.late => StatusPillTone.warning,
+        AttendanceMarkStatus.excused => StatusPillTone.neutral,
+      };
 }

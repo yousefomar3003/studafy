@@ -48,6 +48,8 @@ export async function signAccessToken(
     entitlements_ver: params.entitlements_ver,
     channel: params.channel,
     subscription_status: params.subscription_status,
+    // Omitted rather than `false` so every token without a pending deletion is byte-for-byte unchanged.
+    ...(params.deletion_pending ? { deletion_pending: true } : {}),
   })
     .setProtectedHeader({ alg: "RS256", kid: key.kid })
     .setSubject(params.sub)

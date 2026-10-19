@@ -16,6 +16,8 @@ import type {
   ParsedWebhookEvent,
   PaymentProviderPort,
   PauseSubscriptionInput,
+  RefundInput,
+  RefundResult,
   ResumeSubscriptionInput,
   ReverseCancellationInput,
   ScheduleCancellationInput,
@@ -160,6 +162,10 @@ export class FakeStripeProvider implements PaymentProviderPort {
 
   async listInvoices(_input: ListInvoicesInput): Promise<ListInvoicesResult> {
     return { invoices: [], hasMore: false };
+  }
+
+  async refund(input: RefundInput): Promise<RefundResult> {
+    return { providerRefundId: `re_fake_${input.invoiceId}`, status: "succeeded" };
   }
 }
 

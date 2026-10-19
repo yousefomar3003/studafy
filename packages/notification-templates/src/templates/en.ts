@@ -95,4 +95,9 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       'Your file "{fileName}" could not be processed and is not searchable. You can try again from the material page.',
   },
+  [NOTIFICATION_TYPES.DIRECT_MESSAGE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "New message from {senderName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{senderName}: {preview}",
+    [NOTIFICATION_CHANNELS.EMAIL]: '{senderName} sent you a message: "{preview}"',
+  },
 } as const satisfies LocaleTemplateSet;

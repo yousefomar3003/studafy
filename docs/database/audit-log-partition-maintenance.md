@@ -327,7 +327,7 @@ first step and is reversible; dropping is not.
 To re-measure the 100-log batch target:
 
 ```
-docker compose -f db/compose.yml up -d --wait
+docker compose up -d --wait test-postgres test-redis
 AUDIT_LOGS_BENCHMARK=1 TEST_DATABASE_URL=postgresql://… \
   bun test tests/audit-logs-benchmark.test.ts   # in packages/db
 ```

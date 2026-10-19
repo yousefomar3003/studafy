@@ -74,7 +74,7 @@
 
 .billing-overview__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-16);
   align-items: start;
 }
@@ -161,10 +161,6 @@
 /* --- Invoice history --- */
 
 .billing-invoices__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-16);
   margin-bottom: var(--space-16);
 }
 
@@ -183,4 +179,34 @@
 
 .ai-purchase__intro {
   max-width: 60ch;
+}
+
+/* --- Refund request: a plain text link, deliberately quieter than the buttons above it --- */
+
+.billing-refund {
+  margin: var(--space-12) 0 0;
+  font-size: var(--font-size-sm);
+}
+
+.billing-refund__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-muted-foreground);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.billing-refund__link:hover {
+  color: var(--color-foreground);
+}
+
+.billing-refund__status {
+  margin-bottom: var(--space-16);
+}
+
+.billing-refund__status-title {
+  margin: 0 0 var(--space-4);
+  font-weight: var(--font-weight-medium);
 }

@@ -13,6 +13,13 @@ export const ERROR_CODES = {
   // Distinct from AUTH_TOKEN_INVALID so a client can tell "refresh and retry" apart from "your
   // credential is bad"; the remedy is one call to POST /api/auth/refresh.
   AUTH_ENTITLEMENTS_STALE: "AUTH_ENTITLEMENTS_STALE",
+  // Member-code sign-in (000141). The account is still on the default password: no session until the
+  // request also carries a new one.
+  AUTH_PASSWORD_CHANGE_REQUIRED: "AUTH_PASSWORD_CHANGE_REQUIRED",
+  // Too many wrong passwords; sign-in is refused until the lockout window passes.
+  AUTH_ACCOUNT_LOCKED: "AUTH_ACCOUNT_LOCKED",
+  // The proposed new password breaks the password policy (too short, the default, the username, …).
+  AUTH_PASSWORD_REJECTED: "AUTH_PASSWORD_REJECTED",
 
   // Invitation verification — public invitation lifecycle resolution.
   INVITATION_INVALID: "INVITATION_INVALID",
@@ -20,6 +27,9 @@ export const ERROR_CODES = {
   REVOKED: "REVOKED",
   CONSUMED: "CONSUMED",
   SCHOOL_SUSPENDED: "SCHOOL_SUSPENDED",
+  // The account's roles are mobile-only (students, parents, teachers, attendance officers): no web
+  // session is issued or refreshed for it. See `MOBILE_ONLY_ROLES` in roles.ts.
+  WEB_ACCESS_MOBILE_ONLY: "WEB_ACCESS_MOBILE_ONLY",
 
   // OAuth — external identity provider flow.
   OAUTH_STATE_INVALID: "OAUTH_STATE_INVALID",
@@ -59,6 +69,21 @@ export const ERROR_CODES = {
   // School registration — duplicate school email or slug on registration.
   SCHOOL_EMAIL_DUPLICATE: "SCHOOL_EMAIL_DUPLICATE",
   SCHOOL_SLUG_DUPLICATE: "SCHOOL_SLUG_DUPLICATE",
+
+  // School sign-up applications — the website's Google/Microsoft sign-up flow for a school owner.
+  // The applicant has no session cookie (never signed in, or it expired).
+  SCHOOL_APPLICATION_SESSION_REQUIRED: "SCHOOL_APPLICATION_SESSION_REQUIRED",
+  // This sign-in identity already has an application awaiting review.
+  SCHOOL_APPLICATION_ALREADY_PENDING: "SCHOOL_APPLICATION_ALREADY_PENDING",
+  // This sign-in identity already belongs to a Studafy account; the person should sign in instead.
+  SCHOOL_APPLICATION_ACCOUNT_EXISTS: "SCHOOL_APPLICATION_ACCOUNT_EXISTS",
+  // The proof-of-ownership upload is missing, of the wrong type, or too large.
+  SCHOOL_APPLICATION_PROOF_INVALID: "SCHOOL_APPLICATION_PROOF_INVALID",
+  // Approve/reject on an application that has already been decided.
+  SCHOOL_APPLICATION_NOT_PENDING: "SCHOOL_APPLICATION_NOT_PENDING",
+
+  // School closure — the typed confirmation did not match the school's name.
+  SCHOOL_CLOSURE_NAME_MISMATCH: "SCHOOL_CLOSURE_NAME_MISMATCH",
 
   // School email verification — the presented token failed server-side verification.
   VERIFICATION_TOKEN_INVALID: "VERIFICATION_TOKEN_INVALID",
@@ -170,12 +195,6 @@ export const ERROR_CODES = {
   REFUND_IN_PROGRESS: "REFUND_IN_PROGRESS",
   REFUND_IDEMPOTENCY_KEY_REQUIRED: "REFUND_IDEMPOTENCY_KEY_REQUIRED",
 
-  // Finance gateway — scholarships / discounts.
-  SCHOLARSHIP_DISCOUNT_NOT_FOUND: "SCHOLARSHIP_DISCOUNT_NOT_FOUND",
-  AWARD_NOT_FOUND: "AWARD_NOT_FOUND",
-  AWARD_INVALID_STATUS_TRANSITION: "AWARD_INVALID_STATUS_TRANSITION",
-  AWARD_CONFIRM_SELF: "AWARD_CONFIRM_SELF",
-
   // Import — CSV import lifecycle.
   IMPORT_NOT_FOUND: "IMPORT_NOT_FOUND",
   IMPORT_INVALID_STATE: "IMPORT_INVALID_STATE",
@@ -233,6 +252,15 @@ export const ERROR_CODES = {
   // Self-service account deletion. Apple's /auth/revoke rejected or could not be reached; the
   // deletion is rolled back so the user can retry rather than end up deleted with a live Apple grant.
   APPLE_TOKEN_REVOCATION_FAILED: "APPLE_TOKEN_REVOCATION_FAILED",
+  // The account has a deletion scheduled (000143's 14-day grace period). Every route but the few
+  // that show or cancel it refuses the session until the deletion is cancelled.
+  ACCOUNT_DELETION_SCHEDULED: "ACCOUNT_DELETION_SCHEDULED",
+  // A deletion is already scheduled for this account; cancel it or wait for it to run.
+  ACCOUNT_DELETION_ALREADY_SCHEDULED: "ACCOUNT_DELETION_ALREADY_SCHEDULED",
+  // Cancelling, but no deletion is scheduled (never asked, already cancelled, or already run).
+  ACCOUNT_DELETION_NOT_SCHEDULED: "ACCOUNT_DELETION_NOT_SCHEDULED",
+  // A member-ID account confirmed deletion with a member ID that is not theirs, or a wrong password.
+  ACCOUNT_DELETION_VERIFICATION_FAILED: "ACCOUNT_DELETION_VERIFICATION_FAILED",
 
   // Announcement management (ST-194). The audience class named at compose time doesn't exist in
   // this school.
@@ -278,6 +306,9 @@ export const ERROR_CODES = {
   GRADE_CONCURRENT_EDIT: "GRADE_CONCURRENT_EDIT",
   GRADE_SCORE_EXCEEDS_MAX: "GRADE_SCORE_EXCEEDS_MAX",
   GRADE_INVALID_STATUS_TRANSITION: "GRADE_INVALID_STATUS_TRANSITION",
+  // Grade revisions — corrections to published grades awaiting approval.
+  GRADE_REVISION_NOT_FOUND: "GRADE_REVISION_NOT_FOUND",
+  GRADE_REVISION_ALREADY_PENDING: "GRADE_REVISION_ALREADY_PENDING",
 
   // Discipline — incident and action lifecycle.
   DISCIPLINE_INCIDENT_NOT_FOUND: "DISCIPLINE_INCIDENT_NOT_FOUND",
@@ -414,6 +445,28 @@ export const ERROR_CODES = {
   SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",
   SUBSCRIPTION_CANCELLATION_NOT_PENDING: "SUBSCRIPTION_CANCELLATION_NOT_PENDING",
   SUBSCRIPTION_NOT_LINKED_TO_PROVIDER: "SUBSCRIPTION_NOT_LINKED_TO_PROVIDER",
+
+  // Subscription refund requests: a school's plan or a student's AI add-on, reviewed by Studafy
+  // staff. Distinct from the REFUND_* codes above, which are school-fee refunds in ERPNext.
+  // ALREADY_REQUESTED is the one-open-request rule; PAYMENT_NOT_REFUNDABLE means the named
+  // payment is not a paid charge on the school's provider account; AMOUNT_EXCEEDS_PAYMENT and
+  // PAYMENT_REQUIRED are the approval-time checks on what is actually sent to the provider.
+  SUBSCRIPTION_REFUND_NOT_FOUND: "SUBSCRIPTION_REFUND_NOT_FOUND",
+  SUBSCRIPTION_REFUND_ALREADY_REQUESTED: "SUBSCRIPTION_REFUND_ALREADY_REQUESTED",
+  SUBSCRIPTION_REFUND_INVALID_TRANSITION: "SUBSCRIPTION_REFUND_INVALID_TRANSITION",
+  SUBSCRIPTION_REFUND_PAYMENT_NOT_REFUNDABLE: "SUBSCRIPTION_REFUND_PAYMENT_NOT_REFUNDABLE",
+  SUBSCRIPTION_REFUND_PAYMENT_REQUIRED: "SUBSCRIPTION_REFUND_PAYMENT_REQUIRED",
+  SUBSCRIPTION_REFUND_AMOUNT_EXCEEDS_PAYMENT: "SUBSCRIPTION_REFUND_AMOUNT_EXCEEDS_PAYMENT",
+
+  // Parent<->teacher messaging (000135/000136). MESSAGING_BLOCKED is a send or a new thread refused
+  // because a block stands between the two users (either direction); history stays readable.
+  // MESSAGE_REPORT_ALREADY_OPEN is the one-open-report rule (same reporter, same message or, for a
+  // general report, same thread). MESSAGE_REPORT_NOT_FOUND covers a review-queue lookup and
+  // MESSAGE_REPORT_INVALID_TRANSITION a status change the review workflow does not allow.
+  MESSAGING_BLOCKED: "MESSAGING_BLOCKED",
+  MESSAGE_REPORT_ALREADY_OPEN: "MESSAGE_REPORT_ALREADY_OPEN",
+  MESSAGE_REPORT_NOT_FOUND: "MESSAGE_REPORT_NOT_FOUND",
+  MESSAGE_REPORT_INVALID_TRANSITION: "MESSAGE_REPORT_INVALID_TRANSITION",
 
   // Uncategorized server-side failure.
   INTERNAL_ERROR: "INTERNAL_ERROR",

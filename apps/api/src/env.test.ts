@@ -142,6 +142,19 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ RELEASE_VERSION: "" })).toThrow(EnvValidationError);
   });
 
+  test("treats an empty SENTRY_DSN/SENTRY_ENVIRONMENT as unset and rejects a non-URL DSN", () => {
+    const env = loadEnv({ SENTRY_DSN: "", SENTRY_ENVIRONMENT: "" });
+    expect(env.SENTRY_DSN).toBeUndefined();
+    expect(env.SENTRY_ENVIRONMENT).toBeUndefined();
+    expect(
+      loadEnv({ SENTRY_DSN: "https://public@o0.ingest.sentry.io/1", SENTRY_ENVIRONMENT: "prod" }),
+    ).toMatchObject({
+      SENTRY_DSN: "https://public@o0.ingest.sentry.io/1",
+      SENTRY_ENVIRONMENT: "prod",
+    });
+    expect(() => loadEnv({ SENTRY_DSN: "not-a-dsn" })).toThrow(EnvValidationError);
+  });
+
   test("does not require RELEASE_VERSION in production", () => {
     // A missing release name must degrade to "unknown" in the logs, never block a boot.
     expect(

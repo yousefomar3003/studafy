@@ -31,10 +31,17 @@ function makeOverview(overrides: Record<string, unknown> = {}) {
 }
 
 let currentOverview = makeOverview();
+let refundRequests: Record<string, unknown>[] = [];
 
 const getMock = mock((path: string) => {
   if (path === "/api/subscriptions/current") {
     return Promise.resolve({ data: currentOverview });
+  }
+  if (path === "/api/subscriptions/current/refund-requests") {
+    return Promise.resolve({ data: { requests: refundRequests } });
+  }
+  if (path === "/api/subscriptions/current/invoices") {
+    return Promise.resolve({ data: { invoices: [], hasMore: false } });
   }
   return Promise.resolve({ data: undefined });
 });
@@ -55,6 +62,9 @@ const postMock = mock((path: string) => {
         currentPeriodEnd: "2026-09-01T00:00:00.000Z",
       },
     });
+  }
+  if (path === "/api/subscriptions/current/refund-requests") {
+    return Promise.resolve({ data: { id: "refund-1", status: "pending" } });
   }
   if (path === "/api/subscriptions/current/cancel/reverse") {
     return Promise.resolve({
@@ -122,6 +132,7 @@ afterEach(() => {
   postMock.mockClear();
   assignMock.mockClear();
   currentOverview = makeOverview();
+  refundRequests = [];
 });
 
 describe("BillingOverviewPage", () => {
@@ -199,5 +210,51 @@ describe("BillingOverviewPage", () => {
 
     expect(await screen.findByText("Cancellation undone")).toBeTruthy();
     expect(postMock).toHaveBeenCalledWith("/api/subscriptions/current/cancel/reverse");
+  });
+
+  test("the quiet refund link files a request with the chosen reason", async () => {
+    await renderPage(await loadPage());
+
+    await screen.findByText("Studafy Growth");
+    fireEvent.click(screen.getByRole("button", { name: "Request a refund" }));
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(await within(dialog).findByRole("combobox", { name: "Reason" }));
+    fireEvent.click(within(dialog).getByRole("option", { name: "Charged more than once" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
+
+    await screen.findByText("Refund request sent");
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/subscriptions/current/refund-requests",
+      expect.objectContaining({ body: expect.objectContaining({ reason: "duplicate_charge" }) }),
+    );
+  });
+
+  test("an open refund request shows its status instead of the form", async () => {
+    refundRequests = [
+      {
+        id: "refund-1",
+        scope: "school",
+        status: "pending",
+        reason: "other",
+        details: null,
+        paymentReference: null,
+        amountMinor: null,
+        currencyCode: null,
+        refundedAmountMinor: null,
+        reviewNote: null,
+        reviewedAt: null,
+        refundedAt: null,
+        createdAt: "2026-08-20T00:00:00.000Z",
+      },
+    ];
+    await renderPage(await loadPage());
+
+    await screen.findByText("Studafy Growth");
+    fireEvent.click(screen.getByRole("button", { name: "Request a refund" }));
+
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText(/Waiting for review/);
+    expect(within(dialog).queryByRole("button", { name: "Send request" })).toBeNull();
   });
 });

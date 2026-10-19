@@ -40,7 +40,11 @@ export default defineConfig({
       "@docs": fileURLToPath(new URL("../../docs/", import.meta.url)),
     },
   },
+  // 5180, not Vite's default 5173: another local project owns 5173. strictPort fails fast instead
+  // of silently moving to a port the API's local CORS allowlist does not know.
   server: {
+    port: 5180,
+    strictPort: true,
     fs: {
       allow: [repoRoot],
     },

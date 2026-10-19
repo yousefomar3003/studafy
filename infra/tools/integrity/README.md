@@ -34,7 +34,7 @@ only 100 are embedded.
 - **enrollment-invoice-consistency** — every invoice and every payment for this school must belong
   to a student who has at least one enrollment row in the school (any status), and every paid
   student must have at least one invoice. "Enrolled but not yet invoiced" is deliberately **not** a
-  finding (the demo seed invoices only 4 of 8 students).
+  finding (the demo seed invoices only 5 of 9 students).
 - **grade-weight-sums** — the active `app.assessment_categories` of each gradebook must weigh to
   exactly 100 (the invariant `INVALID_GRADEBOOK_WEIGHT_TOTAL` enforces in the application layer).
   Gradebooks with no active categories vacuously pass.
@@ -55,7 +55,7 @@ only 100 are embedded.
 # local: compose Postgres (port 54329, superuser studafy_test) already migrated & seeded
 bun run db:up && bun run db:migrate && bun run db:seed
 
-# set the same connection the API/tooling uses locally (Infra section of .env, or db/compose.yml)
+# set the same connection the API/tooling uses locally (Infra section of .env, or compose.yml test profile)
 export PGHOST=127.0.0.1 PGPORT=54329 PGUSER=studafy_test PGPASSWORD=studafy_test PGDATABASE=studafy
 
 ./run-integrity-check.sh --school-slug studafy-demo-academy        # -> exit 0, report written

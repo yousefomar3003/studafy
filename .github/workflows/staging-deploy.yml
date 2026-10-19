@@ -45,8 +45,9 @@ env:
 
 jobs:
   # --- Build ---------------------------------------------------------------------------------
-  # Builds, pushes, cosign-signs, and (for `web`) uploads Sentry source maps for all six images
-  # (api/realtime/workers/web/erpnext/migrations) into staging's registry — identical matrix to
+  # Builds, pushes, cosign-signs, and (for `web`) uploads Sentry source maps for every image in
+  # release.yml's matrix (the app images, migrations, erpnext, the observability stack and
+  # backup-verify) into staging's registry — identical matrix to
   # build-and-sign.yml's dev call. `web`/`erpnext` are unused by the jobs below (see
   # infra/deploy/README.md's "Why not apps/web" and modules/erpnext/README.md's own promotion
   # story) but are built anyway for the same reason build-and-sign.yml already does: release.yml
@@ -147,6 +148,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gettext-base jq
       - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
         working-directory: infra/terraform
+      # deploy.sh/rollback.sh read ECS_CLUSTER, subnets and target groups from environments/staging.env;
+      # fill them from this environment's terraform outputs first.
+      - run: ./scripts/populate-env.sh staging
+        working-directory: infra/deploy
       - run: ./scripts/deploy.sh ${{ matrix.service }} staging "$IMAGE_TAG"
         working-directory: infra/deploy
 
@@ -315,6 +320,10 @@ jobs:
           aws-region: eu-central-1
       - run: terraform init -reconfigure -backend-config=environments/staging/backend.hcl
         working-directory: infra/terraform
+      # deploy.sh/rollback.sh read ECS_CLUSTER, subnets and target groups from environments/staging.env;
+      # fill them from this environment's terraform outputs first.
+      - run: ./scripts/populate-env.sh staging
+        working-directory: infra/deploy
       - run: ./scripts/rollback.sh ${{ matrix.service }} staging
         working-directory: infra/deploy
 

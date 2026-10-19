@@ -102,8 +102,8 @@ normalized_email)`) — the same person may hold an account in more than one sch
 ## Role-assignment model
 
 `user_roles` is a pure junction table with natural primary key `(school_id, user_id, role)`;
-`role` is `app.user_role`, the seven fixed values from `@studafy/constants` (`SUPER_ADMIN`,
-`ORG_ADMIN`, `INSTRUCTOR`, `TEACHING_ASSISTANT`, `STUDENT`, `GUEST`, `SUPPORT_AGENT`). A role is
+`role` is `app.user_role`, the fixed values from `@studafy/constants` (`ROLES` in
+`packages/constants/src/roles.ts`). A role is
 assigned at most once per user; there are no role arrays, CSV, or JSONB. The composite foreign
 key `(user_id, school_id) → users(id, school_id)` guarantees an assignment stays within the
 user's own school. Row-level scoping and permission checks remain application responsibilities

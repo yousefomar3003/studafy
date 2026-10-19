@@ -7,10 +7,14 @@ import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import {
   getAttendanceSession,
+  listClassRoster,
+  listSessionRecords,
+  listStudentAttendance,
   listAttendanceSessions,
   openAttendanceSession,
   recordAttendanceBatch,
@@ -24,7 +28,13 @@ import {
   batchRecordAttendanceBodySchema,
   batchRecordAttendanceResponseSchema,
   createAttendanceSessionBodySchema,
+  attendanceRosterSchema,
+  attendanceSessionRecordsSchema,
+  classIdParamSchema,
   sessionIdParamSchema,
+  studentAttendanceQuerySchema,
+  studentAttendanceRecordsSchema,
+  studentIdParamSchema,
   updateAttendanceSessionBodySchema,
 } from "../schemas";
 
@@ -122,6 +132,66 @@ const getSessionRoute = createRoute({
   ),
 });
 
+const classRosterRoute = createRoute({
+  method: "get",
+  path: "/api/attendance/classes/{classId}/roster",
+  tags: ["Attendance"],
+  operationId: "getAttendanceClassRoster",
+  summary: "List a class's register roster",
+  description:
+    "The class's actively enrolled students with display names only, for taking a register. " +
+    "Open on web and mobile (unlike the student directory, which is web-only because it carries " +
+    "the full profile). Visible to the class's teachers, school admins and the attendance officer.",
+  security: [{ bearerAuth: [] }],
+  request: { params: classIdParamSchema },
+  responses: standardResponses(
+    { 200: { description: "The roster.", schema: attendanceRosterSchema } },
+    [401, 403, 404, 500],
+  ),
+});
+
+const listSessionRecordsRoute = createRoute({
+  method: "get",
+  path: "/api/attendance/sessions/{sessionId}/records",
+  tags: ["Attendance"],
+  operationId: "listAttendanceSessionRecords",
+  summary: "List the records taken in an attendance session",
+  description:
+    "Returns every attendance record already taken in the session, so a register can be re-opened " +
+    "showing what was marked. Visibility follows the same row scope as the session itself: the " +
+    "class's teacher, a school admin, or the school's attendance officer.",
+  security: [{ bearerAuth: [] }],
+  request: { params: sessionIdParamSchema },
+  responses: standardResponses(
+    {
+      200: {
+        description: "The session's records.",
+        schema: attendanceSessionRecordsSchema,
+      },
+    },
+    [401, 403, 404, 500],
+  ),
+});
+
+const listStudentAttendanceRoute = createRoute({
+  method: "get",
+  path: "/api/attendance/students/{studentId}/records",
+  tags: ["Attendance"],
+  operationId: "listStudentAttendanceRecords",
+  summary: "List one student's attendance records in a date range",
+  description:
+    "Every attendance record for the student in sessions dated within the range (at most 366 " +
+    "days), newest first, with the session's date, period and class. Row scope applies: a teacher " +
+    "sees only sessions of classes they teach; the attendance officer, principal and school admin " +
+    "see the whole school.",
+  security: [{ bearerAuth: [] }],
+  request: { params: studentIdParamSchema, query: studentAttendanceQuerySchema },
+  responses: standardResponses(
+    { 200: { description: "The student's records.", schema: studentAttendanceRecordsSchema } },
+    [400, 401, 403, 500],
+  ),
+});
+
 const updateSessionStatusRoute = createRoute({
   method: "patch",
   path: "/api/attendance/sessions/{sessionId}",
@@ -212,6 +282,26 @@ export function attendanceSessionRoutes(
     requirePermission(PERMISSIONS.ATTENDANCE_RECORD_CREATE),
   );
 
+  routes.use(
+    "/api/attendance/sessions/:sessionId/records",
+    requirePermission(PERMISSIONS.ATTENDANCE_RECORD_READ),
+  );
+  routes.use(
+    "/api/attendance/classes/:classId/roster",
+    requirePermission(PERMISSIONS.ATTENDANCE_RECORD_READ),
+  );
+  routes.use(
+    "/api/attendance/students/:studentId/records",
+    requirePermission(PERMISSIONS.ATTENDANCE_RECORD_READ),
+  );
+
+  // Opening a session and moving it through its lifecycle are attendance-taking writes. Without a
+  // guard any signed-in member who could see a class (a student sees their own) could open, cancel
+  // or lock its sessions; the handlers have no teacher check of their own.
+  const takeAttendance = requirePermission(PERMISSIONS.ATTENDANCE_RECORD_CREATE);
+  routes.use("/api/attendance/sessions", onlyMethods(["POST"], takeAttendance));
+  routes.use("/api/attendance/sessions/:sessionId", onlyMethods(["PATCH"], takeAttendance));
+
   // --- Batch record attendance ---
 
   routes.openapi(batchRecordAttendanceRoute, async (c) => {
@@ -279,6 +369,52 @@ export function attendanceSessionRoutes(
     );
 
     return c.json({ attendance_sessions: rows, total }, 200);
+  });
+
+  // --- A class's register roster ---
+
+  routes.openapi(classRosterRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { classId } = c.req.valid("param");
+
+    const students = await withTenantTx(database, tenantFrom(c), (tx) =>
+      listClassRoster(tx, auth.schoolId, classId),
+    );
+
+    if (!students) {
+      throw new HTTPException(404, { message: "Class not found" });
+    }
+
+    return c.json({ class_id: classId, students }, 200);
+  });
+
+  // --- List a session's records ---
+
+  routes.openapi(listStudentAttendanceRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { studentId } = c.req.valid("param");
+    const { start_date, end_date } = c.req.valid("query");
+
+    const records = await withTenantTx(database, tenantFrom(c), (tx) =>
+      listStudentAttendance(tx, auth.schoolId, studentId, start_date, end_date),
+    );
+
+    return c.json({ student_id: studentId, records }, 200);
+  });
+
+  routes.openapi(listSessionRecordsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { sessionId } = c.req.valid("param");
+
+    const records = await withTenantTx(database, tenantFrom(c), (tx) =>
+      listSessionRecords(tx, auth.schoolId, sessionId),
+    );
+
+    if (!records) {
+      throw new HTTPException(404, { message: "Attendance session not found" });
+    }
+
+    return c.json({ attendance_session_id: sessionId, records }, 200);
   });
 
   // --- Get session ---

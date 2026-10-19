@@ -64,6 +64,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/schools/resend-verification",
   // School settings (ST-090). Gated on ORGANIZATION_MANAGE_SETTINGS.
   "PATCH /api/schools/current/settings",
+  // School closure. Gated on ORGANIZATION_CLOSE, plus an ORG_ADMIN role check in the handler.
+  "POST /api/schools/current/closure",
   // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
   // school context is sufficient — no cross-user row-level permission.
   "POST /api/schools/{schoolId}/provision",
@@ -90,6 +92,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/users/{userId}",
   "PATCH /api/users/{userId}/role",
   "PATCH /api/users/{userId}/deactivate",
+  // Member password reset (000141), gated on USER_UPDATE.
+  "POST /api/users/{userId}/password/reset",
   // Student profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards
   // for STUDENT_READ, STUDENT_CREATE, and STUDENT_UPDATE.
   "POST /api/students",
@@ -175,8 +179,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
   "POST /api/grades/config/gradebooks/{gradebookId}/scheme/link",
   "POST /api/grades/config/schemes",
-  // Attendance sessions. Tenant-scoped session management protected by requireAuth; school-level
-  // data with no cross-user row-level permission.
+  // Attendance. Batch recording and session open/status changes are guarded by requirePermission()
+  // on ATTENDANCE_RECORD_CREATE; report export on ATTENDANCE_REPORT_EXPORT.
   "POST /api/attendance/records/batch",
   "POST /api/attendance/reports/export",
   "POST /api/attendance/sessions",
@@ -191,6 +195,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+  "POST /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/revisions",
+  "PATCH /api/grades/gradebooks/{gradebookId}/revisions/{revisionId}/withdraw",
   // Discipline incidents & actions. Guarded per method by requirePermissionIn() on
   // DISCIPLIN_INCIDENT_CREATE/READ/UPDATE/RESOLVE and DISCIPLINE_ACTION_CREATE/READ/UPDATE.
   // Finance gateway (ST-119). Guarded by requirePermission(BILLING_UPDATE); FINANCE_PERMISSIONS
@@ -210,6 +216,19 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/school-events",
   "PATCH /api/school-events/{eventId}",
   "DELETE /api/school-events/{eventId}",
+  // Parent<->teacher messaging (000127), gated on MESSAGE_SEND / MESSAGE_READ via requirePermission;
+  // RLS then limits every thread to its two participants.
+  "POST /api/messaging/conversations",
+  "POST /api/messaging/conversations/{conversationId}/messages",
+  "POST /api/messaging/conversations/{conversationId}/read",
+  // Teacher-initiated threads (000130), gated on MESSAGE_SEND via requirePermission.
+  "POST /api/messaging/teacher-conversations",
+  // Blocks (000135) and reports (000136): gated on MESSAGE_READ (safety actions open to every
+  // reader of a thread); the review-queue update on MESSAGE_REPORT_REVIEW.
+  "POST /api/messaging/conversations/{conversationId}/block",
+  "DELETE /api/messaging/conversations/{conversationId}/block",
+  "POST /api/messaging/conversations/{conversationId}/reports",
+  "PATCH /api/messaging/reports/{reportId}",
   // ST-122. Fee schedule generation gated on BILLING_UPDATE via requirePermission middleware.
   "POST /api/finance/fee-schedules/generate",
   // ST-122. Internal API-key-authenticated reconciliation job; listed here for inventory accuracy
@@ -259,10 +278,6 @@ const EXPECTED_MUTATING_ROUTES = [
   // Approval queue (ST-115). Atomic bulk approve/reject with per-item partial-failure.
   // Gated on APPROVAL_REVIEW permission via requirePermission middleware.
   "POST /api/approvals/bulk-decision",
-  // Scholarship/discount awards (ST-119 extension). Maker-checker workflow gated on
-  // BILLING_UPDATE permission via requirePermission middleware.
-  "POST /api/finance/scholarship-discounts/awards",
-  "POST /api/finance/scholarship-discounts/awards/{awardId}/confirm",
   // Refund processing (ST-124). Maker-checker workflow gated on BILLING_REFUND permission
   // via requirePermission middleware in routes.ts.
   "POST /api/finance/refunds/initiate",
@@ -283,10 +298,17 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/privacy/me/dsr",
   // Self-service account deletion — the caller is always the subject (never a parameter).
   "POST /api/account/deletion",
+  "DELETE /api/account/deletion",
   // Public account deletion (ST-302) — unauthenticated; captcha-gated request, then a one-time
   // emailed token.
   "POST /api/account/deletion-requests",
   "POST /api/account/deletion-requests/confirm",
+  // Public "Talk to us" sales inquiry — unauthenticated; captcha-gated and rate-limited.
+  "POST /api/inquiries",
+  // School sign-up applicants — no account yet; authenticated by the applicant session cookie.
+  "POST /api/school-applications/me",
+  "POST /api/school-applications/me/proof-upload-url",
+  "POST /api/school-applications/me/sign-out",
   // Notification preferences (ST-143). Self-service on the caller's own rows; the mandatory-type
   // and digest-eligibility rules are enforced in the handler and, redundantly, by CHECK constraints
   // in migration 000083 — there is no other user's row this could reach.
@@ -295,6 +317,13 @@ const EXPECTED_MUTATING_ROUTES = [
   // cancellation-routes.ts.
   "POST /api/subscriptions/current/cancel",
   "POST /api/subscriptions/current/cancel/reverse",
+  // Subscription refund requests. The school plan's is guarded by ORGANIZATION_MANAGE_BILLING and
+  // the console decisions by platform:manage (subscriptions/routes/refund-*.ts); the AI add-on's is
+  // exempt below.
+  "POST /api/subscriptions/current/refund-requests",
+  "POST /api/subscriptions/ai/refund-requests",
+  "POST /api/platform/refund-requests/{schoolId}/{requestId}/approve",
+  "POST /api/platform/refund-requests/{schoolId}/{requestId}/reject",
   // Hybrid retrieval (ST-162). Gated by the ST-155 AI entitlement gate (403/402/429), not the
   // permission matrix; exempt below because the gate is the authorization surface for every
   // /api/ai/* route and the search's one write is the metered student's own usage ledger.
@@ -345,6 +374,17 @@ const EXPECTED_MUTATING_ROUTES = [
   // AI data-sharing consent (ST-305). Self-service on the caller's own consent record.
   "PUT /api/ai/consent",
   "DELETE /api/ai/consent",
+  // Studafy platform console. Guarded on platform:manage (SUPER_ADMIN only) in
+  // modules/platform/routes.ts.
+  "PATCH /api/platform/schools/{schoolId}/status",
+  "PUT /api/platform/schools/{schoolId}/feature-flags/{flagName}",
+  "PATCH /api/platform/plans/{planId}",
+  "PATCH /api/platform/plans/{planId}/prices/{priceId}",
+  "PATCH /api/platform/settings/{key}",
+  "PATCH /api/platform/inquiries/{inquiryId}",
+  // Guarded on platform:manage in modules/school-applications/routes.ts.
+  "POST /api/platform/school-applications/{applicationId}/approve",
+  "POST /api/platform/school-applications/{applicationId}/reject",
 ];
 
 /**
@@ -436,11 +476,6 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/exams",
   "PATCH /api/academics/exams/{examId}",
   "DELETE /api/academics/exams/{examId}",
-  // Attendance sessions (ST-107) — idempotent session management; teacher self-service
-  // on the class period they teach, guarded by a route handler that verifies the caller
-  // is the class teacher rather than requirePermission().
-  "POST /api/attendance/sessions",
-  "PATCH /api/attendance/sessions/{sessionId}",
   // Learning materials (ST-106) — storage-triggered upload flow, authorized by
   // signed upload URL and row ownership, not by the permission guard.
   "POST /api/academics/materials/upload",
@@ -460,11 +495,21 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // parameter), so there is no other user's data to protect.
   "POST /api/privacy/me/dsr",
   "POST /api/account/deletion",
+  "DELETE /api/account/deletion",
   // Public account deletion (ST-302) — no caller identity or bearer permission. The request is
   // authorized by Turnstile only and discloses nothing; confirm is authorized by the one-time token
   // emailed to the account's address, and acts only on the accounts under that address.
   "POST /api/account/deletion-requests",
   "POST /api/account/deletion-requests/confirm",
+  // Public "Talk to us" sales inquiry — no caller identity or bearer permission. Authorized by
+  // Turnstile only; it files a row in the studafy_admin-only app.sales_inquiries and reads nothing.
+  "POST /api/inquiries",
+  // School sign-up applicants — no bearer identity or permission. Authorized by the applicant
+  // session cookie (a verified Google/Microsoft identity), and they act only on that identity's own
+  // application in the studafy_admin-only app.school_applications.
+  "POST /api/school-applications/me",
+  "POST /api/school-applications/me/proof-upload-url",
+  "POST /api/school-applications/me/sign-out",
   // Generic object storage gateway (SAD §22) — authorized per content class. The class (and thus
   // the required permission) is in the request body, so it is asserted in the handler via
   // requirePermissionIn() rather than mounted at route time — the same per-method pattern the
@@ -477,6 +522,10 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // this student" depends on the request body, so no route-time permission can express it; a
   // path-mounted billing:update would lock out exactly the parents the endpoint exists for.
   "POST /api/finance/online-payments",
+  // AI add-on refund request — authorized in createAiRefundRequest: the caller must be the student
+  // or a parent linked to them (app.parent_child_links). Same body-dependent rule as the online fee
+  // payment above, and the request is reviewed under platform:manage before any money moves.
+  "POST /api/subscriptions/ai/refund-requests",
   // Hybrid retrieval (ST-162) — the ST-155 AI entitlement gate (school active -> AI add-on active ->
   // quota available; 403/402/429), not the permission matrix, is the authorization surface for every
   // /api/ai/* route. The search reads only the school's own corpus under forced RLS, and its one

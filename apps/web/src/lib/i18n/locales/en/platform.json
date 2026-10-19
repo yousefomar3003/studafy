@@ -1,0 +1,570 @@
+{
+  "eyebrow": "Studafy platform",
+  "nav": {
+    "ariaLabel": "Platform console sections",
+    "overview": "Overview",
+    "schools": "Schools",
+    "inquiries": "Inquiries",
+    "finance": "Finance",
+    "ai": "AI usage",
+    "plans": "Plans & pricing",
+    "settings": "Platform settings",
+    "users": "Account lookup",
+    "refunds": "Refunds",
+    "applications": "Applications"
+  },
+  "status": {
+    "registered": "Awaiting email verification",
+    "pending": "Pending",
+    "active": "Active",
+    "suspended": "Suspended",
+    "archived": "Archived"
+  },
+  "subscriptionStatus": {
+    "trialing": "Trial",
+    "active": "Active",
+    "past_due": "Past due",
+    "grace_period": "Grace period",
+    "canceled": "Canceled",
+    "expired": "Expired",
+    "paused": "Paused",
+    "closed": "Closed"
+  },
+  "userStatus": {
+    "invited": "Invited",
+    "active": "Active",
+    "suspended": "Suspended",
+    "archived": "Archived"
+  },
+  "roles": {
+    "SUPER_ADMIN": "Studafy super admin",
+    "ORG_ADMIN": "School admin",
+    "PRINCIPAL": "Principal",
+    "FINANCE": "Finance",
+    "INSTRUCTOR": "Teacher",
+    "STUDENT": "Student",
+    "PARENT": "Parent",
+    "GUEST": "Guest",
+    "SUPPORT_AGENT": "Support agent"
+  },
+  "common": {
+    "previous": "Previous",
+    "next": "Next",
+    "cancel": "Cancel",
+    "save": "Save",
+    "never": "Never",
+    "yes": "Yes",
+    "on": "On",
+    "off": "Off"
+  },
+  "overview": {
+    "title": "Platform overview",
+    "description": "Every school on Studafy at a glance. This console runs the platform; each school's own admin console runs only that school.",
+    "loadError": "Couldn't load platform figures.",
+    "totalSchools": "Schools",
+    "activeUsers": "Active users",
+    "students": "Students",
+    "newSchools": "New schools (30 days)",
+    "trialsEnding": "Trials ending in 7 days",
+    "aiSubscriptions": "Live AI subscriptions",
+    "schoolsByStatus": "Schools by status",
+    "subscriptionsByStatus": "Subscriptions by status",
+    "subscriptionsByPlan": "Subscriptions by plan",
+    "none": "Nothing to show yet.",
+    "generatedAt": "Figures as of {{time}}.",
+    "summary": {
+      "pending_one": "{{count}} school is pending activation",
+      "pending_other": "{{count}} schools are pending activation",
+      "trials_one": "{{count}} trial ends this week",
+      "trials_other": "{{count}} trials end this week",
+      "suspended_one": "{{count}} school is suspended",
+      "suspended_other": "{{count}} schools are suspended"
+    }
+  },
+  "inquiries": {
+    "title": "Inquiries",
+    "description": "Schools that used \"Talk to us\" on the website. Each one is also emailed to the sales inbox set in Platform settings.",
+    "newCount_one": "{{count}} new inquiry waiting for a reply.",
+    "newCount_other": "{{count}} new inquiries waiting for a reply.",
+    "allStatuses": "All statuses",
+    "statusFilter": "Status",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Name, email or school",
+    "caption": "Sales inquiries",
+    "loadError": "Couldn't load inquiries.",
+    "empty": "No inquiries match these filters.",
+    "pageSummary": "Page {{page}} of {{pages}} · {{total}} inquiries",
+    "students_one": "{{count}} student",
+    "students_other": "{{count}} students",
+    "saveError": "Couldn't save. Try again.",
+    "status": {
+      "new": "New",
+      "contacted": "Contacted",
+      "won": "Won",
+      "lost": "Lost"
+    },
+    "columns": {
+      "contact": "Contact",
+      "school": "School",
+      "status": "Status",
+      "received": "Received"
+    },
+    "detail": {
+      "email": "Email",
+      "phone": "Phone",
+      "school": "School",
+      "jobTitle": "Role",
+      "country": "Country",
+      "students": "Students",
+      "source": "Sent from page",
+      "received": "Received",
+      "emailed": "Sales inbox emailed",
+      "notEmailed": "Not yet",
+      "message": "Message",
+      "notes": "Internal notes (only the Studafy team sees these)"
+    }
+  },
+  "finance": {
+    "title": "Platform finance",
+    "description": "What Studafy earns from schools: recurring revenue, renewal charges, and the schools whose billing needs attention. A school's own tuition billing lives in that school's finance console.",
+    "loadError": "Couldn't load platform finance.",
+    "mrr": "Estimated monthly recurring revenue",
+    "mrrNote": "At list price, from each billed school's plan in its currency. Discounts and yearly billing are not reflected.",
+    "billedSchools_one": "{{count}} billed school",
+    "billedSchools_other": "{{count}} billed schools",
+    "renewals": "Renewal charges · last 30 days",
+    "attention": "Needs attention",
+    "attentionHelp": "Overdue or in grace, paused, cancelling at period end, or a trial ending within 14 days.",
+    "attentionEmpty": "Every school's billing is in good standing.",
+    "failedRenewals": "Recent failed renewals",
+    "failedEmpty": "No failed renewal charges.",
+    "reasons": {
+      "past_due": "Past due",
+      "grace_period": "In grace period",
+      "paused": "Paused",
+      "cancel_scheduled": "Cancelling",
+      "trial_ending": "Trial ending"
+    },
+    "subscriptionType": {
+      "school": "School plan",
+      "ai": "AI add-on"
+    },
+    "columns": {
+      "school": "School",
+      "reason": "Issue",
+      "plan": "Plan",
+      "dueAt": "Date",
+      "type": "Charge",
+      "amount": "Amount",
+      "attemptedAt": "Attempted",
+      "failureReason": "Failure reason",
+      "collected": "Collected",
+      "succeeded": "Succeeded",
+      "failed": "Failed"
+    }
+  },
+  "ai": {
+    "title": "AI usage & margin",
+    "description": "AI usage, provider cost and add-on revenue per school for the current billing period.",
+    "period": "AI usage, provider cost and add-on revenue per school, {{start}} – {{end}}.",
+    "loadError": "Couldn't load AI metrics.",
+    "empty": "No school has AI subscriptions this period.",
+    "caption": "AI usage by school",
+    "schools": "Schools using AI",
+    "students": "Subscribed students",
+    "tokens": "Tokens used",
+    "cost": "Estimated cost",
+    "revenue": "AI revenue",
+    "negativeMargin": "Negative-margin schools",
+    "columns": {
+      "school": "School",
+      "students": "Students",
+      "tokens": "Tokens",
+      "budget": "Budget used",
+      "cost": "Est. cost",
+      "revenue": "Revenue",
+      "margin": "Margin"
+    }
+  },
+  "schools": {
+    "title": "Schools",
+    "description": "Every school on the platform. Open one to change its lifecycle or its feature flags.",
+    "allStatuses": "All statuses",
+    "statusFilter": "Status",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Name, slug or email",
+    "caption": "Schools on the platform",
+    "loadError": "Couldn't load schools.",
+    "empty": "No schools match these filters.",
+    "noSubscription": "No subscription",
+    "usersCell": "{{users}} active · {{students}} students",
+    "pageSummary": "Page {{page}} of {{pages}} · {{total}} schools",
+    "columns": {
+      "school": "School",
+      "status": "Status",
+      "plan": "Plan",
+      "users": "People",
+      "country": "Region",
+      "created": "Joined"
+    }
+  },
+  "school": {
+    "loadError": "Couldn't load this school.",
+    "back": "← All schools",
+    "profile": {
+      "title": "Profile",
+      "id": "School ID",
+      "schoolNumber": "School number",
+      "region": "Country · currency",
+      "created": "Joined",
+      "emailVerified": "Email verified",
+      "reviewTenant": "App-store review tenant"
+    },
+    "subscription": {
+      "title": "Subscription",
+      "plan": "Plan",
+      "status": "Status",
+      "seats": "Student seats",
+      "seatsValue": "{{used}} of {{cap}}",
+      "periodEnd": "Current period ends",
+      "trialEnds": "Trial ends"
+    },
+    "people": {
+      "title": "People",
+      "activeUsers_one": "{{count}} active account",
+      "activeUsers_other": "{{count}} active accounts",
+      "codePrefix": "IDs {{prefix}}xxxxx"
+    },
+    "members": {
+      "title": "Members",
+      "description": "Every account in this school. Viewing this list is recorded in the audit log of this school and of yours.",
+      "roleFilterLabel": "Filter members by role",
+      "all": "All",
+      "chip": "{{label}} · {{total}}",
+      "searchLabel": "Search members",
+      "searchPlaceholder": "Name, email, member ID, admission or employee number",
+      "statusFilter": "Account status",
+      "allStatuses": "All statuses",
+      "caption": "Members of {{school}}",
+      "loadError": "Couldn't load this school's members.",
+      "empty": "No members match these filters.",
+      "pageSummary": "Page {{page}} of {{pages}} · {{total}} members",
+      "copy": "Copy",
+      "copyId": "Copy ID of {{name}}",
+      "copied": "ID copied.",
+      "copyError": "Couldn't copy the ID.",
+      "columns": {
+        "name": "Name",
+        "memberCode": "Member ID",
+        "id": "ID",
+        "email": "Email",
+        "roles": "Roles",
+        "status": "Status",
+        "details": "Details",
+        "lastLogin": "Last sign-in"
+      },
+      "admission": "Admission no. {{number}}",
+      "classes": "Classes: {{classes}}",
+      "noClasses": "No active classes",
+      "guardians": "Guardians: {{names}}",
+      "children": "Children: {{names}}",
+      "employee": "Employee no. {{number}}"
+    },
+    "lifecycle": {
+      "title": "Lifecycle",
+      "terminal": "Archived schools are permanent and cannot be changed.",
+      "explain": {
+        "pending": "This school has registered but is not live yet. Activate it to open the school for use.",
+        "active": "This school is live. Suspending blocks sign-in for everyone except its admins and finance staff.",
+        "suspended": "This school is suspended: its users cannot sign in, and students' AI subscriptions are paused.",
+        "archived": "This school is archived."
+      },
+      "actions": {
+        "pending": "Mark pending",
+        "active": "Activate school",
+        "suspended": "Suspend school",
+        "archived": "Archive school"
+      },
+      "consequence": {
+        "pending": "The school returns to pending.",
+        "active": "The school's users can sign in again. If it was suspended, students' AI subscriptions resume billing.",
+        "suspended": "Teachers, students and parents can no longer sign in, and students' AI subscriptions are paused at the payment provider. You can reactivate the school later.",
+        "archived": "The school is closed permanently. This cannot be undone, and students' AI subscriptions stop billing."
+      },
+      "reasonLabel": "Reason",
+      "reasonHelp": "Recorded in the audit log of this school and of yours.",
+      "confirmNameLabel": "Type the school's name to confirm: {{name}}",
+      "confirm": "Confirm",
+      "success": "School is now {{status}}.",
+      "aiAffected_one": "{{count}} AI subscription updated.",
+      "aiAffected_other": "{{count}} AI subscriptions updated.",
+      "aiSyncFailed": "The status changed, but updating AI billing failed. Repeat the same action to retry.",
+      "error": "Couldn't change the school's status."
+    },
+    "flags": {
+      "title": "Feature flags",
+      "description": "Override a platform feature for this school only. Changes take effect within seconds.",
+      "useDefault": "Platform default",
+      "forceOn": "Always on",
+      "forceOff": "Always off",
+      "defaultIs": "Platform default: {{value}}",
+      "valueLabel": "Setting for {{flag}}",
+      "saved": "Feature flag updated.",
+      "error": "Couldn't update the feature flag."
+    }
+  },
+  "plans": {
+    "title": "Plans & pricing",
+    "description": "What schools pay Studafy. Changes are saved here first; sync to publish them to Stripe.",
+    "sync": "Sync with Stripe",
+    "syncSuccess": "Synced {{plans}} plans and {{prices}} prices with Stripe.",
+    "syncError": "Couldn't sync with Stripe.",
+    "loadError": "Couldn't load plans.",
+    "empty": "No plans yet.",
+    "available": "Available to new schools",
+    "edit": "Edit",
+    "noPrices": "No prices for this plan.",
+    "pricesCaption": "Prices for {{plan}}",
+    "priceAvailable": "{{currency}} {{interval}} price available",
+    "columns": {
+      "currency": "Currency",
+      "interval": "Billing",
+      "amount": "Price",
+      "available": "Available"
+    },
+    "interval": {
+      "monthly": "Monthly",
+      "yearly": "Yearly"
+    },
+    "editTitle": "Edit plan",
+    "nameLabel": "Display name",
+    "descriptionLabel": "Description",
+    "syncReminder": "Run “Sync with Stripe” afterwards so checkout shows the new name.",
+    "saved": "Plan saved.",
+    "saveError": "Couldn't save the plan."
+  },
+  "settings": {
+    "title": "Platform settings",
+    "description": "Values the whole platform runs with. Locked settings change only through a migration.",
+    "caption": "Platform settings",
+    "loadError": "Couldn't load platform settings.",
+    "empty": "No platform settings are defined.",
+    "columns": {
+      "key": "Setting",
+      "value": "Value",
+      "notes": "Notes",
+      "updated": "Last changed",
+      "actions": "Actions"
+    },
+    "sensitivity": {
+      "public": "Public",
+      "internal": "Internal"
+    },
+    "requiresRestart": "Needs restart",
+    "edit": "Edit",
+    "locked": "Locked",
+    "editTitle": "Edit setting",
+    "enabled": "Enabled",
+    "valueLabel": "Value",
+    "integerError": "Enter a whole number.",
+    "saved": "Setting saved.",
+    "restartNotice": "This setting takes effect after the next deploy or restart.",
+    "saveError": "Couldn't save the setting."
+  },
+  "users": {
+    "title": "Account lookup",
+    "description": "Find every account a person holds across all schools. Exact email match only.",
+    "emailLabel": "Email address",
+    "search": "Look up",
+    "hint": "Enter an email to see which schools it has an account in.",
+    "caption": "Accounts for {{email}}",
+    "loadError": "Couldn't search accounts.",
+    "empty": "No account uses this email in any school.",
+    "columns": {
+      "school": "School",
+      "name": "Name",
+      "roles": "Roles",
+      "status": "Status",
+      "lastLogin": "Last sign-in"
+    }
+  },
+  "refunds": {
+    "title": "Refunds",
+    "description": "Refund requests for school plans and AI add-ons. Approving one refunds the payment through the provider that took it.",
+    "pendingCount_one": "{{count}} request waiting for review.",
+    "pendingCount_other": "{{count}} requests waiting for review.",
+    "statusTabs": "Filter by status",
+    "tabs": {
+      "pending": "Pending",
+      "approved": "Processing",
+      "failed": "Failed",
+      "refunded": "Refunded",
+      "rejected": "Rejected",
+      "all": "All"
+    },
+    "status": {
+      "pending": "Pending",
+      "approved": "Processing",
+      "failed": "Failed",
+      "refunded": "Refunded",
+      "rejected": "Rejected"
+    },
+    "scope": {
+      "school": "School plan",
+      "ai": "AI add-on"
+    },
+    "reason": {
+      "accidental_purchase": "Bought by mistake",
+      "duplicate_charge": "Charged more than once",
+      "service_issue": "Service didn't work as expected",
+      "not_as_described": "Not as described",
+      "no_longer_needed": "No longer needed",
+      "other": "Other"
+    },
+    "allScopes": "All plans",
+    "scopeFilter": "Plan",
+    "searchLabel": "Search",
+    "searchPlaceholder": "School, name or email",
+    "caption": "Refund requests",
+    "loading": "Loading…",
+    "loadError": "Couldn't load refund requests.",
+    "empty": "No refund requests match these filters.",
+    "pageSummary": "Page {{page}} of {{pages}} · {{total}} requests",
+    "columns": {
+      "requester": "Requested by",
+      "school": "School",
+      "reason": "Reason",
+      "amount": "Amount",
+      "status": "Status",
+      "received": "Received"
+    },
+    "detail": {
+      "status": "Status",
+      "scope": "Plan",
+      "student": "Student",
+      "requester": "Email",
+      "reason": "Reason",
+      "received": "Received",
+      "provider": "Payment provider",
+      "payment": "Payment",
+      "paymentNone": "Not chosen by the requester",
+      "refunded": "Refunded",
+      "providerRefundId": "Provider refund ID",
+      "reviewed": "Reviewed",
+      "reviewNote": "Review note",
+      "failure": "Last error",
+      "details": "Details from the requester"
+    },
+    "noteLabel": "Note to the requester (required to reject)",
+    "approve": {
+      "heading": "Decision",
+      "paymentLabel": "Payment to refund",
+      "paymentPlaceholder": "Choose a payment",
+      "paymentsUnavailable": "Couldn't load the school's payments from the provider.",
+      "amountLabel": "Amount to refund {{currency}}",
+      "amountHelp": "Full payment: {{amount}}",
+      "amountInvalid": "Enter an amount above zero and no more than the payment.",
+      "cancelLabel": "Also cancel the school's subscription at the end of its period",
+      "submit": "Approve and refund",
+      "done": "Refund issued."
+    },
+    "reject": {
+      "submit": "Reject",
+      "noteRequired": "Write a note for the requester first."
+    },
+    "cancellation": {
+      "scheduled": "Refund issued. The subscription will cancel at the end of its period.",
+      "already_scheduled": "Refund issued. The subscription was already set to cancel.",
+      "failed": "Refund issued, but the subscription couldn't be cancelled. Cancel it from the school's billing page."
+    },
+    "actionError": "Couldn't complete that: {{message}}",
+    "tryAgain": "Try again.",
+    "close": "Close"
+  },
+  "applications": {
+    "title": "School applications",
+    "description": "Schools that signed up on the website with Google or Microsoft. Check the proof of ownership, then approve to create the school or reject with a reason. The applicant is emailed either way.",
+    "pendingCount_one": "{{count}} application waiting for review.",
+    "pendingCount_other": "{{count}} applications waiting for review.",
+    "allStatuses": "All statuses",
+    "statusFilter": "Status",
+    "searchLabel": "Search",
+    "searchPlaceholder": "School, applicant, email or city",
+    "caption": "School sign-up applications",
+    "empty": "No applications match these filters.",
+    "loadError": "Could not load applications.",
+    "pageSummary": "Page {{page}} of {{pages}} · {{total}} applications",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "provider": {
+      "google": "Google",
+      "microsoft": "Microsoft",
+      "mock": "Mock (dev)"
+    },
+    "columns": {
+      "school": "School",
+      "applicant": "Applicant",
+      "status": "Status",
+      "received": "Received"
+    },
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject"
+    },
+    "detail": {
+      "back": "Back to applications",
+      "loadError": "Could not load this application.",
+      "school": "School",
+      "schoolName": "Name",
+      "country": "Country",
+      "city": "City",
+      "address": "Address",
+      "schoolEmail": "School email",
+      "website": "Website",
+      "students": "Students",
+      "currency": "Currency",
+      "applicant": "Applicant",
+      "name": "Name",
+      "jobTitle": "Role",
+      "email": "Sign-in email",
+      "phone": "Phone",
+      "provider": "Signed up with",
+      "received": "Received",
+      "teamEmailed": "Team emailed",
+      "notYet": "Not yet",
+      "proof": "Proof of ownership",
+      "proofSize": "{{size}} KB",
+      "proofAlt": "Proof of ownership for {{school}}",
+      "openProof": "Open the file in a new tab",
+      "proofUnavailable": "File storage is not configured, so the file cannot be shown.",
+      "message": "Message from the applicant",
+      "decision": "Decision",
+      "decisionExplain": "Approving creates the school, makes the applicant its administrator, and starts the free trial. They sign in with the same account they applied with.",
+      "reviewedAt": "Reviewed",
+      "reviewNote": "Note",
+      "applicantEmailed": "Applicant emailed",
+      "createdSchool": "School"
+    },
+    "approve": {
+      "title": "Approve {{school}}?",
+      "description": "The school is created and {{email}} becomes its administrator. They will be emailed.",
+      "label": "Internal note (optional)",
+      "done": "{{school}} approved"
+    },
+    "reject": {
+      "title": "Reject {{school}}?",
+      "description": "{{email}} will be emailed this reason and can apply again.",
+      "label": "Reason (sent to the applicant)",
+      "done": "{{school}} rejected"
+    },
+    "errors": {
+      "generic": "The decision could not be saved. Try again.",
+      "SCHOOL_APPLICATION_NOT_PENDING": "This application has already been reviewed. Reload to see the decision.",
+      "SCHOOL_APPLICATION_ACCOUNT_EXISTS": "The applicant's sign-in account already belongs to a Studafy user, so it cannot become this school's administrator.",
+      "SCHOOL_EMAIL_DUPLICATE": "A school with this email already exists."
+    }
+  }
+}

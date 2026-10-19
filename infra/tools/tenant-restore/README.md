@@ -101,7 +101,7 @@ slice.sh` cross-checks pg_dump's row count against an independent `WHERE school_
     `teacher_evaluations` restored, that needs a different procedure (e.g., iterating per
     teacher/evaluator pair), which does not exist today.
   - All of the above was verified against a local, fully-migrated Postgres instance
-    (`db/compose.yml`), not against real AWS RDS. Whether the RDS master credential
+    (`compose.yml` (test profile)), not against real AWS RDS. Whether the RDS master credential
     (`postgres_connection_secret_arn`) behaves the same way a local Docker superuser does, or is
     itself subject to RLS the way this schema's docs insist every non-`BYPASSRLS` role must be, has
     never been confirmed against live infrastructure — see `modules/backup/README.md`'s own Known

@@ -111,18 +111,6 @@ const postMock = mock((path: string) => {
       },
     });
   }
-  if (path === "/api/invitations/bulk") {
-    return Promise.resolve({
-      data: {
-        id: "batch-1",
-        role: "INSTRUCTOR",
-        expiry_days: 7,
-        target_mode: "explicit",
-        total_count: 1,
-        sent_count: 1,
-      },
-    });
-  }
   if (path === "/api/imports/students/upload") {
     return Promise.resolve({ data: UPLOAD_RESPONSE });
   }
@@ -184,12 +172,6 @@ describe("SetupWizardPage", () => {
 
     await screen.findByRole("heading", { name: /timetable periods/i });
     fireEvent.click(screen.getByRole("button", { name: /save and continue/i }));
-
-    await screen.findByRole("heading", { name: /staff invitations/i });
-    fireEvent.change(screen.getByLabelText(/emails/i), {
-      target: { value: "teacher@example.com" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /send invitations/i }));
 
     await screen.findByRole("heading", { name: /student import/i });
     const file = new File(["admission_number,email\n1,not-an-email"], "students.csv", {

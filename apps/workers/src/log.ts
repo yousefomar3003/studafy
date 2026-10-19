@@ -11,7 +11,12 @@
  * alongside the API's without a second parser, and the eventual migration is an import change.
  *
  * Extracted from the copy that was inline in src/index.ts, which is now one of its callers.
+ *
+ * `warn` and `error` are also forwarded to error monitoring (@studafy/observability's forwardLog:
+ * warn → breadcrumb on the current job's scope, error → Sentry event) after the line is written.
+ * A no-op without SENTRY_DSN, and never a change to what reaches stdout.
  */
+import { forwardLog } from "@studafy/observability";
 
 export interface WorkerLogger {
   info: (fields: Record<string, unknown>, message: string) => void;
@@ -43,8 +48,10 @@ export const workerLogger: WorkerLogger = {
   },
   warn: (fields, message) => {
     console.warn(serialize("warn", fields, message));
+    forwardLog("warn", message, fields);
   },
   error: (fields, message) => {
     console.error(serialize("error", fields, message));
+    forwardLog("error", message, fields);
   },
 };

@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/push/push_providers.dart';
 import '../application/shell_providers.dart';
 import '../domain/shell_role.dart';
+import 'deletion_pending_screen.dart';
 import 'locale_toggle_button.dart';
+import 'pill_navigation_bar.dart';
 import 'push_permission_banner.dart';
 import 'shell_destinations.dart';
 import 'view_only_banner.dart';
+import '../../../design/widgets/studafy_logo.dart';
 
 /// The authenticated app's home: bottom navigation scoped to the session's resolved
 /// [ShellRole], with a view-only banner and no mutation affordances for [ShellRole.viewer].
@@ -17,6 +20,16 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // A scheduled deletion confines the session to cancelling it or signing out (the API refuses
+    // everything else), so the shell gives way to that choice until it is made.
+    final deletionScheduledFor = ref
+        .watch(accountProfileProvider)
+        .value
+        ?.deletionScheduledFor;
+    if (deletionScheduledFor != null) {
+      return DeletionPendingScreen(scheduledFor: deletionScheduledFor);
+    }
+
     final shellRole = ref.watch(shellRoleProvider);
 
     // Keyed by role so switching accounts (a different session resolving to a different
@@ -36,6 +49,37 @@ class _AppShellScaffold extends ConsumerStatefulWidget {
 
 class _AppShellScaffoldState extends ConsumerState<_AppShellScaffold> {
   int _selectedIndex = 0;
+  final _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  /// A tap on the nav bar: slide to a neighbouring tab, jump straight to a farther one — sliding
+  /// across would build every tab in between (and fire the requests they make).
+  void _selectTab(int index) {
+    if ((index - _selectedIndex).abs() == 1) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _pageController.jumpToPage(index);
+    }
+    _onTabChanged(index);
+  }
+
+  /// A swipe or a tap landed on [index].
+  void _onTabChanged(int index) {
+    if (index == _selectedIndex) return;
+    setState(() => _selectedIndex = index);
+    ref
+        .read(selectedShellTabProvider.notifier)
+        .select(shellDestinationsFor(widget.shellRole)[index].labelKey);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,45 +87,73 @@ class _AppShellScaffoldState extends ConsumerState<_AppShellScaffold> {
     final pushSetup = ref.watch(pushSetupProvider);
 
     return Scaffold(
+      // The floating nav bar has no backdrop of its own: tab content scrolls on behind it, and the
+      // body sees the bar's height as its bottom `MediaQuery` padding (see `withBottomInset`).
+      extendBody: true,
       appBar: AppBar(
-        title: Text('app.title'.tr()),
+        // Keyed by tab so the scrolled-under state (which tints the bar) resets on a tab switch
+        // instead of carrying over from the previous tab's scroll position.
+        key: ValueKey(_selectedIndex),
+        title: const StudafyLogo(),
         actions: const [LocaleToggleButton()],
       ),
       body: Column(
         children: [
           if (widget.shellRole == ShellRole.viewer) const ViewOnlyBanner(),
-          if (pushSetup == PushSetup.needsPermission) const PushPermissionBanner(),
+          if (pushSetup == PushSetup.needsPermission)
+            const PushPermissionBanner(),
           Expanded(
-            // IndexedStack keeps every tab mounted, so switching tabs preserves each tab's
-            // own state (scroll position, in-progress input) instead of rebuilding it.
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: [for (final destination in destinations) destination.body],
+            // Swipe left/right between tabs (mirrored in RTL, like the nav bar). PageView builds a
+            // tab only once it scrolls into view, so a tab's body (and the providers it watches,
+            // e.g. the AI tab's `GET /api/ai/usage`) stays unbuilt until first reached; after that
+            // [_KeepAlive] keeps it mounted, so each tab's own state (scroll position, in-progress
+            // input) survives switching away.
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: _onTabChanged,
+              children: [
+                for (final destination in destinations)
+                  _KeepAlive(child: destination.body),
+              ],
             ),
           ),
         ],
       ),
-      floatingActionButton: widget.shellRole.canMutate
-          ? FloatingActionButton(
-              // Not yet wired to a real action (tracked separately from the ST-294 a11y audit,
-              // which only adds the tooltip a screen reader needs to announce the button at
-              // all — see the audit report's ticketed findings).
-              tooltip: 'Add',
-              onPressed: () {},
-              child: const Icon(Icons.add),
-            )
-          : null,
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: PillNavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+        onDestinationSelected: _selectTab,
         destinations: [
           for (final destination in destinations)
-            NavigationDestination(
-              icon: Icon(destination.icon),
+            PillNavigationDestination(
+              icon:
+                  destination.decorateIcon?.call(Icon(destination.icon)) ??
+                  Icon(destination.icon),
               label: destination.labelKey.tr(),
             ),
         ],
       ),
     );
+  }
+}
+
+/// Keeps a swiped-away tab mounted inside the [PageView].
+class _KeepAlive extends StatefulWidget {
+  const _KeepAlive({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<_KeepAlive>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

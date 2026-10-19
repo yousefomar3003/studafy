@@ -13,11 +13,11 @@
  *    address has accounts, so the endpoint cannot be used to discover who uses Studafy.
  *
  * 2. confirmAccountDeletion: the token is looked up, the address is resolved again (the accounts
- *    may have changed in the hour), and each account goes through ST-301's deleteAccount — the same
- *    transaction, audit entry, erasure job and confirmation email as a deletion from account
- *    settings, with `source: "web_request"` on the audit entry. The token is deleted only after every
- *    account succeeded, so a failure part-way (a payment provider outage, say) can be retried from
- *    the same link; already-deleted accounts are archived and no longer resolve.
+ *    may have changed in the hour), and each account goes through scheduleAccountDeletion — the
+ *    same 14-day schedule, audit entry and sign-out as a deletion from account settings, with
+ *    `source: "web_request"` on the audit entry (the link is the proof, so no member ID or password
+ *    is asked for). The token is deleted only after every account succeeded, so a failure part-way
+ *    can be retried from the same link; accounts already scheduled are skipped.
  *
  * Nothing is written to a school's audit log for an unconfirmed request: until the link is clicked
  * it is anonymous input, and auditing it would let anyone write rows into any school's audit log.
@@ -36,7 +36,7 @@ import {
   VERIFICATION_TOKEN_PATTERN,
 } from "../tenancy/verification/service";
 
-import { deleteAccount } from "./account-deletion-service";
+import { scheduleAccountDeletion } from "./account-deletion-service";
 
 import type { AccountDeletionDeps } from "./account-deletion-service";
 import type { Database } from "../../db/client";
@@ -71,7 +71,7 @@ export interface ConfirmAccountDeletionParams {
 
 export interface ConfirmedAccountDeletion {
   schoolName: string;
-  requestId: string;
+  scheduledFor: Date;
   completesBy: Date;
 }
 
@@ -156,19 +156,31 @@ export async function confirmAccountDeletion(
 
   const confirmed: ConfirmedAccountDeletion[] = [];
   for (const account of await resolveAccounts(deps.database, email)) {
-    const result = await deleteAccount(deps, {
-      schoolId: account.schoolId,
-      userId: account.userId,
-      source: "web_request",
-      requestId: params.requestId,
-      log: params.log,
-      userAgent: params.userAgent,
-      clientIp: params.clientIp,
-    });
+    let result;
+    try {
+      result = await scheduleAccountDeletion(deps, {
+        schoolId: account.schoolId,
+        userId: account.userId,
+        source: "web_request",
+        requestId: params.requestId,
+        log: params.log,
+        userAgent: params.userAgent,
+        clientIp: params.clientIp,
+      });
+    } catch (error) {
+      // A retry from the same link after a part-way failure: this one is already scheduled.
+      if (
+        error instanceof CodedHttpException &&
+        error.code === ERROR_CODES.ACCOUNT_DELETION_ALREADY_SCHEDULED
+      ) {
+        continue;
+      }
+      throw error;
+    }
     confirmed.push({
       schoolName: account.schoolName,
-      requestId: result.request.id,
-      completesBy: result.request.slaDueAt,
+      scheduledFor: result.scheduledFor,
+      completesBy: result.completesBy,
     });
   }
 

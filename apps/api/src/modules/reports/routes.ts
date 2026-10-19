@@ -13,11 +13,14 @@ import { requirePermission } from "../../middleware/authz";
 import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
 
+import { collectChildTimetable } from "./child-timetable";
 import {
   childBreakdownParamsSchema,
   childBreakdownResponseSchema,
   childComparisonQuerySchema,
   childComparisonResponseSchema,
+  childTimetableParamsSchema,
+  childTimetableResponseSchema,
 } from "./schemas";
 import {
   assertChildLinked,
@@ -71,6 +74,25 @@ const breakdownRoute = createRoute({
   ),
 });
 
+const timetableRoute = createRoute({
+  method: "get",
+  path: "/api/reports/children/{studentId}/timetable",
+  tags: ["Child Comparison Reports"],
+  operationId: "getChildTimetable",
+  summary: "Get one linked child's weekly timetable",
+  description:
+    "The approved timetable version of the school's current term, narrowed to the classes the " +
+    "child is actively enrolled in, together with the school's teaching week. Returns null ids " +
+    "and no slots when the current term has no approved version. The child must be linked to " +
+    "the calling parent.",
+  security: [{ bearerAuth: [] }],
+  request: { params: childTimetableParamsSchema },
+  responses: standardResponses(
+    { 200: { description: "The child's weekly timetable.", schema: childTimetableResponseSchema } },
+    [400, 401, 403, 404, 500],
+  ),
+});
+
 function tenantFrom(c: Context<AppEnv>): {
   schoolId: string;
   userId: string;
@@ -97,11 +119,11 @@ function translateReportError(error: unknown): never {
 /**
  * Parent child-comparison report routes (ST-177).
  *
- * Both routes gate on GRADE_READ — the same permission the published grades parent view uses — and
+ * Every route gates on GRADE_READ — the same permission the published grades parent view uses — and
  * additionally require the PARENT role so a staff member with grade access cannot enumerate
  * children. Every metric is then resolved inside a read-replica transaction whose RLS scope is the
- * caller's own tenant and link set, and the breakdown route asserts the requested child is linked
- * before touching any grade or attendance data.
+ * caller's own tenant and link set, and the per-child routes (breakdown, timetable) assert the
+ * requested child is linked before touching any grade, attendance, or timetable data.
  */
 export function childComparisonRoutes(
   primary: Database,
@@ -118,6 +140,10 @@ export function childComparisonRoutes(
   // actually enforcing anything).
   routes.use(
     "/api/reports/children/:studentId/breakdown",
+    requirePermission(PERMISSIONS.GRADE_READ),
+  );
+  routes.use(
+    "/api/reports/children/:studentId/timetable",
     requirePermission(PERMISSIONS.GRADE_READ),
   );
 
@@ -205,6 +231,28 @@ export function childComparisonRoutes(
         },
         200,
       );
+    } catch (error) {
+      return translateReportError(error);
+    }
+  });
+
+  routes.openapi(timetableRoute, async (c) => {
+    const auth = requireAuth(c);
+    if (!auth.roles.includes(ROLES.PARENT)) {
+      throw new CodedHttpException(403, ERROR_CODES.ACCESS_DENIED, "Access denied");
+    }
+    const { studentId } = c.req.valid("param");
+    try {
+      const timetable = await withTenantTx(
+        databases,
+        tenantFrom(c),
+        async (tx) => {
+          await assertChildLinked(tx, auth.schoolId, auth.userId, studentId);
+          return collectChildTimetable(tx, auth.schoolId, studentId);
+        },
+        { useReadReplica: true },
+      );
+      return c.json(timetable, 200);
     } catch (error) {
       return translateReportError(error);
     }

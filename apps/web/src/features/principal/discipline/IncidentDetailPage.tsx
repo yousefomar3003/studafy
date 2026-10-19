@@ -2,7 +2,7 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Table, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { DATE_TIME_OPTIONS } from "../format";
@@ -90,16 +90,9 @@ export default function IncidentDetailPage() {
   const formatDate = (isoDate: string | null) =>
     isoDate ? formatLocaleDate(new Date(isoDate)) : "—";
 
-  const backLink = (
-    <Link className="discipline-detail__back" to="/portal/principal/discipline">
-      {t("principal.discipline.detail.back")}
-    </Link>
-  );
-
   if (incidentQuery.isPending) {
     return (
       <>
-        {backLink}
         <p role="status">{t("principal.common.loading")}</p>
       </>
     );
@@ -108,7 +101,6 @@ export default function IncidentDetailPage() {
   if (incidentQuery.isError || !incidentQuery.data) {
     return (
       <>
-        {backLink}
         <p role="alert">{t("principal.discipline.detail.loadError")}</p>
       </>
     );
@@ -142,8 +134,6 @@ export default function IncidentDetailPage() {
 
   return (
     <>
-      {backLink}
-
       <h1>{incident.title}</h1>
 
       <dl className="discipline-detail__summary">

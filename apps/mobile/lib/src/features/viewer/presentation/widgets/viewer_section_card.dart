@@ -33,7 +33,9 @@ class ViewerSectionCard extends StatelessWidget {
               children: [
                 Icon(icon, size: 20, color: colorScheme.primary),
                 const SizedBox(width: AppSpacing.space8),
-                Expanded(child: Text(titleKey.tr(), style: textTheme.titleMedium)),
+                Expanded(
+                  child: Text(titleKey.tr(), style: textTheme.titleMedium),
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.space12),
@@ -48,7 +50,11 @@ class ViewerSectionCard extends StatelessWidget {
 /// A one-line, icon-led message for a card's non-content states (empty or errored). Mirrors
 /// `TeacherCardMessage`.
 class ViewerCardMessage extends StatelessWidget {
-  const ViewerCardMessage({required this.messageKey, required this.icon, super.key});
+  const ViewerCardMessage({
+    required this.messageKey,
+    required this.icon,
+    super.key,
+  });
 
   final String messageKey;
   final IconData icon;
@@ -65,7 +71,9 @@ class ViewerCardMessage extends StatelessWidget {
         Expanded(
           child: Text(
             messageKey.tr(),
-            style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],
@@ -93,7 +101,10 @@ class ViewerCardSkeleton extends StatelessWidget {
             alignment: Alignment.centerLeft,
             widthFactor: i.isEven ? 0.6 : 0.85,
             child: DecoratedBox(
-              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(4),
+              ),
               child: const SizedBox(height: 14),
             ),
           ),

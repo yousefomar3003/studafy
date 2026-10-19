@@ -19,9 +19,14 @@ class RosterEntryTile extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     final name = ref.watch(rosterStudentNameProvider(enrollment.studentId));
-    final title = name ??
-        'teacher.class.unknownStudent'.tr(namedArgs: {'id': _shortId(enrollment.studentId)});
-    final enrolledOn = DateFormat.yMMMd(context.locale.toString()).format(enrollment.enrolledAt);
+    final title =
+        name ??
+        'teacher.class.unknownStudent'.tr(
+          namedArgs: {'id': _shortId(enrollment.studentId)},
+        );
+    final enrolledOn = DateFormat.yMMMd(
+      context.locale.toString(),
+    ).format(enrollment.enrolledAt);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
@@ -33,7 +38,9 @@ class RosterEntryTile extends ConsumerWidget {
             foregroundColor: colorScheme.onSecondaryContainer,
             child: Text(
               _initial(name),
-              style: textTheme.labelLarge?.copyWith(color: colorScheme.onSecondaryContainer),
+              style: textTheme.labelLarge?.copyWith(
+                color: colorScheme.onSecondaryContainer,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.space12),
@@ -43,8 +50,12 @@ class RosterEntryTile extends ConsumerWidget {
               children: [
                 Text(title, style: textTheme.bodyMedium),
                 Text(
-                  'teacher.class.enrolledOn'.tr(namedArgs: {'date': enrolledOn}),
-                  style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  'teacher.class.enrolledOn'.tr(
+                    namedArgs: {'date': enrolledOn},
+                  ),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -55,8 +66,9 @@ class RosterEntryTile extends ConsumerWidget {
   }
 
   /// Last 6 characters of the UUID — enough to tell rows apart without showing the full id.
-  String _shortId(String studentId) =>
-      studentId.length <= 6 ? studentId : studentId.substring(studentId.length - 6);
+  String _shortId(String studentId) => studentId.length <= 6
+      ? studentId
+      : studentId.substring(studentId.length - 6);
 
   String _initial(String? name) {
     if (name == null || name.trim().isEmpty) return '#';

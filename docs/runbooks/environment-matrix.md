@@ -35,7 +35,7 @@ Full subnet/security-group topology: `docs/runbooks/network-diagram.md`.
 
 | Environment | `edge_domain_name`        | `cdn_domain_name`                                          | `web_origin`                              | `edge_idle_timeout` | `dns_manage_zone`           |
 | ----------- | ------------------------- | ---------------------------------------------------------- | ----------------------------------------- | ------------------- | --------------------------- |
-| dev         | `dev-api.studafy.com`     | `dev.studafy.com` (unused — `module.cdn` not instantiated) | `http://localhost:5173` (Vite dev server) | `60` (default)      | `false` (reads prod's zone) |
+| dev         | `dev-api.studafy.com`     | `dev.studafy.com` (unused — `module.cdn` not instantiated) | `http://localhost:5180` (Vite dev server) | `60` (default)      | `false` (reads prod's zone) |
 | staging     | `staging-api.studafy.com` | `staging.studafy.com`                                      | `https://staging.studafy.com`             | `3600`              | `false` (reads prod's zone) |
 | prod        | `api.studafy.com`         | `app.studafy.com`                                          | `https://app.studafy.com`                 | `3600`              | `true` (owns the zone)      |
 

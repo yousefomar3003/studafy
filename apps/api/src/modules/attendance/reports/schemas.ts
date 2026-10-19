@@ -132,6 +132,16 @@ export const attendanceSummaryResponseSchema = z
     generated_at: dateTimeSchema,
     period: reportPeriodSchema,
     group_by: reportGroupBySchema,
+    attendance_alert_threshold: z
+      .number()
+      .min(0)
+      .max(100)
+      .nullable()
+      .openapi({
+        description:
+          "The school's attendance alert threshold (%): an attendance rate (present + late) below it " +
+          "puts a student at risk. Null when the school has no settings row.",
+      }),
     totals: attendanceMetricsSchema,
     items: z.array(
       z.discriminatedUnion("group_by", [classSummaryItemSchema, studentSummaryItemSchema]),

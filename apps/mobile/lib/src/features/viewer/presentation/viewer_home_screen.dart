@@ -19,7 +19,9 @@ class ViewerHomeScreen extends ConsumerWidget {
       ViewerRole.finance => const FinanceOverviewScreen(),
       // SUPPORT_AGENT and any unrecognized claim: no mobile-relevant summary yet, same honest
       // placeholder every other unshipped shell tab uses.
-      ViewerRole.unsupported => const ShellTabPlaceholder(titleKey: 'shell.tabs.home'),
+      ViewerRole.unsupported => const ShellTabPlaceholder(
+        titleKey: 'shell.tabs.home',
+      ),
     };
   }
 }

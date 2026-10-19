@@ -87,8 +87,7 @@ Two legal moves, one importer, audited counts before and after:
 
 1. **Bulk invite via the imports module** — the staff roster file (section 1) as a bulk staff
    import, which creates `app.users` (`status='invited'`) and `app.invitations` per staff
-   member, staff roles only (`ORG_ADMIN`, `INSTRUCTOR`, `TEACHING_ASSISTANT`, `SUPPORT_AGENT`,
-   `FINANCE`). Roster CSV count ↔ rows created must match before the import is declared done.
+   member, staff roles only (`ORG_ADMIN`, `INSTRUCTOR`, `SUPPORT_AGENT`, `FINANCE`). Roster CSV count ↔ rows created must match before the import is declared done.
 2. **Any hand-added account goes through the normal invitation flow** — same activation path as
    self-service. No direct `INSERT` into `app.users`/`app.user_roles` with a fabricated status.
 

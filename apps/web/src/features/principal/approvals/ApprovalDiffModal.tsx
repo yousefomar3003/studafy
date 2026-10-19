@@ -2,7 +2,12 @@ import { Modal, Table } from "@studafy/ui";
 
 import { useTranslation } from "../../../lib/i18n";
 
-import type { ApprovalQueueItem, GradeSubmissionDiff, TimetableVersionDiff } from "./queries";
+import type {
+  ApprovalQueueItem,
+  GradeRevisionDiff,
+  GradeSubmissionDiff,
+  TimetableVersionDiff,
+} from "./queries";
 
 export interface ApprovalDiffModalProps {
   item: ApprovalQueueItem | null;
@@ -63,6 +68,53 @@ function DiffBody({ item }: { item: ApprovalQueueItem }) {
                 <Table.Cell>{grade.score ?? "—"}</Table.Cell>
                 <Table.Cell>{grade.max_score}</Table.Cell>
                 <Table.Cell>{grade.weight}</Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table>
+      </>
+    );
+  }
+
+  if (item.item_type === "grade_revision") {
+    const diff = item.diff as GradeRevisionDiff;
+    return (
+      <>
+        <dl className="approvals-diff__meta">
+          <div>
+            <dt>{t("principal.approvals.diff.class")}</dt>
+            <dd>{diff.gradebook_class_code}</dd>
+          </div>
+          <div>
+            <dt>{t("principal.approvals.diff.student")}</dt>
+            <dd>{diff.student_name}</dd>
+          </div>
+          <div>
+            <dt>{t("principal.approvals.diff.reason")}</dt>
+            <dd>{diff.reason}</dd>
+          </div>
+        </dl>
+
+        <Table
+          caption={t("principal.approvals.diff.changesCaption", { student: diff.student_name })}
+        >
+          <Table.Header>
+            <Table.Row>
+              <Table.HeaderCell>{t("principal.approvals.diff.label")}</Table.HeaderCell>
+              <Table.HeaderCell>{t("principal.approvals.diff.publishedScore")}</Table.HeaderCell>
+              <Table.HeaderCell>{t("principal.approvals.diff.proposedScore")}</Table.HeaderCell>
+              <Table.HeaderCell>{t("principal.approvals.diff.maxScore")}</Table.HeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body columnCount={4} empty={t("principal.approvals.diff.noChanges")}>
+            {diff.changes.map((change) => (
+              <Table.Row key={change.grade_id}>
+                <Table.Cell>{change.label}</Table.Cell>
+                <Table.Cell>{change.previous_score ?? "—"}</Table.Cell>
+                <Table.Cell>
+                  <strong>{change.new_score ?? "—"}</strong>
+                </Table.Cell>
+                <Table.Cell>{change.max_score}</Table.Cell>
               </Table.Row>
             ))}
           </Table.Body>

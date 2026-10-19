@@ -250,6 +250,32 @@ describe("CSRF middleware", () => {
       expect(res.status).not.toBe(403);
     });
 
+    it("does not gate the mobile OAuth code exchange, which the app calls before it has a Bearer token", async () => {
+      const app = buildApp();
+
+      for (const path of [
+        "/api/auth/oauth/mock/mobile-exchange",
+        "/api/auth/oauth/google/mobile-exchange",
+        "/api/auth/invitations/some-token/oauth/microsoft/mobile-exchange",
+      ]) {
+        const res = await app.request(`http://localhost${path}`, { method: "POST" });
+        expect(res.status).not.toBe(403);
+      }
+    });
+
+    it("still gates look-alike paths outside the mobile exchange shape", async () => {
+      const app = buildApp();
+
+      for (const path of [
+        "/api/auth/oauth/mobile-exchange",
+        "/api/auth/oauth/mock/mobile-exchange/extra",
+        "/api/users/oauth/mock/mobile-exchange",
+      ]) {
+        const res = await app.request(`http://localhost${path}`, { method: "POST" });
+        expect(res.status).toBe(403);
+      }
+    });
+
     it("does not gate health probes", async () => {
       const app = buildApp();
 

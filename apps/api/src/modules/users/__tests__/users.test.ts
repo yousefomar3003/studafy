@@ -258,7 +258,7 @@ describeDb("createUser", () => {
       createUser(tx, school.id, {
         email: "newuser@test.local",
         display_name: "New User",
-        role: "TEACHING_ASSISTANT",
+        role: "INSTRUCTOR",
       }),
     );
 
@@ -266,7 +266,7 @@ describeDb("createUser", () => {
     expect(user.email).toBe("newuser@test.local");
     expect(user.display_name).toBe("New User");
     expect(user.status).toBe("invited");
-    expect(user.roles).toContain("TEACHING_ASSISTANT");
+    expect(user.roles).toContain("INSTRUCTOR");
   });
 
   test("rejects duplicate email within school", async () => {

@@ -1,4 +1,3 @@
-import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
@@ -76,13 +75,11 @@ async function renderInPortal(Page: ComponentType) {
   return render(
     <AuthProvider store={store}>
       <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <MemoryRouter>
-            <main>
-              <Page />
-            </main>
-          </MemoryRouter>
-        </ToastProvider>
+        <MemoryRouter>
+          <main>
+            <Page />
+          </main>
+        </MemoryRouter>
       </QueryClientProvider>
     </AuthProvider>,
   );
@@ -109,7 +106,7 @@ describe("finance dashboard accessibility", () => {
     });
 
     const { container } = await renderInPortal(await loadFinanceDashboardPage());
-    await screen.findByRole("heading", { name: "Finance" });
+    await screen.findByRole("heading", { name: "Finance overview" });
 
     await expectNoA11yViolations(container);
   });

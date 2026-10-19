@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
@@ -133,8 +134,32 @@ const typesOf = (schema: JsonSchema): string[] =>
  */
 const OMITTED_USER_COLUMNS = new Set(["normalized_email"]);
 
+/**
+ * Applies later migrations' `ALTER TABLE app.users ... ALTER COLUMN x DROP|SET NOT NULL` to the
+ * columns parsed from the CREATE TABLE (e.g. 000141 made email optional), in migration order.
+ */
+function applyNullabilityChanges(columns: Column[]): Column[] {
+  const byName = new Map(columns.map((column) => [column.name, { ...column }]));
+  // Fixed repository directory; filenames are the migrations themselves.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  const files = readdirSync(MIGRATIONS)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+  for (const file of files) {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    const sql = readFileSync(path.join(MIGRATIONS, file), "utf8");
+    for (const block of sql.match(/ALTER TABLE app\.users\b[^;]*;/g) ?? []) {
+      for (const change of block.matchAll(/ALTER COLUMN (\w+) (DROP|SET) NOT NULL/g)) {
+        const column = byName.get(change[1]!);
+        if (column) column.nullable = change[2] === "DROP";
+      }
+    }
+  }
+  return [...byName.values()];
+}
+
 describe("User component mirrors app.users", () => {
-  const columns = parseColumns(usersSql, "app.users");
+  const columns = applyNullabilityChanges(parseColumns(usersSql, "app.users"));
   const exposed = columns.filter((c) => !OMITTED_USER_COLUMNS.has(c.name));
 
   test("exposes every column except the documented omissions", () => {

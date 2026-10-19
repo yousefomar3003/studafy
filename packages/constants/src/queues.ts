@@ -155,6 +155,11 @@ export const JOB_NAMES = {
   // files a row that does not already exist (app.data_subject_requests). Registered on the
   // maintenance queue via Job Scheduler.
   RUN_TENANT_CLOSURE_SWEEP: "run-tenant-closure-sweep",
+  // Scheduled account-deletion sweep (000143). Carries no payload: per school, runs every
+  // self-service deletion whose 14-day grace period has ended -- stops AI billing, detaches the
+  // account from the school, files and enqueues its erasure. Idempotent: a run account is archived
+  // and drops out of the due set. Registered on the maintenance queue via Job Scheduler.
+  RUN_ACCOUNT_DELETION_SWEEP: "run-account-deletion-sweep",
   // One data subject request, export half (ST-268). Carries only the request id and school id --
   // the request's scope (tenant/user), subject and reason are read from app.data_subject_requests at
   // claim time, the same "queue carries identity, the row carries the rest" split

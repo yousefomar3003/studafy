@@ -28,6 +28,8 @@ import { withSystemTenantTx } from "../../../db/tenant-tx";
 
 import { claimEmailRows } from "./claim";
 import { resolveEmail } from "./resolve";
+import { processSalesInquiries } from "./sales-inquiries";
+import { processSchoolApplications } from "./school-applications";
 import { loadSchoolIds } from "./schools";
 import { isRetryableSendError } from "./sender";
 import { isSuppressed } from "./suppressions";
@@ -199,6 +201,18 @@ async function pollOnce(ctx: EmailDispatcherContext): Promise<number> {
     } catch (err) {
       ctx.logger.error({ err, school_id: schoolId }, "email dispatch batch failed");
     }
+  }
+  // Platform-level mail with no school behind it: "Talk to us" inquiries for the sales inbox.
+  try {
+    total += await processSalesInquiries(ctx);
+  } catch (err) {
+    ctx.logger.error({ err }, "sales inquiry notification batch failed");
+  }
+  // School sign-up applications: the onboarding inbox, and applicants about decisions.
+  try {
+    total += await processSchoolApplications(ctx);
+  } catch (err) {
+    ctx.logger.error({ err }, "school application notification batch failed");
   }
   return total;
 }

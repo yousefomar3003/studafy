@@ -63,3 +63,24 @@ export interface ListChargesResult {
   charges: TapCharge[];
   hasMore: boolean;
 }
+
+/** A refund of one captured charge, in full or in part. */
+export interface CreateRefundInput {
+  chargeId: string;
+  amountMinor: number;
+  currency: string;
+  description: string;
+  metadata: Record<string, string>;
+  /** Our own reference, echoed back by Tap. */
+  merchantReference?: string;
+}
+
+export interface TapRefund {
+  id?: string;
+  object?: string;
+  /** `PENDING` until the acquirer settles it, then `REFUNDED`; `FAILED`/`CANCELLED` otherwise. */
+  status?: string;
+  amount?: number;
+  currency?: string;
+  charge_id?: string;
+}

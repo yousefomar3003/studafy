@@ -18,6 +18,7 @@ dependencies:
   json_annotation: ^4.12.0
   web_socket_channel: ^3.0.3
   flutter_secure_storage: ^9.2.4
+  shared_preferences: ^2.5.5
   app_links: ^6.3.0
   url_launcher: ^6.3.1
   easy_localization: ^3.0.8
@@ -39,6 +40,8 @@ dependencies:
   image_picker: ^1.1.2
   mime: ^2.0.0
   flutter_pdfview: ^1.4.5
+  flutter_web_auth_2: ^5.1.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -57,7 +60,6 @@ dev_dependencies:
   json_serializable: ^6.14.1
   swagger_parser: ^1.44.1
   test: ^1.31.0
-  shared_preferences: ^2.5.5
   drift_dev: ^2.34.0
 
 flutter:
@@ -68,6 +70,21 @@ flutter:
     - assets/fonts/Inter-SemiBold.ttf
     - assets/fonts/Inter-Bold.ttf
     - assets/translations/
+    - assets/brand/
+  # Arabic script fallback (IBM Plex Sans Arabic, SIL OFL 1.1 — see
+  # assets/fonts/IBMPlexSansArabic-OFL.txt). Inter has no Arabic glyphs, so AppTypography lists
+  # this family as `fontFamilyFallback`: Latin keeps rendering in Inter, Arabic in Plex.
+  fonts:
+    - family: IBMPlexSansArabic
+      fonts:
+        - asset: assets/fonts/IBMPlexSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSansArabic-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSansArabic-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
+          weight: 700
 
 # Drives `dart run scripts/generate_api_client.dart` (ST-062): generates a typed Dio/Retrofit
 # client from the OpenAPI 3.1 document that ST-060 emits at apps/api/openapi.json. Output is

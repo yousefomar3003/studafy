@@ -10,6 +10,23 @@ the source of truth and the existing checksum/advisory-lock runner applies both 
 platform data. None is owned by or filtered for one school, and none contains `school_id`,
 `tenant_id`, or a disguised tenant discriminator. Future tenant tables may reference their UUIDs.
 
+### Later global tables
+
+Six more tables were classified global after ST-033. Together with the six above they make up the
+twelve-entry `approved_globals` allowlist in
+[`db/policies/rls-coverage.ts`](../../db/policies/rls-coverage.ts); a new global table fails
+`bun run db:test:rls-coverage` until it is reviewed and added there. Each migration header holds the
+full rationale.
+
+| Table                 | Migration      | Why it is global                                                                                                                                | Runtime access when created                             |
+| --------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `billing_events`      | 000016         | Privileged webhook-ingress log; a delivery is deduplicated before it is parsed far enough to know its school.                                   | None for `studafy_app`; RLS policy for `studafy_admin`. |
+| `security_events`     | 000028         | Boundary rejections recorded before authentication, so no tenant was ever established.                                                          | `SELECT`, `INSERT` (append-only).                       |
+| `email_events`        | 000077         | SES/SNS delivery feedback arrives before any tenant context exists.                                                                             | `SELECT`, `INSERT`, `UPDATE`.                           |
+| `email_suppressions`  | 000077         | A suppression is a property of the address, not of one school.                                                                                  | `SELECT`, `INSERT`, `UPDATE`.                           |
+| `sales_inquiries`     | 000125         | A prospective school writes one before it exists as a tenant.                                                                                   | None; `studafy_admin` only.                             |
+| `school_applications` | 000139, 000142 | An application exists before its school does. 000142 renamed its `school_id` to `provisioned_school_id` so no tool mistakes it for tenant data. | None; `studafy_admin` only.                             |
+
 SAD section 10 was not present in the repository or the linked ST-033 material when this migration
 was authored. The global classification therefore comes from the ticket's explicit table list; this
 document does not claim that the unavailable SAD text was inspected.

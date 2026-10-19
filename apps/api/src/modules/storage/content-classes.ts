@@ -35,6 +35,12 @@ export interface ContentClass {
   readonly maxSizeBytes: number;
   /** Permission required to request and confirm an upload of this class. */
   readonly requiredPermission: Permission;
+  /**
+   * False when the owning feature confirms the staged object itself, inside its own write (the
+   * object and the row that references it then commit together), so the generic confirm route
+   * refuses it. Omitted means the generic confirm route serves the class.
+   */
+  readonly gatewayConfirm?: false;
 }
 
 const KIB = 1024;
@@ -104,6 +110,18 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
       allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png"]),
       maxSizeBytes: 10 * MIB,
       requiredPermission: PERMISSIONS.BILLING_UPDATE,
+    },
+  ],
+  [
+    // Images on a parent<->teacher message (000134). Staged through the generic request-upload
+    // route, then confirmed and promoted by the messaging send itself (one transaction with the
+    // message), not by /api/storage/uploads/confirm. Mirrors ck_message_attachments_mime_type.
+    "message.attachment",
+    {
+      allowedContentTypes: new Set(["image/jpeg", "image/png", "image/webp", "image/heic"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.MESSAGE_SEND,
+      gatewayConfirm: false,
     },
   ],
   [

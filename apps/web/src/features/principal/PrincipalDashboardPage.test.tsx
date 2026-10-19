@@ -4,6 +4,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { AuthProvider } from "../../lib/auth";
+import { createTestSessionStore } from "../../lib/test/session";
+
 import type { ComponentType } from "react";
 
 const EMPTY_ATTENDANCE_SUMMARY = {
@@ -35,6 +38,8 @@ function emptyResponsesFor(path: string): Promise<{ data: unknown }> {
       return Promise.resolve({ data: { incidents: [], total: 0 } });
     case "/api/announcements":
       return Promise.resolve({ data: { items: [], next_cursor: null } });
+    case "/api/messaging/reports":
+      return Promise.resolve({ data: { reports: [], total: 0, limit: 3, offset: 0 } });
     default:
       return Promise.resolve({ data: undefined });
   }
@@ -46,14 +51,17 @@ mock.module("../../lib/api", () => ({ api: { GET: getMock } }));
 const loadPrincipalDashboardPage = async (): Promise<ComponentType> =>
   (await import("./PrincipalDashboardPage")).default;
 
-function renderPage(Page: ComponentType) {
+async function renderPage(Page: ComponentType) {
+  const store = await createTestSessionStore(["PRINCIPAL"]);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <Page />
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <Page />
+        </MemoryRouter>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -146,30 +154,36 @@ describe("PrincipalDashboardPage", () => {
       }
     });
 
-    renderPage(await loadPrincipalDashboardPage());
+    await renderPage(await loadPrincipalDashboardPage());
 
     expect(await screen.findByText("4")).toBeTruthy();
     expect(screen.getByText("G9-MATH")).toBeTruthy();
     expect(screen.getByText("95%")).toBeTruthy();
     expect(await screen.findByText("Cafeteria altercation")).toBeTruthy();
     expect(screen.getByText("Early dismissal Friday")).toBeTruthy();
+    expect(
+      await screen.findByText(
+        "4 grade approvals are waiting on you and 1 discipline incident is still open.",
+      ),
+    ).toBeTruthy();
   });
 
   test("renders each tile's empty state when there is nothing to show yet", async () => {
     getMock.mockImplementation(emptyResponsesFor);
 
-    renderPage(await loadPrincipalDashboardPage());
+    await renderPage(await loadPrincipalDashboardPage());
 
     expect(await screen.findByText("Nothing is waiting on review.")).toBeTruthy();
     expect(screen.getByText("No attendance recorded in this window.")).toBeTruthy();
     expect(screen.getByText("No open incidents.")).toBeTruthy();
     expect(screen.getByText("No announcements published yet.")).toBeTruthy();
+    expect(screen.getByText("No open message reports.")).toBeTruthy();
   });
 
   test("links to every area of the principal's work", async () => {
     getMock.mockImplementation(emptyResponsesFor);
 
-    renderPage(await loadPrincipalDashboardPage());
+    await renderPage(await loadPrincipalDashboardPage());
 
     for (const [name, href] of [
       ["Grades →", "/portal/principal/grades"],
@@ -177,6 +191,8 @@ describe("PrincipalDashboardPage", () => {
       ["Timetable →", "/portal/principal/timetable"],
       ["Classes →", "/portal/principal/classes"],
       ["Students →", "/portal/principal/students"],
+      ["Discipline →", "/portal/principal/discipline"],
+      ["Message reports →", "/portal/principal/message-reports"],
       ["Approvals →", "/portal/approvals"],
     ] as const) {
       expect(screen.getByRole("link", { name }).getAttribute("href")).toBe(href);

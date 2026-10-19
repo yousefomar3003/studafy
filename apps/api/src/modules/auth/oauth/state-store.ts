@@ -12,7 +12,7 @@
 const SWEEP_INTERVAL = 10;
 const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-export type OAuthFlowPurpose = "link" | "activation";
+export type OAuthFlowPurpose = "link" | "activation" | "school-application";
 
 export interface StateEntry {
   codeVerifier: string;

@@ -35,8 +35,8 @@ path is exercised — not three descriptions of what should happen.
 
 ### 1. `info` ticket — macro path
 
-Send: a ticket matching macro [#1 in the library](macro-library.md#1-invitation-email-never-arrived)
-("I sent an invitation and it never arrived"), clearly marked `[DRILL]` in the subject so it's never
+Send: a ticket matching macro [#1 in the library](macro-library.md#1-subscription-shows-past-due-or-grace-period)
+("Our subscription says Past due"), clearly marked `[DRILL]` in the subject so it's never
 mistaken for a real school's request.
 
 Expect: triage finds it inside the mailbox-check cadence, matches macro #1, responds with that

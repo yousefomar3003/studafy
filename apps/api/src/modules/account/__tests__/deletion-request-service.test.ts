@@ -1,8 +1,8 @@
 /**
  * Public account deletion (ST-302). The unit tests cover every path that must stop before the
  * database — captcha, cooldown, bad tokens. The integration tests (skipped unless
- * TEST_DATABASE_URL is set) run the whole flow: request -> emailed token -> confirm -> ST-301's
- * deletion in every school the address has an account in.
+ * TEST_DATABASE_URL is set) run the whole flow: request -> emailed token -> confirm -> a scheduled
+ * deletion (14-day grace period, 000143) in every school the address has an account in.
  */
 
 import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
@@ -20,9 +20,7 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { confirmAccountDeletion, requestAccountDeletion } from "../deletion-request-service";
 
 import type { TestDatabase } from "../../../../tests/harness";
-import type { PaymentProviderPort } from "../../subscriptions/ports/payment-provider";
 import type { DeletionRequestDeps } from "../deletion-request-service";
-import type { Queue } from "bullmq";
 import type { Sql } from "postgres";
 
 const integrationTest = test.skipIf(!integrationEnabled);
@@ -51,12 +49,6 @@ function fakeDeps(options: { database?: unknown; captchaSecretKey?: string } = {
   const deps = {
     database: (options.database ?? unusableDatabase) as never,
     denylist: null,
-    paymentProviders: {
-      stripe: { scheduleCancellation: async () => undefined } as unknown as PaymentProviderPort,
-      tap: null,
-    },
-    maintenanceQueue: { add: async () => undefined } as unknown as Queue,
-    siwa: null,
     redis: redis as never,
     captchaSecretKey: options.captchaSecretKey,
   } satisfies DeletionRequestDeps;
@@ -175,11 +167,15 @@ async function outboxRows(schoolId: string, eventName: string) {
 async function userState(schoolId: string, userId: string) {
   return asAdmin(database!.sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
-    const [row] = await tx<{ status: string; audit: Record<string, unknown> | null }[]>`
+    const [row] = await tx<
+      { status: string; due: Date | null; audit: Record<string, unknown> | null }[]
+    >`
       SELECT
         (SELECT status::text FROM app.users WHERE id = ${userId}) AS status,
+        (SELECT deletion_due_at FROM app.users WHERE id = ${userId}) AS due,
         (SELECT new_values FROM app.audit_logs
-          WHERE target_table = 'users' AND target_id = ${userId}::uuid AND action = 'delete') AS audit
+          WHERE target_table = 'users' AND target_id = ${userId}::uuid AND action = 'update'
+            AND new_values->>'event' = 'account_deletion_scheduled') AS audit
     `;
     return row!;
   });
@@ -187,7 +183,7 @@ async function userState(schoolId: string, userId: string) {
 
 describe("public deletion flow", () => {
   integrationTest(
-    "an emailed token deletes the address's accounts in every school",
+    "an emailed token schedules the deletion of the address's accounts in every school",
     async () => {
       const sql = database!.sql;
       const email = `parent-${crypto.randomUUID().slice(0, 8)}@example.com`;
@@ -218,11 +214,18 @@ describe("public deletion flow", () => {
         [lake.id, atLake.id],
       ] as const) {
         const state = await userState(schoolId, userId);
-        expect(state.status).toBe("archived");
-        expect(state.audit).toMatchObject({ reason: "account_deletion", source: "web_request" });
-        expect(await outboxRows(schoolId, DOMAIN_EVENTS.ACCOUNT_DELETED)).toHaveLength(1);
+        // Still attached: the sweep detaches it when the grace period ends.
+        expect(state.status).toBe("active");
+        expect(state.due!.getTime()).toBeGreaterThan(Date.now() + 13 * 86_400_000);
+        expect(state.audit).toMatchObject({
+          event: "account_deletion_scheduled",
+          source: "web_request",
+        });
       }
-      expect((await userState(hill.id, bystander.id)).status).toBe("active");
+      for (const account of confirmed) {
+        expect(account.completesBy.getTime()).toBeGreaterThan(account.scheduledFor.getTime());
+      }
+      expect((await userState(hill.id, bystander.id)).due).toBeNull();
 
       // Single use.
       expect(await codeOf(confirmAccountDeletion(deps, { token: payload.token }))).toBe(

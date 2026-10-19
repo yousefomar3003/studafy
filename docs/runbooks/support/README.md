@@ -11,7 +11,7 @@ This directory is the whole playbook:
 | File                                   | Answers                                                                                             |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `README.md` (this file)                | Intake channels, severity/SLA, triage disposition loop, escalation, ownership                       |
-| [`macro-library.md`](macro-library.md) | Canned responses for the top 10 predicted issues, invitations and payments included                 |
+| [`macro-library.md`](macro-library.md) | Canned responses for the top 7 predicted issues, payments included                                  |
 | [`drill.md`](drill.md)                 | The test-ticket script: intake→triage→resolution per severity, and the SEV→on-call escalation drill |
 
 ## Status — read this before treating this as "ready"
@@ -102,7 +102,7 @@ unconditionally, regardless of how it arrived.
 1. **Mailbox check**: at least once per working day, more often once request volume justifies it —
    this is the first thing to tighten once real volume exists, not a number to guess in advance.
 2. **Check the macro library first** ([`macro-library.md`](macro-library.md)) — most requests match
-   one of the top 10 predicted issues and resolve with a canned response plus a link to the
+   one of the top 7 predicted issues and resolve with a canned response plus a link to the
    relevant `docs/help/` article, no engineering involvement needed.
 3. **Every request gets a disposition**, same four values the pilot's feedback loop already proved
    out (`../launch/pilot-school-onboarding.md`§4), now the permanent vocabulary instead of a
@@ -157,9 +157,9 @@ names, resolve the role to a person when this workflow is actually staffed.
   cadence and the SLA numbers above are starting points, not measured — revisit both once real
   request volume exists, the same way `../on-call-rotation.md`'s own rotation size is a starting
   minimum, not a proven-sufficient one.
-- **The macro library is predicted, not observed** — the top 10 in `macro-library.md` come from
+- **The macro library is predicted, not observed** — the top 7 in `macro-library.md` come from
   what `docs/help/` and the codebase's own error/status states say schools are likely to hit
-  (invitations, payments, onboarding import, timetable conflicts), not from real ticket history.
+  (payments, onboarding import, timetable conflicts), not from real ticket history.
   Re-rank it once real tickets exist.
 - **No dashboard or ticket count exists** for support-labelled issues — same gap the pilot's own
   feedback loop already named for its metrics; a panel is worth building once volume, not workflow

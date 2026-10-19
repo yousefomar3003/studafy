@@ -18,9 +18,10 @@ import { ADVISORY_LOCK_KEY } from "../../packages/db/src/runner";
 import { seedAcademics } from "./data/academics";
 import { seedAi } from "./data/ai";
 import { seedAssessments } from "./data/assessments";
-import { seedEngagement, seedLocalFixtures } from "./data/engagement";
+import { seedEngagement, seedLocalFixtures, seedSchoolEvents } from "./data/engagement";
 import { seedFinance } from "./data/finance";
 import { seedMaterials } from "./data/materials";
+import { seedMessaging } from "./data/messaging";
 import { seedPeople, suppressTenantEmail } from "./data/people";
 import { seedSchool } from "./data/school";
 import { seedTimetableAndAttendance } from "./data/timetable";
@@ -42,6 +43,8 @@ const SUMMARY_TABLES = [
   "students",
   "teachers",
   "parent_child_links",
+  "families",
+  "member_codes",
   "academic_years",
   "terms",
   "subjects",
@@ -75,6 +78,9 @@ const SUMMARY_TABLES = [
   "notifications",
   "notification_preferences",
   "user_devices",
+  "school_events",
+  "message_conversations",
+  "messages",
   "outbox_events",
   "audit_logs",
 ] as const;
@@ -159,6 +165,8 @@ export async function seedTenant(
       await seedFinance(reserved, ctx);
       await seedAi(reserved, ctx, materials);
       await seedEngagement(reserved, ctx);
+      await seedSchoolEvents(reserved, ctx);
+      await seedMessaging(reserved, ctx);
       if (tenant.localFixtures) await seedLocalFixtures(reserved, ctx);
       if (tenant.isReviewTenant) await suppressTenantEmail(reserved, tenant);
 

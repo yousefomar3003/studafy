@@ -33,7 +33,9 @@ class DisciplineOverviewCard extends ConsumerWidget {
           }
           return Text(
             'viewer.admin.discipline.count'.tr(namedArgs: {'count': '$total'}),
-            style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           );
         },
       ),

@@ -1,12 +1,21 @@
-import { Link } from "react-router-dom";
+import { useApprovalQueueQuery } from "../../components/ApprovalQueueBadge";
+import { HomeHeader, useSummarySentence } from "../../components/home/HomeHeader";
+import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip";
+import { useFormatters, useTranslation } from "../../lib/i18n";
 
-import { useTranslation } from "../../lib/i18n";
-
+import {
+  useDraftEvaluationsQuery,
+  useOpenIncidentsPreviewQuery,
+  useOpenMessageReportsPreviewQuery,
+} from "./queries";
 import { AttendanceHeatMapTile } from "./tiles/AttendanceHeatMapTile";
 import { DraftEvaluationsTile } from "./tiles/DraftEvaluationsTile";
 import { OpenDisciplineIncidentsTile } from "./tiles/OpenDisciplineIncidentsTile";
-import { PendingApprovalsTile } from "./tiles/PendingApprovalsTile";
+import { OpenMessageReportsTile } from "./tiles/OpenMessageReportsTile";
 import { RecentAnnouncementsTile } from "./tiles/RecentAnnouncementsTile";
+
+import type { SummaryItem } from "../../components/home/SummaryStrip";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 import "../../components/dashboard-tile.css";
 import "./principal-dashboard.css";
@@ -20,43 +29,130 @@ const PRINCIPAL_LINKS = [
   { key: "students", to: "/portal/principal/students" },
   { key: "attendance", to: "/portal/principal/attendance" },
   { key: "discipline", to: "/portal/principal/discipline" },
+  { key: "messageReports", to: "/portal/principal/message-reports" },
   { key: "evaluations", to: "/portal/principal/evaluations" },
   { key: "approvals", to: "/portal/approvals" },
   { key: "announcements", to: "/portal/admin/announcements" },
 ] as const;
 
+const statusOf = (query: UseQueryResult) =>
+  query.isPending ? "pending" : query.isError ? "error" : "ready";
+
 /**
  * Principal home (`/portal/principal`), gated by `principalDashboard:view` (PRINCIPAL and
- * ORG_ADMIN). Links to each area of a principal's work — grades, the school calendar, timetable,
- * classes, students, attendance, discipline, evaluations, approvals, announcements — above a live
- * snapshot of what needs attention. Each tile owns its own query and loading/error/empty state
- * independently, so one failing endpoint never blocks the others from rendering (same pattern
- * `AdminDashboardPage` uses).
+ * ORG_ADMIN). Opens with who is signed in, a one-line summary of what is waiting, and the four
+ * counts a principal acts on; the tiles below list the items behind those counts, plus attendance
+ * by class and recent announcements. Every figure and tile owns its own query and loading/error
+ * state, so one failing endpoint never blocks the others from rendering.
  */
 export default function PrincipalDashboardPage() {
   const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  const approvals = useApprovalQueueQuery();
+  const incidents = useOpenIncidentsPreviewQuery();
+  const reports = useOpenMessageReportsPreviewQuery();
+  const evaluations = useDraftEvaluationsQuery();
+
+  const counts = {
+    approvals: approvals.data?.total ?? 0,
+    incidents: incidents.data?.total ?? 0,
+    reports: reports.data?.total ?? 0,
+    evaluations: evaluations.data?.length ?? 0,
+  };
+
+  const summary = useSummarySentence(
+    [
+      counts.approvals > 0
+        ? t("principal.home.summary.approvals", { count: counts.approvals })
+        : null,
+      counts.incidents > 0
+        ? t("principal.home.summary.incidents", { count: counts.incidents })
+        : null,
+      counts.reports > 0 ? t("principal.home.summary.reports", { count: counts.reports }) : null,
+    ],
+    {
+      loading: approvals.isPending || incidents.isPending || reports.isPending,
+      failed: approvals.isError || incidents.isError || reports.isError,
+    },
+  );
+
+  const items: SummaryItem[] = [
+    {
+      key: "approvals",
+      label: t("principal.tiles.pendingApprovals.title"),
+      value: formatNumber(counts.approvals),
+      hint:
+        counts.approvals === 0
+          ? t("principal.tiles.pendingApprovals.empty")
+          : t("principal.home.stats.approvalsHint"),
+      to: "/portal/approvals",
+      attention: counts.approvals > 0,
+      status: statusOf(approvals),
+      errorMessage: t("principal.tiles.pendingApprovals.error"),
+    },
+    {
+      key: "incidents",
+      label: t("principal.home.stats.incidents"),
+      value: formatNumber(counts.incidents),
+      hint: t("principal.home.stats.incidentsHint"),
+      to: "/portal/principal/discipline",
+      attention: counts.incidents > 0,
+      status: statusOf(incidents),
+      errorMessage: t("principal.tiles.openIncidents.error"),
+    },
+    {
+      key: "reports",
+      label: t("principal.home.stats.reports"),
+      value: formatNumber(counts.reports),
+      hint: t("principal.home.stats.reportsHint"),
+      to: "/portal/principal/message-reports",
+      attention: counts.reports > 0,
+      status: statusOf(reports),
+      errorMessage: t("principal.tiles.openMessageReports.error"),
+    },
+    {
+      key: "evaluations",
+      label: t("principal.tiles.draftEvaluations.title"),
+      value: formatNumber(counts.evaluations),
+      hint: t("principal.home.stats.evaluationsHint"),
+      to: "/portal/principal/evaluations",
+      status: statusOf(evaluations),
+      errorMessage: t("principal.tiles.draftEvaluations.error"),
+    },
+  ];
+
   return (
     <>
-      <h1>{t("principal.dashboard.title")}</h1>
-      <p>{t("principal.dashboard.description")}</p>
+      <HomeHeader title={t("principal.dashboard.title")} summary={summary} />
+      <SummaryStrip items={items} />
 
-      <ul className="link-tiles">
-        {PRINCIPAL_LINKS.map((link) => (
-          <li key={link.key}>
-            <Link to={link.to} className="link-tiles__item">
-              {t(`principal.dashboard.links.${link.key}`)}
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <HomeShortcuts
+        links={PRINCIPAL_LINKS.map((link) => ({
+          ...link,
+          label: t(`principal.dashboard.links.${link.key}`),
+        }))}
+      />
 
-      <div className="principal-dashboard-grid">
-        <PendingApprovalsTile />
-        <AttendanceHeatMapTile />
-        <OpenDisciplineIncidentsTile />
-        <DraftEvaluationsTile />
-        <RecentAnnouncementsTile />
-      </div>
+      <section className="home-section" aria-labelledby="principal-attention-heading">
+        <h2 id="principal-attention-heading" className="home-section-heading">
+          {t("principal.home.attentionHeading")}
+        </h2>
+        <div className="principal-dashboard-grid">
+          <OpenDisciplineIncidentsTile />
+          <OpenMessageReportsTile />
+          <DraftEvaluationsTile />
+        </div>
+      </section>
+
+      <section className="home-section" aria-labelledby="principal-activity-heading">
+        <h2 id="principal-activity-heading" className="home-section-heading">
+          {t("principal.home.activityHeading")}
+        </h2>
+        <div className="principal-dashboard-grid">
+          <AttendanceHeatMapTile />
+          <RecentAnnouncementsTile />
+        </div>
+      </section>
     </>
   );
 }

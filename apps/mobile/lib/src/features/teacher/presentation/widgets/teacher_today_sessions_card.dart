@@ -5,11 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/teacher_providers.dart';
 import '../../domain/teacher_home.dart';
-import '../attendance_taking_screen.dart';
+import 'take_attendance_button.dart';
 import 'teacher_section_card.dart';
 
-/// Today's teaching sessions for the signed-in teacher, nearest period first, each with a
-/// take-attendance call to action whose label reflects where today's attendance stands.
+/// Today's teaching sessions for the signed-in teacher, nearest period first, each showing where
+/// today's attendance stands. Tapping a session opens that class's register for today.
 class TeacherTodaySessionsCard extends ConsumerWidget {
   const TeacherTodaySessionsCard({super.key});
 
@@ -44,69 +44,77 @@ class TeacherTodaySessionsCard extends ConsumerWidget {
   }
 }
 
-class _SessionRow extends StatelessWidget {
+class _SessionRow extends ConsumerWidget {
   const _SessionRow({required this.session});
 
   final TeacherSession session;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(session.classCode, style: textTheme.bodyMedium),
-                Text(
-                  'teacher.home.sessions.period'.tr(namedArgs: {'period': '${session.period}'}),
-                  style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                ),
-              ],
+    return InkWell(
+      onTap: () => openTeacherRegister(
+        context,
+        ref,
+        classId: session.classId,
+        classCode: session.classCode,
+      ),
+      borderRadius: BorderRadius.circular(AppSpacing.space8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(session.classCode, style: textTheme.bodyMedium),
+                  Text(
+                    'teacher.home.sessions.period'.tr(
+                      namedArgs: {'period': '${session.period}'},
+                    ),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.space12),
-          _TakeAttendanceButton(session: session),
-        ],
+            const SizedBox(width: AppSpacing.space12),
+            _AttendanceStatus(session: session),
+            const SizedBox(width: AppSpacing.space4),
+            Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Navigates to the class so the teacher can take attendance. Disabled once today's attendance
-/// is recorded; its label distinguishes "not started" from "in progress".
-class _TakeAttendanceButton extends StatelessWidget {
-  const _TakeAttendanceButton({required this.session});
+/// Where today's attendance for the session stands — not taken yet, in progress or recorded.
+class _AttendanceStatus extends StatelessWidget {
+  const _AttendanceStatus({required this.session});
 
   final TeacherSession session;
 
   @override
   Widget build(BuildContext context) {
     final labelKey = switch (session.attendance) {
-      SessionAttendanceState.notStarted => 'teacher.home.sessions.takeAttendance',
-      SessionAttendanceState.inProgress => 'teacher.home.sessions.attendanceInProgress',
-      SessionAttendanceState.recorded => 'teacher.home.sessions.attendanceRecorded',
+      SessionAttendanceState.notStarted =>
+        'teacher.home.sessions.attendanceNotTaken',
+      SessionAttendanceState.inProgress =>
+        'teacher.home.sessions.attendanceInProgress',
+      SessionAttendanceState.recorded =>
+        'teacher.home.sessions.attendanceRecorded',
     };
 
-    return FilledButton.tonal(
-      onPressed: session.attendance.invitesAction
-          ? () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => AttendanceTakingScreen(
-                    classId: session.classId,
-                    classCode: session.classCode,
-                    period: session.period,
-                  ),
-                ),
-              )
-          : null,
-      child: Text(labelKey.tr()),
-    );
+    return Chip(label: Text(labelKey.tr()));
   }
 }

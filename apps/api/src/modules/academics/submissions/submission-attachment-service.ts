@@ -34,7 +34,7 @@ import type { TransactionSql } from "postgres";
  * class can read these attachments -- app.can_read_submission (000049) grants that, and they must
  * be able to open what they are marking -- but they cannot alter the evidence. The route layer
  * enforces the same thing from the other side by gating on submission:update, which
- * INSTRUCTOR and TEACHING_ASSISTANT do not hold.
+ * INSTRUCTOR does not hold.
  *
  * ## What differs: attempt_number
  *

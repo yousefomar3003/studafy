@@ -1,7 +1,7 @@
 /**
  * Job dispatch for the `maintenance` queue (ST-268): the scheduled tenant-closure sweep, every data
- * subject request (export or erasure) it and the DSR API file, and the scheduled Ask AI message
- * retention purge (ST-309). Mirrors the reports queue's report-registry.ts dispatch shape -- one
+ * subject request (export or erasure) it and the DSR API file, the scheduled Ask AI message
+ * retention purge (ST-309) and the scheduled account-deletion sweep (000143). Mirrors the reports queue's report-registry.ts dispatch shape -- one
  * function the queue's Worker hands every job to.
  */
 
@@ -10,9 +10,11 @@ import postgres from "postgres";
 
 import { workerLogger } from "../../log";
 
+import { runAccountDeletionSweep } from "./account-deletion-sweep";
 import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
 import { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 import { processDsrJob } from "./dsr-processor";
+import { StripeAiBillingCanceller } from "./stripe-ai-billing-canceller";
 
 import type { EnqueueDsrJob } from "./closure-sweep";
 import type { MaintenanceRunnerConfig } from "./dsr-processor";
@@ -36,6 +38,16 @@ export async function processMaintenanceJob(
       runTenantClosureSweep(sql, new Date(), enqueue, workerLogger),
     );
     return { processed: true };
+  }
+
+  if (job.name === JOB_NAMES.RUN_ACCOUNT_DELETION_SWEEP) {
+    const billing = config.stripeSecretKey
+      ? new StripeAiBillingCanceller(config.stripeSecretKey)
+      : null;
+    const result = await withPrimarySql(config, (sql) =>
+      runAccountDeletionSweep(sql, new Date(), billing, enqueue, workerLogger),
+    );
+    return { processed: true, ...result };
   }
 
   if (job.name === JOB_NAMES.PURGE_EXPIRED_AI_MESSAGES) {

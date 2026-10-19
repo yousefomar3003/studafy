@@ -89,13 +89,7 @@ async function renderPage(Page: ComponentType, role = "FINANCE") {
   );
 }
 
-const MANAGEMENT_LINKS = [
-  "Fee structure builder →",
-  "Invoices →",
-  "Payments →",
-  "Scholarships →",
-  "Expenses →",
-];
+const MANAGEMENT_LINKS = ["Fee structure builder →", "Invoices →", "Payments →", "Expenses →"];
 
 afterEach(() => {
   cleanup();

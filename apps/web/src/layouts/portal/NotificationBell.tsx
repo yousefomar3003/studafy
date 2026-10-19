@@ -114,9 +114,11 @@ export function NotificationBell() {
           </div>
 
           {recentQuery.isPending ? (
-            <p role="status">{t("notificationBell.loading")}</p>
+            <p role="status" className="portal-notification-panel__state">
+              {t("notificationBell.loading")}
+            </p>
           ) : notifications.length === 0 ? (
-            <p>{t("notificationBell.empty")}</p>
+            <p className="portal-notification-panel__state">{t("notificationBell.empty")}</p>
           ) : (
             <ul className="portal-notification-list">
               {notifications.map((notification) => (
@@ -128,13 +130,15 @@ export function NotificationBell() {
                   <p className="portal-notification-list__title">{notification.title}</p>
                   <p className="portal-notification-list__body">{notification.body}</p>
                   {notification.read_at === null ? (
-                    <Button
-                      variant="tertiary"
-                      loading={markRead.isPending && markRead.variables === notification.id}
-                      onClick={() => markRead.mutate(notification.id)}
-                    >
-                      {t("notificationBell.markAsRead")}
-                    </Button>
+                    <div className="portal-notification-list__actions">
+                      <Button
+                        variant="tertiary"
+                        loading={markRead.isPending && markRead.variables === notification.id}
+                        onClick={() => markRead.mutate(notification.id)}
+                      >
+                        {t("notificationBell.markAsRead")}
+                      </Button>
+                    </div>
                   ) : null}
                 </li>
               ))}

@@ -20,7 +20,7 @@ export interface AdjustmentConfirmDialogProps {
 }
 
 /**
- * Maker-checker confirmation shared by both the scholarship award and refund flows: it always shows
+ * Maker-checker confirmation for the refund flow (initiating and approving): it always shows
  * the exact computed financial effect (as `children`, a `<dl>` built by the caller) before either
  * step commits. Same Modal-confirm shape as `admin/settings/ConfirmChangeDialog`, generalized with
  * an inline error slot since a commit here calls ERPNext and can fail after the dialog opens (see

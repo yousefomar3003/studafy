@@ -212,8 +212,10 @@ export async function seedAcademics(sql: Sql, ctx: SchoolCtx & PeopleCtx): Promi
     )}
   `;
 
-  // Enroll students: the first five in Science, the last five in Math (overlapping in the middle), so
-  // both classes are populated and some students appear in both.
+  // Enroll students: the first five in Science, everyone from the fourth on in Math (overlapping in
+  // the middle), so both classes are populated and some students appear in both. Math runs to the end
+  // of the roster so a student appended to the persona list (e.g. Mira Fares, whose brother Adam is
+  // Science-only) lands in Math and gets a different timetable from her sibling.
   const scienceClass = classes[0]!;
   const mathClass = classes[1]!;
   const enrollments: SeededEnrollment[] = [
@@ -221,7 +223,7 @@ export async function seedAcademics(sql: Sql, ctx: SchoolCtx & PeopleCtx): Promi
       .slice(0, 5)
       .map((student) => ({ classId: scienceClass.id, studentId: student.studentId })),
     ...students
-      .slice(3, 8)
+      .slice(3)
       .map((student) => ({ classId: mathClass.id, studentId: student.studentId })),
   ];
   await sql`

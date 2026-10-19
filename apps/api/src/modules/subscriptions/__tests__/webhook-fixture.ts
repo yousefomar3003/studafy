@@ -83,6 +83,7 @@ export function createProviderStub(): ProviderStub {
     scheduleCancellation: unsupported,
     reverseCancellation: unsupported,
     listInvoices: unsupported,
+    refund: unsupported,
   } as ProviderStub;
 
   return stub;

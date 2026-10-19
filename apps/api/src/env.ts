@@ -97,13 +97,19 @@ export const envSchema = z
     // below: "unknown" is a diagnosable log value, whereas a container that refuses to boot over a
     // logging field is an outage. Deployments set it from IMAGE_TAG.
     RELEASE_VERSION: z.string().min(1).default("unknown"),
+    // Sentry error monitoring (@studafy/observability's initErrorMonitoring). Unset disables it —
+    // the normal state in dev and test. Empty is unset: the task definition always injects the key
+    // from the app-secrets container, whose default is "" (infra/terraform/main.tf).
+    SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // The deploy tier events are grouped under. Falls back to APP_ENV (index.ts).
+    SENTRY_ENVIRONMENT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     DATABASE_HOST: z.string().min(1).optional(),
     DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
     DATABASE_NAME: z.string().min(1).optional(),
     DATABASE_USER: z.string().min(1).optional(),
     DATABASE_PASSWORD: z.string().min(1).optional(),
     DATABASE_CA_CERT: z.string().min(1).optional(),
-    // Local development only: `disable` connects to the plain docker-compose Postgres (db/compose.yml)
+    // Local development only: `disable` connects to the plain docker-compose Postgres (compose.yml test profile)
     // without TLS. Refused below outside APP_ENV=development / NODE_ENV!=production, so a deployed
     // API always verifies the database certificate.
     DATABASE_SSL_MODE: z.enum(["disable", "verify-full"]).optional(),

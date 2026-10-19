@@ -19,17 +19,18 @@ Enrollment _enrolment(String studentId) => Enrollment.fromJson({
   'updated_at': _t0,
 });
 
-AttendanceRecord _record(String studentId, String status) => AttendanceRecord.fromJson({
-  'id': 'rec-$studentId',
-  'school_id': 'school-1',
-  'attendance_session_id': 'session-1',
-  'student_id': studentId,
-  'status': status,
-  'minutes_late': null,
-  'reason': null,
-  'recorded_by_user_id': 'user-1',
-  'created_at': _t0,
-});
+AttendanceRecord _record(String studentId, String status) =>
+    AttendanceRecord.fromJson({
+      'id': 'rec-$studentId',
+      'school_id': 'school-1',
+      'attendance_session_id': 'session-1',
+      'student_id': studentId,
+      'status': status,
+      'minutes_late': null,
+      'reason': null,
+      'recorded_by_user_id': 'user-1',
+      'created_at': _t0,
+    });
 
 void main() {
   group('AttendanceMarkStatus.next', () {
@@ -42,52 +43,83 @@ void main() {
   });
 
   group('AttendanceMark', () {
-    test('cycling into late attaches the minimum minutes-late, and away drops it', () {
-      final absent = AttendanceMark.present('s1').cycled();
-      expect(absent.status, AttendanceMarkStatus.absent);
-      expect(absent.minutesLate, isNull);
+    test(
+      'cycling into late attaches the minimum minutes-late, and away drops it',
+      () {
+        final absent = AttendanceMark.present('s1').cycled();
+        expect(absent.status, AttendanceMarkStatus.absent);
+        expect(absent.minutesLate, isNull);
 
-      final late = absent.cycled();
-      expect(late.status, AttendanceMarkStatus.late);
-      expect(late.minutesLate, kMinMinutesLate);
+        final late = absent.cycled();
+        expect(late.status, AttendanceMarkStatus.late);
+        expect(late.minutesLate, kMinMinutesLate);
 
-      final excused = late.cycled();
-      expect(excused.status, AttendanceMarkStatus.excused);
-      expect(excused.minutesLate, isNull);
-    });
+        final excused = late.cycled();
+        expect(excused.status, AttendanceMarkStatus.excused);
+        expect(excused.minutesLate, isNull);
+      },
+    );
 
     test('withMinutesLate floors at the API minimum', () {
-      final late = AttendanceMark.present('s1').cycled().cycled().withMinutesLate(0);
+      final late = AttendanceMark.present(
+        's1',
+      ).cycled().cycled().withMinutesLate(0);
       expect(late.minutesLate, kMinMinutesLate);
       expect(late.withMinutesLate(15).minutesLate, 15);
     });
 
     test('wireStatus maps to the batch enum', () {
-      expect(AttendanceMarkStatus.present.wireStatus, BatchRecordItemStatus.present);
-      expect(AttendanceMarkStatus.late.wireStatus, BatchRecordItemStatus.valueLate);
-      expect(AttendanceMarkStatus.excused.wireStatus, BatchRecordItemStatus.excused);
+      expect(
+        AttendanceMarkStatus.present.wireStatus,
+        BatchRecordItemStatus.present,
+      );
+      expect(
+        AttendanceMarkStatus.late.wireStatus,
+        BatchRecordItemStatus.valueLate,
+      );
+      expect(
+        AttendanceMarkStatus.excused.wireStatus,
+        BatchRecordItemStatus.excused,
+      );
     });
   });
 
   group('AttendanceMarkStatus.fromRecord', () {
     test('maps known statuses and collapses remote/unknown to present', () {
-      expect(AttendanceMarkStatus.fromRecord(AttendanceRecordStatus.absent),
-          AttendanceMarkStatus.absent);
-      expect(AttendanceMarkStatus.fromRecord(AttendanceRecordStatus.valueLate),
-          AttendanceMarkStatus.late);
-      expect(AttendanceMarkStatus.fromRecord(AttendanceRecordStatus.remote),
-          AttendanceMarkStatus.present);
-      expect(AttendanceMarkStatus.fromRecord(AttendanceRecordStatus.$unknown),
-          AttendanceMarkStatus.present);
+      expect(
+        AttendanceMarkStatus.fromRecord(AttendanceRecordStatus.absent),
+        AttendanceMarkStatus.absent,
+      );
+      expect(
+        AttendanceMarkStatus.fromRecord(AttendanceRecordStatus.valueLate),
+        AttendanceMarkStatus.late,
+      );
+      expect(
+        AttendanceMarkStatus.fromRecord(AttendanceRecordStatus.remote),
+        AttendanceMarkStatus.present,
+      );
+      expect(
+        AttendanceMarkStatus.fromRecord(AttendanceRecordStatus.$unknown),
+        AttendanceMarkStatus.present,
+      );
     });
   });
 
   group('AttendanceTally.of', () {
     test('counts each status', () {
       final tally = AttendanceTally.of([
-        const AttendanceMark(studentId: 'a', status: AttendanceMarkStatus.present),
-        const AttendanceMark(studentId: 'b', status: AttendanceMarkStatus.absent),
-        const AttendanceMark(studentId: 'c', status: AttendanceMarkStatus.absent),
+        const AttendanceMark(
+          studentId: 'a',
+          status: AttendanceMarkStatus.present,
+        ),
+        const AttendanceMark(
+          studentId: 'b',
+          status: AttendanceMarkStatus.absent,
+        ),
+        const AttendanceMark(
+          studentId: 'c',
+          status: AttendanceMarkStatus.absent,
+        ),
         const AttendanceMark(studentId: 'd', status: AttendanceMarkStatus.late),
       ]);
       expect(tally.present, 1);
@@ -99,15 +131,18 @@ void main() {
   });
 
   group('AttendanceTakingRegister', () {
-    test('editableRoster excludes students already recorded in an open session', () {
-      final register = AttendanceTakingRegister(
-        roster: [_enrolment('a'), _enrolment('b'), _enrolment('c')],
-        lockedRecords: [_record('b', 'present')],
-      );
+    test(
+      'editableRoster excludes students already recorded in an open session',
+      () {
+        final register = AttendanceTakingRegister(
+          roster: [_enrolment('a'), _enrolment('b'), _enrolment('c')],
+          lockedRecords: [_record('b', 'present')],
+        );
 
-      expect(register.lockedStudentIds, {'b'});
-      expect(register.editableRoster.map((e) => e.studentId), ['a', 'c']);
-    });
+        expect(register.lockedStudentIds, {'b'});
+        expect(register.editableRoster.map((e) => e.studentId), ['a', 'c']);
+      },
+    );
   });
 
   group('RecordedRegister.canCorrect', () {

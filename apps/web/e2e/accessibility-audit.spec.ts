@@ -216,57 +216,6 @@ test.describe("notifications", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Admin: invitations list and the new-invitation modal.
-// ---------------------------------------------------------------------------
-
-test.describe("admin invitations", () => {
-  async function stubInvitations(page: Page) {
-    await page.route("**/api/invitations**", async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      return fulfillJson(route, 200, {
-        invitations: [
-          {
-            id: "invitation-1",
-            email: "jamie@example.edu",
-            role: "INSTRUCTOR",
-            status: "pending",
-            expires_at: "2026-08-30T00:00:00.000Z",
-            revoked_at: null,
-            consumed_at: null,
-            invited_by_user_id: "user-1",
-            created_at: NOW,
-          },
-        ],
-        next_cursor: null,
-        bulk_invites: [],
-      });
-    });
-  }
-
-  test("list has no critical/serious violations", async ({ page }) => {
-    await stubPortalShellDefaults(page);
-    await stubAuthenticatedSession(page, ["ORG_ADMIN"]);
-    await stubInvitations(page);
-
-    await page.goto("/portal/admin/invitations");
-    await expect(page.getByText("jamie@example.edu")).toBeVisible();
-    await runAudit(page);
-  });
-
-  test("new-invitation modal has no critical/serious violations", async ({ page }) => {
-    await stubPortalShellDefaults(page);
-    await stubAuthenticatedSession(page, ["ORG_ADMIN"]);
-    await stubInvitations(page);
-
-    await page.goto("/portal/admin/invitations");
-    await expect(page.getByText("jamie@example.edu")).toBeVisible();
-    await page.getByRole("button", { name: "New invitation" }).click();
-    await expect(page.getByRole("dialog", { name: "New invitation" })).toBeVisible();
-    await runAudit(page);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Finance: payment recording form.
 // ---------------------------------------------------------------------------
 

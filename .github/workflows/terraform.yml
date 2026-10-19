@@ -65,3 +65,8 @@ jobs:
         working-directory: infra/terraform
       - run: terraform plan -lock=false -input=false -var-file=environments/${{ matrix.environment }}/${{ matrix.environment }}.tfvars
         working-directory: infra/terraform
+        # Operator-specific bastion inputs are deliberately not in *.tfvars (variables.tf). They come
+        # from per-environment repository variables, e.g. BASTION_ALLOWED_SSH_CIDRS_DEV='["203.0.113.4/32"]'.
+        env:
+          TF_VAR_bastion_allowed_ssh_cidrs: ${{ vars[format('BASTION_ALLOWED_SSH_CIDRS_{0}', matrix.environment)] }}
+          TF_VAR_bastion_key_name: ${{ vars[format('BASTION_KEY_NAME_{0}', matrix.environment)] }}

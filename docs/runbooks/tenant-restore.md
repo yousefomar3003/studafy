@@ -83,7 +83,7 @@ command to run.
 CONNECTION_SECRET_ARN="$(terraform -chdir=infra/terraform output -raw postgres_connection_secret_arn)" \
 AWS_REGION=eu-central-1 \
 PGHOST_OVERRIDE="<scratch endpoint from step 1>" \
-REPORT_BUCKET="$(terraform -chdir=infra/terraform output -raw backups_archive_bucket_name)" \
+REPORT_BUCKET="$(terraform -chdir=infra/terraform output -raw storage_backups_archive_bucket_id)" \
 infra/tools/tenant-restore/extract-tenant-slice.sh \
   --school-id "<uuid>" --out-dir ./tenant-restore-slice --ticket "<this ticket>"
 ```
@@ -136,7 +136,7 @@ This tool has never been run against real AWS infrastructure — no AWS account 
 applied to from this repo (`infra/terraform/README.md`'s Status line;
 [ST-266's drill report](dr/st-266-game-day-drill-report.md) found the same for every DR runbook).
 What was actually validated, against a local, fully-migrated Postgres instance
-(`db/compose.yml`, seeded via `db/seeds/seed.ts`) rather than staging:
+(`compose.yml` (test profile), seeded via `db/seeds/seed.ts`) rather than staging:
 
 1. **Full-schema extraction**: `extract-tenant-slice.sh` against a seeded school across every
    discovered tenant table (98 of 106, 8 default-excluded) — 1,162 rows extracted, manifest

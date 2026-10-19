@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'app_environment.dart';
 
 class AppConfig {
@@ -17,12 +19,12 @@ class AppConfig {
       environment: environment,
       apiBaseUrl: Uri.parse(
         apiBaseUrlOverride.isEmpty
-            ? environment.defaultApiBaseUrl
+            ? _hostLoopback(environment.defaultApiBaseUrl)
             : apiBaseUrlOverride,
       ),
       realtimeBaseUrl: Uri.parse(
         realtimeBaseUrlOverride.isEmpty
-            ? environment.defaultRealtimeBaseUrl
+            ? _hostLoopback(environment.defaultRealtimeBaseUrl)
             : realtimeBaseUrlOverride,
       ),
       webBaseUrl: Uri.parse(
@@ -30,6 +32,13 @@ class AppConfig {
       ),
     );
   }
+
+  /// The dev defaults use `10.0.2.2`, the Android emulator's alias for the host machine. The iOS
+  /// simulator shares the host's network stack, so there the same services are on `localhost`.
+  static String _hostLoopback(String url) =>
+      !kIsWeb && defaultTargetPlatform != TargetPlatform.android
+          ? url.replaceFirst('//10.0.2.2:', '//localhost:')
+          : url;
 
   final AppEnvironment environment;
   final Uri apiBaseUrl;

@@ -288,7 +288,7 @@ speeds the build, but each parallel worker takes its own allocation — asking f
 OOM-killed and takes the postmaster with it.
 
 The HNSW build also needs shared memory for its parallel workers. Docker's default 64 MB `/dev/shm` is not
-enough (`could not resize shared memory segment ... No space left on device`); `db/compose.yml` sets
+enough (`could not resize shared memory segment ... No space left on device`); `compose.yml` (test profile) sets
 `shm_size: 1gb`.
 
 ## Benchmark
@@ -305,7 +305,7 @@ returning a full 50 rows, all of them the acting school's. The ANN plan resolves
 (validated by the plan assertion in the test).
 
 ```
-docker compose -f db/compose.yml up -d --wait
+docker compose up -d --wait test-postgres test-redis
 MATERIAL_CHUNKS_BENCHMARK=1 TEST_DATABASE_URL=postgresql://… \
   bun test tests/material-chunks-benchmark.test.ts   # in packages/db
 ```

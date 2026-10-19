@@ -135,7 +135,8 @@ export async function createTeacher(
   schoolId: string,
   params: CreateTeacherBody,
 ): Promise<TeacherRow> {
-  const normalizedEmail = params.email.toLowerCase().trim();
+  const email = params.email?.trim() || null;
+  const normalizedEmail = email?.toLowerCase() ?? null;
   const normalizedEmployeeNumber = params.employee_number.toLowerCase().trim();
 
   // Pre-check employee number for a friendly error.
@@ -159,9 +160,9 @@ export async function createTeacher(
     INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
     VALUES (
       ${schoolId},
-      ${params.email},
+      ${email},
       ${normalizedEmail},
-      ${params.email},
+      ${params.display_name ?? email ?? params.employee_number},
       'active'::app.user_status
     )
     RETURNING id
@@ -219,7 +220,7 @@ export async function createTeacher(
     action: "insert",
     targetTable: "users",
     targetId: user.id,
-    newValues: { email: params.email, status: "active" },
+    newValues: { email, status: "active" },
   });
 
   // Audit: role assignment.

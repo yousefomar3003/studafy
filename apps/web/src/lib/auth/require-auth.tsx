@@ -1,10 +1,11 @@
-import { useEffect, type PropsWithChildren } from "react";
+import { isMobileOnly } from "@studafy/constants";
+import { useEffect, useRef, type PropsWithChildren } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { Loading } from "../../components/Loading";
 
 import { useAuthStatus, useSessionStore } from "./context";
-import { setReturnTo } from "./return-to";
+import { clearReturnTo, setReturnTo } from "./return-to";
 
 /**
  * Route guard for authenticated route groups (portal, account, …).
@@ -18,6 +19,11 @@ import { setReturnTo } from "./return-to";
  *     path only) and the browser is sent to `/auth/login`, with `reason=expired` when the session
  *     died mid-life so the login page can say so. The OAuth round trip then lands on `/auth/callback`,
  *     which consumes the return-to and restores the original route (deep-link acceptance criterion).
+ *
+ * A session holding only mobile-only roles (students, parents, teachers, attendance officers) is
+ * signed out and sent to the "use the mobile app" page. The API already refuses such sessions at
+ * sign-in and refresh; this catches an access token minted before that rule, for the minutes it has
+ * left, so the portal never renders for it.
  *
  * The redirect is a `useEffect`, not a render branch, because the store's `restore()` is async: on
  * the very first render there is no answer yet, so a branch would redirect before the check runs.
@@ -35,16 +41,33 @@ export function RequireAuth({ children }: PropsWithChildren) {
     void store.restore();
   }, [store]);
 
+  // A drop straight from `authenticated` to `unauthenticated` is a sign-out, not a deep link: the
+  // page the old user was on must not become where the next sign-in on this tab lands.
+  const previousStatus = useRef(status);
   useEffect(() => {
+    const signedOut = previousStatus.current === "authenticated" && status === "unauthenticated";
+    previousStatus.current = status;
     if (status === "unauthenticated" || status === "expired") {
-      setReturnTo(`${location.pathname}${location.search}`);
+      if (signedOut) {
+        clearReturnTo();
+      } else {
+        setReturnTo(`${location.pathname}${location.search}`);
+      }
       void navigate(status === "expired" ? "/auth/login?reason=expired" : "/auth/login", {
         replace: true,
       });
     }
   }, [status, location, navigate]);
 
-  if (status === "authenticated") {
+  const mobileOnly = status === "authenticated" && isMobileOnly(store.getRoles());
+  useEffect(() => {
+    if (!mobileOnly) return;
+    // Leave the guarded tree first, so the sign-out below cannot also bounce this guard to login.
+    void navigate("/auth/error?code=WEB_ACCESS_MOBILE_ONLY", { replace: true });
+    void store.logout();
+  }, [mobileOnly, navigate, store]);
+
+  if (status === "authenticated" && !mobileOnly) {
     return <>{children}</>;
   }
   return <Loading />;

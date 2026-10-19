@@ -13,10 +13,12 @@ import { toTapAmount } from "./currency";
 
 import type {
   CreateHostedChargeInput,
+  CreateRefundInput,
   CreateSavedCardChargeInput,
   ListChargesInput,
   ListChargesResult,
   TapCharge,
+  TapRefund,
 } from "./charge";
 
 export const TAP_API_BASE_URL = "https://api.tap.company/v2";
@@ -148,6 +150,22 @@ export class TapClient {
       charges: Array.isArray(page.charges) ? page.charges : [],
       hasMore: page.has_more === true,
     };
+  }
+
+  /**
+   * Refund a captured charge. No `post.url` is sent: the billing webhook only reads charges, and a
+   * refund's outcome is read from this response.
+   */
+  createRefund(input: CreateRefundInput): Promise<TapRefund> {
+    return this.request<TapRefund>("POST", "/refunds", {
+      charge_id: input.chargeId,
+      amount: toTapAmount(input.amountMinor, input.currency),
+      currency: input.currency.toUpperCase(),
+      description: input.description,
+      reason: "requested_by_customer",
+      metadata: input.metadata,
+      ...(input.merchantReference ? { reference: { merchant: input.merchantReference } } : {}),
+    });
   }
 
   /**

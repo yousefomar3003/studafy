@@ -20,10 +20,16 @@ export const userWithRolesSchema = z
   .object({
     id: uuidSchema.openapi({ description: "Primary key." }),
     school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
-    email: z.string().max(320).openapi({
-      description: "Contact address as supplied.",
-      example: "student@example.edu",
-    }),
+    email: z
+      .string()
+      .max(320)
+      .nullable()
+      .openapi({
+        description:
+          "Contact address as supplied. Null for members who sign in with their member ID and a " +
+          "password instead of Google or Microsoft.",
+        example: "student@example.edu",
+      }),
     display_name: z.string().nullable().openapi({ description: "Optional human-readable name." }),
     status: userStatusSchema,
     roles: z
@@ -46,16 +52,23 @@ export type UserWithRoles = z.infer<typeof userWithRolesSchema>;
 
 export const createUserBodySchema = z
   .object({
-    email: z.string().email().max(320).openapi({
-      description: "Contact address. Unique per school after normalization.",
-      example: "newuser@example.edu",
-    }),
+    email: z
+      .string()
+      .email()
+      .max(320)
+      .optional()
+      .openapi({
+        description:
+          "Contact address. Unique per school after normalization. " +
+          "Optional for students, parents, teachers and attendance officers, who sign in with their member ID and a password. Required for every other role.",
+        example: "newuser@example.edu",
+      }),
     display_name: z
       .string()
+      .trim()
       .min(1)
       .max(200)
-      .optional()
-      .openapi({ description: "Optional human-readable name." }),
+      .openapi({ description: "Human-readable name.", example: "Jamie Rivera" }),
     role: roleSchema.openapi({ description: "Role to assign to the new user." }),
   })
   .openapi("CreateUserBody");
@@ -96,9 +109,20 @@ export type UpdateUserRoleBody = z.infer<typeof updateUserRoleBodySchema>;
 // List response
 // ---------------------------------------------------------------------------
 
+export const userListItemSchema = userWithRolesSchema
+  .extend({
+    member_codes: z.array(z.string()).openapi({
+      description:
+        "Platform-issued member IDs, one per student/teacher/parent role held (e.g. STU-100001).",
+    }),
+  })
+  .openapi("UserListItem");
+
+export type UserListItem = z.infer<typeof userListItemSchema>;
+
 export const userListSchema = z
   .object({
-    users: z.array(userWithRolesSchema),
+    users: z.array(userListItemSchema),
     next_cursor: z.string().nullable().openapi({
       description: "Opaque cursor for the next page. Null when no more results.",
     }),
@@ -117,6 +141,27 @@ export const userStatusCountsSchema = z
     archived: z.number().int().nonnegative(),
   })
   .openapi("UserStatusCounts");
+
+// ---------------------------------------------------------------------------
+// Member summary
+// ---------------------------------------------------------------------------
+
+export const userMemberSummarySchema = z
+  .object({
+    school_number: z.number().int().positive().openapi({
+      description: "The school's platform number; the leading digits of its member IDs.",
+    }),
+    students: z.number().int().nonnegative(),
+    teachers: z.number().int().nonnegative(),
+    parents: z.number().int().nonnegative(),
+    attendance_officers: z.number().int().nonnegative(),
+    default_password: z.string().openapi({
+      description:
+        "The starting password for new members and after a reset. They must replace it at their " +
+        "first sign-in.",
+    }),
+  })
+  .openapi("UserMemberSummary");
 
 // ---------------------------------------------------------------------------
 // Deactivate response
@@ -267,6 +312,29 @@ export const studentDemographicsSchema = z
 export type StudentDemographics = z.infer<typeof studentDemographicsSchema>;
 
 // ---------------------------------------------------------------------------
+// Student self (GET /api/students/me)
+// ---------------------------------------------------------------------------
+
+export const studentSelfSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "The caller's own student record id." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    user_id: uuidSchema.openapi({ description: "Linked user account (the caller)." }),
+    first_name: z.string().openapi({ description: "Legal first name." }),
+    last_name: z.string().openapi({ description: "Legal last name." }),
+    preferred_name: z.string().nullable().openapi({ description: "Preferred or informal name." }),
+    status: studentStatusSchema,
+    enrolled_class_ids: z.array(uuidSchema).openapi({
+      description:
+        "Ids of the active classes the student is actively enrolled in, sorted ascending. " +
+        "Empty when the student has no current enrollments.",
+    }),
+  })
+  .openapi("StudentSelf");
+
+export type StudentSelf = z.infer<typeof studentSelfSchema>;
+
+// ---------------------------------------------------------------------------
 // Guardian
 // ---------------------------------------------------------------------------
 
@@ -327,10 +395,17 @@ export const guardianParamSchema = z
 
 export const createStudentBodySchema = z
   .object({
-    email: z.string().email().max(320).openapi({
-      description: "Contact address. Unique per school after normalization.",
-      example: "student@example.edu",
-    }),
+    email: z
+      .string()
+      .email()
+      .max(320)
+      .optional()
+      .openapi({
+        description:
+          "Contact address. Unique per school after normalization. Optional: students sign in with " +
+          "their member ID and a password.",
+        example: "student@example.edu",
+      }),
     admission_number: z.string().min(1).max(100).openapi({
       description: "Unique admission number within the school.",
       example: "ADM-2024-001",
@@ -522,9 +597,19 @@ export type TeacherProfile = z.infer<typeof teacherProfileSchema>;
 
 export const createTeacherBodySchema = z
   .object({
-    email: z.string().email().max(320).openapi({
-      description: "Contact address. Unique per school after normalization.",
-      example: "teacher@example.edu",
+    email: z
+      .string()
+      .email()
+      .max(320)
+      .optional()
+      .openapi({
+        description:
+          "Contact address. Unique per school after normalization. Optional: teachers sign in with " +
+          "their member ID and a password.",
+        example: "teacher@example.edu",
+      }),
+    display_name: z.string().trim().min(1).max(200).optional().openapi({
+      description: "The teacher's name. Defaults to the email, or the employee number.",
     }),
     employee_number: z.string().min(1).max(100).openapi({
       description: "Unique employee number within the school.",

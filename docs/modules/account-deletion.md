@@ -5,44 +5,67 @@ data-deletion policy. Code: `apps/api/src/modules/account`.
 
 ## Entry points
 
-| Platform | Where                                                                            |
-| -------- | -------------------------------------------------------------------------------- |
-| Web      | Account settings → Delete account (`/account/delete`, `DeleteAccountPage.tsx`)   |
-| iOS      | Profile tab → "Delete my account", opens `/account/delete` in the system browser |
-| Android  | Same as iOS                                                                      |
-| No login | Public `/legal/delete-account` (the URL for Play's Data Safety form)             |
+| Platform      | Where                                                                          |
+| ------------- | ------------------------------------------------------------------------------ |
+| Web           | Account settings → Delete account (`/account/delete`, `DeleteAccountPage.tsx`) |
+| iOS / Android | Profile → Account → Delete my account (`delete_account_screen.dart`)           |
+| No login      | Public `/legal/delete-account` (the URL for Play's Data Safety form)           |
 
-All three in-app paths call `POST /api/account/deletion`. The no-login path ends in the same
-`deleteAccount()` call — see [Web deletion flow](#web-deletion-flow-no-sign-in).
+The web and mobile paths call `POST /api/account/deletion`. The no-login path ends in the same
+`scheduleAccountDeletion()` call — see [Web deletion flow](#web-deletion-flow-no-sign-in).
+
+The mobile screen is deliberately hard to use by accident: the button enables only after the
+person ticks an acknowledgement, types the confirmation word (`DELETE` / `حذف`) and — for accounts
+that sign in with a member ID and password — enters both, which the API verifies
+(`AccountProfile.deletion_requires_member_credentials`). A wrong password counts toward the normal
+sign-in lockout. A final dialog follows.
+
+The school admin additionally has **"Delete school"**, which is _not_ an account deletion:
+`POST /api/schools/current/closure` archives the school, signs every member out and blocks sign-in,
+and retains all data (`apps/api/src/modules/tenancy/closure`).
 
 ## What happens
 
-Immediately, in one transaction (`account-deletion-service.ts`):
+Deletion has a **14-day grace period** (migration 000143).
 
-1. Sign in with Apple tokens are revoked through `SiwaTokenRevocation` — see "Known gaps".
-2. AI add-on billing stops for the user's student record: Stripe subscriptions are set to cancel at
+**Scheduling** — one transaction (`account-deletion-service.ts`):
+
+1. Refused with `409` if a deletion is already scheduled or an erasure is already in flight.
+2. Member-password accounts must send their own `member_id` and `password` on the signed-in path
+   (`422 ACCOUNT_DELETION_VERIFICATION_FAILED` otherwise; `403 AUTH_ACCOUNT_LOCKED` once locked).
+3. `users.deletion_requested_at` / `deletion_due_at` (now + 14 days) are set, and an `update` audit
+   entry records `event: account_deletion_scheduled`, the due date and `source`.
+
+After commit every session is revoked and its access tokens denylisted (audit reason
+`account_deletion`). The response carries `scheduled_for`, `completes_by` (due date + the 30-day
+erasure SLA) and `retained_records`.
+
+**Grace period** — signing in again mints an access token with the `deletion_pending` claim
+(`session-service.ts`). `accountDeletionGuard` (`apps/api/src/middleware/account-deletion-guard.ts`)
+answers every other request with `403 ACCOUNT_DELETION_SCHEDULED`, allowing only
+`GET /api/account/profile` (which returns `deletion_scheduled_for`), `DELETE /api/account/deletion`
+and logout. The mobile app (`deletion_pending_screen.dart`) and the web
+(`DeletionPendingGate.tsx`) show only "Cancel deletion" and "Sign out". Cancelling clears both
+columns (audited as `account_deletion_cancelled`); the client then refreshes its token.
+
+**On the due date** — the maintenance worker's daily account-deletion sweep (09:00 UTC,
+`apps/workers/src/queues/maintenance/account-deletion-sweep.ts`), per account in one transaction:
+
+1. AI add-on billing stops for the user's student record: Stripe subscriptions are set to cancel at
    period end; Tap subscriptions lose their saved card, so the renewal worker cannot charge them.
-3. The user is detached from the school: `users.status = 'archived'`, and their `user_roles`,
-   `oauth_identities` and `parent_child_links` (as parent) are deleted. With no identity row, no
-   login path can resolve the account again.
-4. An `erasure` row is filed in `app.data_subject_requests` (due in 30 days).
-5. A `delete` audit entry on `users` records the request id, due date, cancelled subscriptions,
-   revoked SIWA tokens, retained categories and `source` (`account_settings` or `web_request`).
-6. An `account.deleted` outbox event is written; the email dispatcher sends the confirmation email
-   (school, erasure date, what is kept) from it.
-7. The erasure job is enqueued. If that fails, everything above rolls back and the user, still
-   signed in, can retry.
+2. The user is detached from the school: `users.status = 'archived'`, and their `user_roles`,
+   `oauth_identities` and `parent_child_links` (as parent) are deleted; any open session is revoked.
+   With no identity row and no roles, no login or refresh can succeed.
+3. An `erasure` row is filed in `app.data_subject_requests` (due in 30 days), with an `update`
+   audit entry on `users` (request id, due date, cancelled subscriptions).
+4. An `account.deleted` outbox event is written when the account has an email address; the email
+   dispatcher sends the confirmation (school, erasure date, what is kept) from it.
 
-After commit, every session is revoked and its access tokens denylisted (audit reason
-`account_deletion`). A failure here is logged, not returned: the account is already unusable, and
-an access token then lasts at most `JWT_ACCESS_TTL_SECONDS`.
+After commit the erasure job is enqueued. A failed account stays due and is retried the next day.
 
 Within 30 days, the maintenance worker's erasure pass
 (`apps/workers/src/queues/maintenance`) redacts personal-data columns across the tenant's tables
 and deletes session/identity artefacts, per `retention-registry.ts`.
-
-The response carries `completes_by` and `retained_records`, which the web page shows as the
-confirmation.
 
 ## Web deletion flow (no sign-in)
 
@@ -73,13 +96,14 @@ uses to create the account.
    send to a server, and the page removes it from the address bar once read. Pressing the button
    sends `POST /api/account/deletion-requests/confirm` with the token in the body.
    - Unknown, expired, malformed or used token → `400 VERIFICATION_TOKEN_INVALID`.
-   - The address is resolved again, and each account goes through `deleteAccount()` with
-     `source: "web_request"`: the same transaction, audit entry, erasure job, session revocation
-     and confirmation email as a deletion from account settings.
-   - The token is deleted only after every account succeeded. A failure part-way (a Stripe outage,
-     say) leaves it valid, and a retry picks up only the accounts not yet archived.
-3. The page lists each school with its erasure date and the retained records from
-   `retention-policy.ts`.
+   - The address is resolved again, and each account goes through `scheduleAccountDeletion()` with
+     `source: "web_request"`: the same 14-day schedule, audit entry and session revocation as a
+     deletion from account settings. The emailed link is the proof of ownership, so no member ID
+     or password is asked for.
+   - The token is deleted only after every account succeeded. A failure part-way leaves it valid,
+     and a retry skips the accounts already scheduled.
+3. The page lists each school with its deletion date, its erasure date and the retained records
+   from `retention-policy.ts`.
 
 Both endpoints are unauthenticated, CSRF-exempt (no ambient credential to forge), and in the
 `auth-strict` rate-limit class. `deletion-request-routes.test.ts` pins that they stay reachable
@@ -88,7 +112,8 @@ without a session while `POST /api/account/deletion` stays protected.
 **Audit.** An unconfirmed request writes nothing to any school's audit log: until the link is
 used it is anonymous input, and auditing it would let anyone write rows into any school's log. It
 is logged (`account_deletion_request_sent` / `_no_account`, without the address). The confirmed
-deletion is the audited event, one `delete` row per account with `source: "web_request"`.
+deletion is the audited event, one `update` row (`event: account_deletion_scheduled`) per account
+with `source: "web_request"`.
 
 **Configuration.** Needs `REDIS_URL` (else `503 DSR_UNAVAILABLE`, as for in-app deletion),
 `TURNSTILE_SECRET_KEY` on the API and `VITE_TURNSTILE_SITE_KEY` on the web (without the secret, the
@@ -117,8 +142,8 @@ Stated plainly so they are not mistaken for done:
 - **Sign in with Apple is not implemented.** Studafy has no Apple login and stores no Apple tokens,
   so there is nothing to revoke. `apple-token-revoker.ts` implements Apple's `/auth/revoke` call
   (ES256 client secret), unit-tested against a stub but never against Apple. When SIWA login is
-  built it must persist the refresh token Apple returns (encrypted) and supply a
-  `SiwaTokenRevocation` to `accountRoutes` in `app.ts`, which passes `null` today. Until then, App
+  built it must persist the refresh token Apple returns (encrypted) and revoke it in the worker's
+  account-deletion sweep, before the identities are removed. Until then, App
   Store guideline 4.8 (offer SIWA alongside Google/Microsoft) remains the open item in
   `apps/mobile/store/review-checklist.md`.
 - **The erasure worker misses free text and files.** It redacts by column name and finds a
@@ -136,8 +161,14 @@ Stated plainly so they are not mistaken for done:
   outbox insert) and one without. The response body and status do not. The cooldown and rate limit
   bound how fast this can be probed; it is not constant-time.
 - **An account with an erasure already pending from `POST /api/privacy/me/dsr`** is not archived,
-  so the web confirm resolves it and `deleteAccount()` answers `409 DSR_ALREADY_PENDING`. The
+  so the web confirm resolves it and `scheduleAccountDeletion()` answers `409 DSR_ALREADY_PENDING`. The
   page shows that message; the pending erasure still runs.
+- **A pending session can still open a realtime connection.** `accountDeletionGuard` covers the
+  API only; the realtime service ignores the `deletion_pending` claim, though it can only deliver
+  events, not act.
+- **The worker's due-date sweep does not use the API's access-token denylist.** Sessions were
+  already revoked when the deletion was scheduled; an access token minted during the grace period
+  carries `deletion_pending`, so it stays confined until it expires on its own TTL.
 - **`POST /api/privacy/me/dsr` with `request_type: "erasure"` still exists.** It files the erasure
   without the immediate sign-out, detach or billing stop. The web app no longer calls it for
   deletion.

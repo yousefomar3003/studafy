@@ -36,15 +36,11 @@ export function usersListQueryKey(filters: UsersFilters, cursor: string | undefi
 
 const PAGE_SIZE = 25;
 
-export async function fetchUsersPage(
-  filters: UsersFilters,
-  cursor: string | undefined,
-  limit: number = PAGE_SIZE,
-) {
+export async function fetchUsersPage(filters: UsersFilters, cursor: string | undefined) {
   const { data } = await api.GET("/api/users", {
     params: {
       query: {
-        limit,
+        limit: PAGE_SIZE,
         cursor,
         role: filters.role || undefined,
         status: filters.status || undefined,
@@ -58,7 +54,7 @@ export async function fetchUsersPage(
   // a pre-existing `@studafy/api-client` typing gap (see ApprovalQueuePage/DeviceSessionsPanel), not a
   // shape mismatch. The annotation restores it without widening to `any`.
   return {
-    users: (data?.users ?? []) as UserWithRoles[],
+    users: (data?.users ?? []) as components["schemas"]["UserListItem"][],
     next_cursor: data?.next_cursor ?? null,
   };
 }

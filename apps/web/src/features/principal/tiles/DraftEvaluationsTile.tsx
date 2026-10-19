@@ -1,27 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
-import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { useTranslation } from "../../../lib/i18n";
 import { EVALUATION_TYPE_LABEL_KEYS } from "../evaluations/labels";
-import { evaluationListKey, fetchEvaluations } from "../evaluations/queries";
+import { useDraftEvaluationsQuery } from "../queries";
 
 const PREVIEW_LIMIT = 5;
 
-/** No realtime event is routed for evaluations yet (`apps/realtime/src/event-routing.ts` only routes
- * `grades.published`), so this polls like `OpenDisciplineIncidentsTile` and the admin dashboard's
- * other unrouted tiles. */
-const DRAFT_EVALUATIONS_POLL_MS = 60_000;
-
+/** The newest draft evaluations. Their count is the principal home's summary strip. */
 export function DraftEvaluationsTile() {
   const { t } = useTranslation();
-  const { formatNumber } = useFormatters();
-  const filter = { status: "draft" as const };
-  const { data, isPending, isError } = useQuery({
-    queryKey: evaluationListKey(filter),
-    queryFn: () => fetchEvaluations(filter),
-    refetchInterval: DRAFT_EVALUATIONS_POLL_MS,
-  });
+  const { data, isPending, isError } = useDraftEvaluationsQuery();
 
   const evaluations = data ?? [];
   const total = evaluations.length;
@@ -32,12 +21,9 @@ export function DraftEvaluationsTile() {
       status={isPending ? "pending" : isError ? "error" : "ready"}
       errorMessage={t("principal.tiles.draftEvaluations.error")}
     >
-      <p className="dashboard-tile__value">{formatNumber(total)}</p>
-      <p className="dashboard-tile__caption">
-        {total === 0
-          ? t("principal.tiles.draftEvaluations.empty")
-          : t("principal.tiles.draftEvaluations.caption")}
-      </p>
+      {total === 0 ? (
+        <p className="dashboard-tile__caption">{t("principal.tiles.draftEvaluations.empty")}</p>
+      ) : null}
 
       {evaluations.length > 0 ? (
         <ul className="principal-incident-list">

@@ -2,36 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
 
-import type { Award, CreateAwardBody, InitiateRefundBody, Refund } from "./queries";
-
-// ---------------------------------------------------------------------------
-// Scholarship/discount awards
-// ---------------------------------------------------------------------------
-
-/** Maker step: creates a pending award. */
-export function useCreateAward() {
-  return useMutation({
-    mutationFn: async (body: CreateAwardBody) => {
-      const { data } = await api.POST("/api/finance/scholarship-discounts/awards", { body });
-      if (!data) throw new Error("Award creation returned no data.");
-      return data as Award;
-    },
-  });
-}
-
-/** Checker step: confirms a pending award and forwards it to ERPNext. */
-export function useConfirmAward() {
-  return useMutation({
-    mutationFn: async (awardId: string) => {
-      const { data } = await api.POST(
-        "/api/finance/scholarship-discounts/awards/{awardId}/confirm",
-        { params: { path: { awardId } } },
-      );
-      if (!data) throw new Error("Award confirmation returned no data.");
-      return data as Award;
-    },
-  });
-}
+import type { InitiateRefundBody, Refund } from "./queries";
 
 // ---------------------------------------------------------------------------
 // Refunds

@@ -39,7 +39,7 @@ export default async function globalTeardown(): Promise<void> {
   }
 
   console.log("[e2e] stopping disposable Postgres + Redis");
-  spawnSync("docker", ["compose", "-f", "db/compose.yml", "down"], {
+  spawnSync("docker", ["compose", "rm", "-sfv", "test-postgres", "test-redis"], {
     cwd: REPO_ROOT,
     stdio: "inherit",
     shell: true,

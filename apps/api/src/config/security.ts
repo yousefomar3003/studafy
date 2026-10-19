@@ -38,9 +38,9 @@ const HSTS_MAX_AGE = 63072000; // 2 years
  * misconfigured deployment fails at bootstrap instead of silently landing on localhost.
  */
 const LOCAL_ORIGINS = [
-  "http://localhost:5173",
+  "http://localhost:5180",
   "http://localhost:3000",
-  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5180",
   "http://127.0.0.1:3000",
 ];
 

@@ -5,7 +5,7 @@
 -- consistency invariant available is that a student the school has invoiced (or recorded a payment
 -- against) actually has at least one enrollment in the school. The reverse direction is NOT an
 -- invariant: a school legitimately has enrolled students who have not been invoiced yet (the demo
--- seed bills only 4 of its 8 students), so "enrolled but un-invoiced" is never a finding.
+-- seed bills only 5 of its 9 students), so "enrolled but un-invoiced" is never a finding.
 --
 -- Three findings classes, all scoped to this school:
 --   1. invoice  -> no enrollment: an invoice_cache student with zero enrollments.

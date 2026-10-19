@@ -89,5 +89,5 @@ export async function searchActorUsers(search: string): Promise<UserWithRoles[]>
   const { data } = await api.GET("/api/users", {
     params: { query: { search: search.trim(), limit: ACTOR_SEARCH_LIMIT } },
   });
-  return (data?.users ?? []) as UserWithRoles[];
+  return (data?.users ?? []) as components["schemas"]["UserListItem"][];
 }

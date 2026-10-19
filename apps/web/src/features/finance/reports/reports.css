@@ -37,11 +37,47 @@
   margin-top: var(--space-16);
 }
 
+/* Top-aligned so a field's helper text (the student picker's) hangs below the row instead of
+   pushing its label above the others; the submit button is then dropped by one label's height so
+   it lines up with the input boxes. */
 .reports-panel__filters {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--space-16);
+}
+
+.reports-panel__filters > .sf-button {
+  margin-top: calc(var(--line-height-sm) + var(--space-4));
+}
+
+/* The date/text filters are plain <input>s inside `.sf-field`; give them the same label and box
+   chrome as the shared Input (packages/ui field.css / input.css) so every control in the row is
+   the same height. */
+.reports-panel__filters > .sf-field > label {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-foreground);
+}
+
+.reports-panel__filters > .sf-field > input {
+  box-sizing: border-box;
+  height: calc(var(--line-height-sm) + 2 * var(--space-8) + 2px);
+  padding: var(--space-8) var(--space-12);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  color: var(--color-foreground);
+}
+
+.reports-panel__filters > .sf-field > input:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-color: var(--color-accent);
 }
 
 .reports-panel__idle {
@@ -92,9 +128,12 @@
   border-top: 1px solid var(--color-border);
 }
 
+/* Padded to the controls' height so the hint's text centres on the Format/Download row. */
 .reports-panel__export-hint {
   color: var(--color-muted-foreground);
   font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  padding-block: calc(var(--space-8) + 1px);
   margin: 0;
 }
 

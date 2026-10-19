@@ -36,6 +36,9 @@ describe("attendance report ECS task definitions", () => {
       S3_REGION: "1",
       S3_APP_FILES_BUCKET: "1",
       S3_PRESIGN_TTL_SECONDS: "900",
+      APP_ENV: "1",
+      CORS_ALLOWED_ORIGINS: "1",
+      FRONTEND_URL: "1",
     });
     expect(values(container.secrets)).toHaveProperty("REDIS_URL");
     expect(values(container.secrets)).toHaveProperty("DATABASE_CA_CERT");
@@ -51,7 +54,19 @@ describe("attendance report ECS task definitions", () => {
       READ_DATABASE_NAME: "workers_read",
       S3_REGION: "1",
       S3_APP_FILES_BUCKET: "1",
+      FRONTEND_URL: "1",
     });
     expect(values(container.secrets)).toHaveProperty("DATABASE_CA_CERT");
+  });
+
+  test("every environment file sets the deploy tier and web origin the templates reference", async () => {
+    for (const environment of ["dev", "staging", "prod"]) {
+      const file = await readFile(
+        join(import.meta.dir, "environments", `${environment}.env`),
+        "utf8",
+      );
+      expect(file).toMatch(/^APP_ENV=(development|staging|production)$/m);
+      expect(file).toMatch(/^WEB_ORIGIN=https?:\/\/[^/\s]+$/m);
+    }
   });
 });

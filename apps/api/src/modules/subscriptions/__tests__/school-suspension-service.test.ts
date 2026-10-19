@@ -79,6 +79,7 @@ function createProviderSpy(): PaymentProviderPort & {
     scheduleCancellation: unsupported,
     reverseCancellation: unsupported,
     listInvoices: unsupported,
+    refund: unsupported,
   };
 }
 

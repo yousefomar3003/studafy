@@ -15,11 +15,27 @@ export 'generated/studafy_api_client.dart' show StudafyApiClient;
 ///
 /// Interceptors run in request order — auth, then the error mapper last, so it owns the response
 /// phase and attaches a typed [ApiException] to any non-2xx [DioException].
-StudafyApiClient createApiClient({required Uri baseUrl, TokenProvider? getToken, Dio? dio}) {
+///
+/// [onUnauthorized] enables 401 recovery and [onSchoolClosed] the closed-school sign-out: see
+/// [AuthInterceptor].
+StudafyApiClient createApiClient({
+  required Uri baseUrl,
+  TokenProvider? getToken,
+  Future<bool> Function()? onUnauthorized,
+  Future<void> Function()? onSchoolClosed,
+  Dio? dio,
+}) {
   final client = dio ?? Dio(BaseOptions(baseUrl: baseUrl.toString()));
 
   if (getToken != null) {
-    client.interceptors.add(AuthInterceptor(getToken));
+    client.interceptors.add(
+      AuthInterceptor(
+        getToken,
+        onUnauthorized: onUnauthorized,
+        onSchoolClosed: onSchoolClosed,
+        retryClient: client,
+      ),
+    );
   }
   client.interceptors.add(ErrorMappingInterceptor());
 

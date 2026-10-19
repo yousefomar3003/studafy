@@ -90,4 +90,9 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       'تعذرت معالجة ملف "{fileName}" وهو غير قابل للبحث. يمكنك المحاولة مرة أخرى من صفحة الملف.',
   },
+  [NOTIFICATION_TYPES.DIRECT_MESSAGE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "رسالة جديدة من {senderName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{senderName}: {preview}",
+    [NOTIFICATION_CHANNELS.EMAIL]: 'أرسل لك {senderName} رسالة: "{preview}"',
+  },
 } as const satisfies LocaleTemplateSet;

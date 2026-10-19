@@ -36,12 +36,11 @@ export interface PaymentsPage {
 export async function fetchPaymentsPage(
   filters: PaymentFilters,
   offset: number,
-  limit: number = PAGE_SIZE,
 ): Promise<PaymentsPage> {
   const { data } = await api.GET("/api/finance/payments", {
     params: {
       query: {
-        limit,
+        limit: PAGE_SIZE,
         offset,
         status: (filters.status || undefined) as PaymentStatus | undefined,
       },

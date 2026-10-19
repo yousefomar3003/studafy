@@ -36,14 +36,15 @@ enum AttendanceMarkStatus {
   /// newer than this build collapse to [present] — they can't be represented on the tap cycle,
   /// and a recorded row is shown read-only anyway (see [AttendanceTakingRegister.lockedStudentIds]),
   /// so this only ever seeds a starting point for a correction.
-  static AttendanceMarkStatus fromRecord(AttendanceRecordStatus status) => switch (status) {
-    AttendanceRecordStatus.present => AttendanceMarkStatus.present,
-    AttendanceRecordStatus.absent => AttendanceMarkStatus.absent,
-    AttendanceRecordStatus.valueLate => AttendanceMarkStatus.late,
-    AttendanceRecordStatus.excused => AttendanceMarkStatus.excused,
-    AttendanceRecordStatus.remote => AttendanceMarkStatus.present,
-    AttendanceRecordStatus.$unknown => AttendanceMarkStatus.present,
-  };
+  static AttendanceMarkStatus fromRecord(AttendanceRecordStatus status) =>
+      switch (status) {
+        AttendanceRecordStatus.present => AttendanceMarkStatus.present,
+        AttendanceRecordStatus.absent => AttendanceMarkStatus.absent,
+        AttendanceRecordStatus.valueLate => AttendanceMarkStatus.late,
+        AttendanceRecordStatus.excused => AttendanceMarkStatus.excused,
+        AttendanceRecordStatus.remote => AttendanceMarkStatus.present,
+        AttendanceRecordStatus.$unknown => AttendanceMarkStatus.present,
+      };
 }
 
 /// The minimum minutes-late the API accepts for a `late` record (`minutes_late >= 1`). Cycling a
@@ -52,7 +53,11 @@ const int kMinMinutesLate = 1;
 
 /// One student's mark in a register that has not been submitted yet.
 class AttendanceMark {
-  const AttendanceMark({required this.studentId, required this.status, this.minutesLate});
+  const AttendanceMark({
+    required this.studentId,
+    required this.status,
+    this.minutesLate,
+  });
 
   final String studentId;
   final AttendanceMarkStatus status;
@@ -63,8 +68,10 @@ class AttendanceMark {
 
   /// Every roster student starts here — the default-present roster is what makes the 30-second
   /// target reachable.
-  factory AttendanceMark.present(String studentId) =>
-      AttendanceMark(studentId: studentId, status: AttendanceMarkStatus.present);
+  factory AttendanceMark.present(String studentId) => AttendanceMark(
+    studentId: studentId,
+    status: AttendanceMarkStatus.present,
+  );
 
   /// Advances [status] by one step in the tap cycle, attaching (or dropping) [minutesLate] so it
   /// is present exactly when the new status is `late`.
@@ -73,7 +80,9 @@ class AttendanceMark {
     return AttendanceMark(
       studentId: studentId,
       status: nextStatus,
-      minutesLate: nextStatus == AttendanceMarkStatus.late ? kMinMinutesLate : null,
+      minutesLate: nextStatus == AttendanceMarkStatus.late
+          ? kMinMinutesLate
+          : null,
     );
   }
 
@@ -114,7 +123,12 @@ class AttendanceTally {
           excused++;
       }
     }
-    return AttendanceTally(present: present, absent: absent, late: late, excused: excused);
+    return AttendanceTally(
+      present: present,
+      absent: absent,
+      late: late,
+      excused: excused,
+    );
   }
 }
 
@@ -150,11 +164,14 @@ class AttendanceTakingRegister extends AttendanceRegister {
   final AttendanceSession? openSession;
   final List<AttendanceRecord> lockedRecords;
 
-  Set<String> get lockedStudentIds => {for (final record in lockedRecords) record.studentId};
+  Set<String> get lockedStudentIds => {
+    for (final record in lockedRecords) record.studentId,
+  };
 
   /// The students whose marks the teacher can still set — the roster minus [lockedStudentIds].
-  Iterable<Enrollment> get editableRoster =>
-      roster.where((enrolment) => !lockedStudentIds.contains(enrolment.studentId));
+  Iterable<Enrollment> get editableRoster => roster.where(
+    (enrolment) => !lockedStudentIds.contains(enrolment.studentId),
+  );
 }
 
 /// Today's attendance has been submitted. [records] is the recorded set when it is known — either

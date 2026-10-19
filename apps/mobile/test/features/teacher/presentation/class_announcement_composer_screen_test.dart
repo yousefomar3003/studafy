@@ -14,18 +14,18 @@ import '../../../support/wrap_with_localization.dart';
 import '../support.dart';
 
 Widget _app() => Builder(
-      builder: (context) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        locale: context.locale,
-        supportedLocales: context.supportedLocales,
-        localizationsDelegates: context.localizationDelegates,
-        theme: AppTheme.light,
-        home: const ClassAnnouncementComposerScreen(
-          classId: 'class-1',
-          classCode: 'MATH101-A',
-        ),
-      ),
-    );
+  builder: (context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    locale: context.locale,
+    supportedLocales: context.supportedLocales,
+    localizationsDelegates: context.localizationDelegates,
+    theme: AppTheme.light,
+    home: const ClassAnnouncementComposerScreen(
+      classId: 'class-1',
+      classCode: 'MATH101-A',
+    ),
+  ),
+);
 
 Future<void> _pump(WidgetTester tester, FakeStudafyApiClient api) {
   return tester.pumpWidget(
@@ -41,26 +41,34 @@ Future<void> _pump(WidgetTester tester, FakeStudafyApiClient api) {
 void main() {
   setUpAll(ensureDateFormattingInitialized);
 
-  testWidgets('sends a non-mandatory class-scoped announcement for this class', (tester) async {
-    final announcements = FakeAnnouncementsClient()..recipientCount = 24;
-    await _pump(tester, FakeStudafyApiClient(announcements: announcements));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'sends a non-mandatory class-scoped announcement for this class',
+    (tester) async {
+      final announcements = FakeAnnouncementsClient()..recipientCount = 24;
+      await _pump(tester, FakeStudafyApiClient(announcements: announcements));
+      await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Field trip');
-    await tester.enterText(find.byType(TextFormField).at(1), 'Slips due Monday.');
-    await tester.tap(find.text('Send announcement'));
-    await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'Field trip');
+      await tester.enterText(
+        find.byType(TextFormField).at(1),
+        'Slips due Monday.',
+      );
+      await tester.tap(find.text('Send announcement'));
+      await tester.pumpAndSettle();
 
-    expect(announcements.createCalls, hasLength(1));
-    final body = announcements.createCalls.single;
-    expect(body.title, 'Field trip');
-    expect(body.body, 'Slips due Monday.');
-    expect(body.mandatory, isFalse);
-    expect(body.audienceType, CreateAnnouncementBodyAudienceType.valueClass);
-    expect(body.audienceClassId, 'class-1');
-  });
+      expect(announcements.createCalls, hasLength(1));
+      final body = announcements.createCalls.single;
+      expect(body.title, 'Field trip');
+      expect(body.body, 'Slips due Monday.');
+      expect(body.mandatory, isFalse);
+      expect(body.audienceType, CreateAnnouncementBodyAudienceType.valueClass);
+      expect(body.audienceClassId, 'class-1');
+    },
+  );
 
-  testWidgets('blocks an empty submission without calling the API', (tester) async {
+  testWidgets('blocks an empty submission without calling the API', (
+    tester,
+  ) async {
     final announcements = FakeAnnouncementsClient();
     await _pump(tester, FakeStudafyApiClient(announcements: announcements));
     await tester.pumpAndSettle();
@@ -73,7 +81,9 @@ void main() {
     expect(find.text('Write a message.'), findsOneWidget);
   });
 
-  testWidgets('surfaces the scoped-forbidden error from the API', (tester) async {
+  testWidgets('surfaces the scoped-forbidden error from the API', (
+    tester,
+  ) async {
     final announcements = FakeAnnouncementsClient()
       ..throwOnCreate = DioException(
         requestOptions: RequestOptions(path: '/api/announcements'),
@@ -91,6 +101,9 @@ void main() {
     await tester.tap(find.text('Send announcement'));
     await tester.pumpAndSettle();
 
-    expect(find.text('You can only announce to classes you teach.'), findsOneWidget);
+    expect(
+      find.text('You can only announce to classes you teach.'),
+      findsOneWidget,
+    );
   });
 }

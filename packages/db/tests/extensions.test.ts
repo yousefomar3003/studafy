@@ -229,7 +229,7 @@ integrationTest("pg_stat_statements collects statistics when preloaded", async (
   try {
     if (!(await statStatementsPreloaded(database))) {
       // Honest fail-open: without shared_preload_libraries the view raises on read. Prove that,
-      // rather than claiming the extension is operational. Preload it (see db/compose.yml) to run
+      // rather than claiming the extension is operational. Preload it (see compose.yml test profile) to run
       // the operational assertions below.
       let raised = false;
       try {

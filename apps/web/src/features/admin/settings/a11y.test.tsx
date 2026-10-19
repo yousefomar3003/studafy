@@ -12,7 +12,7 @@ import type { SessionTokens } from "../../../lib/auth";
 import type { ComponentType } from "react";
 
 /**
- * Automated accessibility audit for the settings hub, mirroring `features/admin/invitations/a11y.test.tsx`
+ * Automated accessibility audit for the settings hub
  * — one render per representative state (the page at rest, and the grading-scheme confirm dialog open,
  * since a Modal's focus trap and labelling are exactly the kind of thing axe catches).
  */

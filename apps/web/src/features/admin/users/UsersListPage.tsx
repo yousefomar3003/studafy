@@ -1,24 +1,24 @@
-import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, DataGrid, FilterBar, Select } from "@studafy/ui";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { ExportCsvButton } from "../../../components/ExportCsvButton";
-import { collectCursorPages } from "../../../lib/data-transfer";
+import { ImportCsvButton } from "../../../components/ImportCsvButton";
+import { api } from "../../../lib/api";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { CreateUserModal } from "./CreateUserModal";
 import { DeactivateUserDialog } from "./DeactivateUserDialog";
 import { EditUserModal } from "./EditUserModal";
-import { fetchUsersPage, usersListQueryKey } from "./queries";
-import { ROLE_LABEL_KEYS, STATUS_LABEL_KEYS } from "./schema";
+import { fetchUsersPage, USERS_LIST_KEY, usersListQueryKey } from "./queries";
+import { ASSIGNABLE_ROLES, createUserSchema, ROLE_LABEL_KEYS, STATUS_LABEL_KEYS } from "./schema";
 import { UserSessionsPanel } from "./UserSessionsPanel";
 
 import "./users.css";
 
 import type { UsersFilters, UserWithRoles } from "./queries";
-import type { ExportColumn } from "../../../lib/data-transfer";
+import type { CreateUserValues } from "./schema";
+import type { ImportSpec } from "../../../lib/data-transfer";
 import type { Role } from "@studafy/constants";
 import type { DataGridColumn, DateRangeValue, SelectOption } from "@studafy/ui";
 
@@ -50,6 +50,7 @@ export default function UsersListPage() {
   // (see `result-groups.ts`'s doc comment on why). Read once on mount, not kept in sync afterward:
   // this is a starting point for the local search box below, not a URL-driven filter.
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { formatDate } = useFormatters();
   const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(() => searchParams.get("q") ?? "");
@@ -123,7 +124,7 @@ export default function UsersListPage() {
     {
       id: "email",
       header: t("adminPeople.users.list.columns.email"),
-      renderCell: (user) => user.email,
+      renderCell: (user) => user.email ?? "—",
     },
     {
       id: "role",
@@ -169,20 +170,49 @@ export default function UsersListPage() {
     },
   ];
 
-  // Same headers as the grid; roles as their stable codes and last login as an ISO timestamp.
-  const exportColumns: ExportColumn<UserWithRoles>[] = [
-    { header: t("adminPeople.users.list.columns.name"), value: (user) => user.display_name },
-    { header: t("adminPeople.users.list.columns.email"), value: (user) => user.email },
-    { header: t("adminPeople.users.list.columns.role"), value: (user) => user.roles.join(", ") },
-    {
-      header: t("adminPeople.users.list.columns.status"),
-      value: (user) => statusLabel(user.status),
+  // One `POST /api/users` per row; each row is re-checked against the create modal's schema, so
+  // the CSV can't assign a role the picker hides (`SUPER_ADMIN`).
+  const importSpec: ImportSpec<CreateUserValues> = {
+    templateName: "users",
+    fields: [
+      {
+        key: "email",
+        label: t("adminPeople.users.form.email"),
+        required: true,
+        type: "email",
+        maxLength: 320,
+        example: "teacher@example.edu",
+      },
+      {
+        key: "display_name",
+        label: t("adminPeople.users.form.displayName"),
+        maxLength: 200,
+        example: "Sara Haddad",
+      },
+      {
+        key: "role",
+        label: t("adminPeople.users.form.role"),
+        required: true,
+        options: ASSIGNABLE_ROLES,
+        example: "INSTRUCTOR",
+      },
+    ],
+    toRecord: (values) => {
+      const result = createUserSchema.safeParse({
+        email: values.email,
+        display_name: values.display_name ?? undefined,
+        role: values.role,
+      });
+      return result.success
+        ? result.data
+        : { errors: result.error.issues.map((issue) => t(issue.message)) };
     },
-    {
-      header: t("adminPeople.users.list.columns.lastActive"),
-      value: (user) => user.last_login_at,
+    create: async (body) => {
+      const { data } = await api.POST("/api/users", { body });
+      if (!data) throw new Error("User creation returned no data.");
+      return data;
     },
-  ];
+  };
 
   return (
     <>
@@ -192,15 +222,10 @@ export default function UsersListPage() {
           <p>{t("adminPeople.users.list.description")}</p>
         </div>
         <div className="users-list__header-actions">
-          <ExportCsvButton
-            filename="users"
-            columns={exportColumns}
-            getRows={() =>
-              collectCursorPages(async (pageCursor) => {
-                const page = await fetchUsersPage(filters, pageCursor, PAGINATION_MAX_LIMIT);
-                return { items: page.users, nextCursor: page.next_cursor };
-              })
-            }
+          <ImportCsvButton
+            spec={importSpec}
+            title={t("adminPeople.users.list.importTitle")}
+            onImported={() => void queryClient.invalidateQueries({ queryKey: USERS_LIST_KEY })}
           />
           <Button onClick={() => setCreateOpen(true)}>{t("adminPeople.users.list.newUser")}</Button>
         </div>
@@ -235,7 +260,7 @@ export default function UsersListPage() {
         columns={columns}
         rows={data?.users ?? []}
         getRowId={(user) => user.id}
-        getRowLabel={(user) => user.display_name ?? user.email}
+        getRowLabel={(user) => user.display_name ?? user.email ?? user.id}
         loading={isPending}
         empty={isError ? t("adminPeople.users.list.loadError") : t("adminPeople.users.list.empty")}
       />

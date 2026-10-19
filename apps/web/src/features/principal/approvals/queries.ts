@@ -5,14 +5,15 @@ import type { components } from "@studafy/api-client";
 export type ApprovalQueueItem = components["schemas"]["ApprovalQueueItem"];
 export type PendingItemType = ApprovalQueueItem["item_type"];
 export type GradeSubmissionDiff = components["schemas"]["GradeSubmissionDiff"];
+export type GradeRevisionDiff = components["schemas"]["GradeRevisionDiff"];
 export type TimetableVersionDiff = components["schemas"]["TimetableVersionDiff"];
 export type BulkDecisionEntry = components["schemas"]["BulkDecisionEntry"];
 export type DecisionResult = components["schemas"]["DecisionResult"];
 export type BulkDecisionResult = components["schemas"]["BulkDecisionResult"];
 
 /**
- * Query-key prefix for the queue list. The badge (`ApprovalQueueBadge.tsx`) and the principal
- * dashboard's tile (`tiles/PendingApprovalsTile.tsx`) key their own count queries under the bare
+ * Query-key prefix for the queue list. The badge and the admin and principal homes count the queue
+ * through `useApprovalQueueQuery` (`components/ApprovalQueueBadge.tsx`), keyed under the bare
  * `["approval-queue"]` prefix, which is what both the realtime `grades.published` invalidation and
  * `useDecideApprovals` (`mutations.ts`) target — invalidating that prefix refetches this list too.
  */

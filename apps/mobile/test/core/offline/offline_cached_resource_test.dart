@@ -106,10 +106,45 @@ void main() {
           .sync('key', () async => throw Exception('offline'))
           .toList();
 
-      expect(values, hasLength(2));
-      expect(values.every((value) => value.data.single == 'old'), isTrue);
-      expect(values.every((value) => value.isStale), isTrue);
-    });
+        expect(values, hasLength(2));
+        expect(values.every((value) => value.data.single == 'old'), isTrue);
+        expect(values.every((value) => value.isStale), isTrue);
+      },
+    );
+
+    test(
+      'cacheFirst: false skips the cached yield and goes straight to the network',
+      () async {
+        await cache.refresh('key', () async => ['old']);
+
+        final values = await cache
+            .sync('key', () async => ['new'], cacheFirst: false)
+            .toList();
+
+        expect(values, hasLength(1));
+        expect(values.single.data, ['new']);
+        expect(values.single.source, CacheSource.network);
+      },
+    );
+
+    test(
+      'cacheFirst: false still falls back to the cache when the fetch fails',
+      () async {
+        await cache.refresh('key', () async => ['old']);
+
+        final values = await cache
+            .sync(
+              'key',
+              () async => throw Exception('offline'),
+              cacheFirst: false,
+            )
+            .toList();
+
+        expect(values, hasLength(1));
+        expect(values.single.data, ['old']);
+        expect(values.single.isStale, isTrue);
+      },
+    );
   });
 
   test('clearAll wipes every resource, not just this one', () async {

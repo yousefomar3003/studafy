@@ -57,11 +57,17 @@
   border-top: 5px solid currentcolor;
 }
 
+/*
+ * Fixed so it is never clipped by a scrolling ancestor; position and width bounds come from
+ * select.tsx. It sits one layer above sticky chrome (e.g. a data-grid header) it can open over —
+ * inside a modal it is contained by the overlay's stacking context, so this cannot escape it.
+ */
 .sf-select__listbox {
-  position: absolute;
-  inset-inline: 0;
-  top: calc(100% + var(--space-4));
-  z-index: var(--z-dropdown);
+  position: fixed;
+  z-index: calc(var(--z-sticky) + 1);
+  box-sizing: border-box;
+  /* At least as wide as the trigger, wider when an option needs it, never wrapping labels. */
+  white-space: nowrap;
 
   max-height: 240px;
   overflow-y: auto;
@@ -80,6 +86,9 @@
 }
 
 .sf-select__option {
+  /* Only bites when the popup is capped at the viewport edge. */
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: var(--space-8) var(--space-12);
   border-radius: var(--radius-sm);
 

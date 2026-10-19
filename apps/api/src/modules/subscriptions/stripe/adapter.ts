@@ -1,4 +1,7 @@
+import { ERROR_CODES } from "@studafy/constants";
 import Stripe from "stripe";
+
+import { PaymentProviderError } from "../ports/payment-provider";
 
 import type {
   CreateCheckoutSessionInput,
@@ -23,6 +26,8 @@ import type {
   LookupPriceResult,
   CreateBillingPortalSessionInput,
   CreateBillingPortalSessionResult,
+  RefundInput,
+  RefundResult,
 } from "../ports/payment-provider";
 
 export interface StripeAdapterOptions {
@@ -251,5 +256,68 @@ export class StripeAdapter implements PaymentProviderPort {
       })),
       hasMore: page.has_more,
     };
+  }
+
+  /**
+   * Refunds the payment behind an invoice. Since API version 2025-03 an invoice no longer names its
+   * PaymentIntent itself: its payments are listed through `invoicePayments`, and the paid one names
+   * the PaymentIntent (or, for an out-of-band legacy charge, the Charge) the money moved on.
+   *
+   * Stripe refunds in the charge's own currency, so `currency` is not sent. The idempotency key
+   * makes a retried call with the same key and amount return the first refund instead of a second.
+   */
+  async refund(input: RefundInput): Promise<RefundResult> {
+    if (!input.invoiceId) {
+      throw new PaymentProviderError(400, ERROR_CODES.VALIDATION_FAILED, "invoiceId is required");
+    }
+
+    try {
+      const payments = await this.stripe.invoicePayments.list({
+        invoice: input.invoiceId,
+        status: "paid",
+        limit: 1,
+      });
+      const payment = payments.data[0]?.payment;
+      const paymentIntent =
+        typeof payment?.payment_intent === "string"
+          ? payment.payment_intent
+          : payment?.payment_intent?.id;
+      const charge = typeof payment?.charge === "string" ? payment.charge : payment?.charge?.id;
+      if (!paymentIntent && !charge) {
+        throw new PaymentProviderError(
+          400,
+          ERROR_CODES.SUBSCRIPTION_REFUND_PAYMENT_NOT_REFUNDABLE,
+          "Invoice has no paid payment to refund",
+        );
+      }
+
+      const refund = await this.stripe.refunds.create(
+        {
+          ...(paymentIntent ? { payment_intent: paymentIntent } : { charge }),
+          amount: input.amountMinor,
+          reason: "requested_by_customer",
+          metadata: input.metadata,
+        },
+        { idempotencyKey: input.idempotencyKey },
+      );
+
+      if (refund.status === "failed" || refund.status === "canceled") {
+        throw new PaymentProviderError(
+          502,
+          ERROR_CODES.STRIPE_API_ERROR,
+          `Stripe refund ${refund.id} ${refund.status}`,
+        );
+      }
+      return {
+        providerRefundId: refund.id,
+        status: refund.status === "succeeded" ? "succeeded" : "pending",
+      };
+    } catch (error) {
+      // Whatever Stripe answered, the failure is upstream of our caller (see PaymentProviderError).
+      if (error instanceof Stripe.errors.StripeError) {
+        throw new PaymentProviderError(502, ERROR_CODES.STRIPE_API_ERROR, error.message);
+      }
+      throw error;
+    }
   }
 }

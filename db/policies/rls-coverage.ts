@@ -74,7 +74,15 @@ approved_globals(table_name) AS (
     -- any tenant context exists, and an address suppression is a property of the address, not of any
     -- one school. See db/migrations/000077_create_email_channel_tables.sql for the full rationale.
     ('email_events'),
-    ('email_suppressions')
+    ('email_suppressions'),
+    -- "Talk to us" sales inquiries. Global by construction: a prospective school writes one before
+    -- it exists as a tenant. Reachable by studafy_admin only; see
+    -- db/migrations/000125_create_sales_inquiries.sql.
+    ('sales_inquiries'),
+    -- School sign-up applications. Global by construction: an application exists before its school
+    -- does; the school an approval provisions is provisioned_school_id, deliberately not
+    -- school_id. Reachable by studafy_admin only; see db/migrations/000139 and 000142.
+    ('school_applications')
 ),
 approved_flexible_columns(table_name, column_name) AS (
   VALUES
@@ -123,7 +131,10 @@ approved_flexible_columns(table_name, column_name) AS (
     -- agreed -- write-once audit evidence of what was disclosed, never joined or filtered on. A new
     -- disclosure supersedes the row rather than editing it. The stable relational fields (tenant,
     -- user, disclosure version, provider and timestamps) remain normalized and constrained.
-    ('ai_data_sharing_consents', 'data_categories')
+    ('ai_data_sharing_consents', 'data_categories'),
+    -- The school's teaching days (ISO weekday numbers). A small closed set bounded by
+    -- ck_school_settings_school_days (db/migrations/000122); read whole, never joined or filtered on.
+    ('school_settings', 'school_days')
 ),
 relations AS (
   SELECT

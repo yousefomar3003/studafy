@@ -7,8 +7,7 @@ import { WHOLE_PERCENT_OPTIONS } from "../format";
 import { fetchClassAttendanceSummary, lastNDaysRange } from "../queries";
 
 const HEAT_MAP_WINDOW_DAYS = 7;
-/** Matches the tone thresholds `AttendanceTodayTile`/`StorageUsageTile` already use elsewhere in
- * the portal (percent thresholds mapped to success/warning/danger), applied here to a class's
+/** Percent thresholds mapped to success/warning/danger, applied here to a class's
  * present-rate over the window instead of a single day. */
 const ATTENDANCE_WARNING_THRESHOLD = 90;
 const ATTENDANCE_DANGER_THRESHOLD = 75;

@@ -2,8 +2,6 @@ import { Chip, Select, Table } from "@studafy/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { ExportCsvButton } from "../../../components/ExportCsvButton";
-import { allRows } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import {
   studentDisplayName,
@@ -13,7 +11,6 @@ import {
 } from "../school/queries";
 import { TermPicker, useTermSelection } from "../school/TermPicker";
 
-import type { ExportColumn } from "../../../lib/data-transfer";
 import type { GradeSubmission } from "../school/queries";
 
 import "../school/principal-school.css";
@@ -74,30 +71,6 @@ export default function PrincipalGradesPage() {
   }
   const pending = counts.get("submitted") ?? 0;
 
-  // Scores and the average go out as plain numbers (average rounded to one decimal, as shown).
-  const exportColumns: ExportColumn<GradeSubmission>[] = [
-    {
-      header: t("principal.grades.columns.student"),
-      value: (submission) => nameById.get(submission.student_id) ?? "",
-    },
-    ...columns.map((column): ExportColumn<GradeSubmission> => ({
-      header: `${column.label} (${column.maxScore})`,
-      value: (submission) =>
-        submission.grades.find((grade) => grade.label === column.label)?.score ?? null,
-    })),
-    {
-      header: t("principal.grades.columns.average"),
-      value: (submission) => {
-        const average = weightedAverage(submission);
-        return average === null ? null : Math.round(average * 10) / 10;
-      },
-    },
-    {
-      header: t("principal.grades.columns.status"),
-      value: (submission) => t(`principal.grades.status.${submission.status}`),
-    },
-  ];
-
   return (
     <>
       <h1>{t("principal.grades.title")}</h1>
@@ -113,14 +86,6 @@ export default function PrincipalGradesPage() {
           placeholder={t("principal.school.noClasses")}
           disabled={classList.length === 0}
         />
-        <div className="principal-school__actions">
-          <ExportCsvButton
-            filename="grades"
-            columns={exportColumns}
-            getRows={() => Promise.resolve(allRows(submissions))}
-            disabled={!klass || gradebook.isPending}
-          />
-        </div>
       </div>
 
       {klass && (

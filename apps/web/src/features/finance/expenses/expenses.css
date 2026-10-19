@@ -131,10 +131,6 @@
 
 /* --- Entry form --- */
 
-.expenses-form__back {
-  margin-bottom: var(--space-8);
-}
-
 .expenses-form {
   display: flex;
   flex-direction: column;
@@ -196,10 +192,6 @@
 }
 
 /* --- Detail --- */
-
-.expenses-detail__back {
-  margin-bottom: var(--space-8);
-}
 
 .expenses-detail__header {
   display: flex;

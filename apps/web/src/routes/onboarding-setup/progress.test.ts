@@ -63,6 +63,29 @@ describe("loadProgress / saveProgress", () => {
     expect(loadProgress()).toEqual(defaultProgress());
   });
 
+  test("resumes progress saved on the retired staff step at the next unfinished step", () => {
+    window.localStorage.setItem(
+      "studafy.onboarding-setup.v1",
+      JSON.stringify({
+        version: 1,
+        currentStep: "staff",
+        stepState: {
+          "school-profile": "completed",
+          "academic-year": "completed",
+          "grading-scheme": "skipped",
+          timetable: "completed",
+          staff: "upcoming",
+          students: "upcoming",
+        },
+      }),
+    );
+
+    const progress = loadProgress();
+
+    expect(progress.currentStep).toBe("students");
+    expect(Object.keys(progress.stepState)).toEqual([...STEP_IDS]);
+  });
+
   test("discards unparsable stored data instead of throwing", () => {
     window.localStorage.setItem("studafy.onboarding-setup.v1", "{not json");
 

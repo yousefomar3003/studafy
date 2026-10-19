@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { LinkButton } from "../../components/LinkButton";
 import { useSeo } from "../../components/Seo";
-import { Trans, useTranslation } from "../../lib/i18n";
+import { Trans, useFormatters, useTranslation } from "../../lib/i18n";
 
 interface FeatureGroup {
   /** Key under `site.marketing.features.groups` — title, body, and `items.<id>` live there. */
@@ -16,7 +16,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
   { id: "attendance", items: ["sessions", "corrections", "reporting"] },
   { id: "grades", items: ["assignments", "exams", "entry", "reporting"] },
   { id: "discipline", items: ["cases", "evaluations"] },
-  { id: "finance", items: ["fees", "scholarships", "payments", "reconciliation"] },
+  { id: "finance", items: ["fees", "payments", "reconciliation"] },
   { id: "family", items: ["perChild", "siblings", "preferences"] },
   { id: "approvals", items: ["queue", "audit"] },
 ];
@@ -24,6 +24,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
 /** Marketing features page (`/features`), code-split like the rest of the non-marketing-home routes. */
 export default function FeaturesPage() {
   const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
 
   useSeo({
     title: t("site.marketing.features.seoTitle"),
@@ -42,27 +43,32 @@ export default function FeaturesPage() {
 
       <section className="marketing-section">
         <div className="marketing-container">
-          <div className="marketing-grid">
-            {FEATURE_GROUPS.map((group) => (
-              <Card key={group.id}>
-                <Card.Body>
-                  <h2 className="marketing-feature-card__title">
+          {/* A ruled index rather than a card grid: seven modules of uneven length read as a
+              spec sheet, one row each, instead of a ragged grid with an orphaned last card. */}
+          <ol className="features-index">
+            {FEATURE_GROUPS.map((group, index) => (
+              <li key={group.id} className="features-index__row">
+                <span className="features-index__number" aria-hidden="true">
+                  {formatNumber(index + 1, { minimumIntegerDigits: 2 })}
+                </span>
+                <div className="features-index__intro">
+                  <h2 className="features-index__title">
                     {t(`site.marketing.features.groups.${group.id}.title`)}
                   </h2>
-                  <p className="marketing-feature-card__body">
+                  <p className="features-index__body">
                     {t(`site.marketing.features.groups.${group.id}.body`)}
                   </p>
-                  <ul className="marketing-feature-card__list">
-                    {group.items.map((item) => (
-                      <li key={item}>
-                        {t(`site.marketing.features.groups.${group.id}.items.${item}`)}
-                      </li>
-                    ))}
-                  </ul>
-                </Card.Body>
-              </Card>
+                </div>
+                <ul className="features-index__items">
+                  {group.items.map((item) => (
+                    <li key={item}>
+                      {t(`site.marketing.features.groups.${group.id}.items.${item}`)}
+                    </li>
+                  ))}
+                </ul>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 

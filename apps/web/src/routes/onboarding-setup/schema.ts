@@ -23,8 +23,6 @@ export const GRADING_SCHEME_TYPES = [
   "pass_fail",
 ] as const;
 
-export const STAFF_INVITE_ROLES = ["ORG_ADMIN", "INSTRUCTOR", "TEACHING_ASSISTANT"] as const;
-
 /** ISO weekday numbers (1 = Monday); `labelKey` is translated where the checkbox renders. */
 export const WEEKDAYS = [
   { value: 1, labelKey: "onboarding.setup.weekdays.mon" },
@@ -49,11 +47,6 @@ const PERCENT_RANGE = "onboarding.setup.validation.percentRange";
 export const schoolProfileSchema = z.object({
   locale: z.enum(LOCALE_OPTIONS),
   timezone: z.string().trim().regex(TIMEZONE_PATTERN, "onboarding.setup.validation.timezone"),
-  invitation_expiry_days: z.coerce
-    .number()
-    .int(INVALID_VALUE)
-    .min(1, "onboarding.setup.validation.expiryDaysRange")
-    .max(365, "onboarding.setup.validation.expiryDaysRange"),
   attendance_alert_threshold: z.coerce.number().min(0, PERCENT_RANGE).max(100, PERCENT_RANGE),
   absence_alert_threshold: z.coerce.number().min(0, PERCENT_RANGE).max(100, PERCENT_RANGE),
   parent_discipline_visibility: z.boolean(),
@@ -121,27 +114,6 @@ export const timetableSchema = z.object({
 });
 
 export type TimetableValues = z.infer<typeof timetableSchema>;
-
-export const staffInviteBatchSchema = z.object({
-  role: z.enum(STAFF_INVITE_ROLES),
-  emails: z
-    .array(z.email("onboarding.setup.validation.emailInvalid"))
-    .min(1, "onboarding.setup.validation.emailRequired"),
-});
-
-export type StaffInviteBatch = z.infer<typeof staffInviteBatchSchema>;
-
-/** Splits a newline/comma-separated block of addresses into a de-duplicated, trimmed list. */
-export function parseEmailList(raw: string): string[] {
-  return Array.from(
-    new Set(
-      raw
-        .split(/[\n,]/)
-        .map((entry) => entry.trim())
-        .filter(Boolean),
-    ),
-  );
-}
 
 /**
  * First validation message per top-level field, for rendering against `Input`/`Select` `error`

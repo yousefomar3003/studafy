@@ -207,3 +207,15 @@ exports[`renderNotification — snapshot tests ar MATERIAL_INGEST_FAILED / in_ap
 exports[`renderNotification — snapshot tests ar MATERIAL_INGEST_FAILED / push renders correctly 1`] = `"فشلت المعالجة: lab-manual.pdf"`;
 
 exports[`renderNotification — snapshot tests ar MATERIAL_INGEST_FAILED / email renders correctly 1`] = `"تعذرت معالجة ملف "lab-manual.pdf" وهو غير قابل للبحث. يمكنك المحاولة مرة أخرى من صفحة الملف."`;
+
+exports[`renderNotification — snapshot tests en DIRECT_MESSAGE / in_app renders correctly 1`] = `"New message from Layla Nasser"`;
+
+exports[`renderNotification — snapshot tests en DIRECT_MESSAGE / push renders correctly 1`] = `"Layla Nasser: Adam did really well on today's lab."`;
+
+exports[`renderNotification — snapshot tests en DIRECT_MESSAGE / email renders correctly 1`] = `"Layla Nasser sent you a message: "Adam did really well on today's lab.""`;
+
+exports[`renderNotification — snapshot tests ar DIRECT_MESSAGE / in_app renders correctly 1`] = `"رسالة جديدة من Layla Nasser"`;
+
+exports[`renderNotification — snapshot tests ar DIRECT_MESSAGE / push renders correctly 1`] = `"Layla Nasser: Adam did really well on today's lab."`;
+
+exports[`renderNotification — snapshot tests ar DIRECT_MESSAGE / email renders correctly 1`] = `"أرسل لك Layla Nasser رسالة: "Adam did really well on today's lab.""`;

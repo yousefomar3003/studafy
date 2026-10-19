@@ -1,7 +1,6 @@
 import type { components } from "@studafy/api-client";
 
 export type AttendanceSummary = components["schemas"]["AttendanceReportSummary"];
-export type AttendanceTrends = components["schemas"]["AttendanceReportTrends"];
 export type AttendanceExportJob = components["schemas"]["AttendanceReportExportJob"];
 export type AttendanceRecordHistory = components["schemas"]["AttendanceRecordHistory"];
 export type CorrectedAttendanceRecord = components["schemas"]["CorrectedAttendanceRecord"];

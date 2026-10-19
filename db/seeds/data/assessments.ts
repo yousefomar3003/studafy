@@ -1,7 +1,8 @@
 // Assessment and grading workflow for the Science class: a published assignment with graded
 // submissions, a closed exam with published results, and a gradebook whose per-student submissions are
 // carried draft -> submitted -> approved -> published (the 000013 state machine owns the audit
-// timestamps, so each step is an UPDATE, not an inserted value). Grades are decoupled from
+// timestamps, so each step is an UPDATE, not an inserted value). The Math class gets a published
+// gradebook for its whole roster too, so Math-only students have grades. Grades are decoupled from
 // assignments/exams by design, so they hang off grade_submissions only.
 import { seedDate, uuid } from "../support";
 
@@ -118,25 +119,61 @@ export async function seedAssessments(sql: Sql, ctx: FullCtx): Promise<void> {
     )}
   `;
 
-  // --- Gradebook + published submissions + grades ---
+  // --- Gradebooks + published submissions + grades ---
+  await seedPublishedGradebook(sql, {
+    schoolId,
+    classId: scienceClass.id,
+    teacherUserId: teacher.userId,
+    approverUserId: orgAdmin.userId,
+    studentIds: gradedStudents.map((student) => student.studentId),
+  });
+
+  // The Math class has no assignment/exam, but its whole roster has published gradebook marks, so
+  // every Math-only student (e.g. Mira Fares) has grades to show.
+  const mathClass = classes[1]!;
+  const mathTeacher = teachers.find((t) => t.key === "instructor-math")!;
+  await seedPublishedGradebook(sql, {
+    schoolId,
+    classId: mathClass.id,
+    teacherUserId: mathTeacher.userId,
+    approverUserId: orgAdmin.userId,
+    studentIds: ctx.enrollments
+      .filter((enrollment) => enrollment.classId === mathClass.id)
+      .map((enrollment) => enrollment.studentId),
+  });
+}
+
+// One active gradebook for a class with a published grade_submission (Midterm + Homework marks) per
+// student, each walked draft -> submitted -> approved -> published.
+async function seedPublishedGradebook(
+  sql: Sql,
+  input: {
+    schoolId: string;
+    classId: string;
+    teacherUserId: string;
+    approverUserId: string;
+    studentIds: readonly string[];
+  },
+): Promise<void> {
+  const { schoolId, classId, studentIds } = input;
   const gradebookId = uuid();
   await sql`
     INSERT INTO app.gradebooks ${sql({
       id: gradebookId,
       school_id: schoolId,
-      class_id: scienceClass.id,
+      class_id: classId,
       status: "active",
     })}
   `;
 
-  const submissionIds = gradedStudents.map(() => uuid());
+  const submissionIds = studentIds.map(() => uuid());
   await sql`
     INSERT INTO app.grade_submissions ${sql(
-      gradedStudents.map((student, index) => ({
+      studentIds.map((studentId, index) => ({
         id: submissionIds[index]!,
         school_id: schoolId,
         gradebook_id: gradebookId,
-        student_id: student.studentId,
+        student_id: studentId,
         status: "draft",
       })),
       "id",
@@ -152,7 +189,7 @@ export async function seedAssessments(sql: Sql, ctx: FullCtx): Promise<void> {
       id: uuid(),
       school_id: schoolId,
       grade_submission_id: submissionId,
-      score: 80 + index * 5,
+      score: 80 + (index % 5) * 5,
       max_score: 100,
       weight: 1,
       label: "Midterm",
@@ -161,7 +198,7 @@ export async function seedAssessments(sql: Sql, ctx: FullCtx): Promise<void> {
       id: uuid(),
       school_id: schoolId,
       grade_submission_id: submissionId,
-      score: 17 + index,
+      score: 17 + (index % 4),
       max_score: 20,
       weight: 0.5,
       label: "Homework",
@@ -184,12 +221,12 @@ export async function seedAssessments(sql: Sql, ctx: FullCtx): Promise<void> {
   for (const submissionId of submissionIds) {
     await sql`
       UPDATE app.grade_submissions
-      SET status = 'submitted', submitted_by_user_id = ${teacher.userId}
+      SET status = 'submitted', submitted_by_user_id = ${input.teacherUserId}
       WHERE id = ${submissionId} AND school_id = ${schoolId}
     `;
     await sql`
       UPDATE app.grade_submissions
-      SET status = 'approved', decided_by_user_id = ${orgAdmin.userId}
+      SET status = 'approved', decided_by_user_id = ${input.approverUserId}
       WHERE id = ${submissionId} AND school_id = ${schoolId}
     `;
     await sql`

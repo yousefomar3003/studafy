@@ -30,7 +30,7 @@ permissions:
   contents: read
 
 env:
-  # Matches e2e-critical.yml's own disposable Postgres/Redis credentials — same db/compose.yml,
+  # Matches e2e-critical.yml's own disposable Postgres/Redis credentials — same compose.yml test profile,
   # same ports, same "fixed not dynamic" reasoning (ports.ts's doc comment applies here too).
   POSTGRES_PASSWORD: studafy_ci_only
   DATABASE_HOST: 127.0.0.1
@@ -57,7 +57,7 @@ jobs:
         run: bunx turbo run build --filter=@studafy/api^... --filter=@studafy/realtime^...
 
       - name: Start disposable Postgres + Redis
-        run: docker compose -f db/compose.yml up -d --wait
+        run: docker compose up -d --wait test-postgres test-redis
 
       - name: Run migrations
         run: bun run db:migrate
@@ -145,7 +145,7 @@ jobs:
 
       - name: Stop disposable Postgres + Redis
         if: always()
-        run: docker compose -f db/compose.yml down
+        run: docker compose rm -sfv test-postgres test-redis
 
   # The literal "device farm" leg of the acceptance criteria. Requires FIREBASE_TEST_LAB_PROJECT_ID
   # and FIREBASE_TEST_LAB_SA_KEY (a GCP service account key JSON with Firebase Test Lab + Cloud
@@ -163,7 +163,7 @@ jobs:
         run: bunx turbo run build --filter=@studafy/api^... --filter=@studafy/realtime^...
 
       - name: Start disposable Postgres + Redis
-        run: docker compose -f db/compose.yml up -d --wait
+        run: docker compose up -d --wait test-postgres test-redis
       - name: Run migrations
         run: bun run db:migrate
       - name: Seed the demo tenant (idempotent)
@@ -298,4 +298,4 @@ jobs:
           kill "$(cat realtime-tunnel.pid)" 2>/dev/null || true
       - name: Stop disposable Postgres + Redis
         if: always()
-        run: docker compose -f db/compose.yml down
+        run: docker compose rm -sfv test-postgres test-redis

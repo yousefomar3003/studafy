@@ -78,7 +78,7 @@ APP_ENV=production
 
 | `APP_ENV`     | Origins                                                                                 |
 | ------------- | --------------------------------------------------------------------------------------- |
-| `development` | `CORS_ALLOWED_ORIGINS` if set, else `localhost:{3000,5173}` and `127.0.0.1` equivalents |
+| `development` | `CORS_ALLOWED_ORIGINS` if set, else `localhost:{3000,5180}` and `127.0.0.1` equivalents |
 | `staging`     | `CORS_ALLOWED_ORIGINS` — **required**                                                   |
 | `production`  | `CORS_ALLOWED_ORIGINS` — **required**                                                   |
 
@@ -101,7 +101,7 @@ Guardrails, enforced at bootstrap by `envSchema` in [`apps/api/src/env.ts`](../.
   equal an `Origin` header, so it would sit in the config looking like protection it does not give.
 
 Matching is exact after lowercasing and stripping a trailing slash. Substring and suffix matching are
-not used, which is what stops `http://localhost:5173.attacker.com` and `http://evil-localhost:5173`.
+not used, which is what stops `http://localhost:5180.attacker.com` and `http://evil-localhost:5180`.
 
 The response is never `Access-Control-Allow-Origin: *`. A wildcard is invalid alongside
 `Allow-Credentials: true`, and every browser rejects the pair. A disallowed origin simply receives no

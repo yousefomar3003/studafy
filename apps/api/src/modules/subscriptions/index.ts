@@ -7,6 +7,8 @@ export { adminSubscriptionRoutes } from "./routes/admin-routes";
 export { billingOverviewRoutes } from "./routes/billing-overview-routes";
 export { invoiceRoutes } from "./routes/invoice-routes";
 export { cancellationRoutes } from "./routes/cancellation-routes";
+export { refundRequestRoutes } from "./routes/refund-routes";
+export { refundAdminRoutes } from "./routes/refund-admin-routes";
 export { StripeAdapter } from "./stripe/adapter";
 export type { StripeAdapterOptions } from "./stripe/adapter";
 export { TapAdapter } from "./tap/adapter";
@@ -79,4 +81,6 @@ export type {
   ListInvoicesInput,
   ListInvoicesResult,
   InvoiceSummary,
+  RefundInput,
+  RefundResult,
 } from "./ports/payment-provider";

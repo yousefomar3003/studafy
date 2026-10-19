@@ -61,31 +61,13 @@
 }
 .attendance-analytics-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
 .attendance-analytics-grid > .sf-card,
 .attendance-dashboard > .sf-card {
   padding: 1rem;
   min-width: 0;
-}
-.attendance-trend {
-  width: 100%;
-  height: auto;
-  color: var(--sf-color-primary, #2457d6);
-  overflow: visible;
-}
-.attendance-trend line {
-  stroke: var(--sf-color-border, #cbd1da);
-}
-.attendance-trend circle {
-  fill: currentColor;
-}
-.attendance-trend-legend {
-  max-height: 5rem;
-  overflow: auto;
-  font-size: 0.75rem;
-  columns: 3;
 }
 .attendance-alert-count {
   display: grid;
@@ -216,9 +198,6 @@
   }
   .attendance-export {
     justify-content: flex-start;
-  }
-  .attendance-trend-legend {
-    columns: 1;
   }
 }
 @media (forced-colors: active) {

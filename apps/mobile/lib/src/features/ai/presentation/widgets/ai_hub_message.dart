@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../../design/layout/bottom_inset_padding.dart';
 
 /// A one-line, icon-led message filling the AI tab's body for a non-loading, non-content state
 /// this screen has no dedicated widget for: the student context couldn't be resolved yet, or a
@@ -19,7 +20,7 @@ class AiHubMessage extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.space24),
+      padding: const EdgeInsets.all(AppSpacing.space24).withBottomInset(context),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Row(

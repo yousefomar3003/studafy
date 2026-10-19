@@ -45,14 +45,13 @@
     "failed": "Failed"
   },
   "dashboard": {
-    "title": "Finance",
+    "title": "Finance overview",
     "intro": "Collections vs due this term, receivables aging, overdue installments, and recent payments.",
     "readGuide": "Read the guide",
     "nav": {
       "fees": "Fee structure builder →",
       "invoices": "Invoices →",
       "payments": "Payments →",
-      "scholarships": "Scholarships →",
       "refunds": "Refunds →",
       "reports": "Reports →",
       "expenses": "Expenses →"
@@ -217,7 +216,7 @@
     "builder": {
       "allYears": "All academic years",
       "title": "Fee structures",
-      "intro": "Build fee structures, see how they price out for a sample student, and track versions.",
+      "intro": "Build fee structures, preview the invoice each one produces, and track versions.",
       "newStructure": "New fee structure",
       "academicYear": "Academic year",
       "existing": "Existing fee structures",
@@ -268,18 +267,7 @@
       "title": "Invoice preview",
       "note": "Estimated from the components below, computed the same way invoice generation computes a real one. ERPNext's own total is authoritative once an invoice actually exists.",
       "empty": "Add at least one component to see a preview.",
-      "caption": "Estimated invoice line items",
-      "subtotal": "Subtotal",
-      "discount": "Discount",
-      "discountLoading": "Discount (loading…)",
-      "noAwards": "{{name}} has no confirmed scholarship or discount awards, so no discount applies."
-    },
-    "studentPicker": {
-      "label": "Sample student",
-      "clear": "Clear",
-      "placeholder": "Search by name or admission number",
-      "helper": "Picks a real student to preview the invoice this structure would generate.",
-      "empty": "No students match."
+      "caption": "Estimated invoice line items"
     }
   },
   "expenses": {
@@ -353,5 +341,16 @@
     "CreditNoteIssued": "Credit Note Issued",
     "Cancelled": "Cancelled",
     "Draft": "Draft"
+  },
+  "home": {
+    "stats": {
+      "collections": "Collections",
+      "thisTerm": "This term",
+      "overdueHint": "Past due with a balance owed"
+    },
+    "summary": {
+      "overdue_one": "{{count}} installment is overdue",
+      "overdue_other": "{{count}} installments are overdue"
+    }
   }
 }

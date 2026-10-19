@@ -33,19 +33,9 @@ const summaryResponse = {
   items: [],
   pagination: { limit: 500, offset: 0, total: 0 },
 };
-const trendResponse = {
-  generated_at: "2026-08-18T08:00:00.000Z",
-  period: summaryResponse.period,
-  interval: "day",
-  points: [
-    { bucket_start: "2026-08-17", ...METRICS },
-    { bucket_start: "2026-08-18", ...METRICS, present_percent: 88 },
-  ],
-};
 
 const getMock = mock((path: string) => {
   if (path === "/api/attendance/reports/summary") return Promise.resolve({ data: summaryResponse });
-  if (path === "/api/attendance/reports/trends") return Promise.resolve({ data: trendResponse });
   if (path.includes("/history"))
     return Promise.resolve({
       data: {
@@ -169,7 +159,8 @@ describe("AttendanceDashboardView", () => {
 
   test("opens student history and submits an authorized correction", async () => {
     const Page = (await import("../views/AttendanceDashboardView")).default;
-    await renderWithRole(Page);
+    // Corrections belong to the principal and the attendance officer, not the school admin.
+    await renderWithRole(Page, "PRINCIPAL");
     fireEvent.click((await screen.findAllByRole("button", { name: "Omar Saleh" }))[0]!);
     expect(await screen.findByRole("dialog", { name: "Omar Saleh" })).toBeTruthy();
     fireEvent.click(screen.getAllByRole("button", { name: "Request correction" })[0]!);

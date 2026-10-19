@@ -58,21 +58,30 @@ afterEach(() => {
 
 /** The exact, per-role visible menu — the "snapshot per role" this ticket's AC calls for. */
 describe.each<[string, string[]]>([
-  [
-    "SUPER_ADMIN",
-    ["Home", "Notifications", "Admin", "Principal", "Billing", "Finance", "Approvals", "Account"],
-  ],
+  // A role with a home page of its own sees it as "Home", not as a second item (`withRoleHome`).
+  ["SUPER_ADMIN", ["Home", "Notifications", "Account"]],
   [
     "ORG_ADMIN",
-    ["Home", "Notifications", "Admin", "Principal", "Billing", "Finance", "Approvals", "Account"],
+    [
+      "Home",
+      "Notifications",
+      "Staff accounts",
+      "School members",
+      "Principal",
+      "Attendance",
+      "Billing",
+      "Finance",
+      "Approvals",
+      "Account",
+    ],
   ],
-  ["PRINCIPAL", ["Home", "Notifications", "Principal", "Approvals", "Account"]],
-  ["INSTRUCTOR", ["Home", "Notifications", "Account"]],
-  ["TEACHING_ASSISTANT", ["Home", "Notifications", "Account"]],
+  ["PRINCIPAL", ["Home", "Notifications", "Attendance", "Approvals", "Account"]],
+  ["ATTENDANCE_OFFICER", ["Home", "Notifications", "Attendance", "Account"]],
+  ["INSTRUCTOR", ["Home", "Notifications", "Attendance", "Account"]],
   ["STUDENT", ["Home", "Notifications", "Account"]],
   ["PARENT", ["Home", "Notifications", "Account"]],
   ["GUEST", ["Home", "Notifications", "Account"]],
-  ["FINANCE", ["Home", "Notifications", "Finance", "Account"]],
+  ["FINANCE", ["Home", "Notifications", "Account"]],
   ["SUPPORT_AGENT", ["Home", "Notifications", "Account"]],
 ])("PortalSidebar for %s", (role, expectedLabels) => {
   test(`renders exactly ${expectedLabels.join(", ")}`, async () => {
@@ -116,6 +125,47 @@ describe("PortalSidebar", () => {
 
     const account = screen.getByRole("link", { name: "Account" });
     expect(account.getAttribute("aria-current")).toBeNull();
+  });
+
+  test.each([
+    // An org admin's home is the admin console, so its sub-pages keep Home lit.
+    ["/portal/admin/timetable", "Home", "/portal/admin"],
+    // Any other section stays lit on its own sub-pages, without also marking Home.
+    ["/portal/finance/invoices", "Finance", "/portal/finance"],
+  ])("on %s, marks %s as the current page", async (path, current, href) => {
+    const { AuthProvider, createSessionStore, PortalSidebar } = await loadDeps();
+    const store = createSessionStore({
+      refreshClient: {
+        refresh: async () => ({
+          accessToken: fakeJwt({ roles: ["ORG_ADMIN"] }),
+          expiresAt: Date.now() + 3_600_000,
+          sessionId: "session-1",
+        }),
+        logout: async () => undefined,
+      },
+    });
+    await store.restore();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider store={store}>
+          <MemoryRouter initialEntries={[path]}>
+            <PortalSidebar navId="portal-nav" open={false} />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>,
+    );
+
+    const active = await screen.findByRole("link", { name: current });
+    expect(active.getAttribute("aria-current")).toBe("page");
+    expect(active.getAttribute("href")).toBe(href);
+    expect(active.className).toContain("portal-nav__link--active");
+
+    const others = screen
+      .getAllByRole("link")
+      .filter((link) => link !== active && link.getAttribute("aria-current") === "page");
+    expect(others).toEqual([]);
   });
 
   test("has no accessibility violations for the fullest nav (SUPER_ADMIN)", async () => {

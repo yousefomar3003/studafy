@@ -30,7 +30,7 @@ biometrics. `NSUserTrackingUsageDescription` must stay absent (`child_directed_s
 - **Where it's asked:** Classes → a class → Materials → **Upload material** → **Camera**
   (`teacher_content_screen.dart`, `_takePhoto`). This is the only `ImagePicker` call site in the app,
   and it uses `ImageSource.camera`. iOS shows its prompt at that tap, the first time only.
-- **Who sees it:** teachers and teaching assistants. Students, parents and the view-only shell have
+- **Who sees it:** teachers. Students, parents and the view-only shell have
   no camera entry point.
 - **If declined:** iOS won't show the prompt again; `image_picker` throws `camera_access_denied`.
   The screen now shows "Camera access is off. Turn it on in Settings > Studafy > Camera to take a

@@ -133,6 +133,6 @@ this reason — link to `.../docs/api/latest/index.html`, not the bare directory
   `smoke` job comment). `cdn_deploy_role_arn`, `cdn_web_bundle_bucket_id` and `cdn_distribution_id`
   are the three outputs that workflow will need once it's written.
 - `modules/cdn` is not instantiated for `dev` (`infra/terraform/main.tf`'s `count` on
-  `module.cdn`) — dev serves `apps/web` from the local Vite dev server (`http://localhost:5173`,
+  `module.cdn`) — dev serves `apps/web` from the local Vite dev server (`http://localhost:5180`,
   `dev.tfvars`'s `web_origin`), not a deployed bundle, so there is nothing to put a CDN in front of
   there yet.

@@ -1,8 +1,9 @@
 import { ApiError } from "@studafy/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 
 import { api } from "../../lib/api";
+import { resolveRoleHome, useAuth } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
 
 /**
@@ -15,10 +16,14 @@ import { useTranslation } from "../../lib/i18n";
  * `?notice=forbidden` is rendered here rather than via a new toast/dialog mechanism: it's the same
  * query-param-carries-the-reason convention `RequireAuth` already uses for `?reason=expired` on
  * `/auth/login` (see `RequirePermission`, which sends a denied session back here with that param).
+ *
+ * Roles with a home page of their own (`resolveRoleHome`) are forwarded there, so the sidebar's
+ * "Home" opens it. Not while showing the forbidden notice: that would hide why the user is here.
  */
 export default function PortalPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
+  const { roles } = useAuth();
   const { data, isPending, error } = useQuery({
     queryKey: ["healthz"],
     queryFn: async () => {
@@ -28,6 +33,11 @@ export default function PortalPage() {
   });
 
   const forbidden = searchParams.get("notice") === "forbidden";
+  const roleHome = resolveRoleHome(roles);
+
+  if (!forbidden && roleHome !== "/portal") {
+    return <Navigate to={roleHome} replace />;
+  }
 
   return (
     <>

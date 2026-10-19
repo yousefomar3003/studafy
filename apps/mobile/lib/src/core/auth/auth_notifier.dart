@@ -7,6 +7,7 @@ import 'auth_session.dart';
 import 'auth_state.dart';
 import 'oauth_browser.dart';
 import 'oauth_client.dart';
+import 'school_closed_notice.dart';
 import 'secure_token_store.dart';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,10 @@ final authSessionProvider = Provider<AuthSession>((ref) {
 class AuthNotifier extends Notifier<AuthStatus> {
   late final AuthSession _session;
   late final MobileAuthClient _authClient;
+
+  /// The sign-out in flight for a closed school, shared by every caller that hits it meanwhile —
+  /// a screen's parallel requests all fail with SCHOOL_SUSPENDED at once.
+  Future<void>? _schoolClosedSignOut;
 
   @override
   AuthStatus build() {
@@ -99,7 +104,10 @@ class AuthNotifier extends Notifier<AuthStatus> {
       );
 
       await _completeLogin(tokens);
-    } catch (_) {
+    } catch (error) {
+      if (isSchoolClosedError(error)) {
+        ref.read(schoolClosedNoticeProvider.notifier).show();
+      }
       state = AuthStatus.unauthenticated;
     }
   }
@@ -108,20 +116,27 @@ class AuthNotifier extends Notifier<AuthStatus> {
   /// the app no callback. [login] then settles as a failed sign-in.
   void cancelLogin() => ref.read(oAuthBrowserProvider).cancel();
 
-  /// Email/password sign-in for the App Store / Play reviewer demo accounts (ST-303).
-  ///
-  /// Unlike [login], this does not pass through [AuthStatus.loading] or swallow failures: the
-  /// caller (the login screen's email form) owns its own progress state and turns the thrown
-  /// error into a specific message, rather than the generic "cancelled or failed" snackbar that
-  /// fits a browser flow the user can abandon.
-  Future<void> loginWithEmail({
-    required String email,
+  /// Member-ID + password sign-in. Unlike [login], this does not pass through
+  /// [AuthStatus.loading] or swallow failures: the caller owns progress and error display; a 403 `AUTH_PASSWORD_CHANGE_REQUIRED` is rethrown so the form can ask for a new
+  /// password and call again with [newPassword].
+  Future<void> loginWithMember({
+    required String username,
     required String password,
+    String? newPassword,
   }) async {
-    final tokens = await _authClient.loginWithEmail(
-      email: email,
-      password: password,
-    );
+    final MobileTokenResponse tokens;
+    try {
+      tokens = await _authClient.loginWithMember(
+        username: username,
+        password: password,
+        newPassword: newPassword,
+      );
+    } catch (error) {
+      if (isSchoolClosedError(error)) {
+        ref.read(schoolClosedNoticeProvider.notifier).show();
+      }
+      rethrow;
+    }
     await _completeLogin(tokens);
   }
 
@@ -132,6 +147,7 @@ class AuthNotifier extends Notifier<AuthStatus> {
       sessionId: tokens.sessionId,
       expiresIn: tokens.expiresIn,
     );
+    ref.read(schoolClosedNoticeProvider.notifier).clear();
     state = AuthStatus.authenticated;
   }
 
@@ -140,7 +156,45 @@ class AuthNotifier extends Notifier<AuthStatus> {
     state = AuthStatus.unauthenticated;
   }
 
-  Future<bool> handleAuthFailure() => _session.handleAuthFailure();
+  /// The account was just deleted (`POST /api/account/deletion`): the server has already revoked
+  /// every session, so clear this device's tokens without calling the logout endpoint.
+  Future<void> handleAccountDeleted() async {
+    await _session.clear();
+    state = AuthStatus.unauthenticated;
+  }
+
+  /// The API rejected the access token: renew it once. When the session can't be renewed (the
+  /// refresh token expired or was revoked), sign out so the router returns to the login screen
+  /// instead of leaving every screen failing with 401s.
+  Future<bool> handleAuthFailure() async {
+    final renewed = await _session.handleAuthFailure();
+    if (!renewed && _session.lastRefreshErrorCode == schoolClosedErrorCode) {
+      await handleSchoolClosed();
+      return false;
+    }
+    if (!renewed && state == AuthStatus.authenticated) {
+      await _session.clear();
+      state = AuthStatus.unauthenticated;
+    }
+    return renewed;
+  }
+
+  /// The API answered SCHOOL_SUSPENDED: the school was closed, so this session is over for good.
+  /// Sign out locally — the server has already revoked every session in the school, so there is
+  /// nothing to tell it — and have the login screen say why.
+  ///
+  /// Safe to call from many failing requests at once: they all share one sign-out.
+  Future<void> handleSchoolClosed() {
+    ref.read(schoolClosedNoticeProvider.notifier).show();
+    return _schoolClosedSignOut ??= _signOutClosedSchool().whenComplete(
+      () => _schoolClosedSignOut = null,
+    );
+  }
+
+  Future<void> _signOutClosedSchool() async {
+    await _session.clear();
+    if (state != AuthStatus.unauthenticated) state = AuthStatus.unauthenticated;
+  }
 
   Uri _buildAuthorizationUrl({
     required String provider,
@@ -213,8 +267,9 @@ class AuthNotifier extends Notifier<AuthStatus> {
       const String.fromEnvironment('MICROSOFT_CLIENT_ID');
 }
 
-final authNotifierProvider =
-    NotifierProvider<AuthNotifier, AuthStatus>(AuthNotifier.new);
+final authNotifierProvider = NotifierProvider<AuthNotifier, AuthStatus>(
+  AuthNotifier.new,
+);
 
 final authStatusProvider = Provider<AuthStatus>((ref) {
   return ref.watch(authNotifierProvider);

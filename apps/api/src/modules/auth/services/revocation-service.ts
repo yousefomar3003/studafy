@@ -64,6 +64,7 @@ export const REVOCATION_REASONS = {
   ADMIN_REVOKE_DEVICE: "admin_revoke_device",
   ADMIN_REVOKE_ALL_DEVICES: "admin_revoke_all_devices",
   ACCOUNT_DELETION: "account_deletion",
+  SCHOOL_CLOSURE: "school_closure",
 } as const;
 
 export type RevocationReason = (typeof REVOCATION_REASONS)[keyof typeof REVOCATION_REASONS];
@@ -366,4 +367,51 @@ export async function adminRevokeUserSessions(
   const denylisted = await denylistRevoked(denylist, revoked, { reason, targetUserId, log });
 
   return { revokedTokens: revoked.length, denylistedJtis: denylisted };
+}
+
+// ---------------------------------------------------------------------------
+// School-wide teardown
+// ---------------------------------------------------------------------------
+
+/** What a school-wide teardown reached. */
+export interface SchoolRevocationResult {
+  /** Users in the tenant whose families were swept (every user, whether or not they had a session). */
+  users: number;
+  /** Refresh-token rows moved to revoked. */
+  revokedTokens: number;
+}
+
+/**
+ * Revoke every session of every user in the transaction's tenant, inside the caller's transaction.
+ *
+ * Built on `app.admin_revoke_user_sessions` for the reason `adminRevokeUserSessions` is: the
+ * per-user `refresh_tokens_owner` policy hides other users' rows from studafy_app, and that
+ * SECURITY DEFINER function is the sanctioned way past it — still fenced to `app.school_id`, so it
+ * cannot reach another tenant whatever this statement names. It also soft-revokes each user's
+ * `app.user_devices` rows, which stops push delivery to the school's handsets.
+ *
+ * Takes the caller's transaction rather than opening its own so a school closure, its audit row and
+ * this teardown commit or roll back as one unit. The caller writes the audit row.
+ *
+ * Does not denylist. School closure kills outstanding access tokens by bumping the school's
+ * entitlement version in the same transaction, which jwtAuthMiddleware answers with
+ * SCHOOL_SUSPENDED — the code the client acts on. A denylist hit would be checked first and answer
+ * the generic AUTH_TOKEN_INVALID instead.
+ */
+export async function revokeAllSchoolSessionsInTx(
+  tx: TransactionSql,
+): Promise<SchoolRevocationResult> {
+  const [row] = await tx<{ users: string; revoked: string }[]>`
+    WITH swept AS (
+      SELECT u.id AS user_id, r.revoked_token_id
+        FROM app.users AS u
+        LEFT JOIN LATERAL app.admin_revoke_user_sessions(u.id, NULL) AS r ON true
+       WHERE u.school_id = current_setting('app.school_id')::uuid
+    )
+    SELECT count(DISTINCT user_id)::text AS users,
+           count(revoked_token_id)::text AS revoked
+      FROM swept
+  `;
+
+  return { users: Number(row?.users ?? 0), revokedTokens: Number(row?.revoked ?? 0) };
 }

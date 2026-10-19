@@ -145,13 +145,7 @@ describe("tenantLifecycleGuard — suspended", () => {
   });
 
   describe("GET blocked for non-admin/non-finance roles", () => {
-    for (const role of [
-      ROLES.INSTRUCTOR,
-      ROLES.TEACHING_ASSISTANT,
-      ROLES.STUDENT,
-      ROLES.GUEST,
-      ROLES.SUPPORT_AGENT,
-    ]) {
+    for (const role of [ROLES.INSTRUCTOR, ROLES.STUDENT, ROLES.GUEST, ROLES.SUPPORT_AGENT]) {
       it(`blocks GET for ${role}`, async () => {
         const auth = contextFor([role], "suspended" as SubscriptionStatus);
         const app = appWith(auth);

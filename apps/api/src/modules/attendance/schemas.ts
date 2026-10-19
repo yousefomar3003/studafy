@@ -129,6 +129,93 @@ export const attendanceRecordSchema = z
 
 export type AttendanceRecord = z.infer<typeof attendanceRecordSchema>;
 
+export const classIdParamSchema = z
+  .object({
+    classId: z
+      .string()
+      .uuid()
+      .openapi({ param: { name: "classId", in: "path" } }),
+  })
+  .openapi("AttendanceClassIdParam");
+
+export const attendanceRosterSchema = z
+  .object({
+    class_id: uuidSchema,
+    students: z
+      .array(
+        z.object({
+          id: uuidSchema,
+          name: z.string().openapi({ description: "Preferred (else first) name and last name." }),
+        }),
+      )
+      .openapi({ description: "Actively enrolled students, ordered by name." }),
+  })
+  .openapi("AttendanceRoster");
+
+export const studentIdParamSchema = z
+  .object({
+    studentId: z
+      .string()
+      .uuid()
+      .openapi({ param: { name: "studentId", in: "path" }, description: "Student UUID." }),
+  })
+  .openapi("AttendanceStudentIdParam");
+
+export const studentAttendanceQuerySchema = z
+  .object({
+    start_date: dateSchema.openapi({ description: "First session date to include (inclusive)." }),
+    end_date: dateSchema.openapi({ description: "Last session date to include (inclusive)." }),
+  })
+  .superRefine((value, context) => {
+    const start = Date.parse(`${value.start_date}T00:00:00Z`);
+    const end = Date.parse(`${value.end_date}T00:00:00Z`);
+    const inclusiveDays = Math.floor((end - start) / 86_400_000) + 1;
+    if (end < start || inclusiveDays > 366) {
+      context.issues.push({
+        code: "custom",
+        input: value,
+        message: "Date range must be ordered and no longer than 366 inclusive days.",
+      });
+    }
+  })
+  .openapi("StudentAttendanceQuery");
+
+export const studentAttendanceEntrySchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Attendance record id." }),
+    attendance_session_id: uuidSchema,
+    session_date: dateSchema,
+    period: z
+      .number()
+      .int()
+      .nullable()
+      .openapi({ description: "Period, or null for a daily register." }),
+    class_id: uuidSchema,
+    class_code: z.string(),
+    status: attendanceStatusSchema,
+    minutes_late: z.number().int().positive().nullable(),
+    reason: z.string().nullable(),
+  })
+  .openapi("StudentAttendanceEntry");
+
+export const studentAttendanceRecordsSchema = z
+  .object({
+    student_id: uuidSchema,
+    records: z.array(studentAttendanceEntrySchema).openapi({
+      description: "The student's records in the range, newest session first.",
+    }),
+  })
+  .openapi("StudentAttendanceRecords");
+
+export const attendanceSessionRecordsSchema = z
+  .object({
+    attendance_session_id: uuidSchema,
+    records: z.array(attendanceRecordSchema).openapi({
+      description: "Every record already taken in the session, ordered by student.",
+    }),
+  })
+  .openapi("AttendanceSessionRecords");
+
 export const batchRecordItemSchema = z
   .object({
     student_id: uuidSchema.openapi({ description: "Student to record attendance for." }),

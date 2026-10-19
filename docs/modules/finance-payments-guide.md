@@ -326,7 +326,7 @@ The exactly-once guarantee is verified against a real PostgreSQL rather than a f
 guard _is_ a unique index plus a transaction boundary — a mock would test the mock.
 
 ```bash
-docker compose -f db/compose.yml up -d
+docker compose up -d test-postgres test-redis
 export TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres
 turbo run db:migrate
 bun test apps/api/src/modules/finance packages/db/tests/finance.test.ts

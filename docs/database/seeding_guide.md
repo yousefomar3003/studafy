@@ -15,10 +15,15 @@ migrations in [`db/migrations`](../../db/migrations); see
 One School (`studafy-demo-academy`) with a billing subscription, and, scoped to it: users across every
 role with mock OAuth logins, student/teacher/parent profiles, an academic year with two terms,
 subjects, courses, rooms, classes and enrollments, an approved timetable, attendance sessions and
-records, assignments/submissions and exams/results, a gradebook with published grades, materials with
+records, assignments/submissions and exams/results, gradebooks with published grades, materials with
 pre-embedded vector chunks, ERPNext finance caches (invoices, payments, fee schedule), AI
-subscriptions/conversations/messages/citations/usage, notifications, devices, domain-event outbox
-rows, and audit-log entries — 40+ interconnected `app.*` tables in all.
+subscriptions/conversations/messages/citations/usage, notifications, devices, school calendar events
+(`app.school_events`, migration 000121: one meeting, event, exam period, and holiday around the seed's
+"today"), one parent-teacher messaging thread (migration 000127: Bassel Fares and Layla Nasser about
+Adam, plus the parent's `DIRECT_MESSAGE` notification), domain-event outbox rows, and audit-log
+entries — 40+ interconnected `app.*` tables in all.
+
+This TypeScript seed is the only seeder: there are no SQL seed files and no `cli.ts seed` command.
 
 ## Running it
 
@@ -27,7 +32,7 @@ below), and it targets an already-migrated database. From the repository root (`
 
 ```bash
 # 1. Start disposable PostgreSQL 16 (pgvector) — data is on tmpfs and destroyed with the container.
-POSTGRES_PASSWORD='<local-only-password>' docker compose -f db/compose.yml up -d --wait
+POSTGRES_PASSWORD='<local-only-password>' docker compose up -d --wait test-postgres test-redis
 
 # 2. Point the tooling at it.
 export DATABASE_URL='postgresql://studafy_test:<local-only-password>@127.0.0.1:54329/postgres?sslmode=disable'
@@ -40,21 +45,21 @@ bun run db:seed            # prints a per-table row-count summary + index-health
 bun run db:seed:index-check
 
 # Tear down.
-docker compose -f db/compose.yml down
+docker compose rm -sfv test-postgres test-redis
 ```
 
 PowerShell uses the same values through `$env:POSTGRES_PASSWORD` and `$env:DATABASE_URL`:
 
 ```powershell
 $env:POSTGRES_PASSWORD = '<local-only-password>'
-docker compose -f db/compose.yml up -d --wait
+docker compose up -d --wait test-postgres test-redis
 $env:DATABASE_URL = 'postgresql://studafy_test:<local-only-password>@127.0.0.1:54329/postgres?sslmode=disable'
 bun run db:migrate
 bun run db:seed
 ```
 
 Re-running `bun run db:seed` against an already-seeded database is a **clean no-op**: it detects the
-demo school's slug and exits with a message rather than duplicating data. To reseed, recreate or
+demo school's slug, writes nothing, and exits non-zero with a message rather than duplicating data. To reseed, recreate or
 re-migrate a fresh database (the disposable container makes this a `down`/`up` cycle).
 
 > Attendance and audit-log rows are dated inside the monthly partitions the migrations ship
@@ -65,9 +70,8 @@ re-migrate a fresh database (the disposable container makes this a `down`/`up` c
 
 There is no password store in the schema — authentication is external OAuth, modeled by
 `app.oauth_identities (provider, subject)`. Every persona logs in through the mock provider
-`mock` with **subject = email**, which a local auth stub maps directly. The role enum has no `PARENT`
-value, so parents carry the `GUEST` role and are related to their children via
-`app.parent_child_links`.
+`mock` with **subject = email**, which a local auth stub maps directly. Parents carry the `PARENT`
+role (migration 000043) and are related to their children via `app.parent_child_links`.
 
 These logins are defined once in [`db/seeds/mock-credentials.ts`](../../db/seeds/mock-credentials.ts)
 and drive both the seed and this table, so they cannot drift.
@@ -79,11 +83,11 @@ and drive both the seed and this table, so they cannot drift.
 | `SUPER_ADMIN`        | Sana Al-Rashid | `superadmin@demo.studafy.test`     |
 | `ORG_ADMIN`          | Omar Haddad    | `admin@demo.studafy.test`          |
 | `PRINCIPAL`          | Samir Qasem    | `principal@demo.studafy.test`      |
+| `ATTENDANCE_OFFICER` | Hala Mansour   | `attendance@demo.studafy.test`     |
 | `FINANCE`            | Reem Saadeh    | `finance@demo.studafy.test`        |
 | `INSTRUCTOR`         | Layla Nasser   | `layla.nasser@demo.studafy.test`   |
 | `INSTRUCTOR`         | Hassan Ibrahim | `hassan.ibrahim@demo.studafy.test` |
 | `INSTRUCTOR`         | Mona Farouk    | `mona.farouk@demo.studafy.test`    |
-| `TEACHING_ASSISTANT` | Yusuf Karim    | `yusuf.karim@demo.studafy.test`    |
 
 ### Students (`STUDENT`)
 
@@ -97,17 +101,23 @@ and drive both the seed and this table, so they cannot drift.
 | Omar Darwish | `omar.darwish@demo.studafy.test` |
 | Huda Rahman  | `huda.rahman@demo.studafy.test`  |
 | Sami Aziz    | `sami.aziz@demo.studafy.test`    |
+| Mira Fares   | `mira.fares@demo.studafy.test`   |
 
-### Parents (`GUEST` + `parent_child_links`)
+### Parents (`PARENT` + `parent_child_links`)
 
-| Name          | Email (OAuth subject)              | Child (relationship)   |
-| ------------- | ---------------------------------- | ---------------------- |
-| Rania Khalil  | `khalil.parent@demo.studafy.test`  | Yara Khalil (mother)   |
-| Bassel Fares  | `fares.parent@demo.studafy.test`   | Adam Fares (father)    |
-| Maha Saleh    | `saleh.parent@demo.studafy.test`   | Nour Saleh (mother)    |
-| Tariq Mansour | `mansour.parent@demo.studafy.test` | Zaid Mansour (father)  |
-| Dalia Haddad  | `haddad.parent@demo.studafy.test`  | Lina Haddad (guardian) |
-| Karim Darwish | `darwish.parent@demo.studafy.test` | Omar Darwish (father)  |
+| Name          | Email (OAuth subject)              | Children (relationship)                  |
+| ------------- | ---------------------------------- | ---------------------------------------- |
+| Rania Khalil  | `khalil.parent@demo.studafy.test`  | Yara Khalil (mother)                     |
+| Bassel Fares  | `fares.parent@demo.studafy.test`   | Adam Fares (father), Mira Fares (father) |
+| Maha Saleh    | `saleh.parent@demo.studafy.test`   | Nour Saleh (mother)                      |
+| Tariq Mansour | `mansour.parent@demo.studafy.test` | Zaid Mansour (father)                    |
+| Dalia Haddad  | `haddad.parent@demo.studafy.test`  | Lina Haddad (guardian)                   |
+| Karim Darwish | `darwish.parent@demo.studafy.test` | Omar Darwish (father)                    |
+
+Each parent has one family (`app.families`) holding all of their links. Bassel Fares is the
+multi-child parent for exercising the child picker: Adam is enrolled in `SCI101-A` only and Mira in
+`MATH101-A` only, so the two children have different timetables, attendance, grades, and invoices
+(Adam's is unpaid, Mira's paid).
 
 ## Production safeguard
 
@@ -119,8 +129,9 @@ run with a non-zero exit code:
    `CRITICAL SAFETY VIOLATION: Seeding is strictly forbidden in production!`.
 2. **Connection-host analysis.** The active connection string's host is parsed. A staging/production
    shape (`*.rds.amazonaws.com`, `*.rds.*`, or a host containing `prod`/`production`/`staging`/
-   `stage`/`preprod`) is rejected unconditionally. Any host that is not a recognized loopback
-   (`localhost`, `127.0.0.1`, `::1`, or the compose service name) is rejected unless
+   `stage`/`preprod`/`pre-prod`) is rejected unconditionally. Any host that is not a recognized local
+   host (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, or the container names `postgres`, `db`,
+   `database`, `host.docker.internal`) is rejected unless
    `SEED_ALLOW_NONLOCAL=true` is set for a disposable remote CI database.
 
 The seed additionally connects as the administrative identity and runs as `studafy_admin` inside one

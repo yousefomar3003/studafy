@@ -234,7 +234,7 @@ in-app help center linking out to it — a dedicated help widget is deliberately
 file's "Help widget" section), the severity/SLA table (reusing `alert-catalog.md`'s
 `critical`/`warning`/`info` vocabulary, not a second scale), the triage disposition loop
 (generalizing the pilot's own `backlog`/`sev`/`wontfix`/`training` dispositions), a macro library
-covering the top 10 predicted issues ([`support/macro-library.md`](../support/macro-library.md)),
+covering the top 7 predicted issues ([`support/macro-library.md`](../support/macro-library.md)),
 and the escalation path into `on-call-rotation.md`'s existing `critical` page — no separate
 support-incident process invented. What's still open, per that directory's own "Known gaps":
 `VITE_MARKETING_CONTACT_EMAIL` is unset in every environment (`apps/web/src/lib/config.ts` — the

@@ -39,7 +39,7 @@ test("documented step screenshots are served and render", async ({ page }) => {
 });
 
 test("a wizard step's help link targets the matching article anchor", async ({ page }) => {
-  await page.goto("/help/onboarding-guide#step-5-staff-invitations");
+  await page.goto("/help/onboarding-guide#step-5-student-import");
 
-  await expect(page.getByRole("heading", { name: "Step 5: Staff invitations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Step 5: Student import" })).toBeVisible();
 });

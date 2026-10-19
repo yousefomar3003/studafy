@@ -31,7 +31,7 @@ rationale and the exact deploy/verify commands:
   ticket's acceptance criteria.
 - **It does not run in `dev`.** The root module only instantiates `module.cdn` for `staging` and
   `prod` (`count` in `infra/terraform/main.tf`) — the ticket's own description says "staging/prod
-  origins", and dev's `web_origin` is `http://localhost:5173` (the Vite dev server), which has
+  origins", and dev's `web_origin` is `http://localhost:5180` (the Vite dev server), which has
   nothing to put behind a CDN.
 
 ## Topology

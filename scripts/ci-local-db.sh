@@ -11,7 +11,7 @@ if [ "${1:-}" = "--full" ]; then
 fi
 
 cleanup() {
-  docker compose -f db/compose.yml down
+  docker compose rm -sfv test-postgres test-redis
 }
 trap cleanup EXIT
 
@@ -21,7 +21,7 @@ export TEST_DATABASE_URL="$DATABASE_URL"
 export DATABASE_SSL_MODE=disable
 
 echo "==> starting disposable PostgreSQL (pgvector + pg_stat_statements)"
-docker compose -f db/compose.yml up -d --wait || exit 1
+docker compose up -d --wait test-postgres test-redis || exit 1
 
 echo "==> migrate + tenant RLS coverage audit"
 bun run db:migrate || exit 1

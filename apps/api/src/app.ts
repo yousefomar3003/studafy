@@ -20,6 +20,7 @@ import {
   securityHeadersMiddleware,
   jwtAuthMiddleware,
   tenantLifecycleGuard,
+  accountDeletionGuard,
 } from "./middleware";
 import {
   academicYearRoutes,
@@ -74,12 +75,14 @@ import {
   adminDeviceRoutes,
   configureRefreshCookie,
   createJtiDenylist,
+  createSchoolStatusReader,
   googleOAuthRoutes,
   jwksRoutes,
   microsoftOAuthRoutes,
   mobileActivationOAuthRoutes,
   mobileOAuthRoutes,
   mockOAuthRoutes,
+  memberPasswordRoutes,
   providerLinkRoutes,
   returningUserLoginRoutes,
   reviewLoginRoutes,
@@ -102,7 +105,6 @@ import {
   reconciliationRoutes,
   refundRoutes,
   refundWebhookRoutes,
-  scholarshipDiscountRoutes,
   settleOnlineFeePayment,
   TenantErpNextFactory,
 } from "./modules/finance";
@@ -113,10 +115,18 @@ import {
   publishedGradeRoutes,
 } from "./modules/grades";
 import { importRoutes } from "./modules/imports";
+import { inquiryRoutes } from "./modules/inquiries";
+import { messagingRoutes } from "./modules/messaging";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
+import { platformRoutes } from "./modules/platform";
 import { privacyRoutes } from "./modules/privacy";
 import { childComparisonRoutes } from "./modules/reports";
+import {
+  platformSchoolApplicationRoutes,
+  schoolApplicantRoutes,
+  schoolApplicationOAuthRoutes,
+} from "./modules/school-applications";
 import { schoolEventRoutes } from "./modules/school-events";
 import { searchRoutes } from "./modules/search";
 import { storageRoutes } from "./modules/storage";
@@ -130,8 +140,11 @@ import {
   billingOverviewRoutes,
   invoiceRoutes,
   cancellationRoutes,
+  refundRequestRoutes,
+  refundAdminRoutes,
   createEntitlementService,
 } from "./modules/subscriptions";
+import { schoolClosureRoutes } from "./modules/tenancy/closure/route";
 import { lookupsRoutes } from "./modules/tenancy/lookups/route";
 import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
@@ -400,6 +413,9 @@ export function createApp({
         keyStore,
         denylist: jtiDenylist,
         entitlements,
+        // Closing a school bumps its entitlement version; the stale tokens that produces are told the
+        // school is closed (SCHOOL_SUSPENDED) instead of being sent to refresh. See school-access.ts.
+        schoolStatus: database ? createSchoolStatusReader(database) : null,
         issuer: jwtIssuer,
         audience: jwtAudience,
       }),
@@ -410,6 +426,10 @@ export function createApp({
   // so the auth context (including subscriptionStatus claim) is available. Runs before the rate
   // limiter so lifecycle blocks short-circuit before any quota consumption.
   app.use("/api/*", tenantLifecycleGuard());
+
+  // Account deletion guard (000143): a session signed in during a deletion's grace period may only
+  // read its profile, cancel the deletion or log out. Claim-only, like the lifecycle guard.
+  app.use("/api/*", accountDeletionGuard());
 
   // Rate limiter middleware: token-bucket rate limiting via Redis. Registered after the logger
   // so rate-limited requests are still logged for observability, but before routes so they
@@ -464,6 +484,12 @@ export function createApp({
     app.route("/", registerSchoolRoutes(database, logger));
   }
 
+  // "Talk to us" sales inquiries from the marketing site — public, no authentication. Protected by
+  // Turnstile captcha and rate limiting (auth-strict class); stored for the platform console.
+  if (database) {
+    app.route("/", inquiryRoutes(database));
+  }
+
   // Reference-data lookups (countries, currencies) — public, no authentication, read-only.
   // Feeds the country/currency selectors on the school self-registration form.
   if (database) {
@@ -473,15 +499,16 @@ export function createApp({
   // School email verification — public, no authentication. Rate-limited (auth-strict class).
   // Verify consumes a one-time token and activates the school; resend regenerates the token.
   // Triggers async tenant provisioning (trial subscription, ERPNext bootstrap) on success.
+  // Also used by school-application approval (platform console), which provisions the same way.
+  const provisioningErpNextClient =
+    process.env.ERPNEXT_API_URL && process.env.ERPNEXT_API_KEY
+      ? new ErpNextClient({
+          baseUrl: process.env.ERPNEXT_API_URL,
+          apiKey: process.env.ERPNEXT_API_KEY,
+        })
+      : null;
   if (database) {
-    const erpNextClient =
-      process.env.ERPNEXT_API_URL && process.env.ERPNEXT_API_KEY
-        ? new ErpNextClient({
-            baseUrl: process.env.ERPNEXT_API_URL,
-            apiKey: process.env.ERPNEXT_API_KEY,
-          })
-        : null;
-    app.route("/", emailVerificationRoutes(database, logger, erpNextClient));
+    app.route("/", emailVerificationRoutes(database, logger, provisioningErpNextClient));
   }
 
   // Both payment adapters, one slot per provider. Subscription checkout and online fee collection
@@ -504,17 +531,22 @@ export function createApp({
       })
     : null;
 
+  // Family financial view (ST-127). Reads only the local finance read models (invoice, installment,
+  // and payment caches) and never calls ERPNext, so it is mounted whenever there is a database —
+  // a school without ERPNext configured still gets an (empty) household view instead of a 404.
+  if (database) {
+    app.route("/", familyFinancialViewRoutes(database, process.env.PAYMENT_REDIRECT_BASE_URL));
+  }
+
   if (database && erpnextFactory) {
     app.route("/", feeStructureRoutes(database, erpnextFactory));
     app.route("/", financeInvoiceRoutes(database, redis ?? null));
     app.route("/", financeReportRoutes(database, erpnextFactory, redis ?? null, storage));
-    app.route("/", familyFinancialViewRoutes(database, process.env.PAYMENT_REDIRECT_BASE_URL));
     app.route("/", expenseRoutes(database, erpnextFactory, storage));
     app.route("/", paymentRoutes(database, erpnextFactory));
     // Online fee collection (ST-298): hosted payment for an outstanding invoice, settled by the
     // provider webhook below and recorded in ERPNext through the payment forwarder above.
     app.route("/", onlineFeePaymentRoutes(database, paymentProviders));
-    app.route("/", scholarshipDiscountRoutes(database, erpnextFactory));
     app.route("/", refundRoutes(database, erpnextFactory));
     app.route("/", installmentRoutes(database, erpnextFactory));
     app.route("/", reconciliationRoutes(database, erpnextFactory, logger));
@@ -620,6 +652,17 @@ export function createApp({
     );
   }
 
+  // School sign-up applications (website "Sign up"): a prospective school owner signs in with
+  // Google or Microsoft, which yields an applicant session cookie rather than a Studafy session, and
+  // submits their school's details and proof of ownership for review in the platform console. The
+  // OAuth endpoints sit under the public /api/auth/oauth prefix; the applicant endpoints under
+  // /api/school-applications/me authenticate by that cookie (jwtAuth.ts public, csrf.ts exempt).
+  if (database && keyStore) {
+    const applicantSession = { keyStore, issuer: jwtIssuer, audience: jwtAudience };
+    app.route("/", schoolApplicationOAuthRoutes(database, applicantSession, logger));
+    app.route("/", schoolApplicantRoutes(database, storage, applicantSession));
+  }
+
   // Mobile OAuth (system-browser PKCE flow). Same database and key store requirements as the
   // browser-redirect routes above. Returns JSON instead of HTTP redirects.
   if (database && keyStore) {
@@ -709,6 +752,21 @@ export function createApp({
     );
   }
 
+  // Member-ID + password sign-in and password change for students, parents, teachers and attendance
+  // officers (000141); see routes/member-password-routes.ts.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      memberPasswordRoutes(database, {
+        keyStore,
+        issuer: jwtIssuer,
+        audience: jwtAudience,
+        accessTtlSeconds: jwtAccessTtlSeconds,
+        refreshTtlSeconds: jwtRefreshTtlSeconds,
+      }),
+    );
+  }
+
   // OAuth provider linking (R-03). Lets authenticated users link a second provider for lockout
   // resilience, and admins unlink providers. Needs database for identity CRUD and the state store
   // for the linking OAuth flow.
@@ -742,6 +800,22 @@ export function createApp({
   // web-channel only. Needs database for settings CRUD and audit logging.
   if (database) {
     app.route("/", schoolSettingsRoutes(database));
+  }
+
+  // The caller's own school (GET /api/schools/current, any member, any channel) and closing it
+  // (POST /api/schools/current/closure, ORG_ADMIN, mobile + web): archives the school, revokes every
+  // session in it and bumps its entitlement version so outstanding access tokens die at once. Data
+  // is retained. Stripe pauses students' AI add-ons, as a platform archive does.
+  if (database) {
+    app.route(
+      "/",
+      schoolClosureRoutes({
+        database,
+        redis: redis ?? null,
+        paymentProvider: stripeProvider,
+        logger,
+      }),
+    );
   }
 
   // User management & administration (ST-093). CRUD endpoints for managing school users,
@@ -869,7 +943,7 @@ export function createApp({
   // timetable decision functions with per-item partial-failure reporting. Gated on
   // APPROVAL_REVIEW permission (ORG_ADMIN+).
   if (database) {
-    app.route("/", approvalQueueRoutes(database));
+    app.route("/", approvalQueueRoutes(database, redis ?? null));
   }
 
   // Attendance sessions (ST-107). Idempotent session management per class period with
@@ -909,7 +983,7 @@ export function createApp({
   // files the erasure the maintenance worker drains. SIWA revocation is null until Sign in with
   // Apple exists and stores tokens (see modules/account/apple-token-revoker.ts).
   if (database) {
-    app.route("/", accountRoutes(database, redis ?? null, jtiDenylist, paymentProviders, null));
+    app.route("/", accountRoutes(database, redis ?? null, jtiDenylist));
   }
 
   // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with
@@ -923,6 +997,9 @@ export function createApp({
   // exams. Read on calendarEvent:read, managed on calendarEvent:manage (PRINCIPAL, ORG_ADMIN).
   if (database) {
     app.route("/", schoolEventRoutes(database));
+    // Parent<->teacher messaging (000127): participant-only threads; sends rate-limited per user.
+    // `storage` carries message images (000134); null keeps text-only messaging working.
+    app.route("/", messagingRoutes(database, redis ?? null, storage));
   }
 
   // Discipline incidents and actions: teacher reporting, principal management (actions,
@@ -996,12 +1073,33 @@ export function createApp({
       }),
     );
     app.route("/", adminSubscriptionRoutes(database, stripeProvider, logger));
+    // Studafy platform console (/api/platform/*): every school's lifecycle, per-school feature
+    // flags, plans and platform settings, for Studafy staff. Gated on platform:read/manage, which
+    // only SUPER_ADMIN holds. Stripe is the provider whose AI subscriptions a suspension pauses.
+    app.route(
+      "/",
+      platformRoutes({ database, redis: redis ?? null, paymentProvider: stripeProvider, logger }),
+    );
+    // The console's school sign-up review queue; approval creates and provisions the school.
+    app.route(
+      "/",
+      platformSchoolApplicationRoutes({
+        database,
+        storage,
+        logger,
+        erpNextClient: provisioningErpNextClient,
+      }),
+    );
     // School billing portal (ST-137): current plan/seats/cancellation overview, invoices read
     // through to the provider, and end-of-period cancellation. The payment-method portal session
     // link already exists at POST /api/subscriptions/portal (checkoutRoutes above).
     app.route("/", billingOverviewRoutes(database));
     app.route("/", invoiceRoutes(database, paymentProviders));
     app.route("/", cancellationRoutes(database, paymentProviders));
+    // Subscription refund requests: filed from the billing pages (school plan) or the AI add-on page,
+    // reviewed in the platform console (/api/platform/refund-requests, platform:read/manage).
+    app.route("/", refundRequestRoutes(database, paymentProviders));
+    app.route("/", refundAdminRoutes(database, paymentProviders));
   }
 
   // AI entitlement & quota gate (ST-155). Mounted only when both a database (to resolve

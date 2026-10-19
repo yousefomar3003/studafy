@@ -34,11 +34,6 @@
   flex: 1;
 }
 
-.evaluations-detail__back {
-  display: inline-block;
-  margin-bottom: var(--space-16);
-}
-
 .evaluations-detail__summary {
   display: flex;
   flex-wrap: wrap;

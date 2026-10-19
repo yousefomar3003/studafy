@@ -57,16 +57,18 @@ class _ClassAnnouncementComposerScreenState
     });
 
     try {
-      final announcement =
-          await ref.read(apiClientProvider).announcements.createAnnouncement(
-                body: CreateAnnouncementBody(
-                  title: _titleController.text.trim(),
-                  body: _bodyController.text.trim(),
-                  mandatory: false,
-                  audienceType: CreateAnnouncementBodyAudienceType.valueClass,
-                  audienceClassId: widget.classId,
-                ),
-              );
+      final announcement = await ref
+          .read(apiClientProvider)
+          .announcements
+          .createAnnouncement(
+            body: CreateAnnouncementBody(
+              title: _titleController.text.trim(),
+              body: _bodyController.text.trim(),
+              mandatory: false,
+              audienceType: CreateAnnouncementBodyAudienceType.valueClass,
+              audienceClassId: widget.classId,
+            ),
+          );
       if (mounted) Navigator.of(context).pop(announcement);
     } on DioException catch (error) {
       setState(() => _errorKey = _messageKeyFor(error.apiError?.code));
@@ -78,12 +80,11 @@ class _ClassAnnouncementComposerScreenState
   }
 
   String _messageKeyFor(String? code) => switch (code) {
-        'ANNOUNCEMENT_SCOPE_FORBIDDEN' ||
-        'AUTHZ_FORBIDDEN' =>
-          'teacher.communication.announce.errorForbidden',
-        'VALIDATION_FAILED' => 'teacher.communication.announce.errorValidation',
-        _ => 'teacher.communication.announce.errorGeneric',
-      };
+    'ANNOUNCEMENT_SCOPE_FORBIDDEN' ||
+    'AUTHZ_FORBIDDEN' => 'teacher.communication.announce.errorForbidden',
+    'VALIDATION_FAILED' => 'teacher.communication.announce.errorValidation',
+    _ => 'teacher.communication.announce.errorGeneric',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -97,10 +98,12 @@ class _ClassAnnouncementComposerScreenState
           padding: const EdgeInsets.all(AppSpacing.space16),
           children: [
             Text(
-              'teacher.communication.announce.audience'
-                  .tr(namedArgs: {'class': widget.classCode}),
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              'teacher.communication.announce.audience'.tr(
+                namedArgs: {'class': widget.classCode},
+              ),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: AppSpacing.space16),
             TextFormField(
@@ -133,8 +136,9 @@ class _ClassAnnouncementComposerScreenState
               const SizedBox(height: AppSpacing.space8),
               Text(
                 _errorKey!.tr(),
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
             ],
             const SizedBox(height: AppSpacing.space20),

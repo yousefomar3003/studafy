@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { PERMISSIONS } from "@studafy/constants";
+import { PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
+import { Queue } from "bullmq";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
@@ -11,13 +12,16 @@ import {
   approvalQueueListSchema,
   bulkDecisionBodySchema,
   bulkDecisionResultSchema,
+  gradeRevisionDiffSchema,
   gradeSubmissionDiffSchema,
   timetableVersionDiffSchema,
 } from "../approval-queue-schemas";
 import { bulkDecision, listPendingApprovals } from "../approval-queue-service";
+import { enqueueNotificationDispatch } from "../enqueue-dispatch";
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { RedisClient } from "../../../redis";
 import type { ApprovalQueueRow } from "../approval-queue-service";
 import type { Context } from "hono";
 
@@ -44,7 +48,11 @@ function toApprovalQueueItem(row: ApprovalQueueRow) {
     requested_by_display_name: row.requested_by_display_name,
     requested_at: row.requested_at?.toISOString() ?? null,
     decided_at: row.decided_at?.toISOString() ?? null,
-    diff: row.diff as z.infer<typeof gradeSubmissionDiffSchema | typeof timetableVersionDiffSchema>,
+    diff: row.diff as z.infer<
+      | typeof gradeSubmissionDiffSchema
+      | typeof gradeRevisionDiffSchema
+      | typeof timetableVersionDiffSchema
+    >,
   };
 }
 
@@ -104,8 +112,17 @@ const bulkDecisionRoute = createRoute({
 // Route factory
 // ---------------------------------------------------------------------------
 
-export function approvalQueueRoutes(database: Database): OpenAPIHono<AppEnv> {
+export function approvalQueueRoutes(
+  database: Database,
+  redis: RedisClient | null = null,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  // Same nullable producer as gradeEntryRoutes: without Redis, approvals still publish grades and
+  // simply notify nobody.
+  const notificationsQueue = redis
+    ? new Queue(QUEUE_NAMES.NOTIFICATIONS, { connection: redis as never })
+    : null;
 
   routes.use("/api/approvals/*", requirePermission(PERMISSIONS.APPROVAL_REVIEW));
   routes.use("/api/approvals/bulk-decision", auditAction("update", "approval_queue"));
@@ -128,9 +145,20 @@ export function approvalQueueRoutes(database: Database): OpenAPIHono<AppEnv> {
     const auth = requireAuth(c);
     const body = c.req.valid("json");
 
-    const result = await withTenantTx(database, tenantFrom(c), (tx) =>
+    const { published, ...result } = await withTenantTx(database, tenantFrom(c), (tx) =>
       bulkDecision(tx, auth.schoolId, auth.userId, body.items),
     );
+
+    // Approving here publishes grades exactly as the per-submission decide route does, so the
+    // student and parents are notified the same way: after COMMIT, never inside the transaction
+    // (see the decide handler in grade-entry-routes.ts for the trade-off).
+    for (const notice of published) {
+      await enqueueNotificationDispatch(notificationsQueue, c, {
+        schoolId: auth.schoolId,
+        submissionId: notice.submissionId,
+        eventId: notice.eventId,
+      });
+    }
 
     return c.json(result, 200);
   });

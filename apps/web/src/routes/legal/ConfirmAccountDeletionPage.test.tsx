@@ -14,8 +14,8 @@ const CONFIRMED = {
   accounts: [
     {
       school_name: "Hill School",
-      request_id: "00000000-0000-4000-8000-000000000001",
-      completes_by: "2026-10-27T00:00:00.000Z",
+      scheduled_for: "2026-10-11T00:00:00.000Z",
+      completes_by: "2026-11-10T00:00:00.000Z",
     },
   ],
   retained_records: [
@@ -66,12 +66,12 @@ describe("ConfirmAccountDeletionPage", () => {
     expect(screen.getByTestId("url").textContent).toBe("/legal/delete-account/confirm");
   });
 
-  test("confirming sends the token and shows what was deleted and kept", async () => {
+  test("confirming sends the token and shows what is scheduled and kept", async () => {
     await renderAt(`/legal/delete-account/confirm#token=${TOKEN}`);
 
     fireEvent.click(deleteButton());
 
-    await screen.findByRole("heading", { name: /your account has been deleted/i });
+    await screen.findByRole("heading", { name: /your account deletion is scheduled/i });
     expect(postMock).toHaveBeenCalledWith("/api/account/deletion-requests/confirm", {
       body: { token: TOKEN },
     });

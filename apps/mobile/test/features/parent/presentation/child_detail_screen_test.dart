@@ -11,6 +11,7 @@ import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/parent/application/child_detail_providers.dart';
 import 'package:studafy_mobile/src/features/parent/application/parent_providers.dart';
+import 'package:studafy_mobile/src/features/parent/domain/child_timetable.dart';
 import 'package:studafy_mobile/src/features/parent/domain/family_finance.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/child_detail_screen.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/widgets/child_detail_placeholders.dart';
@@ -37,6 +38,7 @@ ProviderScope _scope({
   required List<String> childIds,
   required Map<String, ChildComparisonBreakdown> breakdowns,
   FamilyFinanceView? finance,
+  ChildTimetable? timetable,
 }) {
   return ProviderScope(
     overrides: [
@@ -57,6 +59,11 @@ ProviderScope _scope({
       // child alive), so this needs a value even in tests that never visit it — otherwise it
       // falls through to the real `apiClientProvider` and fires a live network call.
       familyFinanceProvider.overrideWith((ref) async => finance),
+      // Built eagerly with the other tabs too — same reason as the finance override above.
+      childTimetableProvider.overrideWith(
+        (ref, studentId) async =>
+            timetable ?? childTimetableFixture(studentId: studentId),
+      ),
     ],
     child: _app(),
   );
@@ -137,18 +144,95 @@ void main() {
     expect(find.text('Weekly present rate'), findsOneWidget);
   });
 
-  testWidgets('timetable tab: honest unavailable state', (tester) async {
-    await tester.pumpWidget(wrapWithLocalization(_scope(
-      childIds: const ['child-1'],
-      breakdowns: {'child-1': childBreakdown(id: 'child-1')},
-    )));
+  testWidgets(
+    "timetable tab: the child's weekly lessons, with server-resolved names",
+    (tester) async {
+      await tester.pumpWidget(
+        wrapWithLocalization(
+          _scope(
+            childIds: const ['child-1'],
+            breakdowns: {'child-1': childBreakdown(id: 'child-1')},
+            timetable: childTimetableFixture(
+              slots: [
+                childTimetableSlotJson(
+                  id: 's1',
+                  weekday: DateTime.sunday,
+                  period: 1,
+                  courseName: 'Science',
+                  teacherName: 'Rana Haddad',
+                  roomName: 'Lab 2',
+                ),
+                childTimetableSlotJson(
+                  id: 's2',
+                  weekday: DateTime.sunday,
+                  period: 2,
+                  courseName: null,
+                  teacherName: null,
+                  roomName: null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Timetable'));
+      await tester.pumpAndSettle();
+
+      // Opens on the first school day (the test clock's weekday is not a school day here) or
+      // today; either way switch to Sunday explicitly.
+      await tester.tap(find.bySemanticsLabel('Sunday'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Science'), findsOneWidget);
+      expect(find.text('Rana Haddad'), findsOneWidget);
+      expect(find.text('Room Lab 2'), findsOneWidget);
+      // No course: falls back to the class code.
+      expect(find.text('SCI-7A'), findsOneWidget);
+    },
+  );
+
+  testWidgets('timetable tab: no approved timetable yet', (tester) async {
+    await tester.pumpWidget(
+      wrapWithLocalization(
+        _scope(
+          childIds: const ['child-1'],
+          breakdowns: {'child-1': childBreakdown(id: 'child-1')},
+          timetable: childTimetableFixture(published: false),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Timetable'));
     await tester.pumpAndSettle();
 
     expect(
-      find.text("The weekly timetable isn't available in the family view yet."),
+      find.text('No timetable has been published for this term yet.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('timetable tab: published but no lessons for this child', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      wrapWithLocalization(
+        _scope(
+          childIds: const ['child-1'],
+          breakdowns: {'child-1': childBreakdown(id: 'child-1')},
+          timetable: childTimetableFixture(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Timetable'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No lessons are scheduled for this child yet.'),
       findsOneWidget,
     );
   });

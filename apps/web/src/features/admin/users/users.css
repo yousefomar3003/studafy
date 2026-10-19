@@ -14,8 +14,8 @@
 
 .users-list__header-actions {
   display: flex;
-  gap: var(--space-8);
   flex-shrink: 0;
+  gap: var(--space-8);
 }
 
 .users-list__toolbar {

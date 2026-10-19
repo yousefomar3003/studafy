@@ -44,7 +44,9 @@ Future<void> _pumpShellGolden(
               await fakeAuthenticatedSession(roles: roles),
             ),
             // See the identical note in `test/support/pump_app_shell.dart`.
-            appConfigProvider.overrideWithValue(AppConfig.fromEnvironment(AppEnvironment.dev)),
+            appConfigProvider.overrideWithValue(
+              AppConfig.fromEnvironment(AppEnvironment.dev),
+            ),
           ],
           child: Builder(
             builder: (context) {

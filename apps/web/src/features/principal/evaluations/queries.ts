@@ -143,7 +143,7 @@ export async function fetchTeacherContacts(): Promise<TeacherContact[]> {
         params: { query: { role: "INSTRUCTOR", limit, cursor } },
       });
       return {
-        rows: (data?.users ?? []) as components["schemas"]["UserWithRoles"][],
+        rows: (data?.users ?? []) as components["schemas"]["UserListItem"][],
         nextCursor: data?.next_cursor ?? null,
       };
     }),

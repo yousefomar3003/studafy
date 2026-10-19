@@ -77,7 +77,7 @@ SDKs collect nothing identifying by default. This app links their data by callin
 | --- | --- |
 | Does your app collect or share any of the required user data types? | Yes |
 | Is all of the user data collected by your app encrypted in transit? | Yes |
-| Which ways do you provide for users to request that their data is deleted? | "My app provides a way for users to request that their data is deleted": in the app (Profile → Delete my account) and on the web |
+| Which ways do you provide for users to request that their data is deleted? | On the web (`/legal/delete-account`, no app or sign-in needed). The app itself has no per-user deletion action; its only one, the school admin's "Delete school", closes the school and keeps the data — see `review-checklist.md` §1 |
 | Delete account URL | `https://app.studafy.com/legal/delete-account` |
 | Data deletion: can users request deletion of some data without deleting the account? | No. Per-item deletion is not offered, so leave the optional "data deletion" URL empty. |
 | Independent security review | No |
@@ -114,7 +114,7 @@ them.
 
 | Route | Who can use it | What it does |
 | --- | --- | --- |
-| App → Profile → Delete my account | Signed-in user | Opens `/account/delete` in the system browser (`legal_links.dart`) |
+| App → Profile → Delete school | School admin (ORG_ADMIN) only | `POST /api/schools/current/closure`: archives the school and signs every member out for good. **Not a deletion** — all data is retained and no erasure is filed |
 | `/account/delete` | Signed-in user | `POST /api/account/deletion`: signs out everywhere, detaches from the school, stops AI billing, and files an erasure due in 30 days |
 | `https://app.studafy.com/legal/delete-account` | Anyone, no app or sign-in | Emails a one-time link (`POST /api/account/deletion-requests`). Confirming it runs the same deletion |
 
@@ -169,6 +169,7 @@ The `sqlite3` pod that `sqlite3_flutter_libs` adds is built from the same SQLite
 | `flutter_local_notifications` | Own | UserDefaults `CA92.1` |
 | `flutter_pdfview` | Own | None |
 | `flutter_secure_storage` | Own | None |
+| `flutter_web_auth_2` | None. Native code calls no required-reason API (checked) | None |
 | `image_picker_ios` | Own | None |
 | `package_info_plus` | Own | None |
 | `path_provider_foundation` | No native target. Dart FFI through `objective_c`, calling only `NSFileManager` directory lookups | None needed |

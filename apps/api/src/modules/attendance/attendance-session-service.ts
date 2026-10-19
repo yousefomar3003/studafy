@@ -390,14 +390,118 @@ function parseRecordRow(row: Record<string, unknown>): AttendanceRecordRow {
 }
 
 /**
+ * The register roster for a class: its actively enrolled students with display names only --
+ * what taking attendance needs, nothing of the student profile (`/api/students` stays web-only for
+ * that reason). Null when the class does not exist or the caller cannot see it. RLS narrows both
+ * reads to the caller's own classes and students, or the whole school for an admin or attendance
+ * officer (migration 000133).
+ */
+export async function listClassRoster(
+  tx: TransactionSql,
+  schoolId: string,
+  classId: string,
+): Promise<{ id: string; name: string }[] | null> {
+  const [klass] = await tx<{ id: string }[]>`
+    SELECT id FROM app.classes WHERE id = ${classId}::uuid AND school_id = ${schoolId}::uuid
+  `;
+  if (!klass) return null;
+
+  return tx<{ id: string; name: string }[]>`
+    SELECT s.id,
+           concat_ws(' ', coalesce(s.preferred_name, s.first_name), s.last_name) AS name
+    FROM app.enrollments AS e
+    JOIN app.students AS s ON s.id = e.student_id AND s.school_id = e.school_id
+    WHERE e.school_id = ${schoolId}::uuid
+      AND e.class_id = ${classId}::uuid
+      AND e.status = 'active'
+    ORDER BY lower(coalesce(s.preferred_name, s.first_name)), lower(s.last_name), s.id
+  `;
+}
+
+/**
+ * Every record already taken in one session, ordered by student. Null when the session does not
+ * exist or the caller cannot see it -- RLS (role_scope_visibility on attendance_sessions/_records)
+ * narrows both reads to the caller's classes, or the whole school for an admin or attendance officer.
+ */
+export async function listSessionRecords(
+  tx: TransactionSql,
+  schoolId: string,
+  sessionId: string,
+): Promise<AttendanceRecordRow[] | null> {
+  const session = await getAttendanceSession(tx, schoolId, sessionId);
+  if (!session) return null;
+
+  const rows = await tx<Record<string, unknown>[]>`
+    SELECT ${tx.unsafe(RECORD_COLUMNS)}
+    FROM app.attendance_records
+    WHERE attendance_session_id = ${sessionId}::uuid
+      AND school_id = ${schoolId}::uuid
+    ORDER BY student_id
+  `;
+  return rows.map(parseRecordRow);
+}
+
+export interface StudentAttendanceEntry {
+  id: string;
+  attendance_session_id: string;
+  session_date: string;
+  period: number | null;
+  class_id: string;
+  class_code: string;
+  status: AttendanceStatus;
+  minutes_late: number | null;
+  reason: string | null;
+}
+
+/**
+ * One student's attendance records for sessions dated within [startDate, endDate], newest first.
+ *
+ * Read under the caller's row scope: records scope by student and sessions by class, so a teacher
+ * sees only the sessions of classes they teach, while the attendance officer, principal and school
+ * admin see every class. A student the caller cannot see yields an empty list, not an error.
+ */
+export async function listStudentAttendance(
+  tx: TransactionSql,
+  schoolId: string,
+  studentId: string,
+  startDate: string,
+  endDate: string,
+): Promise<StudentAttendanceEntry[]> {
+  const rows = await tx<Record<string, unknown>[]>`
+    SELECT r.id, r.attendance_session_id, s.session_date::text AS session_date, s.period,
+           s.class_id, c.code AS class_code, r.status::text AS status, r.minutes_late, r.reason
+    FROM app.attendance_records r
+    JOIN app.attendance_sessions s
+      ON s.id = r.attendance_session_id AND s.school_id = r.school_id
+    JOIN app.classes c ON c.id = s.class_id AND c.school_id = s.school_id
+    WHERE r.school_id = ${schoolId}::uuid
+      AND r.student_id = ${studentId}::uuid
+      AND s.session_date BETWEEN ${startDate}::date AND ${endDate}::date
+      AND s.status <> 'cancelled'
+    ORDER BY s.session_date DESC, s.period NULLS FIRST, c.code
+  `;
+  return rows.map((row) => ({
+    id: row.id as string,
+    attendance_session_id: row.attendance_session_id as string,
+    session_date: row.session_date as string,
+    period: row.period === null ? null : Number(row.period),
+    class_id: row.class_id as string,
+    class_code: row.class_code as string,
+    status: row.status as AttendanceStatus,
+    minutes_late: row.minutes_late === null ? null : Number(row.minutes_late),
+    reason: (row.reason as string | null) ?? null,
+  }));
+}
+
+/**
  * Record attendance for multiple students in a single call.
  *
  * Idempotent: records that already exist for (session_id, student_id) are
  * silently skipped.  The response always reflects the full set of records
  * for the session regardless of how many were actually inserted.
  *
- * Teacher scope is enforced: the caller must be a school admin or the
- * teacher of the class this session belongs to.
+ * Scope is enforced: the caller must be a school admin, the teacher of the
+ * class this session belongs to, or the school's attendance officer.
  */
 export async function recordAttendanceBatch(
   tx: TransactionSql,
@@ -426,12 +530,14 @@ export async function recordAttendanceBatch(
     );
   }
 
-  // 2. Assert teacher scope: caller must be admin or assigned teacher.
+  // 2. Assert scope: caller must be a school admin, the class's teacher, or the school's
+  //    attendance officer (who takes attendance for every class -- migration 000133).
   const classId = session.class_id as string;
   const [auth] = await tx<{ allowed: boolean }[]>`
     SELECT (
       app.current_user_is_school_admin()
       OR app.teaches_class(${classId}::uuid)
+      OR app.current_user_is_attendance_officer()
     ) AS allowed
   `;
   if (!auth?.allowed) {
@@ -442,11 +548,16 @@ export async function recordAttendanceBatch(
     );
   }
 
-  // 3. Validate all student_ids exist and are enrolled in this class.
+  // 3. Validate all student_ids are actively enrolled in this class. Enrolment is the roster: a
+  //    student's class membership lives in app.enrollments (app.students has no class column -- the
+  //    check this replaces filtered on one and failed every batch with an undefined-column error).
   const studentIds = params.records.map((r) => r.student_id);
   const enrolled = await tx<{ id: string }[]>`
-    SELECT id FROM app.students
-    WHERE id = ANY (${studentIds}::uuid[]) AND class_id = ${classId}::uuid
+    SELECT student_id AS id FROM app.enrollments
+    WHERE school_id = ${schoolId}::uuid
+      AND class_id = ${classId}::uuid
+      AND status = 'active'
+      AND student_id = ANY (${studentIds}::uuid[])
   `;
   const enrolledSet = new Set(enrolled.map((r) => r.id));
   for (const sid of studentIds) {

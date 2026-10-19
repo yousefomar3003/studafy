@@ -50,7 +50,8 @@ import 'package:studafy_mobile/src/core/api/generated/timetable/timetable_client
 
 const _t0 = '2026-01-01T00:00:00.000Z';
 
-TeacherProfile teacherProfile({String id = 'teacher-1'}) => TeacherProfile.fromJson({
+TeacherProfile teacherProfile({String id = 'teacher-1'}) =>
+    TeacherProfile.fromJson({
       'id': id,
       'school_id': 'school-1',
       'user_id': 'user-1',
@@ -67,42 +68,46 @@ Class classFixture({
   required String code,
   String courseId = 'course-1',
   String leadTeacherId = 'teacher-1',
-}) =>
-    Class.fromJson({
-      'id': id,
-      'school_id': 'school-1',
-      'course_id': courseId,
-      'academic_year_id': 'year-1',
-      'term_id': 'term-1',
-      'lead_teacher_id': leadTeacherId,
-      'room_id': 'room-1',
-      'code': code,
-      'capacity': 30,
-      'status': 'active',
-      'created_at': _t0,
-      'updated_at': _t0,
-    });
+}) => Class.fromJson({
+  'id': id,
+  'school_id': 'school-1',
+  'course_id': courseId,
+  'academic_year_id': 'year-1',
+  'term_id': 'term-1',
+  'lead_teacher_id': leadTeacherId,
+  'room_id': 'room-1',
+  'code': code,
+  'capacity': 30,
+  'status': 'active',
+  'created_at': _t0,
+  'updated_at': _t0,
+});
 
 Course courseFixture({String id = 'course-1', String name = 'Mathematics'}) =>
-    Course.fromJson({'id': id, 'code': 'MATH101', 'name': name, 'credit_hours': 3});
+    Course.fromJson({
+      'id': id,
+      'code': 'MATH101',
+      'name': name,
+      'credit_hours': 3,
+    });
 
 Enrollment enrollmentFixture({
   required String studentId,
   String classId = 'class-1',
   String enrolledAt = _t0,
-}) =>
-    Enrollment.fromJson({
-      'school_id': 'school-1',
-      'class_id': classId,
-      'student_id': studentId,
-      'status': 'active',
-      'enrolled_at': enrolledAt,
-      'withdrawn_at': null,
-      'created_at': _t0,
-      'updated_at': _t0,
-    });
+}) => Enrollment.fromJson({
+  'school_id': 'school-1',
+  'class_id': classId,
+  'student_id': studentId,
+  'status': 'active',
+  'enrolled_at': enrolledAt,
+  'withdrawn_at': null,
+  'created_at': _t0,
+  'updated_at': _t0,
+});
 
-TimetableVersion approvedVersion({String id = 'version-1'}) => TimetableVersion.fromJson({
+TimetableVersion approvedVersion({String id = 'version-1'}) =>
+    TimetableVersion.fromJson({
       'id': id,
       'school_id': 'school-1',
       'academic_year_id': 'year-1',
@@ -124,63 +129,60 @@ TimetableSlot slotFixture({
   required String teacherId,
   required int weekday,
   required int period,
-}) =>
-    TimetableSlot.fromJson({
-      'id': id,
-      'school_id': 'school-1',
-      'timetable_version_id': 'version-1',
-      'class_id': classId,
-      'teacher_id': teacherId,
-      'room_id': 'room-1',
-      'weekday': weekday,
-      'period': period,
-      'created_at': _t0,
-      'updated_at': _t0,
-    });
+}) => TimetableSlot.fromJson({
+  'id': id,
+  'school_id': 'school-1',
+  'timetable_version_id': 'version-1',
+  'class_id': classId,
+  'teacher_id': teacherId,
+  'room_id': 'room-1',
+  'weekday': weekday,
+  'period': period,
+  'created_at': _t0,
+  'updated_at': _t0,
+});
 
 AttendanceSession attendanceSession({
   required String classId,
   required String status,
   int? period,
-}) =>
-    AttendanceSession.fromJson({
-      'id': 'session-$classId-$period',
-      'school_id': 'school-1',
-      'class_id': classId,
-      'session_date': _t0,
-      'period': period,
-      'status': status,
-      'taken_by_user_id': 'user-1',
-      'created_at': _t0,
-      'updated_at': _t0,
-    });
+}) => AttendanceSession.fromJson({
+  'id': 'session-$classId-$period',
+  'school_id': 'school-1',
+  'class_id': classId,
+  'session_date': _t0,
+  'period': period,
+  'status': status,
+  'taken_by_user_id': 'user-1',
+  'created_at': _t0,
+  'updated_at': _t0,
+});
 
 Assignment assignmentFixture({
   required String id,
   required String classId,
   String title = 'Worksheet',
   String status = 'published',
-}) =>
-    Assignment.fromJson({
-      'id': id,
-      'school_id': 'school-1',
-      'class_id': classId,
-      'subject_id': 'subject-1',
-      'title': title,
-      'description': null,
-      'instructions': null,
-      'status': status,
-      'available_from': null,
-      'assigned_at': _t0,
-      'due_at': _t0,
-      'max_score': 100,
-      'allow_late_submission': true,
-      'attachments': <Object?>[],
-      'created_by_user_id': 'teacher-1',
-      'last_edited_by_user_id': 'teacher-1',
-      'created_at': _t0,
-      'updated_at': _t0,
-    });
+}) => Assignment.fromJson({
+  'id': id,
+  'school_id': 'school-1',
+  'class_id': classId,
+  'subject_id': 'subject-1',
+  'title': title,
+  'description': null,
+  'instructions': null,
+  'status': status,
+  'available_from': null,
+  'assigned_at': _t0,
+  'due_at': _t0,
+  'max_score': 100,
+  'allow_late_submission': true,
+  'attachments': <Object?>[],
+  'created_by_user_id': 'teacher-1',
+  'last_edited_by_user_id': 'teacher-1',
+  'created_at': _t0,
+  'updated_at': _t0,
+});
 
 Submission submissionFixture({
   required String id,
@@ -189,27 +191,28 @@ Submission submissionFixture({
   DateTime? submittedAt,
   String status = 'submitted',
   bool isLate = false,
-}) =>
-    Submission.fromJson({
-      'id': id,
-      'school_id': 'school-1',
-      'assignment_id': assignmentId,
-      'student_id': studentId,
-      'content': 'answer',
-      'status': status,
-      'grade_status': 'none',
-      'is_late': isLate,
-      'attempt_number': 1,
-      'submitted_at': (submittedAt ?? DateTime.parse(_t0)).toUtc().toIso8601String(),
-      'score': null,
-      'feedback': null,
-      'graded_at': null,
-      'graded_by_user_id': null,
-      'attachments': <Object?>[],
-      'last_edited_by_user_id': 'student-1',
-      'created_at': _t0,
-      'updated_at': _t0,
-    });
+}) => Submission.fromJson({
+  'id': id,
+  'school_id': 'school-1',
+  'assignment_id': assignmentId,
+  'student_id': studentId,
+  'content': 'answer',
+  'status': status,
+  'grade_status': 'none',
+  'is_late': isLate,
+  'attempt_number': 1,
+  'submitted_at': (submittedAt ?? DateTime.parse(_t0))
+      .toUtc()
+      .toIso8601String(),
+  'score': null,
+  'feedback': null,
+  'graded_at': null,
+  'graded_by_user_id': null,
+  'attachments': <Object?>[],
+  'last_edited_by_user_id': 'student-1',
+  'created_at': _t0,
+  'updated_at': _t0,
+});
 
 // ---------------------------------------------------------------------------
 // Fake domain clients — only the methods the teacher providers call are implemented
@@ -258,7 +261,8 @@ class FakeAcademicsClient extends Fake implements AcademicsClient {
       classes.firstWhere((c) => c.id == classId);
 
   @override
-  Future<Course> getCourse({required String courseId}) async => coursesById[courseId]!;
+  Future<Course> getCourse({required String courseId}) async =>
+      coursesById[courseId]!;
 
   @override
   Future<EnrollmentList> listEnrollments({
@@ -292,8 +296,7 @@ class FakeTimetableClient extends Fake implements TimetableClient {
     required String versionId,
     int? limit = 20,
     int? offset = 0,
-  }) async =>
-      TimetableSlotList(timetableSlots: slots, total: slots.length);
+  }) async => TimetableSlotList(timetableSlots: slots, total: slots.length);
 }
 
 class FakeAttendanceClient extends Fake implements AttendanceClient {
@@ -333,7 +336,8 @@ class FakeAttendanceClient extends Fake implements AttendanceClient {
     required CreateAttendanceSessionBody body,
   }) async {
     if (throwOnWrite != null) throw throwOnWrite!;
-    final existing = sessionsByClassId[body.classId] ?? const <AttendanceSession>[];
+    final existing =
+        sessionsByClassId[body.classId] ?? const <AttendanceSession>[];
     final match = existing.where((s) => s.period == body.period).toList();
     if (match.isNotEmpty) return match.first;
 
@@ -430,7 +434,9 @@ class FakeAttendanceClient extends Fake implements AttendanceClient {
   }
 
   @override
-  Future<AttendanceSession> getAttendanceSession({required String sessionId}) async {
+  Future<AttendanceSession> getAttendanceSession({
+    required String sessionId,
+  }) async {
     return AttendanceSession.fromJson({
       'id': sessionId,
       'school_id': 'school-1',
@@ -519,7 +525,9 @@ class FakeAnnouncementsClient extends Fake implements AnnouncementsClient {
   int recipientCount = 1;
 
   @override
-  Future<Announcement> createAnnouncement({required CreateAnnouncementBody body}) async {
+  Future<Announcement> createAnnouncement({
+    required CreateAnnouncementBody body,
+  }) async {
     if (throwOnCreate != null) throw throwOnCreate!;
     createCalls.add(body);
     return Announcement.fromJson({
@@ -591,14 +599,14 @@ class FakeStudafyApiClient extends Fake implements StudafyApiClient {
     FakeSubmissionsClient? submissions,
     FakeAnnouncementsClient? announcements,
     FakeDisciplineClient? discipline,
-  })  : teachers = teachers ?? FakeTeachersClient(teacherProfile()),
-        academics = academics ?? FakeAcademicsClient(),
-        timetable = timetable ?? FakeTimetableClient(),
-        attendance = attendance ?? FakeAttendanceClient(),
-        assignments = assignments ?? FakeAssignmentsClient(),
-        submissions = submissions ?? FakeSubmissionsClient(),
-        announcements = announcements ?? FakeAnnouncementsClient(),
-        discipline = discipline ?? FakeDisciplineClient();
+  }) : teachers = teachers ?? FakeTeachersClient(teacherProfile()),
+       academics = academics ?? FakeAcademicsClient(),
+       timetable = timetable ?? FakeTimetableClient(),
+       attendance = attendance ?? FakeAttendanceClient(),
+       assignments = assignments ?? FakeAssignmentsClient(),
+       submissions = submissions ?? FakeSubmissionsClient(),
+       announcements = announcements ?? FakeAnnouncementsClient(),
+       discipline = discipline ?? FakeDisciplineClient();
 
   @override
   final FakeTeachersClient teachers;

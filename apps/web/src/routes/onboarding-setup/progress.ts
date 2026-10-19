@@ -15,7 +15,6 @@ export const STEP_IDS = [
   "academic-year",
   "grading-scheme",
   "timetable",
-  "staff",
   "students",
 ] as const;
 
@@ -47,16 +46,6 @@ export interface TimetableProgress {
   weekdays: number[];
 }
 
-export interface StaffInviteBatchResult {
-  role: string;
-  totalCount: number;
-  sentCount: number;
-}
-
-export interface StaffInvitesProgress {
-  batches: StaffInviteBatchResult[];
-}
-
 export interface StudentImportProgress {
   importId: string;
   status: string;
@@ -70,7 +59,6 @@ export interface WizardProgress {
   academicYear?: AcademicYearProgress;
   gradingScheme?: GradingSchemeProgress;
   timetable?: TimetableProgress;
-  staffInvites?: StaffInvitesProgress;
   studentImport?: StudentImportProgress;
 }
 
@@ -96,11 +84,21 @@ export function loadProgress(): WizardProgress {
     if (!raw) return defaultProgress();
     const parsed = JSON.parse(raw) as Partial<WizardProgress>;
     if (parsed.version !== 1) return defaultProgress();
-    return {
-      ...defaultProgress(),
-      ...parsed,
-      stepState: { ...initialStepState(), ...parsed.stepState },
-    };
+    const stepState = initialStepState();
+    for (const id of STEP_IDS) {
+      // eslint-disable-next-line security/detect-object-injection -- `id` comes from iterating this module's own fixed `STEP_IDS` tuple, not user input
+      const state = parsed.stepState?.[id];
+      // eslint-disable-next-line security/detect-object-injection -- same fixed `STEP_IDS` key as above
+      if (state) stepState[id] = state;
+    }
+    // Progress saved on a step that no longer exists (the retired staff-invitations step) resumes at
+    // the first step not yet passed, rather than rendering no step at all.
+    const currentStep =
+      parsed.currentStep === "complete" || STEP_IDS.includes(parsed.currentStep as StepId)
+        ? parsed.currentStep
+        : // eslint-disable-next-line security/detect-object-injection -- `id` is one of this module's fixed `STEP_IDS`
+          (STEP_IDS.find((id) => stepState[id] === "upcoming") ?? "complete");
+    return { ...defaultProgress(), ...parsed, currentStep: currentStep ?? STEP_IDS[0], stepState };
   } catch {
     return defaultProgress();
   }

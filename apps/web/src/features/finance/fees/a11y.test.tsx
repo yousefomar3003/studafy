@@ -45,9 +45,6 @@ const getMock = mock((path: string) => {
   if (path === "/api/finance/fee-structures") {
     return Promise.resolve({ data: { fee_structures: [STRUCTURE], total: 1 } });
   }
-  if (path === "/api/finance/scholarship-discounts") {
-    return Promise.resolve({ data: { scholarship_discounts: [], total: 0 } });
-  }
   return Promise.resolve({ data: undefined });
 });
 mock.module("../../../lib/api", () => ({ api: { GET: getMock } }));

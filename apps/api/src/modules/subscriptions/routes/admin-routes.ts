@@ -1,8 +1,9 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { requirePermission } from "../../../middleware/authz";
 import { standardResponses } from "../../../openapi/responses";
 import { syncPlanPrices } from "../services/price-sync-service";
 
@@ -35,7 +36,7 @@ const syncPricesRoute = createRoute({
   summary: "Sync plans and prices with Stripe",
   description:
     "Creates or updates Stripe Products and Prices to match the local plans and plan_prices table. " +
-    "Admin-only endpoint. Requires Stripe to be configured.",
+    "Requires platform:manage (SUPER_ADMIN). Requires Stripe to be configured.",
   security: [{ bearerAuth: [] }],
   responses: standardResponses(
     {
@@ -54,6 +55,11 @@ export function adminSubscriptionRoutes(
   logger: Logger,
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
+
+  // Rewrites Stripe Products and Prices for the whole platform, so it is a platform operation, not
+  // a school one: platform:manage, which only SUPER_ADMIN holds. Before this guard any
+  // authenticated session could trigger it.
+  app.use("/api/admin/subscriptions/sync-prices", requirePermission(PERMISSIONS.PLATFORM_MANAGE));
 
   app.openapi(syncPricesRoute, async (c) => {
     const active = requireProvider(provider);

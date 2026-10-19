@@ -2,96 +2,11 @@ import { ApiError } from "@studafy/api-client";
 
 import { buildCsv, parseCsv } from "./csv";
 
-import type { CsvCell } from "./csv";
-
 /**
- * Client-side table export and CSV import, shared by every list page. Export walks the same list
- * endpoint (and filters) the page already uses and serialises the rows to CSV; import parses a CSV,
- * validates each row against an {@link ImportSpec}, and creates the valid rows one by one through
- * the entity's existing create endpoint. Large server-side exports (audit log, attendance, finance
- * reports) keep their own async job flows — this is for the tables that have none.
+ * Client-side CSV import, shared by list pages: parses a CSV, validates each row against an
+ * {@link ImportSpec}, and creates the valid rows one by one through the entity's existing create
+ * endpoint.
  */
-
-// ---------------------------------------------------------------------------
-// Export
-// ---------------------------------------------------------------------------
-
-/** Hard ceiling on one export, so a mis-filtered table can't page the API indefinitely. */
-export const MAX_EXPORT_ROWS = 10_000;
-
-export interface ExportColumn<TRow> {
-  header: string;
-  value: (row: TRow) => CsvCell;
-}
-
-export interface CollectedRows<TRow> {
-  rows: TRow[];
-  /** True when {@link MAX_EXPORT_ROWS} cut the export short. */
-  truncated: boolean;
-}
-
-/** Wraps rows the page already holds in full (non-paginated lists). */
-export function allRows<TRow>(rows: readonly TRow[]): CollectedRows<TRow> {
-  return { rows: rows.slice(0, MAX_EXPORT_ROWS), truncated: rows.length > MAX_EXPORT_ROWS };
-}
-
-/** Exhausts a cursor-paginated list endpoint, following `nextCursor` until it runs out. */
-export async function collectCursorPages<TRow>(
-  fetchPage: (
-    cursor: string | undefined,
-  ) => Promise<{ items: readonly TRow[]; nextCursor?: string | null }>,
-  maxRows: number = MAX_EXPORT_ROWS,
-): Promise<CollectedRows<TRow>> {
-  const rows: TRow[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await fetchPage(cursor);
-    rows.push(...page.items);
-    cursor = page.nextCursor ?? undefined;
-  } while (cursor && rows.length < maxRows);
-  return { rows: rows.slice(0, maxRows), truncated: rows.length > maxRows || Boolean(cursor) };
-}
-
-/** Exhausts an offset/total-shaped list endpoint. Stops on a short or empty page as well as at
- * `total`, so a `total` that drifts while paging can't loop forever. */
-export async function collectOffsetPages<TRow>(
-  fetchPage: (offset: number) => Promise<{ items: readonly TRow[]; total: number }>,
-  maxRows: number = MAX_EXPORT_ROWS,
-): Promise<CollectedRows<TRow>> {
-  const rows: TRow[] = [];
-  let total = Infinity;
-  while (rows.length < total && rows.length < maxRows) {
-    const page = await fetchPage(rows.length);
-    total = page.total;
-    if (page.items.length === 0) break;
-    rows.push(...page.items);
-  }
-  return { rows: rows.slice(0, maxRows), truncated: rows.length >= maxRows && total > maxRows };
-}
-
-export function buildExportCsv<TRow>(
-  columns: readonly ExportColumn<TRow>[],
-  rows: readonly TRow[],
-): string {
-  return buildCsv(
-    columns.map((column) => column.header),
-    rows.map((row) => columns.map((column) => column.value(row))),
-  );
-}
-
-/** `students` → `students-2026-10-06.csv`, dated in the viewer's local time zone. */
-export function exportFilename(base: string, date: Date = new Date()): string {
-  const day = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-  return `${base}-${day}.csv`;
-}
-
-// ---------------------------------------------------------------------------
-// Import
-// ---------------------------------------------------------------------------
 
 /** Ceiling on one import file: rows are created one request at a time. */
 export const MAX_IMPORT_ROWS = 1_000;

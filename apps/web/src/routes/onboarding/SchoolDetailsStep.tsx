@@ -23,7 +23,7 @@ type CurrencyOption = components["schemas"]["CurrenciesResponse"]["currencies"][
  * lookup name; other locales use `Intl.DisplayNames`, falling back to the API name when the runtime
  * has no entry for the code.
  */
-function displayName(
+export function displayName(
   locale: Locale,
   type: "region" | "currency",
   code: string,

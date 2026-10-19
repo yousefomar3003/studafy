@@ -59,7 +59,6 @@
       "academicYear": "Academic year",
       "gradingScheme": "Grading scheme",
       "timetable": "Timetable periods",
-      "staff": "Staff invitations",
       "students": "Student import"
     },
     "stepStatus": {
@@ -76,8 +75,7 @@
       "schoolProfile": "Could not save school settings. Please try again.",
       "academicYear": "Could not create the academic year. Please try again.",
       "gradingScheme": "Could not save the grading scheme. Please try again.",
-      "timetable": "Could not create the timetable. Please try again.",
-      "staff": "Could not send invitations. Please try again."
+      "timetable": "Could not create the timetable. Please try again."
     },
     "complete": {
       "title": "Setup complete",
@@ -90,7 +88,6 @@
       "defaultLanguage": "Default language",
       "timezone": "Timezone",
       "timezoneHelper": "IANA timezone, e.g. Africa/Casablanca.",
-      "invitationExpiry": "Invitation expiry (days)",
       "attendanceThreshold": "Attendance alert threshold (%)",
       "absenceThreshold": "Absence alert threshold (%)",
       "correctionWindow": "Attendance correction window (hours)",
@@ -147,22 +144,6 @@
       "sat": "Sat",
       "sun": "Sun"
     },
-    "staff": {
-      "title": "Staff invitations",
-      "description": "Invite staff by role. Paste one email per line, or separate them with commas.",
-      "batch": "Batch {{number}}",
-      "role": "Role",
-      "roles": {
-        "orgAdmin": "Admin",
-        "instructor": "Teacher",
-        "teachingAssistant": "Teaching assistant"
-      },
-      "emails": "Emails",
-      "checkBatch": "Check this batch.",
-      "removeBatch": "Remove batch",
-      "addBatch": "Add another role",
-      "submit": "Send invitations"
-    },
     "students": {
       "title": "Student import",
       "description": "Upload a CSV of students to validate. Nothing is saved until you confirm.",
@@ -187,7 +168,6 @@
     },
     "validation": {
       "timezone": "Must be a valid IANA timezone (e.g. Africa/Casablanca).",
-      "expiryDaysRange": "Enter a number of days from 1 to 365.",
       "percentRange": "Enter a percentage from 0 to 100.",
       "correctionWindowRange": "Enter a number of hours from 1 to 8760.",
       "codeRequired": "Enter a short code.",
@@ -202,8 +182,6 @@
       "periodsMin": "Enter at least 1 period.",
       "periodsMax": "Enter at most 20 periods.",
       "weekdayRequired": "Select at least one day.",
-      "emailInvalid": "Invalid email address",
-      "emailRequired": "Add at least one email.",
       "tooLong": "This is too long.",
       "invalid": "Enter a valid value."
     }
@@ -239,6 +217,10 @@
       "generic": {
         "heading": "We couldn't verify this invitation",
         "message": "Something went wrong on our end. Please try again in a moment."
+      },
+      "mobileOnly": {
+        "heading": "Accept this invitation in the mobile app",
+        "message": "Your account uses the Studafy mobile app. Install it on your phone and accept your invitation there to finish setting up."
       }
     },
     "approval": {
@@ -316,7 +298,7 @@
       "seoTitle": "Confirm account deletion",
       "seoDescription": "Confirm deletion of your Studafy account.",
       "title": "Delete your account",
-      "body": "This deletes the Studafy account registered to your email address, in every school it belongs to. Straight away, you are signed out on every device, the account is removed from the school, and any AI subscription is cancelled. Your name, contact details and profile are erased within 30 days.",
+      "body": "This deletes the Studafy account registered to your email address, in every school it belongs to. Straight away, you are signed out on every device. 14 days later the account is removed from the school and any AI subscription is cancelled, unless you sign in and cancel the deletion first. Your name, contact details and profile are then erased within 30 days.",
       "irreversible": "This cannot be undone.",
       "submit": "Delete my account",
       "linkInvalid": "This link is invalid, has expired, or has already been used.",
@@ -324,10 +306,83 @@
       "requestNewLink": "Request a new link",
       "nothingTitle": "Nothing to delete",
       "nothingBody": "There is no active Studafy account for this email address any more. It may already have been deleted.",
-      "deletedTitle": "Your account has been deleted",
-      "erasedBy": "{{school}}: personal data erased by {{date}}.",
+      "deletedTitle": "Your account deletion is scheduled",
+      "erasedBy": "{{school}}: deleted on {{scheduledDate}} unless you sign in and cancel; personal data erased by {{date}}.",
       "retainedIntro": "We have emailed you a confirmation. Your school keeps only these records:",
       "seePrivacy": "See the <privacyLink>privacy policy</privacyLink> for why."
+    }
+  },
+  "signup": {
+    "title": "Sign up your school",
+    "subtitle": "Studafy accounts use Google or Microsoft. Choose the account you will use to run your school.",
+    "steps": {
+      "account": "Sign in with Google or Microsoft.",
+      "details": "Tell us about your school and upload proof that you own or run it.",
+      "review": "Our team reviews it and emails you when your school is ready."
+    },
+    "haveAccount": "Already have a Studafy account?",
+    "signIn": "Sign in",
+    "signInInstead": "Sign in instead.",
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "OAUTH_CANCELLED": "Sign-in was cancelled. Choose an account to continue.",
+      "OAUTH_STATE_INVALID": "Your sign-in took too long or was interrupted. Please try again.",
+      "OAUTH_EMAIL_NOT_VERIFIED": "That account's email address is not verified. Verify it with your provider, or use another account.",
+      "SCHOOL_APPLICATION_ACCOUNT_EXISTS": "This account already belongs to a Studafy user.",
+      "SCHOOL_APPLICATION_ALREADY_PENDING": "You already have an application awaiting review.",
+      "SCHOOL_APPLICATION_PROOF_INVALID": "The proof of ownership could not be accepted. Upload a PDF or image up to 10 MB.",
+      "SCHOOL_APPLICATION_SESSION_REQUIRED": "Your sign-in has expired. Go back to the sign-up page and sign in again."
+    },
+    "apply": {
+      "title": "School application",
+      "signedInAs": "Signed in as {{email}} ({{provider}}).",
+      "signOut": "Use another account",
+      "intro": "We review every school before it goes live. Fill in your school's details and upload a document that shows you own or manage it, such as a licence, a commercial registration or a ministry approval.",
+      "schoolSection": "Your school",
+      "applicantSection": "About you",
+      "proofSection": "Proof of ownership",
+      "submit": "Submit application"
+    },
+    "fields": {
+      "schoolName": "School name",
+      "city": "City",
+      "address": "Address",
+      "schoolEmail": "School email",
+      "website": "Website",
+      "studentCount": "Number of students",
+      "optional": "Optional",
+      "applicantName": "Your full name",
+      "jobTitle": "Your role",
+      "jobTitleHelper": "For example owner, principal or director (optional)",
+      "phone": "Phone number",
+      "proof": "Proof document",
+      "proofHelper": "A PDF or photo (JPG, PNG or WebP), up to 10 MB.",
+      "message": "Anything else we should know? (optional)"
+    },
+    "validation": {
+      "required": "This field is required.",
+      "phone": "Enter a valid phone number.",
+      "studentCount": "Enter a whole number.",
+      "proofRequired": "Upload a proof of ownership document.",
+      "proofType": "Upload a PDF, JPG, PNG or WebP file.",
+      "proofSize": "The file must be 10 MB or smaller."
+    },
+    "status": {
+      "pending": {
+        "title": "We're reviewing {{school}}",
+        "body": "Your application was received on {{date}}. We will email {{email}} as soon as it has been reviewed."
+      },
+      "approved": {
+        "title": "{{school}} is approved",
+        "body": "Your school is ready. Sign in with the same account to get started.",
+        "action": "Sign in"
+      },
+      "rejected": {
+        "title": "Your application for {{school}} was not approved",
+        "body": "We could not approve this application. You can apply again with updated details.",
+        "reason": "Reason from our team",
+        "action": "Apply again"
+      }
     }
   }
 }

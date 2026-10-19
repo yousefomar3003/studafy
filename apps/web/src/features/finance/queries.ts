@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+
 import { api } from "../../lib/api";
 
 import type { components } from "@studafy/api-client";
@@ -290,3 +292,14 @@ export async function fetchRecentPayments(): Promise<{ payments: Payment[]; tota
 export const COLLECTIONS_VS_DUE_QUERY_KEY = ["finance", "collections-vs-due"] as const;
 export const AR_AGING_QUERY_KEY = ["finance", "ar-aging"] as const;
 export const RECENT_PAYMENTS_QUERY_KEY = ["finance", "payments", "recent"] as const;
+
+/**
+ * The `collections-vs-due` report. The finance home's summary strip reads its `report_summary`
+ * cards and the overdue tile its rows; sharing this hook means the report is fetched once.
+ */
+export function useCollectionsVsDueQuery() {
+  return useQuery({
+    queryKey: COLLECTIONS_VS_DUE_QUERY_KEY,
+    queryFn: fetchCollectionsVsDueReport,
+  });
+}

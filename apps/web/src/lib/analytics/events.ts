@@ -50,6 +50,5 @@ export const SETUP_WIZARD_FEATURES = {
   "academic-year": "academic_year",
   "grading-scheme": "grading_scheme",
   timetable: "timetable",
-  staff: "staff_invitations",
   students: "student_import",
 } as const;

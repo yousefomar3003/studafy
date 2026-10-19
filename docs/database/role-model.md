@@ -211,14 +211,16 @@ SELECT has_schema_privilege('public', 'app', 'CREATE'),
 Integration tests are gated by `TEST_DATABASE_URL` and run against fresh, disposable databases.
 
 ```bash
-POSTGRES_PASSWORD='<local-only>' docker compose -f db/compose.yml up -d --wait
+POSTGRES_PASSWORD='<local-only>' docker compose up -d --wait test-postgres test-redis
 export TEST_DATABASE_URL='postgresql://studafy_test:<local-only>@127.0.0.1:54329/postgres?sslmode=disable'
 bun test --cwd packages/db
-docker compose -f db/compose.yml down
+docker compose rm -sfv test-postgres test-redis
 ```
 
-CI runs the whole `packages/db` suite (including `roles.test.ts`) against a `postgres:16.4-alpine`
-service in the `database-migrations` job of [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
+CI runs the whole `packages/db` suite (including `roles.test.ts`) against the `pgvector/pgvector:pg16`
+`test-postgres` container from the root `compose.yml` (started with
+`docker compose up -d --wait test-postgres test-redis`, `pg_stat_statements` preloaded) in the
+`database-migrations` job of [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
 The static `config-separation.test.ts` runs in every lane, database or not.
 
 ## Credential handling

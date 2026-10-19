@@ -8,8 +8,12 @@ enum AppRole {
   superAdmin('SUPER_ADMIN'),
   orgAdmin('ORG_ADMIN'),
   finance('FINANCE'),
+
+  /// Takes and corrects daily attendance for every class in the school. Declared ahead of the
+  /// teaching roles so the profile label (which reads the first role in declaration order) matches
+  /// the shell [resolveShellRole] picks for an officer who also teaches.
+  attendanceOfficer('ATTENDANCE_OFFICER'),
   instructor('INSTRUCTOR'),
-  teachingAssistant('TEACHING_ASSISTANT'),
   student('STUDENT'),
   parent('PARENT'),
   guest('GUEST'),

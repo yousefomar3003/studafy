@@ -1,29 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
 import { useTranslation } from "../../../lib/i18n";
-import {
-  COLLECTIONS_VS_DUE_QUERY_KEY,
-  fetchCollectionsVsDueReport,
-  overdueInstallments,
-  todayIsoDate,
-} from "../queries";
+import { overdueInstallments, todayIsoDate, useCollectionsVsDueQuery } from "../queries";
 
 const PREVIEW_LIMIT = 5;
 
 /**
- * Overdue installments (ST-200): the same `collections-vs-due` report the KPI tile reads, filtered
- * to rows past due with a balance owed (see `overdueInstallments` in `queries.ts`). Sharing the
- * query key with `CollectionsVsDueTile` means TanStack Query dedupes the request between the two
- * tiles rather than fetching the same report twice.
+ * Overdue installments (ST-200): the same `collections-vs-due` report the finance home's summary
+ * strip reads, filtered to rows past due with a balance owed (see `overdueInstallments` in
+ * `queries.ts`). Both go through `useCollectionsVsDueQuery`, so TanStack Query fetches the report
+ * once for the page.
  */
 export function OverdueInstallmentsListTile() {
   const { t } = useTranslation();
-  const { data, isPending, isError } = useQuery({
-    queryKey: COLLECTIONS_VS_DUE_QUERY_KEY,
-    queryFn: fetchCollectionsVsDueReport,
-  });
+  const { data, isPending, isError } = useCollectionsVsDueQuery();
 
   const installments = data ? overdueInstallments(data, todayIsoDate()) : [];
   const preview = (installments ?? []).slice(0, PREVIEW_LIMIT);

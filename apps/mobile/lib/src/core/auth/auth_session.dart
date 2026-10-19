@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
+
+import '../api/api_exception.dart';
 import 'jwt_payload.dart';
 import 'oauth_client.dart';
 import 'secure_token_store.dart';
@@ -14,10 +17,7 @@ import 'secure_token_store.dart';
 /// storage. The [tokenProvider] getter is safe to call before [restore] — it
 /// simply returns null, which makes the app behave as unauthenticated.
 class AuthSession {
-  AuthSession({
-    required this._authClient,
-    required this._secureStore,
-  });
+  AuthSession({required this._authClient, required this._secureStore});
 
   final MobileAuthClient _authClient;
   final SecureTokenStore _secureStore;
@@ -28,6 +28,8 @@ class AuthSession {
   List<String> _roles = const [];
   String? _userId;
 
+  String? _lastRefreshErrorCode;
+
   bool _refreshInProgress = false;
   final Completer<void> _restored = Completer<void>();
 
@@ -35,9 +37,16 @@ class AuthSession {
 
   /// TokenProvider compatible with [AuthInterceptor]. Async because the first
   /// call may need to read from secure storage.
+  ///
+  /// Renews the access token first when it is within [isExpiringSoon]'s window, so requests don't
+  /// go out with a token the API is about to reject (access tokens are short-lived). A renewal
+  /// that fails because the network is down leaves the old token in place — the request then
+  /// fails on connectivity, not as a sign-out.
   Future<String?> get tokenProvider async {
-    if (_accessToken != null) return _accessToken;
-    await _restored.future;
+    if (_accessToken == null) await _restored.future;
+    if (_accessToken != null && _refreshToken != null && isExpiringSoon()) {
+      await refresh();
+    }
     return _accessToken;
   }
 
@@ -57,6 +66,12 @@ class AuthSession {
   /// [roles]: for client-side lookups only, never an authorization decision. Null when
   /// unauthenticated or the claim is missing/malformed.
   String? get userId => _userId;
+
+  /// The problem `code` the server gave for the most recent rejected refresh (for example
+  /// `SCHOOL_SUSPENDED` when the school was closed), or `null` when the last refresh succeeded, was
+  /// never attempted, or failed without reaching the server. Lets the caller tell *why* a session
+  /// ended, after [refresh] has already cleared it.
+  String? get lastRefreshErrorCode => _lastRefreshErrorCode;
 
   /// Whether the session has been restored from secure storage.
   bool get isRestored => _restored.isCompleted;
@@ -100,6 +115,7 @@ class AuthSession {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
     _accessTokenExpiresAt = DateTime.now().add(Duration(seconds: expiresIn));
+    _lastRefreshErrorCode = null;
     final payload = decodeJwtPayload(accessToken);
     _roles = _rolesFromPayload(payload);
     _userId = _userIdFromPayload(payload);
@@ -142,6 +158,16 @@ class AuthSession {
       );
       _refreshCompleter!.complete(true);
       return true;
+    } on DioException catch (error) {
+      // Only the server rejecting the refresh token ends the session. A timeout or lost
+      // connection must not sign an offline user out; the caller just retries later.
+      final status = error.response?.statusCode;
+      if (status != null && status >= 400 && status < 500) {
+        _lastRefreshErrorCode = error.apiError?.code;
+        await clear();
+      }
+      _refreshCompleter!.complete(false);
+      return false;
     } catch (_) {
       await clear();
       _refreshCompleter!.complete(false);

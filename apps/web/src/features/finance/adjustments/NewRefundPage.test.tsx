@@ -90,8 +90,7 @@ async function pickInvoice() {
   fireEvent.click(await screen.findByRole("button", { name: /ACC-SINV-2026-00001/ }));
 }
 
-/** `Select` is a custom listbox, not a native `<select>` — same click-open-then-click-option
- * interaction `InvitationsListPage.test.tsx`'s own status filter test uses. */
+/** `Select` is a custom listbox, not a native `<select>` — open it, then click the option. */
 function pickReason(label: string) {
   fireEvent.click(screen.getByRole("combobox", { name: "Reason" }));
   fireEvent.click(screen.getByRole("option", { name: label }));

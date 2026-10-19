@@ -5,22 +5,20 @@
     "PRINCIPAL": "Principal",
     "FINANCE": "Finance",
     "INSTRUCTOR": "Instructor",
-    "TEACHING_ASSISTANT": "Teaching assistant",
     "STUDENT": "Student",
     "PARENT": "Parent",
     "GUEST": "Guest",
     "SUPPORT_AGENT": "Support agent"
   },
   "dashboard": {
-    "title": "Admin",
+    "title": "School overview",
     "intro": "A live snapshot of activation, attendance, approvals, and account health.",
     "links": {
       "users": "Manage users →",
-      "invitations": "Manage invitations →",
       "students": "Manage students →",
       "timetable": "Build timetable →",
+      "calendar": "School calendar →",
       "settings": "School settings →",
-      "audit": "Audit log →",
       "announcements": "Announcements →"
     }
   },
@@ -44,21 +42,6 @@
       "error": "Unable to load the approval queue.",
       "empty": "Nothing is waiting on your review.",
       "awaiting": "awaiting review"
-    },
-    "storage": {
-      "title": "Storage usage",
-      "error": "Unable to load storage usage.",
-      "empty": "No storage data available.",
-      "meterLabel": "{{percent}} of storage used",
-      "noCap": "Storage cap not configured",
-      "usedOfCap": "{{used}} of {{cap}} used",
-      "usedNoCap": "{{used}} used · no cap configured",
-      "units": {
-        "b": "{{value}} B",
-        "kb": "{{value}} KB",
-        "mb": "{{value}} MB",
-        "gb": "{{value}} GB"
-      }
     },
     "subscription": {
       "title": "Subscription",
@@ -140,85 +123,7 @@
       "loadError": "Unable to load announcements.",
       "empty": "No announcements yet.",
       "previous": "Previous",
-      "next": "Next",
-      "export": {
-        "recipients": "Recipients",
-        "notified": "Notified"
-      }
-    }
-  },
-  "audit": {
-    "actions": {
-      "insert": "Created",
-      "update": "Updated",
-      "delete": "Deleted",
-      "login": "Logged in",
-      "logout": "Logged out",
-      "export": "Exported",
-      "permission_change": "Permission changed",
-      "read": "Viewed"
-    },
-    "allActions": "All actions",
-    "exportStatus": {
-      "queued": "Queued",
-      "processing": "Processing",
-      "completed": "Ready",
-      "failed": "Failed"
-    },
-    "title": "Audit log",
-    "intro": "Search the school’s audit trail by actor, action, resource, and date.",
-    "exportCsv": "Export CSV",
-    "filters": {
-      "action": "Action",
-      "resourceTable": "Resource table",
-      "resourceTablePlaceholder": "e.g. students, grades, users",
-      "from": "From",
-      "to": "To",
-      "clear": "Clear filters"
-    },
-    "actor": {
-      "label": "Actor",
-      "clear": "Clear",
-      "placeholder": "Search by name or email",
-      "noMatches": "No users match."
-    },
-    "export": {
-      "statusLabel": "Export status",
-      "download": "Download CSV",
-      "failedFallback": "The export could not be completed.",
-      "ready": "Audit export ready",
-      "readyDescription": "Download it below.",
-      "failed": "Audit export failed",
-      "queued": "Audit export queued",
-      "queuedDescription": "We'll let you know when it's ready.",
-      "startFailed": "Couldn't start export",
-      "tryAgain": "Please try again."
-    },
-    "columns": {
-      "timestamp": "Timestamp",
-      "actor": "Actor",
-      "action": "Action",
-      "resource": "Resource",
-      "ipAddress": "IP address",
-      "diff": "Diff"
-    },
-    "system": "System",
-    "viewDiff": "View diff",
-    "caption": "Audit log entries",
-    "rowLabel": "{{action}} on {{table}}",
-    "loadError": "Unable to load the audit log.",
-    "empty": "No entries match these filters.",
-    "previous": "Previous",
-    "next": "Next",
-    "diff": {
-      "title": "Audit entry diff",
-      "description": "{{action}} · {{table}}",
-      "empty": "No field-level changes recorded for this entry.",
-      "caption": "Before and after values",
-      "field": "Field",
-      "before": "Before",
-      "after": "After",
-      "close": "Close"
+      "next": "Next"
     }
   },
   "settings": {
@@ -235,9 +140,6 @@
       "nameRequired": "Name is required",
       "nameTooLong": "Keep it under 200 characters",
       "invalidTimezone": "Must be a valid IANA timezone (e.g. Africa/Casablanca).",
-      "wholeDays": "Enter a whole number of days.",
-      "minDays": "Must be at least 1 day.",
-      "maxDays": "Must be 365 days or fewer.",
       "percentRange": "Must be between 0 and 100.",
       "wholeHours": "Enter a whole number of hours.",
       "minHours": "Must be at least 1 hour.",
@@ -279,13 +181,6 @@
         "numeric": "Numeric score",
         "pass_fail": "Pass / fail"
       }
-    },
-    "invitationExpiry": {
-      "title": "Invitation expiry",
-      "description": "How long a new invitation link stays valid before it expires.",
-      "label": "Expires after (days)",
-      "help": "Applies to invitations sent after this change — already-sent links keep their original expiry.",
-      "updated": "Invitation expiry updated"
     },
     "attendance": {
       "title": "Attendance alerts",
@@ -379,11 +274,6 @@
       "placeLabel": "Place {{code}} on {{day}} period {{period}}",
       "addLabel": "Add a lesson on {{day}} period {{period}}"
     },
-    "export": {
-      "day": "Day",
-      "class": "Class",
-      "employeeNumber": "Employee number"
-    },
     "slotModal": {
       "addTitle": "Add lesson",
       "addDescription": "{{day}}, period {{period}}",
@@ -442,6 +332,37 @@
       "summary_one": "{{count}} lesson a week · {{classes}} classes",
       "summary_other": "{{count}} lessons a week · {{classes}} classes",
       "defaultName": "{{term}} timetable"
+    },
+    "import": {
+      "title": "Import lessons",
+      "fields": {
+        "day": "Day (1 = Monday … 7 = Sunday)",
+        "period": "Period",
+        "class": "Class code",
+        "teacher": "Teacher employee number",
+        "room": "Room code"
+      },
+      "dayNotInWeek": "Day {{value}} isn't a school day.",
+      "periodRange": "Period must be between 1 and {{max}}.",
+      "unknownClass": "No class with code \"{{value}}\" in this term.",
+      "unknownTeacher": "No teacher with employee number \"{{value}}\".",
+      "unknownRoom": "No room with code \"{{value}}\"."
+    }
+  },
+  "home": {
+    "accountHeading": "School account",
+    "stats": {
+      "active": "Active users",
+      "activeHint": "Accounts in use",
+      "invitedHint": "Yet to activate",
+      "approvalsHint": "Awaiting your review"
+    },
+    "summary": {
+      "approvals_one": "{{count}} grade approval is waiting on you",
+      "approvals_other": "{{count}} grade approvals are waiting on you",
+      "invited_one": "{{count}} invited user hasn't activated yet",
+      "invited_other": "{{count}} invited users haven't activated yet",
+      "billing": "the subscription needs attention"
     }
   }
 }

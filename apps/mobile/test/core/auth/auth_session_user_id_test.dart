@@ -7,9 +7,9 @@ import '../../support/fake_secure_token_store.dart';
 
 void main() {
   AuthSession session() => AuthSession(
-        authClient: MobileAuthClient(baseUrl: 'http://localhost'),
-        secureStore: FakeSecureTokenStore(),
-      );
+    authClient: MobileAuthClient(baseUrl: 'http://localhost'),
+    secureStore: FakeSecureTokenStore(),
+  );
 
   test('userId is null before any tokens are saved', () async {
     final auth = session();

@@ -2,9 +2,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import {
+  assignRole,
   createFullTenant,
   createRefreshSession,
   createTestDatabase,
+  createUser,
   createUserDevice,
   integrationEnabled,
   migrateDatabase,
@@ -257,7 +259,8 @@ describe("reuse detection", () => {
     const { config, destroy } = await sessionConfig();
 
     try {
-      const user = tenant.users.TEACHING_ASSISTANT;
+      const user = await createUser(sql, tenant.schoolId);
+      await assignRole(sql, tenant.schoolId, user.id, "GUEST");
       const seed = await createRefreshSession(sql, tenant.schoolId, user.id);
 
       // Build a chain three deep, so "the whole family" is a meaningful claim.

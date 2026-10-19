@@ -56,15 +56,11 @@ const PAGE_SIZE = 25;
 
 /** The directory's default fetch: server-side search, status, and date-range filtering over the
  * school's full student count, which is what keeps search fast at 5k+ students. */
-export async function fetchStudentsPage(
-  filters: StudentsFilters,
-  cursor: string | undefined,
-  limit: number = PAGE_SIZE,
-) {
+export async function fetchStudentsPage(filters: StudentsFilters, cursor: string | undefined) {
   const { data } = await api.GET("/api/students", {
     params: {
       query: {
-        limit,
+        limit: PAGE_SIZE,
         cursor,
         status: filters.status || undefined,
         search: filters.search || undefined,
@@ -258,7 +254,7 @@ export async function searchParentUsers(search: string): Promise<UserWithRoles[]
   const { data } = await api.GET("/api/users", {
     params: { query: { role: "PARENT", search: search.trim(), limit: PARENT_SEARCH_LIMIT } },
   });
-  return (data?.users ?? []) as UserWithRoles[];
+  return (data?.users ?? []) as components["schemas"]["UserListItem"][];
 }
 
 // ---------------------------------------------------------------------------

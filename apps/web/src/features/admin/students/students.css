@@ -61,10 +61,6 @@
   color: var(--color-danger-subtle-foreground);
 }
 
-.students-profile__back {
-  margin-bottom: var(--space-8);
-}
-
 .students-profile__sections {
   display: flex;
   flex-direction: column;

@@ -88,7 +88,7 @@ resolve_admin_user_id() {
   printf '%s' "$admin_user_id"
 }
 
-# Hosts the disposable local/CI Postgres (db/compose.yml) is reachable at -- the same trust boundary
+# Hosts the disposable local/CI Postgres (compose.yml test profile) is reachable at -- the same trust boundary
 # db/seeds/guard.ts already draws. drill-corruption.sh corrupts and deletes rows, so it may only ever
 # point at a database like this.
 require_loopback_host() {

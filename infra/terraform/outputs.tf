@@ -39,7 +39,7 @@ output "erpnext_security_group_id" {
 }
 
 output "backup_security_group_id" {
-  description = "Security group ID for the Postgres restore-verify ECS task. infra/deploy/scripts/postgres-restore-verify.sh reads this for its run-task network configuration."
+  description = "Security group ID for the Postgres restore-verify ECS task. infra/deploy/scripts/run-postgres-restore-verify.sh reads this for its run-task network configuration."
   value       = module.network.backup_security_group_id
 }
 
@@ -258,6 +258,11 @@ output "monitoring_realtime_probe_function_name" {
   value       = module.monitoring.realtime_probe_function_name
 }
 
+output "monitoring_status_page_incident_function_url" {
+  description = "Function URL for posting a manual status-page incident update (docs/runbooks/incident-comms-templates.md). null where the status page has no verified SES identity."
+  value       = module.monitoring.status_page_incident_function_url
+}
+
 output "monitoring_deploys_log_group_name" {
   description = "CloudWatch Logs group the staging deploy pipeline annotates; read by scripts/annotate-deploy.sh."
   value       = module.monitoring.deploys_log_group_name
@@ -389,7 +394,7 @@ output "erpnext_cluster_service_names" {
 # --- Backup automation and restore verification (modules/backup, ST-265) -----------------------
 
 output "backup_postgres_restore_verify_task_definition_arn" {
-  description = "ARN of the Postgres restore-verify task definition. Pass to infra/deploy/scripts/postgres-restore-verify.sh — registered in every environment, including dev, for the manual PITR demo."
+  description = "ARN of the Postgres restore-verify task definition. Pass to infra/deploy/scripts/run-postgres-restore-verify.sh — registered in every environment, including dev, for the manual PITR demo."
   value       = module.backup.postgres_restore_verify_task_definition_arn
 }
 
@@ -399,7 +404,7 @@ output "backup_monthly_locked_vault_name" {
 }
 
 output "backup_erpnext_restore_drill_task_definition_arn" {
-  description = "ARN of the ERPNext monthly restore-drill task definition. Pass to infra/deploy/scripts/erpnext-restore-drill.sh. null in dev / when erpnext_plane_enabled is false."
+  description = "ARN of the ERPNext monthly restore-drill task definition. Pass to infra/deploy/scripts/run-erpnext-restore-drill.sh. null in dev / when erpnext_plane_enabled is false."
   value       = module.backup.erpnext_restore_drill_task_definition_arn
 }
 

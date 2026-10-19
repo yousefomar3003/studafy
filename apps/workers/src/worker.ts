@@ -1,8 +1,13 @@
-import { recordJobOutcome, withConsumerSpan } from "@studafy/observability";
+import {
+  captureError,
+  recordJobOutcome,
+  withConsumerSpan,
+  withErrorMonitoringScope,
+} from "@studafy/observability";
 import { Worker } from "bullmq";
 
 import type { QueueDefinition } from "./registry";
-import type { TraceContextCarrier } from "@studafy/observability";
+import type { CaptureContext, TraceContextCarrier } from "@studafy/observability";
 import type { ConnectionOptions, Job } from "bullmq";
 
 /** Minimal surface of a BullMQ Worker needed for shutdown — satisfied by the real `Worker` class. */
@@ -14,6 +19,54 @@ export type WorkerFactory = (
   definition: QueueDefinition,
   connection: ConnectionOptions,
 ) => StoppableWorker;
+
+/**
+ * Whether BullMQ will retry this failure — the same rule as its own `Job.shouldRetryJob()`: another
+ * attempt remains and the error is not an `UnrecoverableError` (matched by name, as BullMQ itself
+ * does, so a copy from a second bundled bullmq still counts).
+ */
+function willRetry(job: Job, error: unknown): boolean {
+  const unrecoverable = error instanceof Error && error.name === "UnrecoverableError";
+  return !unrecoverable && job.attemptsMade + 1 < (job.opts.attempts ?? 1);
+}
+
+/**
+ * Runs one job's processor in its own error-monitoring scope, so the warn logs it leaves behind
+ * become breadcrumbs on its own report and nobody else's. A failure is reported once, on the
+ * attempt BullMQ will not retry: an attempt that is about to be retried is not yet an incident,
+ * and reporting every one would turn a three-attempt flake into three events. The error is always
+ * rethrown unchanged — BullMQ's own retry/failed handling is exactly what it was.
+ *
+ * Tags are ids only: queue, job id and name, and the tenant when the payload names one.
+ * `reportError` is a test seam; production uses @studafy/observability's captureError, itself a
+ * no-op without SENTRY_DSN.
+ */
+export function runMonitoredJob(
+  definition: QueueDefinition,
+  job: Job,
+  reportError: (error: unknown, context: CaptureContext) => void = captureError,
+): Promise<unknown> {
+  return withErrorMonitoringScope(async () => {
+    try {
+      return await definition.processor(job);
+    } catch (error) {
+      if (!willRetry(job, error)) {
+        const data = job.data as { schoolId?: unknown; school_id?: unknown } | undefined;
+        const schoolId = data?.schoolId ?? data?.school_id;
+        reportError(error, {
+          tags: {
+            queue: definition.name,
+            job_id: job.id,
+            job_name: job.name,
+            school_id: typeof schoolId === "string" ? schoolId : undefined,
+          },
+          extra: { attempt: job.attemptsMade + 1, max_attempts: job.opts.attempts ?? 1 },
+        });
+      }
+      throw error;
+    }
+  });
+}
 
 /**
  * Builds the real BullMQ `Worker` for a queue definition, with its own per-queue concurrency.
@@ -37,7 +90,9 @@ export const createBullmqWorker: WorkerFactory = (definition, connection) => {
     (job: Job) => {
       const carrier = (job.data as { traceContext?: TraceContextCarrier } | undefined)
         ?.traceContext;
-      return withConsumerSpan(definition.name, job.name, carrier, () => definition.processor(job));
+      return withConsumerSpan(definition.name, job.name, carrier, () =>
+        runMonitoredJob(definition, job),
+      );
     },
     {
       connection,

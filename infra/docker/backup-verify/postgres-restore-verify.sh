@@ -11,7 +11,7 @@
 # RESTORE_TIME (optional): an explicit ISO-8601 timestamp, e.g. "2026-09-01T03:15:00Z". Unset (the
 # weekly schedule's default) means "use the latest restorable time" — routine drift-minimizing
 # verification. Set it to demonstrate PITR to an arbitrary point in dev
-# (infra/deploy/scripts/postgres-restore-verify.sh --restore-time=...).
+# (infra/deploy/scripts/run-postgres-restore-verify.sh --restore-time=...).
 #
 # Exits 0 (PASS) or 1 (FAIL/error) and always writes a JSON report to
 # s3://$REPORT_BUCKET/$REPORT_PREFIX/<timestamp>.json before exiting, whichever happens.

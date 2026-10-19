@@ -5,7 +5,6 @@ import {
   createAttendanceExport,
   fetchAttendanceExport,
   fetchAttendanceSummary,
-  fetchAttendanceTrends,
   fetchRecordHistory,
 } from "../api/attendanceApi";
 import {
@@ -20,7 +19,6 @@ export const attendanceKeys = {
   all: ["principal-attendance"] as const,
   summary: (filters: AttendanceFilters, groupBy: "class" | "student") =>
     [...attendanceKeys.all, "summary", groupBy, filters] as const,
-  trends: (filters: AttendanceFilters) => [...attendanceKeys.all, "trends", filters] as const,
   matrix: () => [...attendanceKeys.all, "matrix"] as const,
   metadata: () => [...attendanceKeys.all, "metadata"] as const,
   profile: (studentId: string) => [...attendanceKeys.all, "profile", studentId] as const,
@@ -31,13 +29,6 @@ export function useAttendanceSummary(filters: AttendanceFilters, groupBy: "class
   return useQuery({
     queryKey: attendanceKeys.summary(filters, groupBy),
     queryFn: () => fetchAttendanceSummary(filters, groupBy),
-  });
-}
-
-export function useAttendanceTrends(filters: AttendanceFilters) {
-  return useQuery({
-    queryKey: attendanceKeys.trends(filters),
-    queryFn: () => fetchAttendanceTrends(filters),
   });
 }
 

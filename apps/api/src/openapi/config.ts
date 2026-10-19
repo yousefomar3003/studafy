@@ -92,6 +92,14 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "carry a one-time-use token, and emit an event for email dispatch.",
     },
     {
+      name: "Platform",
+      description:
+        "The Studafy platform console: cross-school operations for Studafy staff -- every " +
+        "school's lifecycle, per-school feature flags, plans and prices, platform settings, and " +
+        "cross-school account lookup. Gated on platform:read / platform:manage, held by " +
+        "SUPER_ADMIN only.",
+    },
+    {
       name: "Admin",
       description:
         "Administrative operations acting on a user other than the caller. Authenticated and " +
@@ -184,11 +192,31 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "from the school, stops AI add-on billing and files the erasure request.",
     },
     {
+      name: "Inquiries",
+      description:
+        'The public "Talk to us" form on the marketing site. Inquiries are stored for the Studafy ' +
+        "team, who are emailed about each one and work them from the platform console.",
+    },
+    {
+      name: "School applications",
+      description:
+        "The website's sign-up flow for a school owner: after signing in with Google or Microsoft " +
+        "they submit their school's details and proof of ownership, authenticated by an applicant " +
+        "session cookie. Studafy staff approve or reject them from the platform console.",
+    },
+    {
       name: "School calendar",
       description:
         "The school calendar's own entries -- holidays, events, meetings and exam periods -- listed " +
         "by date window and managed by school leadership. Terms and class exams live under the " +
         "academics endpoints. Authenticated and permission-gated.",
+    },
+    {
+      name: "Messaging",
+      description:
+        "Parent<->teacher 1-to-1 conversations. A parent opens a thread about a linked child with a " +
+        "teacher who teaches that child; only the two participants can read or write it. Messages " +
+        "are paged with `before` and polled with `since`. Authenticated, web and mobile sessions only.",
     },
     {
       name: "Announcements",

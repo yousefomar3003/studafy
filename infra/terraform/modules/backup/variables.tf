@@ -17,7 +17,7 @@ variable "automation_enabled" {
     local.monitoring_enabled) — dev has no DR requirement, but it still gets the Postgres
     restore-verify task definition itself (see restore_verify.tf), registered but never scheduled,
     so an operator can run it by hand for the "PITR to arbitrary timestamp demonstrated in dev"
-    acceptance criterion via infra/deploy/scripts/postgres-restore-verify.sh.
+    acceptance criterion via infra/deploy/scripts/run-postgres-restore-verify.sh.
   EOT
   type        = bool
 }
@@ -28,11 +28,6 @@ variable "erpnext_plane_enabled" {
 }
 
 # --- Networking -----------------------------------------------------------------------------
-
-variable "vpc_id" {
-  description = "VPC ID, e.g. module.network.vpc_id. Only used to validate provider configuration is wired correctly — no VPC-scoped resource is created directly against this value."
-  type        = string
-}
 
 variable "private_app_subnet_ids" {
   description = "Private app-tier subnet IDs, e.g. module.network.private_app_subnet_ids. Every ECS task this module runs launches here (NAT route for ECR/Secrets Manager/S3/RDS API calls), same tier modules/erpnext and modules/monitoring already use."
@@ -93,16 +88,6 @@ variable "log_retention_days" {
 variable "postgres_db_instance_id" {
   description = "module.postgres.db_instance_id. Used to build the instance ARN (for AWS Backup selection and cross-region replication) and as the source identifier for the weekly restore-to-point-in-time drill."
   type        = string
-}
-
-variable "postgres_address" {
-  description = "module.postgres.address (write endpoint, host only). Passed to the restore-verify task as the baseline it diffs the restored scratch instance's row counts/checksums against."
-  type        = string
-}
-
-variable "postgres_port" {
-  description = "module.postgres.port / var.db_port."
-  type        = number
 }
 
 variable "postgres_connection_secret_arn" {

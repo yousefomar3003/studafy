@@ -6,6 +6,7 @@ import '../../../../core/api/generated/models/assignment_completion.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/child_detail_providers.dart';
 import 'child_detail_placeholders.dart';
+import '../../../../design/layout/bottom_inset_padding.dart';
 
 /// The Assignments tab of `ChildDetailScreen`: how much of the term's assigned work the child
 /// has handed in, and how much of that was on time.
@@ -41,7 +42,7 @@ class ChildAssignmentsView extends ConsumerWidget {
             );
           }
           return ListView(
-            padding: const EdgeInsets.all(AppSpacing.space16),
+            padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
               _CompletionCard(completion: completion),

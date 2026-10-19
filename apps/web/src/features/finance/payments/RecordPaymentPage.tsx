@@ -46,9 +46,6 @@ export default function RecordPaymentPage() {
 
   return (
     <>
-      <p className="payments-form__back">
-        <Link to="/portal/finance/payments">{t("finance.payments.record.back")}</Link>
-      </p>
       <h1>{t("finance.payments.record.title")}</h1>
 
       {payment ? (

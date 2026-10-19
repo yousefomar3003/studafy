@@ -6,6 +6,7 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/teacher_providers.dart';
 import '../domain/teacher_class.dart';
 import 'teacher_class_detail_screen.dart';
+import '../../../design/layout/bottom_inset_padding.dart';
 
 /// The teacher "Classes" tab: every class the signed-in teacher leads this term, each opening
 /// its roster. Scoped to the teacher's own classes — the list request filters by
@@ -33,10 +34,13 @@ class TeacherClassListScreen extends ConsumerWidget {
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.all(AppSpacing.space16),
+            padding: const EdgeInsets.all(
+              AppSpacing.space16,
+            ).withBottomInset(context),
             physics: const AlwaysScrollableScrollPhysics(),
             itemCount: list.length,
-            separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.space8),
+            separatorBuilder: (context, index) =>
+                const SizedBox(height: AppSpacing.space8),
             itemBuilder: (context, index) => _ClassTile(summary: list[index]),
           );
         },
@@ -58,7 +62,9 @@ class _ClassTile extends StatelessWidget {
         title: Text(summary.code),
         subtitle: Text(summary.course.name),
         trailing: Text(
-          'teacher.classes.roster'.tr(namedArgs: {'count': '${summary.activeEnrollmentCount}'}),
+          'teacher.classes.roster'.tr(
+            namedArgs: {'count': '${summary.activeEnrollmentCount}'},
+          ),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         onTap: () => Navigator.of(context).push(
@@ -87,7 +93,9 @@ class _ScrollableMessage extends StatelessWidget {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(AppSpacing.space32),
+      padding: const EdgeInsets.all(
+        AppSpacing.space32,
+      ).withBottomInset(context),
       children: [
         Column(
           children: [
@@ -96,7 +104,9 @@ class _ScrollableMessage extends StatelessWidget {
             Text(
               messageKey.tr(),
               textAlign: TextAlign.center,
-              style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),

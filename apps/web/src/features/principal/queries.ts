@@ -1,4 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
+
 import { api } from "../../lib/api";
+
+import { evaluationListKey, fetchEvaluations } from "./evaluations/queries";
+import { fetchMessageReports, messageReportTileKey } from "./message-reports/queries";
 
 import type { components } from "@studafy/api-client";
 
@@ -80,22 +85,19 @@ export function lastNDaysRange(days: number): DateRange {
   return { startDate: dateString(start), endDate: dateString(end) };
 }
 
-/** One page of the per-class attendance summary for a date range. `group_by: "class"` items are the
- * only kind the discriminated union can return here. */
-export async function fetchClassAttendanceSummaryPage(
+/** Per-class attendance summary for a date range — backs both the heat map tile and its detail
+ * page. `group_by: "class"` items are the only kind the discriminated union can return here. */
+export async function fetchClassAttendanceSummary(
   range: DateRange,
-  classId: string | undefined,
-  offset: number,
-  limit: number,
-): Promise<{ items: ClassAttendanceSummaryItem[]; total: number }> {
+  classId?: string,
+): Promise<ClassAttendanceSummaryItem[]> {
   const { data } = await api.GET("/api/attendance/reports/summary", {
     params: {
       query: {
         start_date: range.startDate,
         end_date: range.endDate,
         group_by: "class",
-        limit,
-        offset,
+        limit: 100,
         ...(classId ? { class_id: classId } : {}),
       },
     },
@@ -104,15 +106,41 @@ export async function fetchClassAttendanceSummaryPage(
   // same pre-existing `@studafy/api-client` typing gap `NotificationBell.tsx` documents for
   // `notifications`. The annotation restores it without widening to `any`.
   const items = (data?.items ?? []) as ClassAttendanceSummaryItem[];
-  return { items, total: data?.pagination.total ?? items.length };
+  return items;
 }
 
-/** Per-class attendance summary for a date range (first page) — backs both the heat map tile and
- * its detail page. */
-export async function fetchClassAttendanceSummary(
-  range: DateRange,
-  classId?: string,
-): Promise<ClassAttendanceSummaryItem[]> {
-  const { items } = await fetchClassAttendanceSummaryPage(range, classId, 0, 100);
-  return items;
+// ---------------------------------------------------------------------------
+// Principal home: one hook per figure, shared by the summary strip and the tile that lists the
+// same items, so each endpoint is fetched once per page. None of these have a routed realtime
+// event yet (`apps/realtime/src/event-routing.ts` only routes `grades.published`), so they poll.
+// ---------------------------------------------------------------------------
+
+const PRINCIPAL_HOME_POLL_MS = 60_000;
+export const OPEN_INCIDENTS_PREVIEW_LIMIT = 5;
+export const OPEN_MESSAGE_REPORTS_PREVIEW_LIMIT = 3;
+const DRAFT_EVALUATIONS_FILTER = { status: "draft" as const };
+
+export function useOpenIncidentsPreviewQuery() {
+  return useQuery({
+    queryKey: ["discipline-incidents", "open", OPEN_INCIDENTS_PREVIEW_LIMIT],
+    queryFn: () => fetchOpenDisciplineIncidents(OPEN_INCIDENTS_PREVIEW_LIMIT),
+    refetchInterval: PRINCIPAL_HOME_POLL_MS,
+  });
+}
+
+/** Open (pending + in review) message reports, most pressing first. */
+export function useOpenMessageReportsPreviewQuery() {
+  return useQuery({
+    queryKey: messageReportTileKey(OPEN_MESSAGE_REPORTS_PREVIEW_LIMIT),
+    queryFn: () => fetchMessageReports("open", 0, OPEN_MESSAGE_REPORTS_PREVIEW_LIMIT),
+    refetchInterval: PRINCIPAL_HOME_POLL_MS,
+  });
+}
+
+export function useDraftEvaluationsQuery() {
+  return useQuery({
+    queryKey: evaluationListKey(DRAFT_EVALUATIONS_FILTER),
+    queryFn: () => fetchEvaluations(DRAFT_EVALUATIONS_FILTER),
+    refetchInterval: PRINCIPAL_HOME_POLL_MS,
+  });
 }

@@ -105,7 +105,7 @@ export function EditUserModal({ user, onClose }: EditUserModalProps) {
       open={user !== null}
       onClose={onClose}
       title={t("adminPeople.users.edit.title")}
-      description={user?.email}
+      description={user?.email ?? undefined}
     >
       <form onSubmit={handleSubmit} noValidate aria-label={t("adminPeople.users.edit.title")}>
         <Modal.Body>

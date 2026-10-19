@@ -1,14 +1,11 @@
 /**
  * Approval queue screens. `@studafy/ui`'s Table and Modal supply their own chrome; everything here
- * is feature-specific layout, styled with the same design tokens the rest of the portal shell uses
- * (see `features/admin/invitations/invitations.css`, which this mirrors).
+ * is feature-specific layout, styled with the same design tokens the rest of the portal shell uses.
  */
 
 .approvals-queue__toolbar {
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: var(--space-8);
   margin-bottom: var(--space-16);
 }
 
@@ -35,8 +32,7 @@
 /* Reject-reason textarea — reuses Input's `.sf-input`/`.sf-input__control` chrome (see
  * packages/ui/src/components/input/input.css) since there is no Textarea primitive in the design
  * system; `align-items: stretch` overrides Input's single-line `center` so a multi-row textarea
- * doesn't get squeezed against the wrapper's vertical center (same fix
- * `invitations-recipients-input` applies for the bulk-invite textarea). */
+ * doesn't get squeezed against the wrapper's vertical center. */
 .approvals-reason-input {
   align-items: stretch;
   padding-block: var(--space-8);

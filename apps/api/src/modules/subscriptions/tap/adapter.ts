@@ -6,8 +6,8 @@
  * Tap is a charge API with a hosted payment page. It has customers, charges and saved cards; it has
  * no product or price catalog, no subscription object and no customer billing portal. So:
  *
- *   - `createCustomer`, `createCheckoutSession`, `createPaymentSession`, `parseWebhook` and
- *     `listInvoices` (the customer's charges) are real Tap calls.
+ *   - `createCustomer`, `createCheckoutSession`, `createPaymentSession`, `parseWebhook`,
+ *     `listInvoices` (the customer's charges) and `refund` (of one charge) are real Tap calls.
  *   - A subscription checkout saves the card (`save_card`). Renewals are Studafy's job: the renewal
  *     worker in apps/workers charges that card each period. That is why pause, resume and
  *     cancellation have nothing to tell Tap -- see the note on those methods.
@@ -53,6 +53,8 @@ import type {
   ParsedWebhookEvent,
   PauseSubscriptionInput,
   PaymentProviderPort,
+  RefundInput,
+  RefundResult,
   ResumeSubscriptionInput,
   ReverseCancellationInput,
   ScheduleCancellationInput,
@@ -201,6 +203,38 @@ export class TapAdapter implements PaymentProviderPort {
       invoices: page.charges.filter((charge) => charge.id).map(toInvoiceSummary),
       hasMore: page.hasMore,
     };
+  }
+
+  /**
+   * Refund a captured charge -- what `listInvoices` lists as an invoice is the Tap charge itself.
+   *
+   * Tap takes no idempotency key on refunds, so the key travels as the merchant reference: a retry
+   * is not deduplicated by Tap, but Tap does refuse a refund that would exceed what the charge has
+   * left, which bounds the damage of a retried full refund to a rejection.
+   */
+  async refund(input: RefundInput): Promise<RefundResult> {
+    requireValue(input.invoiceId, "invoiceId");
+
+    const refund = await translate(() =>
+      this.client.createRefund({
+        chargeId: input.invoiceId,
+        amountMinor: input.amountMinor,
+        currency: input.currency,
+        description: "Studafy subscription refund",
+        metadata: input.metadata,
+        merchantReference: input.idempotencyKey,
+      }),
+    );
+
+    const status = refund.status?.toUpperCase();
+    if (!refund.id || (status !== "REFUNDED" && status !== "PENDING")) {
+      throw new PaymentProviderError(
+        502,
+        ERROR_CODES.TAP_API_ERROR,
+        `Tap refund ${refund.id ?? "(no id)"} ${status ?? "returned no status"}`,
+      );
+    }
+    return { providerRefundId: refund.id, status: status === "REFUNDED" ? "succeeded" : "pending" };
   }
 
   async lookupProductById(_providerProductId: string): Promise<LookupProductResult | null> {

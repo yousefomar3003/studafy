@@ -1,4 +1,10 @@
-import { startMetricsServer, startTracing } from "@studafy/observability";
+import {
+  forwardLog,
+  initErrorMonitoring,
+  startMetricsServer,
+  startTracing,
+  withErrorMonitoringScope,
+} from "@studafy/observability";
 
 import { createApp } from "./app";
 import { closeDatabasePools, createDatabase, createReadDatabase } from "./database";
@@ -29,6 +35,16 @@ import { closeRedis, createRedisClient } from "./redis";
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a port.
 const env = loadEnv();
 
+// Sentry error monitoring — null (and every reporting call a no-op) when SENTRY_DSN is unset. Must
+// run before startTracing() below: it registers the OTel context manager both share, and
+// startTracing() keeps that registration (see @studafy/observability's errorMonitoring.ts).
+const errorMonitoring = initErrorMonitoring({
+  dsn: env.SENTRY_DSN,
+  environment: env.SENTRY_ENVIRONMENT ?? env.APP_ENV,
+  release: env.RELEASE_VERSION,
+  serviceName: env.SERVICE_NAME,
+});
+
 // Prometheus-format metrics (ST-259), on its own port — must run before createApp() registers
 // createRedMetricsMiddleware(), since an OTel instrument stays bound to whichever meter created
 // it and this call is what registers the real global MeterProvider (see
@@ -53,6 +69,14 @@ const logger = createLogger({
     env: env.NODE_ENV,
     release_version: env.RELEASE_VERSION,
   },
+  // warn → breadcrumb, error/fatal → Sentry event, on top of the unchanged stdout line. Left unset
+  // without a DSN so the logger never materializes its bindings for nobody to read.
+  ...(errorMonitoring
+    ? {
+        observer: (level, msg, fields, bindings) =>
+          forwardLog(level, msg ?? "", { ...bindings, ...fields }),
+      }
+    : {}),
 });
 
 const state = { ready: true };
@@ -196,7 +220,9 @@ const app = createApp({
 const server = Bun.serve({
   port: env.PORT,
   hostname: env.HOST,
-  fetch: app.fetch,
+  // Each request gets its own Sentry scope, so the breadcrumbs its warn logs leave behind ride along
+  // with that request's error report and no other. A plain pass-through without a DSN.
+  fetch: (request, bunServer) => withErrorMonitoringScope(() => app.fetch(request, bunServer)),
 });
 
 logger.info(
@@ -229,6 +255,8 @@ const shutdown = (signal: string) => {
     await closeDatabasePools(database, readDatabase);
     await metricsServer.shutdown();
     await tracing?.shutdown();
+    // Last, so anything the steps above reported still goes out before the process exits.
+    await errorMonitoring?.shutdown();
     logger.info({ signal }, "shutdown complete");
     process.exit(0);
   });

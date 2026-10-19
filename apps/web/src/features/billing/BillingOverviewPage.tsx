@@ -14,6 +14,7 @@ import { formatIsoDate } from "./format";
 import { isEndedStatus, subscriptionStatusLabel, subscriptionStatusTone } from "./labels";
 import { useOpenBillingPortal, useReverseSubscriptionCancellation } from "./mutations";
 import { useBillingOverviewQuery } from "./queries";
+import { RefundRequestLink } from "./RefundRequestLink";
 
 import "./billing.css";
 
@@ -169,6 +170,7 @@ export default function BillingOverviewPage() {
                     </Button>
                   ) : null}
                 </div>
+                <RefundRequestLink scope="school" />
               </Card.Body>
             </Card>
 

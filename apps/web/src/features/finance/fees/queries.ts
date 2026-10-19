@@ -4,8 +4,6 @@ import type { components } from "@studafy/api-client";
 
 export type FeeStructure = components["schemas"]["FeeStructure"];
 export type AcademicYear = components["schemas"]["AcademicYear"];
-export type ScholarshipDiscount = components["schemas"]["ScholarshipDiscount"];
-export type Award = components["schemas"]["Award"];
 export type StudentProfile = components["schemas"]["StudentProfile"];
 export type CreateFeeStructureBody = components["schemas"]["CreateFeeStructureBody"];
 export type UpdateFeeStructureBody = components["schemas"]["UpdateFeeStructureBody"];
@@ -42,16 +40,8 @@ export function feeStructuresQueryKey(academicYearId: string) {
   return ["finance", "fee-structures", academicYearId] as const;
 }
 export const ACADEMIC_YEARS_KEY = ["finance", "fee-structures", "academic-years"] as const;
-export const SCHOLARSHIP_DISCOUNTS_KEY = [
-  "finance",
-  "fee-structures",
-  "scholarship-discounts",
-] as const;
 export function studentSearchQueryKey(search: string) {
   return ["finance", "fee-structures", "student-search", search] as const;
-}
-export function confirmedAwardsQueryKey(studentId: string) {
-  return ["finance", "fee-structures", "confirmed-awards", studentId] as const;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,33 +81,7 @@ export async function fetchAcademicYears(): Promise<AcademicYear[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Scholarship/discount configs and a student's confirmed awards — the inputs
-// `buildInvoicePreview` (see `preview.ts`) needs to mirror what invoice generation actually does.
-// ---------------------------------------------------------------------------
-
-export async function fetchScholarshipDiscounts(): Promise<ScholarshipDiscount[]> {
-  return fetchAllOffsetPages(async (limit, offset) => {
-    const { data } = await api.GET("/api/finance/scholarship-discounts", {
-      params: { query: { is_active: "true", limit, offset } },
-    });
-    return {
-      rows: (data?.scholarship_discounts ?? []) as ScholarshipDiscount[],
-      total: data?.total ?? 0,
-    };
-  });
-}
-
-export async function fetchConfirmedAwards(studentId: string): Promise<Award[]> {
-  return fetchAllOffsetPages(async (limit, offset) => {
-    const { data } = await api.GET("/api/finance/scholarship-discounts/awards", {
-      params: { query: { student_id: studentId, status: "confirmed", limit, offset } },
-    });
-    return { rows: (data?.awards ?? []) as Award[], total: data?.total ?? 0 };
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Student search — backs the sample-student picker, same search-as-you-type shape as
+// Student search — backs the finance reports' student picker, same search-as-you-type shape as
 // `admin/audit/ActorFilterField`'s actor picker (there is no combobox primitive in `@studafy/ui`).
 // ---------------------------------------------------------------------------
 

@@ -19,6 +19,9 @@ import {
   gradebookEntryQuerySchema,
   gradebookIdParamSchema,
   gradebookSchema,
+  gradeRevisionSchema,
+  requestRevisionBodySchema,
+  revisionIdParamSchema,
   submissionIdParamSchema,
   submitBodySchema,
   unlockBodySchema,
@@ -36,12 +39,18 @@ import {
   submitSubmission,
   unlockSubmission,
 } from "../grade-entry-service";
+import {
+  getLatestRevisionsForGradebook,
+  requestRevision,
+  withdrawRevision,
+} from "../grade-revision-service";
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { RedisClient } from "../../../redis";
 import type { GradebookRow } from "../config/gradebook-config-service";
 import type { GradeRow, GradeSubmissionWithGrades } from "../grade-entry-service";
+import type { GradeRevisionRow } from "../grade-revision-service";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -97,7 +106,36 @@ function toGradeResponse(row: GradeRow): {
   };
 }
 
-function toSubmissionResponse(row: GradeSubmissionWithGrades & { grades: GradeRow[] }): {
+function toRevisionResponse(row: GradeRevisionRow): {
+  id: string;
+  grade_submission_id: string;
+  status: GradeRevisionRow["status"];
+  reason: string;
+  changes: GradeRevisionRow["changes"];
+  rejection_reason: string | null;
+  requested_by_user_id: string;
+  requested_at: string;
+  decided_by_user_id: string | null;
+  decided_at: string | null;
+} {
+  return {
+    id: row.id,
+    grade_submission_id: row.grade_submission_id,
+    status: row.status,
+    reason: row.reason,
+    changes: row.changes,
+    rejection_reason: row.rejection_reason,
+    requested_by_user_id: row.requested_by_user_id,
+    requested_at: row.requested_at.toISOString(),
+    decided_by_user_id: row.decided_by_user_id,
+    decided_at: row.decided_at?.toISOString() ?? null,
+  };
+}
+
+function toSubmissionResponse(
+  row: GradeSubmissionWithGrades & { grades: GradeRow[] },
+  latestRevision: GradeRevisionRow | null = null,
+): {
   id: string;
   gradebook_id: string;
   student_id: string;
@@ -110,6 +148,7 @@ function toSubmissionResponse(row: GradeSubmissionWithGrades & { grades: GradeRo
   created_at: string;
   updated_at: string;
   grades: ReturnType<typeof toGradeResponse>[];
+  latest_revision: ReturnType<typeof toRevisionResponse> | null;
 } {
   return {
     id: row.id,
@@ -124,6 +163,7 @@ function toSubmissionResponse(row: GradeSubmissionWithGrades & { grades: GradeRo
     created_at: row.created_at.toISOString(),
     updated_at: row.updated_at.toISOString(),
     grades: row.grades.map(toGradeResponse),
+    latest_revision: latestRevision ? toRevisionResponse(latestRevision) : null,
   };
 }
 
@@ -301,6 +341,50 @@ const unlockSubmissionRoute = createRoute({
   ),
 });
 
+const requestRevisionRoute = createRoute({
+  method: "post",
+  path: "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/revisions",
+  tags: ["Grade Workflow"],
+  operationId: "requestGradeRevision",
+  summary: "Request a correction to published grades",
+  description:
+    "Files corrected scores for a published submission, with a reason. The published grades are " +
+    "unchanged — students and parents keep seeing them — until a school admin or principal " +
+    "approves the revision from the approvals queue. Only the assigned teacher may file, and at " +
+    "most one revision per submission may be pending (409 otherwise).",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema.merge(submissionIdParamSchema),
+    body: {
+      required: true,
+      content: { "application/json": { schema: requestRevisionBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 201: { description: "The pending revision.", schema: gradeRevisionSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const withdrawRevisionRoute = createRoute({
+  method: "patch",
+  path: "/api/grades/gradebooks/{gradebookId}/revisions/{revisionId}/withdraw",
+  tags: ["Grade Workflow"],
+  operationId: "withdrawGradeRevision",
+  summary: "Withdraw a pending grade revision",
+  description:
+    "Takes back a pending correction before it is decided, so the teacher can file a new one. " +
+    "Only the assigned teacher may withdraw.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema.merge(revisionIdParamSchema),
+  },
+  responses: standardResponses(
+    { 200: { description: "The withdrawn revision.", schema: gradeRevisionSchema } },
+    [401, 403, 404, 409, 500],
+  ),
+});
+
 // ---------------------------------------------------------------------------
 // Route factory
 // ---------------------------------------------------------------------------
@@ -363,6 +447,24 @@ export function gradeEntryRoutes(
     auditAction("update", "grade_submissions"),
   );
 
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/revisions",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/revisions",
+    auditAction("insert", "grade_revisions"),
+  );
+
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/revisions/:revisionId/withdraw",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/revisions/:revisionId/withdraw",
+    auditAction("update", "grade_revisions"),
+  );
+
   // --- Resolve the gradebook for a class ---
 
   routes.openapi(resolveGradebookRoute, async (c) => {
@@ -384,17 +486,25 @@ export function gradeEntryRoutes(
     const { gradebookId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const submissions = await withTenantTx(database, tenantFrom(c), async (tx) => {
+    const { submissions, revisions } = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
       await assertCanManageGradebook(tx, gradebook.class_id);
-      return createAssessment(tx, auth.schoolId, gradebookId, gradebook.class_id, {
-        label: body.label,
-        maxScore: body.max_score,
-        weight: body.weight ?? 1,
-      });
+      return {
+        submissions: await createAssessment(tx, auth.schoolId, gradebookId, gradebook.class_id, {
+          label: body.label,
+          maxScore: body.max_score,
+          weight: body.weight ?? 1,
+        }),
+        revisions: await getLatestRevisionsForGradebook(tx, auth.schoolId, gradebookId),
+      };
     });
 
-    return c.json({ submissions: submissions.map(toSubmissionResponse) }, 200);
+    return c.json(
+      {
+        submissions: submissions.map((s) => toSubmissionResponse(s, revisions.get(s.id) ?? null)),
+      },
+      200,
+    );
   });
 
   // --- Get gradebook entry grid ---
@@ -404,17 +514,25 @@ export function gradeEntryRoutes(
     const { gradebookId } = c.req.valid("param");
     const { status } = c.req.valid("query");
 
-    const submissions = await withTenantTx(database, tenantFrom(c), async (tx) => {
+    const { submissions, revisions } = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
       await assertCanManageGradebook(tx, gradebook.class_id);
       // Seed a draft submission per enrolled student so the grid always reflects the full
       // roster — the entry screen shows every student even before the first assessment exists,
       // and a `status` filter still narrows the result.
       await ensureDraftSubmissions(tx, auth.schoolId, gradebookId, gradebook.class_id);
-      return getSubmissionsWithGrades(tx, auth.schoolId, gradebookId, status);
+      return {
+        submissions: await getSubmissionsWithGrades(tx, auth.schoolId, gradebookId, status),
+        revisions: await getLatestRevisionsForGradebook(tx, auth.schoolId, gradebookId),
+      };
     });
 
-    return c.json({ submissions: submissions.map(toSubmissionResponse) }, 200);
+    return c.json(
+      {
+        submissions: submissions.map((s) => toSubmissionResponse(s, revisions.get(s.id) ?? null)),
+      },
+      200,
+    );
   });
 
   // --- Bulk update grades ---
@@ -508,6 +626,37 @@ export function gradeEntryRoutes(
     });
 
     return c.json(toSubmissionResponse({ ...submission, grades: [] }), 200);
+  });
+
+  // --- Request a correction to published grades ---
+
+  routes.openapi(requestRevisionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId, submissionId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const revision = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return requestRevision(tx, auth.schoolId, gradebookId, submissionId, auth.userId, body);
+    });
+
+    return c.json(toRevisionResponse(revision), 201);
+  });
+
+  // --- Withdraw a pending revision ---
+
+  routes.openapi(withdrawRevisionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId, revisionId } = c.req.valid("param");
+
+    const revision = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return withdrawRevision(tx, auth.schoolId, gradebookId, revisionId);
+    });
+
+    return c.json(toRevisionResponse(revision), 200);
   });
 
   return routes;

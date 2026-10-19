@@ -66,7 +66,24 @@ export interface LoggerOptions {
   destination?: (line: string) => void;
   /** Clock for the `time` field. Injected by tests for deterministic output. */
   now?: () => number;
+  /**
+   * Called with every record after its line has been written — an addition to stdout, never a
+   * replacement for it. Receives the call-site fields and the accumulated bindings as live objects,
+   * so a consumer (error monitoring's log forwarding, wired in index.ts) can read `err` as the
+   * actual Error rather than its serialized shape. When unset, bindings are never materialized as
+   * an object, so a logger without an observer pays nothing for this seam.
+   */
+  observer?: LogObserver;
 }
+
+export type LogObserver = (
+  level: LogLevel,
+  msg: string | undefined,
+  fields: LogFields,
+  bindings: LogFields,
+) => void;
+
+const NO_FIELDS: LogFields = Object.freeze({});
 
 /**
  * Bun's process.stdout is a buffered FileSink: writes are ordered and synchronous from the caller's
@@ -126,8 +143,10 @@ function build(
   bindings: string,
   destination: (line: string) => void,
   now: () => number,
+  observer: LogObserver | undefined,
+  bindingFields: LogFields,
 ): Logger {
-  const method = (value: number): LogMethod => {
+  const method = (name: LogLevel, value: number): LogMethod => {
     // Resolved once, here. A disabled level is a no-op call — never a serialization, never an
     // allocation — which is what makes LOG_LEVEL free rather than merely cheap.
     if (value < threshold) return noop;
@@ -142,20 +161,37 @@ function build(
         `{"level":${value},"time":${now()}${bindings}${extra}` +
           `${msg === undefined ? "" : `,"msg":${JSON.stringify(msg)}`}}\n`,
       );
+      if (observer) {
+        try {
+          observer(name, msg, typeof a === "string" ? NO_FIELDS : a, bindingFields);
+        } catch {
+          // Same rule as fragment(): a log call must never break the request that made it.
+        }
+      }
     };
   };
 
   return {
     level,
-    trace: method(LOG_LEVELS.trace),
-    debug: method(LOG_LEVELS.debug),
-    info: method(LOG_LEVELS.info),
-    warn: method(LOG_LEVELS.warn),
-    error: method(LOG_LEVELS.error),
-    fatal: method(LOG_LEVELS.fatal),
+    trace: method("trace", LOG_LEVELS.trace),
+    debug: method("debug", LOG_LEVELS.debug),
+    info: method("info", LOG_LEVELS.info),
+    warn: method("warn", LOG_LEVELS.warn),
+    error: method("error", LOG_LEVELS.error),
+    fatal: method("fatal", LOG_LEVELS.fatal),
     // The cheap merge: the parent's bindings are already a serialized string, so a child costs one
-    // concat of its own fragment and never re-serializes the parent's.
-    child: (extra) => build(level, threshold, bindings + fragments(extra), destination, now),
+    // concat of its own fragment and never re-serializes the parent's. The object form is only
+    // kept up to date when an observer is there to read it.
+    child: (extra) =>
+      build(
+        level,
+        threshold,
+        bindings + fragments(extra),
+        destination,
+        now,
+        observer,
+        observer ? { ...bindingFields, ...extra } : NO_FIELDS,
+      ),
   };
 }
 
@@ -167,5 +203,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
     fragments(options.base ?? {}),
     options.destination ?? writeToStdout,
     options.now ?? Date.now,
+    options.observer,
+    options.observer ? (options.base ?? NO_FIELDS) : NO_FIELDS,
   );
 }

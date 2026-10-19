@@ -6,7 +6,9 @@ That answers _"which school?"_. ST-085 adds the second boundary the academic tab
 rows within the school may **this** user see?"_ — as a set of **RESTRICTIVE** `SELECT` policies named
 `role_scope_visibility`, installed by
 [`db/migrations/000037_add_role_scope_rls_policies.sql`](../../db/migrations/000037_add_role_scope_rls_policies.sql)
-(canonical copy in [`db/policies/role_scope_visibility.sql`](../../db/policies/role_scope_visibility.sql)).
+(reference copy of the 000037 policies in
+[`db/policies/role_scope_visibility.sql`](../../db/policies/role_scope_visibility.sql); the migrations
+are authoritative — later tables and roles change the set, see [Per-table scoping](#per-table-scoping)).
 
 A restrictive policy ANDs with the permissive tenant policy, so a row is readable only when **both**
 boundaries agree: the school matches `app.school_id`, and the caller's role/relationship grants access.
@@ -17,17 +19,28 @@ the academic domain.
 
 ## Role model
 
-There is no `PARENT` enum role. The four scopes are derived from the database, never from a client
-claim:
+`PARENT` has been an enum role since
+[migration 000043](../../db/migrations/000043_add_parent_role.sql), but the parent scope does not
+depend on it: like every scope, it is derived from database relationships, never from a client claim:
 
-| Scope       | Derived from                                                                                             | Sees                                                                                                                   |
-| ----------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Admin**   | `app.user_roles.role IN ('ORG_ADMIN','SUPER_ADMIN','PRINCIPAL')` (PRINCIPAL since migration 000120)      | every row in the school (escape hatch)                                                                                 |
-| **Teacher** | `app.teachers` row, matched to a class via `classes.lead_teacher_id` **or** `timetable_slots.teacher_id` | their classes and those classes' students, materials, assessments, grades, attendance                                  |
-| **Student** | `app.students.user_id`                                                                                   | their own profile, enrollments, submissions, released grades/results, attendance; their classes' materials/assessments |
-| **Parent**  | `app.parent_child_links.parent_user_id`                                                                  | the same, for each linked child                                                                                        |
+| Scope                  | Derived from                                                                                             | Sees                                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Admin**              | `app.user_roles.role IN ('ORG_ADMIN','SUPER_ADMIN','PRINCIPAL')` (PRINCIPAL since migration 000120)      | every row in the school (escape hatch)                                                                                  |
+| **Teacher**            | `app.teachers` row, matched to a class via `classes.lead_teacher_id` **or** `timetable_slots.teacher_id` | their classes and those classes' students, materials, assessments, grades, attendance                                   |
+| **Student**            | `app.students.user_id`                                                                                   | their own profile, enrollments, submissions, released grades/results, attendance; their classes' materials/assessments  |
+| **Parent**             | `app.parent_child_links.parent_user_id`                                                                  | the same, for each linked child                                                                                         |
+| **Attendance officer** | `app.user_roles.role = 'ATTENDANCE_OFFICER'` (role added in 000132, scope in 000133)                     | every class, roster, timetable slot, and attendance row in the school — but no grades, exams, materials, or assignments |
 
-`INSTRUCTOR` and `TEACHING_ASSISTANT` are both "teacher"; `GUEST` and `SUPPORT_AGENT` receive no
+`INSTRUCTOR` is "teacher". `PRINCIPAL` ([000119](../../db/migrations/000119_add_principal_role.sql))
+gets the admin escape hatch by being added to `app.current_user_is_school_admin()` in
+[000120](../../db/migrations/000120_principal_school_wide_visibility.sql). `ATTENDANCE_OFFICER`
+([000132](../../db/migrations/000132_add_attendance_officer_role.sql)) deliberately does **not**:
+[000133](../../db/migrations/000133_attendance_officer_visibility.sql) re-points only the
+`role_scope_visibility` policies an attendance taker needs (`students`, `classes`, `timetable_slots`,
+`enrollments`, `courses`, `subjects`, `attendance_sessions`, `attendance_records` and every leaf,
+`attendance_record_versions`) at officer-aware predicates (`app.can_read_student_for_attendance`,
+`app.can_read_class_for_attendance`) and amends `app.create_attendance_partitions` to match.
+`GUEST` and `SUPPORT_AGENT` receive no
 academic row scope here (they see nothing beyond what tenant isolation alone allows, i.e. nothing on
 these tables unless they also hold one of the scopes above).
 
@@ -96,6 +109,21 @@ there would turn a benign userless read into a 500. With `NULL`, every relations
 | `attendance_sessions`                                                | `can_read_class(class_id)`                                                                         | partitioned                                                   |
 | `attendance_records`                                                 | `can_read_student(student_id)`                                                                     | partitioned                                                   |
 
+000037 covered the tables above (000133 later widened several of them for the attendance officer).
+Tables created afterwards install their own `role_scope_visibility` policy in the migration that
+creates them:
+
+| Table                        | Migration | Predicate                                                                                             |
+| ---------------------------- | --------- | ----------------------------------------------------------------------------------------------------- |
+| `assignment_attachments`     | 000049    | `can_read_assignment(assignment_id)` — `can_read_class` of the assignment's class                     |
+| `submission_attachments`     | 000050    | `can_read_submission(submission_id)` — admin, the assignment's teacher, or the related student/parent |
+| `attendance_record_versions` | 000054    | `can_read_student(student_id)` (officer-aware since 000133)                                           |
+| `attendance_alert_logs`      | 000056    | `can_read_student(student_id)`                                                                        |
+| `student_term_summaries`     | 000065    | `is_related_to_student(student_id)` — the student and linked parents only                             |
+| `teacher_term_comments`      | 000097    | `can_read_student(student_id)`                                                                        |
+| `grade_revisions`            | 000131    | `can_read_grade_revision(grade_submission_id)` — admin or the gradebook's teacher                     |
+| `grade_revision_items`       | 000131    | `can_read_grade_revision_item(grade_revision_id)` — follows the parent revision                       |
+
 ### Release gate
 
 Per the grades workflow, only a `published` grade submission / exam result is visible to students and
@@ -150,4 +178,4 @@ unchanged; the policy adds a bounded, index-backed predicate evaluation per cand
 and the ≤10% overhead target are guarded by
 [`apps/api/tests/security/row-scope.test.ts`](../../apps/api/tests/security/row-scope.test.ts) (an
 `enable_seqscan = off` plan check plus a warmed timing budget) and the standing
-[`bun run db:test:rls-coverage`](./rls-policy-coverage.md) audit.
+[`bun run db:test:rls-coverage`](../testing/rls-policy-coverage.md) audit.

@@ -3,7 +3,7 @@ import { PERMISSIONS } from "@studafy/constants";
 import { Button, Card, Input, Select, Tabs, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
@@ -519,9 +519,6 @@ export default function StudentProfilePage() {
 
   return (
     <>
-      <p className="students-profile__back">
-        <Link to="/portal/admin/students">{t("adminPeople.students.backToStudents")}</Link>
-      </p>
       <h1>{fullName(student) || t("adminPeople.students.profile.studentFallback")}</h1>
 
       <Tabs defaultValue="profile">

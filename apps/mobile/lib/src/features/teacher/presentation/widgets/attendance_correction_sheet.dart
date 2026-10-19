@@ -5,14 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/api/generated/models/attendance_record.dart';
-import '../../../../core/api/generated/models/attendance_record_status.dart';
 import '../../../../core/api/generated/models/correct_attendance_record_body.dart';
 import '../../../../core/api/generated/models/correct_attendance_record_body_status.dart';
-import '../../../../core/api/generated/models/corrected_attendance_record.dart';
 import '../../../../core/auth/auth_providers.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
-import '../../application/attendance_sync_queue.dart';
-import '../../application/attendance_taking_providers.dart';
 import '../../domain/attendance_taking.dart';
 import 'attendance_status_chip.dart';
 
@@ -20,26 +16,31 @@ import 'attendance_status_chip.dart';
 /// `PATCH /api/attendance/records/{recordId}`.
 ///
 /// Corrections are online-only — they are rare, need a written reason, and their conflict
-/// semantics don't fit a replay queue — so this does not touch the outbox. It updates the local
-/// records cache on success so the change shows without the (non-existent) "list records" call.
+/// semantics don't fit a replay queue. Callers refresh their own data once [show] resolves true.
 class AttendanceCorrectionSheet extends ConsumerStatefulWidget {
   const AttendanceCorrectionSheet({
     required this.record,
     required this.studentLabel,
-    required this.scope,
+    this.windowExpiredMessageKey = _defaultWindowExpiredKey,
     super.key,
   });
 
+  static const _defaultWindowExpiredKey =
+      'teacher.attendance.correction.windowExpired';
+
   final AttendanceRecord record;
   final String studentLabel;
-  final AttendanceScope scope;
+
+  /// Translation key shown for `ATTENDANCE_CORRECTION_WINDOW_EXPIRED`, so a caller can point the
+  /// user at who can still make the change.
+  final String windowExpiredMessageKey;
 
   /// Opens the sheet. Resolves true once a correction has been saved.
   static Future<bool?> show(
     BuildContext context, {
     required AttendanceRecord record,
     required String studentLabel,
-    required AttendanceScope scope,
+    String windowExpiredMessageKey = _defaultWindowExpiredKey,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -47,19 +48,22 @@ class AttendanceCorrectionSheet extends ConsumerStatefulWidget {
       builder: (_) => AttendanceCorrectionSheet(
         record: record,
         studentLabel: studentLabel,
-        scope: scope,
+        windowExpiredMessageKey: windowExpiredMessageKey,
       ),
     );
   }
 
   @override
-  ConsumerState<AttendanceCorrectionSheet> createState() => _AttendanceCorrectionSheetState();
+  ConsumerState<AttendanceCorrectionSheet> createState() =>
+      _AttendanceCorrectionSheetState();
 }
 
-class _AttendanceCorrectionSheetState extends ConsumerState<AttendanceCorrectionSheet> {
+class _AttendanceCorrectionSheetState
+    extends ConsumerState<AttendanceCorrectionSheet> {
   final _reasonController = TextEditingController();
-  late final AttendanceMarkStatus _current =
-      AttendanceMarkStatus.fromRecord(widget.record.status);
+  late final AttendanceMarkStatus _current = AttendanceMarkStatus.fromRecord(
+    widget.record.status,
+  );
 
   AttendanceMarkStatus? _choice;
   int _minutesLate = kMinMinutesLate;
@@ -80,13 +84,16 @@ class _AttendanceCorrectionSheetState extends ConsumerState<AttendanceCorrection
   }
 
   bool get _canSave =>
-      !_submitting && _choice != null && _reasonController.text.trim().isNotEmpty;
+      !_submitting &&
+      _choice != null &&
+      _reasonController.text.trim().isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final choices =
-        AttendanceMarkStatus.values.where((status) => status != _current).toList();
+    final choices = AttendanceMarkStatus.values
+        .where((status) => status != _current)
+        .toList();
 
     return SafeArea(
       child: Padding(
@@ -95,7 +102,10 @@ class _AttendanceCorrectionSheetState extends ConsumerState<AttendanceCorrection
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('teacher.attendance.correction.title'.tr(), style: theme.textTheme.titleMedium),
+            Text(
+              'teacher.attendance.correction.title'.tr(),
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: AppSpacing.space4),
             Row(
               children: [
@@ -153,7 +163,9 @@ class _AttendanceCorrectionSheetState extends ConsumerState<AttendanceCorrection
               const SizedBox(height: AppSpacing.space8),
               Text(
                 _errorKey!.tr(),
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
             ],
             const SizedBox(height: AppSpacing.space12),
@@ -182,19 +194,19 @@ class _AttendanceCorrectionSheetState extends ConsumerState<AttendanceCorrection
     });
 
     try {
-      final corrected = await ref.read(apiClientProvider).attendance.correctAttendanceRecord(
-        recordId: widget.record.id,
-        body: CorrectAttendanceRecordBody(
-          status: _toWireStatus(choice),
-          reason: _reasonController.text.trim(),
-          minutesLate: choice == AttendanceMarkStatus.late ? _minutesLate : null,
-        ),
-      );
-
       await ref
-          .read(attendanceSyncQueueProvider)
-          .replaceCachedRecord(widget.record.attendanceSessionId, _asRecord(corrected));
-      ref.invalidate(attendanceRegisterProvider(widget.scope));
+          .read(apiClientProvider)
+          .attendance
+          .correctAttendanceRecord(
+            recordId: widget.record.id,
+            body: CorrectAttendanceRecordBody(
+              status: _toWireStatus(choice),
+              reason: _reasonController.text.trim(),
+              minutesLate: choice == AttendanceMarkStatus.late
+                  ? _minutesLate
+                  : null,
+            ),
+          );
 
       if (mounted) Navigator.of(context).pop(true);
     } on DioException catch (error) {
@@ -210,34 +222,26 @@ class _AttendanceCorrectionSheetState extends ConsumerState<AttendanceCorrection
     }
   }
 
-  CorrectAttendanceRecordBodyStatus _toWireStatus(AttendanceMarkStatus status) => switch (status) {
+  CorrectAttendanceRecordBodyStatus _toWireStatus(
+    AttendanceMarkStatus status,
+  ) => switch (status) {
     AttendanceMarkStatus.present => CorrectAttendanceRecordBodyStatus.present,
     AttendanceMarkStatus.absent => CorrectAttendanceRecordBodyStatus.absent,
     AttendanceMarkStatus.late => CorrectAttendanceRecordBodyStatus.valueLate,
     AttendanceMarkStatus.excused => CorrectAttendanceRecordBodyStatus.excused,
   };
 
-  AttendanceRecord _asRecord(CorrectedAttendanceRecord corrected) => AttendanceRecord(
-    id: corrected.id,
-    schoolId: corrected.schoolId,
-    attendanceSessionId: corrected.attendanceSessionId,
-    studentId: corrected.studentId,
-    status: AttendanceRecordStatus.fromJson(corrected.status.json ?? 'present'),
-    minutesLate: corrected.minutesLate,
-    reason: corrected.reason,
-    recordedByUserId: corrected.recordedByUserId,
-    createdAt: corrected.createdAt,
-  );
-
   String _errorKeyFor(DioException error) {
     switch (error.apiError?.code) {
       case 'ATTENDANCE_CORRECTION_WINDOW_EXPIRED':
-        return 'teacher.attendance.correction.windowExpired';
+        return widget.windowExpiredMessageKey;
       case 'ATTENDANCE_RECORD_FORBIDDEN':
       case 'ATTENDANCE_RECORD_NOT_FOUND':
         return 'teacher.attendance.correction.forbidden';
       case 'ATTENDANCE_CORRECTION_NO_CHANGE':
         return 'teacher.attendance.correction.noChange';
+      case 'ATTENDANCE_CORRECTION_NOT_CORRECTABLE':
+        return 'teacher.attendance.correction.notCorrectable';
     }
     return error.apiError == null
         ? 'teacher.attendance.offline'
@@ -256,10 +260,15 @@ class _MinutesLateField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text('attendance.status.late'.tr(), style: Theme.of(context).textTheme.labelMedium),
+        Text(
+          'attendance.status.late'.tr(),
+          style: Theme.of(context).textTheme.labelMedium,
+        ),
         const SizedBox(width: AppSpacing.space12),
         IconButton(
-          onPressed: minutes > kMinMinutesLate ? () => onChanged(minutes - 1) : null,
+          onPressed: minutes > kMinMinutesLate
+              ? () => onChanged(minutes - 1)
+              : null,
           icon: const Icon(Icons.remove),
           visualDensity: VisualDensity.compact,
         ),
@@ -269,7 +278,10 @@ class _MinutesLateField extends StatelessWidget {
           icon: const Icon(Icons.add),
           visualDensity: VisualDensity.compact,
         ),
-        Text('teacher.attendance.minutesUnit'.tr(), style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          'teacher.attendance.minutesUnit'.tr(),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ],
     );
   }

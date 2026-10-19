@@ -32,9 +32,9 @@ human submits.
 
 - **No ads, analytics, attribution or sign-in SDK is present.** No package is removed or replaced.
 - **Sign-in uses no SDK.** It is OAuth in a system browser (`lib/src/core/auth/oauth_browser.dart`),
-  built from `url_launcher` and `app_links`: `SFSafariViewController` on iOS and the default
-  browser app on Android (ST-310; this line previously said ASWebAuthenticationSession and Custom
-  Tabs, which the code never used). No `google_sign_in`, Facebook or other identity SDK controls
+  `ASWebAuthenticationSession` on iOS (via `flutter_web_auth_2`, which captures the
+  `studafy://auth/callback` redirect itself; `SFSafariViewController` silently dropped it) and the
+  default browser app plus an `app_links` deep link on Android. No `google_sign_in`, Facebook or other identity SDK controls
   access to the app.
 - **AAID.** None of the 43 Google and Sentry Maven artifacts the app resolves declares `AD_ID`, and
   `play-services-ads-identifier` is not among them. The app's manifest also strips the permission
@@ -68,8 +68,11 @@ Status values:
 | `json_annotation` | 4.12.0 | JSON codegen annotations | None | Eligible, on-device only |
 | `web_socket_channel` | 3.0.3 | Realtime gateway | Studafy realtime gateway only | Eligible |
 | `flutter_secure_storage` | 9.2.4 | Token storage (Keystore / Keychain) | None | Eligible, on-device only |
+| `shared_preferences` | 2.5.5 | Reinstall marker, so tokens a previous install left in the Keychain are dropped | None | Eligible, on-device only |
 | `app_links` | 6.4.1 | OAuth callback deep link | None | Eligible, on-device only |
 | `url_launcher` | 6.3.2 | Opens the system browser (sign-in, downloads) | None. The browser makes the requests | Eligible |
+| `flutter_web_auth_2` | 5.1.0 | iOS sign-in sheet (`ASWebAuthenticationSession`) | None. The system sheet makes the requests | Eligible |
+| `flutter_svg` | 2.3.0 | Renders bundled SVG assets (sign-in provider logos) | None | Eligible, on-device only |
 | `easy_localization` | 3.0.8 | Translations from bundled assets | None | Eligible, on-device only |
 | `intl` | 0.20.2 | Formatting | None | Eligible, on-device only |
 | `firebase_core` | 3.15.2 | Firebase bootstrap | Firebase Installation ID (FID), app-scoped | Eligible |
@@ -88,9 +91,7 @@ Status values:
 | `flutter_pdfview` | 1.4.5 | PDF rendering (`AndroidPdfViewer` / PDFKit) | None | Eligible, on-device only |
 
 Dev dependencies such as `integration_test` are not in this table. Flutter leaves dev-dependency
-plugins out of release builds. `shared_preferences` is a dev dependency too, but `easy_localization`
-also depends on it to store the chosen locale, so it ships in release. It stores data on the device
-only.
+plugins out of release builds.
 
 ## Native Android libraries
 

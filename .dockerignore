@@ -13,7 +13,11 @@
 .gitignore
 .claude
 .serena
+.sisyphus
+.opencode
+.vscode
 graphify-out
+**/.DS_Store
 
 # Dependency + build output (reinstalled and rebuilt inside the image; never trusted from host)
 **/node_modules
@@ -40,6 +44,8 @@ apps/mobile/.metadata
 docs/*
 !docs/help
 infra/terraform
+infra/load-tests
+infra/tools
 .github
 
 # Test/coverage output and local env files — never belongs in a build context

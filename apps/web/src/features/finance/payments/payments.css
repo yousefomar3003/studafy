@@ -41,12 +41,6 @@
   margin-bottom: var(--space-16);
 }
 
-.payments-list__header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-12);
-}
-
 .payments-list__toolbar {
   display: flex;
   align-items: flex-end;
@@ -62,10 +56,6 @@
 }
 
 /* --- Form --- */
-
-.payments-form__back {
-  margin-bottom: var(--space-8);
-}
 
 .payments-form {
   display: flex;
@@ -89,7 +79,7 @@
   justify-content: flex-end;
 }
 
-/* --- Invoice picker (mirrors fees/StudentPickerField's `.fee-builder__student-*`) --- */
+/* --- Invoice picker (same search-as-you-type shape as reports/StudentPickerField) --- */
 
 .payments-form__invoice-selected {
   display: flex;

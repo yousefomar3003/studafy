@@ -233,6 +233,7 @@ export async function correctAttendanceRecord(
     SELECT (
       app.current_user_is_school_admin()
       OR app.teaches_class(${subject.class_id}::uuid)
+      OR app.current_user_is_attendance_officer()
     ) AS allowed
   `;
   if (!scope?.allowed) {

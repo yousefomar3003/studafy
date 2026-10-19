@@ -6,6 +6,7 @@ import '../application/parent_providers.dart';
 import 'widgets/child_summary.dart';
 import 'widgets/child_switcher.dart';
 import 'widgets/parent_notifications_card.dart';
+import '../../../design/layout/bottom_inset_padding.dart';
 
 /// The parent home tab: a switcher across the parent's linked children, the selected child's
 /// per-term summary (attendance, latest grades, fees due), and the combined notifications feed.
@@ -26,7 +27,7 @@ class ParentHomeScreen extends ConsumerWidget {
           ..invalidate(parentNotificationsProvider);
       },
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.space16),
+        padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
         children: const [
           ChildSwitcher(),
           SizedBox(height: AppSpacing.space16),

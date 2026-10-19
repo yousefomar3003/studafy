@@ -11,9 +11,9 @@
     "SUPER_ADMIN": "Super admin",
     "ORG_ADMIN": "Org admin",
     "PRINCIPAL": "Principal",
+    "ATTENDANCE_OFFICER": "Attendance officer",
     "FINANCE": "Finance",
     "INSTRUCTOR": "Instructor",
-    "TEACHING_ASSISTANT": "Teaching assistant",
     "STUDENT": "Student",
     "PARENT": "Parent",
     "GUEST": "Guest",
@@ -30,8 +30,6 @@
     "admissionNumberRequired": "Admission number is required",
     "dateInvalid": "Enter a valid date",
     "parentRequired": "Select a parent",
-    "expiryMin": "Must be at least 1 day",
-    "expiryMax": "Must be 365 days or fewer",
     "recipientInvalid": "Invalid email address",
     "recipientsMin": "Add at least one recipient",
     "recipientsMax": "Maximum 5,000 recipients per batch"
@@ -47,6 +45,7 @@
       "title": "Users",
       "description": "Invite, edit, and manage access for everyone in your school.",
       "newUser": "New user",
+      "importTitle": "Import users",
       "searchLabel": "Search",
       "searchPlaceholder": "Search by name or email",
       "createdBetween": "Created between",
@@ -78,7 +77,6 @@
     "create": {
       "title": "New user",
       "description": "Invite someone to this school.",
-      "displayNameHelper": "Optional — they can set this themselves once they accept the invite.",
       "submit": "Send invite",
       "invitedToast": "Invited {{email}}",
       "error": "Couldn't create user"
@@ -116,140 +114,38 @@
       "revokeDevice": "Revoke device"
     }
   },
-  "invitations": {
-    "status": {
-      "pending": "Pending",
-      "expired": "Expired",
-      "consumed": "Consumed",
-      "revoked": "Revoked"
+  "staff": {
+    "title": "Principal & finance accounts",
+    "description": "Give your principal and finance staff their own Studafy accounts.",
+    "invite": {
+      "title": "Invite a principal or finance staff member",
+      "signInNote": "We email them an invitation link. They open it and sign in with their Google or Microsoft (Outlook) account using this exact email address — there is no password to set.",
+      "submit": "Send invitation",
+      "sentToast": "Invitation sent to {{email}}.",
+      "error": "Couldn't send the invitation."
     },
-    "bulkStatus": {
-      "pending": "Pending",
-      "processing": "Processing",
-      "completed": "Completed",
-      "failed": "Failed"
-    },
-    "recipientStatus": {
-      "pending": "Pending",
-      "sent": "Sent",
-      "failed": "Failed"
-    },
-    "page": {
-      "title": "Invitations",
-      "guide": "Read the guide",
-      "tabInvitations": "Invitations",
-      "tabBulk": "Bulk invites"
-    },
-    "form": {
-      "email": "Email",
-      "role": "Role",
-      "expiresAfter": "Expires after (days)"
-    },
-    "board": {
-      "description": "Track and manage invite links: resend, revoke, or copy a link directly.",
-      "newInvitation": "New invitation",
-      "searchLabel": "Search",
-      "searchPlaceholder": "Search by email",
-      "roleFilter": "Role",
-      "statusFilter": "Status",
-      "allRoles": "All roles",
-      "allStatuses": "All statuses",
-      "resendError": "Couldn't resend invitation",
-      "resend": "Resend",
-      "revoke": "Revoke",
-      "caption": "Invitations",
-      "loadError": "Unable to load invitations.",
-      "empty": "No invitations match these filters.",
+    "list": {
+      "caption": "Principal and finance invitations",
       "columns": {
         "email": "Email",
         "role": "Role",
         "status": "Status",
-        "expires": "Expires",
         "sent": "Sent",
         "actions": "Actions"
       },
-      "importTitle": "Import invitations"
+      "resend": "Resend",
+      "revoke": "Revoke",
+      "resentToast": "A new invitation was sent to {{email}}.",
+      "revokedToast": "Invitation for {{email}} revoked.",
+      "actionError": "Couldn't update the invitation.",
+      "loadError": "Couldn't load invitations.",
+      "empty": "No principal or finance invitations yet."
     },
-    "create": {
-      "title": "New invitation",
-      "description": "Issue a one-time invite link for someone to join this school.",
-      "expiresHelper": "Optional — defaults to 7 days.",
-      "submit": "Send invite",
-      "invitedToast": "Invited {{email}}",
-      "error": "Couldn't create invitation"
-    },
-    "revoke": {
-      "title": "Revoke invitation",
-      "body": "The invite link stops working immediately. This cannot be undone from this screen — send a new invitation if they still need access.",
-      "confirm": "Revoke",
-      "successToast": "Invitation to {{email}} revoked",
-      "error": "Couldn't revoke invitation"
-    },
-    "link": {
-      "title": "Invitation sent",
-      "description": "{{email}} — share this link if the email doesn't arrive.",
-      "inviteLink": "Invite link",
-      "copyLink": "Copy link",
-      "copied": "Copied",
-      "done": "Done",
-      "copiedToast": "Link copied",
-      "copyError": "Couldn't copy the link",
-      "copyErrorDescription": "Select the link text and copy it manually."
-    },
-    "bulkBoard": {
-      "description": "Batches of invitations sent together, with per-recipient dispatch tracking.",
-      "newBulkInvite": "New bulk invite",
-      "caption": "Bulk invite batches",
-      "rowLabel": "Batch {{id}}",
-      "loadError": "Unable to load bulk invites.",
-      "empty": "No bulk invites yet.",
-      "viewProgress": "View progress",
-      "columns": {
-        "status": "Status",
-        "role": "Role",
-        "total": "Total",
-        "sent": "Sent",
-        "failed": "Failed",
-        "created": "Created",
-        "actions": "Actions"
-      }
-    },
-    "bulkModal": {
-      "title": "Bulk invite",
-      "description": "Invite many people at once. Each recipient is tracked and retriable individually.",
-      "recipients": "Recipients",
-      "placeholder": "One email per line, or separated by commas",
-      "detected_one": "{{count}} recipient detected. Maximum 5,000 per batch.",
-      "detected_other": "{{count}} recipients detected. Maximum 5,000 per batch.",
-      "expiresHelper": "Optional — defaults to 7 days for every recipient.",
-      "submit_zero": "Send invites",
-      "submit_one": "Send {{count}} invite",
-      "submit_other": "Send {{count}} invites",
-      "queuedToast": "Bulk invite queued",
-      "queuedDescription_one": "{{count}} recipient — dispatch is running in the background.",
-      "queuedDescription_other": "{{count}} recipients — dispatch is running in the background.",
-      "error": "Couldn't create bulk invite"
-    },
-    "progress": {
-      "title": "Bulk invite progress",
-      "description": "{{status}} — {{role}}",
-      "total": "Total",
-      "sent": "Sent",
-      "failed": "Failed",
-      "dispatchProgress": "Dispatch progress",
-      "filterByStatus": "Filter by status",
-      "allStatuses": "All statuses",
-      "retryFailed": "Retry failed",
-      "retryingToast": "Retrying failed recipients",
-      "retryError": "Couldn't retry",
-      "caption": "Recipients",
-      "loadError": "Unable to load recipients.",
-      "empty": "No recipients match this filter.",
-      "columns": {
-        "email": "Email",
-        "status": "Status",
-        "error": "Error"
-      }
+    "status": {
+      "pending": "Waiting for sign-in",
+      "consumed": "Active",
+      "expired": "Expired",
+      "revoked": "Revoked"
     }
   },
   "students": {
@@ -526,6 +422,77 @@
         "body": "The import failed while processing. No students were created from this file.",
         "startNew": "Start a new import"
       }
+    }
+  },
+  "members": {
+    "title": "School members",
+    "description": "Your students, teachers, parents and attendance officers. Everyone gets a Studafy ID automatically, and that ID is their username.",
+    "summary": "Members by role",
+    "kinds": {
+      "STUDENT": "Students",
+      "INSTRUCTOR": "Teachers",
+      "PARENT": "Parents",
+      "ATTENDANCE_OFFICER": "Attendance officers"
+    },
+    "idRange": "IDs {{prefix}}xxxxx",
+    "show": {
+      "STUDENT": "Show students",
+      "INSTRUCTOR": "Show teachers",
+      "PARENT": "Show parents",
+      "ATTENDANCE_OFFICER": "Show attendance officers"
+    },
+    "searchLabel": "Search",
+    "searchPlaceholder": "Name, email or ID (e.g. STU-100001)",
+    "caption": {
+      "STUDENT": "Students",
+      "INSTRUCTOR": "Teachers",
+      "PARENT": "Parents",
+      "ATTENDANCE_OFFICER": "Attendance officers"
+    },
+    "columns": {
+      "memberId": "ID",
+      "name": "Name",
+      "email": "Email",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "loadError": "Couldn't load members.",
+    "empty": "No one matches.",
+    "roleNames": {
+      "STUDENT": "Student",
+      "INSTRUCTOR": "Teacher",
+      "PARENT": "Parent",
+      "ATTENDANCE_OFFICER": "Attendance officer"
+    },
+    "signInNote": "They sign in on the mobile app with their ID as the username. The starting password is {{password}}, and they must choose their own password the first time they sign in. They can change it later in Settings.",
+    "username": "Username",
+    "startingPassword": "Starting password",
+    "mustChangeNote": "Give them these details. They'll be asked to choose their own password when they first sign in.",
+    "add": {
+      "open": "Add member",
+      "title": "Add a member",
+      "description": "No email needed: they sign in with their ID and a password.",
+      "role": "Role",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "admissionNumber": "Admission number",
+      "fullName": "Full name",
+      "employeeNumber": "Employee number",
+      "emailOptional": "Email (optional)",
+      "required": "Required",
+      "submit": "Create account",
+      "created": "Account created.",
+      "another": "Add another",
+      "done": "Done",
+      "error": "Couldn't create the account."
+    },
+    "reset": {
+      "action": "Reset password",
+      "title": "Reset password?",
+      "explain": "Their password goes back to {{password}} and they're signed out on every device. They'll have to choose a new password when they next sign in.",
+      "confirm": "Reset password",
+      "done": "Password reset. Username {{username}}, password {{password}}.",
+      "error": "Couldn't reset the password."
     }
   }
 }

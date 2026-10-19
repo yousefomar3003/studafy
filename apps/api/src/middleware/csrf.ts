@@ -63,6 +63,39 @@ function isInvitationActivationPath(path: string): boolean {
 }
 
 /**
+ * Mobile OAuth code exchange: POST /api/auth/oauth/{provider}/mobile-exchange, and its invitation
+ * twin POST /api/auth/invitations/{token}/oauth/{provider}/mobile-exchange.
+ *
+ * Exempt for the same reason as /api/auth/login: the credential is a single-use authorization code
+ * plus its PKCE verifier and state, all in the body, never a cookie the browser attaches on its own.
+ * The mobile app calls it before it holds an access token, so the Bearer exemption cannot cover it,
+ * and it has no double-submit cookie to echo. Matched structurally because the provider and token
+ * segments vary.
+ */
+function isMobileOAuthExchangePath(path: string): boolean {
+  const segments = path.split("/");
+  const isLogin =
+    segments.length === 6 &&
+    segments[0] === "" &&
+    segments[1] === "api" &&
+    segments[2] === "auth" &&
+    segments[3] === "oauth" &&
+    segments[4] !== "" &&
+    segments[5] === "mobile-exchange";
+  const isActivation =
+    segments.length === 8 &&
+    segments[0] === "" &&
+    segments[1] === "api" &&
+    segments[2] === "auth" &&
+    segments[3] === "invitations" &&
+    segments[4] !== "" &&
+    segments[5] === "oauth" &&
+    segments[6] !== "" &&
+    segments[7] === "mobile-exchange";
+  return isLogin || isActivation;
+}
+
+/**
  * Paths that never carry a browser-forged mutation worth protecting.
  *
  * /api/webhooks is exempt because ERPNext authenticates by HMAC signature over the request body,
@@ -125,6 +158,14 @@ const EXEMPT_PATHS = [
   // activation — no ambient cookie or header a cross-site page could ride on. Prefix match, so
   // this does not cover the Bearer-authenticated /api/account/deletion.
   "/api/account/deletion-requests",
+  // "Talk to us" sales inquiries, same posture as registration: no ambient authority a cross-site
+  // page could ride on, and a forged POST can only file an inquiry anyone could file directly.
+  "/api/inquiries",
+  // School sign-up applicants. Authenticated by the applicant session cookie, which is HttpOnly
+  // and SameSite=Strict exactly like the refresh cookie above, so no cross-site request carries it
+  // and the ambient-authority premise CSRF depends on never holds. The web app talks to the API
+  // cross-origin and so cannot echo a double-submit token for it anyway.
+  "/api/school-applications/me",
 ];
 
 type CsrfFailureReason = "missing_token" | "token_mismatch";
@@ -161,7 +202,11 @@ export function csrfMiddleware(options?: CsrfOptions): MiddlewareHandler {
     const path = c.req.path;
     const method = c.req.method;
 
-    if (isInvitationActivationPath(path) || exemptPaths.some((exempt) => path.startsWith(exempt))) {
+    if (
+      isInvitationActivationPath(path) ||
+      isMobileOAuthExchangePath(path) ||
+      exemptPaths.some((exempt) => path.startsWith(exempt))
+    ) {
       await next();
       return;
     }

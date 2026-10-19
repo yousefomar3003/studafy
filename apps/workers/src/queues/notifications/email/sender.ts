@@ -12,6 +12,8 @@ import type { RenderedEmail } from "./templates";
 
 export interface OutboundEmail extends RenderedEmail {
   to: string;
+  /** Where a reply goes instead of the From address, e.g. the prospect behind a sales inquiry. */
+  replyTo?: string;
 }
 
 export interface SentEmail {
@@ -80,6 +82,7 @@ export function createSesSender(
         new SendEmailCommand({
           FromEmailAddress: fromAddress,
           Destination: { ToAddresses: [email.to] },
+          ...(email.replyTo ? { ReplyToAddresses: [email.replyTo] } : {}),
           Content: {
             Simple: {
               Subject: { Data: email.subject, Charset: "UTF-8" },

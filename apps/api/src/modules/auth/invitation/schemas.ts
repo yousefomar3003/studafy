@@ -15,8 +15,9 @@ export const createInvitationBodySchema = z
       .enum([
         ROLES.ORG_ADMIN,
         ROLES.PRINCIPAL,
+        ROLES.FINANCE,
+        ROLES.ATTENDANCE_OFFICER,
         ROLES.INSTRUCTOR,
-        ROLES.TEACHING_ASSISTANT,
         ROLES.STUDENT,
         ROLES.GUEST,
       ])
@@ -183,8 +184,9 @@ export const invitationListQuerySchema = z
       .enum([
         ROLES.ORG_ADMIN,
         ROLES.PRINCIPAL,
+        ROLES.FINANCE,
+        ROLES.ATTENDANCE_OFFICER,
         ROLES.INSTRUCTOR,
-        ROLES.TEACHING_ASSISTANT,
         ROLES.STUDENT,
         ROLES.GUEST,
       ])
@@ -233,8 +235,9 @@ export const bulkInviteBodySchema = z
       .enum([
         ROLES.ORG_ADMIN,
         ROLES.PRINCIPAL,
+        ROLES.FINANCE,
+        ROLES.ATTENDANCE_OFFICER,
         ROLES.INSTRUCTOR,
-        ROLES.TEACHING_ASSISTANT,
         ROLES.STUDENT,
         ROLES.GUEST,
       ])

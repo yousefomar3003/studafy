@@ -21,7 +21,7 @@ crash.*.log
 override.tf
 override.tf.json
 *_override.tf
-*_override.tf.jzson
+*_override.tf.json
 .terraformrc
 terraform.rc
 # Variable files may carry secrets, so they are ignored by default. The committed
@@ -50,3 +50,6 @@ apps/api/openapi.json
 packages/api-client/src/generated-types.ts
 apps/mobile/lib/src/core/api/generated/
 *.lnk
+
+# macOS Finder metadata
+.DS_Store

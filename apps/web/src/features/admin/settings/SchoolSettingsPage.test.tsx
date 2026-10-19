@@ -166,7 +166,6 @@ describe("SchoolSettingsPage", () => {
     expect(await screen.findByDisplayValue("Jamie Admin")).toBeTruthy();
     expect(screen.getByDisplayValue("admin@example.edu")).toBeTruthy();
     expect(screen.getByDisplayValue("Africa/Casablanca")).toBeTruthy();
-    expect(screen.getByDisplayValue("7")).toBeTruthy();
     expect(screen.getByDisplayValue("75")).toBeTruthy();
     expect(screen.getByDisplayValue("25")).toBeTruthy();
     expect(screen.getByDisplayValue("48")).toBeTruthy();
@@ -212,6 +211,14 @@ describe("SchoolSettingsPage", () => {
       );
     });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  test("grading scheme no longer offers GPA", async () => {
+    await renderAsOrgAdmin(await loadPage());
+
+    fireEvent.click(await screen.findByRole("combobox", { name: "Grading scheme" }));
+    expect(screen.queryByRole("option", { name: /GPA/ })).toBeNull();
+    expect(screen.getByRole("option", { name: "Percentage (0-100%)" })).toBeTruthy();
   });
 
   test("grading scheme change asks for confirmation before saving", async () => {

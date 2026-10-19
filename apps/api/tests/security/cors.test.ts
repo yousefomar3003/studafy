@@ -18,7 +18,7 @@ const logger = createLogger({ destination: () => undefined });
 const tracker = createInflightTracker();
 
 /** On the default localhost allowlist that development/test falls back to. */
-const ALLOWED_ORIGIN = "http://localhost:5173";
+const ALLOWED_ORIGIN = "http://localhost:5180";
 const FOREIGN_ORIGIN = "https://malicious-site.com";
 
 function buildApp() {
@@ -118,9 +118,9 @@ describe("CORS middleware", () => {
       // The classic allowlist bypasses: a suffix-matched attacker subdomain, a prefixed hostname,
       // and a scheme swap. All three pass a naive `includes()` check.
       for (const origin of [
-        "http://localhost:5173.attacker.com",
-        "http://evil-localhost:5173",
-        "https://localhost:5173",
+        "http://localhost:5180.attacker.com",
+        "http://evil-localhost:5180",
+        "https://localhost:5180",
       ]) {
         const res = await buildApp().request("http://localhost/healthz", {
           headers: { Origin: origin },
@@ -131,7 +131,7 @@ describe("CORS middleware", () => {
 
     it("matches an allowlisted origin case-insensitively", async () => {
       const res = await buildApp().request("http://localhost/healthz", {
-        headers: { Origin: "HTTP://LOCALHOST:5173" },
+        headers: { Origin: "HTTP://LOCALHOST:5180" },
       });
 
       expect(res.headers.get("Access-Control-Allow-Origin")).toBeTruthy();

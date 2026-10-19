@@ -44,7 +44,7 @@ function invoiceSubtitle(hit: InvoiceSearchHit): string {
 }
 
 function userTitle(hit: UserSearchHit): string {
-  return hit.display_name ?? hit.email;
+  return hit.display_name ?? hit.email ?? hit.id;
 }
 
 /** Label translator — the palette passes its hook `t`; tests and other callers can omit it. */
@@ -86,7 +86,7 @@ export function buildResultGroups(result: GlobalSearchResult, t?: Translate): Se
         key: `users:${hit.id}`,
         title: userTitle(hit),
         subtitle: userSubtitle(hit, t),
-        href: `/portal/admin/users?q=${encodeURIComponent(hit.email)}`,
+        href: `/portal/admin/users?q=${encodeURIComponent(hit.email ?? hit.display_name ?? "")}`,
       })),
     },
     {

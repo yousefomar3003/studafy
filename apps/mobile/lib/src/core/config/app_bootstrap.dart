@@ -27,6 +27,7 @@ import '../push/push_providers.dart';
 import '../realtime/realtime_providers.dart';
 import 'app_config.dart';
 import 'app_environment.dart';
+import 'provider_retry_policy.dart';
 
 void bootstrapApp(AppEnvironment environment) {
   // Monitoring is set up inside this same guarded zone so both the zone's own error handler and
@@ -73,6 +74,7 @@ void bootstrapApp(AppEnvironment environment) {
 
       final authClient = MobileAuthClient(baseUrl: appConfig.apiBaseUrl.toString());
       final secureStore = SecureTokenStore();
+      await secureStore.discardIfReinstalled();
       final session = AuthSession(authClient: authClient, secureStore: secureStore);
       await session.restore();
 
@@ -82,6 +84,8 @@ void bootstrapApp(AppEnvironment environment) {
           path: AppLocales.translationsPath,
           fallbackLocale: AppLocales.fallback,
           child: ProviderScope(
+            // No automatic retries on 4xx, short backoff otherwise — see providerRetryPolicy.
+            retry: providerRetryPolicy,
             overrides: [
               appConfigProvider.overrideWithValue(appConfig),
               authSessionProvider.overrideWithValue(session),

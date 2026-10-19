@@ -2,11 +2,9 @@ import { PERMISSIONS } from "@studafy/constants";
 import { Table } from "@studafy/ui";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { ExportCsvButton } from "../../../components/ExportCsvButton";
 import { ImportCsvButton } from "../../../components/ImportCsvButton";
 import { api } from "../../../lib/api";
 import { usePermissions } from "../../../lib/auth";
-import { allRows } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import {
   CLASSES_KEY_ROOT,
@@ -18,7 +16,7 @@ import {
 } from "../school/queries";
 import { TermPicker, useTermSelection } from "../school/TermPicker";
 
-import type { ExportColumn, ImportSpec } from "../../../lib/data-transfer";
+import type { ImportSpec } from "../../../lib/data-transfer";
 import type { Class, Room, TeacherContact, Term } from "../../admin/timetable/queries";
 import type { Course } from "../school/queries";
 import type { components } from "@studafy/api-client";
@@ -167,23 +165,6 @@ export default function PrincipalClassesPage() {
   );
   const roomName = new Map((rooms.data ?? []).map((room) => [room.id, room.name]));
 
-  const exportColumns: ExportColumn<Class>[] = [
-    { header: t("principal.classes.columns.class"), value: (klass) => klass.code },
-    {
-      header: t("principal.classes.columns.teacher"),
-      value: (klass) => teacherName.get(klass.lead_teacher_id) ?? "",
-    },
-    {
-      header: t("principal.classes.columns.room"),
-      value: (klass) => roomName.get(klass.room_id) ?? "",
-    },
-    { header: t("principal.classes.columns.enrolled"), value: (klass) => enrolled.get(klass.id) },
-    { header: t("principal.classes.capacity"), value: (klass) => klass.capacity },
-    {
-      header: t("principal.classes.columns.status"),
-      value: (klass) => t(`principal.classes.status.${klass.status}`, klass.status),
-    },
-  ];
   const lookupsReady =
     !selection.isPending && teachers.isSuccess && rooms.isSuccess && courses.isSuccess;
 
@@ -195,12 +176,6 @@ export default function PrincipalClassesPage() {
       <div className="principal-school__filters">
         <TermPicker selection={selection} />
         <div className="principal-school__actions">
-          <ExportCsvButton
-            filename="classes"
-            columns={exportColumns}
-            getRows={() => Promise.resolve(allRows(classList))}
-            disabled={selection.isPending || classes.isPending}
-          />
           {canImport ? (
             <ImportCsvButton
               spec={classImportSpec(t, {

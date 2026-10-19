@@ -27,6 +27,13 @@
       "dependsOn": ["@studafy/api#generate", "^build"],
       "outputs": []
     },
+    // Local development servers (api, realtime, workers, web): long-running, never cached. Needs
+    // the dev Postgres/Redis up first (`docker compose up -d --wait postgres redis`).
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
     "build": {
       "dependsOn": ["^build", "generate"],
       "outputs": ["dist/**", "build/**"],

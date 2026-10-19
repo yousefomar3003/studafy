@@ -471,6 +471,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           s3Region: workerEnv.S3_REGION,
           s3Endpoint: workerEnv.S3_ENDPOINT,
           bucket: workerEnv.S3_APP_FILES_BUCKET,
+          stripeSecretKey: workerEnv.STRIPE_SECRET_KEY,
         },
         enqueueDsrJob,
       ),

@@ -8,6 +8,7 @@ describe("loadEnv", () => {
     expect(loadEnv({})).toEqual({
       NODE_ENV: "development",
       SERVICE_NAME: "workers",
+      RELEASE_VERSION: "unknown",
       METRICS_PORT: 9464,
       REDIS_URL: "redis://localhost:6379",
       SHUTDOWN_TIMEOUT_MS: 10_000,
@@ -17,7 +18,7 @@ describe("loadEnv", () => {
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
       CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
-      FRONTEND_URL: "http://localhost:5173",
+      FRONTEND_URL: "http://localhost:5180",
       EMAIL_MAX_RATE_PER_SECOND: 5,
       EMAIL_POLL_INTERVAL_MS: 1_000,
       EMAIL_BATCH_SIZE: 25,
@@ -38,6 +39,7 @@ describe("loadEnv", () => {
     ).toEqual({
       NODE_ENV: "test",
       SERVICE_NAME: "workers",
+      RELEASE_VERSION: "unknown",
       METRICS_PORT: 9464,
       REDIS_URL: "redis://redis.internal:6380",
       SHUTDOWN_TIMEOUT_MS: 30_000,
@@ -47,7 +49,7 @@ describe("loadEnv", () => {
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
       CLAMAV_MAX_FILE_BYTES: 25 * 1024 * 1024,
-      FRONTEND_URL: "http://localhost:5173",
+      FRONTEND_URL: "http://localhost:5180",
       EMAIL_MAX_RATE_PER_SECOND: 5,
       EMAIL_POLL_INTERVAL_MS: 1_000,
       EMAIL_BATCH_SIZE: 25,

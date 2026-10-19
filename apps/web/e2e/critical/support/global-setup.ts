@@ -10,7 +10,7 @@
  * suite's to depend on. Playwright's own `webServer` (playwright.critical.config.ts) is left to do
  * only the one thing it fits well: building and previewing the web app, which touches no database.
  *
- * Sequence: start disposable Postgres+Redis (db/compose.yml, shared with the rest of this repo's
+ * Sequence: start disposable Postgres+Redis (compose.yml test profile, shared with the rest of this repo's
  * local/CI database-backed suites) → migrate → seed (idempotent — a re-run against an already-seeded
  * database is a clean no-op, per db/seeds/seed.ts's own header) → start the fake Anthropic server →
  * start the E2E API process (tests/e2e/server.ts) with the mock OAuth provider and the fake
@@ -91,7 +91,7 @@ export default async function globalSetup(): Promise<void> {
   const processes: SpawnedProcess[] = [];
 
   console.log("[e2e] starting disposable Postgres + Redis");
-  await run("docker", ["compose", "-f", "db/compose.yml", "up", "-d", "--wait"]);
+  await run("docker", ["compose", "up", "-d", "--wait", "test-postgres", "test-redis"]);
 
   console.log("[e2e] running migrations");
   await run("bun", ["run", "db:migrate"]);

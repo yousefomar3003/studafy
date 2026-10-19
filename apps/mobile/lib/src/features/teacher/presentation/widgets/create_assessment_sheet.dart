@@ -17,7 +17,10 @@ class CreateAssessmentSheet extends ConsumerStatefulWidget {
 
   final String gradebookId;
 
-  static Future<String?> show(BuildContext context, {required String gradebookId}) {
+  static Future<String?> show(
+    BuildContext context, {
+    required String gradebookId,
+  }) {
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -26,7 +29,8 @@ class CreateAssessmentSheet extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<CreateAssessmentSheet> createState() => _CreateAssessmentSheetState();
+  ConsumerState<CreateAssessmentSheet> createState() =>
+      _CreateAssessmentSheetState();
 }
 
 class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
@@ -59,7 +63,9 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
     });
 
     try {
-      await ref.read(gradeEntryClientProvider).createAssessment(
+      await ref
+          .read(gradeEntryClientProvider)
+          .createAssessment(
             widget.gradebookId,
             label: label,
             maxScore: maxScore,
@@ -69,17 +75,19 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
     } on DioException catch (error) {
       setState(() => _errorKey = _messageKeyFor(error.apiError?.code));
     } catch (_) {
-      setState(() => _errorKey = 'teacher.grades.createAssessment.errorGeneric');
+      setState(
+        () => _errorKey = 'teacher.grades.createAssessment.errorGeneric',
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
   String _messageKeyFor(String? code) => switch (code) {
-        'AUTHZ_FORBIDDEN' => 'teacher.grades.createAssessment.errorForbidden',
-        'VALIDATION_FAILED' => 'teacher.grades.createAssessment.errorValidation',
-        _ => 'teacher.grades.createAssessment.errorGeneric',
-      };
+    'AUTHZ_FORBIDDEN' => 'teacher.grades.createAssessment.errorForbidden',
+    'VALIDATION_FAILED' => 'teacher.grades.createAssessment.errorValidation',
+    _ => 'teacher.grades.createAssessment.errorGeneric',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -99,7 +107,10 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('teacher.grades.createAssessment.title'.tr(), style: theme.textTheme.titleMedium),
+            Text(
+              'teacher.grades.createAssessment.title'.tr(),
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: AppSpacing.space16),
             TextFormField(
               controller: _labelController,
@@ -120,10 +131,15 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
                 Expanded(
                   child: TextFormField(
                     controller: _maxScoreController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    ],
                     decoration: InputDecoration(
-                      labelText: 'teacher.grades.createAssessment.maxScoreField'.tr(),
+                      labelText: 'teacher.grades.createAssessment.maxScoreField'
+                          .tr(),
                     ),
                     validator: _positiveNumberValidator,
                   ),
@@ -132,10 +148,15 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
                 Expanded(
                   child: TextFormField(
                     controller: _weightController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    ],
                     decoration: InputDecoration(
-                      labelText: 'teacher.grades.createAssessment.weightField'.tr(),
+                      labelText: 'teacher.grades.createAssessment.weightField'
+                          .tr(),
                     ),
                     validator: _positiveNumberValidator,
                   ),
@@ -146,7 +167,9 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
               const SizedBox(height: AppSpacing.space12),
               Text(
                 _errorKey!.tr(),
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
             ],
             const SizedBox(height: AppSpacing.space20),

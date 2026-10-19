@@ -42,9 +42,6 @@ export default function InvoiceDetailPage() {
   if (query.isError) {
     return (
       <>
-        <p className="invoices-detail__back invoices-detail__no-print">
-          <Link to="/portal/finance/invoices">{t("finance.invoices.backToInvoices")}</Link>
-        </p>
         <p role="alert">{t("finance.invoices.detail.loadError")}</p>
       </>
     );
@@ -59,10 +56,6 @@ export default function InvoiceDetailPage() {
 
   return (
     <div className="invoices-detail">
-      <p className="invoices-detail__back invoices-detail__no-print">
-        <Link to="/portal/finance/invoices">{t("finance.invoices.backToInvoices")}</Link>
-      </p>
-
       <div className="invoices-detail__header">
         <div>
           <h1>{t("finance.invoices.detail.title", { number: invoice.erpnext_docname })}</h1>

@@ -42,6 +42,10 @@ jobs:
       - name: Apply reviewed infrastructure
         run: terraform apply -auto-approve -var-file=environments/${{ inputs.environment }}/${{ inputs.environment }}.tfvars
         working-directory: infra/terraform
+        # Same per-environment repository variables terraform.yml's plan job reads.
+        env:
+          TF_VAR_bastion_allowed_ssh_cidrs: ${{ vars[format('BASTION_ALLOWED_SSH_CIDRS_{0}', inputs.environment)] }}
+          TF_VAR_bastion_key_name: ${{ vars[format('BASTION_KEY_NAME_{0}', inputs.environment)] }}
       - name: Render environment outputs
         run: ./scripts/populate-env.sh ${{ inputs.environment }}
         working-directory: infra/deploy

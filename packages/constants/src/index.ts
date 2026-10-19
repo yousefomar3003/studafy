@@ -30,7 +30,7 @@ export {
   QUEUE_NAMES,
 } from "./queues";
 export type { DeadLetterQueueName, JobName, QueueName } from "./queues";
-export { ROLES } from "./roles";
+export { ROLES, MOBILE_ONLY_ROLES, isMobileOnly } from "./roles";
 export type { Role } from "./roles";
 export {
   FEATURE_FLAGS,

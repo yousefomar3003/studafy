@@ -109,7 +109,7 @@ describe("hasPermission", () => {
   });
 
   it("denies the teaching and learning roles for admin permissions", () => {
-    for (const role of [ROLES.STUDENT, ROLES.INSTRUCTOR, ROLES.TEACHING_ASSISTANT, ROLES.GUEST]) {
+    for (const role of [ROLES.STUDENT, ROLES.INSTRUCTOR, ROLES.GUEST]) {
       expect(hasPermission([role], PERMISSIONS.USER_SUSPEND)).toBe(false);
     }
   });

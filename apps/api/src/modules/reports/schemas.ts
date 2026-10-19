@@ -12,6 +12,7 @@
 import { z } from "@hono/zod-openapi";
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
+import { timetableSettingsSchema } from "../academics/schemas";
 import {
   attendanceMetricsSchema,
   attendanceTrendPointSchema,
@@ -118,3 +119,53 @@ export const childBreakdownResponseSchema = z
     assignments: assignmentCompletionSchema,
   })
   .openapi("ChildComparisonBreakdown");
+
+export const childTimetableParamsSchema = z
+  .object({
+    studentId: uuidSchema.openapi({
+      param: { name: "studentId", in: "path" },
+      description: "Linked child whose weekly timetable is requested.",
+    }),
+  })
+  .openapi("ChildTimetableParams");
+
+export const childTimetableSlotSchema = z
+  .object({
+    id: uuidSchema,
+    weekday: z.number().int().min(1).max(7).openapi({
+      description: "1=Mon..7=Sun (same numbering as the school's teaching week).",
+    }),
+    period: z.number().int().min(1),
+    // Named, not anonymous: client generators derive a model name from the property name, so an
+    // anonymous `room` becomes a second "Room" and overwrites the real Room component (likewise
+    // Class, Course and Teacher) in the generated mobile client.
+    class: z.object({ id: uuidSchema, code: z.string() }).openapi("ChildTimetableClass"),
+    course: z
+      .object({ id: uuidSchema, code: z.string(), name: z.string() })
+      .openapi("ChildTimetableCourse")
+      .nullable(),
+    teacher: z
+      .object({ id: uuidSchema, name: z.string() })
+      .openapi("ChildTimetableTeacher")
+      .nullable(),
+    room: z.object({ id: uuidSchema, name: z.string() }).openapi("ChildTimetableRoom").nullable(),
+  })
+  .openapi("ChildTimetableSlot");
+
+export const childTimetableResponseSchema = z
+  .object({
+    student_id: uuidSchema,
+    term_id: uuidSchema.nullable().openapi({
+      description: "The school's current term; null when no term is current.",
+    }),
+    timetable_version_id: uuidSchema.nullable().openapi({
+      description: "The current term's approved timetable version; null when none is approved.",
+    }),
+    settings: timetableSettingsSchema,
+    slots: z.array(childTimetableSlotSchema).openapi({
+      description:
+        "Approved-version slots for the classes the child is actively enrolled in, sorted by " +
+        "weekday then period. Empty when no approved version exists.",
+    }),
+  })
+  .openapi("ChildTimetable");

@@ -26,7 +26,6 @@ const STEPS = [
   { id: "academic-year", title: "Academic year", file: "onboarding-academic-year.webp" },
   { id: "grading-scheme", title: "Grading scheme", file: "onboarding-grading-scheme.webp" },
   { id: "timetable", title: "Timetable periods", file: "onboarding-timetable.webp" },
-  { id: "staff", title: "Staff invitations", file: "onboarding-staff.webp" },
   { id: "students", title: "Student import", file: "onboarding-student-import.webp" },
 ] as const;
 

@@ -1,4 +1,5 @@
 import { ERROR_CODES } from "@studafy/constants";
+import { captureError, resolveRoute } from "@studafy/observability";
 import { problemDetailsSchema } from "@studafy/shared-schemas";
 import { HTTPException } from "hono/http-exception";
 import { z, ZodError } from "zod";
@@ -13,6 +14,7 @@ import type { Logger } from "../logger";
 import type { SupportedLocale } from "./locale";
 import type { AppEnv } from "./requestId";
 import type { ErrorCode } from "@studafy/constants";
+import type { CaptureContext } from "@studafy/observability";
 import type { ErrorHandler, NotFoundHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -127,7 +129,14 @@ function buildProblem(
  * Intercepts all thrown errors and returns RFC 9457 problem+json responses with
  * localized messages based on the Accept-Language header.
  *
+ * Every 5xx — an unknown error, or an HTTPException/CodedHttpException the code itself raised at
+ * 500+ — is also reported to error monitoring, before it is logged so the log line's own forwarding
+ * (index.ts) recognizes it and does not report it twice. 4xx responses are the client's mistake,
+ * not ours, and stay log-only (a warn, which monitoring keeps as a breadcrumb at most).
+ *
  * @param rootLogger - Logger instance for error logging
+ * @param reportError - Error monitoring seam. Injected by tests; defaults to @studafy/observability's
+ *   captureError, itself a no-op unless SENTRY_DSN is configured.
  * @returns Hono ErrorHandler
  *
  * @example
@@ -135,7 +144,10 @@ function buildProblem(
  * app.onError(errorHandlerMiddleware(logger));
  * ```
  */
-export function errorHandlerMiddleware(rootLogger: Logger): ErrorHandler<AppEnv> {
+export function errorHandlerMiddleware(
+  rootLogger: Logger,
+  reportError: (error: unknown, context: CaptureContext) => void = captureError,
+): ErrorHandler<AppEnv> {
   return (error, c) => {
     const requestId = c.get("requestId") ?? crypto.randomUUID();
     const locale = c.get("locale") ?? "en";
@@ -149,6 +161,17 @@ export function errorHandlerMiddleware(rootLogger: Logger): ErrorHandler<AppEnv>
       status >= 500
         ? undefined
         : (rawDetail ?? getLocalizedMessage(code, locale as SupportedLocale));
+
+    if (status >= 500) {
+      const auth = c.get("auth");
+      // Ids only: the matched route pattern (never the concrete path, which can embed a student
+      // id or an email), the tenant id, and the user id — no names, no request body.
+      reportError(error, {
+        tags: { request_id: requestId, route: resolveRoute(c), school_id: auth?.schoolId, code },
+        userId: auth?.userId ?? null,
+        extra: { status, method: c.req.method },
+      });
+    }
 
     // Log the error with full details (never exposed to client)
     const emit = status >= 500 ? log.error : log.warn;

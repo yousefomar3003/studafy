@@ -343,3 +343,180 @@ export function renderDigestEmail(data: DigestEmailData): RenderedEmail {
     html: shell(data.schoolName, bodyHtml),
   };
 }
+
+export interface SalesInquiryEmailData {
+  fullName: string;
+  email: string;
+  phone: string | null;
+  schoolName: string;
+  jobTitle: string | null;
+  country: string | null;
+  studentCount: number | null;
+  message: string | null;
+  sourcePath: string | null;
+  submittedAt: string;
+  /** The platform console's inquiries page. */
+  consoleUrl: string;
+}
+
+/** Staff-facing: a prospective school used the marketing site's "Talk to us" form. */
+export function renderSalesInquiryEmail(data: SalesInquiryEmailData): RenderedEmail {
+  const fields: [string, string | null][] = [
+    ["Name", data.fullName],
+    ["Email", data.email],
+    ["Phone", data.phone],
+    ["School", data.schoolName],
+    ["Role", data.jobTitle],
+    ["Country", data.country],
+    ["Students", data.studentCount === null ? null : String(data.studentCount)],
+    ["Submitted from", data.sourcePath],
+    ["Received", formatDateLabel(data.submittedAt)],
+  ];
+  const present = fields.filter((field): field is [string, string] => field[1] !== null);
+
+  const rowsHtml = present
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;vertical-align:top">${escapeHtml(label)}</td><td style="padding:4px 0">${escapeHtml(value)}</td></tr>`,
+    )
+    .join("");
+  const messageHtml = data.message
+    ? `<p style="margin:16px 0 4px;color:#6b7280">Message</p><p style="margin:0;white-space:pre-wrap">${escapeHtml(data.message)}</p>`
+    : "";
+  const bodyHtml = `<p>New "Talk to us" inquiry from <strong>${escapeHtml(data.fullName)}</strong> at <strong>${escapeHtml(data.schoolName)}</strong>.</p><table role="presentation" cellpadding="0" cellspacing="0">${rowsHtml}</table>${messageHtml}${button(data.consoleUrl, "Open in platform console")}<p>Reply to this email to answer ${escapeHtml(data.fullName)} directly.</p>`;
+
+  const text = [
+    `New "Talk to us" inquiry from ${data.fullName} at ${data.schoolName}.`,
+    "",
+    ...present.map(([label, value]) => `${label}: ${value}`),
+    ...(data.message ? ["", "Message:", data.message] : []),
+    "",
+    `Open in the platform console: ${data.consoleUrl}`,
+  ].join("\n");
+
+  return {
+    subject: `New inquiry: ${data.schoolName} (${data.fullName})`,
+    text,
+    html: shell("Studafy sales", bodyHtml),
+  };
+}
+
+export interface SchoolApplicationEmailData {
+  applicantName: string;
+  applicantEmail: string;
+  applicantJobTitle: string | null;
+  applicantPhone: string;
+  /** "google" | "microsoft" -- which account they signed up with. */
+  provider: string;
+  schoolName: string;
+  schoolEmail: string | null;
+  country: string;
+  city: string;
+  address: string;
+  website: string | null;
+  studentCount: number | null;
+  currency: string;
+  message: string | null;
+  proofFileName: string;
+  submittedAt: string;
+  /** The platform console's page for this application. */
+  consoleUrl: string;
+}
+
+const PROVIDER_LABELS: Record<string, string> = { google: "Google", microsoft: "Microsoft" };
+
+/** Staff-facing: a school owner submitted a sign-up application with proof of ownership. */
+export function renderSchoolApplicationEmail(data: SchoolApplicationEmailData): RenderedEmail {
+  const fields: [string, string | null][] = [
+    ["School", data.schoolName],
+    ["Country", data.country],
+    ["City", data.city],
+    ["Address", data.address],
+    ["School email", data.schoolEmail],
+    ["Website", data.website],
+    ["Students", data.studentCount === null ? null : String(data.studentCount)],
+    ["Currency", data.currency],
+    ["Applicant", data.applicantName],
+    ["Role", data.applicantJobTitle],
+    ["Applicant email", data.applicantEmail],
+    ["Phone", data.applicantPhone],
+    ["Signed up with", PROVIDER_LABELS[data.provider] ?? data.provider],
+    ["Proof of ownership", data.proofFileName],
+    ["Received", formatDateLabel(data.submittedAt)],
+  ];
+  const present = fields.filter((field): field is [string, string] => field[1] !== null);
+
+  const rowsHtml = present
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;vertical-align:top">${escapeHtml(label)}</td><td style="padding:4px 0">${escapeHtml(value)}</td></tr>`,
+    )
+    .join("");
+  const messageHtml = data.message
+    ? `<p style="margin:16px 0 4px;color:#6b7280">Message</p><p style="margin:0;white-space:pre-wrap">${escapeHtml(data.message)}</p>`
+    : "";
+  const bodyHtml = `<p>New school sign-up application from <strong>${escapeHtml(data.applicantName)}</strong> for <strong>${escapeHtml(data.schoolName)}</strong>.</p><table role="presentation" cellpadding="0" cellspacing="0">${rowsHtml}</table>${messageHtml}${button(data.consoleUrl, "Review in platform console")}<p>The proof of ownership is attached to the application in the console.</p>`;
+
+  const text = [
+    `New school sign-up application from ${data.applicantName} for ${data.schoolName}.`,
+    "",
+    ...present.map(([label, value]) => `${label}: ${value}`),
+    ...(data.message ? ["", "Message:", data.message] : []),
+    "",
+    `Review it in the platform console: ${data.consoleUrl}`,
+  ].join("\n");
+
+  return {
+    subject: `New school application: ${data.schoolName} (${data.city}, ${data.country})`,
+    text,
+    html: shell("Studafy onboarding", bodyHtml),
+  };
+}
+
+export interface SchoolApplicationDecisionEmailData {
+  applicantName: string;
+  schoolName: string;
+  /** "google" | "microsoft" -- the account they must sign in with. */
+  provider: string;
+  /** Approved: the sign-in page. Rejected: the sign-up page, to apply again. */
+  actionUrl: string;
+  /** The reviewer's reason, for a rejection. */
+  reason: string | null;
+}
+
+/** Applicant-facing: their school was approved and is ready to sign in to. */
+export function renderSchoolApplicationApprovedEmail(
+  data: SchoolApplicationDecisionEmailData,
+): RenderedEmail {
+  const provider = PROVIDER_LABELS[data.provider] ?? data.provider;
+  const bodyHtml = `<p>Hi ${escapeHtml(data.applicantName)},</p><p>Good news: <strong>${escapeHtml(data.schoolName)}</strong> has been approved and your Studafy school is ready.</p><p>Sign in with the same ${escapeHtml(provider)} account you used to apply. You are the school's administrator and can invite your staff from there.</p>${button(data.actionUrl, "Sign in to Studafy")}`;
+  return {
+    subject: `${data.schoolName} is approved — welcome to Studafy`,
+    text: `Hi ${data.applicantName},\n\nGood news: ${data.schoolName} has been approved and your Studafy school is ready.\n\nSign in with the same ${provider} account you used to apply. You are the school's administrator and can invite your staff from there.\n\nSign in: ${data.actionUrl}`,
+    html: shell("Studafy", bodyHtml),
+  };
+}
+
+/** Applicant-facing: their application was not approved, with the reviewer's reason. */
+export function renderSchoolApplicationRejectedEmail(
+  data: SchoolApplicationDecisionEmailData,
+): RenderedEmail {
+  const reasonHtml = data.reason
+    ? `<p style="margin:16px 0 4px;color:#6b7280">Reason</p><p style="margin:0;white-space:pre-wrap">${escapeHtml(data.reason)}</p>`
+    : "";
+  const bodyHtml = `<p>Hi ${escapeHtml(data.applicantName)},</p><p>We reviewed your application for <strong>${escapeHtml(data.schoolName)}</strong> and could not approve it.</p>${reasonHtml}<p>You can submit a new application with updated details or proof of ownership.</p>${button(data.actionUrl, "Apply again")}`;
+  return {
+    subject: `Your Studafy application for ${data.schoolName}`,
+    text: [
+      `Hi ${data.applicantName},`,
+      "",
+      `We reviewed your application for ${data.schoolName} and could not approve it.`,
+      ...(data.reason ? ["", `Reason: ${data.reason}`] : []),
+      "",
+      "You can submit a new application with updated details or proof of ownership.",
+      "",
+      `Apply again: ${data.actionUrl}`,
+    ].join("\n"),
+    html: shell("Studafy", bodyHtml),
+  };
+}

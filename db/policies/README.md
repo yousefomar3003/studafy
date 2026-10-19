@@ -1,16 +1,36 @@
 # Tenant Row-Level Security policy authoring
 
+> **What lives in this directory.** The `.sql` files here are **reference copies** of policies as
+> first installed; nothing executes them and they may lag later changes. The authoritative DDL is the
+> ordered migrations in [`db/migrations`](../migrations). [`rls-coverage.ts`](./rls-coverage.ts) is
+> the executable audit that CI runs (`bun run db:test:rls-coverage`) against a fully migrated
+> database; [`rls-coverage-diagnostics.sql`](./rls-coverage-diagnostics.sql) is a read-only psql
+> helper for investigating a failure.
+
 Studafy isolates every school-owned PostgreSQL row with the canonical `school_id` column, the
 transaction-local `app.school_id` setting, and one policy named `tenant_isolation`. Global platform
 tables are deliberately outside this model.
 
 ## Classify the table first
 
-The approved global tables are `app.schools`, `app.plans`, `app.plan_prices`, `app.countries`,
-`app.currencies`, `app.platform_settings`, and `app.billing_events`. They contain no `school_id` and
-receive no tenant policy or tenant index. `billing_events` is the global, privileged webhook-ingress
-log documented in the subscription data model; the original six reference tables are also rejected
-by the helper. Adding another global table requires an explicit review and ST-050 allowlist change.
+The approved global tables are the twelve in the `approved_globals` allowlist of
+[`rls-coverage.ts`](./rls-coverage.ts):
+
+- Reference and platform data: `app.schools`, `app.plans`, `app.plan_prices`, `app.countries`,
+  `app.currencies`, `app.platform_settings`.
+- `app.billing_events` (000016): the global, privileged webhook-ingress log documented in the
+  subscription data model.
+- `app.security_events` (000028): boundary rejections recorded before any tenant is established.
+- `app.email_events`, `app.email_suppressions` (000077): SES delivery feedback; a suppression belongs
+  to the address, not to a school.
+- `app.sales_inquiries` (000125): written by a prospective school before it exists as a tenant.
+- `app.school_applications` (000139, renamed column in 000142): an application exists before its
+  school does; the school an approval provisions is `provisioned_school_id`, deliberately not
+  `school_id`.
+
+They contain no `school_id` and receive no tenant policy or tenant index. The original six reference
+tables are also rejected by the helper. Adding another global table requires an explicit review and
+an allowlist change in `rls-coverage.ts` (see [global-tables.md](../../docs/database/global-tables.md)).
 
 A tenant table must be in `app`, owned by `studafy_admin`, and use a non-null UUID `school_id` with a
 single-column foreign key to `app.schools(id)`. Use explicit `ON UPDATE` and `ON DELETE` actions;

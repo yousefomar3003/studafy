@@ -26,6 +26,8 @@ import type {
   ListInvoicesInput,
   ListInvoicesResult,
   PaymentProviderPort,
+  RefundInput,
+  RefundResult,
 } from "../ports/payment-provider";
 
 type AdapterFactory = () => PaymentProviderPort;
@@ -50,6 +52,7 @@ export function contractTests(name: string, createAdapter: AdapterFactory): void
       expect(typeof adapter.scheduleCancellation).toBe("function");
       expect(typeof adapter.reverseCancellation).toBe("function");
       expect(typeof adapter.listInvoices).toBe("function");
+      expect(typeof adapter.refund).toBe("function");
     });
 
     test("createCustomer rejects empty name with PaymentProviderError", async () => {
@@ -357,6 +360,13 @@ class MockAdapter implements PaymentProviderPort {
       throw new PaymentProviderError(400, "VALIDATION_FAILED" as never, "customerId is required");
     }
     return { invoices: [], hasMore: false };
+  }
+
+  async refund(input: RefundInput): Promise<RefundResult> {
+    if (!input.invoiceId) {
+      throw new PaymentProviderError(400, "VALIDATION_FAILED" as never, "invoiceId is required");
+    }
+    return { providerRefundId: `re_mock_${input.invoiceId}`, status: "succeeded" };
   }
 }
 

@@ -4,6 +4,11 @@
 
 Accepted
 
+> **Note (2026-10-17):** the role list below is the original ST-004 set. The decision still holds,
+> but the enumeration has changed: `FINANCE` (migration 000042), `PARENT` (000043), `PRINCIPAL`
+> (000119), and `ATTENDANCE_OFFICER` (000132) were added, and `TEACHING_ASSISTANT` was removed
+> (000138). The current list is `ROLES` in `packages/constants/src/roles.ts`.
+
 ## Context
 
 Studafy needs an authorization model shared by every app/service: a way to answer "can this

@@ -5,6 +5,7 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 import { approveTimetableVersion, rejectTimetableVersion } from "../academics/timetable-service";
 
 import { decideSubmission } from "./grade-entry-service";
+import { decideRevision } from "./grade-revision-service";
 
 import type {
   BulkDecisionEntry,
@@ -19,7 +20,7 @@ import type { TransactionSql } from "postgres";
 
 export interface ApprovalQueueRow {
   id: string;
-  item_type: "grade_submission" | "timetable_version";
+  item_type: "grade_submission" | "grade_revision" | "timetable_version";
   status: string;
   summary: string;
   requested_by_user_id: string | null;
@@ -88,6 +89,55 @@ export async function listPendingApprovals(
 
     UNION ALL
 
+    -- A teacher's correction to grades that are already published: the diff carries each changed
+    -- assessment's published score next to the proposed one.
+    SELECT
+      rv.id,
+      'grade_revision' AS item_type,
+      rv.status,
+      concat(
+        'Grade correction — ',
+        coalesce(st.preferred_name, concat(st.first_name, ' ', st.last_name))
+      ) AS summary,
+      rv.requested_by_user_id,
+      u_req.display_name AS requested_by_display_name,
+      rv.requested_at,
+      rv.decided_at,
+      jsonb_build_object(
+        'gradebook_id', gb.id,
+        'gradebook_class_code', c.code,
+        'grade_submission_id', gs.id,
+        'student_id', st.id,
+        'student_name', coalesce(st.preferred_name, concat(st.first_name, ' ', st.last_name)),
+        'reason', rv.reason,
+        'changes', COALESCE(ch.changes_json, '[]'::jsonb)
+      ) AS diff
+    FROM app.grade_revisions rv
+    JOIN app.grade_submissions gs ON gs.id = rv.grade_submission_id AND gs.school_id = rv.school_id
+    JOIN app.gradebooks gb ON gb.id = gs.gradebook_id AND gb.school_id = gs.school_id
+    JOIN app.classes c ON c.id = gb.class_id AND c.school_id = gs.school_id
+    JOIN app.students st ON st.id = gs.student_id AND st.school_id = gs.school_id
+    LEFT JOIN app.users u_req ON u_req.id = rv.requested_by_user_id AND u_req.school_id = rv.school_id
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'grade_id', g.id,
+          'label', g.label,
+          'max_score', g.max_score,
+          'previous_score', item.previous_score,
+          'new_score', item.new_score
+        )
+        ORDER BY g.label
+      ) AS changes_json
+      FROM app.grade_revision_items item
+      JOIN app.grades g ON g.id = item.grade_id AND g.school_id = item.school_id
+      WHERE item.grade_revision_id = rv.id AND item.school_id = rv.school_id
+    ) ch ON true
+    WHERE rv.school_id = ${schoolId}::uuid
+      AND rv.status = 'pending'
+
+    UNION ALL
+
     SELECT
       tv.id,
       'timetable_version' AS item_type,
@@ -123,13 +173,25 @@ export async function listPendingApprovals(
 // Bulk decision
 // ---------------------------------------------------------------------------
 
+/**
+ * A grade publication the caller should notify the student and parents about once the transaction
+ * commits: `eventId` is the idempotency key the notification dispatcher dedupes on -- the
+ * submission id for a first publication, the revision id for an approved correction, so a
+ * correction notifies again rather than being swallowed as a replay of the original publication.
+ */
+export interface PublishedGradeNotice {
+  submissionId: string;
+  eventId: string;
+}
+
 export async function bulkDecision(
   tx: TransactionSql,
   schoolId: string,
   userId: string,
   entries: BulkDecisionEntry[],
-): Promise<BulkDecisionResult> {
+): Promise<BulkDecisionResult & { published: PublishedGradeNotice[] }> {
   const results: DecisionResult[] = [];
+  const published: PublishedGradeNotice[] = [];
 
   for (const entry of entries) {
     try {
@@ -160,8 +222,32 @@ export async function bulkDecision(
           entry.action === "reject" ? (entry.rejection_reason ?? null) : null,
         );
 
+        if (entry.action === "approve") {
+          published.push({ submissionId: entry.id, eventId: entry.id });
+        }
+
         results.push({
           item_type: "grade_submission",
+          id: entry.id,
+          status: entry.action === "approve" ? "approved" : "rejected",
+          error: null,
+        });
+      } else if (entry.item_type === "grade_revision") {
+        const revision = await decideRevision(
+          tx,
+          schoolId,
+          entry.id,
+          entry.action,
+          userId,
+          entry.action === "reject" ? (entry.rejection_reason ?? null) : null,
+        );
+
+        if (revision.status === "approved") {
+          published.push({ submissionId: revision.grade_submission_id, eventId: revision.id });
+        }
+
+        results.push({
+          item_type: "grade_revision",
           id: entry.id,
           status: entry.action === "approve" ? "approved" : "rejected",
           error: null,
@@ -203,7 +289,12 @@ export async function bulkDecision(
   await emitAuditLog(tx, {
     action: "update",
     targetTable: "approval_queue",
-    targetId: "bulk",
+    // audit_logs.target_id is a NOT NULL uuid; the literal "bulk" this used to pass failed the cast
+    // and rolled back every bulk decision. A batch has no single target row (each decision writes
+    // its own audit row above), so the summary row targets the school whose queue was worked.
+    targetId: schoolId,
+    // ck_audit_logs_payload requires both sides of an `update`: before, these items were pending.
+    oldValues: { pending: entries.map((entry) => ({ item_type: entry.item_type, id: entry.id })) },
     newValues: {
       total: results.length,
       succeeded: succeeded.length,
@@ -219,6 +310,7 @@ export async function bulkDecision(
 
   return {
     results,
+    published,
     summary: {
       total: results.length,
       succeeded: succeeded.length,

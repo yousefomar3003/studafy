@@ -269,7 +269,7 @@ first step and is reversible; dropping is not.
 To re-measure the 40-record batch target:
 
 ```
-docker compose -f db/compose.yml up -d --wait
+docker compose up -d --wait test-postgres test-redis
 ATTENDANCE_BENCHMARK=1 TEST_DATABASE_URL=postgresql://… \
   bun test tests/attendance-benchmark.test.ts   # in packages/db
 ```

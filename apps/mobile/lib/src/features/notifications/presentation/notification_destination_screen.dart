@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 /// Temporary destination for notification deep-links.
@@ -14,7 +15,7 @@ class NotificationDestinationScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notification')),
+      appBar: AppBar(title: Text('notifications.destination.title'.tr())),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -24,18 +25,13 @@ class NotificationDestinationScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Deep link target', style: textTheme.headlineSmall),
+                  Text('notifications.destination.heading'.tr(), style: textTheme.headlineSmall),
                   const SizedBox(height: 8),
-                  Text(
-                    'This screen is a placeholder for the real destination.',
-                    style: textTheme.bodyMedium,
-                  ),
+                  Text('notifications.destination.body'.tr(), style: textTheme.bodyMedium),
                   const SizedBox(height: 24),
                   SelectableText(
                     route,
-                    style: textTheme.bodyLarge?.copyWith(
-                      fontFamily: 'monospace',
-                    ),
+                    style: textTheme.bodyLarge?.copyWith(fontFamily: 'monospace'),
                   ),
                 ],
               ),

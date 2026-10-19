@@ -9,6 +9,7 @@ import '../../application/child_detail_providers.dart';
 import '../../domain/attendance_alert.dart';
 import 'attendance_alert_badge.dart';
 import 'child_detail_placeholders.dart';
+import '../../../../design/layout/bottom_inset_padding.dart';
 
 /// The Attendance tab of `ChildDetailScreen`: the child's term attendance totals — present,
 /// absent, late and excused, each as a count and a share — with the same [AttendanceAlert] badge
@@ -45,7 +46,7 @@ class ChildAttendanceView extends ConsumerWidget {
           }
           final trends = data.attendance.trends;
           return ListView(
-            padding: const EdgeInsets.all(AppSpacing.space16),
+            padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
               _TotalsCard(totals: totals),

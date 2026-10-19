@@ -1,6 +1,6 @@
 import { Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { useTranslation } from "../../../lib/i18n";
 
@@ -29,10 +29,6 @@ export default function ExpenseDetailPage() {
 
   return (
     <>
-      <p className="expenses-detail__back">
-        <Link to="/portal/finance/expenses">{t("finance.expenses.back")}</Link>
-      </p>
-
       {query.isPending ? (
         <p>{t("finance.common.loading")}</p>
       ) : query.isError || !expense ? (

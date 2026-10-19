@@ -12,17 +12,21 @@
  */
 import arAdminPeople from "./ar/adminPeople.json";
 import arAdminSchool from "./ar/adminSchool.json";
+import arAttendanceOffice from "./ar/attendanceOffice.json";
 import arFinance from "./ar/finance.json";
 import arFinanceReports from "./ar/financeReports.json";
 import arOnboarding from "./ar/onboarding.json";
+import arPlatform from "./ar/platform.json";
 import arPrincipal from "./ar/principal.json";
 import arSite from "./ar/site.json";
 import ar from "./ar.json";
 import enAdminPeople from "./en/adminPeople.json";
 import enAdminSchool from "./en/adminSchool.json";
+import enAttendanceOffice from "./en/attendanceOffice.json";
 import enFinance from "./en/finance.json";
 import enFinanceReports from "./en/financeReports.json";
 import enOnboarding from "./en/onboarding.json";
+import enPlatform from "./en/platform.json";
 import enPrincipal from "./en/principal.json";
 import enSite from "./en/site.json";
 import en from "./en.json";
@@ -34,6 +38,8 @@ export const enCatalog = {
   finance: enFinance,
   financeReports: enFinanceReports,
   principal: enPrincipal,
+  attendanceOffice: enAttendanceOffice,
+  platform: enPlatform,
   onboarding: enOnboarding,
   site: enSite,
 };
@@ -45,6 +51,8 @@ export const arCatalog = {
   finance: arFinance,
   financeReports: arFinanceReports,
   principal: arPrincipal,
+  attendanceOffice: arAttendanceOffice,
+  platform: arPlatform,
   onboarding: arOnboarding,
   site: arSite,
 };

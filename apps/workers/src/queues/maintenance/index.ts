@@ -1,3 +1,9 @@
+export { runAccountDeletionSweep } from "./account-deletion-sweep";
+export type { AccountDeletionSweepResult, AiBillingCanceller } from "./account-deletion-sweep";
+export {
+  ACCOUNT_DELETION_SWEEP_CRON_PATTERN,
+  scheduleAccountDeletionSweepJob,
+} from "./account-deletion-sweep-scheduler";
 export { AI_MESSAGE_PURGE_BATCH_SIZE, purgeExpiredAiMessages } from "./ai-message-retention-sweep";
 export type { PurgeExpiredAiMessagesResult } from "./ai-message-retention-sweep";
 export {

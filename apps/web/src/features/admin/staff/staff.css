@@ -1,0 +1,16 @@
+/** Principal & finance accounts. Header, pills and the table reuse `../users/users.css`. */
+
+.staff-invite {
+  margin-bottom: var(--space-16);
+}
+
+.staff-invite__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+}
+
+.staff-invite__form > :first-child {
+  flex: 1 1 18rem;
+}

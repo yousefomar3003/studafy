@@ -5,7 +5,7 @@ review, a dependency audit, and a full-history secrets scan. This doc is both th
 and the fixes log — every finding below either shipped a fix in this same change or carries an
 explicit, reasoned accepted-risk disposition. **Zero critical/high findings are open at exit.**
 
-Everything here was run against a real Postgres (`db/compose.yml`) and the real app
+Everything here was run against a real Postgres (`compose.yml` (test profile)) and the real app
 (`createApp()`), not mocked — see [Reproducing this pass](#reproducing-this-pass).
 
 ## Summary
@@ -103,6 +103,9 @@ any redundant inline check a handler happened to also carry (a few did, coincide
 Mechanical, reviewed-before-applied codemod: every `.use()` call's literal path argument had
 `{name}` replaced with `:name` (155 sites, 50 files), and the two glued-wildcard mounts
 (`finance/refunds/routes.ts`, `finance/scholarships/routes.ts`) got the missing `/` before `*`.
+_(Later note: the scholarships API module, `apps/api/src/modules/finance/scholarships/`, has since been
+removed. Its tables (`scholarship_discount_cache`, `award_cache`, migration 000066) are retained under
+the financial legal hold in `apps/workers/src/queues/maintenance/retention-registry.ts`.)_
 Verified with an isolated Hono repro before touching any file, then confirmed against the live app:
 the fuzz run above went from 47 failing deny/allow assertions to 0.
 
@@ -395,7 +398,7 @@ docker run --rm -v "$(pwd)":/repo -w /repo zricethezav/gitleaks:latest \
 - A full end-to-end run of every DB-integration test file in `apps/api` simultaneously (not just
   `tests/security`) was attempted but hung on an unrelated environment issue: a second, unrelated
   Docker project's unrelated Redis container (version 3.0.504) on this machine's default Redis port,
-  which some `bullmq`-backed queue tests reach instead of this repo's own `db/compose.yml` Redis and
+  which some `bullmq`-backed queue tests reach instead of this repo's own `compose.yml` (test profile) Redis and
   then retry indefinitely. Not a finding — a local machine/port conflict — but flagging it means the
   full non-`tests/security` integration matrix wasn't re-run end-to-end in this same pass, beyond
   the targeted module tests exercised directly (finance, grades, imports, tenancy/settings,

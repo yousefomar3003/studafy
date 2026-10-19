@@ -67,6 +67,7 @@ const FAILURE_COPY = new Map<string, FailureCopy>([
   ["REVOKED", { keyPrefix: "onboarding.invite.failures.revoked" }],
   ["CONSUMED", { keyPrefix: "onboarding.invite.failures.consumed", actionHref: "/auth/login" }],
   ["SCHOOL_SUSPENDED", { keyPrefix: "onboarding.invite.failures.schoolSuspended" }],
+  ["WEB_ACCESS_MOBILE_ONLY", { keyPrefix: "onboarding.invite.failures.mobileOnly" }],
 ]);
 
 const GENERIC_FAILURE: FailureCopy = { keyPrefix: "onboarding.invite.failures.generic" };

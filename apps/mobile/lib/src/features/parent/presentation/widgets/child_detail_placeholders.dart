@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../design/tokens/app_radius_tokens.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../../design/layout/bottom_inset_padding.dart';
 
 /// A one-line, icon-led message filling a child-detail tab for any non-loading, non-content
 /// state: the term breakdown errored, a section is empty, or the section has no parent-scoped
@@ -14,6 +15,7 @@ class ChildDetailMessage extends StatelessWidget {
     required this.icon,
     this.hintKey,
     this.messageArgs,
+    this.hintArgs,
     super.key,
   });
 
@@ -25,13 +27,16 @@ class ChildDetailMessage extends StatelessWidget {
   /// a message with no variable part.
   final Map<String, String>? messageArgs;
 
+  /// Named substitutions for [hintKey].
+  final Map<String, String>? hintArgs;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.space24),
+      padding: const EdgeInsets.all(AppSpacing.space24).withBottomInset(context),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         Row(
@@ -50,7 +55,7 @@ class ChildDetailMessage extends StatelessWidget {
                   if (hintKey case final hintKey?) ...[
                     const SizedBox(height: AppSpacing.space4),
                     Text(
-                      hintKey.tr(),
+                      hintKey.tr(namedArgs: hintArgs),
                       style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
                   ],
@@ -84,7 +89,7 @@ class ChildDetailSkeleton extends StatelessWidget {
     );
 
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.space16),
+      padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         bar(0.5, 18),

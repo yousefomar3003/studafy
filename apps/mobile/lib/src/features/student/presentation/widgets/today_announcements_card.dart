@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/api/generated/models/announcement.dart';
+import '../../../../core/api/generated/models/notification.dart' as api_models;
+import '../../../../core/offline/announcements_offline_repository.dart';
 import '../../../../core/offline/staleness_banner.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/today_providers.dart';
@@ -55,7 +56,7 @@ class TodayAnnouncementsCard extends ConsumerWidget {
 class _AnnouncementRow extends StatelessWidget {
   const _AnnouncementRow({required this.announcement});
 
-  final Announcement announcement;
+  final api_models.Notification announcement;
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +78,7 @@ class _AnnouncementRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (announcement.mandatory) ...[
+              if (isMandatoryAnnouncement(announcement)) ...[
                 const SizedBox(width: AppSpacing.space8),
                 Icon(Icons.priority_high, size: 16, color: colorScheme.error),
               ],

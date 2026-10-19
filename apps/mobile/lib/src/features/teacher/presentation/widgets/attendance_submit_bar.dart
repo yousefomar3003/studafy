@@ -13,6 +13,7 @@ class AttendanceSubmitBar extends StatelessWidget {
     required this.hasPendingSync,
     required this.onSubmit,
     required this.onRetrySync,
+    this.submitLabel,
     super.key,
   });
 
@@ -24,6 +25,10 @@ class AttendanceSubmitBar extends StatelessWidget {
 
   final VoidCallback onSubmit;
   final VoidCallback onRetrySync;
+
+  /// Already-translated label for the submit button; defaults to "Submit attendance". The
+  /// attendance office passes its own ("Submit register (N)").
+  final String? submitLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -66,10 +71,9 @@ class AttendanceSubmitBar extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Text(
-                        (hasPendingSync
-                                ? 'teacher.attendance.retrySubmit'
-                                : 'teacher.attendance.submit')
-                            .tr(),
+                        hasPendingSync
+                            ? 'teacher.attendance.retrySubmit'.tr()
+                            : submitLabel ?? 'teacher.attendance.submit'.tr(),
                       ),
               ),
             ],
@@ -91,16 +95,25 @@ class _PendingSyncNotice extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(Icons.cloud_off_outlined, size: 18, color: theme.colorScheme.onSurfaceVariant),
+        Icon(
+          Icons.cloud_off_outlined,
+          size: 18,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(width: AppSpacing.space8),
         Expanded(
           child: Text(
             'teacher.attendance.savedOffline'.tr(),
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         if (onRetry != null)
-          TextButton(onPressed: onRetry, child: Text('teacher.attendance.retrySync'.tr())),
+          TextButton(
+            onPressed: onRetry,
+            child: Text('teacher.attendance.retrySync'.tr()),
+          ),
       ],
     );
   }

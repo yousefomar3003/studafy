@@ -66,7 +66,11 @@ class GradeEntryClient {
       data: {
         'grades': [
           for (final edit in edits)
-            {'id': edit.gradeId, 'score': edit.score, 'updated_at': edit.updatedAt},
+            {
+              'id': edit.gradeId,
+              'score': edit.score,
+              'updated_at': edit.updatedAt,
+            },
         ],
       },
     );
@@ -89,9 +93,60 @@ class GradeEntryClient {
     return GradeSubmission.fromJson(response.data!);
   }
 
+  /// `PATCH /api/grades/gradebooks/{id}/submissions/{submissionId}/unlock` — rejected → draft, so
+  /// the teacher can edit and resubmit. [updatedAt] is the submission row's token.
+  Future<GradeSubmission> unlockSubmission(
+    String gradebookId,
+    String submissionId, {
+    required String updatedAt,
+  }) async {
+    final response = await _dio.patch<Map<String, Object?>>(
+      '/api/grades/gradebooks/$gradebookId/submissions/$submissionId/unlock',
+      data: {'updated_at': updatedAt},
+    );
+    return GradeSubmission.fromJson(response.data!);
+  }
+
+  /// `POST /api/grades/gradebooks/{id}/submissions/{submissionId}/revisions` — file a correction
+  /// to published grades. The published scores stay as they are until a school admin or principal
+  /// approves it; 409 `GRADE_REVISION_ALREADY_PENDING` when one is already waiting.
+  Future<GradeRevision> requestRevision(
+    String gradebookId,
+    String submissionId, {
+    required String reason,
+    required Map<String, double?> scoresByGradeId,
+  }) async {
+    final response = await _dio.post<Map<String, Object?>>(
+      '/api/grades/gradebooks/$gradebookId/submissions/$submissionId/revisions',
+      data: {
+        'reason': reason,
+        'changes': [
+          for (final entry in scoresByGradeId.entries)
+            {'grade_id': entry.key, 'score': entry.value},
+        ],
+      },
+    );
+    return GradeRevision.fromJson(response.data!);
+  }
+
+  /// `PATCH /api/grades/gradebooks/{id}/revisions/{revisionId}/withdraw` — take back a pending
+  /// correction so a new one can be filed.
+  Future<GradeRevision> withdrawRevision(
+    String gradebookId,
+    String revisionId,
+  ) async {
+    final response = await _dio.patch<Map<String, Object?>>(
+      '/api/grades/gradebooks/$gradebookId/revisions/$revisionId/withdraw',
+    );
+    return GradeRevision.fromJson(response.data!);
+  }
+
   List<GradeSubmission> _submissionsOf(Map<String, Object?> body) =>
       ((body['submissions'] as List<Object?>?) ?? const [])
-          .map((e) => GradeSubmission.fromJson(Map<String, Object?>.from(e! as Map)))
+          .map(
+            (e) =>
+                GradeSubmission.fromJson(Map<String, Object?>.from(e! as Map)),
+          )
           .toList(growable: false);
 }
 

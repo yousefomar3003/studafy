@@ -6,10 +6,12 @@
 
 export type {
   CreateHostedChargeInput,
+  CreateRefundInput,
   CreateSavedCardChargeInput,
   ListChargesInput,
   ListChargesResult,
   TapCharge,
+  TapRefund,
 } from "./charge";
 export { tapChargeOutcome } from "./charge-status";
 export type { TapChargeOutcome } from "./charge-status";

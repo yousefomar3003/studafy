@@ -5,9 +5,11 @@ import { LinkButton } from "../../components/LinkButton";
 import { LocaleSwitcher } from "../../components/LocaleSwitcher";
 import { usePublicAuthStatus } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
+import { useScrolled } from "../../lib/use-scrolled";
 import { UserMenu } from "../portal/UserMenu";
 
 import { MARKETING_NAV_ITEMS } from "./nav-items";
+import { NavCat } from "./NavCat";
 
 export interface MarketingHeaderProps {
   /** DOM id of the nav list this header's toggle controls. */
@@ -25,10 +27,12 @@ export interface MarketingHeaderProps {
 export function MarketingHeader({ navId, navOpen, onToggleNav }: MarketingHeaderProps) {
   const { t } = useTranslation();
   const signedIn = usePublicAuthStatus() === "authenticated";
+  const scrolled = useScrolled();
 
   return (
-    <header className="marketing-header">
+    <header className="marketing-header" data-scrolled={scrolled}>
       <div className="marketing-header__row">
+        <NavCat />
         <NavLink to="/" className="marketing-header__brand" end>
           <BrandLogo />
         </NavLink>
@@ -80,9 +84,14 @@ export function MarketingHeader({ navId, navOpen, onToggleNav }: MarketingHeader
             {signedIn ? (
               <UserMenu />
             ) : (
-              <LinkButton variant="tertiary" href="/auth/login">
-                {t("site.marketing.header.signIn")}
-              </LinkButton>
+              <>
+                <LinkButton variant="tertiary" href="/auth/login">
+                  {t("site.marketing.header.signIn")}
+                </LinkButton>
+                <LinkButton variant="secondary" href="/signup">
+                  {t("site.marketing.header.signUp")}
+                </LinkButton>
+              </>
             )}
             <LinkButton variant="primary" href="/about#contact">
               {t("site.marketing.header.talkToUs")}

@@ -22,9 +22,9 @@ export const ROLE_LABEL_KEYS: Record<Role, string> = {
   SUPER_ADMIN: "adminPeople.roles.SUPER_ADMIN",
   ORG_ADMIN: "adminPeople.roles.ORG_ADMIN",
   PRINCIPAL: "adminPeople.roles.PRINCIPAL",
+  ATTENDANCE_OFFICER: "adminPeople.roles.ATTENDANCE_OFFICER",
   FINANCE: "adminPeople.roles.FINANCE",
   INSTRUCTOR: "adminPeople.roles.INSTRUCTOR",
-  TEACHING_ASSISTANT: "adminPeople.roles.TEACHING_ASSISTANT",
   STUDENT: "adminPeople.roles.STUDENT",
   PARENT: "adminPeople.roles.PARENT",
   GUEST: "adminPeople.roles.GUEST",
@@ -57,9 +57,8 @@ export const createUserSchema = z.object({
   display_name: z
     .string()
     .trim()
-    .max(200, "adminPeople.validation.maxLength200")
-    .optional()
-    .transform((value) => (value ? value : undefined)),
+    .min(1, "adminPeople.validation.nameRequired")
+    .max(200, "adminPeople.validation.maxLength200"),
   role: roleEnum,
 });
 export type CreateUserValues = z.infer<typeof createUserSchema>;

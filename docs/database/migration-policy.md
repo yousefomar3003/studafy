@@ -54,10 +54,10 @@ For local PostgreSQL 16 verification, start Docker Desktop and use an operator-c
 password; the database uses tmpfs and is destroyed with the container:
 
 ```bash
-POSTGRES_PASSWORD='<local-only-password>' docker compose -f db/compose.yml up -d --wait
+POSTGRES_PASSWORD='<local-only-password>' docker compose up -d --wait test-postgres test-redis
 TEST_DATABASE_URL='postgresql://studafy_test:<local-only-password>@127.0.0.1:54329/postgres?sslmode=disable' \
   bun test packages/db/tests/integration.test.ts
-docker compose -f db/compose.yml down
+docker compose rm -sfv test-postgres test-redis
 ```
 
 PowerShell uses the same values through `$env:POSTGRES_PASSWORD` and `$env:TEST_DATABASE_URL`
@@ -176,6 +176,14 @@ index decision frameworks.
 4. Test migrate, validate, status, idempotent rerun, and failure behavior against disposable
    PostgreSQL 16.
 5. Never edit the file after it has been applied to any shared environment.
+
+A fix to an applied migration ships as a new forward migration. For example,
+`000142_schema_hygiene_after_member_codes.sql` renames `school_applications.school_id` (000139),
+rebuilds `users.search_tsv` for the nullable email 000141 introduced, and revokes runtime privileges
+000129/000131 left in place, instead of editing any of those files.
+
+Version `000048` is a permanent gap. A duplicate `000047` was renumbered to `000048` in `c934a44f`
+and moved back to `000047` in `3094d5ee`, so no `000048` file exists. Never reuse it.
 
 During deployment the signed migrations image runs as a one-off Fargate task before ECS services
 roll. A non-zero exit stops the deployment; schema changes are never coupled to API process boot.

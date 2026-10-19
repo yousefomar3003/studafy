@@ -7,7 +7,7 @@ variable "web_origin" {
   description = <<-EOT
     The single browser origin (scheme + host, no path, no trailing slash) allowed to issue
     cross-origin requests against the app-files bucket for pre-signed uploads/downloads, e.g.
-    "https://app.studafy.com" or "http://localhost:5173" in dev. Exactly one origin is accepted
+    "https://app.studafy.com" or "http://localhost:5180" in dev. Exactly one origin is accepted
     by design — the acceptance criterion is "CORS allows web origin only", not a list, and a
     wildcard would defeat the point of scoping pre-signed URLs to this app's own frontend.
   EOT

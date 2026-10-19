@@ -197,7 +197,17 @@ export function attendanceReportRoutes(
             query.group_by,
             { limit: query.limit, offset: query.offset },
           );
-          return { resolved, summary };
+          const [settings] = await tx<{ attendance_alert_threshold: number | null }[]>`
+            SELECT attendance_alert_threshold
+            FROM app.school_settings
+            WHERE school_id = ${auth.schoolId}::uuid
+          `;
+          const threshold = settings?.attendance_alert_threshold;
+          return {
+            resolved,
+            summary,
+            threshold: threshold === null || threshold === undefined ? null : Number(threshold),
+          };
         },
         { useReadReplica: true },
       );
@@ -206,6 +216,7 @@ export function attendanceReportRoutes(
           generated_at: new Date().toISOString(),
           period: period(result.resolved),
           group_by: query.group_by,
+          attendance_alert_threshold: result.threshold,
           totals: result.summary.totals,
           items: result.summary.items,
           pagination: {

@@ -60,6 +60,10 @@ const STATE_COPY = new Map<string, StateCopy>([
   ["OAUTH_EMAIL_NOT_VERIFIED", copy("emailNotVerified", RETRY)],
   ["OAUTH_PROVIDER_ERROR", copy("providerError", RETRY)],
   ["SCHOOL_SUSPENDED", copy("suspended")],
+  // Students, parents, teachers and attendance officers: the API refuses them a web session.
+  // Retrying cannot help, so the copy points them at the mobile app; "back to sign in" is for
+  // someone who chose the wrong account.
+  ["WEB_ACCESS_MOBILE_ONLY", copy("mobileOnly", BACK_TO_SIGN_IN)],
   ["TENANT_SUSPENDED", copy("suspended")],
   ["OAUTH_CANCELLED", copy("cancelled", RETRY)],
 ]);

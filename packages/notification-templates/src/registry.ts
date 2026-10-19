@@ -174,4 +174,16 @@ export const NOTIFICATION_CATALOG = {
       route: "",
     },
   },
+  // Parent<->teacher messaging (000126). Written by apps/api/src/modules/messaging directly into
+  // app.notifications; the route is the thread itself, keyed by the metadata's conversation_id.
+  [NOTIFICATION_TYPES.DIRECT_MESSAGE]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/messages/{conversationId}",
+    },
+  },
 } as const satisfies NotificationCatalog;

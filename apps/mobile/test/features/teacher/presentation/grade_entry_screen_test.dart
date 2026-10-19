@@ -15,81 +15,150 @@ import '../../../support/wrap_with_localization.dart';
 
 const _t0 = '2026-01-01T00:00:00.000Z';
 
-Map<String, Object?> _cell(String id, String label, {num? score, num maxScore = 100}) => {
-      'id': id,
-      'grade_submission_id': 'sub-$id',
-      'label': label,
-      'score': score,
-      'max_score': maxScore,
-      'weight': 1,
-      'created_at': _t0,
-      'updated_at': _t0,
-    };
+Map<String, Object?> _cell(
+  String id,
+  String label, {
+  num? score,
+  num maxScore = 100,
+}) => {
+  'id': id,
+  'grade_submission_id': 'sub-$id',
+  'label': label,
+  'score': score,
+  'max_score': maxScore,
+  'weight': 1,
+  'created_at': _t0,
+  'updated_at': _t0,
+};
 
 GradeSubmission _submission(
   String id,
   String studentId, {
   String status = 'draft',
   List<Map<String, Object?>> cells = const [],
-}) =>
-    GradeSubmission.fromJson({
-      'id': id,
-      'gradebook_id': 'gb-1',
-      'student_id': studentId,
-      'status': status,
-      'rejection_reason': null,
-      'submitted_by_user_id': null,
-      'decided_by_user_id': null,
-      'submitted_at': null,
-      'decided_at': null,
-      'created_at': _t0,
-      'updated_at': _t0,
-      'grades': cells,
-    });
+  String? rejectionReason,
+  Map<String, Object?>? latestRevision,
+}) => GradeSubmission.fromJson({
+  'id': id,
+  'gradebook_id': 'gb-1',
+  'student_id': studentId,
+  'status': status,
+  'rejection_reason': rejectionReason,
+  'latest_revision': latestRevision,
+  'submitted_by_user_id': null,
+  'decided_by_user_id': null,
+  'submitted_at': null,
+  'decided_at': null,
+  'created_at': _t0,
+  'updated_at': _t0,
+  'grades': cells,
+});
 
 class _FakeGradeEntryClient implements GradeEntryClient {
   int bulkCalls = 0;
+  final List<String> unlocked = [];
+  final List<
+    ({String submissionId, String reason, Map<String, double?> scores})
+  >
+  revisions = [];
+  final List<String> withdrawn = [];
 
   @override
-  Future<List<GradeCell>> bulkUpdateGrades(String gradebookId, List<GradeScoreEdit> edits) async {
+  Future<GradeSubmission> unlockSubmission(
+    String gradebookId,
+    String submissionId, {
+    required String updatedAt,
+  }) async {
+    unlocked.add(submissionId);
+    return _submission(submissionId, 'stu', status: 'draft');
+  }
+
+  @override
+  Future<GradeRevision> requestRevision(
+    String gradebookId,
+    String submissionId, {
+    required String reason,
+    required Map<String, double?> scoresByGradeId,
+  }) async {
+    revisions.add((
+      submissionId: submissionId,
+      reason: reason,
+      scores: scoresByGradeId,
+    ));
+    return GradeRevision.fromJson({
+      'id': 'rev-1',
+      'status': 'pending',
+      'reason': reason,
+      'rejection_reason': null,
+      'changes': const [],
+    });
+  }
+
+  @override
+  Future<GradeRevision> withdrawRevision(
+    String gradebookId,
+    String revisionId,
+  ) async {
+    withdrawn.add(revisionId);
+    return GradeRevision.fromJson({
+      'id': revisionId,
+      'status': 'withdrawn',
+      'reason': 'r',
+      'rejection_reason': null,
+      'changes': const [],
+    });
+  }
+
+  @override
+  Future<List<GradeCell>> bulkUpdateGrades(
+    String gradebookId,
+    List<GradeScoreEdit> edits,
+  ) async {
     bulkCalls++;
     return const [];
   }
 
   @override
-  Future<List<GradeSubmission>> createAssessment(String gradebookId,
-          {required String label, required double maxScore, double weight = 1}) async =>
+  Future<List<GradeSubmission>> createAssessment(
+    String gradebookId, {
+    required String label,
+    required double maxScore,
+    double weight = 1,
+  }) async => const [];
+
+  @override
+  Future<List<GradeSubmission>> fetchEntry(String gradebookId) async =>
       const [];
 
   @override
-  Future<List<GradeSubmission>> fetchEntry(String gradebookId) async => const [];
-
-  @override
-  Future<GradebookRef> resolveGradebook(String classId) => throw UnimplementedError();
-
-  @override
-  Future<GradeSubmission> submitSubmission(String gradebookId, String submissionId,
-          {required String updatedAt}) =>
+  Future<GradebookRef> resolveGradebook(String classId) =>
       throw UnimplementedError();
+
+  @override
+  Future<GradeSubmission> submitSubmission(
+    String gradebookId,
+    String submissionId, {
+    required String updatedAt,
+  }) => throw UnimplementedError();
 }
 
 GradebookRef _gradebook() => const GradebookRef(
-      id: 'gb-1',
-      classId: 'class-1',
-      status: 'draft',
-      gradingSchemeId: null,
-    );
+  id: 'gb-1',
+  classId: 'class-1',
+  status: 'draft',
+  gradingSchemeId: null,
+);
 
 Widget _screenApp() => Builder(
-      builder: (context) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        locale: context.locale,
-        supportedLocales: context.supportedLocales,
-        localizationsDelegates: context.localizationDelegates,
-        theme: AppTheme.light,
-        home: const GradeEntryScreen(classId: 'class-1', classCode: 'MATH101-A'),
-      ),
-    );
+  builder: (context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    locale: context.locale,
+    supportedLocales: context.supportedLocales,
+    localizationsDelegates: context.localizationDelegates,
+    theme: AppTheme.light,
+    home: const GradeEntryScreen(classId: 'class-1', classCode: 'MATH101-A'),
+  ),
+);
 
 Future<void> _pump(
   WidgetTester tester, {
@@ -100,8 +169,12 @@ Future<void> _pump(
     wrapWithLocalization(
       ProviderScope(
         overrides: [
-          gradeEntryClientProvider.overrideWithValue(client ?? _FakeGradeEntryClient()),
-          gradebookForClassProvider('class-1').overrideWith((ref) async => _gradebook()),
+          gradeEntryClientProvider.overrideWithValue(
+            client ?? _FakeGradeEntryClient(),
+          ),
+          gradebookForClassProvider(
+            'class-1',
+          ).overrideWith((ref) async => _gradebook()),
           gradeEntryGridProvider('gb-1').overrideWith((ref) async => grid),
         ],
         child: _screenApp(),
@@ -113,53 +186,179 @@ Future<void> _pump(
 void main() {
   setUpAll(ensureDateFormattingInitialized);
 
-  testWidgets('a submitted student shows a status chip instead of an editable score', (tester) async {
-    await _pump(
-      tester,
-      grid: GradeEntryGrid([
-        _submission('s1', 'stu-aaaaaa', cells: [_cell('g1', 'Midterm', score: 40)]),
-        _submission('s2', 'stu-bbbbbb',
-            status: 'submitted', cells: [_cell('g2', 'Midterm', score: 88)]),
-      ]),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'a submitted student shows a status chip instead of an editable score',
+    (tester) async {
+      await _pump(
+        tester,
+        grid: GradeEntryGrid([
+          _submission(
+            's1',
+            'stu-aaaaaa',
+            cells: [_cell('g1', 'Midterm', score: 40)],
+          ),
+          _submission(
+            's2',
+            'stu-bbbbbb',
+            status: 'submitted',
+            cells: [_cell('g2', 'Midterm', score: 88)],
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
 
-    // Assessment list → open "Midterm".
-    await tester.tap(find.text('Midterm'));
-    await tester.pumpAndSettle();
+      // Assessment list → open "Midterm".
+      await tester.tap(find.text('Midterm'));
+      await tester.pumpAndSettle();
 
-    expect(find.byType(GradeEntryRow), findsNWidgets(2));
-    expect(find.byType(GradeStatusChip), findsOneWidget);
-    expect(find.text('Awaiting approval'), findsOneWidget);
-  });
+      expect(find.byType(GradeEntryRow), findsNWidgets(2));
+      expect(find.byType(GradeStatusChip), findsOneWidget);
+      expect(find.text('Awaiting approval'), findsOneWidget);
+    },
+  );
 
-  testWidgets('a score above the assessment maximum is flagged inline and not saved',
-      (tester) async {
+  testWidgets(
+    'a score above the assessment maximum is flagged inline and not saved',
+    (tester) async {
+      final client = _FakeGradeEntryClient();
+      await _pump(
+        tester,
+        client: client,
+        grid: GradeEntryGrid([
+          _submission(
+            's1',
+            'stu-aaaaaa',
+            cells: [_cell('g1', 'Quiz', maxScore: 50)],
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Quiz'));
+      await tester.pumpAndSettle();
+
+      // Focus the only row, then enter 75 on the docked keypad.
+      await tester.tap(find.byType(GradeEntryRow).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('7'));
+      await tester.pump();
+      await tester.tap(find.text('5'));
+      await tester.pump();
+
+      expect(find.textContaining('Above the maximum'), findsOneWidget);
+
+      // Let any debounce elapse — the out-of-range value must never reach the API.
+      await tester.pump(const Duration(seconds: 2));
+      expect(client.bulkCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'a published grade is corrected through approval, not edited in place',
+    (tester) async {
+      final client = _FakeGradeEntryClient();
+      await _pump(
+        tester,
+        client: client,
+        grid: GradeEntryGrid([
+          _submission(
+            's1',
+            'stu-aaaaaa',
+            status: 'published',
+            cells: [_cell('g1', 'Midterm', score: 70)],
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Midterm'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tap to correct'), findsOneWidget);
+      await tester.tap(find.byType(GradeEntryRow));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Correct published grade'), findsOneWidget);
+      await tester.enterText(find.byType(TextFormField).at(0), '78');
+      await tester.enterText(
+        find.byType(TextFormField).at(1),
+        'Mis-keyed the midterm',
+      );
+      await tester.tap(find.text('Send for approval'));
+      await tester.pumpAndSettle();
+
+      expect(client.revisions, hasLength(1));
+      expect(client.revisions.single.submissionId, 's1');
+      expect(client.revisions.single.reason, 'Mis-keyed the midterm');
+      expect(client.revisions.single.scores, {'g1': 78.0});
+      expect(client.bulkCalls, 0);
+    },
+  );
+
+  testWidgets('a pending correction is shown on the row and can be withdrawn', (
+    tester,
+  ) async {
     final client = _FakeGradeEntryClient();
     await _pump(
       tester,
       client: client,
       grid: GradeEntryGrid([
-        _submission('s1', 'stu-aaaaaa', cells: [_cell('g1', 'Quiz', maxScore: 50)]),
+        _submission(
+          's1',
+          'stu-aaaaaa',
+          status: 'published',
+          cells: [_cell('g1', 'Midterm', score: 70)],
+          latestRevision: {
+            'id': 'rev-9',
+            'status': 'pending',
+            'reason': 'Re-marked',
+            'rejection_reason': null,
+            'changes': [
+              {'grade_id': 'g1', 'previous_score': 70, 'new_score': 82},
+            ],
+          },
+        ),
       ]),
     );
     await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Quiz'));
+    await tester.tap(find.text('Midterm'));
     await tester.pumpAndSettle();
 
-    // Focus the only row, then enter 75 on the docked keypad.
-    await tester.tap(find.byType(GradeEntryRow).first);
+    expect(find.text('Correction to 82 awaiting approval'), findsOneWidget);
+    await tester.tap(find.byType(GradeEntryRow));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('7'));
-    await tester.pump();
-    await tester.tap(find.text('5'));
-    await tester.pump();
+    await tester.tap(find.text('Withdraw correction'));
+    await tester.pumpAndSettle();
 
-    expect(find.textContaining('Above the maximum'), findsOneWidget);
+    expect(client.withdrawn, ['rev-9']);
+  });
 
-    // Let any debounce elapse — the out-of-range value must never reach the API.
-    await tester.pump(const Duration(seconds: 2));
-    expect(client.bulkCalls, 0);
+  testWidgets('a returned grade is unlocked back to draft after confirming', (
+    tester,
+  ) async {
+    final client = _FakeGradeEntryClient();
+    await _pump(
+      tester,
+      client: client,
+      grid: GradeEntryGrid([
+        _submission(
+          's1',
+          'stu-aaaaaa',
+          status: 'rejected',
+          rejectionReason: 'Check question 3',
+          cells: [_cell('g1', 'Midterm', score: 70)],
+        ),
+      ]),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Midterm'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(GradeEntryRow));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Check question 3'), findsOneWidget);
+    await tester.tap(find.text('Unlock and edit'));
+    await tester.pumpAndSettle();
+
+    expect(client.unlocked, ['s1']);
   });
 }

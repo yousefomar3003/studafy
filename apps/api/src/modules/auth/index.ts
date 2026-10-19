@@ -76,6 +76,12 @@ export {
   usesCookieDelivery,
   type TokenResponseBody,
 } from "./delivery";
+export {
+  createSchoolStatusReader,
+  isLoginPermitted,
+  isSchoolClosed,
+  type SchoolStatusReader,
+} from "./school-access";
 export { sessionRoutes } from "./routes/session-routes";
 export {
   activationRoutes,
@@ -101,6 +107,7 @@ export {
 export { adminDeviceRoutes } from "./routes/admin-device-routes";
 export { returningUserLoginRoutes } from "./routes/returning-user-login-routes";
 export { reviewLoginRoutes } from "./routes/review-login-routes";
+export { memberPasswordRoutes } from "./routes/member-password-routes";
 export {
   loginReviewUser,
   REVIEW_LOGIN_PROVIDER,

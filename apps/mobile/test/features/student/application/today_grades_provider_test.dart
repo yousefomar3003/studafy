@@ -28,14 +28,20 @@ import 'package:studafy_mobile/src/features/student/domain/today_section.dart';
 const _studentId = 'student-1';
 const _termId = 'term-1';
 
-/// `currentStudentIdProvider`'s doc comment describes its `ref.watch(authSessionProvider)` as a
-/// cheap, side-effect-free dependency touch — but `authSessionProvider`'s default body builds
-/// `authClientProvider`, which (since ST-247's fix to that client's hardcoded-localhost base URL)
-/// now reads `appConfigProvider`, whose own default throws `StateError` until something provides
-/// one. A bare `ProviderContainer()` needs this override for the same reason `pumpStudafyApp` and
-/// `pumpAppShell` already provide one.
+/// Anything reaching the auth chain (`authSessionProvider` -> `authClientProvider`) reads
+/// `appConfigProvider`, whose own default throws `StateError` until something provides one (since
+/// ST-247's fix to that client's hardcoded-localhost base URL). A bare `ProviderContainer()` needs
+/// this override for the same reason `pumpStudafyApp` and `pumpAppShell` already provide one.
 final _appConfigOverride = appConfigProvider.overrideWithValue(
   AppConfig.fromEnvironment(AppEnvironment.dev),
+);
+
+/// The signed-in student's context left unresolved — what `currentStudentIdProvider` yields while
+/// `GET /api/students/me` is loading, has failed, or 404s (not a student). Overridden rather than
+/// left to its default, which would reach the real auth session and secure storage.
+/// No student profile: `/api/students/me` resolved to null (e.g. a 404 for a non-student).
+final _unresolvedStudent = currentStudentSelfProvider.overrideWith(
+  (ref) async => null,
 );
 
 Term _fakeTerm() {
@@ -160,10 +166,14 @@ void main() {
     addTearDown(eventsController.close);
   });
 
-  test('resolves TodaySectionUnavailable when the student context cannot be resolved', () async {
-    final unresolvedContainer = ProviderContainer(overrides: [_appConfigOverride]);
-    addTearDown(unresolvedContainer.dispose);
-    _keepAlive(unresolvedContainer);
+  test(
+    'resolves TodaySectionUnavailable when the student context cannot be resolved',
+    () async {
+      final unresolvedContainer = ProviderContainer(
+        overrides: [_appConfigOverride, _unresolvedStudent],
+      );
+      addTearDown(unresolvedContainer.dispose);
+      _keepAlive(unresolvedContainer);
 
     final section = await unresolvedContainer.read(todayGradesProvider.future);
 

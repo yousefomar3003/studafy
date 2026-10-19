@@ -7,9 +7,11 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { KeyStore } from "../../src/modules/auth";
 import {
+  assignRole,
   createFullTenant,
   createRefreshSession,
   createTestDatabase,
+  createUser,
   createUserDevice,
   integrationEnabled,
   migrateDatabase,
@@ -326,7 +328,8 @@ describe("logout", () => {
 describe("session management", () => {
   integrationTest("lists one entry per session, not per rotation", async () => {
     const { rotateRefreshToken } = await import("../../src/modules/auth");
-    const user = tenant.users.TEACHING_ASSISTANT;
+    const user = await createUser(sql, tenant.schoolId);
+    await assignRole(sql, tenant.schoolId, user.id, "GUEST");
     const device = await createUserDevice(sql, tenant.schoolId, user.id, { platform: "ios" });
 
     const seed = await createRefreshSession(sql, tenant.schoolId, user.id, {

@@ -22,14 +22,15 @@ explains the parts of the behaviour a schema cannot express. For the underlying 
 
 Correcting past the school's window additionally requires `attendance:correction:override`.
 
-| Permission                       | `ORG_ADMIN` / `SUPER_ADMIN` | `INSTRUCTOR` | `TEACHING_ASSISTANT` |
-| -------------------------------- | --------------------------- | ------------ | -------------------- |
-| `attendance:record:read`         | yes                         | yes          | yes                  |
-| `attendance:record:correct`      | yes                         | yes          | no                   |
-| `attendance:correction:override` | yes                         | **no**       | no                   |
+| Permission                       | `ATTENDANCE_OFFICER` | `PRINCIPAL` | `ORG_ADMIN` | `INSTRUCTOR` |
+| -------------------------------- | -------------------- | ----------- | ----------- | ------------ |
+| `attendance:record:read`         | yes                  | yes         | yes         | yes          |
+| `attendance:record:correct`      | yes                  | yes         | no          | no           |
+| `attendance:correction:override` | no                   | yes         | no          | no           |
 
-The role names in the ticket map onto the platform's fixed role set (ADR 0002): _Teacher_ is
-`INSTRUCTOR`, _Principal_ is `ORG_ADMIN`.
+Registers are taken only by the attendance officer, and corrections stay with the officer and the
+principal; the school admin and teachers view attendance read-only. `SUPER_ADMIN` holds every
+permission. Source of truth: `packages/constants/src/permissions.ts`.
 
 ## Correcting a record
 

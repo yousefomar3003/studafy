@@ -11,7 +11,9 @@ import 'grade_status_chip.dart';
 /// While the submission is a draft the score box is the tap target that binds the docked keypad
 /// to this row; [isFocused] highlights the bound row and [isOutOfRange] flags a value past the
 /// assessment maximum inline (it is never saved). Once the submission is submitted/approved the
-/// row is read-only: the recorded score and a [GradeStatusChip] instead of an input.
+/// row is read-only: the recorded score and a [GradeStatusChip] instead of an input. A locked row
+/// can still be tapped through [onLockedTap] (the screen uses it to correct a published grade),
+/// and [note] adds a one-line hint under the student, e.g. a correction awaiting approval.
 class GradeEntryRow extends StatelessWidget {
   const GradeEntryRow({
     required this.studentLabel,
@@ -22,6 +24,8 @@ class GradeEntryRow extends StatelessWidget {
     required this.isOutOfRange,
     required this.isDirty,
     required this.onTap,
+    this.onLockedTap,
+    this.note,
     super.key,
   });
 
@@ -33,6 +37,8 @@ class GradeEntryRow extends StatelessWidget {
   final bool isOutOfRange;
   final bool isDirty;
   final VoidCallback onTap;
+  final VoidCallback? onLockedTap;
+  final String? note;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +52,7 @@ class GradeEntryRow extends StatelessWidget {
     return Semantics(
       selected: isFocused,
       child: InkWell(
-        onTap: locked ? null : onTap,
+        onTap: locked ? onLockedTap : onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(
             vertical: AppSpacing.space12,
@@ -70,6 +76,13 @@ class GradeEntryRow extends StatelessWidget {
                         ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.error,
+                        ),
+                      )
+                    else if (note != null)
+                      Text(
+                        note!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       )
                     else if (status.isRejected)

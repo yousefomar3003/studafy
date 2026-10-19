@@ -1,17 +1,43 @@
 /**
- * Marketing site chrome: header + footer. Sticky header stays out of the CLS budget since it has a
+ * Marketing site chrome: header + footer. The header stays out of the CLS budget since it has a
  * fixed 64px height regardless of nav state — only its dropdown panel (mobile) grows/shrinks.
  */
 
+/* Fills `main` (see root-shell.css). The header is laid over the scroll region rather than above it,
+ * so the page scrolls *behind* the translucent pill. The region's top padding keeps the page clear
+ * of the header at rest, and its scrollbar track is inset by the same 64px, so the bar still starts
+ * below the header (Chromium/Safari; Firefox has no track pseudo-element and shows a full bar). */
+.marketing-shell {
+  position: relative;
+  block-size: 100%;
+}
+
+.marketing-shell__scroll {
+  block-size: 100%;
+  padding-top: 64px;
+  overflow-y: auto;
+  /* Anchor jumps (`/about#contact`) land below the pill instead of under it. */
+  scroll-padding-top: calc(64px + var(--space-24));
+}
+
+.marketing-shell__scroll::-webkit-scrollbar-track {
+  margin-block-start: 64px;
+}
+
 .marketing-header {
-  position: sticky;
-  top: 0;
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
   z-index: var(--z-sticky);
   background-color: var(--color-background);
   border-bottom: 1px solid var(--color-border);
+  transition:
+    background-color var(--duration-base) ease,
+    border-color var(--duration-base) ease;
 }
 
 .marketing-header__row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-16);
@@ -19,6 +45,33 @@
   height: 64px;
   margin: 0 auto;
   padding: 0 var(--space-24);
+  border-radius: var(--radius-full);
+  transition:
+    max-width var(--duration-base) ease,
+    transform var(--duration-base) ease,
+    box-shadow var(--duration-base) ease,
+    background-color var(--duration-base) ease;
+}
+
+/* Scrolled: the full-width bar gives way to a floating pill. The header box keeps its 64px height
+ * (the pill is only translated down), so content under the sticky header never shifts. */
+.marketing-header[data-scrolled="true"] {
+  background-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.marketing-header[data-scrolled="true"] .marketing-header__row {
+  max-width: min(1100px, calc(100% - 2 * var(--space-16)));
+  transform: translateY(var(--space-12));
+  /* Frosted glass: the page shows through, blurred so the nav stays legible over any content. */
+  background-color: color-mix(in srgb, var(--color-background) 72%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  backdrop-filter: saturate(160%) blur(16px);
+  box-shadow: var(--elevation-4);
+}
+
+.marketing-header[data-scrolled="true"] .marketing-nav__actions .sf-button {
+  border-radius: var(--radius-full);
 }
 
 .marketing-header__brand {
@@ -183,6 +236,15 @@
     display: flex;
   }
 
+  /* Pill mode: the transformed row is the panel's containing block, so it drops just below the
+   * pill at the pill's width — round it to match. */
+  .marketing-header[data-scrolled="true"] .marketing-nav {
+    top: calc(64px + var(--space-8));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--elevation-4);
+  }
+
   .marketing-nav__list {
     flex-direction: column;
     align-items: stretch;
@@ -202,5 +264,176 @@
   .marketing-footer__row {
     flex-direction: column;
     gap: var(--space-24);
+  }
+}
+
+/* The nav cat (NavCat.tsx), a pixel-art sprite that walks around the outside of the header.
+ *
+ * `.nav-cat` covers the header row; `.nav-cat__walker` is a zero-size point travelling along the
+ * row's outline, and the sprite hangs off it with its feet on that point. Rotating the point turns
+ * the cat to face its direction of travel with its feet on the bar: 0deg on top, 90deg down the
+ * right end, 180deg (upside-down) along the underside, 270deg up the left end -- a clockwise loop
+ * following the pill's semicircular ends (generated keyframes below). The cat only appears once the
+ * visitor scrolls and the full-width bar becomes the floating pill. */
+.nav-cat {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.nav-cat__walker {
+  position: absolute;
+  width: 0;
+  height: 0;
+  left: 32px;
+  top: 0;
+  animation: nav-cat-loop 36s linear infinite;
+}
+
+.marketing-header[data-scrolled="true"] .nav-cat {
+  display: block;
+}
+
+/* Feet sit 2px into the bar, so on top of the pill the cat's ears stay below the viewport edge. */
+.nav-cat__sprite {
+  position: absolute;
+  left: -10px;
+  top: -12px;
+  display: block;
+  /* Dark blue; the eye is a white pixel so it reads on the cat in either theme. */
+  color: #1e3a8a;
+  fill: currentColor;
+  image-rendering: pixelated;
+}
+
+.nav-cat__eye {
+  fill: #fff;
+}
+
+/* On the dark theme's navy bar a dark blue cat would vanish, so it gets a 1px light-blue pixel
+ * outline (four unblurred shadows keep the edges square). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .nav-cat__sprite {
+    filter: drop-shadow(1px 0 0 #93c5fd) drop-shadow(-1px 0 0 #93c5fd) drop-shadow(0 1px 0 #93c5fd)
+      drop-shadow(0 -1px 0 #93c5fd);
+  }
+}
+
+:root[data-theme="dark"] .nav-cat__sprite {
+  filter: drop-shadow(1px 0 0 #93c5fd) drop-shadow(-1px 0 0 #93c5fd) drop-shadow(0 1px 0 #93c5fd)
+    drop-shadow(0 -1px 0 #93c5fd);
+}
+
+.nav-cat__frame {
+  animation: nav-cat-frame 0.4s steps(1) infinite;
+}
+
+.nav-cat__frame--b {
+  animation-delay: -0.2s;
+}
+
+@keyframes nav-cat-frame {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Clockwise around the pill: top edge, right cap, underside, left cap. */
+@keyframes nav-cat-loop {
+  0% {
+    left: 32px;
+    top: 0px;
+    transform: rotate(0deg);
+  }
+  44% {
+    left: calc(100% - 32px);
+    top: 0px;
+    transform: rotate(0deg);
+  }
+  45% {
+    left: calc(100% - 32px + 16px);
+    top: 4.287187078897961px;
+    transform: rotate(30deg);
+  }
+  46% {
+    left: calc(100% - 32px + 27.71px);
+    top: 15.999999999999996px;
+    transform: rotate(60deg);
+  }
+  47% {
+    left: calc(100% - 32px + 32px);
+    top: 31.999999999999996px;
+    transform: rotate(90deg);
+  }
+  48% {
+    left: calc(100% - 32px + 27.71px);
+    top: 47.99999999999999px;
+    transform: rotate(120deg);
+  }
+  49% {
+    left: calc(100% - 32px + 16px);
+    top: 59.71281292110204px;
+    transform: rotate(150deg);
+  }
+  50% {
+    left: calc(100% - 32px);
+    top: 64px;
+    transform: rotate(180deg);
+  }
+  94% {
+    left: 32px;
+    top: 64px;
+    transform: rotate(180deg);
+  }
+  95% {
+    left: 16px;
+    top: 59.712812921102035px;
+    transform: rotate(210deg);
+  }
+  96% {
+    left: 4.29px;
+    top: 48.000000000000014px;
+    transform: rotate(240deg);
+  }
+  97% {
+    left: 0px;
+    top: 32.00000000000001px;
+    transform: rotate(270deg);
+  }
+  98% {
+    left: 4.29px;
+    top: 15.999999999999996px;
+    transform: rotate(300deg);
+  }
+  99% {
+    left: 16px;
+    top: 4.287187078897972px;
+    transform: rotate(330deg);
+  }
+  100% {
+    left: 32px;
+    top: 0px;
+    transform: rotate(360deg);
+  }
+  100% {
+    left: 32px;
+    top: 0px;
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-cat__walker,
+  .nav-cat__frame {
+    animation: none;
+  }
+
+  .nav-cat__frame--b {
+    opacity: 0;
   }
 }

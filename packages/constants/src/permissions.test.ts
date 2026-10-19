@@ -45,16 +45,51 @@ describe("ROLE_PERMISSIONS", () => {
     }
   });
 
-  test("attendance reporting permissions are limited to school leadership", () => {
-    for (const permission of [
-      PERMISSIONS.ATTENDANCE_REPORT_READ,
-      PERMISSIONS.ATTENDANCE_REPORT_EXPORT,
-    ]) {
-      const roles = Object.entries(ROLE_PERMISSIONS)
-        .filter(([, permissions]) => permissions.includes(permission))
-        .map(([role]) => role)
-        .sort();
-      expect(roles).toEqual([ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort());
-    }
+  function rolesHolding(permission: string): string[] {
+    return Object.entries(ROLE_PERMISSIONS)
+      .filter(([, permissions]) => (permissions as readonly string[]).includes(permission))
+      .map(([role]) => role)
+      .sort();
+  }
+
+  // Teachers read attendance reports for their own classes (row scope narrows them); exporting stays
+  // with school leadership and the attendance office.
+  test("attendance report read and export are held by the expected roles", () => {
+    expect(rolesHolding(PERMISSIONS.ATTENDANCE_REPORT_READ)).toEqual(
+      [
+        ROLES.ATTENDANCE_OFFICER,
+        ROLES.INSTRUCTOR,
+        ROLES.ORG_ADMIN,
+        ROLES.PRINCIPAL,
+        ROLES.SUPER_ADMIN,
+      ].sort(),
+    );
+    expect(rolesHolding(PERMISSIONS.ATTENDANCE_REPORT_EXPORT)).toEqual(
+      [ROLES.ATTENDANCE_OFFICER, ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
+    );
+  });
+
+  // Registers are taken by the attendance office and by teachers (row scope keeps a teacher to their
+  // own classes); corrections stay with the office and the principal. SUPER_ADMIN holds every
+  // permission by design.
+  test("the attendance officer and teachers take registers", () => {
+    expect(rolesHolding(PERMISSIONS.ATTENDANCE_RECORD_CREATE)).toEqual(
+      [ROLES.ATTENDANCE_OFFICER, ROLES.INSTRUCTOR, ROLES.SUPER_ADMIN].sort(),
+    );
+    expect(rolesHolding(PERMISSIONS.ATTENDANCE_RECORD_CORRECT)).toEqual(
+      [ROLES.ATTENDANCE_OFFICER, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
+    );
+  });
+
+  test("admin, principal, teacher and attendance officer get the attendance dashboard", () => {
+    expect(rolesHolding(PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW)).toEqual(
+      [
+        ROLES.ATTENDANCE_OFFICER,
+        ROLES.INSTRUCTOR,
+        ROLES.ORG_ADMIN,
+        ROLES.PRINCIPAL,
+        ROLES.SUPER_ADMIN,
+      ].sort(),
+    );
   });
 });

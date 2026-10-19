@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,7 +10,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 
+import '../../../core/api/api_exception.dart';
 import '../../../core/api/generated/models/assignment.dart';
+import '../../../core/api/generated/models/assignment_attachment.dart';
+import '../../../core/api/generated/models/assignment_status.dart';
 import '../../../core/api/generated/models/confirm_attachment_body.dart';
 import '../../../core/api/generated/models/confirm_upload_body.dart';
 import '../../../core/api/generated/models/create_assignment_body.dart';
@@ -18,14 +22,19 @@ import '../../../core/api/generated/models/create_material_body.dart';
 import '../../../core/api/generated/models/create_upload_url_body.dart';
 import '../../../core/api/generated/models/material.dart' as material_api;
 import '../../../core/api/generated/models/toggle_ai_visible_body.dart';
+import '../../../core/api/generated/models/update_assignment_body.dart';
+import '../../../core/api/generated/models/update_assignment_body_status.dart';
+import '../../../core/api/generated/models/update_material_body.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../student/domain/material_ready_state.dart';
 import '../../student/presentation/widgets/material_ready_state_pill.dart';
 
-/// Teacher-owned content for one class. Material rows are periodically refreshed while their
-/// server-side scan or AI ingestion is active, so the transition to Ready is visible without
-/// requiring the teacher to leave and return.
+/// Teacher-owned content for one class: create and edit assignments, upload and edit materials.
+///
+/// Material rows are periodically refreshed while their server-side scan or AI ingestion is
+/// active, so the transition to Ready is visible without requiring the teacher to leave and
+/// return.
 class TeacherContentScreen extends ConsumerStatefulWidget {
   const TeacherContentScreen({
     required this.classId,
@@ -74,10 +83,19 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
               .listMaterials(classId: widget.classId, limit: 100))
           .materials;
 
-  void _refreshAssignments() =>
-      setState(() => _assignments = _loadAssignments());
+  // Block-bodied closures: an arrow would return the assigned Future, which setState rejects.
+  void _refreshAssignments() {
+    if (!mounted) return;
+    setState(() {
+      _assignments = _loadAssignments();
+    });
+  }
+
   void _refreshMaterials() {
-    if (mounted) setState(() => _materials = _loadMaterials());
+    if (!mounted) return;
+    setState(() {
+      _materials = _loadMaterials();
+    });
   }
 
   @override
@@ -87,15 +105,25 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
     super.dispose();
   }
 
+  /// Pushes [page] and refreshes the matching list when it pops with `true` (something saved).
+  Future<void> _open(Widget page, {required bool assignments}) async {
+    final changed = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => page));
+    if (changed == true) {
+      assignments ? _refreshAssignments() : _refreshMaterials();
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(widget.classCode),
       bottom: TabBar(
         controller: _tabs,
-        tabs: const [
-          Tab(text: 'Assignments'),
-          Tab(text: 'Materials'),
+        tabs: [
+          Tab(text: 'teacher.content.tabs.assignments'.tr()),
+          Tab(text: 'teacher.content.tabs.materials'.tr()),
         ],
       ),
     ),
@@ -107,29 +135,39 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
               ? Icons.add_task_outlined
               : Icons.upload_file_outlined,
         ),
-        label: Text(_tabs.index == 0 ? 'Create assignment' : 'Upload material'),
-        onPressed: () async {
-          final changed = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(
-              builder: (_) => _tabs.index == 0
-                  ? _AssignmentComposer(classId: widget.classId)
-                  : _MaterialComposer(classId: widget.classId),
-            ),
-          );
-          if (changed == true) {
-            _tabs.index == 0 ? _refreshAssignments() : _refreshMaterials();
-          }
-        },
+        label: Text(
+          _tabs.index == 0
+              ? 'teacher.content.assignments.create'.tr()
+              : 'teacher.content.materials.upload'.tr(),
+        ),
+        onPressed: () => _tabs.index == 0
+            ? _open(
+                _AssignmentComposer(classId: widget.classId),
+                assignments: true,
+              )
+            : _open(
+                _MaterialComposer(classId: widget.classId),
+                assignments: false,
+              ),
       ),
     ),
     body: TabBarView(
       controller: _tabs,
       children: [
-        _AssignmentList(future: _assignments, onRefresh: _refreshAssignments),
+        _AssignmentList(
+          future: _assignments,
+          onRefresh: _refreshAssignments,
+          onEdit: (assignment) => _open(
+            _AssignmentComposer(classId: widget.classId, existing: assignment),
+            assignments: true,
+          ),
+        ),
         _MaterialList(
           future: _materials,
           onRefresh: _refreshMaterials,
           onToggleAi: _toggleAi,
+          onEdit: (material) =>
+              _open(_MaterialEditor(material: material), assignments: false),
         ),
       ],
     ),
@@ -148,17 +186,50 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
     } on DioException catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not update AI visibility.')),
+          SnackBar(content: Text('teacher.content.materials.aiError'.tr())),
         );
       }
     }
   }
 }
 
+/// Maps an API rejection to a translation key. Branches on the stable `code`, falling back to
+/// the HTTP status for bodies that carry none, then to [fallbackKey].
+String _errorKeyFor(DioException error, String fallbackKey) {
+  final apiError = error.apiError;
+  return switch (apiError?.code) {
+    'ASSIGNMENT_INVALID_STATUS_TRANSITION' =>
+      'teacher.content.errors.statusTransition',
+    'VALIDATION_FAILED' => 'teacher.content.errors.validation',
+    'AUTHZ_FORBIDDEN' => 'teacher.content.errors.forbidden',
+    'RESOURCE_NOT_FOUND' ||
+    'MATERIAL_NOT_FOUND' => 'teacher.content.errors.notFound',
+    _ => switch (apiError?.status) {
+      400 || 422 => 'teacher.content.errors.validation',
+      403 => 'teacher.content.errors.forbidden',
+      404 => 'teacher.content.errors.notFound',
+      _ => fallbackKey,
+    },
+  };
+}
+
+String _statusLabel(AssignmentStatus status) => switch (status) {
+  AssignmentStatus.draft => 'teacher.content.status.draft'.tr(),
+  AssignmentStatus.published => 'teacher.content.status.published'.tr(),
+  AssignmentStatus.closed => 'teacher.content.status.closed'.tr(),
+  AssignmentStatus.archived => 'teacher.content.status.archived'.tr(),
+  AssignmentStatus.$unknown => status.toString(),
+};
+
 class _AssignmentList extends StatelessWidget {
-  const _AssignmentList({required this.future, required this.onRefresh});
+  const _AssignmentList({
+    required this.future,
+    required this.onRefresh,
+    required this.onEdit,
+  });
   final Future<List<Assignment>> future;
   final VoidCallback onRefresh;
+  final ValueChanged<Assignment> onEdit;
 
   @override
   Widget build(BuildContext context) => FutureBuilder<List<Assignment>>(
@@ -170,16 +241,16 @@ class _AssignmentList extends StatelessWidget {
       if (snapshot.hasError) {
         return _Message(
           icon: Icons.error_outline,
-          text: 'Could not load assignments.',
+          text: 'teacher.content.assignments.loadError'.tr(),
         );
       }
       final assignments = snapshot.data!;
       return RefreshIndicator(
         onRefresh: () async => onRefresh(),
         child: assignments.isEmpty
-            ? const _Message(
+            ? _Message(
                 icon: Icons.assignment_outlined,
-                text: 'No assignments yet.',
+                text: 'teacher.content.assignments.empty'.tr(),
               )
             : ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -193,11 +264,29 @@ class _AssignmentList extends StatelessWidget {
                     child: ListTile(
                       title: Text(item.title),
                       subtitle: Text(
-                        'Due ${MaterialLocalizations.of(context).formatMediumDate(item.dueAt.toLocal())} · ${item.maxScore} points',
+                        'teacher.content.assignments.subtitle'.tr(
+                          namedArgs: {
+                            'date': MaterialLocalizations.of(
+                              context,
+                            ).formatMediumDate(item.dueAt.toLocal()),
+                            'points': '${item.maxScore}',
+                            'status': _statusLabel(item.status),
+                          },
+                        ),
                       ),
-                      trailing: item.attachments.isEmpty
-                          ? null
-                          : Badge(label: Text('${item.attachments.length}')),
+                      onTap: () => onEdit(item),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (item.attachments.isNotEmpty)
+                            Badge(label: Text('${item.attachments.length}')),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            tooltip: 'teacher.content.assignments.edit'.tr(),
+                            onPressed: () => onEdit(item),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -212,10 +301,12 @@ class _MaterialList extends StatelessWidget {
     required this.future,
     required this.onRefresh,
     required this.onToggleAi,
+    required this.onEdit,
   });
   final Future<List<material_api.Material>> future;
   final VoidCallback onRefresh;
   final Future<void> Function(material_api.Material, bool) onToggleAi;
+  final ValueChanged<material_api.Material> onEdit;
 
   @override
   Widget build(
@@ -227,18 +318,18 @@ class _MaterialList extends StatelessWidget {
         return const Center(child: CircularProgressIndicator());
       }
       if (snapshot.hasError) {
-        return const _Message(
+        return _Message(
           icon: Icons.error_outline,
-          text: 'Could not load materials.',
+          text: 'teacher.content.materials.loadError'.tr(),
         );
       }
       final materials = snapshot.data!;
       return RefreshIndicator(
         onRefresh: () async => onRefresh(),
         child: materials.isEmpty
-            ? const _Message(
+            ? _Message(
                 icon: Icons.folder_open_outlined,
-                text: 'No materials yet.',
+                text: 'teacher.content.materials.empty'.tr(),
               )
             : ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -248,6 +339,7 @@ class _MaterialList extends StatelessWidget {
                     const SizedBox(height: AppSpacing.space8),
                 itemBuilder: (_, index) {
                   final material = materials[index];
+                  final description = material.description;
                   return Card(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(
@@ -259,11 +351,31 @@ class _MaterialList extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            material.title,
-                            style: Theme.of(context).textTheme.titleSmall,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  material.title,
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined),
+                                tooltip: 'teacher.content.materials.edit'.tr(),
+                                onPressed: () => onEdit(material),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: AppSpacing.space4),
+                          if (description != null && description.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppSpacing.space4,
+                              ),
+                              child: Text(
+                                description,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
                           MaterialReadyStatePill(
                             state: materialReadyStateFromWireName(
                               material.ingestStatus.name,
@@ -271,11 +383,11 @@ class _MaterialList extends StatelessWidget {
                           ),
                           SwitchListTile.adaptive(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text(
-                              'Allow Studafy AI to use this material',
+                            title: Text(
+                              'teacher.content.materials.aiTitle'.tr(),
                             ),
-                            subtitle: const Text(
-                              'When on, its content can be processed for AI study tools.',
+                            subtitle: Text(
+                              'teacher.content.materials.aiSubtitle'.tr(),
                             ),
                             value: material.aiVisible,
                             onChanged: (value) => onToggleAi(material, value),
@@ -313,6 +425,19 @@ class _Message extends StatelessWidget {
   );
 }
 
+class _FormError extends StatelessWidget {
+  const _FormError(this.messageKey);
+  final String messageKey;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: AppSpacing.space12),
+    child: Text(
+      messageKey.tr(),
+      style: TextStyle(color: Theme.of(context).colorScheme.error),
+    ),
+  );
+}
+
 class _LocalFile {
   const _LocalFile(this.path, this.name, this.sizeBytes);
   final String path;
@@ -321,9 +446,13 @@ class _LocalFile {
   String get contentType => lookupMimeType(path) ?? 'application/octet-stream';
 }
 
+/// Creates an assignment, or edits [existing] when given. Editing prefills every field, lets the
+/// teacher move the lifecycle forward (never back to draft -- the API rejects that with 409), and
+/// add or remove attachments.
 class _AssignmentComposer extends ConsumerStatefulWidget {
-  const _AssignmentComposer({required this.classId});
+  const _AssignmentComposer({required this.classId, this.existing});
   final String classId;
+  final Assignment? existing;
   @override
   ConsumerState<_AssignmentComposer> createState() =>
       _AssignmentComposerState();
@@ -331,14 +460,45 @@ class _AssignmentComposer extends ConsumerStatefulWidget {
 
 class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
   final _formKey = GlobalKey<FormState>();
-  final _title = TextEditingController();
-  final _details = TextEditingController();
-  final _score = TextEditingController(text: '100');
+  late final TextEditingController _title;
+  late final TextEditingController _details;
+  late final TextEditingController _score;
   final List<_LocalFile> _attachments = [];
-  DateTime _dueAt = DateTime.now().add(const Duration(days: 7));
-  bool _lateAllowed = false;
+  final Set<String> _removedAttachmentIds = {};
+  late DateTime _dueAt;
+  late bool _lateAllowed;
+  late AssignmentStatus _status;
   bool _saving = false;
-  String? _error;
+  String? _errorKey;
+
+  bool get _editing => widget.existing != null;
+
+  /// Statuses offered in the picker. A draft may stay a draft or be published; once published the
+  /// assignment can only move between published and closed (archiving happens via delete).
+  List<AssignmentStatus> get _statusOptions {
+    final current = widget.existing?.status ?? AssignmentStatus.published;
+    return [
+      if (!_editing || current == AssignmentStatus.draft)
+        AssignmentStatus.draft,
+      AssignmentStatus.published,
+      if (_editing) AssignmentStatus.closed,
+      if (current == AssignmentStatus.archived) AssignmentStatus.archived,
+    ];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _title = TextEditingController(text: existing?.title ?? '');
+    _details = TextEditingController(text: existing?.description ?? '');
+    _score = TextEditingController(text: '${existing?.maxScore ?? 100}');
+    _dueAt =
+        existing?.dueAt.toLocal() ??
+        DateTime.now().add(const Duration(days: 7));
+    _lateAllowed = existing?.allowLateSubmission ?? false;
+    _status = existing?.status ?? AssignmentStatus.published;
+  }
 
   @override
   void dispose() {
@@ -366,11 +526,15 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
   }
 
   Future<void> _pickDueDate() async {
+    final now = DateTime.now();
+    // An assignment being edited may already be past due; the picker requires the initial date to
+    // fall inside its range.
+    final firstDate = _dueAt.isBefore(now) ? _dueAt : now;
     final date = await showDatePicker(
       context: context,
       initialDate: _dueAt,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      firstDate: firstDate,
+      lastDate: now.add(const Duration(days: 3650)),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
@@ -390,40 +554,66 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
     }
   }
 
+  Future<Assignment> _persist() {
+    final api = ref.read(apiClientProvider).assignments;
+    final description = _details.text.trim().isEmpty
+        ? null
+        : _details.text.trim();
+    final existing = widget.existing;
+    if (existing == null) {
+      return api.createAssignment(
+        body: CreateAssignmentBody(
+          classId: widget.classId,
+          title: _title.text.trim(),
+          description: description,
+          dueAt: _dueAt.toUtc(),
+          maxScore: num.parse(_score.text),
+          allowLateSubmission: _lateAllowed,
+          status: CreateAssignmentBodyStatus.fromJson(_status.json!),
+        ),
+      );
+    }
+    // The generated body serialises every field, nulls included, and the API reads a null as
+    // "clear" (or rejects it for required columns). So send the full resolved state, carrying the
+    // fields this form doesn't edit over from the stored row.
+    return api.updateAssignment(
+      assignmentId: existing.id,
+      body: UpdateAssignmentBody(
+        title: _title.text.trim(),
+        description: description,
+        instructions: existing.instructions,
+        availableFrom: existing.availableFrom,
+        dueAt: _dueAt.toUtc(),
+        maxScore: num.parse(_score.text),
+        allowLateSubmission: _lateAllowed,
+        status: UpdateAssignmentBodyStatus.fromJson(_status.json!),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _saving = true;
-      _error = null;
+      _errorKey = null;
     });
     try {
-      final assignment = await ref
-          .read(apiClientProvider)
-          .assignments
-          .createAssignment(
-            body: CreateAssignmentBody(
-              classId: widget.classId,
-              title: _title.text.trim(),
-              description: _details.text.trim().isEmpty
-                  ? null
-                  : _details.text.trim(),
-              dueAt: _dueAt.toUtc(),
-              maxScore: num.parse(_score.text),
-              allowLateSubmission: _lateAllowed,
-              status: CreateAssignmentBodyStatus.published,
-            ),
-          );
+      final api = ref.read(apiClientProvider).assignments;
+      final assignment = await _persist();
+      for (final attachmentId in _removedAttachmentIds) {
+        await api.deleteAssignmentAttachment(
+          assignmentId: assignment.id,
+          attachmentId: attachmentId,
+        );
+      }
       for (final file in _attachments) {
-        final upload = await ref
-            .read(apiClientProvider)
-            .assignments
-            .createAssignmentAttachmentUploadUrl(
-              assignmentId: assignment.id,
-              body: CreateUploadUrlBody(
-                fileName: file.name,
-                contentType: file.contentType,
-              ),
-            );
+        final upload = await api.createAssignmentAttachmentUploadUrl(
+          assignmentId: assignment.id,
+          body: CreateUploadUrlBody(
+            fileName: file.name,
+            contentType: file.contentType,
+          ),
+        );
         await Dio().put<void>(
           upload.uploadUrl,
           data: File(file.path).openRead(),
@@ -432,107 +622,172 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
             headers: {Headers.contentLengthHeader: file.sizeBytes},
           ),
         );
-        await ref
-            .read(apiClientProvider)
-            .assignments
-            .confirmAssignmentAttachment(
-              assignmentId: assignment.id,
-              body: ConfirmAttachmentBody(storageKey: upload.storageKey),
-            );
+        await api.confirmAssignmentAttachment(
+          assignmentId: assignment.id,
+          body: ConfirmAttachmentBody(storageKey: upload.storageKey),
+        );
       }
       if (mounted) Navigator.of(context).pop(true);
     } on DioException catch (error) {
-      setState(() => _error = error.message ?? 'Could not create assignment.');
+      setState(() => _errorKey = _errorKeyFor(error, _fallbackErrorKey));
     } catch (_) {
-      setState(() => _error = 'Could not create assignment.');
+      setState(() => _errorKey = _fallbackErrorKey);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
+  String get _fallbackErrorKey => _editing
+      ? 'teacher.content.errors.save'
+      : 'teacher.content.errors.createAssignment';
+
+  String get _submitKey => _editing
+      ? 'teacher.content.assignmentForm.save'
+      : _status == AssignmentStatus.draft
+      ? 'teacher.content.assignmentForm.saveDraft'
+      : 'teacher.content.assignmentForm.publish';
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Create assignment')),
-    body: Form(
-      key: _formKey,
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.space16),
-        children: [
-          TextFormField(
-            controller: _title,
-            decoration: const InputDecoration(labelText: 'Title'),
-            validator: (v) =>
-                v == null || v.trim().isEmpty ? 'Enter a title.' : null,
-          ),
-          const SizedBox(height: AppSpacing.space12),
-          TextFormField(
-            controller: _details,
-            decoration: const InputDecoration(
-              labelText: 'Instructions (optional)',
+  Widget build(BuildContext context) {
+    final keptAttachments = <AssignmentAttachment>[
+      for (final attachment
+          in widget.existing?.attachments ?? const <AssignmentAttachment>[])
+        if (!_removedAttachmentIds.contains(attachment.id)) attachment,
+    ];
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          (_editing
+                  ? 'teacher.content.assignments.edit'
+                  : 'teacher.content.assignments.create')
+              .tr(),
+        ),
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.space16),
+          children: [
+            TextFormField(
+              controller: _title,
+              decoration: InputDecoration(
+                labelText: 'teacher.content.assignmentForm.title'.tr(),
+              ),
+              maxLength: 200,
+              validator: (v) => v == null || v.trim().isEmpty
+                  ? 'teacher.content.assignmentForm.titleRequired'.tr()
+                  : null,
             ),
-            minLines: 3,
-            maxLines: 6,
-          ),
-          const SizedBox(height: AppSpacing.space12),
-          TextFormField(
-            controller: _score,
-            decoration: const InputDecoration(labelText: 'Points'),
-            keyboardType: TextInputType.number,
-            validator: (v) =>
-                num.tryParse(v ?? '') == null ? 'Enter valid points.' : null,
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Due date'),
-            subtitle: Text(
-              MaterialLocalizations.of(context).formatFullDate(_dueAt),
+            const SizedBox(height: AppSpacing.space12),
+            TextFormField(
+              controller: _details,
+              decoration: InputDecoration(
+                labelText: 'teacher.content.assignmentForm.details'.tr(),
+              ),
+              maxLength: 2000,
+              minLines: 3,
+              maxLines: 6,
             ),
-            trailing: const Icon(Icons.calendar_today_outlined),
-            onTap: _pickDueDate,
-          ),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Allow late submissions'),
-            value: _lateAllowed,
-            onChanged: (v) => setState(() => _lateAllowed = v),
-          ),
-          OutlinedButton.icon(
-            onPressed: _saving ? null : _pickFiles,
-            icon: const Icon(Icons.attach_file),
-            label: const Text('Add attachments'),
-          ),
-          for (final file in _attachments)
+            const SizedBox(height: AppSpacing.space12),
+            TextFormField(
+              controller: _score,
+              decoration: InputDecoration(
+                labelText: 'teacher.content.assignmentForm.points'.tr(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              validator: (v) {
+                final points = num.tryParse(v ?? '');
+                return points == null || points <= 0
+                    ? 'teacher.content.assignmentForm.pointsInvalid'.tr()
+                    : null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.space12),
+            DropdownButtonFormField<AssignmentStatus>(
+              initialValue: _status,
+              decoration: InputDecoration(
+                labelText: 'teacher.content.assignmentForm.status'.tr(),
+              ),
+              items: [
+                for (final status in _statusOptions)
+                  DropdownMenuItem(
+                    value: status,
+                    child: Text(_statusLabel(status)),
+                  ),
+              ],
+              onChanged: _saving
+                  ? null
+                  : (value) {
+                      if (value != null) setState(() => _status = value);
+                    },
+            ),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.insert_drive_file_outlined),
-              title: Text(file.name),
-              trailing: IconButton(
-                icon: const Icon(Icons.close),
-                tooltip: 'Remove attachment',
-                onPressed: _saving
-                    ? null
-                    : () => setState(() => _attachments.remove(file)),
+              title: Text('teacher.content.assignmentForm.dueDate'.tr()),
+              subtitle: Text(
+                MaterialLocalizations.of(context).formatFullDate(_dueAt),
               ),
+              trailing: const Icon(Icons.calendar_today_outlined),
+              onTap: _saving ? null : _pickDueDate,
             ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.space12),
-              child: Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: Text('teacher.content.assignmentForm.lateAllowed'.tr()),
+              value: _lateAllowed,
+              onChanged: _saving
+                  ? null
+                  : (v) => setState(() => _lateAllowed = v),
+            ),
+            for (final attachment in keptAttachments)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.insert_drive_file_outlined),
+                title: Text(attachment.originalFileName),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'teacher.content.assignmentForm.removeAttachment'
+                      .tr(),
+                  onPressed: _saving
+                      ? null
+                      : () => setState(
+                          () => _removedAttachmentIds.add(attachment.id),
+                        ),
+                ),
               ),
+            for (final file in _attachments)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.insert_drive_file_outlined),
+                title: Text(file.name),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'teacher.content.assignmentForm.removeAttachment'
+                      .tr(),
+                  onPressed: _saving
+                      ? null
+                      : () => setState(() => _attachments.remove(file)),
+                ),
+              ),
+            OutlinedButton.icon(
+              onPressed: _saving ? null : _pickFiles,
+              icon: const Icon(Icons.attach_file),
+              label: Text('teacher.content.assignmentForm.addAttachments'.tr()),
             ),
-          const SizedBox(height: AppSpacing.space24),
-          FilledButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const CircularProgressIndicator()
-                : const Text('Publish assignment'),
-          ),
-        ],
+            if (_errorKey != null) _FormError(_errorKey!),
+            const SizedBox(height: AppSpacing.space24),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const CircularProgressIndicator()
+                  : Text(_submitKey.tr()),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _MaterialComposer extends ConsumerStatefulWidget {
@@ -545,14 +800,16 @@ class _MaterialComposer extends ConsumerStatefulWidget {
 class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
+  final _description = TextEditingController();
   _LocalFile? _file;
   bool _aiVisible = false;
   bool _uploading = false;
   double? _progress;
-  String? _error;
+  String? _errorKey;
   @override
   void dispose() {
     _title.dispose();
+    _description.dispose();
     super.dispose();
   }
 
@@ -574,9 +831,9 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
     } on PlatformException catch (error) {
       // iOS doesn't show the camera prompt again once it's been declined; image_picker throws.
       setState(
-        () => _error = error.code == 'camera_access_denied'
-            ? 'Camera access is off. Turn it on in Settings > Studafy > Camera to take a photo.'
-            : 'Could not open the camera.',
+        () => _errorKey = error.code == 'camera_access_denied'
+            ? 'teacher.content.materialForm.cameraDenied'
+            : 'teacher.content.materialForm.cameraError',
       );
       return;
     }
@@ -591,21 +848,23 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
 
   Future<void> _upload() async {
     if (!_formKey.currentState!.validate() || _file == null) {
-      setState(() => _error = 'Choose a file or take a photo.');
+      setState(() => _errorKey = 'teacher.content.materialForm.fileRequired');
       return;
     }
     final file = _file!;
     setState(() {
       _uploading = true;
       _progress = 0;
-      _error = null;
+      _errorKey = null;
     });
     try {
       final api = ref.read(apiClientProvider);
+      final description = _description.text.trim();
       final upload = await api.academics.initiateMaterialUpload(
         body: CreateMaterialBody(
           classId: widget.classId,
           title: _title.text.trim(),
+          description: description.isEmpty ? null : description,
           originalFileName: file.name,
           mimeType: file.contentType,
           sizeBytes: file.sizeBytes,
@@ -648,9 +907,11 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
       }
       if (mounted) Navigator.of(context).pop(true);
     } on DioException catch (error) {
-      setState(() => _error = error.message ?? 'Upload failed.');
+      setState(
+        () => _errorKey = _errorKeyFor(error, 'teacher.content.errors.upload'),
+      );
     } catch (_) {
-      setState(() => _error = 'Upload failed.');
+      setState(() => _errorKey = 'teacher.content.errors.upload');
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -658,18 +919,13 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Upload material')),
+    appBar: AppBar(title: Text('teacher.content.materials.upload'.tr())),
     body: Form(
       key: _formKey,
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.space16),
         children: [
-          TextFormField(
-            controller: _title,
-            decoration: const InputDecoration(labelText: 'Title'),
-            validator: (v) =>
-                v == null || v.trim().isEmpty ? 'Enter a title.' : null,
-          ),
+          _MaterialFields(title: _title, description: _description),
           const SizedBox(height: AppSpacing.space12),
           Wrap(
             spacing: AppSpacing.space8,
@@ -677,12 +933,12 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
               OutlinedButton.icon(
                 onPressed: _uploading ? null : _chooseFile,
                 icon: const Icon(Icons.upload_file_outlined),
-                label: const Text('Choose file'),
+                label: Text('teacher.content.materialForm.chooseFile'.tr()),
               ),
               OutlinedButton.icon(
                 onPressed: _uploading ? null : _takePhoto,
                 icon: const Icon(Icons.camera_alt_outlined),
-                label: const Text('Camera'),
+                label: Text('teacher.content.materialForm.camera'.tr()),
               ),
             ],
           ),
@@ -694,10 +950,8 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
             ),
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Allow Studafy AI to use this material'),
-            subtitle: const Text(
-              'When on, its content can be processed for AI study tools.',
-            ),
+            title: Text('teacher.content.materials.aiTitle'.tr()),
+            subtitle: Text('teacher.content.materials.aiSubtitle'.tr()),
             value: _aiVisible,
             onChanged: _uploading
                 ? null
@@ -708,18 +962,141 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
               padding: const EdgeInsets.only(top: AppSpacing.space12),
               child: LinearProgressIndicator(value: _progress),
             ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.space12),
-              child: Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
+          if (_errorKey != null) _FormError(_errorKey!),
           const SizedBox(height: AppSpacing.space24),
           FilledButton(
             onPressed: _uploading ? null : _upload,
-            child: Text(_uploading ? 'Uploading…' : 'Upload material'),
+            child: Text(
+              (_uploading
+                      ? 'teacher.content.materialForm.uploading'
+                      : 'teacher.content.materials.upload')
+                  .tr(),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Title and description fields shared by the upload and edit forms.
+class _MaterialFields extends StatelessWidget {
+  const _MaterialFields({required this.title, required this.description});
+  final TextEditingController title;
+  final TextEditingController description;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      TextFormField(
+        controller: title,
+        decoration: InputDecoration(
+          labelText: 'teacher.content.materialForm.title'.tr(),
+        ),
+        maxLength: 200,
+        validator: (v) => v == null || v.trim().isEmpty
+            ? 'teacher.content.materialForm.titleRequired'.tr()
+            : null,
+      ),
+      const SizedBox(height: AppSpacing.space12),
+      TextFormField(
+        controller: description,
+        decoration: InputDecoration(
+          labelText: 'teacher.content.materialForm.description'.tr(),
+        ),
+        maxLength: 2000,
+        minLines: 2,
+        maxLines: 5,
+      ),
+    ],
+  );
+}
+
+/// Edits an uploaded material's metadata. The file itself is immutable -- replacing it means
+/// uploading a new material -- and AI visibility is toggled from the list row.
+class _MaterialEditor extends ConsumerStatefulWidget {
+  const _MaterialEditor({required this.material});
+  final material_api.Material material;
+  @override
+  ConsumerState<_MaterialEditor> createState() => _MaterialEditorState();
+}
+
+class _MaterialEditorState extends ConsumerState<_MaterialEditor> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _title;
+  late final TextEditingController _description;
+  bool _saving = false;
+  String? _errorKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _title = TextEditingController(text: widget.material.title);
+    _description = TextEditingController(
+      text: widget.material.description ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _saving = true;
+      _errorKey = null;
+    });
+    try {
+      final description = _description.text.trim();
+      // Both fields are always sent: the generated body serialises nulls, and a null description
+      // is exactly how the API clears it.
+      await ref
+          .read(apiClientProvider)
+          .academics
+          .updateMaterial(
+            materialId: widget.material.id,
+            body: UpdateMaterialBody(
+              title: _title.text.trim(),
+              description: description.isEmpty ? null : description,
+            ),
+          );
+      if (mounted) Navigator.of(context).pop(true);
+    } on DioException catch (error) {
+      setState(
+        () => _errorKey = _errorKeyFor(error, 'teacher.content.errors.save'),
+      );
+    } catch (_) {
+      setState(() => _errorKey = 'teacher.content.errors.save');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text('teacher.content.materials.edit'.tr())),
+    body: Form(
+      key: _formKey,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.space16),
+        children: [
+          _MaterialFields(title: _title, description: _description),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.insert_drive_file_outlined),
+            title: Text(widget.material.originalFileName),
+          ),
+          if (_errorKey != null) _FormError(_errorKey!),
+          const SizedBox(height: AppSpacing.space24),
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: _saving
+                ? const CircularProgressIndicator()
+                : Text('teacher.content.materialForm.save'.tr()),
           ),
         ],
       ),

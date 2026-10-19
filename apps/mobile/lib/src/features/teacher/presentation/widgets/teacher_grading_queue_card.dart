@@ -20,9 +20,7 @@ class TeacherGradingQueueCard extends ConsumerWidget {
       titleKey: 'teacher.home.grading.title',
       icon: Icons.rate_review_outlined,
       trailing: pending.maybeWhen(
-        data: (list) => list.isEmpty
-            ? null
-            : _CountBadge(count: list.length),
+        data: (list) => list.isEmpty ? null : _CountBadge(count: list.length),
         orElse: () => null,
       ),
       child: pending.when(
@@ -39,8 +37,12 @@ class TeacherGradingQueueCard extends ConsumerWidget {
             );
           }
           return Text(
-            'teacher.home.grading.count'.tr(namedArgs: {'count': '${list.length}'}),
-            style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            'teacher.home.grading.count'.tr(
+              namedArgs: {'count': '${list.length}'},
+            ),
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           );
         },
       ),
@@ -69,7 +71,9 @@ class _CountBadge extends StatelessWidget {
       ),
       child: Text(
         '$count',
-        style: textTheme.labelMedium?.copyWith(color: colorScheme.onPrimaryContainer),
+        style: textTheme.labelMedium?.copyWith(
+          color: colorScheme.onPrimaryContainer,
+        ),
       ),
     );
   }

@@ -16,7 +16,7 @@ az_count           = 2
 single_nat_gateway = true # cost over HA in dev
 
 # The actual Vite dev server default (apps/web/README.md), not a guess.
-web_origin = "http://localhost:5173"
+web_origin = "http://localhost:5180"
 
 # Placeholder, not a researched/confirmed domain: apps/mobile's dev flavor talks to the Android
 # emulator loopback (10.0.2.2), not a DNS name, so unlike staging/prod there is no existing

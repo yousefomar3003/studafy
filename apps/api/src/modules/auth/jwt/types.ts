@@ -33,6 +33,11 @@ export interface AccessTokenClaims {
   channel: AuthChannel;
   /** The tenant's current subscription lifecycle state. Drives the lifecycle middleware. */
   subscription_status: SubscriptionStatus;
+  /**
+   * Present (and `true`) only while the user has a self-service deletion scheduled (000143). Drives
+   * accountDeletionGuard, which limits the session to showing and cancelling the deletion.
+   */
+  deletion_pending?: true;
 }
 
 /**
@@ -55,4 +60,5 @@ export interface SignAccessTokenParams {
   entitlements_ver: number;
   channel: AuthChannel;
   subscription_status: SubscriptionStatus;
+  deletion_pending?: boolean;
 }

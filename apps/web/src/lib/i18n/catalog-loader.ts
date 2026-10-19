@@ -16,7 +16,14 @@ import { isSupportedLocale, type Locale } from "./config";
 import { i18next } from "./i18next";
 
 export type CatalogArea =
-  "adminPeople" | "adminSchool" | "finance" | "financeReports" | "principal" | "onboarding";
+  | "adminPeople"
+  | "adminSchool"
+  | "finance"
+  | "financeReports"
+  | "principal"
+  | "attendanceOffice"
+  | "platform"
+  | "onboarding";
 
 type Catalog = Record<string, unknown>;
 type CatalogModule = Promise<{ default: Catalog }>;
@@ -40,6 +47,8 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     finance: () => import("./locales/en/finance.json"),
     financeReports: () => import("./locales/en/financeReports.json"),
     principal: () => import("./locales/en/principal.json"),
+    attendanceOffice: () => import("./locales/en/attendanceOffice.json"),
+    platform: () => import("./locales/en/platform.json"),
     onboarding: () => import("./locales/en/onboarding.json"),
   },
   ar: {
@@ -48,6 +57,8 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     finance: () => import("./locales/ar/finance.json"),
     financeReports: () => import("./locales/ar/financeReports.json"),
     principal: () => import("./locales/ar/principal.json"),
+    attendanceOffice: () => import("./locales/ar/attendanceOffice.json"),
+    platform: () => import("./locales/ar/platform.json"),
     onboarding: () => import("./locales/ar/onboarding.json"),
   },
 };

@@ -1,14 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/generated/models/announcement.dart';
 import '../../../core/api/generated/models/assignment.dart';
+import '../../../core/api/generated/models/notification.dart';
 import '../../../core/api/generated/models/published_grade_snapshot.dart';
-import '../../../core/api/generated/models/status11.dart';
 import '../../../core/api/generated/models/timetable_slot.dart';
-import '../../../core/auth/auth_providers.dart';
 import '../../../core/offline/cached_value.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../core/realtime/realtime_providers.dart';
+import '../../timetable/application/weekly_schedule_providers.dart';
 import '../domain/today_section.dart';
 import 'current_term_provider.dart';
 import 'student_context_providers.dart';
@@ -20,10 +19,12 @@ final todayAssignmentsProvider = StreamProvider.autoDispose<CachedValue<List<Ass
   return ref.watch(assignmentsOfflineRepositoryProvider).dueSoon();
 });
 
-/// The newest announcements, offline-aware. Same self-scoping note as
-/// [todayAssignmentsProvider] — the server resolves audience visibility, so this is a direct
-/// pass-through of the existing feed.
-final todayAnnouncementsProvider = StreamProvider.autoDispose<CachedValue<List<Announcement>>>((
+/// The newest announcements addressed to this student, offline-aware: the inbox copies an
+/// announcement fans out as (see `AnnouncementsOfflineRepository`), not the admin-only
+/// `GET /api/announcements` history, which answers 403 for students. Self-scoped like
+/// [todayAssignmentsProvider] — the server resolved the audience at publish time, so this is a
+/// direct pass-through of the feed.
+final todayAnnouncementsProvider = StreamProvider.autoDispose<CachedValue<List<Notification>>>((
   ref,
 ) {
   return ref.watch(announcementsOfflineRepositoryProvider).feed();
@@ -41,6 +42,8 @@ final todayAnnouncementsProvider = StreamProvider.autoDispose<CachedValue<List<A
 final todayGradesProvider = StreamProvider.autoDispose<TodaySection<PublishedGradeSnapshot>>((
   ref,
 ) async* {
+  // Stay in loading (rather than flash "unavailable") while /api/students/me resolves.
+  if (ref.watch(currentStudentSelfProvider).isLoading) return;
   final studentId = ref.watch(currentStudentIdProvider);
   if (studentId == null) {
     yield const TodaySectionUnavailable();
@@ -66,28 +69,25 @@ final todayGradesProvider = StreamProvider.autoDispose<TodaySection<PublishedGra
 
 /// Today's timetable slots, nearest period first. [TodaySectionUnavailable] when
 /// [currentEnrolledClassIdsProvider] hasn't resolved, or when the current term has no approved
-/// timetable version yet — both are legitimate "nothing to show" states, not errors.
+/// timetable version yet — both are legitimate "nothing to show" states, not errors. A weekday
+/// that isn't a school day simply has no slots, so the card shows its "no classes today" state.
 final todayTimetableProvider = StreamProvider.autoDispose<TodaySection<List<TimetableSlot>>>((
   ref,
 ) async* {
+  if (ref.watch(currentStudentSelfProvider).isLoading) return;
   final classIds = ref.watch(currentEnrolledClassIdsProvider);
   if (classIds.isEmpty) {
     yield const TodaySectionUnavailable();
     return;
   }
 
-  final term = await ref.watch(currentTermProvider.future);
-  final api = ref.watch(apiClientProvider);
-  final versions = await api.timetable.listTimetableVersions(
-    termId: term.id,
-    status: Status11.approved,
-    limit: 1,
-  );
-  if (versions.timetableVersions.isEmpty) {
+  // The same approved version the Timetable tab shows (`weekly_schedule_providers.dart`), so the
+  // two never disagree about which timetable is live.
+  final version = await ref.watch(approvedTimetableVersionProvider.future);
+  if (version == null) {
     yield const TodaySectionUnavailable();
     return;
   }
-  final version = versions.timetableVersions.first;
 
   final repo = ref.watch(timetableOfflineRepositoryProvider);
   final today = DateTime.now().weekday;

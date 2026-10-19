@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../../design/widgets/today_date_hero.dart';
 import '../application/today_providers.dart';
 import 'widgets/today_announcements_card.dart';
 import 'widgets/today_assignments_card.dart';
 import 'widgets/today_grades_card.dart';
 import 'widgets/today_timetable_card.dart';
+import '../../../design/layout/bottom_inset_padding.dart';
 
 /// The student home tab: today's timetable, due-soon assignments, newly published grades, and
 /// the latest announcements, each loading and refreshing independently.
@@ -28,8 +30,10 @@ class TodayScreen extends ConsumerWidget {
           ..invalidate(todayAnnouncementsProvider);
       },
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.space16),
+        padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
         children: const [
+          TodayDateHero(),
+          SizedBox(height: AppSpacing.space16),
           TodayTimetableCard(),
           SizedBox(height: AppSpacing.space16),
           TodayAssignmentsCard(),

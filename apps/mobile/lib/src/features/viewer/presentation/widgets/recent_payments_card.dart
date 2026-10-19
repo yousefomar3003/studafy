@@ -9,14 +9,17 @@ import 'viewer_section_card.dart';
 
 String _modeLabel(FinancePaymentMode mode) => switch (mode) {
   FinancePaymentMode.cash => 'viewer.finance.payments.mode.cash'.tr(),
-  FinancePaymentMode.bankTransfer => 'viewer.finance.payments.mode.bankTransfer'.tr(),
-  FinancePaymentMode.cardExternal => 'viewer.finance.payments.mode.cardExternal'.tr(),
+  FinancePaymentMode.bankTransfer =>
+    'viewer.finance.payments.mode.bankTransfer'.tr(),
+  FinancePaymentMode.cardExternal =>
+    'viewer.finance.payments.mode.cardExternal'.tr(),
   FinancePaymentMode.unknown => 'viewer.finance.payments.mode.unknown'.tr(),
 };
 
 String _statusLabel(FinancePaymentStatus status) => switch (status) {
   FinancePaymentStatus.pending => 'viewer.finance.payments.status.pending'.tr(),
-  FinancePaymentStatus.confirmed => 'viewer.finance.payments.status.confirmed'.tr(),
+  FinancePaymentStatus.confirmed =>
+    'viewer.finance.payments.status.confirmed'.tr(),
   FinancePaymentStatus.failed => 'viewer.finance.payments.status.failed'.tr(),
   FinancePaymentStatus.unknown => 'viewer.finance.payments.status.unknown'.tr(),
 };
@@ -60,7 +63,10 @@ class RecentPaymentsCard extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${payment.amount} ${payment.currency}', style: textTheme.bodyLarge),
+                          Text(
+                            '${payment.amount} ${payment.currency}',
+                            style: textTheme.bodyLarge,
+                          ),
                           Text(
                             '${_modeLabel(payment.paymentMode)} · ${payment.paymentDate}',
                             style: textTheme.bodySmall?.copyWith(
@@ -72,11 +78,14 @@ class RecentPaymentsCard extends ConsumerWidget {
                     ),
                     Text(
                       _statusLabel(payment.status),
-                      style: textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                      style: textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
-                if (payment != items.last) const SizedBox(height: AppSpacing.space8),
+                if (payment != items.last)
+                  const SizedBox(height: AppSpacing.space8),
               ],
             ],
           );

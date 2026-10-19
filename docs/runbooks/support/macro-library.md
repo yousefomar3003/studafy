@@ -1,15 +1,15 @@
 # Macro library
 
-Canned first-response text for the top 10 support issues [`README.md`](README.md#triage) predicts a
+Canned first-response text for the top 7 support issues [`README.md`](README.md#triage) predicts a
 live school will hit most, ranked by how likely and how self-service-able each one is. Every macro
 does three things and no more: names the state the reader is actually in, links the one
 `docs/help/` article that already explains it, and says what to do only when the article doesn't
 already say it — the workflow's own rule is that a macro is a shortcut into existing documentation,
 not a second copy of it.
 
-**How this list was built** — from what already exists, not from guesswork: the invitation and
-payment states below are the literal state machines `docs/help/getting-started/invitations.md` and
-`docs/help/billing/subscriptions.md` / `docs/help/finance/workflows.md` document, plus two states
+**How this list was built** — from what already exists, not from guesswork: the payment states
+below are the literal state machines `docs/help/billing/subscriptions.md` /
+`docs/help/finance/workflows.md` document, plus two states
 (CSV import, timetable conflicts) that those same articles' own troubleshooting sections already
 call out as the ones people get stuck on. See `README.md`'s Known gaps: this is a prediction, not
 ticket history — re-rank once real tickets exist.
@@ -19,35 +19,7 @@ Each macro's **Disposition** is the default; triage still applies the "SEV candi
 
 ---
 
-## 1. Invitation email never arrived
-
-**Disposition:** `training` (self-service) — escalate to `backlog` only if resend also fails to
-deliver.
-
-> Check Admin → Invitations — if the invite shows `Pending` (or the bulk batch shows `Sent`), the
-> email was dispatched; please check spam/trash first. If it's still not there, select the
-> invitation and `Resend`, then use `Copy link` to share it directly instead of waiting on email.
-> Full steps: [`docs/help/getting-started/invitations.md`](../../help/getting-started/invitations.md#troubleshooting).
-
-## 2. Invitation link "doesn't work"
-
-**Disposition:** `training`.
-
-> A link works exactly once. If the invitation shows `Consumed`, an account already exists — the
-> person should just sign in. If it shows `Expired` or `Revoked`, `Resend` issues a fresh link; the
-> old one stays dead by design.
-> Full steps: [`docs/help/getting-started/invitations.md`](../../help/getting-started/invitations.md#invitation-states).
-
-## 3. Bulk invite batch has `Failed` rows
-
-**Disposition:** `training`, unless the failure rate is high enough to suggest a dispatch-side
-defect (then `backlog` — attach the batch ID).
-
-> `Failed` rows are rejected addresses (invalid, or dispatch failure) — the rest of the batch is
-> unaffected. Create a new batch with the corrected addresses for just those rows.
-> Full steps: [`docs/help/getting-started/invitations.md`](../../help/getting-started/invitations.md#troubleshooting).
-
-## 4. Subscription shows `Past due` or `Grace period`
+## 1. Subscription shows `Past due` or `Grace period`
 
 **Disposition:** `training` — this is expected product behavior, not a defect. Promote to `sev`
 only if the payment method is confirmed valid and the state doesn't clear after a retry (that's a
@@ -58,7 +30,7 @@ webhook or reconciliation defect, not a billing question).
 > provider's own portal (Studafy never stores card details).
 > Full steps: [`docs/help/billing/subscriptions.md`](../../help/billing/subscriptions.md#subscription-states).
 
-## 5. "My card was declined / payment method won't update"
+## 2. "My card was declined / payment method won't update"
 
 **Disposition:** `training` first response (send to the provider portal); `backlog` if the provider
 portal itself errors rather than the card being rejected.
@@ -69,7 +41,7 @@ portal itself errors rather than the card being rejected.
 > errors, that's ours to fix — file `backlog`.
 > Full steps: [`docs/help/billing/subscriptions.md`](../../help/billing/subscriptions.md#managing-the-payment-method).
 
-## 6. Tuition payment stuck on `Pending`
+## 3. Tuition payment stuck on `Pending`
 
 **Disposition:** `training` first response; `backlog` if still `Pending` after a working day (ERPNext
 confirmation is background but not indefinite).
@@ -79,7 +51,7 @@ confirmation is background but not indefinite).
 > duplicate; if a submission was already recorded, check the payment history before retrying.
 > Full steps: [`docs/help/finance/workflows.md`](../../help/finance/workflows.md#3-record-payments).
 
-## 7. Refund request stuck, `Rejected`, or `Failed`
+## 4. Refund request stuck, `Rejected`, or `Failed`
 
 **Disposition:** `training` if it's sitting in `Pending approval` (needs a second approver, working
 as designed); `backlog` if it reached `Rejected`/`Failed` without an approver ever actioning it.
@@ -90,15 +62,17 @@ as designed); `backlog` if it reached `Rejected`/`Failed` without an approver ev
 > refunds list.
 > Full steps: [`docs/help/finance/workflows.md`](../../help/finance/workflows.md#request-a-refund).
 
-## 8. Scholarship/discount award not applying to invoices
+## 5. Scholarship/discount award not applying to invoices
 
 **Disposition:** `training`.
 
-> An award takes effect only after a **different** user confirms it — the creator cannot also
-> confirm, by design. Check whether the award is still `Pending confirmation`.
-> Full steps: [`docs/help/finance/workflows.md`](../../help/finance/workflows.md#award-a-scholarship-or-discount).
+> Scholarships and discounts are switched off for now: there is no way to award one, and new invoices
+> are generated at the fee structure's full amount — including for students who had a confirmed
+> award before the feature was removed. Invoices issued earlier keep whatever discount they carried.
+> If a family needs a reduction today, the school can issue a refund (`Discount adjustment` reason).
+> Full steps: [`docs/help/finance/workflows.md`](../../help/finance/workflows.md#request-a-refund).
 
-## 9. Student/staff CSV import rejected during onboarding
+## 6. Student/staff CSV import rejected during onboarding
 
 **Disposition:** `training` first response; `backlog` if the error report itself is wrong or
 unreadable rather than the data being invalid.
@@ -107,7 +81,7 @@ unreadable rather than the data being invalid.
 > and re-upload. Valid rows in the same file are unaffected; only the flagged rows are skipped.
 > Full steps: [`docs/help/getting-started/onboarding-guide.md`](../../help/getting-started/onboarding-guide.md#troubleshooting).
 
-## 10. Timetable won't approve — "conflict" blocking it
+## 7. Timetable won't approve — "conflict" blocking it
 
 **Disposition:** `training`.
 

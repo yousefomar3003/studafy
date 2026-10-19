@@ -40,9 +40,12 @@ class AnnouncementsOverviewCard extends ConsumerWidget {
                 if (announcement.publishedAt != null)
                   Text(
                     relativeTimeLabel(announcement.publishedAt!),
-                    style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                if (announcement != items.last) const SizedBox(height: AppSpacing.space8),
+                if (announcement != items.last)
+                  const SizedBox(height: AppSpacing.space8),
               ],
             ],
           );

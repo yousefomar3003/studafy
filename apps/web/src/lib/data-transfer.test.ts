@@ -1,76 +1,9 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import {
-  buildExportCsv,
-  buildImportTemplate,
-  coerceImportValue,
-  collectCursorPages,
-  collectOffsetPages,
-  exportFilename,
-  prepareImport,
-  runImport,
-} from "./data-transfer";
+import { buildImportTemplate, coerceImportValue, prepareImport, runImport } from "./data-transfer";
 
 import type { ImportField } from "./data-transfer";
-
-describe("collectCursorPages", () => {
-  test("follows cursors until exhausted", async () => {
-    const pages: Record<string, { items: number[]; nextCursor?: string }> = {
-      start: { items: [1, 2], nextCursor: "b" },
-      b: { items: [3], nextCursor: "c" },
-      c: { items: [4] },
-    };
-    const result = await collectCursorPages(async (cursor) => pages[cursor ?? "start"]!);
-    expect(result).toEqual({ rows: [1, 2, 3, 4], truncated: false });
-  });
-
-  test("stops at the row cap and reports truncation", async () => {
-    const result = await collectCursorPages(async () => ({ items: [1, 2, 3], nextCursor: "x" }), 5);
-    expect(result).toEqual({ rows: [1, 2, 3, 1, 2], truncated: true });
-  });
-});
-
-describe("collectOffsetPages", () => {
-  test("pages by offset until total", async () => {
-    const data = [1, 2, 3, 4, 5];
-    const result = await collectOffsetPages(async (offset) => ({
-      items: data.slice(offset, offset + 2),
-      total: data.length,
-    }));
-    expect(result).toEqual({ rows: data, truncated: false });
-  });
-
-  test("stops on an empty page even if total overcounts", async () => {
-    const result = await collectOffsetPages(async (offset) => ({
-      items: offset === 0 ? [1] : [],
-      total: 10,
-    }));
-    expect(result).toEqual({ rows: [1], truncated: false });
-  });
-
-  test("reports truncation at the cap", async () => {
-    const result = await collectOffsetPages(async () => ({ items: [1, 2], total: 100 }), 3);
-    expect(result).toEqual({ rows: [1, 2, 1], truncated: true });
-  });
-});
-
-describe("export helpers", () => {
-  test("buildExportCsv maps columns over rows", () => {
-    const csv = buildExportCsv(
-      [
-        { header: "Name", value: (row: { name: string; n: number }) => row.name },
-        { header: "N", value: (row) => row.n },
-      ],
-      [{ name: "A", n: 1 }],
-    );
-    expect(csv).toBe("Name,N\r\nA,1");
-  });
-
-  test("exportFilename dates the file", () => {
-    expect(exportFilename("classes", new Date(2026, 0, 5))).toBe("classes-2026-01-05.csv");
-  });
-});
 
 const FIELDS: ImportField[] = [
   { key: "name", label: "Name", required: true, maxLength: 5 },

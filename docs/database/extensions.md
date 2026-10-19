@@ -98,7 +98,7 @@ module must be loaded through `shared_preload_libraries`, which is a **static** 
   [`infra/terraform/modules/postgres/main.tf`](../../infra/terraform/modules/postgres/main.tf).
   Because it is static, it applies on the instance's first boot; **changing it on a running instance
   requires a reboot.** No reboot ⇒ the extension exists but the views raise on read.
-- **Local / CI:** `db/compose.yml` starts Postgres with
+- **Local / CI:** `compose.yml` (test profile) starts Postgres with
   `-c shared_preload_libraries=pg_stat_statements`, so operationality is genuinely exercised.
 
 The migration warns (does not fail) when the library is not preloaded, so the other three extensions
@@ -191,11 +191,11 @@ If step 2 raises `pg_stat_statements must be loaded via shared_preload_libraries
 ## Local development setup
 
 ```bash
-POSTGRES_PASSWORD='<local-only>' docker compose -f db/compose.yml up -d --wait
+POSTGRES_PASSWORD='<local-only>' docker compose up -d --wait test-postgres test-redis
 export TEST_DATABASE_URL='postgresql://studafy_test:<local-only>@127.0.0.1:54329/postgres?sslmode=disable'
 bun run db:migrate            # applies 000001..000003
 bun test --cwd packages/db    # includes extensions.test.ts and roles.test.ts
-docker compose -f db/compose.yml down
+docker compose rm -sfv test-postgres test-redis
 ```
 
 PowerShell uses the same values via `$env:POSTGRES_PASSWORD` / `$env:TEST_DATABASE_URL`.
@@ -203,7 +203,7 @@ PowerShell uses the same values via `$env:POSTGRES_PASSWORD` / `$env:TEST_DATABA
 ## CI validation
 
 The `database-migrations` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) starts
-the database from `db/compose.yml` (so the pgvector image and `pg_stat_statements` preload match
+the database from `compose.yml` (test profile) (so the pgvector image and `pg_stat_statements` preload match
 local development) and runs the whole `packages/db` suite, which applies the migrations to a fresh
 disposable database and verifies every extension, including that `pg_stat_statements` collects
 statistics.

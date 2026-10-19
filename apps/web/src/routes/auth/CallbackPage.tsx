@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Loading } from "../../components/Loading";
-import { consumeReturnTo, useAuthStatus, useSessionStore } from "../../lib/auth";
+import { consumeReturnTo, resolveRoleHome, useAuthStatus, useSessionStore } from "../../lib/auth";
 
 /**
  * OAuth callback (`/auth/callback`).
@@ -25,7 +25,7 @@ export default function CallbackPage() {
   useEffect(() => {
     if (status === "authenticated" && !handled.current) {
       handled.current = true;
-      void navigate(consumeReturnTo() ?? "/portal", { replace: true });
+      void navigate(consumeReturnTo() ?? resolveRoleHome(store.getRoles()), { replace: true });
     } else if ((status === "unauthenticated" || status === "expired") && !handled.current) {
       handled.current = true;
       void navigate(status === "expired" ? "/auth/login?reason=expired" : "/auth/login", {

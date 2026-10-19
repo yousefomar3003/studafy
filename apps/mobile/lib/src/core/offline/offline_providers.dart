@@ -60,7 +60,7 @@ final materialsOfflineRepositoryProvider = Provider<MaterialsOfflineRepository>(
 final announcementsOfflineRepositoryProvider = Provider<AnnouncementsOfflineRepository>((ref) {
   return AnnouncementsOfflineRepository(
     database: ref.watch(offlineDatabaseProvider),
-    client: ref.watch(apiClientProvider).announcements,
+    client: ref.watch(apiClientProvider).notifications,
   );
 });
 

@@ -38,7 +38,8 @@
     },
     "header": {
       "signIn": "Sign in",
-      "talkToUs": "Talk to us"
+      "talkToUs": "Talk to us",
+      "signUp": "Sign up"
     },
     "footer": {
       "tagline": "School operations, in one system.",
@@ -58,7 +59,7 @@
     "home": {
       "seoTitle": "School operations, in one system",
       "seoDescription": "Studafy brings academics, attendance, grades, discipline, finance, and family communication into one school management platform.",
-      "heroTitle": "Studafy: school operations, in one system",
+      "heroTitle": "School operations, in one system",
       "heroSubtitle": "Academics, attendance, grades, discipline, finance, and family communication — one platform your staff and families both actually use.",
       "includedEyebrow": "What’s included",
       "includedTitle": "Everything a school runs on",
@@ -74,7 +75,7 @@
         },
         "finance": {
           "title": "Finance & billing",
-          "body": "Fee structures, installments, scholarships and discounts, payments, refunds, and reconciliation — with reporting that adds up for finance staff, not just for parents."
+          "body": "Fee structures, installments, payments, refunds, and reconciliation — with reporting that adds up for finance staff, not just for parents."
         },
         "family": {
           "title": "Family portal & notifications",
@@ -148,7 +149,6 @@
           "body": "Fees through to reconciliation.",
           "items": {
             "fees": "Fee structures and installments",
-            "scholarships": "Scholarships and discounts",
             "payments": "Payments and refunds",
             "reconciliation": "Reconciliation and finance reporting"
           }
@@ -214,6 +214,30 @@
       "contactTitle": "Talk to us",
       "contactLede": "Tell us about your school and we’ll walk you through Studafy.",
       "emailLabel": "Email"
+    },
+    "contactForm": {
+      "ariaLabel": "Talk to us",
+      "fullName": "Full name",
+      "email": "Work email",
+      "phone": "Phone (optional)",
+      "schoolName": "School name",
+      "country": "Country (optional)",
+      "studentCount": "Number of students (optional)",
+      "message": "How can we help? (optional)",
+      "submit": "Send",
+      "submitting": "Sending…",
+      "sentTitle": "Thanks — we've got your message",
+      "sentBody": "Someone from the Studafy team will reply to {{email}} shortly.",
+      "errors": {
+        "fullName": "Enter your name.",
+        "email": "Enter a valid email address.",
+        "schoolName": "Enter your school's name.",
+        "studentCount": "Enter a whole number.",
+        "captcha": "Complete the verification check before sending.",
+        "captchaExpired": "The verification check expired. Complete it again and resend.",
+        "rateLimited": "Too many messages from your network. Wait a minute and try again.",
+        "generic": "We couldn't send your message. Check your connection and try again."
+      }
     }
   },
   "login": {
@@ -221,18 +245,6 @@
     "subtitle": "Welcome back. Choose how you'd like to continue.",
     "sessionExpired": "Your session expired. Sign in again to continue.",
     "continueWith": "Continue with {{provider}}",
-    "divider": "or sign in with email",
-    "emailLabel": "Email",
-    "passwordLabel": "Password",
-    "submit": "Sign in",
-    "errors": {
-      "invalidCredentials": "Incorrect email or password.",
-      "suspended": "Your school's account has been suspended.",
-      "passwordDisabled": "Email sign-in isn't enabled on this server.",
-      "rateLimited": "Too many attempts. Wait a moment and try again.",
-      "generic": "We couldn't sign you in. Check your connection and try again.",
-      "sessionNotStarted": "Signed in, but the session couldn't be started. Try again."
-    },
     "dev": {
       "badge": "Dev",
       "title": "Quick sign-in as a demo account",
@@ -248,11 +260,11 @@
         "superAdmin": "Super admin",
         "schoolAdmin": "School admin",
         "principal": "Principal",
+        "attendanceOfficer": "Attendance officer",
         "finance": "Finance officer",
         "science": "Science",
         "math": "Math",
-        "arts": "Arts",
-        "teachingAssistant": "Teaching assistant"
+        "arts": "Arts"
       }
     }
   },
@@ -286,6 +298,10 @@
     "generic": {
       "heading": "We couldn't complete your sign-in",
       "message": "Something went wrong on our end. Please try again in a moment."
+    },
+    "mobileOnly": {
+      "heading": "Use the Studafy mobile app",
+      "message": "Students, parents, teachers and attendance officers sign in on the Studafy mobile app. The website is for school administrators, principals and finance staff."
     }
   },
   "help": {
@@ -339,7 +355,8 @@
       "MATERIAL_SCAN_FAILED": "Material scan failed",
       "MATERIAL_OCR_LOW_CONFIDENCE": "Material text quality warning",
       "MATERIAL_INGESTED": "Material ready for AI search",
-      "MATERIAL_INGEST_FAILED": "Material processing failed"
+      "MATERIAL_INGEST_FAILED": "Material processing failed",
+      "DIRECT_MESSAGE": "New messages"
     },
     "channels": {
       "in_app": "In-app",
@@ -441,6 +458,42 @@
       "confirm": "Cancel subscription",
       "scheduledToast": "Cancellation scheduled",
       "errorToast": "Couldn't cancel the subscription"
+    },
+    "refund": {
+      "link": "Request a refund",
+      "title": "Request a refund",
+      "description": "Tell us what happened and the Studafy team will review your request.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Choose a reason",
+      "reasonRequired": "Choose a reason first.",
+      "reasons": {
+        "accidental_purchase": "Bought by mistake",
+        "duplicate_charge": "Charged more than once",
+        "service_issue": "The service didn't work as expected",
+        "not_as_described": "Not what was described",
+        "no_longer_needed": "No longer needed",
+        "other": "Other"
+      },
+      "paymentLabel": "Payment",
+      "paymentNone": "Not sure — let the Studafy team check",
+      "paymentOption": "{{date}} · {{amount}}",
+      "detailsLabel": "Details (optional)",
+      "submit": "Send request",
+      "close": "Close",
+      "submittedToast": "Refund request sent",
+      "errorToast": "Couldn't send the refund request",
+      "openNotice": "You can send another request once this one has been reviewed.",
+      "statusHeading": "Your latest request",
+      "statusLine": "Sent {{date}} · {{status}}",
+      "status": {
+        "pending": "Waiting for review",
+        "approved": "Approved, being processed",
+        "failed": "Approved, being processed",
+        "refunded": "Refunded",
+        "rejected": "Not approved"
+      },
+      "refundedAmount": "Refunded: {{amount}}",
+      "reviewNote": "Note from Studafy: {{note}}"
     },
     "changePlanModal": {
       "title": "Change plan",

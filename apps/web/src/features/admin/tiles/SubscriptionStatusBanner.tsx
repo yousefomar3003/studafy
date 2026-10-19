@@ -3,7 +3,7 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { subscriptionStatusTone } from "../../billing/labels";
 import { useBillingOverviewQuery } from "../../billing/queries";
 
-/** Current plan, lifecycle status, and seat usage — one call, shared with `StorageUsageTile`. */
+/** Current plan, lifecycle status, and seat usage. */
 export function SubscriptionStatusBanner() {
   const { t } = useTranslation();
   const { formatNumber } = useFormatters();

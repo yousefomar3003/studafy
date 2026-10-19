@@ -5,15 +5,17 @@ import { BrandLogo } from "../components/BrandLogo";
 import { Loading } from "../components/Loading";
 import { LocaleSwitcher } from "../components/LocaleSwitcher";
 import { useTranslation } from "../lib/i18n";
+import { ScrollToTopOnNavigate, useScrolled } from "../lib/use-scrolled";
 
 import { MARKETING_NAV_ITEMS } from "./marketing/nav-items";
 
 import "./root-shell.css";
 
 // Every route that renders inside `MarketingLayout` (see `app/routes.tsx`): the nav pages plus the
-// public legal pages, which are linked from the footer and app-store listings rather than the nav.
+// public legal pages, which are linked from the footer and app-store listings rather than the nav,
+// and the school sign-up pages (`/signup`, `/signup/apply`), reached from the header's "Sign up".
 const MARKETING_PATHS = new Set(MARKETING_NAV_ITEMS.map((item) => item.to));
-const MARKETING_PATH_PREFIXES = ["/privacy", "/legal/"];
+const MARKETING_PATH_PREFIXES = ["/privacy", "/legal/", "/signup"];
 
 /**
  * Shared shell wrapping every route group: skip link, primary navigation, and the main landmark.
@@ -36,14 +38,15 @@ export function RootLayout() {
   const isAuth = pathname.startsWith("/auth");
   // PortalLayout renders its own header (brand, search, user menu); a second bar would stack on it.
   const isPortal = pathname.startsWith("/portal");
+  const scrolled = useScrolled();
 
   return (
-    <>
+    <div className="app-shell">
       <a className="skip-link" href="#main">
         {t("shell.skipToContent")}
       </a>
       {!isMarketing && !isHelp && !isAuth && !isPortal && (
-        <header className="root-nav">
+        <header className="root-nav" data-scrolled={scrolled}>
           <div className="root-nav__inner">
             <Link to="/" className="root-nav__brand" aria-label={t("shell.homeLink")}>
               <BrandLogo />
@@ -66,11 +69,13 @@ export function RootLayout() {
           </div>
         </header>
       )}
-      <main id="main">
+      <main id="main" className="app-shell__main" data-scroll-root="">
         <Suspense fallback={<Loading />}>
+          {/* Inside the boundary so the rewind waits for a lazy page to load (see the hook). */}
+          <ScrollToTopOnNavigate />
           <Outlet />
         </Suspense>
       </main>
-    </>
+    </div>
   );
 }

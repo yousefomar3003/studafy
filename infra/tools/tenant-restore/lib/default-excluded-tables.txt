@@ -41,3 +41,8 @@ refresh_tokens
 # Failure log the notification dispatcher's own retry sweep reads from. Restoring a stale
 # dead-letter row can cause an already-superseded delivery failure to be retried again.
 notification_dead_letters
+
+# Member password hashes (db/migrations/000141). Same reasoning as refresh_tokens: a credential
+# changed or cleared since the backup must stay that way; restoring the row brings back an old
+# password. Restored members sign in again through a reset.
+member_credentials

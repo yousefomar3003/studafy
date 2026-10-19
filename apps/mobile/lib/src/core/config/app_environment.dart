@@ -8,14 +8,14 @@ enum AppEnvironment {
   // for defaultApiBaseUrl: app.studafy.com / staging.studafy.com are the real apps/web hostnames
   // (infra/terraform/variables.tf's cdn_domain_name), so hardcoding them here carries no more risk
   // than the API host already does. Dev has no emulator alias to reach for — apps/web runs on the
-  // host machine's Vite dev server (default port 5173), which the Android emulator's loopback
+  // host machine's Vite dev server (default port 5180), which the Android emulator's loopback
   // alias (10.0.2.2) reaches the same way it reaches the API on 10.0.2.2:3000.
   dev(
     label: 'Development',
     shortName: 'dev',
     defaultApiBaseUrl: 'http://10.0.2.2:3000',
     defaultRealtimeBaseUrl: 'ws://10.0.2.2:3001',
-    defaultWebBaseUrl: 'http://10.0.2.2:5173',
+    defaultWebBaseUrl: 'http://10.0.2.2:5180',
   ),
   staging(
     label: 'Staging',

@@ -35,6 +35,8 @@ export interface AuthContext {
   entitlementsVer: number;
   /** The tenant's current subscription lifecycle state. Drives tenantLifecycleGuard middleware. */
   subscriptionStatus: SubscriptionStatus;
+  /** A self-service deletion is scheduled for this user. Drives accountDeletionGuard middleware. */
+  deletionPending?: boolean;
 }
 
 /**

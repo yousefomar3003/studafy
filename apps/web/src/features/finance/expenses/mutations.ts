@@ -20,21 +20,7 @@ export function useRequestExpenseUploadUrl() {
   });
 }
 
-/**
- * PUTs `file`'s bytes directly to a pre-signed S3 URL obtained from `useRequestExpenseUploadUrl`.
- * Not a TanStack mutation, and not routed through `api`: the URL is already fully authorized and
- * points outside this app's own API, so there is no typed client call to wrap here.
- */
-export async function uploadFileToPresignedUrl(uploadUrl: string, file: File): Promise<void> {
-  const response = await fetch(uploadUrl, {
-    method: "PUT",
-    body: file,
-    headers: file.type ? { "Content-Type": file.type } : undefined,
-  });
-  if (!response.ok) {
-    throw new Error(`Attachment upload failed (${response.status}).`);
-  }
-}
+export { uploadFileToPresignedUrl } from "../../../lib/upload";
 
 /** `POST /api/finance/expenses` — shared by the entry form and `ExpenseListPage`'s CSV import. */
 export async function createExpense(body: CreateExpenseBody): Promise<Expense> {

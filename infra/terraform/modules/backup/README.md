@@ -83,7 +83,7 @@ module "backup" {
 ## Running the dev PITR demo
 
 ```bash
-infra/deploy/scripts/postgres-restore-verify.sh dev --restore-time=2026-09-01T03:15:00Z
+infra/deploy/scripts/run-postgres-restore-verify.sh dev --restore-time=2026-09-01T03:15:00Z
 ```
 
 Restores `module.postgres`'s dev instance to that exact timestamp into a scratch instance, verifies
@@ -94,7 +94,7 @@ pointed at an explicit timestamp instead of "latest restorable time". Must be a 
 ## Running an ERPNext restore drill on demand
 
 ```bash
-infra/deploy/scripts/erpnext-restore-drill.sh staging
+infra/deploy/scripts/run-erpnext-restore-drill.sh staging
 ```
 
 ## Tenant-slice restore (ST-267)

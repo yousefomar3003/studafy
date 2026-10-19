@@ -17,6 +17,9 @@
       ],
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
+        { "name": "APP_ENV", "value": "${APP_ENV}" },
+        { "name": "CORS_ALLOWED_ORIGINS", "value": "${WEB_ORIGIN}" },
+        { "name": "FRONTEND_URL", "value": "${WEB_ORIGIN}" },
         { "name": "PORT", "value": "3000" },
         { "name": "HOST", "value": "0.0.0.0" },
         { "name": "METRICS_PORT", "value": "9464" },
@@ -24,6 +27,7 @@
         { "name": "LOG_LEVEL", "value": "info" },
         { "name": "SERVICE_NAME", "value": "api" },
         { "name": "RELEASE_VERSION", "value": "${IMAGE_TAG}" },
+        { "name": "SENTRY_ENVIRONMENT", "value": "${SENTRY_ENVIRONMENT}" },
         { "name": "DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },
         { "name": "DATABASE_PORT", "value": "6432" },
         { "name": "DATABASE_NAME", "value": "api" },
@@ -40,7 +44,8 @@
         { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" },
         { "name": "REDIS_URL", "valueFrom": "${REDIS_SECRET_ARN}:queue_url::" },
         { "name": "TAP_SECRET_KEY", "valueFrom": "${API_APP_SECRETS_ARN}:TAP_SECRET_KEY::" },
-        { "name": "TAP_WEBHOOK_URL", "valueFrom": "${API_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" }
+        { "name": "TAP_WEBHOOK_URL", "valueFrom": "${API_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" },
+        { "name": "SENTRY_DSN", "valueFrom": "${API_APP_SECRETS_ARN}:SENTRY_DSN::" }
       ],
       "healthCheck": {
         "command": [

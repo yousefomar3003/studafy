@@ -4,6 +4,7 @@ import { BrandLogo } from "../../components/BrandLogo";
 import { LocaleSwitcher } from "../../components/LocaleSwitcher";
 import { GlobalSearchTrigger } from "../../features/search/GlobalSearchTrigger";
 import { useTranslation } from "../../lib/i18n";
+import { useScrolled } from "../../lib/use-scrolled";
 
 import { NotificationBell } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
@@ -23,9 +24,10 @@ export interface PortalHeaderProps {
  */
 export function PortalHeader({ navId, navOpen, onToggleNav }: PortalHeaderProps) {
   const { t } = useTranslation();
+  const scrolled = useScrolled();
 
   return (
-    <header className="portal-header">
+    <header className="portal-header" data-scrolled={scrolled}>
       <button
         type="button"
         className="portal-icon-button portal-header__nav-toggle"
@@ -44,7 +46,9 @@ export function PortalHeader({ navId, navOpen, onToggleNav }: PortalHeaderProps)
         <span className="sf-visually-hidden">{t("shell.toggleNav")}</span>
       </button>
 
-      <Link to="/" className="portal-header__brand" aria-label={t("shell.homeLink")}>
+      {/* Signed in, the logo means "my home", not the marketing site. `/portal` forwards each role
+          to its own home page (see `routes/portal/PortalPage.tsx`). */}
+      <Link to="/portal" className="portal-header__brand" aria-label={t("shell.homeLink")}>
         <BrandLogo />
       </Link>
 

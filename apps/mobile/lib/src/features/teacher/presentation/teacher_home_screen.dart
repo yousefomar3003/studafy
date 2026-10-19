@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../../design/widgets/today_date_hero.dart';
 import '../application/teacher_providers.dart';
+import 'widgets/take_attendance_button.dart';
 import 'widgets/teacher_grading_queue_card.dart';
 import 'widgets/teacher_recent_submissions_card.dart';
 import 'widgets/teacher_today_sessions_card.dart';
+import '../../../design/layout/bottom_inset_padding.dart';
 
-/// The teacher home tab: today's sessions with take-attendance CTAs, the pending-grading count,
-/// and the most recent submissions.
+/// The teacher home tab: today's date and time, a Take attendance action, today's sessions with
+/// their attendance state, the pending-grading count, and the most recent submissions.
 ///
 /// Each card owns its provider and renders its own loading / empty / error state, so a slow
 /// grading-queue fan-out never holds up today's sessions from showing. Pull-to-refresh
@@ -27,8 +30,14 @@ class TeacherHomeScreen extends ConsumerWidget {
           ..invalidate(teacherClassesProvider);
       },
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.space16),
+        padding: const EdgeInsets.all(
+          AppSpacing.space16,
+        ).withBottomInset(context),
         children: const [
+          TodayDateHero(),
+          SizedBox(height: AppSpacing.space16),
+          TakeAttendanceButton(),
+          SizedBox(height: AppSpacing.space16),
           TeacherTodaySessionsCard(),
           SizedBox(height: AppSpacing.space16),
           TeacherGradingQueueCard(),

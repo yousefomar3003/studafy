@@ -7,7 +7,6 @@ export { settleOnlineFeePayment } from "./online-payments/service";
 export { paymentWebhookRoutes } from "./webhooks/payment-confirmed";
 export { refundRoutes } from "./refunds/routes";
 export { refundWebhookRoutes } from "./webhooks/refund-processed";
-export { scholarshipDiscountRoutes } from "./scholarships/routes";
 export { installmentRoutes } from "./installments/routes";
 export { reconciliationRoutes } from "./jobs/reconciliation.routes";
 export { financeReportRoutes } from "./reports/routes";

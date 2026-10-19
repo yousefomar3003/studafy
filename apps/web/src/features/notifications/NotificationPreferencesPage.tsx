@@ -3,7 +3,6 @@ import { NOTIFICATION_TYPES } from "@studafy/constants";
 import { NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
 import { Button, Card, Chip, Input, Table, useToast } from "@studafy/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { useTranslation } from "../../lib/i18n";
 
@@ -153,11 +152,6 @@ export default function NotificationPreferencesPage() {
           <h1>{t("site.notifications.preferences.title")}</h1>
           <p>{t("site.notifications.preferences.description")}</p>
         </div>
-        <Link to="/portal/notifications">
-          <Button type="button" variant="secondary">
-            {t("site.notifications.preferences.backToInbox")}
-          </Button>
-        </Link>
       </div>
 
       {preferencesQuery.isError ? (

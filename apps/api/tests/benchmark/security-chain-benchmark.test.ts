@@ -31,7 +31,7 @@ const WARMUP_ITERATIONS = 1_000;
 const MEASURED_ITERATIONS = 2_000;
 const TARGET_MS = 0.5;
 
-const ALLOWED_ORIGIN = "http://localhost:5173";
+const ALLOWED_ORIGIN = "http://localhost:5180";
 const CSRF_TOKEN = "YmVuY2htYXJrLXRva2VuLTMyLWJ5dGVzLWxvbmctcGFk";
 
 /** Requests served, so the measured arm is proven to have done the work rather than skipped it. */

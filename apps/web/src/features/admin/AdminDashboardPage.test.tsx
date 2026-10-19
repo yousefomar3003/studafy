@@ -4,7 +4,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { AuthProvider } from "../../lib/auth";
 import { expectNoA11yViolations } from "../../lib/test/axe";
+import { createTestSessionStore, TEST_PROFILE } from "../../lib/test/session";
 
 import type { ComponentType } from "react";
 
@@ -22,6 +24,8 @@ const EMPTY_ATTENDANCE_TOTALS = {
 
 function emptyResponsesFor(path: string): Promise<{ data: unknown }> {
   switch (path) {
+    case "/api/account/profile":
+      return Promise.resolve({ data: TEST_PROFILE });
     case "/api/approvals/queue":
       return Promise.resolve({ data: { items: [], total: 0 } });
     case "/api/users/status-counts":
@@ -66,16 +70,19 @@ mock.module("../../lib/api", () => ({ api: { GET: getMock } }));
 const loadAdminDashboardPage = async (): Promise<ComponentType> =>
   (await import("./AdminDashboardPage")).default;
 
-function renderPage(Page: ComponentType) {
+async function renderPage(Page: ComponentType) {
+  const store = await createTestSessionStore(["ORG_ADMIN"]);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <main>
-          <Page />
-        </main>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <main>
+            <Page />
+          </main>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -88,6 +95,8 @@ describe("AdminDashboardPage", () => {
   test("renders live data from every tile's endpoint", async () => {
     getMock.mockImplementation((path: string) => {
       switch (path) {
+        case "/api/account/profile":
+          return Promise.resolve({ data: TEST_PROFILE });
         case "/api/approvals/queue":
           return Promise.resolve({ data: { items: [], total: 3 } });
         case "/api/users/status-counts":
@@ -131,7 +140,7 @@ describe("AdminDashboardPage", () => {
       }
     });
 
-    renderPage(await loadAdminDashboardPage());
+    await renderPage(await loadAdminDashboardPage());
 
     expect(await screen.findByText("3")).toBeTruthy();
     expect(screen.getByText("Invited")).toBeTruthy();
@@ -141,24 +150,39 @@ describe("AdminDashboardPage", () => {
     expect(screen.getByText("8 present of 10 records")).toBeTruthy();
     expect(screen.getByText("Past due")).toBeTruthy();
     expect(screen.getByText("Studafy Growth · 7/20 seats")).toBeTruthy();
-    expect(screen.getByText("500.0 MB of 1000.0 MB used")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "3 grade approvals are waiting on you, 5 invited users haven't activated yet, and the subscription needs attention.",
+      ),
+    ).toBeTruthy();
   });
 
   test("renders each tile's empty state when there is nothing to show yet", async () => {
     getMock.mockImplementation(emptyResponsesFor);
 
-    renderPage(await loadAdminDashboardPage());
+    await renderPage(await loadAdminDashboardPage());
 
     expect(await screen.findByText("Nothing is waiting on your review.")).toBeTruthy();
-    expect(screen.getByText("No invited or active users yet.")).toBeTruthy();
     expect(screen.getByText("No attendance recorded yet today.")).toBeTruthy();
+    expect(await screen.findByText("Nothing needs your attention right now.")).toBeTruthy();
   });
 
   test("has no accessibility violations, with data and with empty tiles", async () => {
     getMock.mockImplementation(emptyResponsesFor);
-    const { container } = renderPage(await loadAdminDashboardPage());
-    await screen.findByText("No invited or active users yet.");
+    const { container } = await renderPage(await loadAdminDashboardPage());
+    await screen.findByText("Nothing needs your attention right now.");
 
     await expectNoA11yViolations(container);
+  });
+
+  test("shows who is signed in, in small print above the title", async () => {
+    getMock.mockImplementation(emptyResponsesFor);
+
+    await renderPage(await loadAdminDashboardPage());
+
+    expect(await screen.findByText("Fatima Al-Sabah")).toBeTruthy();
+    expect(screen.getByText("School admin")).toBeTruthy();
+    expect(screen.getByText("Al-Noor Academy")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "School overview" })).toBeTruthy();
   });
 });

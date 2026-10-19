@@ -9,8 +9,7 @@ import { expectNoA11yViolations } from "../../../lib/test/axe";
 import type { ComponentType } from "react";
 
 /**
- * Automated accessibility audit for the approval queue, mirroring `admin/invitations/a11y.test.tsx`
- * — one render per representative state (the list, the diff modal, and the reject-reason modal)
+ * Automated accessibility audit for the approval queue — one render per representative state (the list, the diff modal, and the reject-reason modal)
  * inside a `<main>`, matching how `RootLayout` wraps every route.
  */
 

@@ -15,19 +15,19 @@ import '../../../support/wrap_with_localization.dart';
 import '../support.dart';
 
 Widget _app({String? initialStudentId}) => Builder(
-      builder: (context) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        locale: context.locale,
-        supportedLocales: context.supportedLocales,
-        localizationsDelegates: context.localizationDelegates,
-        theme: AppTheme.light,
-        home: IncidentReportScreen(
-          classId: 'class-1',
-          classCode: 'MATH101-A',
-          initialStudentId: initialStudentId,
-        ),
-      ),
-    );
+  builder: (context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    locale: context.locale,
+    supportedLocales: context.supportedLocales,
+    localizationsDelegates: context.localizationDelegates,
+    theme: AppTheme.light,
+    home: IncidentReportScreen(
+      classId: 'class-1',
+      classCode: 'MATH101-A',
+      initialStudentId: initialStudentId,
+    ),
+  ),
+);
 
 Future<void> _pump(
   WidgetTester tester, {
@@ -41,8 +41,7 @@ Future<void> _pump(
         overrides: [
           apiClientProvider.overrideWithValue(api),
           classRosterProvider('class-1').overrideWith(
-            (ref) =>
-                roster ?? [enrollmentFixture(studentId: 'student-abcdef')],
+            (ref) => roster ?? [enrollmentFixture(studentId: 'student-abcdef')],
           ),
         ],
         child: _app(initialStudentId: initialStudentId),
@@ -54,7 +53,9 @@ Future<void> _pump(
 void main() {
   setUpAll(ensureDateFormattingInitialized);
 
-  testWidgets('files a reported incident routed to the Principal workflow', (tester) async {
+  testWidgets('files a reported incident routed to the Principal workflow', (
+    tester,
+  ) async {
     final discipline = FakeDisciplineClient();
     await _pump(
       tester,
@@ -63,7 +64,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Disruptive in class');
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'Disruptive in class',
+    );
     await tester.tap(find.text('Send report'));
     await tester.pumpAndSettle();
 
@@ -81,7 +85,10 @@ void main() {
     await _pump(tester, api: FakeStudafyApiClient(discipline: discipline));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Something happened');
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'Something happened',
+    );
     await tester.tap(find.text('Send report'));
     await tester.pumpAndSettle();
 
@@ -90,12 +97,12 @@ void main() {
   });
 
   testWidgets('states that the report routes to the Principal', (tester) async {
-    await _pump(tester, api: FakeStudafyApiClient(discipline: FakeDisciplineClient()));
+    await _pump(
+      tester,
+      api: FakeStudafyApiClient(discipline: FakeDisciplineClient()),
+    );
     await tester.pumpAndSettle();
 
-    expect(
-      find.textContaining("Principal's discipline inbox"),
-      findsOneWidget,
-    );
+    expect(find.textContaining("Principal's discipline inbox"), findsOneWidget);
   });
 }

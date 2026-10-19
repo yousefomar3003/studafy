@@ -12,8 +12,7 @@ export const ONBOARDING_STEP_ANCHORS = {
   academicYear: "step-2-academic-year",
   gradingScheme: "step-3-grading-scheme",
   timetable: "step-4-timetable-periods",
-  staff: "step-5-staff-invitations",
-  students: "step-6-student-import",
+  students: "step-5-student-import",
 } as const;
 
 export function onboardingStepHelpPath(step: keyof typeof ONBOARDING_STEP_ANCHORS): string {

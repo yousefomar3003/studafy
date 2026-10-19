@@ -44,14 +44,14 @@ yourself — the badge will not do it for you.
 
 ## Posting an update
 
-`POST` to `status-page-incident`'s Function URL (`terraform output -raw
-status_page_incident_function_url` — `null` if SES isn't provisioned for this environment, see
+`POST` to `status-page-incident`'s Function URL (`terraform -chdir=infra/terraform output -raw
+monitoring_status_page_incident_function_url` — `null` if SES isn't provisioned for this environment, see
 below) with header `x-status-page-admin-token: <STATUS_PAGE_ADMIN_TOKEN>` (the `monitoring`
 app-secrets container — same place Alertmanager's receiver URLs live, `secrets-conventions.md`) and
 a JSON body:
 
 ```bash
-curl -X POST "$(terraform output -raw status_page_incident_function_url)" \
+curl -X POST "$(terraform output -raw monitoring_status_page_incident_function_url)" \
   -H "x-status-page-admin-token: $STATUS_PAGE_ADMIN_TOKEN" \
   -H "content-type: application/json" \
   -d '{
@@ -68,7 +68,7 @@ The response's `incident.id` is what every follow-up update on the _same_ incide
 incident):
 
 ```bash
-curl -X POST "$(terraform output -raw status_page_incident_function_url)" \
+curl -X POST "$(terraform output -raw monitoring_status_page_incident_function_url)" \
   -H "x-status-page-admin-token: $STATUS_PAGE_ADMIN_TOKEN" \
   -H "content-type: application/json" \
   -d '{

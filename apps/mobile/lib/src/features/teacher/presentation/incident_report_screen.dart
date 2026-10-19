@@ -35,7 +35,8 @@ class IncidentReportScreen extends ConsumerStatefulWidget {
   final String? initialStudentId;
 
   @override
-  ConsumerState<IncidentReportScreen> createState() => _IncidentReportScreenState();
+  ConsumerState<IncidentReportScreen> createState() =>
+      _IncidentReportScreenState();
 }
 
 class _IncidentReportScreenState extends ConsumerState<IncidentReportScreen> {
@@ -92,9 +93,13 @@ class _IncidentReportScreenState extends ConsumerState<IncidentReportScreen> {
 
   Future<void> _submit() async {
     final studentId = _studentId;
-    if (_submitting || studentId == null || !(_formKey.currentState?.validate() ?? false)) {
+    if (_submitting ||
+        studentId == null ||
+        !(_formKey.currentState?.validate() ?? false)) {
       if (studentId == null) {
-        setState(() => _errorKey = 'teacher.communication.incident.studentRequired');
+        setState(
+          () => _errorKey = 'teacher.communication.incident.studentRequired',
+        );
       }
       return;
     }
@@ -106,7 +111,10 @@ class _IncidentReportScreenState extends ConsumerState<IncidentReportScreen> {
 
     try {
       final description = _descriptionController.text.trim();
-      final incident = await ref.read(apiClientProvider).discipline.createDisciplineIncident(
+      final incident = await ref
+          .read(apiClientProvider)
+          .discipline
+          .createDisciplineIncident(
             body: CreateIncidentBody(
               studentId: studentId,
               classId: widget.classId,
@@ -128,21 +136,24 @@ class _IncidentReportScreenState extends ConsumerState<IncidentReportScreen> {
   }
 
   String _messageKeyFor(String? code) => switch (code) {
-        'AUTHZ_FORBIDDEN' => 'teacher.communication.incident.errorForbidden',
-        'VALIDATION_FAILED' => 'teacher.communication.incident.errorValidation',
-        _ => 'teacher.communication.incident.errorGeneric',
-      };
+    'AUTHZ_FORBIDDEN' => 'teacher.communication.incident.errorForbidden',
+    'VALIDATION_FAILED' => 'teacher.communication.incident.errorValidation',
+    _ => 'teacher.communication.incident.errorGeneric',
+  };
 
   String _studentLabel(String studentId) {
     final name = ref.watch(rosterStudentNameProvider(studentId));
     if (name != null) return name;
-    final shortId =
-        studentId.length <= 6 ? studentId : studentId.substring(studentId.length - 6);
+    final shortId = studentId.length <= 6
+        ? studentId
+        : studentId.substring(studentId.length - 6);
     return 'teacher.class.unknownStudent'.tr(namedArgs: {'id': shortId});
   }
 
   @override
   Widget build(BuildContext context) {
+    // Resolve roster names for this class (see classRosterNamesProvider).
+    ref.watch(classRosterNamesProvider(widget.classId));
     final theme = Theme.of(context);
     final roster = ref.watch(classRosterProvider(widget.classId));
 
@@ -155,8 +166,9 @@ class _IncidentReportScreenState extends ConsumerState<IncidentReportScreen> {
           children: [
             Text(
               'teacher.communication.incident.routing'.tr(),
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: AppSpacing.space16),
             roster.when(
@@ -168,8 +180,9 @@ class _IncidentReportScreenState extends ConsumerState<IncidentReportScreen> {
               ),
               error: (_, _) => Text(
                 'teacher.class.rosterError'.tr(),
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
               data: (enrollments) => DropdownButtonFormField<String>(
                 initialValue: enrollments.any((e) => e.studentId == _studentId)
@@ -204,8 +217,7 @@ class _IncidentReportScreenState extends ConsumerState<IncidentReportScreen> {
                     child: Text(incidentTypeLabelKey(type).tr()),
                   ),
               ],
-              onChanged: (value) =>
-                  setState(() => _type = value ?? _type),
+              onChanged: (value) => setState(() => _type = value ?? _type),
             ),
             const SizedBox(height: AppSpacing.space12),
             DropdownButtonFormField<CreateIncidentBodySeverity>(
@@ -253,8 +265,9 @@ class _IncidentReportScreenState extends ConsumerState<IncidentReportScreen> {
                 builder: (context) {
                   final l10n = MaterialLocalizations.of(context);
                   final date = l10n.formatFullDate(_occurredAt);
-                  final time =
-                      l10n.formatTimeOfDay(TimeOfDay.fromDateTime(_occurredAt));
+                  final time = l10n.formatTimeOfDay(
+                    TimeOfDay.fromDateTime(_occurredAt),
+                  );
                   return Text('$date · $time');
                 },
               ),
@@ -265,8 +278,9 @@ class _IncidentReportScreenState extends ConsumerState<IncidentReportScreen> {
               const SizedBox(height: AppSpacing.space8),
               Text(
                 _errorKey!.tr(),
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
             ],
             const SizedBox(height: AppSpacing.space20),

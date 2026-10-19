@@ -36,7 +36,7 @@ sha256_file() {
 #
 #   Direct mode (CONNECTION_SECRET_ARN unset): PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE must
 #   already be set by the caller -- plain libpq env vars, nothing tenant-restore-specific. This is
-#   what every script here was validated against locally (db/compose.yml's studafy_test instance),
+#   what every script here was validated against locally (compose.yml test profile's studafy_test instance),
 #   and it is also the escape hatch for a target this tool's own AWS wiring doesn't reach (e.g. a
 #   non-AWS staging box), so it stays a first-class mode rather than a test-only shim.
 resolve_pg_connection() {

@@ -7,11 +7,12 @@
 #
 # Then open http://localhost:8080 and use "Continue with Mock" to sign in.
 #
-# Separate from db/compose.yml on purpose: that file is the disposable tmpfs database the test suite
-# creates/drops databases in, while this one keeps data in a named volume across restarts. The two
-# use different project names ("studafy" here, "studafy-test" there) and host ports, so they can
-# run side by side -- sharing a name would let `db:up` replace this stack's postgres/redis with the
-# tmpfs test ones, since both files define services by those names.
+# The disposable test database lives here too, as `test-postgres`/`test-redis` behind the "test"
+# profile, so a plain `up` never starts it. The test suite creates/drops databases in it, so it is a
+# tmpfs on its own ports, kept apart from the dev `postgres`, whose data persists in a named volume:
+#
+#   bun run db:up    # docker compose up -d --wait test-postgres test-redis
+#   bun run db:down  # docker compose rm -sfv test-postgres test-redis (leaves the dev stack running)
 #
 # The services run with NODE_ENV=development: the images default to production, whose env schemas
 # require an RDS CA cert, a read replica, Stripe, and ClamAV (apps/api/src/env.ts,
@@ -39,7 +40,7 @@ x-app-env: &app-env
 
 services:
   postgres:
-    # Same image and preload as db/compose.yml -- the migrations need pgvector and
+    # Same image and preload as test-postgres -- the migrations need pgvector and
     # pg_stat_statements.
     image: pgvector/pgvector:pg16
     command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
@@ -62,6 +63,53 @@ services:
     image: redis:7-alpine
     ports:
       - "127.0.0.1:6391:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  # Disposable test database (bun run db:up). Only started when named or with --profile test.
+  test-postgres:
+    profiles: ["test"]
+    # pgvector/pgvector:pg16 is the official pgvector image built on the standard Postgres 16 image,
+    # so it ships the `vector` extension plus the contrib modules the migrations use (pgcrypto,
+    # pg_trgm, pg_stat_statements). The stock postgres:16-alpine image has no pgvector, so
+    # `CREATE EXTENSION vector` would fail against it.
+    image: pgvector/pgvector:pg16
+    # Preload pg_stat_statements so the disposable local/CI database actually collects statistics and
+    # the operational extension tests can query them. On RDS this is the parameter-group setting in
+    # infra/terraform/modules/postgres (requires a reboot); here it is a container flag.
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    environment:
+      POSTGRES_USER: studafy_test
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studafy_test}
+      POSTGRES_DB: studafy
+    ports:
+      - "127.0.0.1:54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studafy_test -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    # Docker gives a container 64 MB of /dev/shm by default, and PostgreSQL puts the shared memory for
+    # PARALLEL workers there. Building the HNSW index over the 100,000-chunk benchmark corpus (ST-047)
+    # asks for a ~530 MB parallel-worker segment and dies with "could not resize shared memory segment
+    # ... No space left on device" against the default. This is not a Postgres tuning question -- the
+    # server is configured correctly -- it is the container's shm being too small for it.
+    shm_size: 1gb
+    # The data directory is a tmpfs: this database is disposable, and keeping it in RAM makes the test
+    # suite (which creates and drops a database per test) far faster. The size is raised from the default
+    # (half of host RAM, but capped low in some CI runners) because the benchmark corpus is genuinely
+    # large: 100,000 x 1536 float4 embeddings is ~600 MB of vectors before the HNSW graph is built.
+    tmpfs:
+      - /var/lib/postgresql/data:size=4g
+
+  test-redis:
+    profiles: ["test"]
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6390:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s

@@ -75,6 +75,8 @@ describe("templates — completeness", () => {
                       "fileName",
                       "virus",
                       "pages",
+                      "senderName",
+                      "preview",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -147,6 +149,10 @@ describe("renderNotification — snapshot tests", () => {
     },
     [NOTIFICATION_TYPES.MATERIAL_INGEST_FAILED]: {
       fileName: "lab-manual.pdf",
+    },
+    [NOTIFICATION_TYPES.DIRECT_MESSAGE]: {
+      senderName: "Layla Nasser",
+      preview: "Adam did really well on today's lab.",
     },
   } as const;
 

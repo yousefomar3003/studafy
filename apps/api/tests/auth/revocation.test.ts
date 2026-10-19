@@ -10,9 +10,11 @@ import { jtiDenylistKey, KeyStore } from "../../src/modules/auth";
 import { AUTH_CHANNELS } from "../../src/modules/auth/channels";
 import { createRedisClient } from "../../src/redis";
 import {
+  assignRole,
   createFullTenant,
   createRefreshSession,
   createTestDatabase,
+  createUser,
   createUserDevice,
   integrationEnabled,
   migrateDatabase,
@@ -418,7 +420,8 @@ describe("device revocation", () => {
   integrationTest(
     "GET /api/auth/devices lists the caller's devices with session counts",
     async () => {
-      const user = tenant.users.TEACHING_ASSISTANT;
+      const user = await createUser(sql, tenant.schoolId);
+      await assignRole(sql, tenant.schoolId, user.id, "GUEST");
       const device = await createUserDevice(sql, tenant.schoolId, user.id);
       await createRefreshSession(sql, tenant.schoolId, user.id, { deviceId: device.id });
 
@@ -576,7 +579,8 @@ describe("admin device revocation", () => {
   });
 
   integrationTest("narrows to one device when a device id is given", async () => {
-    const target = tenant.users.TEACHING_ASSISTANT;
+    const target = await createUser(sql, tenant.schoolId);
+    await assignRole(sql, tenant.schoolId, target.id, "GUEST");
     const device = await createUserDevice(sql, tenant.schoolId, target.id, {
       fcmToken: `tok-${crypto.randomUUID()}`,
     });

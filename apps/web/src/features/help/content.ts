@@ -34,7 +34,7 @@ export function categoryLabel(category: CategorySlug): string {
 
 /**
  * Deterministic heading/identifier slug, shared by the Markdown renderer (heading ids) and the
- * onboarding wizard's step links. "Step 5: Staff invitations" → `step-5-staff-invitations`.
+ * onboarding wizard's step links. "Step 5: Student import" → `step-5-student-import`.
  */
 export function slugify(value: string): string {
   return value

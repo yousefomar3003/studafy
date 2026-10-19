@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 
+import { PortalBackLink } from "./portal/PortalBackLink";
 import { PortalHeader } from "./portal/PortalHeader";
 import { PortalSidebar } from "./portal/PortalSidebar";
+
+import type { RouteObject } from "react-router-dom";
 
 const NAV_ID = "portal-nav";
 
@@ -15,8 +18,11 @@ const NAV_ID = "portal-nav";
  *   - desktop: an in-grid column, expanded by default, that its own toggle at the top shrinks to an
  *     icon rail (`collapsed`).
  * The state lives here, above the routed page, so it survives navigation between portal pages.
+ *
+ * `routes` (the app's route table, read lazily because it is the table this layout sits in) lets
+ * the shared back link find each page's parent page; without it there is no back link.
  */
-export function PortalLayout() {
+export function PortalLayout({ routes }: { routes?: () => readonly RouteObject[] } = {}) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -34,7 +40,8 @@ export function PortalLayout() {
         onToggleCollapsed={() => setCollapsed((current) => !current)}
         onNavigate={() => setDrawerOpen(false)}
       />
-      <div className="portal-content">
+      <div className="portal-content" data-scroll-root="">
+        {routes ? <PortalBackLink routes={routes} /> : null}
         <Outlet />
       </div>
     </div>

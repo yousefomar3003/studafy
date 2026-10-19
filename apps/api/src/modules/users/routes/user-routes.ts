@@ -1,4 +1,4 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
@@ -12,6 +12,14 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
 import {
+  DEFAULT_MEMBER_PASSWORD,
+  resetMemberPassword,
+} from "../../auth/services/member-password-service";
+import {
+  adminRevokeUserSessions,
+  REVOCATION_REASONS,
+} from "../../auth/services/revocation-service";
+import {
   createUserBodySchema,
   userListQuerySchema,
   userListSchema,
@@ -19,6 +27,8 @@ import {
   updateUserBodySchema,
   updateUserRoleBodySchema,
   userDeactivateResponseSchema,
+  userListItemSchema,
+  userMemberSummarySchema,
   userStatusCountsSchema,
   userWithRolesSchema,
 } from "../schemas";
@@ -26,6 +36,7 @@ import {
   createUser as createUserService,
   deactivateUser,
   getUser,
+  getUserMemberSummary,
   getUserStatusCounts,
   listUsers,
   updateUser as updateUserService,
@@ -106,6 +117,27 @@ const getUserStatusCountsRoute = createRoute({
   ),
 });
 
+const getUserMemberSummaryRoute = createRoute({
+  method: "get",
+  path: "/api/users/member-summary",
+  tags: ["Users"],
+  operationId: "getUserMemberSummary",
+  summary: "Get student, teacher and parent counts",
+  description:
+    "The school's platform number and how many students, teachers and parents it has. Each of " +
+    "them holds a member ID: STU, TCH or PAR, then the school number and a sequence.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    {
+      200: {
+        description: "School number and headcount by role.",
+        schema: userMemberSummarySchema,
+      },
+    },
+    [401, 403, 429, 500],
+  ),
+});
+
 const getUserRoute = createRoute({
   method: "get",
   path: "/api/users/{userId}",
@@ -118,8 +150,8 @@ const getUserRoute = createRoute({
   responses: standardResponses(
     {
       200: {
-        description: "The user with roles.",
-        schema: userWithRolesSchema,
+        description: "The user with roles and member IDs.",
+        schema: userListItemSchema,
       },
     },
     [401, 403, 404, 500],
@@ -145,8 +177,8 @@ const createUserRoute = createRoute({
   responses: standardResponses(
     {
       201: {
-        description: "The created user with roles.",
-        schema: userWithRolesSchema,
+        description: "The created user with roles and member IDs.",
+        schema: userListItemSchema,
       },
     },
     [400, 401, 403, 409, 429, 500],
@@ -231,6 +263,36 @@ const deactivateUserRoute = createRoute({
   ),
 });
 
+const resetPasswordRoute = createRoute({
+  method: "post",
+  path: "/api/users/{userId}/password/reset",
+  tags: ["Users"],
+  operationId: "resetMemberPassword",
+  summary: "Reset a member's password",
+  description:
+    "Returns a student, parent, teacher or attendance officer to the starting password, clears any " +
+    "lockout and signs them out everywhere. They must choose a new password at their next sign-in. " +
+    "404 for accounts that sign in with Google or Microsoft (no member ID).",
+  security: [{ bearerAuth: [] }],
+  request: { params: userIdParamSchema },
+  responses: standardResponses(
+    {
+      200: {
+        description: "Password reset.",
+        schema: z
+          .object({
+            usernames: z
+              .array(z.string())
+              .openapi({ description: "The member IDs they sign in with." }),
+            default_password: z.string().openapi({ description: "The password to give them." }),
+          })
+          .openapi("MemberPasswordReset"),
+      },
+    },
+    [401, 403, 404, 429, 500],
+  ),
+});
+
 // ---------------------------------------------------------------------------
 // Route factory
 // ---------------------------------------------------------------------------
@@ -242,14 +304,17 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
   const channelGuard = requireChannel(AUTH_CHANNELS.WEB);
   routes.use("/api/users", channelGuard);
   routes.use("/api/users/status-counts", channelGuard);
+  routes.use("/api/users/member-summary", channelGuard);
   routes.use("/api/users/:userId", channelGuard);
   routes.use("/api/users/:userId/role", channelGuard);
   routes.use("/api/users/:userId/deactivate", channelGuard);
+  routes.use("/api/users/:userId/password/reset", channelGuard);
 
   // --- Permission guards ---
   routes.use("/api/users", requirePermission(PERMISSIONS.USER_READ));
   routes.use("/api/users", onlyMethods(["POST"], requirePermission(PERMISSIONS.USER_CREATE)));
   routes.use("/api/users/status-counts", requirePermission(PERMISSIONS.USER_READ));
+  routes.use("/api/users/member-summary", requirePermission(PERMISSIONS.USER_READ));
   routes.use("/api/users/:userId", requirePermission(PERMISSIONS.USER_READ));
   routes.use(
     "/api/users/:userId",
@@ -257,12 +322,14 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
   );
   routes.use("/api/users/:userId/role", requirePermission(PERMISSIONS.ROLE_ASSIGN));
   routes.use("/api/users/:userId/deactivate", requirePermission(PERMISSIONS.USER_SUSPEND));
+  routes.use("/api/users/:userId/password/reset", requirePermission(PERMISSIONS.USER_UPDATE));
 
   // --- Audit declarations ---
   routes.use("/api/users", auditAction("insert", "users"));
   routes.use("/api/users/:userId", auditAction("update", "users"));
   routes.use("/api/users/:userId/role", auditAction("update", "user_roles"));
   routes.use("/api/users/:userId/deactivate", auditAction("update", "users"));
+  routes.use("/api/users/:userId/password/reset", auditAction("update", "member_credentials"));
 
   // --- Handlers ---
 
@@ -288,6 +355,16 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
     );
 
     return c.json(counts, 200);
+  });
+
+  routes.openapi(getUserMemberSummaryRoute, async (c) => {
+    const auth = requireAuth(c);
+
+    const summary = await withTenantTx(database, tenantFrom(c), (tx) =>
+      getUserMemberSummary(tx, auth.schoolId),
+    );
+
+    return c.json({ ...summary, default_password: DEFAULT_MEMBER_PASSWORD }, 200);
   });
 
   routes.openapi(getUserRoute, async (c) => {
@@ -362,6 +439,31 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
     });
 
     return c.json(result, 200);
+  });
+
+  routes.openapi(resetPasswordRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { userId } = c.req.valid("param");
+    const tenant = tenantFrom(c);
+
+    const reset = await withTenantTx(database, tenant, (tx) => resetMemberPassword(tx, userId));
+    if (!reset) {
+      throw new HTTPException(404, { message: "This account has no member ID or password." });
+    }
+
+    // Whoever knew the old password is signed out with it.
+    await adminRevokeUserSessions({
+      database,
+      denylist,
+      tenant: { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+      targetUserId: userId,
+      reason: REVOCATION_REASONS.ADMIN_REVOKE_ALL_DEVICES,
+      log: c.get("log"),
+      userAgent: c.req.header("User-Agent") ?? null,
+      clientIp: clientIpFrom(c),
+    });
+
+    return c.json({ usernames: reset.usernames, default_password: DEFAULT_MEMBER_PASSWORD }, 200);
   });
 
   return routes;

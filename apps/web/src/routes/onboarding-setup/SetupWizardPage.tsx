@@ -17,7 +17,6 @@ import { clearProgress, loadProgress, nextStepAfter, saveProgress } from "./prog
 import { AcademicYearStep } from "./steps/AcademicYearStep";
 import { GradingSchemeStep } from "./steps/GradingSchemeStep";
 import { SchoolProfileStep } from "./steps/SchoolProfileStep";
-import { StaffInvitationsStep } from "./steps/StaffInvitationsStep";
 import { StudentImportStep } from "./steps/StudentImportStep";
 import { TimetableStep } from "./steps/TimetableStep";
 import { WizardStepper } from "./WizardStepper";
@@ -27,7 +26,6 @@ import type {
   AcademicYearValues,
   GradingSchemeValues,
   SchoolProfileValues,
-  StaffInviteBatch,
   TimetableValues,
 } from "./schema";
 
@@ -167,25 +165,6 @@ export default function SetupWizardPage() {
     onError: (error) => handleError(error, t("onboarding.setup.errors.timetable")),
   });
 
-  const staffInvitesMutation = useMutation({
-    mutationFn: async (batches: StaffInviteBatch[]) => {
-      const results = [];
-      for (const batch of batches) {
-        const { data } = await api.POST("/api/invitations/bulk", {
-          body: { role: batch.role, recipients: batch.emails.map((email) => ({ email })) },
-        });
-        results.push({
-          role: batch.role,
-          totalCount: data?.total_count ?? batch.emails.length,
-          sentCount: data?.sent_count ?? 0,
-        });
-      }
-      return results;
-    },
-    onSuccess: (batches) => completeStep("staff", { staffInvites: { batches } }),
-    onError: (error) => handleError(error, t("onboarding.setup.errors.staff")),
-  });
-
   if (progress.currentStep === "complete") {
     return (
       <Card>
@@ -270,14 +249,6 @@ export default function SetupWizardPage() {
           onNext={(values) => timetableMutation.mutate(values)}
           onSkip={() => skipStep("timetable")}
           onGoToAcademicYear={() => goToStep("academic-year")}
-        />
-      ) : null}
-
-      {progress.currentStep === "staff" ? (
-        <StaffInvitationsStep
-          submitting={staffInvitesMutation.isPending}
-          onNext={(batches) => staffInvitesMutation.mutate(batches)}
-          onSkip={() => skipStep("staff")}
         />
       ) : null}
 

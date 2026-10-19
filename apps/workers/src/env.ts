@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 /**
+ * An empty environment variable is an unset one: it is present only because a deployment template
+ * always injects the key. Same helper as apps/api/src/env.ts.
+ */
+function emptyAsUnset(value: unknown): unknown {
+  return value === "" ? undefined : value;
+}
+
+/**
  * Environment configuration for the workers process. Parsed and validated once at bootstrap so
  * that an invalid environment fails fast — before any Redis connection is opened — with a named,
  * readable error.
@@ -9,6 +17,13 @@ export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     SERVICE_NAME: z.string().min(1).default("workers"),
+    // Names the running build for error monitoring; see apps/api/src/env.ts's own RELEASE_VERSION.
+    // Deployments set it from IMAGE_TAG.
+    RELEASE_VERSION: z.string().min(1).default("unknown"),
+    // Sentry error monitoring: see apps/api/src/env.ts's own SENTRY_DSN/SENTRY_ENVIRONMENT. Empty is
+    // unset, since the task definition always injects the key from the app-secrets container.
+    SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    SENTRY_ENVIRONMENT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // apps/workers has no HTTP surface of its own (infra/docker/README.md), so unlike api/realtime
     // this is not "a separate port from PORT" — it is the *only* port this process listens on, and
     // it exists solely for @studafy/observability's Prometheus-format /metrics endpoint (ST-259).
@@ -72,7 +87,7 @@ export const envSchema = z
       .default(25 * 1024 * 1024),
     // Base URL for the action links embedded in emails. The verify/activate endpoints are the
     // API's (the only surface with an ALB), so the link host is the app's public origin.
-    FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+    FRONTEND_URL: z.string().url().default("http://localhost:5180"),
     // Email dispatcher tunables. See queues/notifications/email/dispatcher.ts for how they bound
     // the polling loop.
     EMAIL_MAX_RATE_PER_SECOND: z.coerce.number().positive().default(5),

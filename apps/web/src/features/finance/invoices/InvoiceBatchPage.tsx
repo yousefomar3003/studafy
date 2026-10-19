@@ -1,12 +1,8 @@
 import { ApiError } from "@studafy/api-client";
-import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, Card, DataGrid, Select, useToast } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
-import { ExportCsvButton } from "../../../components/ExportCsvButton";
-import { collectCursorPages } from "../../../lib/data-transfer";
 import { useTranslation } from "../../../lib/i18n";
 import { fetchActiveClasses } from "../../admin/announcements/queries";
 import { fetchFeeStructures } from "../fees/queries";
@@ -22,7 +18,6 @@ import { fetchInvoiceBatch, fetchInvoiceBatchItemsPage, invoiceBatchQueryKey } f
 import "./invoices.css";
 
 import type { InvoiceBatch, InvoiceBatchItem, InvoiceBatchItemStatus } from "./queries";
-import type { ExportColumn } from "../../../lib/data-transfer";
 import type { ClassOption } from "../../admin/announcements/queries";
 import type { FeeStructure } from "../fees/queries";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
@@ -45,9 +40,6 @@ export default function InvoiceBatchPage() {
 
   return (
     <>
-      <p className="invoices-detail__back">
-        <Link to="/portal/finance/invoices">{t("finance.invoices.backToInvoices")}</Link>
-      </p>
       <h1>{t("finance.invoices.batch.title")}</h1>
 
       {batchId ? (
@@ -253,8 +245,7 @@ interface BatchProgressProps {
   onReset: () => void;
 }
 
-/** Batches still being worked are polled every 3s, mirroring
- * `admin/invitations/BulkInviteProgressPanel` — this is what keeps a 1,000-student run cheap on
+/** Batches still being worked are polled every 3s — this is what keeps a 1,000-student run cheap on
  * the client: the item table is cursor-paginated (20 rows at a time), never one giant list. */
 const IN_FLIGHT_STATUSES = new Set<InvoiceBatch["status"]>(["pending", "processing"]);
 const POLL_INTERVAL_MS = 3000;
@@ -324,19 +315,6 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
     },
   ];
 
-  const exportColumns: ExportColumn<InvoiceBatchItem>[] = [
-    { header: t("finance.common.student"), value: (row) => row.student_name },
-    { header: t("finance.common.admissionNumber"), value: (row) => row.admission_number },
-    {
-      header: t("finance.common.status"),
-      value: (row) => invoiceBatchItemStatusLabel(row.status, t),
-    },
-    {
-      header: t("finance.invoices.batch.result"),
-      value: (row) => row.erpnext_docname ?? row.error_message,
-    },
-  ];
-
   return (
     <>
       {batch ? (
@@ -402,21 +380,6 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
             setCursor(undefined);
             setCursorHistory([]);
           }}
-        />
-        <ExportCsvButton
-          filename="invoice-batch-items"
-          columns={exportColumns}
-          getRows={() =>
-            collectCursorPages(async (pageCursor) => {
-              const page = await fetchInvoiceBatchItemsPage(
-                batchId,
-                pageCursor,
-                statusFilter,
-                PAGINATION_MAX_LIMIT,
-              );
-              return { items: page.items, nextCursor: page.next_cursor };
-            })
-          }
         />
       </div>
 

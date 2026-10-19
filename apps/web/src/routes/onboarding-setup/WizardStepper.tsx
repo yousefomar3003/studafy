@@ -12,7 +12,6 @@ const STEP_LABEL_KEYS: Record<StepId, string> = {
   "academic-year": "onboarding.setup.steps.academicYear",
   "grading-scheme": "onboarding.setup.steps.gradingScheme",
   timetable: "onboarding.setup.steps.timetable",
-  staff: "onboarding.setup.steps.staff",
   students: "onboarding.setup.steps.students",
 };
 

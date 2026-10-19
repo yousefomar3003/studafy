@@ -1,11 +1,12 @@
-import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { AuthProvider } from "../../lib/auth";
 import { expectNoA11yViolations } from "../../lib/test/axe";
+import { createTestSessionStore } from "../../lib/test/session";
 
 import type { ComponentType } from "react";
 
@@ -23,18 +24,19 @@ const loadPrincipalDashboardPage = async (): Promise<ComponentType> =>
 const loadAttendanceByClassPage = async (): Promise<ComponentType> =>
   (await import("./AttendanceByClassPage")).default;
 
-function renderInPortal(Page: ComponentType) {
+async function renderInPortal(Page: ComponentType) {
+  const store = await createTestSessionStore(["PRINCIPAL"]);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <main>
             <Page />
           </main>
         </MemoryRouter>
-      </ToastProvider>
-    </QueryClientProvider>,
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -58,8 +60,8 @@ describe("principal dashboard accessibility", () => {
       return Promise.resolve({ data: undefined });
     });
 
-    const { container } = renderInPortal(await loadPrincipalDashboardPage());
-    await screen.findByRole("heading", { name: "Principal" });
+    const { container } = await renderInPortal(await loadPrincipalDashboardPage());
+    await screen.findByRole("heading", { name: "Leadership overview" });
 
     await expectNoA11yViolations(container);
   });
@@ -88,7 +90,7 @@ describe("principal dashboard accessibility", () => {
       }),
     );
 
-    const { container } = renderInPortal(await loadAttendanceByClassPage());
+    const { container } = await renderInPortal(await loadAttendanceByClassPage());
     await screen.findByRole("heading", { name: "Attendance by class" });
 
     await expectNoA11yViolations(container);

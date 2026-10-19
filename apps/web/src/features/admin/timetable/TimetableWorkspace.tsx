@@ -1,13 +1,11 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Modal, Select, useToast } from "@studafy/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
-import { ExportCsvButton } from "../../../components/ExportCsvButton";
-import { allRows } from "../../../lib/data-transfer";
+import { ImportCsvButton } from "../../../components/ImportCsvButton";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
-import { weekdayLabel } from "./constants";
 import {
   useApproveVersion,
   useDiscardDraft,
@@ -36,12 +34,12 @@ import {
   versionsQueryKey,
 } from "./queries";
 import { SchoolWeekModal } from "./SchoolWeekModal";
+import { slotImportSpec } from "./slot-import";
 import { TimetableGrid } from "./TimetableGrid";
 
 import "./timetable.css";
 
 import type { AcademicYear, Term, TimetableSlot, TimetableVersion } from "./queries";
-import type { ExportColumn } from "../../../lib/data-transfer";
 import type { SelectOption } from "@studafy/ui";
 import type { ReactNode } from "react";
 
@@ -93,6 +91,7 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
   const { t } = useTranslation();
   const { formatDate } = useFormatters();
   const { show } = useToast();
+  const queryClient = useQueryClient();
 
   const [yearId, setYearId] = useState("");
   const [termId, setTermId] = useState("");
@@ -186,53 +185,6 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
     [classFilter, teacherFilter],
   );
   const visibleSlots = slots.filter(isVisible);
-
-  // --- Export: the lessons on screen, week order, ids resolved to what the grid shows ---------
-  const classById = new Map(classes.map((klass) => [klass.id, klass]));
-  const teacherById = new Map(teachers.map((teacher) => [teacher.id, teacher]));
-  const roomById = new Map(rooms.map((room) => [room.id, room]));
-  const exportColumns: ExportColumn<TimetableSlot>[] = [
-    {
-      header: t("adminSchool.timetable.export.day"),
-      value: (slot) => weekdayLabel(slot.weekday, t),
-    },
-    { header: t("adminSchool.timetable.grid.period"), value: (slot) => slot.period },
-    {
-      header: t("adminSchool.timetable.export.class"),
-      value: (slot) =>
-        classById.get(slot.class_id)?.code ?? t("adminSchool.timetable.unknownClass"),
-    },
-    {
-      header: t("adminSchool.timetable.editModal.teacher"),
-      value: (slot) =>
-        teacherById.get(slot.teacher_id)?.display_name ?? t("adminSchool.timetable.unknownTeacher"),
-    },
-    {
-      header: t("adminSchool.timetable.export.employeeNumber"),
-      value: (slot) => teacherById.get(slot.teacher_id)?.employee_number,
-    },
-    {
-      header: t("adminSchool.timetable.editModal.room"),
-      value: (slot) => roomById.get(slot.room_id)?.code ?? t("adminSchool.timetable.unknownRoom"),
-    },
-  ];
-  const dayOrder = (weekday: number) => {
-    const index = settings.school_days.indexOf(weekday);
-    return index === -1 ? 7 + weekday : index;
-  };
-  const exportSlots = () =>
-    Promise.resolve(
-      allRows(
-        [...visibleSlots].sort(
-          (a, b) =>
-            dayOrder(a.weekday) - dayOrder(b.weekday) ||
-            a.period - b.period ||
-            (classById.get(a.class_id)?.code ?? "").localeCompare(
-              classById.get(b.class_id)?.code ?? "",
-            ),
-        ),
-      ),
-    );
 
   // --- Actions ------------------------------------------------------------------------------
   function handleEdit() {
@@ -507,12 +459,6 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
           {aside}
         </div>
         <div className="timetable-workspace__actions">
-          <ExportCsvButton
-            filename="timetable"
-            columns={exportColumns}
-            getRows={exportSlots}
-            disabled={!shown || slotsQuery.isPending}
-          />
           {canManage ? (
             <>
               <Button
@@ -522,6 +468,23 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
               >
                 {t("adminSchool.timetable.workspace.schoolWeek")}
               </Button>
+              {editing ? (
+                <ImportCsvButton
+                  spec={slotImportSpec(t, {
+                    versionId: shown.id,
+                    classes,
+                    teachers,
+                    rooms,
+                    schoolDays: settings.school_days,
+                    periodsPerDay: settings.periods_per_day,
+                  })}
+                  title={t("adminSchool.timetable.import.title")}
+                  onImported={() =>
+                    void queryClient.invalidateQueries({ queryKey: slotsQueryKey(shown.id) })
+                  }
+                  disabled={loadingReference}
+                />
+              ) : null}
               {shown && !editing && shown.status === "approved" ? (
                 <Button loading={startEditing.isPending} onClick={handleEdit}>
                   {working

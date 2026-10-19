@@ -44,7 +44,8 @@ class PushPermissionBanner extends ConsumerWidget {
             ),
             const SizedBox(width: AppSpacing.space8),
             TextButton(
-              onPressed: () => ref.read(pushSetupProvider.notifier).requestPermission(),
+              onPressed: () =>
+                  ref.read(pushSetupProvider.notifier).requestPermission(),
               child: Text('shell.pushPermission.continue'.tr()),
             ),
           ],

@@ -185,6 +185,28 @@ export interface ListInvoicesResult {
   hasMore: boolean;
 }
 
+/**
+ * Return money for one payment, in full or in part.
+ *
+ * `invoiceId` is the payment exactly as `listInvoices` names it -- a Stripe invoice, or a Tap
+ * charge -- so a caller never has to know which provider-side object actually holds the money.
+ * `idempotencyKey` must be stable for one refund attempt: a retried call with the same key must not
+ * refund twice where the provider supports it.
+ */
+export interface RefundInput {
+  invoiceId: string;
+  amountMinor: number;
+  currency: string;
+  idempotencyKey: string;
+  metadata: Record<string, string>;
+}
+
+export interface RefundResult {
+  providerRefundId: string;
+  /** `pending` when the provider accepted the refund but settles it asynchronously. */
+  status: "succeeded" | "pending";
+}
+
 export interface PaymentProviderPort {
   createCustomer(input: CreateCustomerInput): Promise<CreateCustomerResult>;
   createCheckoutSession(input: CreateCheckoutSessionInput): Promise<CreateCheckoutSessionResult>;
@@ -218,4 +240,9 @@ export interface PaymentProviderPort {
   reverseCancellation(input: ReverseCancellationInput): Promise<void>;
   /** List invoices billed to a customer, newest first. */
   listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult>;
+  /**
+   * Refund one paid invoice (or Tap charge), fully or partially. A provider that cannot refund
+   * throws a 501 `PAYMENT_PROVIDER_OPERATION_UNSUPPORTED`; a provider-side failure is a 502.
+   */
+  refund(input: RefundInput): Promise<RefundResult>;
 }

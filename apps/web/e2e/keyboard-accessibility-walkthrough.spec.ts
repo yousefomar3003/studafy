@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import type { Locator, Page, Route } from "@playwright/test";
 
 /**
- * ST-211's keyboard-only walkthrough of 5 core journeys: every interaction below is a keyboard
+ * ST-211's keyboard-only walkthrough of 4 core journeys: every interaction below is a keyboard
  * event (`Tab`/`Shift+Tab`/`Enter`/`Space`/arrow keys/typed characters/`Escape`) — this file never
  * calls `.click()`. Each journey also proves the two things a mouse-driven test cannot: that every
  * control is reachable in forward tab order (`tabTo` fails the test if it isn't, rather than
@@ -234,76 +234,13 @@ test("journey 2 — read a notification, then change a channel preference, keybo
 });
 
 // ---------------------------------------------------------------------------
-// Journey 3 — Org admin: invite a new user by email.
-// Exercises: a modal with an autofocused first field, typed input, the design system's ARIA 1.2
-// combobox (opened and committed with the keyboard, never a mouse-driven option click), and a
-// second modal chained off the first one's success.
-// ---------------------------------------------------------------------------
-
-test("journey 3 — invite a user through the New invitation modal, keyboard only", async ({
-  page,
-}) => {
-  await stubPortalShellDefaults(page);
-  await stubAuthenticatedSession(page, ["ORG_ADMIN"]);
-  await page.route("**/api/invitations**", async (route) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    return fulfillJson(route, 200, { invitations: [], next_cursor: null, bulk_invites: [] });
-  });
-  await page.route("**/api/invitations", async (route) => {
-    if (route.request().method() !== "POST") return route.fallback();
-    const body = route.request().postDataJSON() as { email: string; role: string };
-    expect(body).toMatchObject({ email: "morgan@example.edu", role: "STUDENT" });
-    return fulfillJson(route, 201, {
-      invitation: { email: body.email, role: body.role },
-      token: "tok_abc123",
-    });
-  });
-
-  await page.goto("/portal/admin/invitations");
-  await expect(page.getByRole("heading", { name: "Invitations" })).toBeVisible();
-
-  const newInvitation = page.getByRole("button", { name: "New invitation" });
-  await tabTo(page, newInvitation);
-  await page.keyboard.press("Enter");
-
-  const dialog = page.getByRole("dialog", { name: "New invitation" });
-  await expect(dialog).toBeVisible();
-
-  // The email field is the dialog's first focusable content (the trap skips the header's close
-  // button for its default target — see `useFocusTrap`'s doc comment) — no Tab needed to reach it.
-  const emailField = dialog.getByLabel("Email");
-  await expectFocused(emailField);
-  await page.keyboard.type("morgan@example.edu");
-
-  const roleSelect = dialog.getByRole("combobox", { name: "Role" });
-  await tabTo(page, roleSelect);
-  // Typeahead: "S" opens the listbox and jumps straight to "Student" (the only invitation role
-  // starting with S), then Enter commits it — the combobox's documented keyboard model.
-  await page.keyboard.press("s");
-  await expect(roleSelect).toHaveAttribute("aria-expanded", "true");
-  await page.keyboard.press("Enter");
-  await expect(roleSelect).toHaveText("Student");
-
-  const sendInvite = dialog.getByRole("button", { name: "Send invite" });
-  await tabTo(page, sendInvite);
-  await page.keyboard.press("Enter");
-
-  const linkDialog = page.getByRole("dialog", { name: "Invitation sent" });
-  await expect(linkDialog).toBeVisible();
-  const done = linkDialog.getByRole("button", { name: "Done" });
-  await tabTo(page, done);
-  await page.keyboard.press("Enter");
-  await expect(linkDialog).toBeHidden();
-});
-
-// ---------------------------------------------------------------------------
-// Journey 4 — Finance: record a payment against an invoice.
+// Journey 3 — Finance: record a payment against an invoice.
 // Exercises: a search-and-pick pattern (type to filter, then activate a result button), a text
 // field, a radio group (arrow-key selection per the native radio keyboard model), and a submit that
 // leaves the record-a-payment flow.
 // ---------------------------------------------------------------------------
 
-test("journey 4 — record a payment against an invoice, keyboard only", async ({ page }) => {
+test("journey 3 — record a payment against an invoice, keyboard only", async ({ page }) => {
   await stubPortalShellDefaults(page);
   await stubAuthenticatedSession(page, ["FINANCE"]);
 
@@ -412,12 +349,12 @@ test("journey 4 — record a payment against an invoice, keyboard only", async (
 });
 
 // ---------------------------------------------------------------------------
-// Journey 5 — Principal: triage a discipline incident (add an action, then resolve it).
+// Journey 4 — Principal: triage a discipline incident (add an action, then resolve it).
 // Exercises: navigating into a detail view via a link, a second ARIA combobox (typeahead again), a
 // textarea, and a second dialog opened only once the first workflow step unblocks it.
 // ---------------------------------------------------------------------------
 
-test("journey 5 — record a disciplinary action and resolve the incident, keyboard only", async ({
+test("journey 4 — record a disciplinary action and resolve the incident, keyboard only", async ({
   page,
 }) => {
   await stubPortalShellDefaults(page);

@@ -5,16 +5,16 @@
 // There is no password store in the schema (see migration 000007): authentication is external OAuth,
 // modeled by app.oauth_identities (provider, subject). For local development every persona logs in
 // through a mock provider whose subject equals the persona's email, which a dev auth stub can map
-// directly. The role enum (000007) has no PARENT value, so parents carry the GUEST role and are related
-// to their children through app.parent_child_links (ST-052 decision).
+// directly. Parents carry the PARENT role (migration 000043) and are related to their children through
+// app.parent_child_links.
 
 export type MockRole =
   | "SUPER_ADMIN"
   | "ORG_ADMIN"
   | "PRINCIPAL"
+  | "ATTENDANCE_OFFICER"
   | "FINANCE"
   | "INSTRUCTOR"
-  | "TEACHING_ASSISTANT"
   | "STUDENT"
   | "PARENT"
   | "GUEST";
@@ -64,6 +64,9 @@ const STUDENT_KEYS = [
   "student-omar",
   "student-huda",
   "student-sami",
+  // Adam's younger sister, so the Fares parent has two children (mobile child picker). Kept last so
+  // the index-driven seed modules (data/*.ts) keep their existing per-student data for everyone else.
+  "student-mira",
 ] as const;
 
 const students: MockPersona[] = [
@@ -75,6 +78,7 @@ const students: MockPersona[] = [
   ["student-omar", "Omar", "Darwish"],
   ["student-huda", "Huda", "Rahman"],
   ["student-sami", "Sami", "Aziz"],
+  ["student-mira", "Mira", "Fares"],
 ].map(([key, firstName, lastName]) => ({
   key,
   group: "student" as const,
@@ -84,21 +88,38 @@ const students: MockPersona[] = [
   email: `${key.replace("student-", "")}.${lastName.toLowerCase()}@${MOCK_EMAIL_DOMAIN}`,
 }));
 
-const parents: MockPersona[] = [
-  ["parent-khalil", "Rania", "Khalil", "student-yara", "mother"],
-  ["parent-fares", "Bassel", "Fares", "student-adam", "father"],
-  ["parent-saleh", "Maha", "Saleh", "student-nour", "mother"],
-  ["parent-mansour", "Tariq", "Mansour", "student-zaid", "father"],
-  ["parent-haddad", "Dalia", "Haddad", "student-lina", "guardian"],
-  ["parent-darwish", "Karim", "Darwish", "student-omar", "father"],
-].map(([key, firstName, lastName, studentKey, relationship]) => ({
+// [key, firstName, lastName, children]. A parent may guard several students; they all share the
+// parent's one family.
+const parents: MockPersona[] = (
+  [
+    ["parent-khalil", "Rania", "Khalil", [["student-yara", "mother"]]],
+    [
+      "parent-fares",
+      "Bassel",
+      "Fares",
+      [
+        ["student-adam", "father"],
+        ["student-mira", "father"],
+      ],
+    ],
+    ["parent-saleh", "Maha", "Saleh", [["student-nour", "mother"]]],
+    ["parent-mansour", "Tariq", "Mansour", [["student-zaid", "father"]]],
+    ["parent-haddad", "Dalia", "Haddad", [["student-lina", "guardian"]]],
+    ["parent-darwish", "Karim", "Darwish", [["student-omar", "father"]]],
+  ] as const satisfies readonly (readonly [
+    string,
+    string,
+    string,
+    readonly (readonly [string, MockRelationship])[],
+  ])[]
+).map(([key, firstName, lastName, children]) => ({
   key,
   group: "parent" as const,
-  role: "GUEST" as const,
+  role: "PARENT" as const,
   firstName,
   lastName,
   email: `${key.replace("parent-", "")}.parent@${MOCK_EMAIL_DOMAIN}`,
-  children: [{ studentKey, relationship: relationship as MockRelationship }],
+  children: children.map(([studentKey, relationship]) => ({ studentKey, relationship })),
 }));
 
 const staff: MockPersona[] = [
@@ -125,6 +146,14 @@ const staff: MockPersona[] = [
     firstName: "Samir",
     lastName: "Qasem",
     email: `principal@${MOCK_EMAIL_DOMAIN}`,
+  },
+  {
+    key: "attendance-officer",
+    group: "admin",
+    role: "ATTENDANCE_OFFICER",
+    firstName: "Hala",
+    lastName: "Mansour",
+    email: `attendance@${MOCK_EMAIL_DOMAIN}`,
   },
   {
     key: "finance-officer",
@@ -157,14 +186,6 @@ const staff: MockPersona[] = [
     firstName: "Mona",
     lastName: "Farouk",
     email: `mona.farouk@${MOCK_EMAIL_DOMAIN}`,
-  },
-  {
-    key: "teaching-assistant",
-    group: "teacher",
-    role: "TEACHING_ASSISTANT",
-    firstName: "Yusuf",
-    lastName: "Karim",
-    email: `yusuf.karim@${MOCK_EMAIL_DOMAIN}`,
   },
 ];
 

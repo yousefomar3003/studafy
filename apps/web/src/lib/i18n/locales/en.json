@@ -3,14 +3,19 @@
     "skipToContent": "Skip to content",
     "primaryNavAriaLabel": "Primary",
     "toggleNav": "Toggle navigation",
-    "homeLink": "Studafy home"
+    "homeLink": "Studafy home",
+    "back": "Back"
   },
   "nav": {
     "ariaLabel": "Portal",
     "home": "Home",
     "notifications": "Notifications",
     "admin": "Admin",
+    "staff": "Staff accounts",
+    "members": "School members",
     "principal": "Principal",
+    "attendance": "Attendance",
+    "platform": "Studafy platform",
     "billing": "Billing",
     "finance": "Finance",
     "approvals": "Approvals",
@@ -107,15 +112,19 @@
     "previousFailed": "Your last deletion request couldn't be completed. Please try again or contact your school.",
     "deleteButton": "Delete my account",
     "confirmTitle": "Delete your account?",
-    "confirmBody": "You'll be signed out everywhere right away. This can't be undone.",
+    "confirmBody": "You'll be signed out everywhere right away, and your account will be deleted in 14 days unless you sign in and cancel.",
     "confirmButton": "Delete account",
     "requestError": "Couldn't delete your account",
     "tryAgain": "Please try again.",
-    "completedTitle": "Your account is being deleted",
-    "completedBody": "You've been signed out on every device. Your personal data will be erased by {{date}}.",
-    "completedAiCanceled": "Your AI subscription won't renew.",
+    "completedTitle": "Your account deletion is scheduled",
+    "completedBody": "You've been signed out on every device. Your account will be deleted on {{scheduledDate}}; sign in before then to cancel. Your personal data will be erased by {{date}}.",
     "completedRetainedIntro": "Your school keeps only these records, as the law requires:",
     "completedDone": "Done",
+    "pendingGateTitle": "Your account is scheduled for deletion",
+    "pendingGateBody": "Your account will be deleted on {{date}}. Cancel the deletion to keep using Studafy.",
+    "pendingGateCancel": "Cancel deletion",
+    "pendingGateSignOut": "Sign out",
+    "pendingGateFailed": "The deletion couldn't be cancelled. Try again.",
     "retained": {
       "academic_grades": "Grades, without your name or contact details",
       "attendance": "Attendance, without your name or contact details",
@@ -163,14 +172,6 @@
     "filterClearAll": "Clear all"
   },
   "dataTransfer": {
-    "export": {
-      "button": "Export CSV",
-      "empty": "There are no rows to export.",
-      "done_one": "Exported {{count}} row.",
-      "done_other": "Exported {{count}} rows.",
-      "truncated": "Export limited to the first {{count}} rows. Narrow the filters to export the rest.",
-      "failed": "Export failed."
-    },
     "import": {
       "button": "Import CSV",
       "intro": "Upload a CSV file with a header row using the columns below (up to {{max}} rows). Download the template to start from the right format.",
@@ -210,5 +211,25 @@
         "tooLong": "{{field}} must be at most {{max}} characters."
       }
     }
+  },
+  "home": {
+    "signedInAs": "Signed in as",
+    "roles": {
+      "SUPER_ADMIN": "Super admin",
+      "ORG_ADMIN": "School admin",
+      "PRINCIPAL": "Principal",
+      "FINANCE": "Finance",
+      "ATTENDANCE_OFFICER": "Attendance officer",
+      "INSTRUCTOR": "Teacher",
+      "SUPPORT_AGENT": "Support agent",
+      "PARENT": "Parent",
+      "STUDENT": "Student",
+      "GUEST": "Guest"
+    },
+    "summaryLabel": "Summary",
+    "summarySentence": "{{items}}.",
+    "allClear": "Nothing needs your attention right now.",
+    "unavailable": "Couldn't load",
+    "shortcuts": "Shortcuts"
   }
 }

@@ -37,7 +37,7 @@ export function SettingsCard({
         <h2>{title}</h2>
         <p className="settings-card__description">{description}</p>
       </Card.Header>
-      <form onSubmit={onSubmit} noValidate aria-label={title}>
+      <form className="settings-card__form" onSubmit={onSubmit} noValidate aria-label={title}>
         <Card.Body>{children}</Card.Body>
         <Card.Footer>
           <Button type="submit" loading={saving}>

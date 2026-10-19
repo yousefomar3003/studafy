@@ -46,11 +46,6 @@ export default function NewRefundPage() {
 
   return (
     <>
-      <p className="adjustments-form__back">
-        <Link to="/portal/finance/adjustments/refunds">
-          {t("financeReports.adjustments.newRefund.back")}
-        </Link>
-      </p>
       <h1>{t("financeReports.adjustments.newRefund.title")}</h1>
 
       {refund ? (

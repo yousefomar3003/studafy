@@ -49,12 +49,11 @@ describe("integration test harness", () => {
     expect(res.status).toBe(200);
   });
 
-  integrationTest("createFullTenant provisions all 7 roles", async () => {
+  integrationTest("createFullTenant provisions all 6 roles", async () => {
     const roles = [
       "SUPER_ADMIN",
       "ORG_ADMIN",
       "INSTRUCTOR",
-      "TEACHING_ASSISTANT",
       "STUDENT",
       "GUEST",
       "SUPPORT_AGENT",

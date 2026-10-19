@@ -4,8 +4,7 @@ import '../../../core/api/generated/models/attendance_session_status.dart';
 import '../../../core/api/generated/models/submission.dart';
 import '../../../core/api/generated/models/timetable_slot.dart';
 
-/// Where today's attendance stands for one teaching session. Drives the take-attendance CTA's
-/// label and whether it still invites action.
+/// Where today's attendance stands for one teaching session, shown on the teacher home.
 enum SessionAttendanceState {
   /// No attendance session has been opened for this class and period today.
   notStarted,
@@ -15,8 +14,6 @@ enum SessionAttendanceState {
 
   /// Attendance has been `submitted` or `locked` for today; nothing left to do.
   recorded;
-
-  bool get invitesAction => this != SessionAttendanceState.recorded;
 
   /// Resolves the state from the attendance sessions already recorded for a class on a date,
   /// matching [period]. A session with a null period (whole-day) counts for any period.

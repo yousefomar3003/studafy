@@ -1,6 +1,6 @@
 ---
 title: "Onboarding guide"
-description: "Complete walkthrough of the six-step setup wizard every administrator sees after activating their school."
+description: "Complete walkthrough of the five-step setup wizard every administrator sees after activating their school."
 keywords:
   [
     "setup",
@@ -9,7 +9,6 @@ keywords:
     "academic year",
     "grading scheme",
     "timetable",
-    "staff invitations",
     "student import",
     "csv",
     "skip",
@@ -20,8 +19,8 @@ order: 1
 # Onboarding guide
 
 The setup wizard appears after your school account is activated. It walks you
-through six steps: school profile, academic year, grading scheme, timetable
-periods, staff invitations, and student import.
+through five steps: school profile, academic year, grading scheme, timetable
+periods, and student import.
 
 Nothing here is permanent. Every step can be skipped, and everything you
 configure can be changed later from the portal. Skipped steps do not block
@@ -46,7 +45,6 @@ settings. Fields:
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------- |
 | **Default language**                                             | Interface language for the school (English, Francais, Arabic, Espanol, Portuguese, Deutsch). | English             |
 | **Timezone**                                                     | IANA timezone, e.g. `Africa/Casablanca`. Used for scheduling and dates.                      | `Africa/Casablanca` |
-| **Invitation expiry (days)**                                     | How long invite links stay valid. 1–365.                                                     | 7                   |
 | **Attendance alert threshold (%)**                               | Below this attendance rate, alerts fire. 0–100.                                              | 75                  |
 | **Absence alert threshold (%)**                                  | Above this absence rate, alerts fire. 0–100.                                                 | 25                  |
 | **Attendance correction window (hours)**                         | How long an attendance record can be corrected. 1–8760.                                      | 48                  |
@@ -115,27 +113,7 @@ At this stage the wizard only reserves the structure — it creates a draft
 timetable version for the term. Clock times, teachers, rooms, and slot
 placement are finalised later in the Timetable builder.
 
-## Step 5: Staff invitations
-
-![Staff invitations step](/help-media/screenshots/onboarding-staff.webp)
-
-"Invite staff by role. Paste one email per line, or separate them with commas."
-
-For each batch:
-
-| Field      | What it does                                                    |
-| ---------- | --------------------------------------------------------------- |
-| **Role**   | `Admin`, `Teacher`, or `Teaching assistant`.                    |
-| **Emails** | One email per line, or comma-separated. Duplicates are removed. |
-
-Use `Add another role` to send several batches in one go, and `Remove batch` to
-drop one. `Send invitations` emails every recipient a personalized invite link.
-
-An invite link is single-use and expires after the school default set in step 1
-(7 days). There are no password resets for invitations — see the invitations
-article for troubleshooting.
-
-## Step 6: Student import
+## Step 5: Student import
 
 ![Student import step](/help-media/screenshots/onboarding-student-import.webp)
 
@@ -157,7 +135,6 @@ When every step is passed you see the completion screen. `Go to dashboard`
 opens the portal. From there you can:
 
 - Build clock times and assign teachers/rooms in the Timetable builder.
-- Send more invitations from Admin → Invitations, with more roles and bulk support.
 - Import more students from Admin → Students.
 - Change school defaults from Admin → Settings.
 
@@ -165,7 +142,7 @@ opens the portal. From there you can:
 
 **I skipped a step. Can I redo it?** Yes. The wizard resumes on this browser; a
 skipped step is not deleted. You can also do the equivalent tasks in the portal
-(Settings, Timetable builder, Invitations, Students).
+(Settings, Timetable builder, Students).
 
 **I closed the browser mid-wizard.** Progress is saved in `localStorage` on
 that browser. Return to `/onboarding/setup` and continue where you left off.

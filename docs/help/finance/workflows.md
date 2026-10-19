@@ -1,6 +1,6 @@
 ---
 title: "Finance workflows"
-description: "The end-to-end billing cycle: fee structures, invoice batches, payments, scholarships, refunds, expenses, and reports."
+description: "The end-to-end billing cycle: fee structures, invoice batches, payments, refunds, expenses, and reports."
 keywords:
   [
     "finance",
@@ -9,7 +9,6 @@ keywords:
     "invoice",
     "batch",
     "payment",
-    "scholarship",
     "refund",
     "expense",
     "reports",
@@ -36,9 +35,9 @@ amount, optional description) for a program and academic year.
 1. `New fee structure` (or pick an existing structure to edit it).
 2. Give it a **Title**, **Academic year**, **Program** (the ERPNext program
    grouping, e.g. "Grade 5"), and a 3-letter **Currency** code.
-3. Add components with `Add component`. The **Invoice preview** panel shows an
-   estimate for a sample student, including any confirmed scholarship
-   discounts.
+3. Add components with `Add component`. The **Invoice preview** panel shows
+   the invoice the structure produces. Scholarships and discounts are not
+   available at the moment, so every student is invoiced the full amount.
 4. `Create fee structure` (or `Save changes`).
 
 A new structure is created `Draft` in ERPNext. Once it is `Submitted` or
@@ -82,19 +81,7 @@ Payments are idempotent — double-submitting cannot record the same payment
 twice. If a submission was already recorded, you are told to check the payment
 history before retrying.
 
-## 4. Scholarships and refunds
-
-### Award a scholarship or discount
-
-Finance → Scholarships → `New award`.
-
-1. Pick the **Student** and the **Scholarship / discount**.
-2. The effect line shows exactly what applies, e.g. "50 JOD off the 'Tuition'
-   fee category on every future invoice."
-3. `Review award`, confirm, and the award is created **Pending confirmation**.
-
-A different user must confirm a pending award before it affects any invoice.
-This separation is deliberate — one person cannot both create and confirm.
+## 4. Refunds
 
 ### Request a refund
 
@@ -142,6 +129,4 @@ aging buckets, recent payments) to close the month.
 ## Order of operations
 
 Do not skip steps: fee structures before invoices, invoices before payments,
-payments before refunds. Scholarships apply to future invoices, so award them
-before the relevant batch is generated if they must affect that billing
-period.
+payments before refunds.

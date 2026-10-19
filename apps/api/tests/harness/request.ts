@@ -6,6 +6,7 @@ import { createLogger } from "../../src/logger";
 import { AUTH_CHANNELS, KeyStore, signAccessToken } from "../../src/modules/auth";
 
 import type { Database } from "../../src/db";
+import type { StorageService } from "../../src/lib/storage";
 import type { AppEnv } from "../../src/middleware/requestId";
 import type { AuthChannel } from "../../src/modules/auth";
 import type { PaymentProviderPort } from "../../src/modules/subscriptions";
@@ -54,6 +55,8 @@ export interface TestAppOptions {
    * `parseWebhook` accepts, and the route sees exactly the same success and failure shapes.
    */
   stripeProvider?: PaymentProviderPort | null;
+  /** Object storage (e.g. an in-memory fake). Defaults to `null`: storage-backed routes answer 503. */
+  storage?: StorageService | null;
 }
 
 /** A test app plus the key store whose keys its tokens must be signed with. */
@@ -90,6 +93,7 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     jwtAudience: TEST_JWT_AUDIENCE,
     docsEnabled: options.docsEnabled ?? false,
     stripeProvider: options.stripeProvider ?? null,
+    storage: options.storage ?? null,
   });
 
   return { app, keyStore, ready: keyStore.init() };

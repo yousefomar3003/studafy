@@ -2,14 +2,14 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:studafy_mobile/src/core/api/generated/models/announcement.dart';
-import 'package:studafy_mobile/src/core/api/generated/models/announcement_audience_type.dart';
-import 'package:studafy_mobile/src/core/api/generated/models/announcement_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/class_value.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/course.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/cumulative_grade_summary.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/notification.dart'
+    as api_models;
+import 'package:studafy_mobile/src/core/api/generated/models/notification_notification_type.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/published_grade.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/published_grade_snapshot.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/published_term_summary.dart';
@@ -55,30 +55,26 @@ Assignment _assignment(String id, String title, int daysUntilDue) {
   );
 }
 
-Announcement _announcement(
+api_models.Notification _announcement(
   String id,
   String title,
   String body, {
   bool mandatory = false,
 }) {
   final now = DateTime(2026, 1, 1);
-  return Announcement(
+  return api_models.Notification(
     id: id,
     schoolId: 'school-1',
-    createdBy: 'admin-1',
-    createdByName: 'Principal',
+    userId: 'student-1',
+    // Mandatory announcements fan out to the inbox as ADMIN_ANNOUNCEMENT, optional ones as
+    // ANNOUNCEMENT — see `isMandatoryAnnouncement`.
+    notificationType: mandatory
+        ? NotificationNotificationType.adminAnnouncement
+        : NotificationNotificationType.announcement,
     title: title,
     body: body,
-    mandatory: mandatory,
-    audienceType: AnnouncementAudienceType.school,
-    audienceRole: null,
-    audienceClassId: null,
-    audienceClassCode: null,
-    status: AnnouncementStatus.published,
-    scheduledAt: now,
-    publishedAt: now,
-    recipientCount: 10,
-    notifiedCount: 10,
+    metadata: const {},
+    readAt: null,
     createdAt: now,
     updatedAt: now,
   );

@@ -63,10 +63,16 @@ export const userSchema = z
     school_id: uuidSchema.openapi({
       description: "Owning school tenant. Immutable — enforced by a database trigger, not policy.",
     }),
-    email: z.string().max(320).openapi({
-      description: "Contact address as supplied. Unique per school after normalization.",
-      example: "student@example.edu",
-    }),
+    email: z
+      .string()
+      .max(320)
+      .nullable()
+      .openapi({
+        description:
+          "Contact address as supplied. Unique per school after normalization. Null for members who " +
+          "sign in with their member ID and a password.",
+        example: "student@example.edu",
+      }),
     display_name: z.string().nullable().openapi({ description: "Optional human-readable name." }),
     status: userStatusSchema,
     email_verified_at: dateTimeSchema

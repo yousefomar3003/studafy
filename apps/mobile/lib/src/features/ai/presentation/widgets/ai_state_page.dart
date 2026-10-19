@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../../design/layout/bottom_inset_padding.dart';
 
 /// Common scroll shell for the AI tab's non-loading, non-error states with real content to show --
 /// always scrollable so pull-to-refresh keeps working even when [child] is short enough to fit one
@@ -14,7 +15,7 @@ class AiStatePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.space16),
+      padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [child],
     );

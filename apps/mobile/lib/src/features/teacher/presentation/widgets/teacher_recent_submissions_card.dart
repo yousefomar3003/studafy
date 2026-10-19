@@ -36,7 +36,8 @@ class TeacherRecentSubmissionsCard extends ConsumerWidget {
           }
           return Column(
             children: [
-              for (final entry in list.take(_maxRows)) _SubmissionRow(pending: entry),
+              for (final entry in list.take(_maxRows))
+                _SubmissionRow(pending: entry),
             ],
           );
         },
@@ -71,7 +72,9 @@ class _SubmissionRow extends StatelessWidget {
                 ),
                 Text(
                   relativeTimeLabel(pending.submittedAt),
-                  style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),

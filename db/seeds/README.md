@@ -1,131 +1,78 @@
 # Demo Seed Data
 
-SQL seed scripts that populate a realistic demo school with all roles, academic structure, timetable, grades, invoices, materials, and AI data for local dev/staging.
+TypeScript seed that builds one fully-populated demo school (`studafy-demo-academy`, "Studafy Demo
+Academy") for local development and CI: users in every role with mock OAuth logins, academic
+structure, timetable, attendance, assessments, grades, materials with embedded chunks, ERPNext finance
+caches, AI data, notifications, school events, and a parent-teacher messaging thread.
+
+The full walkthrough (what is seeded, persona logins, 3NF notes, index health) is
+[`docs/database/seeding_guide.md`](../../docs/database/seeding_guide.md). The persona list lives
+in one place, [`mock-credentials.ts`](./mock-credentials.ts); this README does not repeat it.
 
 ## Prerequisites
 
-- All migrations applied (`bun run db:migrate`)
-- Local PostgreSQL running (`docker compose -f db/compose.yml up -d`)
+- An already-migrated local database (`bun run db:migrate`).
+- Local PostgreSQL running, e.g. the disposable test database (`bun run db:up`, which starts
+  `test-postgres`/`test-redis` from the root `compose.yml`), with `DATABASE_URL` pointing at it.
 
-## Usage
+## Commands
 
-```bash
-# Run all seeds
-bun run db:seed
+| Command                       | Entry point        | What it does                                                                                                                                                                     |
+| ----------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run db:seed`             | `seed.ts`          | Seeds the local demo tenant, prints a per-table row-count summary, then runs the index health check.                                                                             |
+| `bun run db:seed:index-check` | `index-health.ts`  | Re-runs the index health check on its own (read-only, rolled back): every `app` index valid and ready, and representative tenant queries served by an index.                     |
+| `bun run db:seed:review`      | `review-tenant.ts` | Provisions the App Store / Play reviewer tenant (`studafy-review-academy`) from the same data modules. Meant for production; see [Reviewer tenant](#reviewer-tenant-production). |
 
-# Or via CLI directly
-bun packages/db/src/cli.ts seed
-```
+`bun run db:seed` is the only seeder. There are no SQL seed files and no `cli.ts seed` command.
+With the full local stack, `docker compose --profile seed run --rm seed` runs the same `seed.ts`
+against the compose `postgres` service.
+
+## Behavior
+
+- **All or nothing.** The whole dataset is written in one transaction as `studafy_admin`, with
+  `app.school_id` set, under the shared migration advisory lock. A failure anywhere rolls everything
+  back.
+- **Not re-runnable.** If a school with the tenant's slug already exists, the seed writes nothing,
+  prints `Seed skipped: tenant 'studafy-demo-academy' already exists.` and exits non-zero. To reseed,
+  recreate or re-migrate a fresh database (`bun run db:down && bun run db:up` for the disposable one).
+- **Dated data.** Attendance and audit-log rows land in the monthly partitions the migrations ship; a
+  database migrated after those run out needs `bun run db:attendance:partitions` and
+  `bun run db:audit:partitions` first.
+
+## Safety guard
+
+[`guard.ts`](./guard.ts) runs before any connection is opened; either layer aborts the run with exit
+code 1:
+
+1. **Environment.** `NODE_ENV=production` or `APP_ENV=production` is refused.
+2. **Host.** A staging/production-shaped host (`*.rds.amazonaws.com`, `*.rds.*`, or a host segment
+   `prod`, `production`, `staging`, `stage`, `preprod`, `pre-prod`) is always refused. Any other host
+   that is not local (`localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, `postgres`, `db`, `database`,
+   `host.docker.internal`) is refused unless `SEED_ALLOW_NONLOCAL=true` is set for a disposable remote
+   CI database.
+
+`db:seed:index-check` uses the same guard.
 
 ## Reviewer tenant (production)
 
-`bun run db:seed:review` provisions the App Store / Play reviewer tenant (`studafy-review-academy`)
-from the same data modules, and is meant to run in production. It needs
-`REVIEW_TENANT_SEED_CONFIRM=studafy-review-academy`, and it writes nothing if the tenant already
-exists. Roster: `review-credentials.ts`; profiles: `tenants.ts`. For credentials and provisioning,
-see [`docs/runbooks/app-review-access.md`](../../docs/runbooks/app-review-access.md). The local
-`db:seed` below never creates it.
-
-## Safety
-
-- **Idempotent**: Every INSERT uses `ON CONFLICT DO NOTHING`. Safe to re-run.
-- **Production guard**: Refuses to run if `NODE_ENV=production`.
-- **Migration check**: Aborts if any pending migrations exist (must apply migrations first).
+`bun run db:seed:review` provisions the reviewer tenant and is meant to run in production. It skips
+the host checks above and instead requires `REVIEW_TENANT_SEED_CONFIRM=studafy-review-academy`. If
+the tenant already exists it writes nothing and still succeeds, so a pipeline can run it on every
+release. Roster: [`review-credentials.ts`](./review-credentials.ts); profiles:
+[`tenants.ts`](./tenants.ts). For credentials and provisioning, see
+[`docs/runbooks/app-review-access.md`](../../docs/runbooks/app-review-access.md). The local
+`db:seed` never creates it.
 
 ## Files
 
-| File                          | Description                                               |
-| ----------------------------- | --------------------------------------------------------- |
-| `001_global_reference.sql`    | Plans + plan_prices (starter, pro)                        |
-| `002_school.sql`              | Demo Academy school + subscription                        |
-| `003_users_and_roles.sql`     | 13 users across all 7 roles + OAuth mocks                 |
-| `004_profiles.sql`            | Teacher profiles (4) + student profiles (5) + parent link |
-| `005_academic_structure.sql`  | Academic year, terms, subjects, courses, rooms            |
-| `006_classes_enrollments.sql` | 5 classes for Spring 2026 + 20 enrollments                |
-| `007_timetable.sql`           | Approved timetable version + 15 time slots                |
-| `008_materials.sql`           | 4 materials + 5 material chunks (RAG embeddings)          |
-| `009_assessments.sql`         | 4 assignments + 4 submissions                             |
-| `010_grades.sql`              | 5 gradebooks + grade submissions + grades                 |
-| `011_attendance.sql`          | 3 attendance sessions + records (July 2026)               |
-| `012_finance.sql`             | Invoice cache, payment cache, fee schedule cache          |
-| `013_ai.sql`                  | AI subscriptions, conversations, messages, usage meters   |
-| `014_notifications.sql`       | Notifications + user devices                              |
-
-## Demo Data
-
-### School
-
-- **Demo Academy** (slug: `demo-academy`)
-- Plan: Starter, USD currency, US country
-
-### Users
-
-| Role               | Email                              | Notes                   |
-| ------------------ | ---------------------------------- | ----------------------- |
-| SUPER_ADMIN        | admin@studafy.local                | Platform admin          |
-| ORG_ADMIN          | admin@demo-academy.local           | School admin            |
-| INSTRUCTOR         | teacher.math@demo-academy.local    | Math teacher            |
-| INSTRUCTOR         | teacher.science@demo-academy.local | Science teacher         |
-| INSTRUCTOR         | teacher.english@demo-academy.local | English teacher         |
-| INSTRUCTOR         | teacher.history@demo-academy.local | History teacher         |
-| TEACHING_ASSISTANT | ta@demo-academy.local              | TA                      |
-| STUDENT            | student.alice@demo-academy.local   | Alice (ADM-2026-001)    |
-| STUDENT            | student.bob@demo-academy.local     | Bob (ADM-2026-002)      |
-| STUDENT            | student.carol@demo-academy.local   | Carol (ADM-2026-003)    |
-| STUDENT            | student.david@demo-academy.local   | David (ADM-2026-004)    |
-| STUDENT            | student.eve@demo-academy.local     | Eve (ADM-2026-005)      |
-| PARENT             | parent.frank@demo-academy.local    | Frank (parent of Alice) |
-| GUEST              | guest@demo-academy.local           | Guest user              |
-| SUPPORT_AGENT      | support@demo-academy.local         | Support agent           |
-
-### Academic
-
-- **Year**: AY-2025-2026
-- **Terms**: Fall 2025 (closed), Spring 2026 (active), Summer 2026 (planned)
-- **Subjects**: MATH, SCI, ENG, HIST, ART
-- **Courses**: 5 courses mapped to subjects
-- **Classes**: 5 classes for Spring 2026
-- **Enrollments**: 20 total (all 5 students in 3 core, 3 in History, 2 in Art)
-
-### Timetable
-
-- 1 approved version with 15 time slots (Mon-Fri, 3 periods)
-
-### Materials
-
-- 4 materials with storage keys matching `^permanent/<school_id>/[^/]+/[^/]+$`
-- 5 material chunks with dummy embeddings for RAG
-
-### Assessments
-
-- 4 assignments (2 Math, 1 Science, 1 English)
-- 4 submissions (mix of submitted/graded)
-
-### Grades
-
-- 5 gradebooks (one per class, status active)
-- 2 grade submissions (published, submitted)
-- 2 grades
-
-### Attendance
-
-- 3 sessions in July 2026 (within partition range)
-- Records for enrolled students (present, late, absent)
-
-### Finance
-
-- 1 fee schedule cache (Fall 2026 tuition)
-- 3 invoice caches (overdue, partially paid, paid)
-- 2 payment caches (partial, full)
-
-### AI
-
-- 5 subscriptions (3 active, 2 trialing)
-- 3 conversations
-- 3 messages
-- 5 usage meters
-
-### Notifications
-
-- 6 notifications (enrollment, assignment due, grade posted, course published, discussion reply)
-- 4 devices (iOS, Android, 2x web)
+| Path                       | Purpose                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `seed.ts`                  | Entry point and the shared `seedTenant` envelope (guard, lock, existence check, one transaction, summary).                |
+| `guard.ts`                 | Production safeguards for the demo seed and the reviewer-tenant confirmation.                                             |
+| `tenants.ts`               | The two tenant profiles (demo, reviewer).                                                                                 |
+| `mock-credentials.ts`      | Demo personas: the single source for seeded users, roles, OAuth identities, and parent links.                             |
+| `review-credentials.ts`    | Reviewer-tenant personas.                                                                                                 |
+| `support.ts`               | Shared types and deterministic helpers.                                                                                   |
+| `data/*.ts`                | One module per domain (school, people, academics, timetable, assessments, materials, finance, ai, engagement, messaging). |
+| `index-health.ts`          | Post-seed index validity and usability check.                                                                             |
+| `e2e-critical-fixtures.ts` | Extra idempotent fixture for the critical-journeys E2E suite, run by its global setup after `db:seed`.                    |

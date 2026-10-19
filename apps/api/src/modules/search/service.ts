@@ -54,7 +54,7 @@ export interface StudentSearchHit {
 export interface UserSearchHit {
   id: string;
   display_name: string | null;
-  email: string;
+  email: string | null;
   status: UserStatus;
   rank: number;
 }
@@ -138,7 +138,7 @@ export async function searchStudents(
 interface RawUserSearchRow {
   id: string;
   display_name: string | null;
-  email: string;
+  email: string | null;
   status: string;
   rank: number;
 }

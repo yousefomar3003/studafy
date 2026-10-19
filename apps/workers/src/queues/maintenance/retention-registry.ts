@@ -46,6 +46,9 @@ export const LEGAL_HOLD_TABLES: ReadonlySet<string> = new Set([
   "tap_renewal_attempts",
   "online_fee_payments",
   "payment_provider_customers",
+  // Subscription refund requests (db/migrations/000129): the school-side record of a refund of a
+  // subscription charge.
+  "subscription_refund_requests",
   // ERPNext-synced finance records and their caches (docs/database/finance-data-model.md).
   "invoice_batches",
   "invoice_batch_items",

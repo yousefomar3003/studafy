@@ -23,7 +23,6 @@ const LOCALE_LABELS: Record<(typeof LOCALE_OPTIONS)[number], string> = {
 const FALLBACK_VALUES: SchoolProfileValues = {
   locale: "en",
   timezone: "Africa/Casablanca",
-  invitation_expiry_days: 7,
   attendance_alert_threshold: 75,
   absence_alert_threshold: 25,
   parent_discipline_visibility: false,
@@ -42,7 +41,7 @@ export interface SchoolProfileStepProps {
  * Step 1: the school-wide defaults an admin can set today (`PATCH /api/schools/current/settings`).
  * The backend has no editable "name / address / logo" fields yet — those are captured once at
  * registration and aren't re-editable through any endpoint — so this step is scoped to what the
- * settings API actually owns: locale, timezone, invitation expiry, and attendance thresholds.
+ * settings API actually owns: locale, timezone, and attendance thresholds.
  */
 export function SchoolProfileStep({
   cachedValues,
@@ -68,7 +67,6 @@ export function SchoolProfileStep({
       setValues({
         locale: settingsQuery.data.locale,
         timezone: settingsQuery.data.timezone,
-        invitation_expiry_days: settingsQuery.data.invitation_expiry_days,
         attendance_alert_threshold: settingsQuery.data.attendance_alert_threshold,
         absence_alert_threshold: settingsQuery.data.absence_alert_threshold,
         parent_discipline_visibility: settingsQuery.data.parent_discipline_visibility,
@@ -128,17 +126,6 @@ export function SchoolProfileStep({
               !errors.timezone ? t("onboarding.setup.schoolProfile.timezoneHelper") : undefined
             }
             error={errors.timezone && t(errors.timezone)}
-            required
-          />
-
-          <Input
-            label={t("onboarding.setup.schoolProfile.invitationExpiry")}
-            type="number"
-            min={1}
-            max={365}
-            value={values.invitation_expiry_days}
-            onChange={(e) => setField("invitation_expiry_days", Number(e.target.value))}
-            error={errors.invitation_expiry_days && t(errors.invitation_expiry_days)}
             required
           />
 

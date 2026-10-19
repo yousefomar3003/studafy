@@ -16,11 +16,6 @@ export interface AuditTrailTarget {
   /** No audit entry for this record can predate its own creation — passed as the query's `from` so
    * the endpoint's own 30-day-ago default (see `auditLogQuerySchema`) never hides older history. */
   createdAt: string;
-  /** For `award_cache`, every award in the school shares one `target_id` (the school id, not the
-   * award's own id — see `createAward`'s `emitAuditLog` call in the API), so entries are matched by
-   * this record's own id inside `old_values`/`new_values` instead of by `target_id`. `undefined`
-   * skips that extra narrowing (refund entries carry the record's own id as `target_id` already). */
-  recordId?: string;
 }
 
 export interface AuditTrailModalProps {
@@ -45,13 +40,8 @@ function actorLabel(entry: AuditLogEntry, t: TFunction): string {
   );
 }
 
-function carriesRecordId(values: Record<string, unknown> | null, recordId: string): boolean {
-  if (!values) return false;
-  return Object.values(values).includes(recordId);
-}
-
 /**
- * Read-only history for one award or refund record — the "audit trail visible on records"
+ * Read-only history for one refund record — the "audit trail visible on records"
  * acceptance criterion. Reuses `buildAuditDiff`/`formatAuditValue` from `admin/audit/diff` (pure
  * functions, no CSS dependency) rather than re-deriving the same before/after reduction; the modal
  * markup itself stays local to `adjustments.css` rather than pulling in `admin/audit`'s stylesheet,
@@ -78,13 +68,7 @@ export function AuditTrailModal({ target, onClose }: AuditTrailModalProps) {
     enabled: target !== null,
   });
 
-  const entries = (query.data ?? []).filter((entry) => {
-    if (!target?.recordId) return true;
-    return (
-      carriesRecordId(entry.old_values, target.recordId) ||
-      carriesRecordId(entry.new_values, target.recordId)
-    );
-  });
+  const entries = query.data ?? [];
 
   return (
     <Modal

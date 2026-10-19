@@ -1,6 +1,6 @@
 import { LIVE_STATUSES } from "@studafy/billing";
 
-import { GENESIS_ENTITLEMENTS_VERSION } from "./version";
+import { GENESIS_ENTITLEMENTS_VERSION, readEntitlementVersion } from "./version";
 
 import type { SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -154,9 +154,12 @@ function resolutionQuery(tx: TransactionSql, studentId: string | null) {
 /**
  * The school's entitlement, as of this transaction.
  *
- * A school with no subscription row resolves to a live `trialing` at the genesis version, mirroring
- * the fallback `readSubscriptionStatus` has always applied: a tenant whose provisioning has not yet
- * written the row is mid-setup, not unentitled.
+ * A school with no subscription row resolves to a live `trialing`, mirroring the fallback
+ * `readSubscriptionStatus` has always applied: a tenant whose provisioning has not yet written the
+ * row is mid-setup, not unentitled. Its version still comes from `app.entitlement_versions` (genesis
+ * when absent), never assumed: closing a school bumps the counter whether or not the school ever
+ * subscribed, and the JWT staleness check must see that bump — the same counter session issuance
+ * stamps into `entitlements_ver`.
  */
 export async function resolveSchoolEntitlement(
   tx: TransactionSql,
@@ -167,7 +170,7 @@ export async function resolveSchoolEntitlement(
   if (!row) {
     return {
       schoolId,
-      version: GENESIS_ENTITLEMENTS_VERSION,
+      version: await readEntitlementVersion(tx, "school", schoolId),
       subscriptionId: null,
       status: "trialing",
       active: true,

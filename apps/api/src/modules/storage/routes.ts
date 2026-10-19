@@ -1,6 +1,8 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { ERROR_CODES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
+import { CodedHttpException } from "../../coded-http-exception";
 import { withTenantTx } from "../../db/tenant-tx";
 import { requireStorage } from "../../lib/storage";
 import { auditAction } from "../../middleware/auditEmitter";
@@ -216,6 +218,15 @@ export function storageRoutes(
     const body = c.req.valid("json");
     const contentClass = getContentClass(body.content_class);
     requirePermissionIn(c, contentClass.requiredPermission);
+    if (contentClass.gatewayConfirm === false) {
+      // e.g. message.attachment: the messaging send confirms and promotes the staged object in the
+      // same transaction as the message. Promoting it here would strand it in permanent/ unreferenced.
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.VALIDATION_FAILED,
+        `Uploads of class ${body.content_class} are confirmed by the feature that uses them, not here`,
+      );
+    }
 
     let confirmed;
     let quota: StorageUsage | null = null;

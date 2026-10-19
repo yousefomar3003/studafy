@@ -1,12 +1,34 @@
 /* Shared top bar rendered by RootLayout on the non-marketing, non-portal route groups
    (onboarding, account, invite). Theme-aware via the shared tokens; logical properties for RTL. */
 
+/* App frame: exactly one viewport high, and the window never scrolls. The header sits in a fixed
+ * slot at the top and `main` scrolls below it, so the scrollbar starts under the header instead of
+ * running beside it. Marketing and portal pages render their own header inside `main`, so their
+ * shells fill it (`height: 100%`) and scroll a region of their own (`[data-scroll-root]`); `main`
+ * then never overflows. `main` stays a plain block box: as a flex container it would shrink every
+ * centred page (`.page-shell`'s auto margins) to its content width. */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
+  block-size: 100dvh;
+}
+
+.app-shell__main {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
 .root-nav {
-  position: sticky;
-  inset-block-start: 0;
+  position: relative;
+  flex: none;
   z-index: 10;
   border-block-end: 1px solid var(--color-border);
   background-color: var(--color-background);
+  transition:
+    background-color var(--duration-base) ease,
+    border-color var(--duration-base) ease;
 }
 
 .root-nav__inner {
@@ -17,6 +39,26 @@
   min-block-size: 64px;
   margin-inline: auto;
   padding-inline: var(--space-24);
+  border-radius: var(--radius-full);
+  transition:
+    max-inline-size var(--duration-base) ease,
+    transform var(--duration-base) ease,
+    box-shadow var(--duration-base) ease,
+    background-color var(--duration-base) ease;
+}
+
+/* Scrolled: floating pill, same as the marketing header. The bar keeps its height (the pill is only
+ * translated down), so content under it never shifts. */
+.root-nav[data-scrolled="true"] {
+  background-color: transparent;
+  border-block-end-color: transparent;
+}
+
+.root-nav[data-scrolled="true"] .root-nav__inner {
+  max-inline-size: min(68rem, calc(100% - 2 * var(--space-16)));
+  transform: translateY(var(--space-12));
+  background-color: var(--color-background);
+  box-shadow: var(--elevation-4);
 }
 
 .root-nav__brand {

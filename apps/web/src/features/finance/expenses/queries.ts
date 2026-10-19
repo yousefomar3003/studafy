@@ -49,13 +49,12 @@ export const EXPENSES_PAGE_SIZE = PAGE_SIZE;
 export async function fetchExpensesPage(
   filters: ExpenseFilters,
   offset: number,
-  limit: number = PAGE_SIZE,
 ): Promise<ExpensesPage> {
   const range = monthDateRange(filters.month);
   const { data } = await api.GET("/api/finance/expenses", {
     params: {
       query: {
-        limit,
+        limit: PAGE_SIZE,
         offset,
         category: filters.category || undefined,
         date_from: range?.date_from,

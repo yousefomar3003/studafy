@@ -22,7 +22,7 @@ import { assertSchoolOwnedKey, buildPermanentKey, buildTempKey } from "../../lib
 import { promoteTempObject } from "../../lib/storage/promote";
 
 import type { ContentClass } from "./content-classes";
-import type { PresignedUrl, StorageService } from "../../lib/storage";
+import type { ParsedStorageKey, PresignedUrl, StorageService } from "../../lib/storage";
 
 export interface RequestUploadParams {
   fileName: string;
@@ -93,13 +93,30 @@ export interface ConfirmedUpload {
   checksumSha256: string | null;
 }
 
-export async function confirmUpload(
+/** A staged temp/ object that has passed every confirm-time check but has not been promoted. */
+export interface InspectedStagedUpload {
+  /** The validated temp/ key, decomposed. */
+  parsed: ParsedStorageKey;
+  /** Stored Content-Type -- the value S3 bound at upload, not what the client claimed. */
+  contentType: string;
+  /** Stored size, re-read from the bucket. */
+  sizeBytes: number;
+  checksumSha256: string | null;
+}
+
+/**
+ * Every confirm-time check, without the promotion: the key is this school's temp/ key, the object
+ * exists, its *stored* type and size satisfy the content class, and (when supplied) its SHA-256
+ * matches. Read-only against storage, so a caller confirming several objects together (a message
+ * with images) can inspect them all before promoting any -- one bad file then leaves every staged
+ * object in place for a retry.
+ */
+export async function inspectStagedUpload(
   storage: StorageService,
   schoolId: string,
   contentClass: ContentClass,
   params: ConfirmUploadParams,
-  options: ConfirmUploadOptions = {},
-): Promise<ConfirmedUpload> {
+): Promise<InspectedStagedUpload> {
   // The key arrives from the client (it was echoed back in the upload-url response), so it is
   // untrusted: it must parse as the four-segment scheme, live under temp/, and belong to this
   // school before it is ever handed to storage. Raising 403 here rather than 404 keeps a caller
@@ -147,20 +164,38 @@ export async function confirmUpload(
     }
   }
 
+  return {
+    parsed,
+    contentType: metadata.contentType,
+    sizeBytes: metadata.sizeBytes,
+    checksumSha256: checksum,
+  };
+}
+
+export async function confirmUpload(
+  storage: StorageService,
+  schoolId: string,
+  contentClass: ContentClass,
+  params: ConfirmUploadParams,
+  options: ConfirmUploadOptions = {},
+): Promise<ConfirmedUpload> {
+  const inspected = await inspectStagedUpload(storage, schoolId, contentClass, params);
+
   // Quota is checked against the stored size, not the request's claim, before the object leaves
   // temp/ -- the same "the bucket is the truth" ordering as the content-class re-checks above.
   if (options.assertCanPromote) {
-    await options.assertCanPromote(metadata.sizeBytes);
+    await options.assertCanPromote(inspected.sizeBytes);
   }
 
+  const { parsed } = inspected;
   const permanentKey = buildPermanentKey(schoolId, parsed.objectId, parsed.filename);
   const { sizeBytes } = await promoteTempObject(storage, params.storageKey, permanentKey);
 
   return {
     storageKey: permanentKey,
     originalFileName: parsed.filename,
-    contentType: metadata.contentType,
+    contentType: inspected.contentType,
     sizeBytes,
-    checksumSha256: checksum,
+    checksumSha256: inspected.checksumSha256,
   };
 }

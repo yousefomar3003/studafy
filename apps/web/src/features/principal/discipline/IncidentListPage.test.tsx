@@ -1,4 +1,3 @@
-import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
@@ -39,11 +38,9 @@ function renderPage(Page: ComponentType) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <MemoryRouter>
-          <Page />
-        </MemoryRouter>
-      </ToastProvider>
+      <MemoryRouter>
+        <Page />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

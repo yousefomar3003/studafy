@@ -162,7 +162,6 @@ describe("published docs", () => {
     const articles = buildArticles(raw);
     expect(articles.map((article) => article.slug)).toEqual([
       "onboarding-guide",
-      "invitations",
       "timetable",
       "workflows",
       "subscriptions",

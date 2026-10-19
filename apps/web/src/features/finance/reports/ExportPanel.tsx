@@ -97,8 +97,8 @@ export function ExportPanel({ reportLabel, buildRequest, disabledReason }: Expor
 
   // Export is a write against the report-export gate specifically (`report:export`) — narrower than
   // the `report:viewFinancial` this whole page is already routed behind, so a viewer without the
-  // export permission simply doesn't see a download option, matching how `ScholarshipAwardsListPage`
-  // hides its own checker-only actions from a maker-only viewer.
+  // export permission simply doesn't see a download option, matching how `RefundsListPage` hides
+  // its own checker-only actions from a maker-only viewer.
   if (!permissions.has(PERMISSIONS.REPORT_EXPORT)) return null;
 
   const request = buildRequest(fileFormat);

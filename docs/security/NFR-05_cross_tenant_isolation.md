@@ -10,10 +10,10 @@ Actions status is `CI / cross-tenant-security`; branch protection must require t
 Start the repository's disposable PostgreSQL service and provide its administrative database URL:
 
 ```bash
-POSTGRES_PASSWORD=studafy_local docker compose -f db/compose.yml up -d --wait
+POSTGRES_PASSWORD=studafy_local docker compose up -d --wait test-postgres test-redis
 TEST_DATABASE_URL='postgresql://studafy_test:studafy_local@127.0.0.1:54329/postgres?sslmode=disable' \
   bun run test:security
-docker compose -f db/compose.yml down
+docker compose rm -sfv test-postgres test-redis
 ```
 
 The suite reports cold database creation, migration, and fixture time separately. Its `<500 ms`

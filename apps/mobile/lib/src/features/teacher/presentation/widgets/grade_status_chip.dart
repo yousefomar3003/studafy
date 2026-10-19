@@ -18,20 +18,20 @@ class GradeStatusChip extends StatelessWidget {
   }
 
   static String _labelKey(GradeSubmissionStatus status) => switch (status) {
-        GradeSubmissionStatus.draft => 'teacher.grades.status.draft',
-        GradeSubmissionStatus.submitted => 'teacher.grades.status.submitted',
-        GradeSubmissionStatus.approved => 'teacher.grades.status.approved',
-        GradeSubmissionStatus.rejected => 'teacher.grades.status.rejected',
-        GradeSubmissionStatus.published => 'teacher.grades.status.published',
-        GradeSubmissionStatus.unknown => 'teacher.grades.status.submitted',
-      };
+    GradeSubmissionStatus.draft => 'teacher.grades.status.draft',
+    GradeSubmissionStatus.submitted => 'teacher.grades.status.submitted',
+    GradeSubmissionStatus.approved => 'teacher.grades.status.approved',
+    GradeSubmissionStatus.rejected => 'teacher.grades.status.rejected',
+    GradeSubmissionStatus.published => 'teacher.grades.status.published',
+    GradeSubmissionStatus.unknown => 'teacher.grades.status.submitted',
+  };
 
   static StatusPillTone _tone(GradeSubmissionStatus status) => switch (status) {
-        GradeSubmissionStatus.draft => StatusPillTone.neutral,
-        GradeSubmissionStatus.submitted => StatusPillTone.warning,
-        GradeSubmissionStatus.approved => StatusPillTone.success,
-        GradeSubmissionStatus.published => StatusPillTone.success,
-        GradeSubmissionStatus.rejected => StatusPillTone.danger,
-        GradeSubmissionStatus.unknown => StatusPillTone.warning,
-      };
+    GradeSubmissionStatus.draft => StatusPillTone.neutral,
+    GradeSubmissionStatus.submitted => StatusPillTone.warning,
+    GradeSubmissionStatus.approved => StatusPillTone.success,
+    GradeSubmissionStatus.published => StatusPillTone.success,
+    GradeSubmissionStatus.rejected => StatusPillTone.danger,
+    GradeSubmissionStatus.unknown => StatusPillTone.warning,
+  };
 }

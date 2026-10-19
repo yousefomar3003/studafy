@@ -5,7 +5,9 @@ import type { ChangeEvent } from "react";
 import "./locale-switcher.css";
 
 /**
- * The only UI for changing locale: a native `<select>` over `SUPPORTED_LOCALES`, labelled with each
+ * The only UI for changing locale: a globe icon over a native `<select>` of `SUPPORTED_LOCALES`.
+ * The select is transparent and covers the icon, so clicking the globe opens the platform's own
+ * picker and keyboard/screen-reader behaviour is the select's. Options are labelled with each
  * locale's own name (not translated — a language names itself the same way regardless of which one
  * is currently active). `useLocale`'s `setLocale` persists the choice and drives the `<html>`
  * `lang`/`dir` swap; this component does nothing beyond reading and calling it.
@@ -22,8 +24,9 @@ export function LocaleSwitcher() {
   };
 
   return (
-    <label className="locale-switcher">
+    <label className="locale-switcher" title={t("localeSwitcher.label")}>
       <span className="sf-visually-hidden">{t("localeSwitcher.label")}</span>
+      <GlobeIcon />
       <select
         className="locale-switcher__select"
         value={locale}
@@ -38,5 +41,28 @@ export function LocaleSwitcher() {
         ))}
       </select>
     </label>
+  );
+}
+
+/** Globe glyph shown in place of the select's text; the select itself carries the label. */
+function GlobeIcon() {
+  return (
+    <svg
+      className="locale-switcher__icon"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3c2.5 2.6 3.75 5.6 3.75 9S14.5 18.4 12 21c-2.5-2.6-3.75-5.6-3.75-9S9.5 5.6 12 3z" />
+    </svg>
   );
 }

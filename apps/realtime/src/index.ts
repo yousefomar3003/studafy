@@ -1,4 +1,9 @@
-import { startMetricsServer, startTracing } from "@studafy/observability";
+import {
+  initErrorMonitoring,
+  startMetricsServer,
+  startTracing,
+  withErrorMonitoringScope,
+} from "@studafy/observability";
 import { websocket } from "hono/bun";
 
 import { createApp } from "./app";
@@ -17,6 +22,16 @@ import type { RoomManager } from "./rooms";
 // Fail fast: an invalid environment throws EnvValidationError here, before the server binds a
 // port or opens a Redis connection.
 const env = loadEnv();
+
+// Sentry error monitoring — null (and every reporting call a no-op) when SENTRY_DSN is unset. Before
+// startTracing(), for the context-manager ordering apps/api/src/index.ts's own call documents.
+// Handshake and WebSocket handler errors are reported from app.ts.
+const errorMonitoring = initErrorMonitoring({
+  dsn: env.SENTRY_DSN,
+  environment: env.SENTRY_ENVIRONMENT ?? env.NODE_ENV,
+  release: env.RELEASE_VERSION,
+  serviceName: env.SERVICE_NAME,
+});
 
 // Prometheus-format metrics (ST-259), on its own port — must run before createApp() registers
 // createRedMetricsMiddleware(), since an OTel instrument stays bound to whichever meter created
@@ -68,7 +83,8 @@ const app = createApp({
 const server = Bun.serve({
   port: env.PORT,
   hostname: env.HOST,
-  fetch: app.fetch,
+  // One Sentry scope per handshake request; see apps/api/src/index.ts's own Bun.serve.
+  fetch: (request, bunServer) => withErrorMonitoringScope(() => app.fetch(request, bunServer)),
   websocket,
 });
 
@@ -97,6 +113,8 @@ const shutdown = (signal: string) => {
     outboxSubscriber.disconnect();
     await metricsServer.shutdown();
     await tracing?.shutdown();
+    // Last, so anything reported while connections were closing still goes out before the exit.
+    await errorMonitoring?.shutdown();
     console.log("Shutdown complete.");
     process.exit(0);
   });

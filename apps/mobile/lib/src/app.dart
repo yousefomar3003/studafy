@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'core/auth/auth_notifier.dart';
 import 'core/auth/auth_state.dart';
 import 'core/di/app_providers.dart';
+import 'core/localization/locale_rebuild_scope.dart';
 import 'core/monitoring/monitoring_providers.dart';
 import 'core/push/push_providers.dart';
 import 'design/theme/app_theme.dart';
@@ -87,6 +88,7 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
       locale: context.locale,
       supportedLocales: context.supportedLocales,
       localizationsDelegates: context.localizationDelegates,
+      builder: (context, child) => LocaleRebuildScope(child: child!),
     );
   }
 }

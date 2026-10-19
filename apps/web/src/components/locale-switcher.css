@@ -1,30 +1,46 @@
-/* Locale select (LocaleSwitcher.tsx), shared by the portal header, marketing header, root nav, and
-   sign-in page. Token-based only: inside the dark-blue headers the tokens are re-declared (see
-   styles/global.css), so the same rules re-theme there with no per-host overrides. */
+/* Locale switcher (LocaleSwitcher.tsx), shared by the portal header, marketing header, root nav, and
+   sign-in page: a round globe button. The native select sits on top of the icon, fully transparent,
+   so it receives the click and opens the platform picker. Token-based only: inside the dark-blue
+   headers the tokens are re-declared (see styles/global.css), so the same rules re-theme there with
+   no per-host overrides. */
 
 .locale-switcher {
-  display: inline-flex;
-  align-items: center;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
   flex-shrink: 0;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--radius-full);
+  color: var(--color-foreground);
+}
+
+/* No ring, border or hover fill, even while the select keeps focus after a choice. Keyboard focus
+ * only tints the globe in the accent color, so tabbing to it stays visible. */
+.locale-switcher:has(.locale-switcher__select:focus-visible) {
+  color: var(--color-accent);
+}
+
+.locale-switcher__select:focus,
+.locale-switcher__select:focus-visible {
+  outline: none;
+}
+
+.locale-switcher__icon {
+  pointer-events: none;
 }
 
 .locale-switcher__select {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background-color: transparent;
-  color: var(--color-foreground);
-  padding-block: var(--space-4);
-  padding-inline: var(--space-8);
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: inherit;
+  opacity: 0;
   font: inherit;
   font-size: var(--font-size-sm);
   cursor: pointer;
-}
-
-.locale-switcher__select:hover {
-  background-color: var(--color-surface);
-}
-
-.locale-switcher__select:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
+  appearance: none;
 }

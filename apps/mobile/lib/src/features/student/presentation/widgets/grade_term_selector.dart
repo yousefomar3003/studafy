@@ -8,7 +8,7 @@ import '../../domain/grade_report.dart';
 
 /// The term picker above the grades report: one chip per term of the academic year, the
 /// selected one filled. Sits directly under the app bar, above the scrolling report, the same
-/// way `TimetableWeekNavigator` does for the timetable.
+/// way the weekly schedule's day chips (`timetable/presentation/weekly_schedule_view.dart`) do.
 ///
 /// Owns its own reads of [academicYearTermsProvider] and [selectedGradeTermProvider] rather
 /// than taking them from the parent, so it is the single place that renders term choices.

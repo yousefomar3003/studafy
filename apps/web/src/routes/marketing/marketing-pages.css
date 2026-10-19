@@ -130,6 +130,103 @@
   margin-top: var(--space-4);
 }
 
+/* Features index (FeaturesPage): one ruled row per module — number, title + summary, then the
+   module's capabilities in two columns. Hairlines carry the structure, so no card chrome. */
+
+.features-index {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.features-index__row {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 5fr) minmax(0, 7fr);
+  column-gap: var(--space-32);
+  padding: var(--space-32) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.features-index__number {
+  padding-top: 0.2em;
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.features-index__title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-foreground);
+}
+
+.features-index__body {
+  margin: var(--space-8) 0 0;
+  max-width: 34ch;
+  color: var(--color-muted-foreground);
+  line-height: var(--line-height-base);
+}
+
+/* Two columns of capabilities, each on its own hairline, so short and long modules share one rhythm. */
+.features-index__items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-32);
+  align-content: start;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.features-index__items li {
+  padding: var(--space-12) 0;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* The first row of items sits level with the title, without a rule above it. */
+.features-index__items li:nth-child(-n + 2) {
+  padding-top: 0.35em;
+  border-top: none;
+}
+
+@media (max-width: 900px) {
+  .features-index__row {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    row-gap: var(--space-20);
+  }
+
+  .features-index__items {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 560px) {
+  .features-index__row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-12);
+    padding: var(--space-24) 0;
+  }
+
+  .features-index__items {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: var(--space-8);
+  }
+
+  .features-index__items li:nth-child(2) {
+    padding-top: var(--space-12);
+    border-top: 1px solid var(--color-border);
+  }
+}
+
 /* Steps */
 
 .marketing-steps {
@@ -323,7 +420,8 @@
 }
 
 .marketing-contact-card {
-  max-width: 480px;
+  margin: var(--space-24) 0 0;
+  text-align: center;
 }
 
 .marketing-contact-card__label {
@@ -351,4 +449,70 @@
   .marketing-hero {
     padding: var(--space-48) 0;
   }
+}
+
+/* Contact section: heading, form card and email line share one centered column. */
+.marketing-contact__heading {
+  margin-inline: auto;
+  text-align: center;
+}
+
+.marketing-contact__card {
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.marketing-contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.marketing-contact-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-20) var(--space-24);
+}
+
+.marketing-contact-form__textarea textarea {
+  resize: vertical;
+  min-height: 140px;
+}
+
+.marketing-contact-form__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-16);
+  padding-top: var(--space-8);
+}
+
+.marketing-contact-form__footer .sf-button {
+  width: 100%;
+  max-width: 320px;
+}
+
+.marketing-contact-form__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .marketing-contact-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .marketing-contact-form__footer .sf-button {
+    max-width: none;
+  }
+}
+
+.marketing-contact-form__sent {
+  text-align: center;
+}
+
+.marketing-contact-form__sent h3 {
+  margin: 0 0 var(--space-8);
 }

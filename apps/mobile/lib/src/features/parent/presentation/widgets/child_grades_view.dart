@@ -9,6 +9,7 @@ import '../../../student/presentation/widgets/subject_grades_card.dart';
 import '../../application/child_detail_providers.dart';
 import '../../domain/child_subject_grades.dart';
 import 'child_detail_placeholders.dart';
+import '../../../../design/layout/bottom_inset_padding.dart';
 
 /// The Grades tab of `ChildDetailScreen`: the child's term summary, their term-over-term average
 /// trend, and one `SubjectGradesCard` per course — the same per-subject breakdown widget the
@@ -34,7 +35,7 @@ class ChildGradesView extends ConsumerWidget {
         data: (data) {
           final subjects = groupChildSubjects(data.grade.grades);
           return ListView(
-            padding: const EdgeInsets.all(AppSpacing.space16),
+            padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
               _TermSummaryCard(summary: data.grade.termSummary),

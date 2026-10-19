@@ -10,8 +10,9 @@ import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 /// deliberate scope line the web app's `lib/i18n/store.ts` documents: there is no per-user
 /// server-side language preference, only a persisted choice for this install.
 void main() {
-  testWidgets('setting a locale persists it for the next EasyLocalization startup',
-      (tester) async {
+  testWidgets('setting a locale persists it for the next EasyLocalization startup', (
+    tester,
+  ) async {
     // Start clean: no saved locale yet, so the app boots on its fallback.
     SharedPreferences.setMockInitialValues({});
     await EasyLocalization.ensureInitialized();
@@ -28,7 +29,10 @@ void main() {
     expect(find.text('en'), findsOneWidget);
 
     final probeContext = tester.element(find.byType(_LocaleProbe));
-    await probeContext.setLocale(const Locale('ar'));
+    // ar.json is over the 50 KB threshold above which `rootBundle.loadString` decodes on a
+    // background isolate (`compute`), which never completes inside the test's fake-async zone —
+    // so the switch runs in real async.
+    await tester.runAsync(() => probeContext.setLocale(const Locale('ar')));
     await tester.pumpAndSettle();
     expect(find.text('ar'), findsOneWidget);
 

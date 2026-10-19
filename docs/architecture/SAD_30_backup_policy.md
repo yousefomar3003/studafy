@@ -34,13 +34,13 @@ The single-database-per-deployment assumption this policy is written against is 
 
 ## Acceptance criteria → mechanism
 
-| Acceptance criterion                                           | How it's met                                                                                                                                                   |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Restore-verify job green weekly with report artifact           | `restore_verify.tf`'s EventBridge Scheduler schedule (staging/prod), reporting to `s3://<backups-archive>/reports/postgres/restore-verify/`.                   |
-| PITR to arbitrary timestamp demonstrated in dev                | `infra/deploy/scripts/postgres-restore-verify.sh dev --restore-time=<timestamp>` — the same job, given an explicit target instead of "latest restorable time". |
-| Immutable copy inaccessible with prod credentials              | AWS Backup Vault Lock, Compliance mode (`main.tf`) — see "What 'immutable' and 'inaccessible' actually mean here" below.                                       |
-| ERPNext site backup restores to a scratch environment in drill | `erpnext_backup.tf`'s monthly restore-drill task: `bench new-site` + `bench restore` + `bench doctor` against a fresh site on the existing MariaDB instance.   |
-| RPO/RTO documented for both planes                             | This document.                                                                                                                                                 |
+| Acceptance criterion                                           | How it's met                                                                                                                                                       |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Restore-verify job green weekly with report artifact           | `restore_verify.tf`'s EventBridge Scheduler schedule (staging/prod), reporting to `s3://<backups-archive>/reports/postgres/restore-verify/`.                       |
+| PITR to arbitrary timestamp demonstrated in dev                | `infra/deploy/scripts/run-postgres-restore-verify.sh dev --restore-time=<timestamp>` — the same job, given an explicit target instead of "latest restorable time". |
+| Immutable copy inaccessible with prod credentials              | AWS Backup Vault Lock, Compliance mode (`main.tf`) — see "What 'immutable' and 'inaccessible' actually mean here" below.                                           |
+| ERPNext site backup restores to a scratch environment in drill | `erpnext_backup.tf`'s monthly restore-drill task: `bench new-site` + `bench restore` + `bench doctor` against a fresh site on the existing MariaDB instance.       |
+| RPO/RTO documented for both planes                             | This document.                                                                                                                                                     |
 
 ## What "immutable" and "inaccessible with prod credentials" actually mean here
 

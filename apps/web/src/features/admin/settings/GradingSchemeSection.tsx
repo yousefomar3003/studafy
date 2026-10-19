@@ -6,7 +6,11 @@ import { useTranslation } from "../../../lib/i18n";
 
 import { ConfirmChangeDialog } from "./ConfirmChangeDialog";
 import { useUpdateSchoolSettings } from "./mutations";
-import { GRADING_SCHEME_TYPES, gradingSchemeLabelKey } from "./schema";
+import {
+  GRADING_SCHEME_TYPES,
+  gradingSchemeLabelKey,
+  SELECTABLE_GRADING_SCHEME_TYPES,
+} from "./schema";
 import { SettingsCard } from "./SettingsCard";
 
 import type { SchoolSettings } from "./queries";
@@ -27,12 +31,17 @@ export function GradingSchemeSection({ settings, loading }: GradingSchemeSection
   const { show } = useToast();
   const updateSettings = useUpdateSchoolSettings();
 
-  const gradingSchemeOptions = GRADING_SCHEME_TYPES.map((scheme) => ({
+  const [value, setValue] = useState<(typeof GRADING_SCHEME_TYPES)[number]>("letter");
+
+  // A retired scheme (GPA) is listed only while it is the saved value, so the select can still show it.
+  const gradingSchemeOptions = GRADING_SCHEME_TYPES.filter(
+    (scheme) =>
+      (SELECTABLE_GRADING_SCHEME_TYPES as readonly string[]).includes(scheme) ||
+      scheme === settings?.grading_scheme,
+  ).map((scheme) => ({
     value: scheme,
     label: t(gradingSchemeLabelKey(scheme)),
   }));
-
-  const [value, setValue] = useState<(typeof GRADING_SCHEME_TYPES)[number]>("letter");
   const [confirming, setConfirming] = useState(false);
   const hydrated = useRef(false);
 

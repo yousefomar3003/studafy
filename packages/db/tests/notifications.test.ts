@@ -46,6 +46,8 @@ const NOTIFICATION_TYPES = [
   // ST-194. Appended by 000104, same mechanism. ADMIN_ANNOUNCEMENT's non-mandatory sibling; sorts
   // last, after the ingestion pair.
   "ANNOUNCEMENT",
+  // Parent<->teacher messaging. Appended by 000126, same mechanism; sorts last, after ANNOUNCEMENT.
+  "DIRECT_MESSAGE",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;

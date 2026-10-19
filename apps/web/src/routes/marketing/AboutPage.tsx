@@ -4,7 +4,12 @@ import { useSeo } from "../../components/Seo";
 import { MARKETING_CONTACT_EMAIL } from "../../lib/config";
 import { useTranslation } from "../../lib/i18n";
 
-/** About & contact page (`/about`). One page for both, matching the ticket's "about/contact" grouping. */
+import { ContactForm } from "./ContactForm";
+
+/**
+ * About & contact page (`/about`). One page for both, matching the ticket's "about/contact"
+ * grouping. Every "Talk to us" button on the site links to the `#contact` form here.
+ */
 export default function AboutPage() {
   const { t } = useTranslation();
 
@@ -32,8 +37,8 @@ export default function AboutPage() {
       </section>
 
       <section id="contact" className="marketing-section marketing-section--muted">
-        <div className="marketing-container">
-          <div className="marketing-section__heading">
+        <div className="marketing-container marketing-contact">
+          <div className="marketing-section__heading marketing-contact__heading">
             <span className="marketing-section__eyebrow">
               {t("site.marketing.about.contactEyebrow")}
             </span>
@@ -41,28 +46,27 @@ export default function AboutPage() {
             <p className="marketing-section__lede">{t("site.marketing.about.contactLede")}</p>
           </div>
 
-          <Card>
-            <Card.Body>
-              <div className="marketing-contact-card">
-                <span className="marketing-contact-card__label">
-                  {t("site.marketing.about.emailLabel")}
-                </span>
-                {MARKETING_CONTACT_EMAIL ? (
-                  <a
-                    className="marketing-contact-card__email"
-                    href={`mailto:${MARKETING_CONTACT_EMAIL}`}
-                  >
-                    {MARKETING_CONTACT_EMAIL}
-                  </a>
-                ) : (
-                  // Dev/config-only hint (names an env var), deliberately not translated.
-                  <span className="marketing-contact-card__email">
-                    Contact address not yet configured (set VITE_MARKETING_CONTACT_EMAIL)
-                  </span>
-                )}
-              </div>
-            </Card.Body>
-          </Card>
+          <div className="marketing-contact__card">
+            <Card elevation={2}>
+              <Card.Body>
+                <ContactForm />
+              </Card.Body>
+            </Card>
+          </div>
+
+          {MARKETING_CONTACT_EMAIL ? (
+            <p className="marketing-contact-card">
+              <span className="marketing-contact-card__label">
+                {t("site.marketing.about.emailLabel")}
+              </span>
+              <a
+                className="marketing-contact-card__email"
+                href={`mailto:${MARKETING_CONTACT_EMAIL}`}
+              >
+                {MARKETING_CONTACT_EMAIL}
+              </a>
+            </p>
+          ) : null}
         </div>
       </section>
     </>

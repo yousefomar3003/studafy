@@ -160,7 +160,8 @@ const refreshRoute = createRoute({
   description:
     "Consumes the presented refresh token and issues a replacement pair. The presented token is " +
     "invalidated unconditionally — a token is valid exactly once. Re-presenting an already-rotated " +
-    "token is treated as theft: the entire token family is revoked and the session ends.",
+    "token is treated as theft: the entire token family is revoked and the session ends. A " +
+    "session in a closed school is refused with 403 SCHOOL_SUSPENDED.",
   security: [],
   request: {
     body: {
@@ -170,7 +171,7 @@ const refreshRoute = createRoute({
   },
   responses: standardResponses(
     { 200: { description: "A new token pair.", schema: tokenResponseSchema } },
-    [400, 401, 429, 500],
+    [400, 401, 403, 429, 500],
   ),
 });
 

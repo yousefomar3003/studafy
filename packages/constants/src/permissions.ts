@@ -23,6 +23,11 @@ export const PERMISSIONS = {
   ORGANIZATION_READ: "organization:read",
   ORGANIZATION_UPDATE: "organization:update",
   ORGANIZATION_DELETE: "organization:delete",
+  // Closing one's own school (POST /api/schools/current/closure): the school is archived, every
+  // member is signed out and can no longer sign in, and all data is retained. Distinct from
+  // `organization:delete`, which is the platform's (SUPER_ADMIN) cross-tenant power; this one is
+  // the school admin acting on their own tenant.
+  ORGANIZATION_CLOSE: "organization:close",
   ORGANIZATION_MANAGE_SETTINGS: "organization:manageSettings",
   ORGANIZATION_MANAGE_BILLING: "organization:manageBilling",
 
@@ -96,14 +101,38 @@ export const PERMISSIONS = {
   // pages without also getting the ops-facing admin console (users, invitations, settings).
   PRINCIPAL_DASHBOARD_VIEW: "principalDashboard:view",
 
+  // Opening the attendance dashboard (/portal/attendance): today's numbers, register progress,
+  // students at risk, trends and per-student attendance, each within the caller's row scope (a
+  // teacher sees their own classes). Taking registers on top of that needs attendance:record:create,
+  // which the ATTENDANCE_OFFICER and INSTRUCTOR hold. Its own permission so a role gets the dashboard
+  // without the principal dashboard (grades, approvals, discipline, evaluations) or the admin console.
+  ATTENDANCE_DASHBOARD_VIEW: "attendanceDashboard:view",
+
   // The school calendar's own entries (app.school_events: holidays, events, meetings, exam periods).
   // Terms and exams appear on the calendar too, but under their own academics permissions.
   CALENDAR_EVENT_READ: "calendarEvent:read",
   CALENDAR_EVENT_MANAGE: "calendarEvent:manage",
 
+  // Parent<->teacher 1-to-1 messaging (apps/api/src/modules/messaging, migration 000127). Holding
+  // these is only the floor: the database limits every thread to its two participants, and a parent
+  // may open one only about a linked child with a teacher who teaches that child.
+  MESSAGE_READ: "message:read",
+  MESSAGE_SEND: "message:send",
+  // Working the school's queue of messaging reports (a participant reporting a message or the other
+  // participant, migration 000136): reading the report and its evidence snapshot, and resolving it.
+  // A safeguarding duty, so school leadership only -- ORG_ADMIN (and SUPER_ADMIN) automatically,
+  // PRINCIPAL explicitly. Mirrored in the database by app.current_user_can_review_message_reports().
+  MESSAGE_REPORT_REVIEW: "messageReport:review",
+
   // Building and publishing the weekly timetable (versions, slots, school days). Reading the live
   // timetable stays open to every authenticated school member -- teachers and students need it.
   TIMETABLE_MANAGE: "timetable:manage",
+
+  // The Studafy platform console (/portal/platform): every school on the platform, their lifecycle,
+  // per-school feature flags, plans and platform settings. Cross-tenant by nature, so held by
+  // SUPER_ADMIN alone -- deliberately excluded from ORG_ADMIN, which runs one school, not Studafy.
+  PLATFORM_READ: "platform:read",
+  PLATFORM_MANAGE: "platform:manage",
 
   AUDIT_LOG_READ: "auditLog:read",
   AUDIT_LOG_EXPORT: "auditLog:export",
@@ -151,7 +180,7 @@ export const PERMISSIONS = {
   MATERIAL_DELETE: "material:delete",
   MATERIAL_MANAGE_AI: "material:manageAi",
   // Working the AI content moderation queue (ST-306): reading reported and filter-escalated AI
-  // output and resolving it. Withheld from INSTRUCTOR/TEACHING_ASSISTANT on purpose -- the queue
+  // output and resolving it. Withheld from INSTRUCTOR on purpose -- the queue
   // spans the whole school and can hold child-safety escalations, which belong to the school's
   // designated safeguarding lead (an ORG_ADMIN), not to every teacher.
   AI_CONTENT_MODERATE: "aiContent:moderate",
@@ -204,13 +233,22 @@ const ORG_ADMIN_PERMISSIONS: readonly Permission[] = ALL_PERMISSIONS.filter(
     permission !== PERMISSIONS.USER_IMPERSONATE &&
     permission !== PERMISSIONS.ORGANIZATION_CREATE &&
     permission !== PERMISSIONS.ORGANIZATION_DELETE &&
+    permission !== PERMISSIONS.PLATFORM_READ &&
+    permission !== PERMISSIONS.PLATFORM_MANAGE &&
     permission !== PERMISSIONS.API_KEY_CREATE &&
     permission !== PERMISSIONS.API_KEY_READ &&
-    permission !== PERMISSIONS.API_KEY_REVOKE,
+    permission !== PERMISSIONS.API_KEY_REVOKE &&
+    // Attendance is taken by the attendance officer and the class teacher and corrected only by the
+    // officer and the principal; the school admin views it.
+    permission !== PERMISSIONS.ATTENDANCE_RECORD_CREATE &&
+    permission !== PERMISSIONS.ATTENDANCE_RECORD_CORRECT &&
+    permission !== PERMISSIONS.ATTENDANCE_CORRECTION_OVERRIDE,
 );
 
 const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.CALENDAR_EVENT_READ,
+  PERMISSIONS.MESSAGE_READ,
+  PERMISSIONS.MESSAGE_SEND,
   PERMISSIONS.COURSE_CREATE,
   PERMISSIONS.COURSE_READ,
   PERMISSIONS.COURSE_UPDATE,
@@ -269,37 +307,12 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.MATERIAL_MANAGE_AI,
   PERMISSIONS.DISCIPLINE_INCIDENT_CREATE,
   PERMISSIONS.DISCIPLINE_INCIDENT_READ,
+  // Takes registers for their own classes (row scope limits writes to classes they teach, as it
+  // does reads); corrections stay with the attendance officer and the principal.
+  PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW,
   PERMISSIONS.ATTENDANCE_RECORD_CREATE,
   PERMISSIONS.ATTENDANCE_RECORD_READ,
-  // Correct, but not override: past the school's correction window an instructor is refused and
-  // the amendment becomes a principal's call (ST-109).
-  PERMISSIONS.ATTENDANCE_RECORD_CORRECT,
-];
-
-const TEACHING_ASSISTANT_PERMISSIONS: readonly Permission[] = [
-  PERMISSIONS.CALENDAR_EVENT_READ,
-  PERMISSIONS.COURSE_READ,
-  PERMISSIONS.LESSON_READ,
-  PERMISSIONS.ENROLLMENT_READ,
-  PERMISSIONS.ASSIGNMENT_READ,
-  PERMISSIONS.SUBMISSION_READ,
-  PERMISSIONS.SUBMISSION_GRADE,
-  PERMISSIONS.SUBMISSION_REQUEST_RESUBMISSION,
-  PERMISSIONS.GRADE_READ,
-  PERMISSIONS.DISCUSSION_READ,
-  PERMISSIONS.DISCUSSION_UPDATE,
-  PERMISSIONS.DISCUSSION_MODERATE,
-  PERMISSIONS.STUDY_GROUP_READ,
-  PERMISSIONS.STUDY_GROUP_MODERATE,
-  PERMISSIONS.QUIZ_READ,
-  PERMISSIONS.QUIZ_GRADE,
-  PERMISSIONS.NOTIFICATION_READ,
-  PERMISSIONS.STUDENT_READ,
-  PERMISSIONS.MATERIAL_READ,
-  PERMISSIONS.ATTENDANCE_RECORD_READ,
-
-  PERMISSIONS.EVALUATION_READ,
-  PERMISSIONS.EVALUATION_SCORE_READ,
+  PERMISSIONS.ATTENDANCE_REPORT_READ,
 ];
 
 const STUDENT_PERMISSIONS: readonly Permission[] = [
@@ -338,6 +351,9 @@ const PARENT_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.SUBMISSION_READ,
   PERMISSIONS.GRADE_READ,
   PERMISSIONS.DISCIPLINE_INCIDENT_READ,
+  // Message their child's teachers; see MESSAGE_READ above for the row-level narrowing.
+  PERMISSIONS.MESSAGE_READ,
+  PERMISSIONS.MESSAGE_SEND,
 ];
 
 const GUEST_PERMISSIONS: readonly Permission[] = [PERMISSIONS.COURSE_READ, PERMISSIONS.LESSON_READ];
@@ -349,6 +365,8 @@ const GUEST_PERMISSIONS: readonly Permission[] = [PERMISSIONS.COURSE_READ, PERMI
 // migration 000120 widened to include PRINCIPAL.
 const PRINCIPAL_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW,
+  PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW,
+  PERMISSIONS.MESSAGE_REPORT_REVIEW,
   PERMISSIONS.CALENDAR_EVENT_READ,
   PERMISSIONS.CALENDAR_EVENT_MANAGE,
   PERMISSIONS.TIMETABLE_MANAGE,
@@ -391,6 +409,26 @@ const PRINCIPAL_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.EVALUATION_SCORE_DELETE,
 ];
 
+// The attendance office: takes, corrects and reports attendance for the whole school, and nothing
+// else. School-wide row visibility is scoped to rosters and attendance alone by migration 000133
+// (app.current_user_is_attendance_officer), deliberately not app.current_user_is_school_admin(), so
+// an officer sees every class's roster and attendance but no grades, exams, materials or discipline.
+// It takes any class's register; a teacher takes only their own. Correcting past the school's correction window
+// (ATTENDANCE_CORRECTION_OVERRIDE) stays the principal's call.
+const ATTENDANCE_OFFICER_PERMISSIONS: readonly Permission[] = [
+  PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW,
+  PERMISSIONS.ATTENDANCE_RECORD_CREATE,
+  PERMISSIONS.ATTENDANCE_RECORD_READ,
+  PERMISSIONS.ATTENDANCE_RECORD_CORRECT,
+  PERMISSIONS.ATTENDANCE_REPORT_READ,
+  PERMISSIONS.ATTENDANCE_REPORT_EXPORT,
+  PERMISSIONS.STUDENT_READ,
+  PERMISSIONS.COURSE_READ,
+  PERMISSIONS.ENROLLMENT_READ,
+  PERMISSIONS.CALENDAR_EVENT_READ,
+  PERMISSIONS.NOTIFICATION_READ,
+];
+
 const FINANCE_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.BILLING_READ,
   PERMISSIONS.BILLING_UPDATE,
@@ -429,9 +467,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   [ROLES.SUPER_ADMIN]: ALL_PERMISSIONS,
   [ROLES.ORG_ADMIN]: ORG_ADMIN_PERMISSIONS,
   [ROLES.PRINCIPAL]: PRINCIPAL_PERMISSIONS,
+  [ROLES.ATTENDANCE_OFFICER]: ATTENDANCE_OFFICER_PERMISSIONS,
   [ROLES.FINANCE]: FINANCE_PERMISSIONS,
   [ROLES.INSTRUCTOR]: INSTRUCTOR_PERMISSIONS,
-  [ROLES.TEACHING_ASSISTANT]: TEACHING_ASSISTANT_PERMISSIONS,
   [ROLES.STUDENT]: STUDENT_PERMISSIONS,
   [ROLES.PARENT]: PARENT_PERMISSIONS,
   [ROLES.GUEST]: GUEST_PERMISSIONS,

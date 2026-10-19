@@ -9,38 +9,36 @@ Map<String, Object?> _cell(
   num? score,
   num maxScore = 100,
   num weight = 1,
-}) =>
-    {
-      'id': id,
-      'grade_submission_id': 'sub-of-$id',
-      'label': label,
-      'score': score,
-      'max_score': maxScore,
-      'weight': weight,
-      'created_at': _t0,
-      'updated_at': _t0,
-    };
+}) => {
+  'id': id,
+  'grade_submission_id': 'sub-of-$id',
+  'label': label,
+  'score': score,
+  'max_score': maxScore,
+  'weight': weight,
+  'created_at': _t0,
+  'updated_at': _t0,
+};
 
 GradeSubmission _submission(
   String id,
   String studentId, {
   String status = 'draft',
   List<Map<String, Object?>> cells = const [],
-}) =>
-    GradeSubmission.fromJson({
-      'id': id,
-      'gradebook_id': 'gb-1',
-      'student_id': studentId,
-      'status': status,
-      'rejection_reason': null,
-      'submitted_by_user_id': null,
-      'decided_by_user_id': null,
-      'submitted_at': null,
-      'decided_at': null,
-      'created_at': _t0,
-      'updated_at': _t0,
-      'grades': cells,
-    });
+}) => GradeSubmission.fromJson({
+  'id': id,
+  'gradebook_id': 'gb-1',
+  'student_id': studentId,
+  'status': status,
+  'rejection_reason': null,
+  'submitted_by_user_id': null,
+  'decided_by_user_id': null,
+  'submitted_at': null,
+  'decided_at': null,
+  'created_at': _t0,
+  'updated_at': _t0,
+  'grades': cells,
+});
 
 void main() {
   group('GradeSubmissionStatus', () {
@@ -78,39 +76,80 @@ void main() {
   });
 
   group('GradeEntryGrid', () {
-    test('assessments are the distinct labels across every submission, sorted', () {
-      final grid = GradeEntryGrid([
-        _submission('s1', 'stu-b', cells: [_cell('a', 'Midterm'), _cell('b', 'Homework 1')]),
-        _submission('s2', 'stu-a', cells: [_cell('c', 'Homework 1'), _cell('d', 'Final')]),
-      ]);
+    test(
+      'assessments are the distinct labels across every submission, sorted',
+      () {
+        final grid = GradeEntryGrid([
+          _submission(
+            's1',
+            'stu-b',
+            cells: [_cell('a', 'Midterm'), _cell('b', 'Homework 1')],
+          ),
+          _submission(
+            's2',
+            'stu-a',
+            cells: [_cell('c', 'Homework 1'), _cell('d', 'Final')],
+          ),
+        ]);
 
-      expect(grid.assessments.map((a) => a.label), ['Final', 'Homework 1', 'Midterm']);
-      expect(grid.studentCount, 2);
-    });
+        expect(grid.assessments.map((a) => a.label), [
+          'Final',
+          'Homework 1',
+          'Midterm',
+        ]);
+        expect(grid.studentCount, 2);
+      },
+    );
 
-    test('rowsFor slices one assessment across students, ordered by student id', () {
-      final grid = GradeEntryGrid([
-        _submission('s1', 'stu-charlie', cells: [_cell('a', 'Midterm', score: 40, maxScore: 50)]),
-        _submission('s2', 'stu-alice', cells: [_cell('b', 'Midterm', maxScore: 50)]),
-        _submission('s3', 'stu-bob', cells: [_cell('c', 'Homework 1')]),
-      ]);
+    test(
+      'rowsFor slices one assessment across students, ordered by student id',
+      () {
+        final grid = GradeEntryGrid([
+          _submission(
+            's1',
+            'stu-charlie',
+            cells: [_cell('a', 'Midterm', score: 40, maxScore: 50)],
+          ),
+          _submission(
+            's2',
+            'stu-alice',
+            cells: [_cell('b', 'Midterm', maxScore: 50)],
+          ),
+          _submission('s3', 'stu-bob', cells: [_cell('c', 'Homework 1')]),
+        ]);
 
-      final rows = grid.rowsFor('Midterm');
-      expect(rows.map((r) => r.studentId), ['stu-alice', 'stu-charlie']);
-      expect(rows.first.cell.maxScore, 50);
-      expect(rows.first.cell.isGraded, isFalse);
-      expect(rows.last.cell.score, 40);
-    });
+        final rows = grid.rowsFor('Midterm');
+        expect(rows.map((r) => r.studentId), ['stu-alice', 'stu-charlie']);
+        expect(rows.first.cell.maxScore, 50);
+        expect(rows.first.cell.isGraded, isFalse);
+        expect(rows.last.cell.score, 40);
+      },
+    );
 
-    test('submittableSubmissions are draft submissions with at least one graded cell', () {
-      final grid = GradeEntryGrid([
-        _submission('s1', 'a', cells: [_cell('a', 'Midterm', score: 30)]), // draft + graded
-        _submission('s2', 'b', cells: [_cell('b', 'Midterm')]), // draft, nothing graded
-        _submission('s3', 'c',
-            status: 'submitted', cells: [_cell('c', 'Midterm', score: 20)]), // already locked
-      ]);
+    test(
+      'submittableSubmissions are draft submissions with at least one graded cell',
+      () {
+        final grid = GradeEntryGrid([
+          _submission(
+            's1',
+            'a',
+            cells: [_cell('a', 'Midterm', score: 30)],
+          ), // draft + graded
+          _submission(
+            's2',
+            'b',
+            cells: [_cell('b', 'Midterm')],
+          ), // draft, nothing graded
+          _submission(
+            's3',
+            'c',
+            status: 'submitted',
+            cells: [_cell('c', 'Midterm', score: 20)],
+          ), // already locked
+        ]);
 
-      expect(grid.submittableSubmissions.map((s) => s.id), ['s1']);
-    });
+        expect(grid.submittableSubmissions.map((s) => s.id), ['s1']);
+      },
+    );
   });
 }

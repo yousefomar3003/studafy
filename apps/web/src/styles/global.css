@@ -20,6 +20,41 @@
   box-sizing: border-box;
 }
 
+/* Slim, token-coloured scrollbars instead of the chunky grey native ones. Chromium and Safari use the
+   ::-webkit-scrollbar pseudo-elements; Firefox has none and gets the standard properties. Chromium
+   ignores the pseudo-elements whenever scrollbar-color is set, hence the @supports guard. The window
+   never scrolls (root-shell.css), so every bar belongs to a region below its shell's header. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-neutral-300) var(--color-background);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-neutral-300);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-neutral-400);
+}
+
 body {
   margin: 0;
   font-family: var(--font-family-sans);
@@ -212,4 +247,18 @@ a:hover {
   --color-accent-subtle-foreground: var(--color-accent-800);
 
   color: var(--color-foreground);
+}
+
+/* Page scrollbars stay on the right in both languages. Browsers put a scroll container's scrollbar
+ * on its inline-start side under dir="rtl", so each page-level scroll region is laid out LTR and its
+ * content is switched back to RTL one level down -- the text, layout and logical properties inside
+ * are unchanged; only the container's own scrollbar side is pinned. */
+.app-shell__main,
+.marketing-shell__scroll,
+.portal-content {
+  direction: ltr;
+}
+
+:root[dir="rtl"] :is(.app-shell__main, .marketing-shell__scroll, .portal-content) > * {
+  direction: rtl;
 }

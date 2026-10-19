@@ -108,6 +108,27 @@ describe("web auth flow", () => {
     expect(router.state.location.hash).toBe("");
   });
 
+  test("signing out does not save the page, so the next account lands on its home", async () => {
+    const { store, setHasSession } = createStore();
+    setHasSession(true);
+    renderAt("/account", store);
+    await screen.findByRole("heading", { name: /account/i, level: 1 }, { timeout: 5000 });
+
+    // The server clears the refresh cookie on logout.
+    setHasSession(false);
+    await store.logout();
+
+    expect(await screen.findByRole("heading", { name: /sign in/i })).toBeTruthy();
+    expect(getReturnTo()).toBeNull();
+
+    // A different account signs in on the same tab: it lands on its home, not the old page.
+    cleanup();
+    setHasSession(true);
+    const { router } = renderAt("/auth/callback", store);
+    await screen.findByRole("heading", { name: /portal/i, level: 1 }, { timeout: 5000 });
+    expect(router.state.location.pathname).toBe("/portal");
+  });
+
   test("the login page recovers a still-live session instead of showing provider buttons", async () => {
     const { store, setHasSession } = createStore();
     setHasSession(true);

@@ -33,7 +33,7 @@ export interface RateLimitBudget {
   windowSeconds: number;
 }
 
-export type RouteClass = "auth" | "auth-strict" | "ai" | "default";
+export type RouteClass = "auth" | "auth-strict" | "ai" | "messaging" | "default";
 
 /**
  * Per-class token-bucket budgets.
@@ -44,12 +44,16 @@ export type RouteClass = "auth" | "auth-strict" | "ai" | "default";
  * - `auth`: Authenticated admin-mutating endpoints (invitations). 10 tokens burst,
  *   ~10 req/min sustained.
  * - `ai`: Metered tenant+user scoped (existing).
+ * - `messaging`: Sending a parent<->teacher message, tenant+user scoped. Not path-resolved: the
+ *   send route mounts it explicitly for POST only (modules/messaging/routes.ts), so polling the
+ *   same path for new messages stays on `default`. 20 burst, ~20 sends/min sustained.
  * - `default`: Generous catch-all for public/read endpoints (existing).
  */
 export const RATE_LIMIT_BUDGETS: Record<RouteClass, RateLimitBudget> = {
   "auth-strict": { maxTokens: 5, refillRate: 0.08, windowSeconds: 60 },
   auth: { maxTokens: 10, refillRate: 0.17, windowSeconds: 60 },
   ai: { maxTokens: 30, refillRate: 0.5, windowSeconds: 60 },
+  messaging: { maxTokens: 20, refillRate: 0.33, windowSeconds: 60 },
   default: { maxTokens: 100, refillRate: 1.67, windowSeconds: 60 },
 };
 
@@ -72,6 +76,8 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/auth/refresh": "auth-strict",
   "/api/auth/logout": "auth-strict",
   "/api/auth/login/review": "auth-strict",
+  "/api/auth/login/member": "auth-strict",
+  "/api/auth/password/change": "auth-strict",
   // Auth — authenticated, IP-scoped, sensitive mutations
   "/api/auth/sessions": "auth",
   "/api/auth/sessions/*": "auth",
@@ -86,6 +92,14 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/schools/resend-verification": "auth-strict",
   // Public account deletion (ST-302) — sends email / consumes a bearer token, IP-scoped.
   "/api/account/deletion-requests": "auth-strict",
+  // Public "Talk to us" form: unauthenticated and writes a row per call, so IP-scoped and strict.
+  "/api/inquiries": "auth-strict",
+  // School sign-up applicants: no account yet, so IP-scoped. `auth` rather than `auth-strict`
+  // because one application takes several calls (status, upload URL, submit) from the same IP.
+  "/api/school-applications/me": "auth",
+  "/api/school-applications/me/*": "auth",
+  "/api/auth/oauth/google/school-application/*": "auth-strict",
+  "/api/auth/oauth/microsoft/school-application/*": "auth-strict",
   "/api/account/deletion-requests/confirm": "auth-strict",
   "/api/auth/oauth/google/start": "auth-strict",
   "/api/auth/oauth/google/callback": "auth-strict",
@@ -95,6 +109,9 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   // Discipline — authenticated CRUD
   "/api/discipline/incidents": "default",
   "/api/discipline/incidents/*": "default",
+  // Parent<->teacher messaging — authenticated reads and polling. Sends are additionally limited by
+  // the `messaging` class, mounted in modules/messaging/routes.ts.
+  "/api/messaging/*": "default",
   // Finance gateway — authenticated, and every write is a synchronous call into ERPNext. Classed
   // explicitly rather than left to fall through, because the cost of a request here is paid by a
   // second system: a burst that this app would shrug off can still exhaust ERPNext's workers.

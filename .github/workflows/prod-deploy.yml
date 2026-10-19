@@ -218,6 +218,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gettext-base jq
       - run: terraform init -reconfigure -backend-config=environments/prod/backend.hcl
         working-directory: infra/terraform
+      # deploy.sh/rollback.sh read ECS_CLUSTER, subnets and target groups from environments/prod.env;
+      # fill them from this environment's terraform outputs first.
+      - run: ./scripts/populate-env.sh prod
+        working-directory: infra/deploy
       - run: ./scripts/deploy.sh ${{ matrix.service }} prod "$IMAGE_TAG"
         working-directory: infra/deploy
 
@@ -438,6 +442,10 @@ jobs:
           aws-region: eu-central-1
       - run: terraform init -reconfigure -backend-config=environments/prod/backend.hcl
         working-directory: infra/terraform
+      # deploy.sh/rollback.sh read ECS_CLUSTER, subnets and target groups from environments/prod.env;
+      # fill them from this environment's terraform outputs first.
+      - run: ./scripts/populate-env.sh prod
+        working-directory: infra/deploy
       - run: ./scripts/rollback.sh ${{ matrix.service }} prod
         working-directory: infra/deploy
 

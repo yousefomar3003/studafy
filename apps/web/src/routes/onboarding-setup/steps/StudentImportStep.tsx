@@ -32,7 +32,7 @@ export interface StudentImportStepProps {
 }
 
 /**
- * Step 6: uploads a student CSV for validation (`POST /api/imports/students/upload`). Nothing is
+ * Step 5: uploads a student CSV for validation (`POST /api/imports/students/upload`). Nothing is
  * committed by that call — it's the dry run — so the row-level `errors` it returns are rendered
  * directly, with a client-built CSV of them to download (the API only returns errors as JSON; there
  * is no error-report file endpoint). `POST .../confirm` is a separate, explicit action.

@@ -1,0 +1,99 @@
+/* Website sign-up (SignupPage.tsx, ApplyPage.tsx). Builds on the sign-in card (auth/login-page.css);
+   logical properties keep it correct in RTL. */
+
+.signup__card {
+  max-inline-size: 28rem;
+}
+
+.signup__steps {
+  margin: 0;
+  padding-inline-start: var(--space-20);
+  display: grid;
+  gap: var(--space-8);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.signup__provider {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.signup__footnote {
+  text-align: center;
+}
+
+.apply {
+  max-inline-size: 48rem;
+  margin-inline: auto;
+  padding-block: var(--space-32);
+  padding-inline: var(--space-16);
+  display: grid;
+  gap: var(--space-24);
+}
+
+.apply__header h1 {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+}
+
+.apply__identity {
+  margin: var(--space-4) 0 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.apply__form {
+  display: grid;
+  gap: var(--space-24);
+}
+
+.apply__fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: var(--space-16);
+}
+
+.apply__fieldset legend {
+  margin-block-end: var(--space-8);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+}
+
+.apply__row {
+  display: grid;
+  gap: var(--space-16);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.apply__file-name {
+  margin: var(--space-4) 0 0;
+  font-size: var(--font-size-sm);
+}
+
+.apply__status {
+  padding: var(--space-24);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-background);
+  display: grid;
+  gap: var(--space-12);
+}
+
+.apply__status h2 {
+  margin: 0;
+}
+
+.apply__reason {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.apply__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+}

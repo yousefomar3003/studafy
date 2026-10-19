@@ -2,6 +2,55 @@
   "app": {
     "title": "Studafy"
   },
+  "auth": {
+    "login": {
+      "subtitle": "Sign in with your school account to continue.",
+      "mock": "Continue with Mock",
+      "mockSheetTitle": "Choose a demo persona",
+      "failed": "Sign-in was cancelled or failed.",
+      "signingIn": "Signing in",
+      "signingInHint": "Securely connecting to your school…",
+      "privacyPolicy": "Privacy policy",
+      "roles": {
+        "student": "Student",
+        "teacher": "Teacher",
+        "parent": "Parent",
+        "attendanceOfficer": "Attendance officer"
+      },
+      "schoolClosed": "This app is no longer available for your school."
+    },
+    "emailForm": {
+      "password": "Password",
+      "passwordRequired": "Enter your password.",
+      "rateLimited": "Too many attempts. Wait a minute and try again.",
+      "genericError": "Couldn't sign in. Check your connection and try again."
+    },
+    "memberForm": {
+      "username": "Your ID",
+      "usernameHint": "e.g. STU-100001",
+      "usernameRequired": "Enter the ID your school gave you",
+      "submit": "Sign in",
+      "invalidCredentials": "That ID or password is not correct.",
+      "locked": "Too many wrong passwords. Wait 15 minutes or ask your school to reset your password.",
+      "passwordRejected": "Choose a different password.",
+      "newPasswordTitle": "Choose your own password",
+      "newPasswordBody": "You're signing in for the first time with the starting password from your school. Choose a new password that only you know.",
+      "newPassword": "New password",
+      "newPasswordHelp": "At least 8 characters. Not the starting password or your ID.",
+      "confirmPassword": "Confirm new password",
+      "tooShort": "Use at least 8 characters",
+      "mismatch": "The passwords don't match",
+      "saveAndSignIn": "Save and sign in",
+      "back": "Back"
+    }
+  },
+  "notifications": {
+    "destination": {
+      "title": "Notification",
+      "heading": "Deep link target",
+      "body": "This screen is a placeholder for the real destination."
+    }
+  },
   "shell": {
     "switchLanguage": "Switch language",
     "viewOnlyBanner": "View only — this account can’t make changes on Studafy Mobile.",
@@ -17,11 +66,107 @@
       "ai": "AI",
       "classes": "Classes",
       "children": "Children",
-      "profile": "Profile"
+      "messages": "Messages",
+      "profile": "Profile",
+      "registers": "Registers",
+      "notifications": "Notifications"
     },
     "profile": {
-      "deleteAccount": "Delete my account",
-      "privacyPolicy": "Privacy policy"
+      "deleteAccount": {
+        "action": "Delete my account",
+        "title": "Delete account",
+        "warningTitle": "Your account will be deleted in 14 days",
+        "consequences": {
+          "signedOut": "You're signed out of Studafy on every device right away.",
+          "grace": "Your account is deleted 14 days from now. Until then, you can sign in and cancel the deletion.",
+          "removed": "After that, it's removed from your school and you can't sign in with it again.",
+          "erased": "Your personal data is then erased. Only records the law requires us to keep are retained."
+        },
+        "credentialsPrompt": "To confirm it's you, enter your member ID and password.",
+        "memberIdLabel": "Member ID",
+        "passwordLabel": "Password",
+        "acknowledge": "I understand that my account and personal data will be permanently deleted.",
+        "typePrompt": "Type {word} to confirm.",
+        "typeWord": "DELETE",
+        "typeLabel": "Confirmation",
+        "confirm": "Delete my account",
+        "deleting": "Deleting account",
+        "dialog": {
+          "title": "Delete your account?",
+          "body": "You'll be signed out now, and your account will be deleted in 14 days unless you sign in and cancel.",
+          "cancel": "Cancel",
+          "confirm": "Delete"
+        },
+        "done": {
+          "title": "Deletion scheduled",
+          "body": "Your account will be deleted on {date}. Sign in before then if you want to cancel.",
+          "ok": "OK"
+        },
+        "alreadyPending": "A deletion is already scheduled for your account.",
+        "wrongCredentials": "The member ID or password is incorrect.",
+        "locked": "Too many wrong passwords. Try again later.",
+        "failed": "Your account couldn't be deleted. Check your connection and try again."
+      },
+      "deletionPending": {
+        "title": "Account scheduled for deletion",
+        "body": "Your account will be deleted on {date}. Cancel the deletion to keep using Studafy.",
+        "cancel": "Cancel deletion",
+        "cancelling": "Cancelling deletion",
+        "signOut": "Sign out",
+        "failed": "The deletion couldn't be cancelled. Check your connection and try again."
+      },
+      "deleteSchool": {
+        "action": "Delete school",
+        "title": "Delete school",
+        "warningTitle": "This closes your school for everyone",
+        "consequences": {
+          "signedOut": "Everyone at your school — staff, teachers, students and parents — is signed out immediately.",
+          "noSignIn": "Nobody at your school can sign in to Studafy again.",
+          "dataKept": "Your school's data is kept. Nothing is deleted."
+        },
+        "confirmPrompt": "To confirm, type your school's name exactly as shown:",
+        "nameLabel": "School name",
+        "confirm": "Delete school",
+        "deleting": "Deleting school",
+        "nameMismatch": "The name you typed doesn't match your school's name.",
+        "failed": "The school couldn't be deleted. Check your connection and try again.",
+        "loadFailed": "Your school's details couldn't be loaded.",
+        "retry": "Try again"
+      },
+      "privacyPolicy": "Privacy policy",
+      "signedIn": "Signed in to Studafy",
+      "sections": {
+        "preferences": "Preferences",
+        "account": "Account"
+      },
+      "language": "Language",
+      "logout": "Log out",
+      "logoutDialog": {
+        "title": "Log out?",
+        "body": "You'll need to sign in again to use Studafy on this device. Data saved on this device will be removed.",
+        "confirm": "Log out",
+        "cancel": "Cancel"
+      },
+      "roles": {
+        "superAdmin": "Super admin",
+        "orgAdmin": "School admin",
+        "finance": "Finance",
+        "instructor": "Teacher",
+        "student": "Student",
+        "parent": "Parent",
+        "guest": "Guest",
+        "supportAgent": "Support agent",
+        "attendanceOfficer": "Attendance officer",
+        "unknown": "Member"
+      },
+      "changePassword": {
+        "title": "Change password",
+        "current": "Current password",
+        "submit": "Save new password",
+        "saved": "Your password was changed.",
+        "wrongCurrent": "Your current password is not correct.",
+        "error": "Couldn't change your password. Try again."
+      }
     }
   },
   "offline": {
@@ -40,6 +185,11 @@
     }
   },
   "today": {
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening"
+    },
     "timetable": {
       "title": "Today's timetable",
       "empty": "No classes scheduled for today.",
@@ -151,11 +301,16 @@
     "title": "Timetable",
     "error": "Couldn't load your timetable.",
     "unavailable": "Your timetable isn't available yet.",
-    "emptyWeek": "No classes this week.",
-    "thisWeek": "This week",
-    "previousWeek": "Previous week",
-    "nextWeek": "Next week",
-    "exam": "Exam · {title}",
+    "weeklySchedule": "Weekly schedule",
+    "lessonsPerWeek": {
+      "zero": "No lessons a week",
+      "one": "1 lesson a week",
+      "other": "{} lessons a week"
+    },
+    "emptySchedule": "There are no classes on your weekly schedule yet.",
+    "freeDay": "No classes on {day}.",
+    "freeDayHint": "Enjoy the free day.",
+    "period": "Period {period}",
     "slot": {
       "unknownClass": "Class",
       "room": "Room {room}"
@@ -587,13 +742,19 @@
   },
   "teacher": {
     "home": {
+      "attendance": {
+        "take": "Take attendance",
+        "pickClass": "Which class?",
+        "noClasses": "You have no active classes this term.",
+        "error": "Couldn't load your classes. Try again."
+      },
       "sessions": {
         "title": "Today's sessions",
         "empty": "No sessions scheduled for today.",
         "error": "Couldn't load today's sessions.",
         "period": "Period {period}",
-        "takeAttendance": "Take attendance",
-        "attendanceInProgress": "Finish attendance",
+        "attendanceNotTaken": "Not taken yet",
+        "attendanceInProgress": "Attendance in progress",
         "attendanceRecorded": "Attendance recorded"
       },
       "grading": {
@@ -614,6 +775,71 @@
       "error": "Couldn't load your classes.",
       "roster": "{count} students"
     },
+    "content": {
+      "open": "Assignments and materials",
+      "tabs": {
+        "assignments": "Assignments",
+        "materials": "Materials"
+      },
+      "status": {
+        "draft": "Draft",
+        "published": "Published",
+        "closed": "Closed",
+        "archived": "Archived"
+      },
+      "assignments": {
+        "create": "Create assignment",
+        "edit": "Edit assignment",
+        "empty": "No assignments yet.",
+        "loadError": "Could not load assignments.",
+        "subtitle": "Due {date} · {points} points · {status}"
+      },
+      "materials": {
+        "upload": "Upload material",
+        "edit": "Edit material",
+        "empty": "No materials yet.",
+        "loadError": "Could not load materials.",
+        "aiTitle": "Allow Studafy AI to use this material",
+        "aiSubtitle": "When on, its content can be processed for AI study tools.",
+        "aiError": "Could not update AI visibility."
+      },
+      "assignmentForm": {
+        "title": "Title",
+        "titleRequired": "Enter a title.",
+        "details": "Instructions (optional)",
+        "points": "Points",
+        "pointsInvalid": "Enter valid points.",
+        "dueDate": "Due date",
+        "lateAllowed": "Allow late submissions",
+        "status": "Status",
+        "addAttachments": "Add attachments",
+        "removeAttachment": "Remove attachment",
+        "publish": "Publish assignment",
+        "saveDraft": "Save as draft",
+        "save": "Save changes"
+      },
+      "materialForm": {
+        "title": "Title",
+        "titleRequired": "Enter a title.",
+        "description": "Description (optional)",
+        "chooseFile": "Choose file",
+        "camera": "Camera",
+        "cameraDenied": "Camera access is off. Turn it on in Settings > Studafy > Camera to take a photo.",
+        "cameraError": "Could not open the camera.",
+        "fileRequired": "Choose a file or take a photo.",
+        "uploading": "Uploading…",
+        "save": "Save changes"
+      },
+      "errors": {
+        "createAssignment": "Could not create the assignment. Try again.",
+        "upload": "Upload failed. Try again.",
+        "save": "Could not save your changes. Try again.",
+        "validation": "Check the details and try again.",
+        "forbidden": "You can only change content for classes you teach.",
+        "notFound": "This item no longer exists. Go back and refresh.",
+        "statusTransition": "A published assignment can't go back to draft."
+      }
+    },
     "class": {
       "rosterTitle": "Roster",
       "rosterEmpty": "No students enrolled yet.",
@@ -633,7 +859,7 @@
       },
       "entry": {
         "overMax": "Above the maximum of {max}",
-        "rejectedHint": "Returned by the reviewer — unlock to edit.",
+        "rejectedHint": "Returned by the reviewer — tap to unlock and edit.",
         "noStudents": "No students to grade for this assessment.",
         "saving": "Saving…",
         "unsaved": "Unsaved changes",
@@ -676,10 +902,40 @@
         "errorForbidden": "You're not assigned to this class.",
         "errorValidation": "Check the values and try again.",
         "errorGeneric": "Couldn't add the assessment. Try again."
+      },
+      "correction": {
+        "title": "Correct published grade",
+        "published": "Published score: {score} / {max}",
+        "newScore": "Corrected score",
+        "reason": "Reason for the correction",
+        "reasonHint": "e.g. Mis-keyed the score, re-marked paper",
+        "reasonRequired": "Explain why the grade is changing.",
+        "approvalHint": "Students and parents keep seeing the published score until the principal or a school admin approves the correction.",
+        "submit": "Send for approval",
+        "pending": "Correction to {score} awaiting approval",
+        "reasonShown": "Reason: {reason}",
+        "pendingHint": "Withdraw it to send a different correction.",
+        "withdraw": "Withdraw correction",
+        "lastRejected": "Last correction was rejected: {reason}",
+        "updated": "Correction updated.",
+        "tapToCorrect": "Tap to correct",
+        "rowPending": "Correction to {score} awaiting approval",
+        "rowRejected": "Correction rejected — tap to see why",
+        "errorPending": "A correction is already awaiting approval.",
+        "errorOverMax": "That score is above the maximum.",
+        "errorNoChange": "Enter a score different from the published one.",
+        "errorGeneric": "Couldn't send the correction. Try again."
+      },
+      "unlock": {
+        "title": "Edit returned grades?",
+        "body": "The reviewer returned these grades. Unlocking moves them back to draft so you can edit and resubmit.",
+        "bodyWithReason": "The reviewer returned these grades: “{reason}”\n\nUnlocking moves them back to draft so you can edit and resubmit.",
+        "confirm": "Unlock and edit",
+        "success": "Grades unlocked. You can edit them now.",
+        "failed": "Couldn't unlock these grades. Try again."
       }
     },
     "attendance": {
-      "take": "Take attendance",
       "dailyScope": "Daily attendance",
       "submit": "Submit attendance",
       "retrySubmit": "Retry submit",
@@ -707,7 +963,8 @@
         "windowExpired": "The correction window for this session has closed.",
         "forbidden": "You can't correct this record.",
         "noChange": "That's already this student's status.",
-        "failed": "Couldn't save the correction. Try again."
+        "failed": "Couldn't save the correction. Try again.",
+        "notCorrectable": "This record can't be corrected."
       }
     },
     "communication": {
@@ -890,8 +1147,11 @@
         "note": "Counts every published assignment in the classes this child is enrolled in for the term."
       },
       "timetable": {
-        "unavailable": "The weekly timetable isn't available in the family view yet.",
-        "unavailableHint": "It will appear here once class schedules are shared to parents."
+        "unpublished": "No timetable has been published for this term yet.",
+        "unpublishedHint": "It will appear here as soon as the school approves this term's schedule.",
+        "empty": "No lessons are scheduled for this child yet.",
+        "emptyHint": "Lessons appear here once the child is placed in a class on the timetable.",
+        "error": "Couldn't load the timetable. Pull down to try again."
       },
       "finance": {
         "error": "Couldn't load this child's finance details.",
@@ -1008,6 +1268,197 @@
       "inappropriate": "Offensive or inappropriate",
       "inaccurate": "Wrong or misleading",
       "other": "Something else"
+    }
+  },
+  "messaging": {
+    "title": "Messages",
+    "newMessage": "New message",
+    "list": {
+      "empty": "No conversations yet.",
+      "emptyParentHint": "Tap New message to write to one of {name}'s teachers.",
+      "emptyTeacherHint": "Tap New message to write to a parent of one of your students.",
+      "error": "Couldn't load your messages. Pull down to try again.",
+      "noMessagesYet": "No messages yet",
+      "you": "You: {body}",
+      "regarding": "re: {student}",
+      "unread": "{count} unread",
+      "photo": "📷 Photo",
+      "photos": "📷 Photos",
+      "blocked": "Blocked"
+    },
+    "contacts": {
+      "title": "New message",
+      "subtitle": "Teachers of {name}",
+      "empty": "There are no teachers to message for this child yet.",
+      "error": "Couldn't load teachers. Pull down to try again.",
+      "startError": "Couldn't open the conversation. Please try again."
+    },
+    "teacherContacts": {
+      "title": "New message",
+      "searchHint": "Search students or parents",
+      "empty": "None of your students have a parent you can message yet.",
+      "noMatches": "No students or parents match your search.",
+      "error": "Couldn't load your students. Pull down to try again."
+    },
+    "relationship": {
+      "mother": "Mother",
+      "father": "Father",
+      "guardian": "Guardian",
+      "step_parent": "Step-parent",
+      "grandparent": "Grandparent",
+      "sibling": "Sibling",
+      "other": "Family member",
+      "parent": "Parent"
+    },
+    "chat": {
+      "about": "About {student}",
+      "composerHint": "Message",
+      "send": "Send",
+      "empty": "No messages yet. Say hello!",
+      "error": "Couldn't load this conversation.",
+      "retry": "Try again",
+      "sending": "Sending…",
+      "failed": "Not sent. Tap to retry.",
+      "rateLimited": "You're sending messages too quickly. Wait a moment, then tap to retry.",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "openProfile": "View {name}'s profile",
+      "moreActions": "More options",
+      "viewProfile": "View profile",
+      "report": "Report {name}",
+      "block": "Block",
+      "unblock": "Unblock",
+      "reportMessage": "Report message",
+      "blocked": "Not sent — messaging is blocked in this conversation.",
+      "quotaExceeded": "Not sent — your school's storage is full. Tap to retry.",
+      "storageUnavailable": "Not sent — photos can't be sent right now. Tap to retry.",
+      "invalid": "Not sent — this message couldn't be accepted. Tap to retry."
+    },
+    "attachments": {
+      "attach": "Attach photos",
+      "gallery": "Photo library",
+      "camera": "Take a photo",
+      "remove": "Remove photo",
+      "uploading": "Uploading photo, {percent}%",
+      "uploaded": "Photo ready to send",
+      "failed": "Photo upload failed. Tap to retry.",
+      "image": "Photo {index} of {count}",
+      "unavailable": "Photo unavailable",
+      "viewerClose": "Close",
+      "viewerPosition": "{index} / {count}",
+      "unsupportedType": "Only JPEG, PNG, WebP or HEIC photos can be sent.",
+      "tooLarge": "Photos must be 10 MB or smaller.",
+      "tooMany": "You can attach up to 4 photos to one message.",
+      "cameraDenied": "Camera access is off. Turn it on in Settings to take a photo.",
+      "cameraError": "Couldn't open the camera.",
+      "pickError": "Couldn't open your photos.",
+      "uploadFailed": "Couldn't upload a photo. Tap it to try again.",
+      "quotaExceeded": "Your school's storage is full, so photos can't be uploaded.",
+      "storageUnavailable": "Photos can't be sent right now.",
+      "rateLimited": "Too many uploads at once. Wait a moment, then tap the photo to retry."
+    },
+    "block": {
+      "confirmTitle": "Block {name}?",
+      "confirmBody": "{name} won't be able to message you in this conversation. Your message history stays, and you can unblock them at any time.",
+      "confirm": "Block",
+      "cancel": "Cancel",
+      "blockedBanner": "You blocked {name}. Unblock to send messages.",
+      "blockedByThem": "You can't reply in this conversation.",
+      "unblock": "Unblock",
+      "blockedDone": "{name} is blocked.",
+      "unblockedDone": "{name} is unblocked.",
+      "error": "Couldn't update the block. Please try again."
+    },
+    "report": {
+      "title": "Report {name}",
+      "messageTitle": "Report message",
+      "subtitle": "Your report goes to the school, which will review it.",
+      "reasonLabel": "What's the problem?",
+      "reason": {
+        "harassment": "Harassment or bullying",
+        "inappropriate": "Inappropriate content",
+        "spam": "Spam",
+        "safety_concern": "A safety concern",
+        "other": "Something else"
+      },
+      "detailsHint": "Add details (optional)",
+      "alsoBlock": "Also block {name}",
+      "submit": "Send report",
+      "cancel": "Cancel",
+      "sent": "Report sent to the school",
+      "alreadyOpen": "You've already reported this; the school is reviewing it.",
+      "error": "Couldn't send the report. Please try again."
+    },
+    "profile": {
+      "teacher": "Teacher",
+      "parent": "Parent",
+      "teaches": "Teaches {child}",
+      "noClasses": "No current classes with {child}.",
+      "subjects": "Subjects",
+      "relationshipTo": "{relationship} of {child}",
+      "children": "Children you teach",
+      "thisConversation": "This conversation",
+      "noChildClasses": "Not in your classes",
+      "error": "Couldn't load this profile.",
+      "retry": "Try again",
+      "block": "Block",
+      "unblock": "Unblock",
+      "report": "Report"
+    }
+  },
+  "attendanceOffice": {
+    "registers": {
+      "date": "Register date",
+      "changeDate": "Change register date",
+      "today": "Today",
+      "term": "Term",
+      "changeTerm": "Change term",
+      "noTerm": "No academic term is set up for this school yet.",
+      "count": {
+        "notStarted": "{count} not started",
+        "inProgress": "{count} in progress",
+        "submitted": "{count} submitted"
+      },
+      "searchHint": "Search by class code",
+      "empty": "No classes in this term.",
+      "noMatches": "No classes match \"{query}\".",
+      "error": "Couldn't load the registers.",
+      "retry": "Try again",
+      "rowLabel": "{class}, register {state}"
+    },
+    "state": {
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "submitted": "Submitted"
+    },
+    "register": {
+      "description": "Everyone starts as present. Change anyone who isn't, then submit.",
+      "submittedDescription": "This register is submitted. Use Correct to change a record within the correction window.",
+      "submittedReadOnly": "This register is submitted. To change a record, ask the attendance office.",
+      "markAllPresent": "Mark all present",
+      "submit": "Submit register ({count})",
+      "confirmTitle": "Submit register?",
+      "confirmBody": "Record {count} students for {class} on {date}? After submitting, changes need a correction with a reason.",
+      "confirm": "Submit",
+      "cancel": "Cancel",
+      "submitted": "Register submitted.",
+      "submitFailed": "Couldn't submit the register ({code}). Try again.",
+      "submitFailedGeneric": "Couldn't submit the register. Try again.",
+      "offline": "You're offline, so nothing was submitted. Check your connection and try again.",
+      "cancelled": "This register was cancelled and can't be taken.",
+      "lateNeedsMinutes": "Enter the minutes late (1 or more) for every late student.",
+      "minutesLate": "Min late",
+      "minutesLateInvalid": "1 or more",
+      "alreadyRecorded": "Already recorded",
+      "notRecorded": "Not recorded",
+      "correct": "Correct",
+      "correctLabel": "Correct attendance for {student}",
+      "corrected": "Correction saved.",
+      "windowExpired": "The correction window has closed — ask the principal.",
+      "statusFor": "Attendance for {student}: {status}",
+      "empty": "No students are enrolled in this class.",
+      "error": "Couldn't load this register.",
+      "retry": "Try again"
     }
   }
 }

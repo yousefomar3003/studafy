@@ -8,6 +8,7 @@ import { useTranslation } from "../../lib/i18n";
 
 import { useStartAiCheckout } from "./mutations";
 import { aiCheckoutStudentQueryKey, fetchAiCheckoutStudent } from "./queries";
+import { RefundRequestLink } from "./RefundRequestLink";
 
 import type { AiCheckoutStudent } from "./queries";
 
@@ -102,6 +103,7 @@ export default function AiSubscriptionPurchasePage() {
             <p className="billing-overview__caption">{t("site.billing.ai.returnToApp")}</p>
           </Card.Body>
         </Card>
+        <RefundRequestLink scope="ai" studentId={studentId} />
       </>
     );
   }
@@ -184,6 +186,8 @@ export default function AiSubscriptionPurchasePage() {
           </Card.Body>
         </Card>
       )}
+
+      {studentQuery.isSuccess ? <RefundRequestLink scope="ai" studentId={studentId} /> : null}
     </>
   );
 }

@@ -64,7 +64,7 @@ export const userSearchHitSchema = z
   .object({
     id: uuidSchema,
     display_name: z.string().nullable(),
-    email: z.string(),
+    email: z.string().nullable(),
     status: userStatusSchema,
     rank: z.number(),
   })

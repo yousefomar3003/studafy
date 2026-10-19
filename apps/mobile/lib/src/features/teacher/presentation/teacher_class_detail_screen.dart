@@ -6,7 +6,6 @@ import '../../../core/api/generated/models/announcement.dart';
 import '../../../core/api/generated/models/discipline_incident.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/teacher_providers.dart';
-import 'attendance_taking_screen.dart';
 import 'class_announcement_composer_screen.dart';
 import 'grade_entry_screen.dart';
 import 'incident_report_screen.dart';
@@ -30,6 +29,8 @@ class TeacherClassDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Resolve roster names for this class (see classRosterNamesProvider).
+    ref.watch(classRosterNamesProvider(classId));
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final roster = ref.watch(classRosterProvider(classId));
@@ -41,7 +42,7 @@ class TeacherClassDetailScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.library_books_outlined),
-            tooltip: 'Assignments and materials',
+            tooltip: 'teacher.content.open'.tr(),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => TeacherContentScreen(
@@ -72,16 +73,6 @@ class TeacherClassDetailScreen extends ConsumerWidget {
             onPressed: () => _reportIncident(context),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) =>
-                AttendanceTakingScreen(classId: classId, classCode: classCode),
-          ),
-        ),
-        icon: const Icon(Icons.fact_check_outlined),
-        label: Text('teacher.attendance.take'.tr()),
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(classRosterProvider(classId)),
@@ -178,10 +169,8 @@ class TeacherClassDetailScreen extends ConsumerWidget {
   Future<void> _reportIncident(BuildContext context) async {
     final incident = await Navigator.of(context).push<DisciplineIncident>(
       MaterialPageRoute(
-        builder: (_) => IncidentReportScreen(
-          classId: classId,
-          classCode: classCode,
-        ),
+        builder: (_) =>
+            IncidentReportScreen(classId: classId, classCode: classCode),
       ),
     );
     if (incident == null || !context.mounted) return;

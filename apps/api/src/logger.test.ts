@@ -267,3 +267,64 @@ describe("log injection safety", () => {
     expect(parse(lines[0]!).header).toBe(payload);
   });
 });
+
+describe("observer", () => {
+  const buildObserved = (level?: LogLevel) => {
+    const lines: string[] = [];
+    const records: [
+      LogLevel,
+      string | undefined,
+      Record<string, unknown>,
+      Record<string, unknown>,
+    ][] = [];
+    const logger = createLogger({
+      level,
+      base: { service: "api" },
+      destination: (line) => lines.push(line),
+      observer: (name, msg, fields, bindings) => records.push([name, msg, fields, bindings]),
+    });
+    return { logger, lines, records };
+  };
+
+  test("sees each record after it is written, with live fields and accumulated bindings", () => {
+    const { logger, lines, records } = buildObserved();
+    const err = new Error("boom");
+
+    logger.child({ request_id: "r-1" }).child({ school_id: "s-1" }).error({ err }, "failed");
+
+    expect(lines).toHaveLength(1);
+    expect(records).toEqual([
+      ["error", "failed", { err }, { service: "api", request_id: "r-1", school_id: "s-1" }],
+    ]);
+    expect(records[0]![2].err).toBe(err);
+  });
+
+  test("passes empty fields for a message-only call", () => {
+    const { logger, records } = buildObserved();
+
+    logger.warn("slow");
+
+    expect(records).toEqual([["warn", "slow", {}, { service: "api" }]]);
+  });
+
+  test("is not called for a level below the threshold", () => {
+    const { logger, records } = buildObserved("warn");
+
+    logger.info("ignored");
+
+    expect(records).toHaveLength(0);
+  });
+
+  test("a throwing observer cannot break the log call or its stdout line", () => {
+    const lines: string[] = [];
+    const logger = createLogger({
+      destination: (line) => lines.push(line),
+      observer: () => {
+        throw new Error("observer exploded");
+      },
+    });
+
+    expect(() => logger.error("still written")).not.toThrow();
+    expect(lines).toHaveLength(1);
+  });
+});

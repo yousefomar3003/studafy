@@ -3,10 +3,9 @@
 // the same login table, so what reviewers are told cannot drift from what was seeded.
 //
 // The roster reuses the local demo personas (same keys, names, and relationships) so every shared
-// data module seeds the same realistic school, with three differences that make it safe to provision
+// data module seeds the same realistic school, with two differences that make it safe to provision
 // in production:
 //   - no SUPER_ADMIN: a platform-wide role must never be reachable with a shared password;
-//   - parents carry the PARENT role (migration 000043), not the local seed's GUEST;
 //   - only the four accounts in REVIEW_LOGINS get a login identity; everyone else is roster-only.
 //
 // The password is NOT here. It is one deployment secret, REVIEW_LOGIN_PASSWORD, read by the API.
@@ -47,7 +46,6 @@ const loginEmailByKey = new Map(REVIEW_LOGINS.map((login) => [login.personaKey, 
 function toReviewPersona(persona: MockPersona): MockPersona {
   return {
     ...persona,
-    role: persona.group === "parent" ? "PARENT" : persona.role,
     email:
       loginEmailByKey.get(persona.key) ??
       persona.email.replace(`@${MOCK_EMAIL_DOMAIN}`, `@${REVIEW_EMAIL_DOMAIN}`),

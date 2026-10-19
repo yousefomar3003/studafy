@@ -2,6 +2,7 @@ import { PERMISSIONS } from "@studafy/constants";
 import { lazy } from "react";
 
 import { RouteError } from "../components/RouteError";
+import { DeletionPendingGate } from "../features/account/privacy/DeletionPendingGate";
 import { AccountLayout } from "../layouts/AccountLayout";
 import { HelpLayout } from "../layouts/HelpLayout";
 import { MarketingLayout } from "../layouts/MarketingLayout";
@@ -21,6 +22,10 @@ import type { RouteObject } from "react-router-dom";
 // Translation catalogs each route group needs beyond the bundled shell (see lib/i18n/catalog-loader).
 const ADMIN_CATALOGS: readonly CatalogArea[] = ["adminPeople", "adminSchool"];
 const PRINCIPAL_CATALOGS: readonly CatalogArea[] = ["principal"];
+// The attendance office reuses the principal's term picker, correction modal and reports view, so it
+// loads their strings alongside its own.
+const ATTENDANCE_OFFICE_CATALOGS: readonly CatalogArea[] = ["attendanceOffice", "principal"];
+const PLATFORM_CATALOGS: readonly CatalogArea[] = ["platform"];
 const FINANCE_CATALOGS: readonly CatalogArea[] = ["finance", "financeReports"];
 const ONBOARDING_CATALOGS: readonly CatalogArea[] = ["onboarding"];
 
@@ -53,6 +58,11 @@ const OnboardingPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../routes/onboarding/OnboardingPage"),
 );
+const SignupPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/signup/SignupPage"),
+);
+const ApplyPage = lazyWithCatalogs(ONBOARDING_CATALOGS, () => import("../routes/signup/ApplyPage"));
 const SetupWizardPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../routes/onboarding-setup/SetupWizardPage"),
@@ -69,9 +79,13 @@ const UsersListPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
   () => import("../features/admin/users/UsersListPage"),
 );
-const InvitationsListPage = lazyWithCatalogs(
+const StaffAccountsPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
-  () => import("../features/admin/invitations/InvitationsListPage"),
+  () => import("../features/admin/staff/StaffAccountsPage"),
+);
+const SchoolMembersPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/members/SchoolMembersPage"),
 );
 const StudentsListPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
@@ -93,13 +107,63 @@ const SchoolSettingsPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
   () => import("../features/admin/settings/SchoolSettingsPage"),
 );
-const AuditLogExplorerPage = lazyWithCatalogs(
-  ADMIN_CATALOGS,
-  () => import("../features/admin/audit/AuditLogExplorerPage"),
-);
 const AnnouncementsPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
   () => import("../features/admin/announcements/AnnouncementsPage"),
+);
+// The principal's `SchoolCalendarPage`, reused for the school admin; its strings live in the
+// principal catalog.
+const AdminSchoolCalendarPage = lazyWithCatalogs(
+  [...ADMIN_CATALOGS, ...PRINCIPAL_CATALOGS],
+  () => import("../features/principal/calendar/SchoolCalendarPage"),
+);
+const PlatformOverviewPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/PlatformOverviewPage"),
+);
+const PlatformApplicationsPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/ApplicationsPage"),
+);
+const PlatformApplicationDetailPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/ApplicationDetailPage"),
+);
+const PlatformSchoolsListPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/SchoolsListPage"),
+);
+const PlatformSchoolDetailPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/SchoolDetailPage"),
+);
+const PlatformPlansPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/PlansPage"),
+);
+const PlatformSettingsPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/PlatformSettingsPage"),
+);
+const PlatformFinancePage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/PlatformFinancePage"),
+);
+const PlatformAiUsagePage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/AiUsagePage"),
+);
+const PlatformInquiriesPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/InquiriesPage"),
+);
+const PlatformUserLookupPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/UserLookupPage"),
+);
+const PlatformRefundsPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/RefundsPage"),
 );
 const PrincipalDashboardPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
@@ -134,6 +198,14 @@ const IncidentDetailPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/discipline/IncidentDetailPage"),
 );
+const MessageReportListPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/message-reports/MessageReportListPage"),
+);
+const MessageReportDetailPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/message-reports/MessageReportDetailPage"),
+);
 const AttendanceDashboardView = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/attendance/views/AttendanceDashboardView"),
@@ -149,6 +221,22 @@ const EvaluationDetailPage = lazyWithCatalogs(
 const CriteriaTemplatesPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/evaluations/CriteriaTemplatesPage"),
+);
+const AttendanceOfficePage = lazyWithCatalogs(
+  ATTENDANCE_OFFICE_CATALOGS,
+  () => import("../features/attendance-office/AttendanceOfficePage"),
+);
+const AttendanceRegisterPage = lazyWithCatalogs(
+  ATTENDANCE_OFFICE_CATALOGS,
+  () => import("../features/attendance-office/RegisterPage"),
+);
+const StudentAttendancePage = lazyWithCatalogs(
+  ATTENDANCE_OFFICE_CATALOGS,
+  () => import("../features/attendance-office/StudentAttendancePage"),
+);
+const AttendanceOfficeReportsPage = lazyWithCatalogs(
+  ATTENDANCE_OFFICE_CATALOGS,
+  () => import("../features/principal/attendance/views/AttendanceDashboardView"),
 );
 const ApprovalQueuePage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
@@ -191,14 +279,6 @@ const PaymentsListPage = lazyWithCatalogs(
 const RecordPaymentPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/payments/RecordPaymentPage"),
-);
-const ScholarshipAwardsListPage = lazyWithCatalogs(
-  FINANCE_CATALOGS,
-  () => import("../features/finance/adjustments/ScholarshipAwardsListPage"),
-);
-const NewScholarshipAwardPage = lazyWithCatalogs(
-  FINANCE_CATALOGS,
-  () => import("../features/finance/adjustments/NewScholarshipAwardPage"),
 );
 const RefundsListPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
@@ -278,6 +358,10 @@ export const routes: RouteObject[] = [
           { path: "legal/delete-account", element: <DeleteAccountInfoPage /> },
           // Where the emailed deletion link lands (ST-302).
           { path: "legal/delete-account/confirm", element: <ConfirmAccountDeletionPage /> },
+          // School sign-up: Google/Microsoft sign-in, then the application form and its status.
+          // Public; /signup/apply is authorized by the API's applicant cookie, not RequireAuth.
+          { path: "signup", element: <SignupPage /> },
+          { path: "signup/apply", element: <ApplyPage /> },
         ],
       },
       {
@@ -308,7 +392,9 @@ export const routes: RouteObject[] = [
         path: "onboarding/setup",
         element: (
           <RequireAuth>
-            <SetupWizardLayout />
+            <DeletionPendingGate>
+              <SetupWizardLayout />
+            </DeletionPendingGate>
           </RequireAuth>
         ),
         children: [
@@ -335,11 +421,39 @@ export const routes: RouteObject[] = [
         path: "portal",
         element: (
           <RequireAuth>
-            <PortalLayout />
+            <DeletionPendingGate>
+              <PortalLayout routes={() => routes} />
+            </DeletionPendingGate>
           </RequireAuth>
         ),
         children: [
           { index: true, element: <PortalPage /> },
+          // Studafy platform console. Reads gate on platform:read (SUPER_ADMIN only); each write
+          // is additionally refused server-side without platform:manage.
+          ...(
+            [
+              ["platform", <PlatformOverviewPage key="overview" />],
+              ["platform/schools", <PlatformSchoolsListPage key="schools" />],
+              ["platform/schools/:schoolId", <PlatformSchoolDetailPage key="school" />],
+              ["platform/applications", <PlatformApplicationsPage key="applications" />],
+              [
+                "platform/applications/:applicationId",
+                <PlatformApplicationDetailPage key="application" />,
+              ],
+              ["platform/inquiries", <PlatformInquiriesPage key="inquiries" />],
+              ["platform/refunds", <PlatformRefundsPage key="refunds" />],
+              ["platform/finance", <PlatformFinancePage key="finance" />],
+              ["platform/ai", <PlatformAiUsagePage key="ai" />],
+              ["platform/plans", <PlatformPlansPage key="plans" />],
+              ["platform/settings", <PlatformSettingsPage key="settings" />],
+              ["platform/users", <PlatformUserLookupPage key="users" />],
+            ] as const
+          ).map(([path, page]) => ({
+            path,
+            element: (
+              <RequirePermission permission={PERMISSIONS.PLATFORM_READ}>{page}</RequirePermission>
+            ),
+          })),
           {
             path: "admin",
             element: (
@@ -357,10 +471,18 @@ export const routes: RouteObject[] = [
             ),
           },
           {
-            path: "admin/invitations",
+            path: "accounts",
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
-                <InvitationsListPage />
+                <StaffAccountsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "members",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <SchoolMembersPage />
               </RequirePermission>
             ),
           },
@@ -397,21 +519,19 @@ export const routes: RouteObject[] = [
             ),
           },
           {
-            path: "admin/settings",
+            // Same permission and page as `principal/calendar`; ORG_ADMIN holds `calendarEvent:*`.
+            path: "admin/calendar",
             element: (
-              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
-                <SchoolSettingsPage />
+              <RequirePermission permission={PERMISSIONS.CALENDAR_EVENT_READ}>
+                <AdminSchoolCalendarPage />
               </RequirePermission>
             ),
           },
           {
-            // Gated on the specific `auditLog:read` permission, not `organization:manageSettings` —
-            // FINANCE and SUPPORT_AGENT hold the former without the latter (see
-            // `packages/constants/src/permissions.ts`) and are meant to reach this page directly.
-            path: "admin/audit",
+            path: "admin/settings",
             element: (
-              <RequirePermission permission={PERMISSIONS.AUDIT_LOG_READ}>
-                <AuditLogExplorerPage />
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <SchoolSettingsPage />
               </RequirePermission>
             ),
           },
@@ -449,6 +569,24 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <IncidentDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Parent <-> teacher message report review queue. Its own permission, held by
+            // PRINCIPAL, ORG_ADMIN and SUPER_ADMIN.
+            path: "principal/message-reports",
+            element: (
+              <RequirePermission permission={PERMISSIONS.MESSAGE_REPORT_REVIEW}>
+                <MessageReportListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/message-reports/:reportId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.MESSAGE_REPORT_REVIEW}>
+                <MessageReportDetailPage />
               </RequirePermission>
             ),
           },
@@ -521,6 +659,43 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <PrincipalStudentsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // The attendance office: daily registers for every class, corrections inside the
+            // window, and attendance reports. Held by ATTENDANCE_OFFICER and ORG_ADMIN; its own
+            // permission so an attendance officer gets these pages and nothing of the principal's.
+            path: "attendance",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW}>
+                <AttendanceOfficePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "attendance/register/:classId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW}>
+                <AttendanceRegisterPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "attendance/students/:studentId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW}>
+                <StudentAttendancePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // The full reports view (exports, grids) stays with the roles that export attendance:
+            // the attendance officer, principal and school admin. Teachers use the dashboard.
+            path: "attendance/reports",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ATTENDANCE_REPORT_EXPORT}>
+                <AttendanceOfficeReportsPage />
               </RequirePermission>
             ),
           },
@@ -648,30 +823,6 @@ export const routes: RouteObject[] = [
             ),
           },
           {
-            // Gated on `billing:read`, matching the scholarship/award gateway's own read routes
-            // (apps/api/src/modules/finance/scholarships/routes.ts). Confirming a pending award (the
-            // checker step) still requires `billing:update` — enforced both by the route the API
-            // itself requires and, client-side, by `ScholarshipAwardsListPage`'s own row actions.
-            path: "finance/adjustments/scholarships",
-            element: (
-              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
-                <ScholarshipAwardsListPage />
-              </RequirePermission>
-            ),
-          },
-          {
-            // Gated on `billing:update` — awarding a scholarship/discount is the maker step, the
-            // same write gate `POST /api/finance/scholarship-discounts/awards` itself requires.
-            // Static path, matching `finance/payments/new`'s own note on why registration order
-            // doesn't matter here (no dynamic `:awardId` segment to collide with).
-            path: "finance/adjustments/scholarships/new",
-            element: (
-              <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
-                <NewScholarshipAwardPage />
-              </RequirePermission>
-            ),
-          },
-          {
             // Gated on `billing:read`, matching the refund gateway's own read routes
             // (apps/api/src/modules/finance/refunds/routes.ts). Approving or rejecting a pending
             // refund (the checker step) requires the stricter `billing:refund` — enforced both by
@@ -741,7 +892,9 @@ export const routes: RouteObject[] = [
         path: "account",
         element: (
           <RequireAuth>
-            <AccountLayout />
+            <DeletionPendingGate>
+              <AccountLayout />
+            </DeletionPendingGate>
           </RequireAuth>
         ),
         children: [

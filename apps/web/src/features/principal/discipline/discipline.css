@@ -6,22 +6,12 @@
  */
 
 .discipline-list__tabs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-8);
   margin-bottom: var(--space-16);
 }
 
 .discipline-list__filter {
   margin-bottom: var(--space-16);
   max-width: 320px;
-}
-
-.discipline-detail__back {
-  display: inline-block;
-  margin-bottom: var(--space-16);
 }
 
 .discipline-detail__summary {

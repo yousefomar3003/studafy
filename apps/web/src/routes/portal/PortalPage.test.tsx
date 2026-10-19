@@ -3,9 +3,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { AuthProvider } from "../../lib/auth";
 import { expectNoA11yViolations } from "../../lib/test/axe";
+import { createTestSessionStore } from "../../lib/test/session";
 
 import type { ComponentType } from "react";
 
@@ -16,17 +18,23 @@ mock.module("../../lib/api", () => ({ api: { GET: getMock } }));
 
 const loadPortalPage = async (): Promise<ComponentType> => (await import("./PortalPage")).default;
 
-function renderPage(Page: ComponentType, initialPath = "/portal") {
+async function renderPage(Page: ComponentType, initialPath = "/portal", roles = ["INSTRUCTOR"]) {
+  const store = await createTestSessionStore(roles);
   // retry: false so a rejected query settles to its error state immediately.
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <main>
-          <Page />
-        </main>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[initialPath]}>
+          <main>
+            <Routes>
+              <Route path="/portal" element={<Page />} />
+              <Route path="/portal/principal" element={<h1>Principal home</h1>} />
+            </Routes>
+          </main>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -39,7 +47,7 @@ describe("PortalPage health smoke test", () => {
   test("renders the typed /healthz status end-to-end", async () => {
     getMock.mockImplementation(() => Promise.resolve({ data: { status: "ok" } }));
 
-    renderPage(await loadPortalPage());
+    await renderPage(await loadPortalPage());
 
     expect(await screen.findByText(/api status: ok/i)).toBeTruthy();
   });
@@ -61,7 +69,7 @@ describe("PortalPage health smoke test", () => {
       ),
     );
 
-    renderPage(await loadPortalPage());
+    await renderPage(await loadPortalPage());
 
     expect(
       await screen.findByText(new RegExp(`unavailable \\(ref ${requestId}\\)`, "i")),
@@ -73,7 +81,7 @@ describe("PortalPage forbidden notice", () => {
   test("renders a notice when redirected here with ?notice=forbidden", async () => {
     getMock.mockImplementation(() => Promise.resolve({ data: { status: "ok" } }));
 
-    renderPage(await loadPortalPage(), "/portal?notice=forbidden");
+    await renderPage(await loadPortalPage(), "/portal?notice=forbidden");
 
     const notice = await screen.findByRole("alert");
     expect(notice.textContent).toMatch(/don.t have access/i);
@@ -82,7 +90,7 @@ describe("PortalPage forbidden notice", () => {
   test("has no accessibility violations with the forbidden notice showing", async () => {
     getMock.mockImplementation(() => Promise.resolve({ data: { status: "ok" } }));
 
-    const { container } = renderPage(await loadPortalPage(), "/portal?notice=forbidden");
+    const { container } = await renderPage(await loadPortalPage(), "/portal?notice=forbidden");
     await screen.findByRole("alert");
 
     await expectNoA11yViolations(container);
@@ -91,9 +99,27 @@ describe("PortalPage forbidden notice", () => {
   test("renders no notice on a plain visit", async () => {
     getMock.mockImplementation(() => Promise.resolve({ data: { status: "ok" } }));
 
-    renderPage(await loadPortalPage());
+    await renderPage(await loadPortalPage());
 
     await screen.findByText(/api status: ok/i);
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("PortalPage role home forwarding", () => {
+  test("forwards a role with its own home page there", async () => {
+    getMock.mockImplementation(() => Promise.resolve({ data: { status: "ok" } }));
+
+    await renderPage(await loadPortalPage(), "/portal", ["PRINCIPAL"]);
+
+    expect(await screen.findByRole("heading", { name: "Principal home" })).toBeTruthy();
+  });
+
+  test("stays put to show the forbidden notice", async () => {
+    getMock.mockImplementation(() => Promise.resolve({ data: { status: "ok" } }));
+
+    await renderPage(await loadPortalPage(), "/portal?notice=forbidden", ["PRINCIPAL"]);
+
+    expect((await screen.findByRole("alert")).textContent).toMatch(/don.t have access/i);
   });
 });

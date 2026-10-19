@@ -1,10 +1,10 @@
 import { NavLink } from "react-router-dom";
 
 import { ApprovalQueueBadge } from "../../components/ApprovalQueueBadge";
-import { usePermissions } from "../../lib/auth";
+import { resolveRoleHome, useAuth, usePermissions } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
 
-import { visiblePortalNavItems } from "./nav-items";
+import { visiblePortalNavItems, withRoleHome } from "./nav-items";
 import { NavIcon } from "./NavIcon";
 
 export interface PortalSidebarProps {
@@ -39,7 +39,8 @@ export function PortalSidebar({
 }: PortalSidebarProps) {
   const { t } = useTranslation();
   const permissions = usePermissions();
-  const items = visiblePortalNavItems(permissions);
+  const { roles } = useAuth();
+  const items = withRoleHome(visiblePortalNavItems(permissions), resolveRoleHome(roles));
   const listId = `${navId}-list`;
 
   return (
@@ -79,7 +80,9 @@ export function PortalSidebar({
           <li key={item.id} className="portal-nav__item">
             <NavLink
               to={item.to}
-              end
+              // Every section stays highlighted on its sub-pages (`/portal/admin/timetable` keeps
+              // "Admin" active); only Home matches exactly, since `/portal` prefixes every route.
+              end={item.to === "/portal"}
               title={collapsed ? t(item.labelKey) : undefined}
               onClick={onNavigate}
               className={({ isActive }) =>

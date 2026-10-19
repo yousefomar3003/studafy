@@ -1,6 +1,12 @@
-import { createRedMetricsMiddleware, createTracingMiddleware } from "@studafy/observability";
+import {
+  captureError,
+  createRedMetricsMiddleware,
+  createTracingMiddleware,
+  resolveRoute,
+} from "@studafy/observability";
 import { Hono } from "hono";
 import { upgradeWebSocket } from "hono/bun";
+import { HTTPException } from "hono/http-exception";
 
 import { TokenVerificationError, verifyToken } from "./auth";
 import { healthRoutes } from "./health";
@@ -12,6 +18,7 @@ import type { ConnectionTracker } from "./lifecycle";
 import type { FanoutMetrics } from "./metrics";
 import type { ClientMessage, RoomKey, SystemMessage } from "./protocol";
 import type { RoomManager } from "./rooms";
+import type { CaptureContext } from "@studafy/observability";
 import type { Context } from "hono";
 import type { WSContext } from "hono/ws";
 
@@ -68,6 +75,37 @@ export interface AppOptions {
   rooms: RoomManager<RawSocket>;
   tracker: ConnectionTracker<RawSocket>;
   metrics: () => FanoutMetrics;
+  /**
+   * Error monitoring seam. Injected by tests; defaults to @studafy/observability's captureError,
+   * itself a no-op unless SENTRY_DSN is configured.
+   */
+  reportError?: (error: unknown, context: CaptureContext) => void;
+}
+
+type WsEvent = "open" | "message" | "close";
+
+/**
+ * Runs one WebSocket event handler, reporting anything it throws — tagged with the event and the
+ * connection's tenant and user ids, never its token or message payload — and then rethrowing, so
+ * the socket fails exactly as it did before monitoring existed. Exported for app.monitoring.test.ts:
+ * a throw out of a live Bun WebSocket handler is an uncaught error by design, so the wrapper is
+ * tested directly rather than through a real socket.
+ */
+export function monitored(
+  reportError: NonNullable<AppOptions["reportError"]>,
+  event: WsEvent,
+  claims: AuthClaims,
+  handler: () => void,
+): void {
+  try {
+    handler();
+  } catch (error) {
+    reportError(error, {
+      tags: { ws_event: event, school_id: claims.schoolId },
+      userId: claims.userId,
+    });
+    throw error;
+  }
 }
 
 /**
@@ -85,8 +123,21 @@ export function createApp({
   rooms,
   tracker,
   metrics,
+  reportError = captureError,
 }: AppOptions): Hono<Bindings> {
   const app = new Hono<Bindings>();
+
+  // Hono's own default handler, plus a report: an unexpected throw from the handshake or a health
+  // route is a 500 nobody would otherwise hear about. HTTPExceptions keep their own response and
+  // are not reported — this app only raises them for client errors.
+  app.onError((error, c) => {
+    if (error instanceof HTTPException) {
+      return error.getResponse();
+    }
+    reportError(error, { tags: { route: resolveRoute(c) } });
+    console.error(error);
+    return c.text("Internal Server Error", 500);
+  });
 
   // Distributed tracing (ST-260): one SERVER span per HTTP request (the /ws handshake and health
   // routes — the upgraded WebSocket connection itself, once established, is out of scope for this
@@ -129,22 +180,28 @@ export function createApp({
 
       return {
         onOpen(_event, ws) {
-          const socket = raw(ws);
-          tracker.add(socket);
-          for (const room of homeRooms) {
-            rooms.join(room, socket);
-            send(ws, { type: "system.joined", room });
-          }
-          reauthTimer = scheduleReauth(claims, ws);
+          monitored(reportError, "open", claims, () => {
+            const socket = raw(ws);
+            tracker.add(socket);
+            for (const room of homeRooms) {
+              rooms.join(room, socket);
+              send(ws, { type: "system.joined", room });
+            }
+            reauthTimer = scheduleReauth(claims, ws);
+          });
         },
         onMessage(event, ws) {
-          handleClientMessage(event.data, ws, claims, rooms);
+          monitored(reportError, "message", claims, () => {
+            handleClientMessage(event.data, ws, claims, rooms);
+          });
         },
         onClose(_event, ws) {
-          clearTimeout(reauthTimer);
-          const socket = raw(ws);
-          tracker.remove(socket);
-          rooms.leaveAll(socket);
+          monitored(reportError, "close", claims, () => {
+            clearTimeout(reauthTimer);
+            const socket = raw(ws);
+            tracker.remove(socket);
+            rooms.leaveAll(socket);
+          });
         },
       };
     }),

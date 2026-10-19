@@ -27,7 +27,7 @@ const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 
 /**
  * Expense entry (`/portal/finance/expenses/new`), gated by `billing:update`. Single-step create —
- * unlike the refund/scholarship maker/checker pair, an expense has no separate confirmation step,
+ * unlike the refund maker/checker pair, an expense has no separate confirmation step,
  * so this follows `payments/RecordPaymentPage`'s simpler direct-submit shape instead.
  *
  * The attachment (if any) goes through the pre-signed flow before the expense itself is created:
@@ -44,9 +44,6 @@ export default function NewExpensePage() {
 
   return (
     <>
-      <p className="expenses-form__back">
-        <Link to="/portal/finance/expenses">{t("finance.expenses.back")}</Link>
-      </p>
       <h1>{t("finance.expenses.new.title")}</h1>
 
       {expense ? (

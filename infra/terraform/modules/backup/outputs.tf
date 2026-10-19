@@ -1,5 +1,5 @@
 output "postgres_restore_verify_task_definition_arn" {
-  description = "ARN of the inert Postgres restore-verify task definition. Pass to infra/deploy/scripts/postgres-restore-verify.sh, or to the weekly schedule (created automatically when automation_enabled)."
+  description = "ARN of the inert Postgres restore-verify task definition. Pass to infra/deploy/scripts/run-postgres-restore-verify.sh, or to the weekly schedule (created automatically when automation_enabled)."
   value       = aws_ecs_task_definition.postgres_restore_verify.arn
 }
 
@@ -29,7 +29,7 @@ output "erpnext_site_backup_task_definition_arn" {
 }
 
 output "erpnext_restore_drill_task_definition_arn" {
-  description = "ARN of the ERPNext monthly restore-drill task definition. Pass to infra/deploy/scripts/erpnext-restore-drill.sh for an on-demand run. null in dev / when erpnext_plane_enabled is false."
+  description = "ARN of the ERPNext monthly restore-drill task definition. Pass to infra/deploy/scripts/run-erpnext-restore-drill.sh for an on-demand run. null in dev / when erpnext_plane_enabled is false."
   value       = one(aws_ecs_task_definition.erpnext_restore_drill[*].arn)
 }
 

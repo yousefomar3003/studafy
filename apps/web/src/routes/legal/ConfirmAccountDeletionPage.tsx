@@ -120,9 +120,10 @@ function DeletionResult({ result }: { result: ConfirmedDeletion }) {
       <h1>{t("onboarding.legal.confirmDeletion.deletedTitle")}</h1>
       <ul role="status">
         {result.accounts.map((account) => (
-          <li key={account.request_id}>
+          <li key={account.school_name}>
             {t("onboarding.legal.confirmDeletion.erasedBy", {
               school: account.school_name,
+              scheduledDate: formatDate(new Date(account.scheduled_for)),
               date: formatDate(new Date(account.completes_by)),
             })}
           </li>

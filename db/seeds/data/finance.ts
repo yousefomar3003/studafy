@@ -8,7 +8,10 @@ import type { FullCtx, Sql } from "../support";
 
 export async function seedFinance(sql: Sql, ctx: FullCtx): Promise<void> {
   const { schoolId, currencyId, students, academicYearId, terms } = ctx;
-  const billedStudents = students.slice(0, 4);
+  // The first four students, plus Mira Fares so the two-child Fares parent sees an invoice per child.
+  const billedStudents = students.filter(
+    (student, index) => index < 4 || student.key === "student-mira",
+  );
   const lastSyncedAt = seedDate(-1);
 
   const invoices = billedStudents.map((student, index) => ({

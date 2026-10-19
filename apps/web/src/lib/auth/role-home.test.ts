@@ -5,14 +5,20 @@ import { resolveRoleHome } from "./role-home";
 
 describe("resolveRoleHome", () => {
   test.each([
-    ["ORG_ADMIN"],
-    ["PRINCIPAL"],
-    ["INSTRUCTOR"],
-    ["TEACHING_ASSISTANT"],
-    ["STUDENT"],
-    ["GUEST"],
-  ])("routes a %s session to the portal", (role) => {
+    ["SUPER_ADMIN", "/portal/platform"],
+    ["ORG_ADMIN", "/portal/admin"],
+    ["PRINCIPAL", "/portal/principal"],
+    ["FINANCE", "/portal/finance"],
+  ])("routes a %s session to its own home", (role, home) => {
+    expect(resolveRoleHome([role])).toBe(home);
+  });
+
+  test.each([["GUEST"]])("routes a %s session to the portal", (role) => {
     expect(resolveRoleHome([role])).toBe("/portal");
+  });
+
+  test("an ORG_ADMIN who also teaches lands on the admin home", () => {
+    expect(resolveRoleHome(["INSTRUCTOR", "ORG_ADMIN"])).toBe("/portal/admin");
   });
 
   test("falls back to the portal for an unrecognized role", () => {
@@ -24,8 +30,8 @@ describe("resolveRoleHome", () => {
   });
 
   test("picks the higher-priority role when a session holds more than one", () => {
-    expect(resolveRoleHome(["STUDENT", "ORG_ADMIN"])).toBe("/portal");
-    // Same destination today, but exercises the priority search rather than array order.
-    expect(resolveRoleHome(["GUEST", "INSTRUCTOR", "STUDENT"])).toBe("/portal");
+    expect(resolveRoleHome(["STUDENT", "ORG_ADMIN"])).toBe("/portal/admin");
+    expect(resolveRoleHome(["FINANCE", "SUPER_ADMIN"])).toBe("/portal/platform");
+    expect(resolveRoleHome(["FINANCE", "PRINCIPAL"])).toBe("/portal/principal");
   });
 });

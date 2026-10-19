@@ -75,12 +75,10 @@ export default function DeleteAccountPage() {
         <Card.Body>
           <p role="status">
             {t("accountDeletion.completedBody", {
+              scheduledDate: formatDate(new Date(deletion.scheduled_for)),
               date: formatDate(new Date(deletion.completes_by)),
             })}
           </p>
-          {deletion.ai_subscriptions_canceled > 0 ? (
-            <p>{t("accountDeletion.completedAiCanceled")}</p>
-          ) : null}
           <p>{t("accountDeletion.completedRetainedIntro")}</p>
           <ul>
             {deletion.retained_records.map((record) => (

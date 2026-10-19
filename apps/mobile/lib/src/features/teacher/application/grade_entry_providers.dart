@@ -26,16 +26,22 @@ final gradeEntryClientProvider = Provider<GradeEntryClient>((ref) {
 });
 
 /// The gradebook for a class, created empty on first access. Keyed by class id.
-final gradebookForClassProvider =
-    FutureProvider.family<GradebookRef, String>((ref, classId) async {
+final gradebookForClassProvider = FutureProvider.family<GradebookRef, String>((
+  ref,
+  classId,
+) async {
   return ref.watch(gradeEntryClientProvider).resolveGradebook(classId);
 });
 
 /// The full entry grid for a gradebook — one submission per enrolled student, each with its
 /// assessment cells. Keyed by gradebook id. Pull-to-refresh / post-write `invalidate` re-runs it.
-final gradeEntryGridProvider =
-    FutureProvider.family<GradeEntryGrid, String>((ref, gradebookId) async {
-  final submissions = await ref.watch(gradeEntryClientProvider).fetchEntry(gradebookId);
+final gradeEntryGridProvider = FutureProvider.family<GradeEntryGrid, String>((
+  ref,
+  gradebookId,
+) async {
+  final submissions = await ref
+      .watch(gradeEntryClientProvider)
+      .fetchEntry(gradebookId);
   return GradeEntryGrid(submissions);
 });
 
@@ -131,7 +137,8 @@ class GradeEntryController extends ChangeNotifier {
       existing.maxScore = row.cell.maxScore;
       final isClean = _parse(existing.text) == existing.savedScore;
       if (isClean &&
-          (existing.token != row.cell.updatedAt || existing.savedScore != row.cell.score)) {
+          (existing.token != row.cell.updatedAt ||
+              existing.savedScore != row.cell.score)) {
         existing
           ..text = _formatScore(row.cell.score)
           ..savedScore = row.cell.score
@@ -170,8 +177,9 @@ class GradeEntryController extends ChangeNotifier {
     return _parse(draft.text) != draft.savedScore;
   }
 
-  int get pendingCount =>
-      _drafts.entries.where((e) => _parse(e.value.text) != e.value.savedScore).length;
+  int get pendingCount => _drafts.entries
+      .where((e) => _parse(e.value.text) != e.value.savedScore)
+      .length;
 
   /// Record a keystroke for [gradeId] and (re)arm the debounce. [maxScore] gates the save: an
   /// out-of-range value is kept in the field and shown as an error but never sent.
@@ -201,7 +209,13 @@ class GradeEntryController extends ChangeNotifier {
       final isDirtyCell = value != draft.savedScore;
       final outOfRange = value != null && (value < 0 || value > draft.maxScore);
       if (!isDirtyCell || outOfRange) continue;
-      edits.add(GradeScoreEdit(gradeId: entry.key, score: value, updatedAt: draft.token));
+      edits.add(
+        GradeScoreEdit(
+          gradeId: entry.key,
+          score: value,
+          updatedAt: draft.token,
+        ),
+      );
     }
     return edits;
   }
@@ -228,10 +242,14 @@ class GradeEntryController extends ChangeNotifier {
         draft
           ..savedScore = cell.score
           ..token = cell.updatedAt
-          ..text = _parse(draft.text) == cell.score ? draft.text : _formatScore(cell.score);
+          ..text = _parse(draft.text) == cell.score
+              ? draft.text
+              : _formatScore(cell.score);
       }
       _lastSavedAt = DateTime.now();
-      _status = pendingCount > 0 ? GradeSaveStatus.pending : GradeSaveStatus.saved;
+      _status = pendingCount > 0
+          ? GradeSaveStatus.pending
+          : GradeSaveStatus.saved;
       _errorCode = null;
     } on DioException catch (error) {
       _status = GradeSaveStatus.error;
@@ -277,7 +295,9 @@ class GradeEntryController extends ChangeNotifier {
     _disposed = true;
     if (pending.isNotEmpty) {
       unawaited(
-        _client.bulkUpdateGrades(gradebookId, pending).catchError((_) => const <GradeCell>[]),
+        _client
+            .bulkUpdateGrades(gradebookId, pending)
+            .catchError((_) => const <GradeCell>[]),
       );
     }
     super.dispose();

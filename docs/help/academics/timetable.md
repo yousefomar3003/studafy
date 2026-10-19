@@ -84,7 +84,11 @@ Timetables submitted for review through the older two-step flow show as
 `Submitted`. Use `Approve and publish` to make one live, or `Send back to draft`
 to keep editing it.
 
-## Export
+## Import lessons
 
-`Export CSV` downloads the lessons on screen (day, period, class, teacher,
-employee number, room), respecting the class and teacher filters.
+While a draft is open, `Import CSV` adds lessons from a spreadsheet. Each row
+needs `day` (1 = Monday … 7 = Sunday, one of the school days), `period`,
+`class` (class code), `teacher` (employee number) and `room` (room code).
+Download the template from the dialog to start from the right columns. Rows
+with an unknown code, a day outside the school week, or a clash are reported by
+line and skipped; the rest are added to the draft.

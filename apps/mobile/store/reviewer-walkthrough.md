@@ -58,8 +58,8 @@ harmless; reviewers do.
 | **7** | **Privacy policy in the app** | |
 | 7.1 | Profile → **Privacy policy** | Same URL as 1.2 opens in the system browser. |
 | **8** | **Account deletion** (disposable account only) | |
-| 8.1 | Profile → **Delete my account** | `/account/delete` opens in the system browser and explains the consequences. |
-| 8.2 | Confirm | The request is accepted and a completion date is shown. Deletion revokes every session: back in the app, the next action should land on the login screen. Record what actually happens. |
+| 8.1 | Profile, signed in as any role except the school admin | No deletion action is shown — only the privacy policy (see `review-checklist.md` §1 for the 5.1.1(v) risk). |
+| 8.2 | Open `https://app.studafy.com/account/delete` in a browser, sign in with the disposable account, confirm | The request is accepted and a completion date is shown. Deletion revokes every session: back in the app, the next action should land on the login screen. Record what actually happens. |
 | 8.3 | Open `https://app.studafy.com/legal/delete-account` signed out | The public deletion page loads (Play's Data safety URL). |
 | **9** | **Metadata matches the build** | |
 | 9.1 | Compare each screenshot in the upload set with the same screen in this build | Same layout, labels and features. No permission banner, debug banner or real student data. |

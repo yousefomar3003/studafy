@@ -1,15 +1,11 @@
 /**
- * Admin dashboard page layout. Tile chrome itself (`dashboard-tile__*`) lives in the shared
- * `apps/web/src/components/dashboard-tile.css`, imported by `AdminDashboardPage.tsx` alongside
- * this file — this stylesheet only holds the layout classes specific to this page.
+ * Admin dashboard page layout. The header, summary strip and shortcuts come from
+ * `components/home/home.css`; tile chrome (`dashboard-tile__*`) from `components/dashboard-tile.css`.
+ * This stylesheet only holds the layout classes specific to this page.
  */
-
-.admin-dashboard-banner {
-  margin-bottom: var(--space-16);
-}
 
 .admin-dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: var(--space-16);
 }

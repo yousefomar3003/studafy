@@ -4,29 +4,18 @@
 # default (its base image is ~2.7GB); set INCLUDE_ERPNEXT=1 to include it.
 set -uo pipefail
 
-declare -A DOCKERFILES=(
-  [api]=infra/docker/api.Dockerfile
-  [realtime]=infra/docker/realtime.Dockerfile
-  [workers]=infra/docker/workers.Dockerfile
-  [migrations]=infra/docker/migrations.Dockerfile
-  [web]=infra/docker/web.Dockerfile
-)
-declare -A MAX_MB=(
-  [api]=150
-  [realtime]=200
-  [workers]=250
-  [migrations]=100
-  [web]=120
-)
-
+# "service:size-budget-MB" pairs, same budgets as containers.yml. Plain arrays rather than
+# associative ones so this runs on macOS's stock bash 3.2.
+SERVICES=(api:150 realtime:200 workers:250 migrations:100 web:120)
 if [ "${INCLUDE_ERPNEXT:-0}" = "1" ]; then
-  DOCKERFILES[erpnext]=infra/docker/erpnext.Dockerfile
-  MAX_MB[erpnext]=3072
+  SERVICES+=(erpnext:3072)
 fi
 
 fail=0
-for service in "${!DOCKERFILES[@]}"; do
-  dockerfile="${DOCKERFILES[$service]}"
+for entry in "${SERVICES[@]}"; do
+  service="${entry%%:*}"
+  budget_mb="${entry##*:}"
+  dockerfile="infra/docker/$service.Dockerfile"
   echo "==> building $service ($dockerfile)"
   if ! docker build -f "$dockerfile" -t "studafy/$service:ci-local" .; then
     echo "$service failed to build" >&2
@@ -35,8 +24,8 @@ for service in "${!DOCKERFILES[@]}"; do
   fi
 
   bytes=$(docker image inspect "studafy/$service:ci-local" --format '{{.Size}}')
-  max=$(( MAX_MB[$service] * 1024 * 1024 ))
-  echo "image size: $((bytes / 1024 / 1024))MB ($bytes bytes) -- budget: ${MAX_MB[$service]}MB"
+  max=$((budget_mb * 1024 * 1024))
+  echo "image size: $((bytes / 1024 / 1024))MB ($bytes bytes) -- budget: ${budget_mb}MB"
   if [ "$bytes" -gt "$max" ]; then
     echo "$service exceeds its image size budget" >&2
     fail=1

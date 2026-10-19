@@ -1,4 +1,9 @@
-import { startMetricsServer, startQueueGauges, startTracing } from "@studafy/observability";
+import {
+  initErrorMonitoring,
+  startMetricsServer,
+  startQueueGauges,
+  startTracing,
+} from "@studafy/observability";
 import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
@@ -15,7 +20,11 @@ import {
 } from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
 import { scheduleAbandonedImportSweepJob } from "./queues/imports";
-import { scheduleAiMessageRetentionSweepJob, scheduleClosureSweepJob } from "./queues/maintenance";
+import {
+  scheduleAccountDeletionSweepJob,
+  scheduleAiMessageRetentionSweepJob,
+  scheduleClosureSweepJob,
+} from "./queues/maintenance";
 import {
   createSesSender,
   scheduleDigestJob,
@@ -32,6 +41,16 @@ import type { RelayHandle } from "./queues/outbox-relay/relay";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before any Redis connection opens.
 const env = loadEnv();
+
+// Sentry error monitoring — null (and every reporting call a no-op) when SENTRY_DSN is unset. Before
+// startTracing(), for the context-manager ordering apps/api/src/index.ts's own call documents.
+// Failed jobs are reported by worker.ts's runMonitoredJob, warn/error logs by log.ts.
+const errorMonitoring = initErrorMonitoring({
+  dsn: env.SENTRY_DSN,
+  environment: env.SENTRY_ENVIRONMENT ?? env.NODE_ENV,
+  release: env.RELEASE_VERSION,
+  serviceName: env.SERVICE_NAME,
+});
 
 // Prometheus-format metrics (ST-259), on its own port — must run before startWorkers()/worker.ts's
 // createBullmqWorker records anything, since an OTel instrument stays bound to whichever meter
@@ -220,6 +239,13 @@ void scheduleAiMessageRetentionSweepJob(aiMessageRetentionRedis).then(() =>
   aiMessageRetentionRedis.disconnect(),
 );
 
+// Account-deletion sweep scheduler (000143): idempotently register the daily 09:00 run of every
+// self-service deletion whose 14-day grace period has ended.
+const accountDeletionSweepRedis = createRedisConnection(env);
+void scheduleAccountDeletionSweepJob(accountDeletionSweepRedis).then(() =>
+  accountDeletionSweepRedis.disconnect(),
+);
+
 console.log(
   `Workers started for queues: ${QUEUE_REGISTRY.map((definition) => definition.name).join(", ")} (${env.NODE_ENV})`,
 );
@@ -255,6 +281,8 @@ const shutdown = (signal: string) => {
     await billingPipelineDb.end({ timeout: 5 });
     await metricsServer.shutdown();
     await tracing?.shutdown();
+    // Last, so a failure reported while jobs were draining still goes out before the exit.
+    await errorMonitoring?.shutdown();
     console.log("Shutdown complete.");
     process.exit(0);
   });

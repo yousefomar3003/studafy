@@ -8,8 +8,9 @@
  *
  * Status: Studafy does not offer Sign in with Apple yet and stores no Apple tokens
  * (app.oauth_identities deliberately keeps none), so nothing constructs this client today. It is
- * the revocation half the SIWA login ticket plugs in through `SiwaTokenRevocation`
- * (account-deletion-service.ts) once it persists the refresh token Apple returns at sign-in.
+ * the revocation half the SIWA login ticket plugs into the worker's account-deletion sweep
+ * (apps/workers/src/queues/maintenance/account-deletion-sweep.ts, which runs the deletion on its
+ * due date) once it persists the refresh token Apple returns at sign-in.
  */
 
 import { ERROR_CODES } from "@studafy/constants";

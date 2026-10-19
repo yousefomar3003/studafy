@@ -22,7 +22,10 @@ Widget _detailApp() {
       locale: context.locale,
       supportedLocales: context.supportedLocales,
       localizationsDelegates: context.localizationDelegates,
-      home: const TeacherClassDetailScreen(classId: 'class-1', classCode: 'MATH101-A'),
+      home: const TeacherClassDetailScreen(
+        classId: 'class-1',
+        classCode: 'MATH101-A',
+      ),
     ),
   );
 }
@@ -35,7 +38,9 @@ void main() {
       tester,
       ProviderScope(
         overrides: [
-          classCourseNameProvider('class-1').overrideWith((ref) => 'Mathematics'),
+          classCourseNameProvider(
+            'class-1',
+          ).overrideWith((ref) => 'Mathematics'),
           classRosterProvider('class-1').overrideWith((ref) => <Enrollment>[]),
         ],
         child: _detailApp(),
@@ -52,7 +57,9 @@ void main() {
       tester,
       ProviderScope(
         overrides: [
-          classCourseNameProvider('class-1').overrideWith((ref) => 'Mathematics'),
+          classCourseNameProvider(
+            'class-1',
+          ).overrideWith((ref) => 'Mathematics'),
           classRosterProvider('class-1').overrideWith(
             (ref) => [
               enrollmentFixture(studentId: 'student-aaaaaa'),
@@ -68,32 +75,45 @@ void main() {
     expect(find.byType(RosterEntryTile), findsNWidgets(2));
   });
 
-  testWidgets('falls back to a short student id while no name resolver exists', (tester) async {
+  testWidgets(
+    'falls back to a short student id while no name resolver exists',
+    (tester) async {
+      await _pump(
+        tester,
+        ProviderScope(
+          overrides: [
+            classCourseNameProvider(
+              'class-1',
+            ).overrideWith((ref) => 'Mathematics'),
+            classRosterProvider('class-1').overrideWith(
+              (ref) => [enrollmentFixture(studentId: 'student-abcdef')],
+            ),
+          ],
+          child: _detailApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Student abcdef'), findsOneWidget);
+    },
+  );
+
+  testWidgets('shows the name when the resolver seam is populated', (
+    tester,
+  ) async {
     await _pump(
       tester,
       ProviderScope(
         overrides: [
-          classCourseNameProvider('class-1').overrideWith((ref) => 'Mathematics'),
-          classRosterProvider('class-1')
-              .overrideWith((ref) => [enrollmentFixture(studentId: 'student-abcdef')]),
-        ],
-        child: _detailApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Student abcdef'), findsOneWidget);
-  });
-
-  testWidgets('shows the name when the resolver seam is populated', (tester) async {
-    await _pump(
-      tester,
-      ProviderScope(
-        overrides: [
-          classCourseNameProvider('class-1').overrideWith((ref) => 'Mathematics'),
-          classRosterProvider('class-1')
-              .overrideWith((ref) => [enrollmentFixture(studentId: 'student-abcdef')]),
-          rosterStudentNameProvider('student-abcdef').overrideWithValue('Sara Ahmed'),
+          classCourseNameProvider(
+            'class-1',
+          ).overrideWith((ref) => 'Mathematics'),
+          classRosterProvider('class-1').overrideWith(
+            (ref) => [enrollmentFixture(studentId: 'student-abcdef')],
+          ),
+          rosterStudentNameProvider(
+            'student-abcdef',
+          ).overrideWithValue('Sara Ahmed'),
         ],
         child: _detailApp(),
       ),
@@ -109,7 +129,9 @@ void main() {
       tester,
       ProviderScope(
         overrides: [
-          classCourseNameProvider('class-1').overrideWith((ref) => 'Mathematics'),
+          classCourseNameProvider(
+            'class-1',
+          ).overrideWith((ref) => 'Mathematics'),
           classRosterProvider('class-1').overrideWith((ref) => <Enrollment>[]),
         ],
         child: _detailApp(),

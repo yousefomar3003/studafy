@@ -4,6 +4,12 @@ Apple App Review and Google Play review sign in to the production build as each 
 email and password rather than a Microsoft or Google account. Those accounts belong to one demo school, the
 **reviewer tenant**, which is isolated from real schools and cannot be billed (ST-303).
 
+> [!WARNING]
+> The mobile app no longer has a "Sign in with email" entry. Mobile sign-in is member ID + password
+> only (`POST /api/auth/login/member`). The reviewer accounts below are email-only and have no
+> member username, so reviewers cannot sign in with them until the reviewer tenant is given
+> member-ID accounts and the store instructions below are updated to use them.
+
 - Seed: [`db/seeds/review-tenant.ts`](../../db/seeds/review-tenant.ts) (`bun run db:seed:review`)
 - Roster and logins (source of truth for the table below):
   [`db/seeds/review-credentials.ts`](../../db/seeds/review-credentials.ts)
@@ -28,7 +34,7 @@ and the Play Console only.
 
 The addresses are on the reserved `.test` domain. No inbox exists, and every address is on
 `app.email_suppressions`, so the platform never sends them mail. The rest of the roster (two more
-teachers, a teaching assistant, seven more students, five more parents) exists so the school looks
+teachers, seven more students, five more parents) exists so the school looks
 real. Those accounts have no login.
 
 ## Seeded data
@@ -156,9 +162,9 @@ are revoked. To end them immediately, use the admin session revocation for each 
 
 ## Known limitations
 
-- **Mobile only.** The "Sign in with email" entry exists in the mobile app's login screen
-  (`apps/mobile/lib/src/features/auth/presentation/login_screen.dart`). The web app has no email
-  form; store review does not use it.
+- **No email entry in either app.** The mobile login screen
+  (`apps/mobile/lib/src/features/auth/presentation/login_screen.dart`) offers member ID + password
+  only, and the web app has no email form. See the warning at the top.
 - **Administrator on mobile is read-only.** Admin roles get the mobile view-only shell by design,
   and admin management endpoints refuse mobile sessions (`CHANNEL_NOT_AUTHORIZED`). Reviewers see
   the school overview, not the admin console.

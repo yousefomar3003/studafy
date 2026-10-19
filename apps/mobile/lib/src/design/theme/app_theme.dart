@@ -6,6 +6,7 @@ import 'app_semantic_colors.dart';
 import 'component_themes/app_button_theme.dart';
 import 'component_themes/app_card_theme.dart';
 import 'component_themes/app_chip_theme.dart';
+import 'component_themes/app_chrome_theme.dart';
 import 'component_themes/app_input_theme.dart';
 
 /// Corporate Precision — Flutter [ThemeData].
@@ -25,7 +26,9 @@ abstract final class AppTheme {
       useMaterial3: true,
       colorScheme: colors,
       textTheme: textTheme,
-      scaffoldBackgroundColor: colors.surface,
+      // The web's `surface` token: pages sit on it and cards (`background`) lift off it, the
+      // same pairing as the portal's sidebar and content panes.
+      scaffoldBackgroundColor: colors.surfaceContainerHighest,
       extensions: [semanticColors],
       filledButtonTheme: AppButtonTheme.filled(colors),
       outlinedButtonTheme: AppButtonTheme.outlined(colors),
@@ -33,6 +36,17 @@ abstract final class AppTheme {
       inputDecorationTheme: AppInputTheme.build(colors),
       cardTheme: AppCardTheme.build(colors),
       chipTheme: AppChipTheme.build(colors, textTheme),
+      appBarTheme: AppChromeTheme.appBar(colors, textTheme),
+      navigationBarTheme: AppChromeTheme.navigationBar(colors, textTheme),
+      dialogTheme: AppChromeTheme.dialog(colors, textTheme),
+      bottomSheetTheme: AppChromeTheme.bottomSheet(colors),
+      popupMenuTheme: AppChromeTheme.popupMenu(colors, textTheme),
+      snackBarTheme: AppChromeTheme.snackBar(colors, textTheme),
+      listTileTheme: AppChromeTheme.listTile(colors, textTheme),
+      dividerTheme: AppChromeTheme.divider(colors),
+      floatingActionButtonTheme: AppChromeTheme.fab(colors),
+      segmentedButtonTheme: AppChromeTheme.segmentedButton(colors),
+      progressIndicatorTheme: AppChromeTheme.progressIndicator(colors),
     );
   }
 }

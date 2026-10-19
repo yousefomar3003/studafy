@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 
 import { permissionsForRoles } from "../../lib/auth/permissions";
 
-import { visiblePortalNavItems } from "./nav-items";
+import { PORTAL_NAV_ITEMS, visiblePortalNavItems, withRoleHome } from "./nav-items";
 
 /** Item ids, in render order — the "snapshot" this ticket's acceptance criteria calls for. */
 const idsFor = (roles: readonly string[]) =>
@@ -11,18 +11,27 @@ const idsFor = (roles: readonly string[]) =>
 
 describe("visiblePortalNavItems", () => {
   test.each<[string, string[]]>([
-    [
-      "SUPER_ADMIN",
-      ["home", "notifications", "admin", "principal", "billing", "finance", "approvals", "account"],
-    ],
+    ["SUPER_ADMIN", ["home", "notifications", "platform", "account"]],
     [
       "ORG_ADMIN",
-      ["home", "notifications", "admin", "principal", "billing", "finance", "approvals", "account"],
+      [
+        "home",
+        "notifications",
+        "admin",
+        "staff",
+        "members",
+        "principal",
+        "attendance",
+        "billing",
+        "finance",
+        "approvals",
+        "account",
+      ],
     ],
-    ["PRINCIPAL", ["home", "notifications", "principal", "approvals", "account"]],
+    ["PRINCIPAL", ["home", "notifications", "principal", "attendance", "approvals", "account"]],
+    ["ATTENDANCE_OFFICER", ["home", "notifications", "attendance", "account"]],
     ["FINANCE", ["home", "notifications", "finance", "account"]],
-    ["INSTRUCTOR", ["home", "notifications", "account"]],
-    ["TEACHING_ASSISTANT", ["home", "notifications", "account"]],
+    ["INSTRUCTOR", ["home", "notifications", "attendance", "account"]],
     ["STUDENT", ["home", "notifications", "account"]],
     ["PARENT", ["home", "notifications", "account"]],
     ["GUEST", ["home", "notifications", "account"]],
@@ -40,11 +49,27 @@ describe("visiblePortalNavItems", () => {
       "home",
       "notifications",
       "admin",
+      "staff",
+      "members",
       "principal",
+      "attendance",
       "billing",
       "finance",
       "approvals",
       "account",
     ]);
+  });
+});
+
+describe("withRoleHome", () => {
+  test("points Home at the role's home and drops the item that duplicated it", () => {
+    const items = withRoleHome(PORTAL_NAV_ITEMS, "/portal/admin");
+    expect(items.find((item) => item.id === "home")?.to).toBe("/portal/admin");
+    expect(items.some((item) => item.id === "admin")).toBe(false);
+    expect(items).toHaveLength(PORTAL_NAV_ITEMS.length - 1);
+  });
+
+  test("leaves the menu unchanged for a session whose home is the portal", () => {
+    expect(withRoleHome(PORTAL_NAV_ITEMS, "/portal")).toBe(PORTAL_NAV_ITEMS);
   });
 });

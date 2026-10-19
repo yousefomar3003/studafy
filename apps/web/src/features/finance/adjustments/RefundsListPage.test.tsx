@@ -45,7 +45,6 @@ const getMock = mock((path: string) => {
 });
 
 const postMock = mock((path: string) => {
-  // Same literal-templated-path mocking as `ScholarshipAwardsListPage.test.tsx`'s own confirm mock.
   if (path === "/api/finance/refunds/{refundId}/approve") {
     return Promise.resolve({
       data: makeRefund({ status: "submitted_to_erpnext", checker_id: "user-current" }),

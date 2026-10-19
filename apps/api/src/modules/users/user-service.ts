@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { withTenantTx } from "../../db/tenant-tx";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../lib/keyset-cursor";
 import { emitAuditLog } from "../../middleware/auditEmitter";
+import { MEMBER_PASSWORD_ROLES } from "../auth/services/member-password-service";
 import { adminRevokeUserSessions, REVOCATION_REASONS } from "../auth/services/revocation-service";
 
 import type { Database } from "../../db/client";
@@ -21,7 +22,7 @@ export type UserStatus = "invited" | "active" | "suspended" | "archived";
 export interface UserRow {
   id: string;
   school_id: string;
-  email: string;
+  email: string | null;
   display_name: string | null;
   status: UserStatus;
   email_verified_at: Date | null;
@@ -32,6 +33,10 @@ export interface UserRow {
 
 export interface UserWithRolesRow extends UserRow {
   roles: Role[];
+}
+
+export interface UserListRow extends UserWithRolesRow {
+  member_codes: string[];
 }
 
 export interface ListUsersParams {
@@ -45,7 +50,7 @@ export interface ListUsersParams {
 }
 
 export interface CreateUserParams {
-  email: string;
+  email?: string;
   display_name?: string;
   role: Role;
 }
@@ -84,11 +89,13 @@ export async function listUsers(
   tx: TransactionSql,
   schoolId: string,
   params: ListUsersParams,
-): Promise<{ rows: UserWithRolesRow[]; next_cursor: string | null }> {
+): Promise<{ rows: UserListRow[]; next_cursor: string | null }> {
   const statusFilter = params.status ? tx` AND u.status = ${params.status}::app.user_status` : tx``;
 
   const searchFilter = params.search
-    ? tx` AND (u.display_name ILIKE ${`%${params.search}%`} OR u.email ILIKE ${`%${params.search}%`})`
+    ? tx` AND (u.display_name ILIKE ${`%${params.search}%`} OR u.email ILIKE ${`%${params.search}%`}
+             OR EXISTS (SELECT 1 FROM app.member_codes mc
+                        WHERE mc.user_id = u.id AND mc.code ILIKE ${`%${params.search}%`}))`
     : tx``;
 
   const createdFromFilter = params.created_from
@@ -115,13 +122,15 @@ export async function listUsers(
 
   const limit = params.limit + 1; // fetch one extra to detect next page
 
-  const rows = await tx<UserWithRolesRow[]>`
+  const rows = await tx<UserListRow[]>`
     SELECT u.id, u.school_id, u.email, u.display_name, u.status,
            u.email_verified_at, u.last_login_at, u.created_at, u.updated_at,
            COALESCE(
              ARRAY_AGG(ur.role ORDER BY ur.created_at) FILTER (WHERE ur.role IS NOT NULL),
              '{}'
-           ) AS roles
+           ) AS roles,
+           ARRAY(SELECT mc.code FROM app.member_codes mc
+                 WHERE mc.user_id = u.id ORDER BY mc.kind) AS member_codes
     FROM app.users u
     LEFT JOIN app.user_roles ur ON ur.user_id = u.id AND ur.school_id = u.school_id
     WHERE u.school_id = ${schoolId}
@@ -149,6 +158,7 @@ export async function listUsers(
       ...row,
       status: row.status as UserStatus,
       roles: (row.roles ?? []) as Role[],
+      member_codes: row.member_codes ?? [],
     })),
     next_cursor,
   };
@@ -183,18 +193,56 @@ export async function getUserStatusCounts(
   return counts;
 }
 
+/**
+ * The school's number and how many students, teachers and parents it has (distinct users holding
+ * each role). Each of them holds a member ID (000140) prefixed STU/TCH/PAR plus the school number.
+ */
+export async function getUserMemberSummary(
+  tx: TransactionSql,
+  schoolId: string,
+): Promise<{
+  school_number: number;
+  students: number;
+  teachers: number;
+  parents: number;
+  attendance_officers: number;
+}> {
+  const [row] = await tx<
+    {
+      school_number: number;
+      students: number;
+      teachers: number;
+      parents: number;
+      attendance_officers: number;
+    }[]
+  >`
+    SELECT s.school_number,
+      (SELECT count(*)::int FROM app.user_roles WHERE school_id = s.id AND role = 'STUDENT') AS students,
+      (SELECT count(*)::int FROM app.user_roles WHERE school_id = s.id AND role = 'INSTRUCTOR') AS teachers,
+      (SELECT count(*)::int FROM app.user_roles WHERE school_id = s.id AND role = 'PARENT') AS parents,
+      (SELECT count(*)::int FROM app.user_roles
+       WHERE school_id = s.id AND role = 'ATTENDANCE_OFFICER') AS attendance_officers
+    FROM app.schools s
+    WHERE s.id = ${schoolId}
+  `;
+  if (!row) throw new HTTPException(404, { message: "School not found" });
+  return row;
+}
+
 export async function getUser(
   tx: TransactionSql,
   schoolId: string,
   userId: string,
-): Promise<UserWithRolesRow | undefined> {
-  const [row] = await tx<UserWithRolesRow[]>`
+): Promise<UserListRow | undefined> {
+  const [row] = await tx<UserListRow[]>`
     SELECT u.id, u.school_id, u.email, u.display_name, u.status,
            u.email_verified_at, u.last_login_at, u.created_at, u.updated_at,
            COALESCE(
              ARRAY_AGG(ur.role ORDER BY ur.created_at) FILTER (WHERE ur.role IS NOT NULL),
              '{}'
-           ) AS roles
+           ) AS roles,
+           ARRAY(SELECT mc.code FROM app.member_codes mc
+                 WHERE mc.user_id = u.id ORDER BY mc.kind) AS member_codes
     FROM app.users u
     LEFT JOIN app.user_roles ur ON ur.user_id = u.id AND ur.school_id = u.school_id
     WHERE u.id = ${userId}::uuid AND u.school_id = ${schoolId}
@@ -206,6 +254,7 @@ export async function getUser(
     ...row,
     status: row.status as UserStatus,
     roles: (row.roles ?? []) as Role[],
+    member_codes: row.member_codes ?? [],
   };
 }
 
@@ -213,14 +262,20 @@ export async function createUser(
   tx: TransactionSql,
   schoolId: string,
   params: CreateUserParams,
-): Promise<UserWithRolesRow> {
-  const normalizedEmail = params.email.toLowerCase().trim();
+): Promise<UserListRow> {
+  if (!params.email && !MEMBER_PASSWORD_ROLES.includes(params.role)) {
+    throw new HTTPException(400, {
+      message: "An email is required for roles that sign in with Google or Microsoft.",
+    });
+  }
+  const email = params.email?.trim() || null;
+  const normalizedEmail = email?.toLowerCase() ?? null;
 
   const [row] = await tx<{ id: string }[]>`
     INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
     VALUES (
       ${schoolId},
-      ${params.email},
+      ${email},
       ${normalizedEmail},
       ${params.display_name ?? null},
       'invited'::app.user_status
@@ -242,7 +297,7 @@ export async function createUser(
     targetTable: "users",
     targetId: row.id,
     newValues: {
-      email: params.email,
+      email,
       display_name: params.display_name ?? null,
       status: "invited",
     },

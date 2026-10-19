@@ -60,7 +60,6 @@ describe("setup wizard accessibility", () => {
       schoolProfile: {
         locale: "en",
         timezone: "Africa/Casablanca",
-        invitation_expiry_days: 7,
         attendance_alert_threshold: 75,
         absence_alert_threshold: 25,
         parent_discipline_visibility: false,
@@ -85,7 +84,6 @@ describe("setup wizard accessibility", () => {
         "academic-year": "skipped",
         "grading-scheme": "skipped",
         timetable: "skipped",
-        staff: "skipped",
       },
     });
 

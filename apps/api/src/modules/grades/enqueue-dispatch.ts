@@ -38,6 +38,12 @@ import type { Context } from "hono";
 export interface NotificationDispatchJobPayload {
   schoolId: string;
   submissionId: string;
+  /**
+   * Idempotency key for the dispatch; defaults to `submissionId`. An approved grade revision passes
+   * its own id, so the corrected grades notify again instead of deduping against the original
+   * publication.
+   */
+  eventId?: string;
 }
 
 /**
@@ -73,7 +79,7 @@ export async function enqueueNotificationDispatch(
         // `approved -> published` transition, so it is stable across a duplicate enqueue and a job
         // replay — which is exactly what a per-recipient idempotency key needs. A generated uuid
         // would make every replay look like a brand new event and notify everyone twice.
-        eventId: payload.submissionId,
+        eventId: payload.eventId ?? payload.submissionId,
         eventType: DOMAIN_EVENTS.GRADES_PUBLISHED,
         submissionId: payload.submissionId,
         // Distributed tracing (ST-260): carries this request's span across the Redis boundary so

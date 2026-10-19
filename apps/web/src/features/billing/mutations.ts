@@ -2,9 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../lib/api";
 
-import { BILLING_OVERVIEW_QUERY_KEY } from "./queries";
+import { BILLING_OVERVIEW_QUERY_KEY, refundRequestsQueryKey } from "./queries";
 
-import type { SubscriptionCancellationState } from "./queries";
+import type {
+  SubscriptionCancellationState,
+  SubscriptionRefundReason,
+  SubscriptionRefundRequest,
+  SubscriptionRefundScope,
+} from "./queries";
 
 /** Opens the payment provider's own portal (payment method, tax details, past receipts) in a new
  * tab — Studafy never stores card details itself, so this is the only place to manage them. */
@@ -92,6 +97,48 @@ export function useReverseSubscriptionCancellation() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: BILLING_OVERVIEW_QUERY_KEY });
+    },
+  });
+}
+
+export interface CreateRefundRequestInput {
+  scope: SubscriptionRefundScope;
+  /** AI add-on only: the student whose add-on it is. */
+  studentId?: string;
+  /** School plan only: a paid invoice id, or none to let the reviewer pick. */
+  paymentReference?: string;
+  reason: SubscriptionRefundReason;
+  details?: string;
+}
+
+/** Files a refund request for Studafy staff to review. Nothing is refunded until they approve it. */
+export function useCreateRefundRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      scope,
+      studentId,
+      paymentReference,
+      reason,
+      details,
+    }: CreateRefundRequestInput) => {
+      const { data } =
+        scope === "school"
+          ? await api.POST("/api/subscriptions/current/refund-requests", {
+              body: {
+                paymentReference: paymentReference || undefined,
+                reason,
+                details: details || undefined,
+              },
+            })
+          : await api.POST("/api/subscriptions/ai/refund-requests", {
+              body: { studentId: studentId ?? "", reason, details: details || undefined },
+            });
+      if (!data) throw new Error("Refund request returned no data.");
+      return data as SubscriptionRefundRequest;
+    },
+    onSuccess: (_data, { scope }) => {
+      void queryClient.invalidateQueries({ queryKey: refundRequestsQueryKey(scope) });
     },
   });
 }

@@ -9,6 +9,7 @@ import 'child_detail_placeholders.dart';
 import 'finance_installment_tile.dart';
 import 'finance_invoice_tile.dart';
 import 'finance_receipt_tile.dart';
+import '../../../../design/layout/bottom_inset_padding.dart';
 
 /// The Finance tab of `ChildDetailScreen`: the selected child's balance, invoices,
 /// fee-schedule installments and payment receipts, drawn from the same household
@@ -41,7 +42,7 @@ class ChildFinanceView extends ConsumerWidget {
             );
           }
           return ListView(
-            padding: const EdgeInsets.all(AppSpacing.space16),
+            padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
               _BalanceCard(totals: section.totals, dataAsOf: view.dataAsOf),

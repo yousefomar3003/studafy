@@ -67,6 +67,7 @@ let sql: Sql;
 let tenant: TenantFixture;
 let financeUserId: string;
 let principalUserId: string;
+let attendanceOfficerUserId: string;
 let app: OpenAPIHono<AppEnv>;
 let keyStore: KeyStore;
 
@@ -99,6 +100,15 @@ beforeAll(async () => {
   });
   await assignRole(sql, tenant.schoolId, principalUser.id, ROLES.PRINCIPAL);
   principalUserId = principalUser.id;
+
+  // ATTENDANCE_OFFICER: takes any class's register, so it is the "allowed" probe for
+  // attendance:record:create. Seeded the same way.
+  const attendanceOfficerUser = await createUser(sql, tenant.schoolId, {
+    email: `attendance-officer@test-${tenant.schoolSlug}.local`,
+    displayName: "ATTENDANCE_OFFICER User",
+  });
+  await assignRole(sql, tenant.schoolId, attendanceOfficerUser.id, ROLES.ATTENDANCE_OFFICER);
+  attendanceOfficerUserId = attendanceOfficerUser.id;
 
   // Tier A hits every route including the three webhook endpoints; without these two vars they'd
   // each hit their own "not configured" 500 before ever reaching signature verification, which
@@ -133,7 +143,6 @@ const ALL_ROLES: Role[] = [
   ROLES.PRINCIPAL,
   ROLES.FINANCE,
   ROLES.INSTRUCTOR,
-  ROLES.TEACHING_ASSISTANT,
   ROLES.STUDENT,
   ROLES.PARENT,
   ROLES.GUEST,
@@ -143,6 +152,7 @@ const ALL_ROLES: Role[] = [
 function userIdFor(role: Role): string {
   if (role === ROLES.FINANCE) return financeUserId;
   if (role === ROLES.PRINCIPAL) return principalUserId;
+  if (role === ROLES.ATTENDANCE_OFFICER) return attendanceOfficerUserId;
   return tenant.users[role].id;
 }
 
@@ -325,7 +335,8 @@ describe("authz role matrix — Tier A: no route ever crashes or leaks, for any 
  * route that exists in this app's actual module set), so GUEST is the universal "must be denied"
  * probe. ORG_ADMIN holds every permission below (ORG_ADMIN = every permission except
  * USER_IMPERSONATE/ORGANIZATION_CREATE/ORGANIZATION_DELETE/API_KEY_*, none of which appear here),
- * so ORG_ADMIN is the universal "must not be denied by this gate" probe.
+ * so ORG_ADMIN is the "must not be denied by this gate" probe — except where a row names its own
+ * `allowedRole` (attendance taking and correcting, which ORG_ADMIN deliberately does not hold).
  */
 interface GuardCase {
   method: string;
@@ -340,6 +351,8 @@ interface GuardCase {
    * than asserting something the route was never meant to allow.
    */
   allowedRoleAlsoRestrictedBy?: string;
+  /** The role probed as "holds the permission"; ORG_ADMIN when unset. */
+  allowedRole?: Role;
 }
 
 const GUARD_CASES: GuardCase[] = [
@@ -366,6 +379,7 @@ const GUARD_CASES: GuardCase[] = [
     path: "/api/attendance/records/{recordId}",
     permission: "attendance:record:correct",
     source: "attendance/corrections/routes/correction-routes.ts",
+    allowedRole: ROLES.PRINCIPAL,
   },
   {
     method: "GET",
@@ -378,6 +392,7 @@ const GUARD_CASES: GuardCase[] = [
     path: "/api/attendance/records/batch",
     permission: "attendance:record:create",
     source: "attendance/routes/attendance-session-routes.ts",
+    allowedRole: ROLES.ATTENDANCE_OFFICER,
   },
   {
     method: "GET",
@@ -596,10 +611,24 @@ const GUARD_CASES: GuardCase[] = [
     source: "reports/routes.ts",
   },
   {
+    method: "GET",
+    path: "/api/reports/children/{studentId}/timetable",
+    permission: "grade:read",
+    source: "reports/routes.ts",
+    allowedRoleAlsoRestrictedBy: "caller must also hold the PARENT role (see reports/routes.ts)",
+  },
+  {
     method: "PATCH",
     path: "/api/schools/current/settings",
     permission: "organization:manageSettings",
     source: "tenancy/settings/route.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/schools/current/closure",
+    permission: "organization:close",
+    source: "tenancy/closure/route.ts",
+    allowedRoleAlsoRestrictedBy: "caller must also hold the ORG_ADMIN role (see closure/route.ts)",
   },
   {
     method: "GET",
@@ -784,24 +813,6 @@ const GUARD_CASES: GuardCase[] = [
   },
   {
     method: "GET",
-    path: "/api/finance/scholarship-discounts",
-    permission: "billing:read",
-    source: "finance/scholarships/routes.ts",
-  },
-  {
-    method: "POST",
-    path: "/api/finance/scholarship-discounts/awards",
-    permission: "billing:update",
-    source: "finance/scholarships/routes.ts",
-  },
-  {
-    method: "POST",
-    path: "/api/finance/scholarship-discounts/awards/{awardId}/confirm",
-    permission: "billing:update",
-    source: "finance/scholarships/routes.ts",
-  },
-  {
-    method: "GET",
     path: "/api/finance/students/{studentId}/installments",
     permission: "billing:read",
     source: "finance/installments/routes.ts",
@@ -902,12 +913,51 @@ const GUARD_CASES: GuardCase[] = [
     permission: "notification:manage",
     source: "announcements/routes.ts",
   },
+  {
+    method: "GET",
+    path: "/api/messaging/conversations",
+    permission: "message:read",
+    source: "messaging/routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/messaging/contacts",
+    permission: "message:read",
+    source: "messaging/routes.ts",
+    allowedRoleAlsoRestrictedBy: "caller must also hold the PARENT role (see messaging/routes.ts)",
+  },
+  {
+    method: "GET",
+    path: "/api/messaging/teacher-contacts",
+    permission: "message:read",
+    source: "messaging/routes.ts",
+    allowedRoleAlsoRestrictedBy: "caller must also hold INSTRUCTOR (see messaging/routes.ts)",
+  },
+  {
+    method: "GET",
+    path: "/api/messaging/reports",
+    permission: "messageReport:review",
+    source: "messaging/routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/messaging/reports/{reportId}",
+    permission: "messageReport:review",
+    source: "messaging/routes.ts",
+  },
+  {
+    method: "PATCH",
+    path: "/api/messaging/reports/{reportId}",
+    permission: "messageReport:review",
+    source: "messaging/routes.ts",
+  },
 ];
 
 describe("authz role matrix — Tier B: every requirePermission() mount point", () => {
-  for (const { method, path, permission, source, allowedRoleAlsoRestrictedBy } of GUARD_CASES) {
+  for (const guard of GUARD_CASES) {
+    const { method, path, permission, source, allowedRoleAlsoRestrictedBy } = guard;
     const deniedRole = ROLES.GUEST;
-    const allowedRole = ROLES.ORG_ADMIN;
+    const allowedRole = guard.allowedRole ?? ROLES.ORG_ADMIN;
 
     test(`${deniedRole} lacks ${permission}, is denied on ${method} ${path} (${source})`, () => {
       expect(ROLE_PERMISSIONS[deniedRole].includes(permission)).toBe(false);

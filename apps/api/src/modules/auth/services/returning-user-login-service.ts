@@ -6,7 +6,8 @@
  *   1. Match the incoming (provider, sub) pair against app.oauth_identities.
  *   2. If no match: yield NO_ACCOUNT (structured log, no audit_logs row — school_id is unknown).
  *   3. Enforce tenant suspension policy: suspended schools block standard roles; admin roles
- *      (SUPER_ADMIN, ORG_ADMIN) are permitted to log in to resolve administrative issues.
+ *      (SUPER_ADMIN, ORG_ADMIN) are permitted to log in to resolve administrative issues. A closed
+ *      (archived) school blocks every role — see ../school-access.ts.
  *   4. Issue a session token pair (ST-071 reuse) and update last_login_at atomically.
  *   5. Record the outcome in audit_logs (LOGIN_SUCCESS, LOGIN_FAILED_SCHOOL_SUSPENDED).
  *
@@ -17,10 +18,9 @@
  * Performance target: p95 < 400 ms (excluding external Microsoft JWKS round-trips).
  */
 
-import { ROLES } from "@studafy/constants";
-
 import { withTenantTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
+import { isLoginPermitted } from "../school-access";
 
 import { issueTokenPair } from "./session-service";
 
@@ -57,13 +57,6 @@ export type ReturningUserLoginResult =
   | { outcome: "LOGIN_SUCCESS"; tokens: IssuedTokenPair }
   | { outcome: "NO_ACCOUNT" }
   | { outcome: "SCHOOL_SUSPENDED" };
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/** Roles permitted to log into a suspended school to resolve administrative issues. */
-const ADMINISTRATIVE_ROLES: ReadonlySet<Role> = new Set([ROLES.SUPER_ADMIN, ROLES.ORG_ADMIN]);
 
 // ---------------------------------------------------------------------------
 // Identity resolution
@@ -153,17 +146,6 @@ async function readTenantPolicy(
       roles: roleRows.map((r) => r.role),
     };
   });
-}
-
-/**
- * Evaluate the tenant suspension policy.
- *
- * Returns true if the login is permitted (school is active, or user holds an administrative
- * role in a suspended school).
- */
-function isLoginPermitted(schoolStatus: string, roles: Role[]): boolean {
-  if (schoolStatus === "active") return true;
-  return roles.some((role) => ADMINISTRATIVE_ROLES.has(role));
 }
 
 // ---------------------------------------------------------------------------

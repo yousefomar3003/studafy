@@ -3,7 +3,7 @@ import { api } from "../../../lib/api";
 import type { components } from "@studafy/api-client";
 
 export type SchoolSettings = components["schemas"]["SchoolSettings"];
-export type MyProfile = components["schemas"]["UserWithRoles"];
+export type MyProfile = components["schemas"]["UserListItem"];
 
 // ---------------------------------------------------------------------------
 // Query keys
@@ -16,7 +16,7 @@ export function myProfileQueryKey(userId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// School-wide settings (locale, timezone, grading scheme, invitation expiry, attendance alerts)
+// School-wide settings (locale, timezone, grading scheme, attendance alerts)
 // ---------------------------------------------------------------------------
 
 export async function fetchSchoolSettings(): Promise<SchoolSettings> {

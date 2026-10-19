@@ -1,12 +1,15 @@
+import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/api_exception.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/grade_entry_providers.dart';
 import '../application/teacher_providers.dart';
 import '../domain/grade_entry.dart';
 import 'widgets/create_assessment_sheet.dart';
+import 'widgets/grade_correction_sheet.dart';
 import 'widgets/grade_entry_row.dart';
 import 'widgets/grade_numeric_keypad.dart';
 import 'widgets/grade_submit_bar.dart';
@@ -17,7 +20,9 @@ import 'widgets/grade_submit_bar.dart';
 /// the class's gradebook, then the entry grid. The teacher picks an assessment — or adds one —
 /// and enters scores for the whole roster on a docked numeric keypad: each keystroke autosaves
 /// on a short debounce, an out-of-range value is blocked inline, and "submit for approval" locks
-/// every draft student behind a confirmation.
+/// every draft student behind a confirmation. A published grade is corrected from its row through
+/// [GradeCorrectionSheet] (approved by a school admin or principal before students see it), and a
+/// returned one is unlocked back to draft from its row.
 class GradeEntryScreen extends ConsumerStatefulWidget {
   const GradeEntryScreen({
     required this.classId,
@@ -72,6 +77,8 @@ class _GradeEntryScreenState extends ConsumerState<GradeEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Resolve roster names for this class (see classRosterNamesProvider).
+    ref.watch(classRosterNamesProvider(widget.classId));
     final gradebook = ref.watch(gradebookForClassProvider(widget.classId));
 
     return Scaffold(
@@ -203,8 +210,13 @@ class _GradeEntryScreenState extends ConsumerState<GradeEntryScreen> {
                       row: row,
                       controller: controller,
                       isFocused: row.cell.id == focusedId,
-                      onTap: () =>
-                          setState(() => _focusedGradeId = row.cell.id),
+                      onTap: row.status.isRejected
+                          ? () => _confirmAndUnlock(gradebookId, row)
+                          : () => setState(() => _focusedGradeId = row.cell.id),
+                      onCorrect: row.status.isPublished
+                          ? (studentLabel) =>
+                                _openCorrection(gradebookId, row, studentLabel)
+                          : null,
                     );
                   },
                 ),
@@ -291,6 +303,84 @@ class _GradeEntryScreenState extends ConsumerState<GradeEntryScreen> {
         curve: Curves.easeOut,
       );
     }
+  }
+
+  Future<void> _openCorrection(
+    String gradebookId,
+    StudentGradeEntry row,
+    String studentLabel,
+  ) async {
+    await _controller?.flush();
+    if (!mounted) return;
+    final changed = await GradeCorrectionSheet.show(
+      context,
+      gradebookId: gradebookId,
+      studentLabel: studentLabel,
+      entry: row,
+    );
+    if (changed != true || !mounted) return;
+    ref.invalidate(gradeEntryGridProvider(gradebookId));
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text('teacher.grades.correction.updated'.tr())),
+      );
+  }
+
+  /// A returned submission goes back to draft only on the teacher's say-so: the reviewer's reason
+  /// is shown first, since unlocking clears it.
+  Future<void> _confirmAndUnlock(
+    String gradebookId,
+    StudentGradeEntry row,
+  ) async {
+    final reason = row.rejectionReason;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('teacher.grades.unlock.title'.tr()),
+        content: Text(
+          reason == null || reason.isEmpty
+              ? 'teacher.grades.unlock.body'.tr()
+              : 'teacher.grades.unlock.bodyWithReason'.tr(
+                  namedArgs: {'reason': reason},
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              MaterialLocalizations.of(dialogContext).cancelButtonLabel,
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text('teacher.grades.unlock.confirm'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    String message;
+    try {
+      await ref
+          .read(gradeEntryClientProvider)
+          .unlockSubmission(
+            gradebookId,
+            row.submissionId,
+            updatedAt: row.submissionUpdatedAt,
+          );
+      message = 'teacher.grades.unlock.success'.tr();
+    } on DioException catch (error) {
+      message = error.apiError?.code == 'GRADE_CONCURRENT_EDIT'
+          ? 'teacher.grades.entry.saveConflict'.tr()
+          : 'teacher.grades.unlock.failed'.tr();
+    }
+    if (!mounted) return;
+    ref.invalidate(gradeEntryGridProvider(gradebookId));
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _confirmAndSubmit(
@@ -449,12 +539,16 @@ class _StudentRow extends ConsumerWidget {
     required this.controller,
     required this.isFocused,
     required this.onTap,
+    this.onCorrect,
   });
 
   final StudentGradeEntry row;
   final GradeEntryController controller;
   final bool isFocused;
   final VoidCallback onTap;
+
+  /// Set for a published row: opens the correction sheet for this student.
+  final ValueChanged<String>? onCorrect;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -474,7 +568,33 @@ class _StudentRow extends ConsumerWidget {
       isOutOfRange: controller.isOutOfRange(row.cell.id, row.cell.maxScore),
       isDirty: controller.isDirty(row.cell.id),
       onTap: onTap,
+      onLockedTap: onCorrect == null ? null : () => onCorrect!(label),
+      note: _noteFor(row),
     );
+  }
+
+  static String? _noteFor(StudentGradeEntry row) {
+    if (!row.status.isPublished) return null;
+    final revision = row.latestRevision;
+    final change = revision?.changeFor(row.cell.id);
+    if (revision != null && change != null) {
+      if (revision.isPending) {
+        return 'teacher.grades.correction.rowPending'.tr(
+          namedArgs: {'score': _formatScore(change.newScore)},
+        );
+      }
+      if (revision.isRejected) {
+        return 'teacher.grades.correction.rowRejected'.tr();
+      }
+    }
+    return 'teacher.grades.correction.tapToCorrect'.tr();
+  }
+
+  static String _formatScore(double? value) {
+    if (value == null) return '—';
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toString();
   }
 
   static String _shortId(String id) =>

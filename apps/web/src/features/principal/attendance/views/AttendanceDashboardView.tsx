@@ -7,7 +7,6 @@ import { useFormatters, useTranslation } from "../../../../lib/i18n";
 import { ONE_DECIMAL_PERCENT_OPTIONS } from "../../format";
 import { AttendanceExportToolbar } from "../components/AttendanceExportToolbar";
 import { AttendanceSummaryCards } from "../components/AttendanceSummaryCards";
-import { AttendanceTrendChart } from "../components/AttendanceTrendChart";
 import { CorrectionRequestModal } from "../components/CorrectionRequestModal";
 import { DailyAttendanceGrid, STATUS_LABEL_KEYS } from "../components/DailyAttendanceGrid";
 import { StudentAttendanceHistoryModal } from "../components/StudentAttendanceHistoryModal";
@@ -16,7 +15,6 @@ import {
   useAttendanceMatrix,
   useAttendanceMetadata,
   useAttendanceSummary,
-  useAttendanceTrends,
 } from "../hooks/useAttendanceData";
 import { useAttendanceFilters } from "../hooks/useAttendanceFilters";
 
@@ -38,7 +36,6 @@ export default function AttendanceDashboardView() {
   const { formatNumber } = useFormatters();
   const { filters, updateFilters, clearFilters } = useAttendanceFilters();
   const summary = useAttendanceSummary(filters, filters.view === "class" ? "class" : "student");
-  const trends = useAttendanceTrends(filters);
   const matrix = useAttendanceMatrix();
   const metadata = useAttendanceMetadata();
   const permissions = usePermissions();
@@ -255,7 +252,6 @@ export default function AttendanceDashboardView() {
       ) : null}
 
       <div className="attendance-analytics-grid">
-        <AttendanceTrendChart data={trends.data} loading={trends.isPending} />
         <ThresholdBreachList rows={rows} onSelectStudent={setSelected} />
       </div>
 

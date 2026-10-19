@@ -34,7 +34,10 @@ class AttendanceOverviewCard extends ConsumerWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${totals.presentPercent.round()}%', style: textTheme.headlineSmall),
+              Text(
+                '${totals.presentPercent.round()}%',
+                style: textTheme.headlineSmall,
+              ),
               Text(
                 'viewer.admin.attendance.summary'.tr(
                   namedArgs: {
@@ -42,7 +45,9 @@ class AttendanceOverviewCard extends ConsumerWidget {
                     'total': '${totals.totalRecords}',
                   },
                 ),
-                style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           );

@@ -2,6 +2,7 @@ import { createApiClient } from "@studafy/api-client";
 
 import { sessionStore } from "./auth";
 import { API_BASE_URL } from "./config";
+import { retryOnRejectedToken } from "./retry-rejected-token";
 
 /**
  * The app-wide, typed API client, generated from the backend's OpenAPI contract (ST-060/ST-061).
@@ -18,4 +19,6 @@ export const api = createApiClient({
   getToken: () => sessionStore.getToken(),
   // TODO(tenancy): return the active tenant's school_id once tenant selection exists.
   getSchoolId: () => null,
+  // Recovers open tabs when the API starts signing with a new key (restart, deploy) — see the file.
+  fetch: retryOnRejectedToken(sessionStore),
 });

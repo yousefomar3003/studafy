@@ -80,9 +80,17 @@ export function startTracing(options: TracingOptions): TracingHandle | null {
   // the propagator (so a `traceparent` header round-trips through `httpTracing.ts`/
   // `queueTracing.ts`). `AsyncLocalStorageContextManager` over `AsyncHooksContextManager`: it is
   // the propagation package's own modern default and Bun implements `AsyncLocalStorage` natively.
+  //
+  // The context manager is the one global this may find already taken: `initErrorMonitoring()`
+  // (errorMonitoring.ts) runs first when Sentry is configured and registers Sentry's own
+  // `AsyncLocalStorage`-backed manager, which propagates OTel context exactly as this one would
+  // and additionally forks Sentry's per-request scopes. That registration is kept; this one is
+  // discarded rather than left enabled and unused.
   const contextManager = new AsyncLocalStorageContextManager();
   contextManager.enable();
-  context.setGlobalContextManager(contextManager);
+  if (!context.setGlobalContextManager(contextManager)) {
+    contextManager.disable();
+  }
   trace.setGlobalTracerProvider(provider);
   propagation.setGlobalPropagator(
     new CompositePropagator({

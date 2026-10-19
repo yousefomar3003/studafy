@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Client-side form schemas for the settings screens, each mirroring the request body its section
- * submits — `localeTimezoneSchema` / `invitationExpirySchema` / `attendanceAlertsSchema` against
+ * submits — `localeTimezoneSchema` / `attendanceAlertsSchema` against
  * `UpdateSchoolSettings` (apps/api/src/modules/tenancy/settings/schemas.ts), `profileSchema` against
  * `UpdateUserBody` (apps/api/src/modules/users/schemas.ts). Grading scheme has no schema of its own —
  * it's a closed `Select` over `GRADING_SCHEME_TYPES`, so there's no invalid state to reject client-side.
@@ -34,6 +34,14 @@ export const GRADING_SCHEME_TYPES = [
   "pass_fail",
 ] as const;
 
+/**
+ * The schemes an admin can switch to from settings. GPA is no longer offered; it stays in
+ * `GRADING_SCHEME_TYPES` only so a school already on it still renders (and keeps) its current value.
+ */
+export const SELECTABLE_GRADING_SCHEME_TYPES = GRADING_SCHEME_TYPES.filter(
+  (scheme) => scheme !== "gpa",
+);
+
 /** Translation key for a grading scheme's display name, resolved with `t()` at render time. */
 export function gradingSchemeLabelKey(scheme: (typeof GRADING_SCHEME_TYPES)[number]): string {
   return `adminSchool.settings.grading.schemes.${scheme}`;
@@ -59,15 +67,6 @@ export const localeTimezoneSchema = z.object({
     .regex(TIMEZONE_PATTERN, "adminSchool.settings.validation.invalidTimezone"),
 });
 export type LocaleTimezoneValues = z.infer<typeof localeTimezoneSchema>;
-
-export const invitationExpirySchema = z.object({
-  invitation_expiry_days: z.coerce
-    .number()
-    .int("adminSchool.settings.validation.wholeDays")
-    .min(1, "adminSchool.settings.validation.minDays")
-    .max(365, "adminSchool.settings.validation.maxDays"),
-});
-export type InvitationExpiryValues = z.infer<typeof invitationExpirySchema>;
 
 export const attendanceAlertsSchema = z.object({
   attendance_alert_threshold: z.coerce

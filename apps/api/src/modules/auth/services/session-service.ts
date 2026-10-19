@@ -27,7 +27,9 @@ import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { AuthException } from "../../../middleware/jwtAuth";
 import { emitTokenReuseDetected } from "../auth-anomaly-events";
 import { signAccessToken } from "../jwt/sign";
+import { isSchoolClosed, schoolClosedException } from "../school-access";
 import { hashSecret, mintOpaqueToken, parseOpaqueToken } from "../tokens/opaque-token";
+import { isWebSessionRefused, mobileOnlyWebException } from "../web-access";
 
 import type { Database } from "../../../db/client";
 import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
@@ -93,6 +95,10 @@ export interface IssueTokenPairParams {
  * claim, and the one place they can be sourced from without becoming forgeable is the table that
  * defines them — a login route that passed in a role list would be one bug away from privilege
  * escalation.
+ *
+ * Refuses (403 SCHOOL_SUSPENDED) to mint anything for a closed school. Every sign-in path funnels
+ * through here, so this is the backstop that keeps a closed school closed even on a path that does
+ * not run the login policy itself (the web OAuth callbacks).
  */
 export async function issueTokenPair(
   tx: TransactionSql,
@@ -101,8 +107,11 @@ export async function issueTokenPair(
 ): Promise<IssuedTokenPair> {
   const [roles, claims] = await Promise.all([
     readUserRoles(tx, params.userId),
-    readSessionClaims(tx),
+    readSessionClaims(tx, params.userId),
   ]);
+
+  if (isSchoolClosed(claims.schoolStatus)) throw schoolClosedException();
+  if (isWebSessionRefused(params.channel, roles)) throw mobileOnlyWebException();
 
   const minted = mintOpaqueToken(params.schoolId, params.userId);
   const device = params.device ?? {};
@@ -152,6 +161,7 @@ export async function issueTokenPair(
       entitlements_ver: claims.entitlementsVersion,
       channel: params.channel,
       subscription_status: claims.status,
+      deletion_pending: claims.deletionPending,
     },
     {
       issuer: config.issuer,
@@ -196,6 +206,10 @@ async function readUserRoles(tx: TransactionSql, userId: string): Promise<Role[]
 interface SessionClaims {
   status: SubscriptionStatus;
   entitlementsVersion: number;
+  /** The school's lifecycle status. Not a claim; read alongside so issuance can refuse a closed school. */
+  schoolStatus: string | null;
+  /** Whether the user has a self-service deletion scheduled (000143): the `deletion_pending` claim. */
+  deletionPending: boolean;
 }
 
 /**
@@ -212,12 +226,19 @@ interface SessionClaims {
  * stay valid until the school's first real subscription change, which is precisely when they should
  * stop being.
  *
- * Two scalar subqueries rather than a join: `app.subscriptions` and `app.entitlement_versions` are
- * independent single-row lookups, and a join between them would return no row at all when either
- * side is missing — losing the fallback this function exists to provide.
+ * Scalar subqueries rather than a join: `app.subscriptions`, `app.entitlement_versions` and
+ * `app.schools` are independent single-row lookups, and a join between them would return no row at
+ * all when either side is missing — losing the fallback this function exists to provide.
  */
-async function readSessionClaims(tx: TransactionSql): Promise<SessionClaims> {
-  const [row] = await tx<{ status: SubscriptionStatus; version: string }[]>`
+async function readSessionClaims(tx: TransactionSql, userId: string): Promise<SessionClaims> {
+  const [row] = await tx<
+    {
+      status: SubscriptionStatus;
+      version: string;
+      school_status: string | null;
+      deletion_pending: boolean | null;
+    }[]
+  >`
     SELECT
       COALESCE(
         (SELECT status::text FROM app.subscriptions
@@ -230,12 +251,18 @@ async function readSessionClaims(tx: TransactionSql): Promise<SessionClaims> {
             AND subject_type = 'school'
             AND subject_id = current_setting('app.school_id')::uuid),
         1
-      )::text AS version
+      )::text AS version,
+      (SELECT status::text FROM app.schools
+        WHERE id = current_setting('app.school_id')::uuid) AS school_status,
+      (SELECT deletion_due_at IS NOT NULL FROM app.users
+        WHERE id = ${userId}::uuid) AS deletion_pending
   `;
 
   return {
     status: row?.status ?? "trialing",
     entitlementsVersion: Number(row?.version ?? 1),
+    schoolStatus: row?.school_status ?? null,
+    deletionPending: row?.deletion_pending ?? false,
   };
 }
 
@@ -302,6 +329,12 @@ export async function rotateRefreshToken(
       // fences. Wrong locators and wrong secrets are indistinguishable from an absent session.
       if (!session) return { kind: "not_found" };
 
+      // A closed school is checked before reuse. Closing a school revokes every session in it, so
+      // each of its users' next refresh presents a revoked token; reporting that as reuse would file
+      // a theft alarm per user and hide the real answer — which is that the school is gone.
+      const claims = await readSessionClaims(tx, session.user_id);
+      if (isSchoolClosed(claims.schoolStatus)) return { kind: "school_closed" };
+
       // Reuse is checked before expiry. The revocation and audit record must commit, so the public
       // exception is raised only after this transaction returns successfully.
       if (session.rotated_at !== null || session.revoked_at !== null) {
@@ -317,6 +350,10 @@ export async function rotateRefreshToken(
         );
       }
 
+      // A web session that predates the mobile-only rule, or whose web role was since removed,
+      // stops here rather than living on through rotation.
+      if (isWebSessionRefused(session.channel, session.roles)) return { kind: "mobile_only" };
+
       const minted = mintOpaqueToken(session.school_id, session.user_id);
       const childId = randomUUID();
       const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
@@ -326,10 +363,8 @@ export async function rotateRefreshToken(
       const accessJti = randomUUID();
       const accessExpiresAt = new Date(Date.now() + config.accessTtlSeconds * 1000);
 
-      // Hoisted above the concurrent pair below for the same reason as childId and accessJti: every
-      // value both statements need has to exist before either starts. This is the one round trip the
-      // inline `await readSubscriptionStatus(tx)` used to cost here, now returning both claims.
-      const claims = await readSessionClaims(tx);
+      // `claims` was read above, before the reuse check, and is reused here: every value both
+      // statements below need has to exist before either starts.
 
       // Signing and persistence are independent once the locked row has supplied the claims. Run
       // them together, but do not commit until both succeed: a signing failure therefore rolls the
@@ -343,6 +378,7 @@ export async function rotateRefreshToken(
           entitlements_ver: claims.entitlementsVersion,
           channel: session.channel,
           subscription_status: claims.status,
+          deletion_pending: claims.deletionPending,
         },
         {
           issuer: config.issuer,
@@ -428,6 +464,8 @@ export async function rotateRefreshToken(
   if (outcome.kind === "expired") {
     throw new AuthException(ERROR_CODES.AUTH_TOKEN_EXPIRED, "Refresh token has expired");
   }
+  if (outcome.kind === "school_closed") throw schoolClosedException();
+  if (outcome.kind === "mobile_only") throw mobileOnlyWebException();
 
   emitTokenReuseDetected(params.log, params.eventSink, {
     familyId: outcome.event.familyId,
@@ -863,6 +901,8 @@ type RotationOutcome =
   | { kind: "issued"; pair: IssuedTokenPair }
   | { kind: "not_found" }
   | { kind: "expired" }
+  | { kind: "school_closed" }
+  | { kind: "mobile_only" }
   | { kind: "reuse"; event: ReuseEvent };
 
 /** Lock the presented row and fetch its authoritative roles in the same indexed round trip. */

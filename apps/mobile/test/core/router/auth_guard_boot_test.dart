@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:studafy_mobile/src/features/shell/presentation/pill_navigation_bar.dart';
 
 import '../../support/pump_studafy_app.dart';
 
@@ -19,7 +20,7 @@ void main() {
       session: await fakeAuthenticatedSession(roles: const ['STUDENT']),
     );
 
-    expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.text('Sign in with Microsoft'), findsNothing);
+    expect(find.byType(PillNavigationBar), findsOneWidget);
+    expect(find.byKey(const Key('brandLogo')), findsNothing);
   });
 }

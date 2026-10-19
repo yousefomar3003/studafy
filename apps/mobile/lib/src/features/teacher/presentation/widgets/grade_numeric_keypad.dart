@@ -48,7 +48,8 @@ class GradeNumericKeypad extends StatelessWidget {
               ])
                 Row(
                   children: [
-                    for (final key in row) _Key(label: key, onTap: () => onDigit(key)),
+                    for (final key in row)
+                      _Key(label: key, onTap: () => onDigit(key)),
                   ],
                 ),
               Row(
@@ -70,7 +71,10 @@ class GradeNumericKeypad extends StatelessWidget {
                   onPressed: onNext,
                   icon: Icon(isLastRow ? Icons.check : Icons.arrow_downward),
                   label: Text(
-                    (isLastRow ? 'teacher.grades.keypad.done' : 'teacher.grades.keypad.next').tr(),
+                    (isLastRow
+                            ? 'teacher.grades.keypad.done'
+                            : 'teacher.grades.keypad.next')
+                        .tr(),
                   ),
                 ),
               ),
@@ -125,7 +129,9 @@ class _Key extends StatelessWidget {
                   ? Icon(icon, size: 22)
                   : Text(
                       label!,
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
             ),
           ),

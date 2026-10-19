@@ -21,7 +21,7 @@ covers the `CI` workflow itself.
 | `hooks`                 | Commitlint accepts conventional commits and rejects non-conforming ones                                                                                    | No                    |
 
 `database-migrations`, `api-integration`, and `cross-tenant-security` each start their own
-disposable Postgres/Redis via `db/compose.yml` rather than a `services:` block, because the
+disposable Postgres/Redis via `compose.yml` (test profile) rather than a `services:` block, because the
 Postgres image needs `pg_stat_statements` preloaded via a container command — see those jobs'
 own comments for why.
 

@@ -21,8 +21,9 @@ complete state dump, run `db/policies/rls-coverage-diagnostics.sql` with `psql`.
 ## Classification and RLS rules
 
 Every `app` table must either contain `school_id` or appear in the reviewed global allowlist:
-`countries`, `currencies`, `schools`, `plans`, `plan_prices`, `platform_settings`, and
-`billing_events`. `public.schema_migrations` is outside the application schema and therefore outside
+`approved_globals` in `db/policies/rls-coverage.ts` (12 tables today: `countries`, `currencies`,
+`schools`, `plans`, `plan_prices`, `platform_settings`, `billing_events`, `security_events`,
+`email_events`, `email_suppressions`, `sales_inquiries`, `school_applications`). `public.schema_migrations` is outside the application schema and therefore outside
 this audit. A new global table fails until its scope is documented and reviewed.
 
 Every tenant relation must have:

@@ -29,6 +29,16 @@ function renderHeader(refresh: () => Promise<SessionTokens>) {
   return { refreshMock, store };
 }
 
+/** Scrolls a stand-in for the layout's scroll region — the window itself never scrolls. */
+function scrollRegionTo(y: number) {
+  const region = document.createElement("div");
+  region.setAttribute("data-scroll-root", "");
+  document.body.append(region);
+  region.scrollTop = y;
+  fireEvent.scroll(region);
+  region.remove();
+}
+
 beforeEach(() => localStorage.removeItem(HINT_KEY));
 afterEach(() => {
   cleanup();
@@ -72,5 +82,17 @@ describe("MarketingHeader", () => {
 
     await waitFor(() => expect(localStorage.getItem(HINT_KEY)).toBeNull());
     expect(screen.getByRole("link", { name: "Sign in" })).toBeTruthy();
+  });
+
+  test("the header switches to the floating pill once the page region scrolls, and back at the top", () => {
+    renderHeader(() => Promise.reject(new Error("no session")));
+    const header = screen.getByRole("banner");
+    expect(header.getAttribute("data-scrolled")).toBe("false");
+
+    scrollRegionTo(200);
+    expect(header.getAttribute("data-scrolled")).toBe("true");
+
+    scrollRegionTo(0);
+    expect(header.getAttribute("data-scrolled")).toBe("false");
   });
 });

@@ -316,6 +316,43 @@ export const gradeSchema = z
 
 export type Grade = z.infer<typeof gradeSchema>;
 
+export const gradeRevisionChangeSchema = z
+  .object({
+    grade_id: uuidSchema.openapi({ description: "The published grade record being corrected." }),
+    previous_score: z.number().nullable().openapi({
+      description: "The published score when the revision was filed.",
+      example: 72,
+    }),
+    new_score: z.number().nullable().openapi({
+      description: "The score the grade takes once the revision is approved.",
+      example: 78,
+    }),
+  })
+  .openapi("GradeRevisionChange");
+
+export const gradeRevisionSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    grade_submission_id: uuidSchema.openapi({ description: "The published submission revised." }),
+    status: z.enum(["pending", "approved", "rejected", "withdrawn"]).openapi({
+      description:
+        "pending until a school admin or principal decides; the published grades change only " +
+        "on approved.",
+    }),
+    reason: z.string().openapi({ description: "Why the teacher is correcting the grades." }),
+    changes: z.array(gradeRevisionChangeSchema),
+    rejection_reason: z.string().nullable().openapi({
+      description: "Why the revision was rejected. Set only when status is 'rejected'.",
+    }),
+    requested_by_user_id: uuidSchema,
+    requested_at: dateTimeSchema,
+    decided_by_user_id: uuidSchema.nullable(),
+    decided_at: dateTimeSchema.nullable(),
+  })
+  .openapi("GradeRevision");
+
+export type GradeRevision = z.infer<typeof gradeRevisionSchema>;
+
 export const gradeSubmissionSchema = z
   .object({
     id: uuidSchema.openapi({ description: "Primary key." }),
@@ -343,6 +380,11 @@ export const gradeSubmissionSchema = z
     created_at: dateTimeSchema.openapi({ description: "Row creation timestamp." }),
     updated_at: dateTimeSchema.openapi({ description: "Last modification timestamp." }),
     grades: z.array(gradeSchema).openapi({ description: "Individual grade records." }),
+    latest_revision: gradeRevisionSchema.nullable().openapi({
+      description:
+        "The most recent non-withdrawn correction filed against this (published) submission, " +
+        "or null. Only the entry grid populates it; workflow responses return null.",
+    }),
   })
   .openapi("GradeSubmission");
 
@@ -360,6 +402,15 @@ export const submissionIdParamSchema = z
     }),
   })
   .openapi("SubmissionIdParam");
+
+export const revisionIdParamSchema = z
+  .object({
+    revisionId: uuidSchema.openapi({
+      param: { name: "revisionId", in: "path" },
+      description: "Grade revision UUID.",
+    }),
+  })
+  .openapi("RevisionIdParam");
 
 export const gradebookEntryQuerySchema = z
   .object({
@@ -513,3 +564,33 @@ export const gradebookEntryListSchema = z
   .openapi("GradebookEntryList");
 
 export type GradebookEntryList = z.infer<typeof gradebookEntryListSchema>;
+
+// ---------------------------------------------------------------------------
+// Grade revisions — corrections to published grades
+// ---------------------------------------------------------------------------
+
+export const requestRevisionBodySchema = z
+  .object({
+    reason: z.string().trim().min(1).max(2000).openapi({
+      description: "Why the published grades need correcting; shown to the approver.",
+      example: "Mis-keyed the midterm score.",
+    }),
+    changes: z
+      .array(
+        z.object({
+          grade_id: uuidSchema.openapi({ description: "Grade record UUID." }),
+          score: z.number().nullable().openapi({
+            description: "Corrected score (null to ungrade). Must be 0 ≤ score ≤ max_score.",
+            example: 78,
+          }),
+        }),
+      )
+      .min(1)
+      .max(100)
+      .refine((entries) => new Set(entries.map((e) => e.grade_id)).size === entries.length, {
+        message: "changes must not repeat the same grade_id",
+      }),
+  })
+  .openapi("RequestGradeRevisionBody");
+
+export type RequestRevisionBody = z.infer<typeof requestRevisionBodySchema>;

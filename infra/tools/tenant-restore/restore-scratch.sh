@@ -2,7 +2,7 @@
 # Phase A of the tenant-slice restore tool (ST-267): restores a Postgres backup to a scratch RDS
 # instance, so extract-tenant-slice.sh has a point-in-time copy to read a school's rows from
 # without ever touching the live instance. Same RestoreDBInstanceToPointInTime mechanism ST-265's
-# infra/deploy/scripts/postgres-restore-verify.sh already uses -- deliberately not the same
+# infra/deploy/scripts/run-postgres-restore-verify.sh already uses -- deliberately not the same
 # scratch-instance identifier prefix (this tool uses "-tenant-restore-" where the automated drill
 # uses "-pg-verify-"), so the two tools' IAM scoping and blast radius never overlap: see
 # infra/terraform/modules/backup/tenant_restore.tf's own scratch-instance ARN pattern.

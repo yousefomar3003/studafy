@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/viewer_providers.dart';
 import 'widgets/recent_payments_card.dart';
+import '../../../design/layout/bottom_inset_padding.dart';
 
 /// The Finance viewer summary: recent payments.
 ///
@@ -19,7 +20,9 @@ class FinanceOverviewScreen extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(viewerRecentPaymentsProvider),
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.space16),
+        padding: const EdgeInsets.all(
+          AppSpacing.space16,
+        ).withBottomInset(context),
         children: const [RecentPaymentsCard()],
       ),
     );

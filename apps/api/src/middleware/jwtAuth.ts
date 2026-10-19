@@ -2,12 +2,14 @@ import { ERROR_CODES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { TokenVerificationError, verifyAccessToken } from "../modules/auth/jwt/verify";
+import { isSchoolClosed, schoolClosedException } from "../modules/auth/school-access";
 
 import type { AuthContext } from "./authContext";
 import type { AppEnv } from "./requestId";
 import type { JtiDenylist } from "../modules/auth/denylist";
 import type { KeyStore } from "../modules/auth/jwt/key-store";
 import type { TokenFailureReason } from "../modules/auth/jwt/verify";
+import type { SchoolStatusReader } from "../modules/auth/school-access";
 import type { ErrorCode } from "@studafy/constants";
 import type { MiddlewareHandler } from "hono";
 
@@ -55,6 +57,13 @@ export interface JwtAuthOptions {
    * request keeps it from passing unnoticed in a deployed environment.
    */
   entitlements?: EntitlementVersionReader | null;
+  /**
+   * School lifecycle lookup, consulted only for a token that failed the entitlement check above.
+   * Closing a school bumps its entitlement version, so every outstanding token in it arrives here as
+   * stale; this lookup turns that into SCHOOL_SUSPENDED rather than "refresh and retry", which is the
+   * answer the client can act on. `null` (the default) keeps every stale token on the refresh path.
+   */
+  schoolStatus?: SchoolStatusReader | null;
   /** Required `iss` claim. Threaded from env.JWT_ISSUER. */
   issuer: string;
   /** Required `aud` claim. Threaded from env.JWT_AUDIENCE. */
@@ -99,6 +108,14 @@ const DEFAULT_PUBLIC_PATHS = [
   // Public account deletion (ST-302): Google Play requires it to work without the app or a session.
   // The request is captcha-gated; its /confirm child authenticates with the emailed token.
   "/api/account/deletion-requests",
+  // "Talk to us" sales inquiries from the marketing site: the visitor has no account. Captcha-gated
+  // and rate-limited like registration; nothing else lives under /api/inquiries.
+  "/api/inquiries",
+  // School sign-up applicants (website "Sign up"): signed in with Google/Microsoft but holding no
+  // Studafy account, so no bearer token exists. These endpoints authenticate with the applicant
+  // session cookie instead (modules/school-applications/applicant-session.ts). Matches /me and its
+  // children only; nothing else lives under /api/school-applications.
+  "/api/school-applications/me",
   // Reference-data lookups (ST-184): public, read-only, feed the registration form's country/
   // currency selectors before a school (and therefore a token) exists.
   "/api/lookups/countries",
@@ -229,6 +246,7 @@ export function jwtAuthMiddleware({
   keyStore,
   denylist,
   entitlements = null,
+  schoolStatus = null,
   issuer,
   audience,
   publicPaths = DEFAULT_PUBLIC_PATHS,
@@ -317,6 +335,22 @@ export function jwtAuthMiddleware({
       // not be rejected, and neither must a pre-ST-133 token carrying the genesis version 1 — which
       // is exactly what a school with no counter row resolves to.
       if (payload.entitlements_ver < current) {
+        // Only now, and only for a stale token, is the school's lifecycle worth a lookup: a closure
+        // is one of the things that bumps the version, and its tokens must not be sent to refresh.
+        if (schoolStatus) {
+          let status: string | null;
+          try {
+            status = await schoolStatus.status(payload.school_id);
+          } catch (err) {
+            log?.error({ err }, "school status lookup failed");
+            throw new HTTPException(503, { message: "Authentication temporarily unavailable" });
+          }
+          if (isSchoolClosed(status)) {
+            log?.warn({ reason: "school_closed" }, "authentication failed");
+            throw schoolClosedException();
+          }
+        }
+
         log?.warn(
           { reason: "entitlements_stale", claim: payload.entitlements_ver, current },
           "authentication failed",
@@ -342,6 +376,7 @@ export function jwtAuthMiddleware({
       jti: payload.jti,
       entitlementsVer: payload.entitlements_ver,
       subscriptionStatus: payload.subscription_status,
+      ...(payload.deletion_pending ? { deletionPending: true } : {}),
     };
     c.set("auth", auth);
 

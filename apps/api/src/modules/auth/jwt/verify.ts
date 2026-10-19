@@ -81,6 +81,7 @@ const accessTokenClaimsSchema = z.object({
   jti: pgUuidSchema,
   channel: z.enum(AUTH_CHANNELS),
   subscription_status: z.enum(SUBSCRIPTION_STATUSES),
+  deletion_pending: z.literal(true).optional(),
 });
 
 /** Translate a `jose` verification failure into our own reason taxonomy. */

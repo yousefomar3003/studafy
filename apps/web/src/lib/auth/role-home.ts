@@ -2,10 +2,10 @@
  * Where a freshly authenticated session lands. Today's only caller is the invitation activation
  * flow (`routes/invite/InviteCompletePage.tsx`), routing a just-activated user home by role.
  *
- * The web app has exactly one authenticated home right now (`/portal` — see `app/routes.tsx`), so
- * every invitable role resolves there. This map exists so that changes when a per-role destination
- * (an admin console, a distinct student view, ...) ships: it becomes a one-line edit here instead of
- * a hunt through every flow that routes a user home. `ROLE_PRIORITY` decides which destination wins
+ * Roles with a home page of their own (platform console, admin, principal, finance) land there; everyone else lands on the generic `/portal`, which also forwards those roles
+ * to their home when they click "Home" (see `routes/portal/PortalPage.tsx`). Keeping the map here
+ * makes a new per-role destination a one-line edit instead of a hunt through every flow that routes
+ * a user home. `ROLE_PRIORITY` decides which destination wins
  * if a session ever carries more than one matching role.
  *
  * Roles are carried as plain strings, not the `@studafy/constants` `Role` union. The web app already
@@ -15,21 +15,21 @@
 const DEFAULT_HOME = "/portal";
 
 const ROLE_HOME: Readonly<Record<string, string>> = {
-  ORG_ADMIN: "/portal",
-  PRINCIPAL: "/portal",
-  INSTRUCTOR: "/portal",
-  TEACHING_ASSISTANT: "/portal",
-  STUDENT: "/portal",
+  SUPER_ADMIN: "/portal/platform",
+  ORG_ADMIN: "/portal/admin",
+  PRINCIPAL: "/portal/principal",
+  FINANCE: "/portal/finance",
+  // Students, parents, teachers and attendance officers are mobile-only (`MOBILE_ONLY_ROLES`) and
+  // never get a web session, so they have no entry here.
   GUEST: "/portal",
 };
 
 /** Most- to least-privileged, matching `ROLE_HOME`'s keys. Only used to break ties on multi-role sessions. */
 const ROLE_PRIORITY: readonly string[] = [
+  "SUPER_ADMIN",
   "ORG_ADMIN",
   "PRINCIPAL",
-  "INSTRUCTOR",
-  "TEACHING_ASSISTANT",
-  "STUDENT",
+  "FINANCE",
   "GUEST",
 ];
 

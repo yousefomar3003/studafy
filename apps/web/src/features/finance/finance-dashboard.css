@@ -4,6 +4,11 @@
  * alongside this file — matching how `principal-dashboard.css` is structured.
  */
 
+.finance-home__guide {
+  margin: var(--space-8) 0 0;
+  font-size: var(--font-size-sm);
+}
+
 .finance-dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -125,13 +130,4 @@
   .finance-aging-chart__fill {
     transition: none;
   }
-}
-
-/* --- Overdue installments page --- */
-
-.finance-overdue__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-16);
 }

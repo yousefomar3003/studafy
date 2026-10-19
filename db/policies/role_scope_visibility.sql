@@ -1,9 +1,22 @@
--- Canonical reference copy of the ST-085 intra-tenant row-scope policies.
+-- Reference copy of the ST-085 intra-tenant row-scope policies.
 --
--- The authoritative DDL lives in db/migrations/000037_add_role_scope_rls_policies.sql; this file is the
--- readable copy kept alongside the other policy references (tenant_isolation.sql,
--- evaluation_visibility.sql, notification_user_isolation.sql). Migrations are immutable, so any change
--- to these policies ships as a new forward migration and is reflected here.
+-- REFERENCE SNAPSHOT -- NOT EXECUTED. Nothing runs this file, and it may lag the migrations. The
+-- authoritative DDL is db/migrations (first 000037_add_role_scope_rls_policies.sql, then every later
+-- forward migration); the executable check is db/policies/rls-coverage.ts (bun run
+-- db:test:rls-coverage). This file is the readable copy kept alongside the other policy references
+-- (tenant_isolation.sql, evaluation_visibility.sql, notification_user_isolation.sql).
+--
+-- It covers the 000037 tables, with the 000120 (PRINCIPAL) and 000133 (ATTENDANCE_OFFICER) changes
+-- folded in. Tables created later install their own role_scope_visibility policy in the migration that
+-- creates them and are NOT repeated here:
+--   app.assignment_attachments      000049  app.can_read_assignment(assignment_id)
+--   app.submission_attachments      000050  app.can_read_submission(submission_id)
+--   app.attendance_record_versions  000054  app.can_read_student(student_id)  (re-pointed by 000133)
+--   app.attendance_alert_logs       000056  app.can_read_student(student_id)
+--   app.student_term_summaries      000065  app.is_related_to_student(student_id)
+--   app.teacher_term_comments       000097  app.can_read_student(student_id)
+--   app.grade_revisions             000131  app.can_read_grade_revision(grade_submission_id)
+--   app.grade_revision_items        000131  app.can_read_grade_revision_item(grade_revision_id)
 --
 -- WHAT THIS LAYER ADDS
 -- tenant_isolation answers "which school?"; these RESTRICTIVE policies answer "which rows within the
@@ -11,13 +24,17 @@
 -- tenant_isolation policy, so a row is readable only when the school matches app.school_id AND the
 -- caller's role/relationship grants access.
 --
--- ROLE MODEL (no PARENT role exists)
+-- ROLE MODEL (scopes come from relationships; PARENT is an enum role since 000043, but the parent
+-- scope is derived from app.parent_child_links, not from the role)
 --   * Admin   -> app.user_roles.role IN ('ORG_ADMIN','SUPER_ADMIN','PRINCIPAL'); full school-wide read
 --                access (PRINCIPAL added by 000120).
 --   * Teacher -> app.teachers row; scoped to classes they lead (classes.lead_teacher_id) or teach via
 --                a timetable slot (timetable_slots.teacher_id).
 --   * Student -> app.students row; scoped to their own records and their classes.
 --   * Parent  -> presence in app.parent_child_links.parent_user_id; scoped to linked children.
+--   * Attendance officer -> app.user_roles.role = 'ATTENDANCE_OFFICER' (app.current_user_is_attendance_officer,
+--                000133); school-wide on rosters and attendance only -- the policies below marked
+--                "000133" -- and nothing else (no materials, assignments, exams, grades).
 --
 -- WHY ONE POLICY PER TABLE WITH ORed SCOPES
 -- Restrictive policies AND together, so teacher/parent/student scopes are ORed inside a single policy
@@ -53,7 +70,7 @@
 
 CREATE POLICY role_scope_visibility ON app.students
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_student(id));
+  USING (app.can_read_student_for_attendance(id)); -- 000133
 
 CREATE POLICY role_scope_visibility ON app.enrollments
   AS RESTRICTIVE FOR SELECT TO studafy_app
@@ -61,19 +78,20 @@ CREATE POLICY role_scope_visibility ON app.enrollments
     app.current_user_is_school_admin()
     OR app.teaches_class(class_id)
     OR app.is_related_to_student(student_id)
+    OR app.current_user_is_attendance_officer() -- 000133
   );
 
 CREATE POLICY role_scope_visibility ON app.classes
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_class(id));
+  USING (app.can_read_class_for_attendance(id)); -- 000133
 
 CREATE POLICY role_scope_visibility ON app.subjects
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_subject(id));
+  USING (app.can_read_subject(id) OR app.current_user_is_attendance_officer()); -- 000133
 
 CREATE POLICY role_scope_visibility ON app.courses
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_course(id));
+  USING (app.can_read_course(id) OR app.current_user_is_attendance_officer()); -- 000133
 
 CREATE POLICY role_scope_visibility ON app.materials
   AS RESTRICTIVE FOR SELECT TO studafy_app
@@ -93,7 +111,7 @@ CREATE POLICY role_scope_visibility ON app.gradebooks
 
 CREATE POLICY role_scope_visibility ON app.timetable_slots
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_class(class_id));
+  USING (app.can_read_class_for_attendance(class_id)); -- 000133
 
 -- Student's own submission is theirs in any grading status; teacher of the class and admins also see it.
 CREATE POLICY role_scope_visibility ON app.assignment_submissions
@@ -130,8 +148,8 @@ CREATE POLICY role_scope_visibility ON app.grades
 -- leaves. Sessions scope by class; records scope by student.
 CREATE POLICY role_scope_visibility ON app.attendance_sessions
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_class(class_id));
+  USING (app.can_read_class_for_attendance(class_id)); -- 000133
 
 CREATE POLICY role_scope_visibility ON app.attendance_records
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_student(student_id));
+  USING (app.can_read_student_for_attendance(student_id)); -- 000133

@@ -34,6 +34,8 @@ export interface MaintenanceRunnerConfig {
   s3Region?: string;
   s3Endpoint?: string;
   bucket?: string;
+  /** For the account-deletion sweep's Stripe AI add-on cancellations; absent outside production. */
+  stripeSecretKey?: string;
 }
 
 export interface DsrJobResult {

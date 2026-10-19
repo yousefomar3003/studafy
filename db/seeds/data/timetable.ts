@@ -1,7 +1,7 @@
 // Timetable and attendance. A single timetable version is built while it is a draft (the only state in
 // which slots may be written), then transitioned draft -> pending -> approved via UPDATEs, because the
 // approval state machine's timestamps/actors are written by the 000010 trigger, never inserted. Two
-// attendance sessions are then recorded for the Science class. Attendance rows are dated inside the
+// attendance sessions are then recorded for each class. Attendance rows are dated inside the
 // 2026-07 partition, and each record carries the parent session's created_at exactly (timestamptz(3)
 // equality across the driver round-trip). The session/record key registries are trigger-maintained, so
 // this module never touches them.
@@ -97,27 +97,55 @@ export async function seedTimetableAndAttendance(sql: Sql, ctx: FullCtx): Promis
     WHERE id = ${versionId} AND school_id = ${schoolId}
   `;
 
-  // --- Attendance for the Science class ---
-  const scienceStudentIds = enrollments
-    .filter((enrollment) => enrollment.classId === scienceClass.id)
-    .map((enrollment) => enrollment.studentId);
-
-  // Two taken sessions on distinct dates. created_at is pinned to a .000ms instant so the record ->
-  // session key foreign key matches exactly.
+  // --- Attendance for both classes ---
+  // Two taken sessions per class on distinct dates, matching each class's weekly slots (Science Mon/Wed
+  // period 1, Math Mon period 2 / Tue period 1). created_at is pinned to a .000ms instant so the record
+  // -> session key foreign key matches exactly.
+  const mathTeacher = teachers.find((t) => t.key === "instructor-math")!;
   const sessions = [
-    { id: uuid(), date: "2026-07-06", createdAt: seedDate(0, 8) },
-    { id: uuid(), date: "2026-07-08", createdAt: seedDate(2, 8) },
+    {
+      id: uuid(),
+      classId: scienceClass.id,
+      date: "2026-07-06",
+      period: 1,
+      takenBy: scienceTeacher.userId,
+      createdAt: seedDate(0, 8),
+    },
+    {
+      id: uuid(),
+      classId: scienceClass.id,
+      date: "2026-07-08",
+      period: 1,
+      takenBy: scienceTeacher.userId,
+      createdAt: seedDate(2, 8),
+    },
+    {
+      id: uuid(),
+      classId: mathClass.id,
+      date: "2026-07-06",
+      period: 2,
+      takenBy: mathTeacher.userId,
+      createdAt: seedDate(0, 9),
+    },
+    {
+      id: uuid(),
+      classId: mathClass.id,
+      date: "2026-07-07",
+      period: 1,
+      takenBy: mathTeacher.userId,
+      createdAt: seedDate(1, 8),
+    },
   ];
   await sql`
     INSERT INTO app.attendance_sessions ${sql(
       sessions.map((session) => ({
         id: session.id,
         school_id: schoolId,
-        class_id: scienceClass.id,
+        class_id: session.classId,
         session_date: session.date,
-        period: 1,
+        period: session.period,
         status: "submitted",
-        taken_by_user_id: scienceTeacher.userId,
+        taken_by_user_id: session.takenBy,
         created_at: session.createdAt,
       })),
       "id",
@@ -134,20 +162,22 @@ export async function seedTimetableAndAttendance(sql: Sql, ctx: FullCtx): Promis
   // One record per enrolled student per session. Vary the status so the demo shows more than "present".
   const statuses = ["present", "present", "late", "absent", "excused"] as const;
   const recordRows = sessions.flatMap((session) =>
-    scienceStudentIds.map((studentId, index) => {
-      const status = statuses[index % statuses.length]!;
-      return {
-        id: uuid(),
-        school_id: schoolId,
-        attendance_session_id: session.id,
-        session_created_at: session.createdAt,
-        student_id: studentId,
-        status,
-        minutes_late: status === "late" ? 8 : null,
-        recorded_by_user_id: scienceTeacher.userId,
-        created_at: session.createdAt,
-      };
-    }),
+    enrollments
+      .filter((enrollment) => enrollment.classId === session.classId)
+      .map((enrollment, index) => {
+        const status = statuses[index % statuses.length]!;
+        return {
+          id: uuid(),
+          school_id: schoolId,
+          attendance_session_id: session.id,
+          session_created_at: session.createdAt,
+          student_id: enrollment.studentId,
+          status,
+          minutes_late: status === "late" ? 8 : null,
+          recorded_by_user_id: session.takenBy,
+          created_at: session.createdAt,
+        };
+      }),
   );
   await sql`
     INSERT INTO app.attendance_records ${sql(

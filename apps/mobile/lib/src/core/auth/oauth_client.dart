@@ -56,8 +56,8 @@ class MobileTokenResponse {
 /// OpenAPI-generated client yet and the surface is trivial.
 class MobileAuthClient {
   MobileAuthClient({required String baseUrl, Dio? dio})
-      : _dio = (dio ?? Dio(BaseOptions(baseUrl: baseUrl)))
-          ..interceptors.add(ErrorMappingInterceptor());
+    : _dio = (dio ?? Dio(BaseOptions(baseUrl: baseUrl)))
+        ..interceptors.add(ErrorMappingInterceptor());
 
   final Dio _dio;
 
@@ -83,11 +83,7 @@ class MobileAuthClient {
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/auth/oauth/$provider/mobile-exchange',
-      data: {
-        'code': code,
-        'state': state,
-        'nonce': nonce,
-      },
+      data: {'code': code, 'state': state, 'nonce': nonce},
     );
     return MobileTokenResponse.fromJson(response.data!);
   }
@@ -117,25 +113,28 @@ class MobileAuthClient {
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/auth/invitations/$token/oauth/$provider/mobile-exchange',
-      data: {
-        'code': code,
-        'state': state,
-        'nonce': nonce,
-      },
+      data: {'code': code, 'state': state, 'nonce': nonce},
     );
     return MobileTokenResponse.fromJson(response.data!);
   }
 
-  /// Email/password sign-in for the App Store / Play reviewer demo accounts (ST-303). The server
-  /// accepts only the reviewer tenant's accounts here; every real account signs in through
-  /// [startOAuth]/[exchangeCode]. See `review-login-routes.ts`.
-  Future<MobileTokenResponse> loginWithEmail({
-    required String email,
+  /// Member-ID + password sign-in for students, parents, teachers and attendance officers
+  /// (`member-password-routes.ts`). While the account is still on its starting password the API
+  /// answers 403 `AUTH_PASSWORD_CHANGE_REQUIRED` and issues no session; repeat the call with
+  /// [newPassword] to set one and sign in.
+  Future<MobileTokenResponse> loginWithMember({
+    required String username,
     required String password,
+    String? newPassword,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
-      '/api/auth/login/review',
-      data: {'email': email, 'password': password, 'channel': 'mobile'},
+      '/api/auth/login/member',
+      data: {
+        'username': username,
+        'password': password,
+        'new_password': ?newPassword,
+        'channel': 'mobile',
+      },
     );
     return MobileTokenResponse.fromJson(response.data!);
   }

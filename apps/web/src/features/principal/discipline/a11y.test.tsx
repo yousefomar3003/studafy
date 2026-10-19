@@ -70,13 +70,11 @@ function renderListInMain(Page: ComponentType) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <MemoryRouter>
-          <main>
-            <Page />
-          </main>
-        </MemoryRouter>
-      </ToastProvider>
+      <MemoryRouter>
+        <main>
+          <Page />
+        </main>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

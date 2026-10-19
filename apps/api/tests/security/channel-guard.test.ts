@@ -226,3 +226,54 @@ describe("teacher routes — channel guard", () => {
     await expectChannelDenied(res);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Student routes — the `:studentId` guards must not capture `/api/students/me`
+// ---------------------------------------------------------------------------
+
+describe("student routes — channel guard", () => {
+  integrationTest("a student's mobile token can read /api/students/me", async () => {
+    const student = tenant.students[0]!;
+    const token = await mintTestToken(keyStore, {
+      schoolId: tenant.schoolId,
+      userId: student.userId,
+      roles: ["STUDENT"],
+      channel: "mobile",
+    });
+    const res = await app.request("/api/students/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; enrolled_class_ids: string[] };
+    expect(body.id).toBe(student.id);
+    expect(body.enrolled_class_ids).toEqual([tenant.cls.id]);
+    expect(body).not.toHaveProperty("admission_number");
+  });
+
+  integrationTest("a non-student caller gets 404 from /api/students/me", async () => {
+    const teacher = tenant.teachers[0]!;
+    const token = await mintTestToken(keyStore, {
+      schoolId: tenant.schoolId,
+      userId: teacher.userId,
+      roles: ["INSTRUCTOR"],
+      channel: "mobile",
+    });
+    const res = await app.request("/api/students/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  integrationTest("/api/students/me requires authentication", async () => {
+    const res = await app.request("/api/students/me");
+    expect(res.status).toBe(401);
+  });
+
+  integrationTest("mobile token is still rejected on GET /api/students/{studentId}", async () => {
+    const token = await adminToken("mobile");
+    const res = await app.request(`/api/students/${tenant.students[0]!.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    await expectChannelDenied(res);
+  });
+});

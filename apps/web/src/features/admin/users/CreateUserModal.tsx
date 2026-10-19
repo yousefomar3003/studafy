@@ -98,7 +98,7 @@ export function CreateUserModal({ open, onClose }: CreateUserModalProps) {
             value={values.display_name}
             onChange={(e) => setField("display_name", e.target.value)}
             error={errors.display_name && t(errors.display_name)}
-            helperText={t("adminPeople.users.create.displayNameHelper")}
+            required
           />
           <Select
             label={t("adminPeople.users.form.role")}

@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/update/forced_update_screen.dart';
 import 'package:studafy_mobile/src/core/update/update_status.dart';
+import 'package:studafy_mobile/src/features/shell/presentation/pill_navigation_bar.dart';
 
 import '../../support/pump_studafy_app.dart';
 
@@ -23,7 +23,8 @@ void main() {
       updateStatus: UpdateStatus.updateRequired,
     );
 
-    expect(find.byType(ForcedUpdateScreen), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
-  });
+      expect(find.byType(ForcedUpdateScreen), findsOneWidget);
+      expect(find.byType(PillNavigationBar), findsNothing);
+    },
+  );
 }

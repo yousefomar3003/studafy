@@ -107,17 +107,6 @@ async function stubWizardBackend(page: Page) {
     }),
   );
 
-  await page.route("**/api/invitations/bulk", (route) =>
-    fulfillJson(route, 201, {
-      id: "batch-1",
-      role: "INSTRUCTOR",
-      expiry_days: 7,
-      target_mode: "explicit",
-      total_count: 1,
-      sent_count: 1,
-    }),
-  );
-
   const uploadResponse = {
     id: "import-1",
     school_id: "school-1",
@@ -171,10 +160,6 @@ test.describe("post-activation setup wizard", () => {
 
     await expect(page.getByRole("heading", { name: /timetable periods/i })).toBeVisible();
     await page.getByRole("button", { name: /save and continue/i }).click();
-
-    await expect(page.getByRole("heading", { name: /staff invitations/i })).toBeVisible();
-    await page.getByLabel(/emails/i).fill("teacher@example.com");
-    await page.getByRole("button", { name: /send invitations/i }).click();
 
     await expect(page.getByRole("heading", { name: /student import/i })).toBeVisible();
     await page.getByLabel(/student csv file/i).setInputFiles({

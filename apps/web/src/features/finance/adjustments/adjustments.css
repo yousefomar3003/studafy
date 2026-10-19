@@ -1,5 +1,5 @@
 /**
- * Scholarship award and refund screens. Loaded only when `/portal/finance/adjustments*` is,
+ * Refund screens. Loaded only when `/portal/finance/adjustments*` is,
  * matching the rest of the app (see `payments/payments.css`'s doc comment for why each feature owns
  * its own stylesheet rather than importing a sibling's).
  */
@@ -41,12 +41,6 @@
   margin-bottom: var(--space-16);
 }
 
-.adjustments-list__header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-12);
-}
-
 .adjustments-list__toolbar {
   display: flex;
   align-items: flex-end;
@@ -68,10 +62,6 @@
 }
 
 /* --- Form --- */
-
-.adjustments-form__back {
-  margin-bottom: var(--space-8);
-}
 
 .adjustments-form {
   display: flex;
@@ -97,64 +87,6 @@
 
 .adjustments-reason-input textarea {
   resize: vertical;
-}
-
-/* --- Student picker (mirrors `fees/StudentPickerField`'s `.fee-builder__student-*`) --- */
-
-.adjustments-form__student-selected {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-}
-
-.adjustments-form__student-selected p {
-  margin: 0;
-}
-
-.adjustments-form__student-picker {
-  position: relative;
-}
-
-.adjustments-form__student-results {
-  list-style: none;
-  margin: var(--space-4) 0 0;
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  max-height: 240px;
-  overflow-y: auto;
-  background-color: var(--color-background);
-}
-
-.adjustments-form__student-result {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-4);
-  border: none;
-  background: none;
-  padding: var(--space-8) var(--space-12);
-  cursor: pointer;
-  font: inherit;
-  text-align: start;
-}
-
-.adjustments-form__student-result:hover,
-.adjustments-form__student-result:focus-visible {
-  background-color: var(--color-surface);
-}
-
-.adjustments-form__student-result span {
-  color: var(--color-muted-foreground);
-  font-size: var(--font-size-xs);
-}
-
-.adjustments-form__student-empty {
-  padding: var(--space-8) var(--space-12);
-  color: var(--color-muted-foreground);
-  font-size: var(--font-size-sm);
 }
 
 /* --- Invoice picker (mirrors `payments/InvoicePickerField`'s `.payments-form__invoice-*`) --- */
@@ -235,7 +167,7 @@
   margin-top: var(--space-16);
 }
 
-/* --- Confirmation dialog's computed-effect summary (shared by the award and refund flows) --- */
+/* --- Confirmation dialog's computed-effect summary (refund flows) --- */
 
 .adjustments-effect {
   display: flex;

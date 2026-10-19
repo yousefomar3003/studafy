@@ -178,6 +178,6 @@ incident.
 - The rename-based cutover in step 5 is standard AWS practice but has never been run against this
   repo's PgBouncer. First real drill should watch this specifically.
 - No script wraps steps 1-6 — every real incident runs them by hand today. A
-  `postgres-restore-cutover.sh` (siblings: `infra/deploy/scripts/postgres-restore-verify.sh`) that
+  `postgres-restore-cutover.sh` (siblings: `infra/deploy/scripts/run-postgres-restore-verify.sh`) that
   does steps 1-6 without the drill script's delete-on-exit trap would remove most of the manual
   risk here; not built by this ticket, ticketed in the drill report.

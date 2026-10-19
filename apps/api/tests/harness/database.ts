@@ -32,7 +32,7 @@ export async function createTestDatabase(options: TestDatabaseOptions = {}): Pro
   const adminUrl = process.env.TEST_DATABASE_URL;
   if (!adminUrl) {
     throw new Error(
-      "TEST_DATABASE_URL is not set. Start PostgreSQL with: docker compose -f db/compose.yml up -d",
+      "TEST_DATABASE_URL is not set. Start PostgreSQL with: docker compose up -d test-postgres test-redis",
     );
   }
 

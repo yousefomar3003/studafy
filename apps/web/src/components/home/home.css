@@ -1,0 +1,233 @@
+/**
+ * Role home pages (platform, admin, principal, finance): identity line, title, summary sentence,
+ * headline figures and shortcuts. Tiles below them keep their own `dashboard-tile.css` chrome.
+ * Logical properties throughout so the layout mirrors cleanly in Arabic.
+ */
+
+.home-header {
+  margin-block-end: var(--space-24);
+}
+
+/* Identity line: small and quiet, so the title below it reads first. */
+
+.home-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-16);
+  margin-block-end: var(--space-12);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+}
+
+.home-identity p {
+  margin: 0;
+}
+
+.home-identity__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  min-inline-size: 0;
+}
+
+.home-identity__name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-foreground);
+}
+
+.home-identity__role {
+  padding: 1px var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
+}
+
+.home-identity__school::before {
+  content: "·";
+  margin-inline-end: var(--space-8);
+}
+
+.home-identity__date {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.home-header__title {
+  margin: 0;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.home-header__summary {
+  max-inline-size: 64ch;
+  margin: var(--space-8) 0 0;
+  font-size: var(--font-size-lg);
+  line-height: 1.5;
+  color: var(--color-muted-foreground);
+}
+
+/* Headline figures: one bordered band split by hairlines, not a row of separate cards. */
+
+.home-summary {
+  margin-block-end: var(--space-32);
+}
+
+.home-summary__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-border);
+}
+
+.home-summary__item {
+  display: flex;
+  min-inline-size: 0;
+  background-color: var(--color-background);
+}
+
+.home-summary__cell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-16) var(--space-20);
+  color: inherit;
+  text-decoration: none;
+}
+
+.home-summary__cell--link {
+  transition: background-color var(--duration-fast) var(--easing-standard);
+}
+
+.home-summary__cell--link:hover {
+  background-color: var(--color-surface);
+}
+
+.home-summary__cell--link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.home-summary__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted-foreground);
+}
+
+/* A count someone should act on gets a small warning dot; the number itself stays neutral. */
+.home-summary__item[data-attention] .home-summary__label::before {
+  content: "";
+  flex: none;
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-warning);
+}
+
+.home-summary__value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-summary__value[data-muted] {
+  color: var(--color-muted-foreground);
+}
+
+.home-summary__hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+}
+
+.home-summary__hint[data-error] {
+  color: var(--color-danger);
+}
+
+/* Section headings and shortcuts */
+
+.home-section-heading {
+  margin: 0 0 var(--space-12);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+}
+
+.home-section {
+  margin-block-end: var(--space-32);
+}
+
+.home-shortcuts {
+  margin-block-end: var(--space-32);
+}
+
+.home-shortcuts__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+  gap: var(--space-4) var(--space-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-shortcuts__link {
+  display: block;
+  padding: var(--space-8) 0;
+  border-block-end: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-foreground);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--easing-standard);
+}
+
+.home-shortcuts__link:hover {
+  color: var(--color-accent);
+  border-block-end-color: var(--color-accent);
+}
+
+.home-shortcuts__link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (max-width: 480px) {
+  .home-header__title {
+    font-size: var(--font-size-2xl);
+  }
+
+  .home-summary__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-shortcuts__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-summary__cell {
+    padding: var(--space-12) var(--space-16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-summary__cell--link,
+  .home-shortcuts__link {
+    transition: none;
+  }
+}

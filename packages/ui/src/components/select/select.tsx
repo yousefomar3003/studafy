@@ -1,17 +1,22 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { cx } from "../../internal/cx";
 import { firstEnabledIndex, lastEnabledIndex, nextEnabledIndex } from "../../internal/roving";
 import { useUiStrings } from "../../internal/ui-strings";
 import { useControllableState } from "../../internal/use-controllable-state";
 
-import type { KeyboardEvent } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 
 export interface SelectOption<Value extends string = string> {
   value: Value;
   label: string;
   disabled?: boolean;
 }
+
+/** Mirrors `.sf-select__listbox` in select.css: gap is `--space-4`, cap is the max-height. */
+const POPUP_GAP = 4;
+const POPUP_MAX_HEIGHT = 240;
+const VIEWPORT_MARGIN = 8;
 
 export interface SelectProps<Value extends string = string> {
   label: string;
@@ -34,8 +39,10 @@ export interface SelectProps<Value extends string = string> {
  * owns the `listbox` / `option` structure and the keyboard model — arbitrary children would let a
  * caller break `aria-required-children` without noticing.
  *
- * The popup is absolutely positioned inside a relative wrapper. That keeps the package free of a
- * positioning library, at the cost of clipping inside an `overflow: hidden` ancestor.
+ * The popup is `position: fixed`, anchored to the trigger's viewport rect, so it escapes scrolling or
+ * `overflow: hidden` ancestors such as a modal body. It opens downward and flips upward when the
+ * space below is too tight. Staying in the DOM next to the trigger keeps it inside a modal's focus
+ * trap without a portal.
  */
 export function Select<Value extends string = string>({
   label,
@@ -71,6 +78,7 @@ export function Select<Value extends string = string>({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
   const typeahead = useRef({ query: "", timer: 0 });
+  const [popupStyle, setPopupStyle] = useState<CSSProperties>();
 
   const selectedIndex = options.findIndex((option) => option.value === selected);
   // eslint-disable-next-line security/detect-object-injection -- `selectedIndex` comes from findIndex on `options`, and -1 is handled
@@ -102,14 +110,61 @@ export function Select<Value extends string = string>({
     [closeListbox, options, setSelected],
   );
 
-  // Keep the active option in view. happy-dom has no layout, hence the optional call.
-  useEffect(() => {
+  // Anchor the fixed popup to the trigger, re-measuring whenever any ancestor scrolls or the viewport
+  // resizes so it tracks the trigger instead of floating free.
+  useLayoutEffect(() => {
     if (!open) {
       return;
     }
-    const active = listboxRef.current?.querySelector<HTMLElement>(".sf-select__option--active");
-    active?.scrollIntoView?.({ block: "nearest" });
-  }, [activeIndex, open]);
+    const place = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) {
+        return;
+      }
+      const rect = trigger.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom - POPUP_GAP - VIEWPORT_MARGIN;
+      const spaceAbove = rect.top - POPUP_GAP - VIEWPORT_MARGIN;
+      const natural = Math.min(
+        listboxRef.current?.scrollHeight ?? POPUP_MAX_HEIGHT,
+        POPUP_MAX_HEIGHT,
+      );
+      const flip = spaceBelow < natural && spaceAbove > spaceBelow;
+      setPopupStyle({
+        left: rect.left,
+        minWidth: rect.width,
+        maxWidth: Math.max(window.innerWidth - rect.left - VIEWPORT_MARGIN, rect.width),
+        maxHeight: Math.max(Math.min(POPUP_MAX_HEIGHT, flip ? spaceAbove : spaceBelow), 0),
+        ...(flip
+          ? { bottom: window.innerHeight - rect.top + POPUP_GAP }
+          : { top: rect.bottom + POPUP_GAP }),
+      });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
+
+  // Keep the active option in view by scrolling the listbox only: scrollIntoView would also scroll
+  // every scrollable ancestor, shoving a modal body around underneath the popup.
+  useEffect(() => {
+    const listbox = listboxRef.current;
+    if (!open || !listbox) {
+      return;
+    }
+    const active = listbox.querySelector<HTMLElement>(".sf-select__option--active");
+    if (!active) {
+      return;
+    }
+    if (active.offsetTop < listbox.scrollTop) {
+      listbox.scrollTop = active.offsetTop;
+    } else if (active.offsetTop + active.offsetHeight > listbox.scrollTop + listbox.clientHeight) {
+      listbox.scrollTop = active.offsetTop + active.offsetHeight - listbox.clientHeight;
+    }
+  }, [activeIndex, open, popupStyle]);
 
   // Tab and outside clicks commit the active option's absence: they just close the popup.
   useEffect(() => {
@@ -258,6 +313,7 @@ export function Select<Value extends string = string>({
           aria-labelledby={labelId}
           hidden={!open}
           className="sf-select__listbox"
+          style={popupStyle}
         >
           {options.map((option, index) => (
             <li

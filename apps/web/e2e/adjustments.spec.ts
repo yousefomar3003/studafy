@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
 /**
- * End-to-end coverage for the scholarship award and refund flows, against a stubbed backend — same
+ * End-to-end coverage for the refund flow, against a stubbed backend — same
  * approach as `payment-recording.spec.ts`, no Postgres or `apps/api` process required. Covers what a
  * component test cannot: the maker form's confirmation dialog and the checker's confirm action, each
  * driven by real browser click events against the actual rendered DOM.
@@ -34,46 +34,6 @@ async function stubAuthenticatedSession(page: Page) {
       session_id: "session-1",
     }),
   );
-}
-
-function buildStudent() {
-  return { id: "student-1", first_name: "Layla", last_name: "Haddad", admission_number: "ADM-001" };
-}
-
-function buildDiscount() {
-  return {
-    id: "discount-1",
-    school_id: "school-1",
-    erpnext_docname: "SD-0001",
-    erpnext_status: "Active",
-    title: "Sibling discount",
-    discount_type: "fixed",
-    amount: 50,
-    scope: "global",
-    fee_category: null,
-    currency: "JOD",
-    currency_minor_unit: 3,
-    is_active: true,
-    last_synced_at: NOW,
-  };
-}
-
-function buildAward(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "award-1",
-    school_id: "school-1",
-    student_id: "student-1",
-    scholarship_discount_id: "discount-1",
-    scholarship_discount_title: "Sibling discount",
-    award_status: "pending",
-    awarded_by: "someone-else",
-    confirmed_by: null,
-    confirmed_at: null,
-    erpnext_docname: null,
-    created_at: NOW,
-    updated_at: NOW,
-    ...overrides,
-  };
 }
 
 function buildInvoice() {
@@ -122,37 +82,6 @@ function buildRefund(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function stubScholarshipBackend(page: Page) {
-  const pathIs = (url: string, pathname: string) => new URL(url).pathname === pathname;
-  let createCalls = 0;
-  let confirmCalls = 0;
-
-  await page.route("**/api/students**", (route) =>
-    fulfillJson(route, 200, { students: [buildStudent()], total: 1 }),
-  );
-
-  await page.route("**/api/finance/scholarship-discounts**", async (route) => {
-    const url = route.request().url();
-    if (pathIs(url, "/api/finance/scholarship-discounts/awards")) {
-      if (route.request().method() === "POST") {
-        createCalls += 1;
-        return fulfillJson(route, 201, buildAward());
-      }
-      return fulfillJson(route, 200, { awards: [buildAward()], total: 1 });
-    }
-    if (url.endsWith("/confirm") && route.request().method() === "POST") {
-      confirmCalls += 1;
-      return fulfillJson(route, 200, buildAward({ award_status: "confirmed" }));
-    }
-    if (pathIs(url, "/api/finance/scholarship-discounts")) {
-      return fulfillJson(route, 200, { scholarship_discounts: [buildDiscount()], total: 1 });
-    }
-    return route.fallback();
-  });
-
-  return { createCallCount: () => createCalls, confirmCallCount: () => confirmCalls };
-}
-
 async function stubRefundBackend(page: Page) {
   const pathIs = (url: string, pathname: string) => new URL(url).pathname === pathname;
   let initiateCalls = 0;
@@ -176,61 +105,6 @@ async function stubRefundBackend(page: Page) {
 
   return { initiateCallCount: () => initiateCalls };
 }
-
-test.describe("scholarship award", () => {
-  test("awards a scholarship, showing the computed effect before it commits", async ({ page }) => {
-    await stubPortalShellDefaults(page);
-    await stubAuthenticatedSession(page);
-    const backend = await stubScholarshipBackend(page);
-
-    await page.goto("/portal/finance/adjustments/scholarships/new");
-    await expect(
-      page.getByRole("heading", { name: "Award a scholarship or discount" }),
-    ).toBeVisible();
-
-    await page.getByLabel("Student", { exact: false }).fill("Layla");
-    await page.getByRole("button", { name: /Layla Haddad/ }).click();
-
-    await page.getByRole("combobox", { name: "Scholarship / discount" }).click();
-    await page.getByRole("option", { name: "Sibling discount" }).click();
-    await expect(
-      page.getByText("50 JOD off all fee categories on every future invoice."),
-    ).toBeVisible();
-
-    await page.getByRole("button", { name: "Review award" }).click();
-
-    const dialog = page.getByRole("dialog", { name: "Award scholarship?" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText("Sibling discount")).toBeVisible();
-
-    const createRequest = page.waitForRequest(
-      (req) =>
-        req.url().includes("/api/finance/scholarship-discounts/awards") && req.method() === "POST",
-    );
-    await dialog.getByRole("button", { name: "Create award" }).click();
-    await createRequest;
-
-    await expect(page.getByText("Award created — Sibling discount")).toBeVisible();
-    expect(backend.createCallCount()).toBe(1);
-  });
-
-  test("confirming a pending award (the checker step) forwards it", async ({ page }) => {
-    await stubPortalShellDefaults(page);
-    await stubAuthenticatedSession(page);
-    const backend = await stubScholarshipBackend(page);
-
-    await page.goto("/portal/finance/adjustments/scholarships");
-    await expect(page.getByText("Sibling discount")).toBeVisible();
-
-    await page.getByRole("button", { name: "Confirm" }).click();
-    const dialog = page.getByRole("dialog", { name: "Confirm scholarship award?" });
-    await expect(dialog).toBeVisible();
-
-    await dialog.getByRole("button", { name: "Confirm award" }).click();
-    await expect(page.getByText("Award confirmed")).toBeVisible();
-    expect(backend.confirmCallCount()).toBe(1);
-  });
-});
 
 test.describe("refund", () => {
   test("blocks a refund that exceeds the invoice's paid amount, then requests one within the cap", async ({

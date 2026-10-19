@@ -14,8 +14,6 @@ import subscriptions from "@docs/help/billing/subscriptions.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import workflows from "@docs/help/finance/workflows.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
-import invitations from "@docs/help/getting-started/invitations.md?raw";
-// eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import onboardingGuide from "@docs/help/getting-started/onboarding-guide.md?raw";
 
 import { buildArticles, searchArticles } from "./content";
@@ -26,7 +24,6 @@ const ARTICLE_SOURCES = [
   { path: "@docs/help/academics/timetable.md", raw: timetable },
   { path: "@docs/help/billing/subscriptions.md", raw: subscriptions },
   { path: "@docs/help/finance/workflows.md", raw: workflows },
-  { path: "@docs/help/getting-started/invitations.md", raw: invitations },
   { path: "@docs/help/getting-started/onboarding-guide.md", raw: onboardingGuide },
 ] as const;
 

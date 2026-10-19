@@ -25,7 +25,7 @@ Teachers hold `submission:read` but not `submission:create`, and students the re
 path-wide gate on either would be wrong in one direction.
 
 `submission:update` on the attachment routes is doing real work rather than filling a slot. Only
-`STUDENT` and the admin roles hold it; `INSTRUCTOR` and `TEACHING_ASSISTANT` do not. A teacher can
+`STUDENT` and the admin roles hold it; `INSTRUCTOR` does not. A teacher can
 read the files they are marking and cannot add to or remove from them.
 
 The hand-in endpoint answers **201** on a first submission and **200** on a resubmission, so a
@@ -54,10 +54,8 @@ Three layers, and each answers a question the others cannot.
 a timetable slot for it. It is `app.teaches_assignment()`, the same helper the RLS policy calls;
 neither the service nor the projection reimplements it, so "staff" has one definition in the system.
 
-Note that `app.teaches_class()` requires the caller to have a row in `app.teachers`. A
-`TEACHING_ASSISTANT` holds `submission:grade` but will be refused at the row-scope check unless
-they are also modelled as a teacher — that is pre-existing behaviour inherited from `000037`, not
-something this API decides.
+Note that `app.teaches_class()` requires the caller to have a row in `app.teachers` — that is
+pre-existing behaviour inherited from `000037`, not something this API decides.
 
 Parents were granted `submission:read` and `assignment:read` by this ticket. Before it,
 `PARENT_PERMISSIONS` was `[STUDENT_READ]` alone, so a linked parent was refused at the permission

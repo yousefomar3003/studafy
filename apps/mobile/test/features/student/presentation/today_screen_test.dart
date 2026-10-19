@@ -1,18 +1,21 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:studafy_mobile/src/core/api/generated/models/announcement.dart';
-import 'package:studafy_mobile/src/core/api/generated/models/announcement_audience_type.dart';
-import 'package:studafy_mobile/src/core/api/generated/models/announcement_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/cumulative_grade_summary.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/notification.dart'
+    as api_models;
+import 'package:studafy_mobile/src/core/api/generated/models/notification_notification_type.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/published_grade_snapshot.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/published_term_summary.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/timetable_slot.dart';
+import 'package:studafy_mobile/src/core/api/api_exception.dart';
+import 'package:studafy_mobile/src/core/config/provider_retry_policy.dart';
 import 'package:studafy_mobile/src/core/offline/cached_value.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/student/application/today_providers.dart';
@@ -48,25 +51,17 @@ Assignment _fakeAssignment() {
   );
 }
 
-Announcement _fakeAnnouncement() {
+api_models.Notification _fakeAnnouncement() {
   final now = DateTime(2026, 1, 1);
-  return Announcement(
+  return api_models.Notification(
     id: 'announcement-1',
     schoolId: 'school-1',
-    createdBy: 'admin-1',
-    createdByName: 'Principal',
+    userId: 'student-1',
+    notificationType: NotificationNotificationType.announcement,
     title: 'Sports Day',
     body: 'Sports day is next Friday.',
-    mandatory: false,
-    audienceType: AnnouncementAudienceType.school,
-    audienceRole: null,
-    audienceClassId: null,
-    audienceClassCode: null,
-    status: AnnouncementStatus.published,
-    scheduledAt: now,
-    publishedAt: now,
-    recipientCount: 10,
-    notifiedCount: 10,
+    metadata: const {'announcement_id': 'a-1', 'route': '/announcements'},
+    readAt: null,
     createdAt: now,
     updatedAt: now,
   );
@@ -97,6 +92,11 @@ CachedValue<T> _live<T>(T data) {
 /// `ProviderScope.overrides` is typed with, so a test helper can't name `List<Override>` itself;
 /// building the scope (with [TodayScreen] already inside it) at each call site sidesteps that.
 Future<void> _pumpTodayScreen(WidgetTester tester, ProviderScope scope) async {
+  // A tall phone, so the lazily built list lays out every card below the date header.
+  tester.view
+    ..physicalSize = const Size(390, 1400)
+    ..devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
   await tester.pumpWidget(wrapWithLocalization(scope));
 }
 
@@ -220,8 +220,58 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(TodayStateMessage), findsNWidgets(4));
-    expect(find.text("Today's timetable isn't available yet."), findsOneWidget);
-    expect(find.text("Grades aren't available yet."), findsOneWidget);
-  });
+      expect(find.byType(TodayStateMessage), findsNWidgets(4));
+      expect(
+        find.text("Today's timetable isn't available yet."),
+        findsOneWidget,
+      );
+      expect(find.text("Grades aren't available yet."), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a 403 on a card settles into its error message instead of a skeleton',
+    (tester) async {
+      final forbidden = DioException(
+        requestOptions: RequestOptions(path: '/api/notifications'),
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: '/api/notifications'),
+          statusCode: 403,
+        ),
+        type: DioExceptionType.badResponse,
+        error: const ApiException(
+          status: 403,
+          title: 'Forbidden',
+          code: 'FORBIDDEN',
+        ),
+      );
+
+      await _pumpTodayScreen(
+        tester,
+        ProviderScope(
+          // The app's real policy: a 4xx is never retried, so the card leaves loading at once.
+          retry: providerRetryPolicy,
+          overrides: [
+            todayTimetableProvider.overrideWith(
+              (ref) => Stream.value(const TodaySectionUnavailable()),
+            ),
+            todayAssignmentsProvider.overrideWith(
+              (ref) => Stream.value(_live(const [])),
+            ),
+            todayGradesProvider.overrideWith(
+              (ref) => Stream.value(const TodaySectionUnavailable()),
+            ),
+            todayAnnouncementsProvider.overrideWith(
+              (ref) => Stream.error(forbidden),
+            ),
+          ],
+          child: _todayScreenScope(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TodaySkeleton), findsNothing);
+      expect(find.text("Couldn't load announcements."), findsOneWidget);
+    },
+  );
 }

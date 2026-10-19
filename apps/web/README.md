@@ -6,7 +6,7 @@ Studafy's web client — a Vite + React 18 + TypeScript single-page app. This is
 ## Local development
 
 ```sh
-bun run dev          # start the Vite dev server (http://localhost:5173)
+bun run dev          # start the Vite dev server (http://localhost:5180)
 bun run build        # production build to dist/
 bun run preview      # serve the production build locally
 bun run check-types  # tsc --noEmit

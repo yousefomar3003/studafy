@@ -9,21 +9,13 @@
       "amount": "Amount",
       "refundAmount": "Refund amount",
       "paidToDate": "Paid to date",
-      "scholarshipDiscount": "Scholarship / discount",
-      "effect": "Effect",
       "created": "Created",
       "status": "Status",
       "actions": "Actions",
       "auditTrail": "Audit trail",
       "allStatuses": "All statuses",
       "previous": "Previous",
-      "next": "Next",
-      "loading": "Loading…"
-    },
-    "awardStatus": {
-      "pending": "Pending confirmation",
-      "confirmed": "Confirmed",
-      "cancelled": "Cancelled"
+      "next": "Next"
     },
     "refundStatus": {
       "pending_approval": "Pending approval",
@@ -39,12 +31,6 @@
       "discount_adjustment": "Discount adjustment",
       "error_correction": "Error correction"
     },
-    "discountEffect": {
-      "fixedAll": "{{amount}} off all fee categories on every future invoice.",
-      "fixedCategory": "{{amount}} off the \"{{category}}\" fee category on every future invoice.",
-      "percentAll": "{{amount}}% off all fee categories on every future invoice.",
-      "percentCategory": "{{amount}}% off the \"{{category}}\" fee category on every future invoice."
-    },
     "auditTrailModal": {
       "title": "Audit trail",
       "description": "Every recorded change to this record, oldest first.",
@@ -54,47 +40,12 @@
       "system": "System",
       "entryMeta": "<strong>{{action}}</strong> by {{actor}} · {{date}}"
     },
-    "studentPicker": {
-      "placeholder": "Search by name or admission number",
-      "noMatches": "No students match."
-    },
     "invoicePicker": {
       "paidToDate": "Paid to date: {{amount}} {{currency}}",
       "placeholder": "Search by student or invoice number",
       "helper": "Only submitted invoices with a paid amount can be refunded.",
       "paid": "Paid {{amount}} {{currency}}",
       "noMatches": "No refundable invoices match."
-    },
-    "scholarships": {
-      "title": "Scholarship & discount awards",
-      "description": "Pending awards need confirmation from a different user before they apply to invoices.",
-      "awardScholarship": "Award scholarship",
-      "caption": "Scholarship and discount awards",
-      "loadError": "Unable to load awards.",
-      "empty": "No awards match this filter.",
-      "confirm": "Confirm",
-      "ownAwardHint": "A different user must confirm this award.",
-      "confirmedToast": "Award confirmed",
-      "confirmTitle": "Confirm scholarship award?",
-      "confirmDescription": "This forwards the award to ERPNext. It cannot be undone from here.",
-      "confirmLabel": "Confirm award",
-      "confirmError": "The award could not be confirmed."
-    },
-    "newScholarship": {
-      "back": "← Back to scholarship awards",
-      "title": "Award a scholarship or discount",
-      "formLabel": "Scholarship award form",
-      "selectDiscount": "Select a scholarship or discount",
-      "reviewAward": "Review award",
-      "confirmTitle": "Award scholarship?",
-      "confirmDescription": "This creates a pending award. A different user must confirm it before it applies to any invoice.",
-      "confirmLabel": "Create award",
-      "createError": "The award could not be created.",
-      "createdLabel": "Award created",
-      "createdHeadline": "Award created — {{title}}",
-      "createdBody": "Pending confirmation from a different user. It will not apply to any invoice until confirmed.",
-      "awardAnother": "Award another scholarship",
-      "viewAwards": "View scholarship awards"
     },
     "refunds": {
       "title": "Refunds",

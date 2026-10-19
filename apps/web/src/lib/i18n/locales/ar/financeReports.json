@@ -9,21 +9,13 @@
       "amount": "المبلغ",
       "refundAmount": "مبلغ الاسترداد",
       "paidToDate": "المدفوع حتى تاريخه",
-      "scholarshipDiscount": "المنحة الدراسية / الخصم",
-      "effect": "الأثر",
       "created": "تاريخ الإنشاء",
       "status": "الحالة",
       "actions": "الإجراءات",
       "auditTrail": "سجل التدقيق",
       "allStatuses": "جميع الحالات",
       "previous": "السابق",
-      "next": "التالي",
-      "loading": "جارٍ التحميل…"
-    },
-    "awardStatus": {
-      "pending": "بانتظار التأكيد",
-      "confirmed": "مؤكَّد",
-      "cancelled": "ملغى"
+      "next": "التالي"
     },
     "refundStatus": {
       "pending_approval": "بانتظار الاعتماد",
@@ -39,12 +31,6 @@
       "discount_adjustment": "تعديل خصم",
       "error_correction": "تصحيح خطأ"
     },
-    "discountEffect": {
-      "fixedAll": "خصم {{amount}} على جميع فئات الرسوم في كل فاتورة مستقبلية.",
-      "fixedCategory": "خصم {{amount}} على فئة الرسوم \"{{category}}\" في كل فاتورة مستقبلية.",
-      "percentAll": "خصم {{amount}}% على جميع فئات الرسوم في كل فاتورة مستقبلية.",
-      "percentCategory": "خصم {{amount}}% على فئة الرسوم \"{{category}}\" في كل فاتورة مستقبلية."
-    },
     "auditTrailModal": {
       "title": "سجل التدقيق",
       "description": "كل تغيير مسجَّل على هذا السجل، من الأقدم إلى الأحدث.",
@@ -54,47 +40,12 @@
       "system": "النظام",
       "entryMeta": "<strong>{{action}}</strong> بواسطة {{actor}} · {{date}}"
     },
-    "studentPicker": {
-      "placeholder": "ابحث بالاسم أو رقم القيد",
-      "noMatches": "لا يوجد طلاب مطابقون."
-    },
     "invoicePicker": {
       "paidToDate": "المدفوع حتى تاريخه: {{amount}} {{currency}}",
       "placeholder": "ابحث باسم الطالب أو رقم الفاتورة",
       "helper": "لا يمكن الاسترداد إلا من الفواتير المعتمدة التي عليها مبلغ مدفوع.",
       "paid": "مدفوع {{amount}} {{currency}}",
       "noMatches": "لا توجد فواتير قابلة للاسترداد مطابقة."
-    },
-    "scholarships": {
-      "title": "منح المنح الدراسية والخصومات",
-      "description": "تحتاج المنح المعلّقة إلى تأكيد من مستخدم آخر قبل تطبيقها على الفواتير.",
-      "awardScholarship": "منح منحة دراسية",
-      "caption": "منح المنح الدراسية والخصومات",
-      "loadError": "تعذّر تحميل المنح.",
-      "empty": "لا توجد منح مطابقة لهذا الفلتر.",
-      "confirm": "تأكيد",
-      "ownAwardHint": "يجب أن يؤكد هذه المنحة مستخدم آخر.",
-      "confirmedToast": "تم تأكيد المنحة",
-      "confirmTitle": "تأكيد منح المنحة الدراسية؟",
-      "confirmDescription": "سيؤدي هذا إلى إرسال المنحة إلى ERPNext. لا يمكن التراجع عن ذلك من هنا.",
-      "confirmLabel": "تأكيد المنحة",
-      "confirmError": "تعذّر تأكيد المنحة."
-    },
-    "newScholarship": {
-      "back": "→ العودة إلى منح المنح الدراسية",
-      "title": "منح منحة دراسية أو خصم",
-      "formLabel": "نموذج منح المنحة الدراسية",
-      "selectDiscount": "اختر منحة دراسية أو خصمًا",
-      "reviewAward": "مراجعة المنحة",
-      "confirmTitle": "منح المنحة الدراسية؟",
-      "confirmDescription": "سيؤدي هذا إلى إنشاء منحة معلّقة. يجب أن يؤكدها مستخدم آخر قبل تطبيقها على أي فاتورة.",
-      "confirmLabel": "إنشاء المنحة",
-      "createError": "تعذّر إنشاء المنحة.",
-      "createdLabel": "تم إنشاء المنحة",
-      "createdHeadline": "تم إنشاء المنحة — {{title}}",
-      "createdBody": "بانتظار التأكيد من مستخدم آخر. لن تُطبَّق على أي فاتورة حتى يتم تأكيدها.",
-      "awardAnother": "منح منحة دراسية أخرى",
-      "viewAwards": "عرض منح المنح الدراسية"
     },
     "refunds": {
       "title": "المبالغ المستردة",

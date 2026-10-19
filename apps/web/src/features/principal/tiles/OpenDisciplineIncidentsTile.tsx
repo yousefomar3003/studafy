@@ -1,25 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { DashboardTile } from "../../../components/DashboardTile";
-import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { useTranslation } from "../../../lib/i18n";
 import { DISCIPLINE_SEVERITY_LABEL_KEYS, severityTone } from "../labels";
-import { fetchOpenDisciplineIncidents } from "../queries";
+import { useOpenIncidentsPreviewQuery } from "../queries";
 
-const PREVIEW_LIMIT = 5;
-
-/** No realtime event is routed for discipline incidents yet (`apps/realtime/src/event-routing.ts`
- * only routes `grades.published`), so this polls like the admin dashboard's other unrouted tiles. */
-const OPEN_INCIDENTS_POLL_MS = 60_000;
+/** The newest open incidents. Their count is the principal home's summary strip, not repeated here. */
 
 export function OpenDisciplineIncidentsTile() {
   const { t } = useTranslation();
-  const { formatNumber } = useFormatters();
-  const { data, isPending, isError } = useQuery({
-    queryKey: ["discipline-incidents", "open", PREVIEW_LIMIT],
-    queryFn: () => fetchOpenDisciplineIncidents(PREVIEW_LIMIT),
-    refetchInterval: OPEN_INCIDENTS_POLL_MS,
-  });
+  const { data, isPending, isError } = useOpenIncidentsPreviewQuery();
 
   const total = data?.total ?? 0;
   const items = data?.items ?? [];
@@ -30,12 +20,9 @@ export function OpenDisciplineIncidentsTile() {
       status={isPending ? "pending" : isError ? "error" : "ready"}
       errorMessage={t("principal.tiles.openIncidents.error")}
     >
-      <p className="dashboard-tile__value">{formatNumber(total)}</p>
-      <p className="dashboard-tile__caption">
-        {total === 0
-          ? t("principal.tiles.openIncidents.empty")
-          : t("principal.tiles.openIncidents.caption")}
-      </p>
+      {total === 0 ? (
+        <p className="dashboard-tile__caption">{t("principal.tiles.openIncidents.empty")}</p>
+      ) : null}
 
       {items.length > 0 ? (
         <ul className="principal-incident-list">

@@ -36,7 +36,9 @@ class TeacherSectionCard extends StatelessWidget {
               children: [
                 Icon(icon, size: 20, color: colorScheme.primary),
                 const SizedBox(width: AppSpacing.space8),
-                Expanded(child: Text(titleKey.tr(), style: textTheme.titleMedium)),
+                Expanded(
+                  child: Text(titleKey.tr(), style: textTheme.titleMedium),
+                ),
                 ?trailing,
               ],
             ),
@@ -52,7 +54,11 @@ class TeacherSectionCard extends StatelessWidget {
 /// A one-line, icon-led message for a card's non-content states (empty or errored). Mirrors the
 /// student screens' `TodayStateMessage`.
 class TeacherCardMessage extends StatelessWidget {
-  const TeacherCardMessage({required this.messageKey, required this.icon, super.key});
+  const TeacherCardMessage({
+    required this.messageKey,
+    required this.icon,
+    super.key,
+  });
 
   final String messageKey;
   final IconData icon;
@@ -69,7 +75,9 @@ class TeacherCardMessage extends StatelessWidget {
         Expanded(
           child: Text(
             messageKey.tr(),
-            style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],

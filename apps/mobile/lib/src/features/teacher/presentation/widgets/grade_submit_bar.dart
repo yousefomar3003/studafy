@@ -30,7 +30,10 @@ class GradeSubmitBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final canSubmit = submittableCount > 0 && !isSubmitting && saveStatus != GradeSaveStatus.saving;
+    final canSubmit =
+        submittableCount > 0 &&
+        !isSubmitting &&
+        saveStatus != GradeSaveStatus.saving;
 
     return Material(
       elevation: 3,
@@ -41,12 +44,14 @@ class GradeSubmitBar extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.space16),
           child: Row(
             children: [
-              Expanded(child: _SaveIndicator(
-                status: saveStatus,
-                lastSavedAt: lastSavedAt,
-                errorCode: errorCode,
-                onRetry: onRetrySave,
-              )),
+              Expanded(
+                child: _SaveIndicator(
+                  status: saveStatus,
+                  lastSavedAt: lastSavedAt,
+                  errorCode: errorCode,
+                  onRetry: onRetrySave,
+                ),
+              ),
               const SizedBox(width: AppSpacing.space12),
               FilledButton(
                 onPressed: canSubmit ? onSubmit : null,
@@ -56,8 +61,9 @@ class GradeSubmitBar extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Text(
-                        'teacher.grades.entry.submitCount'
-                            .tr(namedArgs: {'count': '$submittableCount'}),
+                        'teacher.grades.entry.submitCount'.tr(
+                          namedArgs: {'count': '$submittableCount'},
+                        ),
                       ),
               ),
             ],
@@ -84,13 +90,18 @@ class _SaveIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
 
     switch (status) {
       case GradeSaveStatus.saving:
         return Row(
           children: [
-            const SizedBox.square(dimension: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox.square(
+              dimension: 12,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
             const SizedBox(width: AppSpacing.space8),
             Text('teacher.grades.entry.saving'.tr(), style: muted),
           ],
@@ -108,20 +119,30 @@ class _SaveIndicator extends StatelessWidget {
                         ? 'teacher.grades.entry.saveConflict'
                         : 'teacher.grades.entry.saveFailed')
                     .tr(),
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
             ),
-            TextButton(onPressed: onRetry, child: Text('teacher.grades.entry.retry'.tr())),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('teacher.grades.entry.retry'.tr()),
+            ),
           ],
         );
       case GradeSaveStatus.saved:
         final savedText = lastSavedAt == null
             ? 'teacher.grades.entry.allSaved'.tr()
-            : 'teacher.grades.entry.savedAt'
-                .tr(namedArgs: {'time': DateFormat.Hm().format(lastSavedAt!)});
+            : 'teacher.grades.entry.savedAt'.tr(
+                namedArgs: {'time': DateFormat.Hm().format(lastSavedAt!)},
+              );
         return Row(
           children: [
-            Icon(Icons.cloud_done_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.cloud_done_outlined,
+              size: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: AppSpacing.space4),
             Flexible(child: Text(savedText, style: muted)),
           ],

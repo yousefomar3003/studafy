@@ -135,6 +135,49 @@ export async function getStudent(
   return { ...row, status: row.status as StudentStatus };
 }
 
+export interface StudentSelfRow extends StudentRow {
+  enrolled_class_ids: string[];
+}
+
+/**
+ * Resolve the caller's own student record plus the ids of the active classes they are actively
+ * enrolled in. Keyed on the session's user id, never a client-supplied student id; RLS
+ * (`role_scope_visibility` on students/enrollments/classes) additionally limits a student to their
+ * own rows. Returns undefined when the user has no student record in this school.
+ */
+export async function getStudentSelfByUserId(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+): Promise<StudentSelfRow | undefined> {
+  const [row] = await tx<StudentRow[]>`
+    SELECT s.id, s.school_id, s.user_id, s.admission_number,
+           s.first_name, s.middle_name, s.last_name, s.preferred_name,
+           s.date_of_birth, s.nationality_country_id, s.admission_date,
+           s.status, s.created_at, s.updated_at
+    FROM app.students s
+    WHERE s.user_id = ${userId}::uuid AND s.school_id = ${schoolId}
+  `;
+  if (!row) return undefined;
+
+  const classRows = await tx<{ class_id: string }[]>`
+    SELECT e.class_id
+    FROM app.enrollments e
+    JOIN app.classes c ON c.id = e.class_id AND c.school_id = e.school_id
+    WHERE e.school_id = ${schoolId}
+      AND e.student_id = ${row.id}::uuid
+      AND e.status = 'active'
+      AND c.status = 'active'
+    ORDER BY e.class_id
+  `;
+
+  return {
+    ...row,
+    status: row.status as StudentStatus,
+    enrolled_class_ids: classRows.map((r) => r.class_id),
+  };
+}
+
 export async function getStudentGuardians(
   tx: TransactionSql,
   schoolId: string,
@@ -155,7 +198,8 @@ export async function createStudent(
   schoolId: string,
   params: CreateStudentBody,
 ): Promise<StudentRow> {
-  const normalizedEmail = params.email.toLowerCase().trim();
+  const email = params.email?.trim() || null;
+  const normalizedEmail = email?.toLowerCase() ?? null;
   const normalizedAdmission = params.admission_number.toLowerCase().trim();
 
   // Pre-check admission number for a friendly error.
@@ -179,7 +223,7 @@ export async function createStudent(
     INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
     VALUES (
       ${schoolId},
-      ${params.email},
+      ${email},
       ${normalizedEmail},
       ${params.first_name || params.last_name},
       'active'::app.user_status
@@ -271,7 +315,7 @@ export async function createStudent(
     action: "insert",
     targetTable: "users",
     targetId: user.id,
-    newValues: { email: params.email, status: "active" },
+    newValues: { email, status: "active" },
   });
 
   // Audit: role assignment.

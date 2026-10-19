@@ -17,6 +17,7 @@ import 'package:studafy_mobile/src/core/api/generated/models/unread_only.dart';
 import 'package:studafy_mobile/src/core/api/generated/notifications/notifications_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/studafy_api_client.dart';
 import 'package:studafy_mobile/src/features/parent/data/family_finance_client.dart';
+import 'package:studafy_mobile/src/features/parent/domain/child_timetable.dart';
 import 'package:studafy_mobile/src/features/parent/domain/family_finance.dart';
 
 // ---------------------------------------------------------------------------
@@ -352,6 +353,44 @@ FamilyStudentFinance financeSection({
       receipts: receipts,
       totals: totals,
     );
+
+/// One slot of `GET /api/reports/children/{id}/timetable`. [courseName] null means the class has
+/// no course; teacher / room are omitted when their names are null.
+Map<String, Object?> childTimetableSlotJson({
+  String id = 'slot-1',
+  int weekday = DateTime.sunday,
+  int period = 1,
+  String classCode = 'SCI-7A',
+  String? courseName = 'Science',
+  String? teacherName = 'Rana Haddad',
+  String? roomName = 'Lab 2',
+}) => {
+  'id': id,
+  'weekday': weekday,
+  'period': period,
+  'class': {'id': 'class-$id', 'code': classCode},
+  'course': courseName == null
+      ? null
+      : {'id': 'course-$id', 'code': 'C', 'name': courseName},
+  'teacher': teacherName == null
+      ? null
+      : {'id': 'teacher-$id', 'name': teacherName},
+  'room': roomName == null ? null : {'id': 'room-$id', 'name': roomName},
+};
+
+/// A child's timetable. [published] false is "no approved version this term".
+ChildTimetable childTimetableFixture({
+  String studentId = 'child-1',
+  bool published = true,
+  List<int> schoolDays = const [7, 1, 2, 3, 4],
+  List<Map<String, Object?>> slots = const [],
+}) => ChildTimetable.fromJson({
+  'student_id': studentId,
+  'term_id': 'term-1',
+  'timetable_version_id': published ? 'version-1' : null,
+  'settings': {'school_days': schoolDays, 'periods_per_day': 7},
+  'slots': slots,
+});
 
 // ---------------------------------------------------------------------------
 // Fake domain clients — only the methods the parent providers call.

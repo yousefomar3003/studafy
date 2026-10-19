@@ -200,9 +200,6 @@ export default function ImportStudentsPage() {
 
   return (
     <>
-      <p className="students-profile__back">
-        <Link to="/portal/admin/students">{t("adminPeople.students.backToStudents")}</Link>
-      </p>
       <h1>{t("adminPeople.students.import.page.title")}</h1>
       <p>{t("adminPeople.students.import.page.intro")}</p>
 

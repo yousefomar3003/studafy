@@ -282,7 +282,7 @@ Audit queries must carry a `created_at` bound or they probe every monthly partit
 ## Run locally
 
 ```bash
-POSTGRES_PASSWORD=studafy_local docker compose -f db/compose.yml up -d --wait
+POSTGRES_PASSWORD=studafy_local docker compose up -d --wait test-postgres test-redis
 
 export TEST_DATABASE_URL='postgresql://studafy_test:studafy_local@127.0.0.1:54329/postgres?sslmode=disable'
 export TEST_REDIS_URL='redis://127.0.0.1:6390'

@@ -1,9 +1,13 @@
 import { z } from "@hono/zod-openapi";
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
-export const pendingItemTypeSchema = z.enum(["grade_submission", "timetable_version"]).openapi({
-  description: "Type of entity awaiting approval.",
-});
+export const pendingItemTypeSchema = z
+  .enum(["grade_submission", "grade_revision", "timetable_version"])
+  .openapi({
+    description:
+      "Type of entity awaiting approval. `grade_revision` is a teacher's correction to grades " +
+      "that are already published.",
+  });
 
 export const gradeSubmissionDiffSchema = z
   .object({
@@ -32,6 +36,32 @@ export const gradeSubmissionDiffSchema = z
 
 export type GradeSubmissionDiff = z.infer<typeof gradeSubmissionDiffSchema>;
 
+export const gradeRevisionDiffSchema = z
+  .object({
+    gradebook_id: uuidSchema,
+    gradebook_class_code: z
+      .string()
+      .openapi({ description: "Class code from the linked gradebook." }),
+    grade_submission_id: uuidSchema,
+    student_id: uuidSchema,
+    student_name: z.string().openapi({ description: "Display name of the student." }),
+    reason: z.string().openapi({ description: "The teacher's reason for the correction." }),
+    changes: z
+      .array(
+        z.object({
+          grade_id: uuidSchema,
+          label: z.string(),
+          max_score: z.number(),
+          previous_score: z.number().nullable(),
+          new_score: z.number().nullable(),
+        }),
+      )
+      .openapi({ description: "Each corrected assessment: published score and proposed score." }),
+  })
+  .openapi("GradeRevisionDiff");
+
+export type GradeRevisionDiff = z.infer<typeof gradeRevisionDiffSchema>;
+
 export const timetableVersionDiffSchema = z
   .object({
     version_name: z.string().openapi({ description: "Name of the timetable version." }),
@@ -54,9 +84,11 @@ export const approvalQueueItemSchema = z
     }),
     requested_at: dateTimeSchema.nullable(),
     decided_at: dateTimeSchema.nullable(),
-    diff: z.union([gradeSubmissionDiffSchema, timetableVersionDiffSchema]).openapi({
-      description: "Type-specific payload describing what is being approved.",
-    }),
+    diff: z
+      .union([gradeSubmissionDiffSchema, gradeRevisionDiffSchema, timetableVersionDiffSchema])
+      .openapi({
+        description: "Type-specific payload describing what is being approved.",
+      }),
   })
   .openapi("ApprovalQueueItem");
 

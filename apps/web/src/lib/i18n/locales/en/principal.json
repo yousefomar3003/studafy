@@ -4,7 +4,7 @@
     "loading": "Loading…"
   },
   "dashboard": {
-    "title": "Principal",
+    "title": "Leadership overview",
     "description": "Everything you oversee as principal: grades, the school calendar, timetable, classes and students, plus what needs your attention today.",
     "links": {
       "grades": "Grades →",
@@ -14,6 +14,7 @@
       "students": "Students →",
       "attendance": "Attendance →",
       "discipline": "Discipline →",
+      "messageReports": "Message reports →",
       "evaluations": "Teacher evaluations →",
       "approvals": "Approvals →",
       "announcements": "Announcements →"
@@ -41,6 +42,13 @@
       "empty": "No open incidents.",
       "caption": "reported, under review, or escalated",
       "link": "View discipline incidents →"
+    },
+    "openMessageReports": {
+      "title": "Open message reports",
+      "error": "Unable to load message reports.",
+      "empty": "No open message reports.",
+      "caption": "pending or in review",
+      "link": "Review message reports →"
     },
     "draftEvaluations": {
       "title": "Draft evaluations",
@@ -102,6 +110,7 @@
     "reject": "Reject",
     "itemType": {
       "grade_submission": "Grade submission",
+      "grade_revision": "Grade correction",
       "timetable_version": "Timetable version"
     },
     "toast": {
@@ -140,7 +149,12 @@
       "empty": "No grade records in this submission.",
       "version": "Version",
       "term": "Term",
-      "slots": "Timetable slots"
+      "slots": "Timetable slots",
+      "reason": "Teacher's reason",
+      "changesCaption": "Proposed corrections to {{student}}'s published grades",
+      "publishedScore": "Published score",
+      "proposedScore": "Proposed score",
+      "noChanges": "No score changes in this correction."
     }
   },
   "discipline": {
@@ -265,6 +279,110 @@
       "submit": "Resolve",
       "success": "Incident resolved",
       "failed": "Couldn't resolve incident"
+    }
+  },
+  "messageReports": {
+    "status": {
+      "pending": "Pending",
+      "in_review": "In review",
+      "actioned": "Actioned",
+      "dismissed": "Dismissed"
+    },
+    "priority": {
+      "urgent": "Urgent",
+      "high": "High",
+      "normal": "Normal"
+    },
+    "reason": {
+      "harassment": "Harassment",
+      "inappropriate": "Inappropriate content",
+      "spam": "Spam",
+      "safety_concern": "Safety concern",
+      "other": "Other"
+    },
+    "role": {
+      "parent": "Parent",
+      "teacher": "Teacher"
+    },
+    "party": "{{name}} ({{role}})",
+    "overdue": "Overdue",
+    "respondBy": "Respond by {{time}}",
+    "list": {
+      "title": "Message reports",
+      "description": "Reports parents and teachers have filed about messages. Urgent and overdue reports come first.",
+      "statusLabel": "Status",
+      "filterOpen": "Open",
+      "filterAll": "All",
+      "caption": "Message reports",
+      "columns": {
+        "priority": "Priority",
+        "reason": "Reason",
+        "reported": "Reported user",
+        "reporter": "Reported by",
+        "student": "Student",
+        "createdAt": "Reported at",
+        "status": "Status",
+        "review": "Review"
+      },
+      "reviewLink": "Review",
+      "reviewLinkLabel": "Review report about {{name}}",
+      "empty": "No message reports match this filter.",
+      "error": "Unable to load message reports.",
+      "range": "Showing {{from}}–{{to}} of {{total}}",
+      "previous": "← Previous",
+      "next": "Next →"
+    },
+    "detail": {
+      "back": "← Back to message reports",
+      "loadError": "Unable to load this report.",
+      "notFound": "This report doesn't exist or is no longer available.",
+      "overdueWarning": "Overdue — a response was due by {{time}}.",
+      "priority": "Priority",
+      "status": "Status",
+      "respondBy": "Respond by",
+      "reporter": "Reported by",
+      "reported": "Reported user",
+      "student": "Student",
+      "createdAt": "Reported at",
+      "block": "Messaging block",
+      "blockYes": "Blocked",
+      "blockNo": "Not blocked",
+      "details": "Reporter's details",
+      "noDetails": "The reporter didn't add any details.",
+      "review": "Review",
+      "startReview": "Start review",
+      "markActioned": "Mark actioned",
+      "dismiss": "Dismiss",
+      "inReviewBy": "Review started by {{name}}.",
+      "resolutionNote": "Resolution note",
+      "reviewedBy": "Reviewed by",
+      "reviewedAt": "Reviewed at",
+      "transcript": "Conversation evidence",
+      "transcriptHint": "The messages as they read when the report was filed, oldest first.",
+      "transcriptHintImages": "The messages as they read when the report was filed, oldest first. Image links expire after 5 minutes — refresh them if an image won't open.",
+      "transcriptEmpty": "No messages were captured with this report.",
+      "reportedMessage": "Reported message",
+      "refreshImages": "Refresh images",
+      "imageAlt": "Image sent by {{name}}",
+      "openImage": "Open full-size image sent by {{name}} in a new tab",
+      "imageUnavailable": "Image unavailable",
+      "toast": {
+        "in_review": "Review started",
+        "actioned": "Report marked as actioned",
+        "dismissed": "Report dismissed"
+      },
+      "updateFailed": "Couldn't update the report",
+      "conflictTitle": "This report was already updated",
+      "conflictDescription": "Someone else changed its status. The latest version is shown now."
+    },
+    "resolve": {
+      "actionedTitle": "Mark report as actioned",
+      "dismissedTitle": "Dismiss report",
+      "description": "Closing a report is final. Record what was done or why no action is needed.",
+      "note": "Resolution note",
+      "noteRequired": "Enter a resolution note (up to 2000 characters).",
+      "actionedSubmit": "Mark actioned",
+      "dismissedSubmit": "Dismiss report"
     }
   },
   "evaluations": {
@@ -477,16 +595,6 @@
       "unexcused": "Unexcused absences",
       "tardy": "Tardy"
     },
-    "trend": {
-      "title": "Attendance trend",
-      "description": "Present rate over the selected period",
-      "loading": "Loading attendance trend…",
-      "empty": "No trend data is available.",
-      "chartTitle": "Attendance present-rate trend",
-      "pointDescription": "{{date}}: {{percent}} percent",
-      "legendLabel": "Trend values",
-      "legendItem": "{{date}}: {{percent}}"
-    },
     "correction": {
       "title": "Request attendance correction",
       "description": "{{date}} · Current status: {{status}}",
@@ -675,9 +783,26 @@
       "titleRequired": "Enter a title.",
       "datesRequired": "Choose a start and end date.",
       "endBeforeStart": "The end date can't be before the start date."
-    },
-    "import": {
-      "title": "Import calendar events"
     }
+  },
+  "home": {
+    "stats": {
+      "approvalsHint": "Awaiting your review",
+      "incidents": "Open incidents",
+      "incidentsHint": "Reported, under review or escalated",
+      "reports": "Message reports",
+      "reportsHint": "Pending or in review",
+      "evaluationsHint": "Awaiting scoring, submission or sharing"
+    },
+    "summary": {
+      "approvals_one": "{{count}} grade approval is waiting on you",
+      "approvals_other": "{{count}} grade approvals are waiting on you",
+      "incidents_one": "{{count}} discipline incident is still open",
+      "incidents_other": "{{count}} discipline incidents are still open",
+      "reports_one": "{{count}} message report needs a response",
+      "reports_other": "{{count}} message reports need a response"
+    },
+    "attentionHeading": "Needs attention",
+    "activityHeading": "School activity"
   }
 }

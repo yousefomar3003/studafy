@@ -5,7 +5,6 @@ import type {
   AttendanceFilters,
   AttendanceRecordHistory,
   AttendanceSummary,
-  AttendanceTrends,
   CorrectedAttendanceRecord,
 } from "../types";
 
@@ -35,21 +34,6 @@ export async function fetchAttendanceSummary(
   // recursive response transform. Restore the concrete schema type at this boundary (same seam as
   // the established principal attendance query adapter).
   return data as AttendanceSummary;
-}
-
-export async function fetchAttendanceTrends(filters: AttendanceFilters): Promise<AttendanceTrends> {
-  const interval = filters.interval === "term" ? "month" : filters.interval;
-  const { data } = await api.GET("/api/attendance/reports/trends", {
-    params: {
-      query: {
-        ...scope(filters),
-        interval,
-        ...(filters.classId ? { class_id: filters.classId } : {}),
-      },
-    },
-  });
-  if (!data) throw new Error("Attendance trends returned no data.");
-  return data as AttendanceTrends;
 }
 
 export async function createAttendanceExport(

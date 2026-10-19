@@ -1,4 +1,4 @@
-# Deploy manifests: `apps/api`, `apps/realtime`, `apps/workers`, the ERPNext plane
+# Deploy manifests: `apps/api`, `apps/realtime`, `apps/workers`, migrations, the ERPNext plane
 
 ECS Fargate task-definition and service manifests, one per service per concern, plus the scripts
 that render and apply them. Target platform and why it's ECS (not Kubernetes or Compose), and why
@@ -13,12 +13,34 @@ infra/deploy/
 ├── ecs/
 │   ├── api/{task-definition,service}.json.tpl
 │   ├── realtime/{task-definition,service}.json.tpl
-│   └── workers/{task-definition,service}.json.tpl
-├── preview/    — per-PR preview: one two-container task-definition template + its nginx.conf + web.Dockerfile
-├── erpnext/seed/    — synthetic seed fixtures for the ERPNext plane's seed tenant (see its own README)
-├── environments/{dev,staging,prod,preview}.env    — replica counts, cpu/memory, rolling-update thresholds
-└── scripts/{render,migrate,deploy,rollback,populate-env,annotate-deploy,erpnext-new-site,preview-db,preview-up,preview-down}.sh
+│   ├── workers/{task-definition,service}.json.tpl
+│   └── migrations/task-definition.json.tpl    — one-off task, no service
+├── environments/{dev,staging,prod,preview}.env    — see "Environment files" below
+├── scripts/                                       — see "Scripts" below
+├── preview/    — per-PR preview: two-container task-definition template + its test, nginx.conf, web.Dockerfile
+├── erpnext/
+│   ├── seed/      — synthetic seed fixtures for the ERPNext plane's seed tenant (see its own README)
+│   └── backup/    — erpnext-backup.sh (nightly) and erpnext-restore-drill.sh (monthly), baked into
+│                    the erpnext image and run by modules/backup's scheduled tasks
+└── task-definitions.test.ts    — renders the api/workers templates and checks every env file sets
+                                  APP_ENV and WEB_ORIGIN
 ```
+
+### Scripts
+
+| Script                                              | What it does                                                                                                                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `render.sh`                                         | Renders one `.json.tpl` for a service + environment from `terraform output` and `environments/<env>.env`; prints JSON to stdout.                                         |
+| `populate-env.sh`                                   | Fills the blank `ECS_*`/subnet/security-group/target-group lines of `environments/<env>.env` from `terraform output`, in place.                                          |
+| `migrate.sh`                                        | Verifies the signed migrations image and runs it as a one-off Fargate task; a non-zero exit stops the deploy.                                                            |
+| `deploy.sh`                                         | Verifies an image's cosign signature, registers a task-definition revision, and rolls `api`, `realtime`, or `workers` to it.                                             |
+| `rollback.sh`                                       | Manual rollback of one service to a previous task-definition revision (default: current - 1).                                                                            |
+| `annotate-deploy.sh`                                | Writes one line to `modules/monitoring`'s deploy log group (the dashboard's "Recent deploys" table).                                                                     |
+| `rotate-app-secret.sh`                              | Rotates one key in a service's `app-secrets` container through Terraform, then rolls the service.                                                                        |
+| `erpnext-new-site.sh`                               | One-shot `bench new-site` for one school on the ERPNext plane (optionally `--seed`).                                                                                     |
+| `run-postgres-restore-verify.sh`                    | Operator wrapper: launches `modules/backup`'s Postgres restore-verify ECS task on demand (in-container script: `infra/docker/backup-verify/postgres-restore-verify.sh`). |
+| `run-erpnext-restore-drill.sh`                      | Operator wrapper: launches `modules/backup`'s ERPNext restore-drill ECS task on demand (in-container script: `erpnext/backup/erpnext-restore-drill.sh`).                 |
+| `preview-db.sh`, `preview-up.sh`, `preview-down.sh` | PR preview lifecycle; see "PR preview environments" below.                                                                                                               |
 
 The ERPNext plane (`infra/terraform/modules/erpnext`) has no `ecs/erpnext/*.json.tpl` pair here —
 unlike api/realtime/workers, its ECS task definitions and services are Terraform-owned directly
@@ -39,6 +61,24 @@ added to.
 `envsubst` over it — `.json` would make this repo's own prettier pre-commit hook (which formats
 every staged `*.json` file) try to parse it as JSON and fail. `scripts/render.sh` takes the
 template path as an explicit argument, so it has no hardcoded extension assumption either way.
+
+## Environment files
+
+`environments/<env>.env` is sourced by `render.sh` (`set -a`), so every key is available to the
+templates' `${VAR}` placeholders. Values that `terraform output` can supply are never duplicated here.
+
+| Key(s)                                                                                                                                          | Meaning                                                                                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ECS_CLUSTER`, `ECS_EXECUTION_ROLE_ARN`, `PRIVATE_APP_SUBNET_IDS`, `APP_SECURITY_GROUP_ID`, `API_TARGET_GROUP_ARN`, `REALTIME_TARGET_GROUP_ARN` | Committed blank; filled by `populate-env.sh` from `terraform output` inside each workflow job.                                                                                                                    |
+| `APP_ENV`                                                                                                                                       | The API's deploy tier (`development` / `staging` / `production`). Anything but `development` enforces `CORS_ALLOWED_ORIGINS` and an enforcing CSP.                                                                |
+| `WEB_ORIGIN`                                                                                                                                    | The web app's public origin; must match `web_origin` in `infra/terraform/environments/<env>/<env>.tfvars`. Dev: `http://localhost:5180`; staging: `https://staging.studafy.com`; prod: `https://app.studafy.com`. |
+| `OTEL_COLLECTOR_ENDPOINT`, `SENTRY_ENVIRONMENT`                                                                                                 | Tracing endpoint and Sentry environment name.                                                                                                                                                                     |
+| `<SERVICE>_DESIRED_COUNT`, `_CPU`, `_MEMORY`, `_MIN_HEALTHY_PERCENT`, `_MAX_PERCENT`                                                            | Replica count, task size, and rolling-update thresholds per service.                                                                                                                                              |
+
+The templates map `APP_ENV` and `WEB_ORIGIN` as follows: the api task gets `APP_ENV`,
+`CORS_ALLOWED_ORIGINS=${WEB_ORIGIN}`, and `FRONTEND_URL=${WEB_ORIGIN}`; the workers task gets
+`FRONTEND_URL=${WEB_ORIGIN}` (links in emails). `task-definitions.test.ts` fails if an env file
+drops either key. `preview.env` is separate; see "PR preview environments".
 
 ## Rolling update strategy (the ticket's core ask)
 
@@ -79,29 +119,22 @@ raw TCP check against `REDIS_URL`), and it has no target group at all — it's n
 
 ## env-from-secrets
 
-`containerDefinitions[].secrets` injects from `infra/terraform/modules/secrets`'s per-service
-`<name_prefix>/<service>/app-secrets` containers, `<arn>:<key>::` syntax (the convention
-`docs/runbooks/secrets-conventions.md` already documented, ahead of any compute tier existing to
-use it):
+`containerDefinitions[].secrets` injects Secrets Manager keys with the `<arn>:<key>::` syntax
+(`docs/runbooks/secrets-conventions.md`). Today's templates use:
 
-- **`realtime`**: `WS_JWT_SECRET` — real, wired, one-to-one (`apps/realtime/src/env.ts` reads
-  exactly this key from exactly this secret).
-- **`api`**: empty `"secrets": []`. `apps/api/src/env.ts` has no secret-shaped variable today
-  (`NODE_ENV`, `PORT`, `HOST`, `SHUTDOWN_TIMEOUT_MS` only) — an empty array here is accurate, not
-  an oversight.
-- **`workers`**: empty `"secrets": []`, for the same reason as `api`.
+- **`api`**: `DATABASE_USER`/`DATABASE_PASSWORD`/`DATABASE_CA_CERT` from the PgBouncer secret,
+  `REDIS_URL` from the Redis secret's `queue_url`, and `TAP_SECRET_KEY`/`TAP_WEBHOOK_URL`/`SENTRY_DSN`
+  from `<name_prefix>/api/app-secrets`.
+- **`workers`**: the same database and `REDIS_URL` (`queue_url`) keys, plus
+  `STRIPE_SECRET_KEY`/`TAP_SECRET_KEY`/`TAP_WEBHOOK_URL`/`SENTRY_DSN` from its own app-secrets.
+- **`realtime`**: `WS_JWT_SECRET` and `SENTRY_DSN` from its app-secrets, and `REDIS_URL` from the
+  Redis secret's `pubsub_url`.
+- **`migrations`**: `DATABASE_HOST`/`PORT`/`NAME`/`USER`/`PASSWORD` from the Postgres connection
+  secret (it connects directly to RDS, not PgBouncer).
 
-**`REDIS_URL` is deliberately not wired**, for `realtime` or `workers`. Both read a single
-`REDIS_URL` connection-string env var, but `modules/redis`'s secret stores separate fields
-(`auth_token`, `primary_endpoint`, `reader_endpoint`, `port`, `tls`, ...) — `secrets-conventions.md`
-already flags composing those into one string as "a task-definition-level concern... that belongs
-to whatever ticket adds the compute module," which isn't fully this one either. ECS's `secrets`
-field maps one Secrets Manager key to exactly one env var; it cannot compute a URL from five of
-them. Closing this gap needs either `apps/realtime`/`apps/workers`' `env.ts` to accept split
-`REDIS_HOST`/`REDIS_PORT`/`REDIS_AUTH_TOKEN` vars and compose the URL itself, or a small
-container-level init step — an application change, not a manifest change, so it's not done here.
-Same reasoning applies to `apps/api` and Postgres/PgBouncer: `apps/api/src/env.ts` has no database
-variable at all yet, so there is nothing for this ticket to wire.
+The Redis secret stores ready-made `queue_url`/`pubsub_url` connection strings, so no composition
+step is needed in the task definition. The task definitions are the source of truth; check them
+before relying on this list.
 
 ## Metrics scrape wiring (ST-259)
 
@@ -132,17 +165,17 @@ infrastructure this repo has given no other indication it wants, not "authoring 
 
 ## Why not `apps/web`
 
-`apps/web` has a Dockerfile (`infra/docker/web.Dockerfile`) but no ECR repository —
-`modules/registry`'s `image_repository_names` default is `["api", "realtime", "workers"]`, on
-purpose, because whether `apps/web` ships as a CDN-hosted static bundle (`modules/cdn`, already
-provisioned) or a containerized nginx image hasn't been decided (`infra/docker/README.md`'s "Known
-gaps"). Authoring ECS manifests for it here would be picking that decision by default, silently,
-from the wrong ticket. Out of scope until that's resolved.
+`apps/web` has a Dockerfile (`infra/docker/web.Dockerfile`) and an ECR repository (it is in
+`modules/registry`'s `image_repository_names` default), and `release.yml` builds and signs it — but
+nothing here deploys it. Whether `apps/web` ships as a CDN-hosted static bundle (`modules/cdn`,
+already provisioned) or a containerized nginx service is still undecided (see `staging-deploy.yml`'s
+`smoke` comment). Authoring ECS manifests for it here would be picking that decision by default,
+silently, from the wrong ticket. Out of scope until that's resolved.
 
 ## Staging auto-deploy pipeline (ST-255)
 
-`.github/workflows/staging-deploy.yml` runs `migrate.sh` → `deploy.sh` (api/realtime/workers, in
-parallel) → a post-deploy smoke check on every merge to `main`, with no human dispatch — the
+`.github/workflows/staging-deploy.yml` runs `migrate.sh` → `populate-env.sh` + `deploy.sh`
+(api/realtime/workers, in parallel) → a post-deploy smoke check on every merge to `main`, with no human dispatch — the
 continuous-delivery counterpart to `deploy.yml`'s manual, any-environment dispatch. Full runbook:
 `docs/runbooks/deploy-rollback.md`'s "Staging auto-deploy" section. Two things worth knowing
 without reading that doc:
@@ -155,8 +188,8 @@ without reading that doc:
   `ClientsWaiting` alarm — so a GitHub issue is the interim alert: real, actionable, and zero new
   secrets, not a placeholder for a channel that doesn't exist.
 - **A smoke failure rolls back the service images, not the migration.** `packages/db`'s migration
-  runner has no "down" command (`cli.ts`'s command set is `migrate|status|validate|pending|seed`
-  only) — migrations are forward-only by design, so `scripts/rollback.sh` reverting api/realtime/
+  runner has no "down" command (`cli.ts`'s command set is `migrate|status|validate|pending` plus
+  the partition and `rls-coverage` maintenance commands) — migrations are forward-only by design, so `scripts/rollback.sh` reverting api/realtime/
   workers to their previous task-definition revision after a smoke failure can leave the schema
   ahead of the code it just rolled back to. This is why every migration in `db/migrations/` must
   stay backward-compatible with the previous release (expand/contract, additive-first) — a schema
@@ -169,8 +202,8 @@ as a "Recent deploys" table — the "deploy annotations appear in monitoring" ac
 ## Production deploy pipeline
 
 `.github/workflows/prod-deploy.yml` is the manual, approval-gated production path — `workflow_dispatch`
-only, never a merge trigger. It reuses the same scripts as staging (`migrate.sh` → `deploy.sh` →
-`rollback.sh`) in the same order, and adds four things staging does not have:
+only, never a merge trigger. It reuses the same scripts as staging (`migrate.sh` → `populate-env.sh` + `deploy.sh` →
+`populate-env.sh` + `rollback.sh`) in the same order, and adds four things staging does not have:
 
 - a `gate` job on the `prod` GitHub Environment, whose required-reviewers rule enforces the approval;
 - a `synthetics` job that asserts `/healthz`/`/readyz` and the realtime probe stay green _during_ the
@@ -214,6 +247,19 @@ Scripts:
   task-definition revisions, then **re-check the first three and exit non-zero on any residue** —
   that failing exit is the "teardown verified" acceptance gate.
 
+## Workflow inputs
+
+- **`populate-env.sh` runs in every job that deploys or rolls back**: `deploy.yml`'s `deploy` job
+  (after `terraform apply`), and the `deploy` and `rollback` jobs of both `staging-deploy.yml` and
+  `prod-deploy.yml`, each before `deploy.sh`/`rollback.sh`. The committed env files keep those lines
+  blank; nobody copies `terraform output` values by hand.
+- **Bastion inputs come from repository variables.** `bastion_allowed_ssh_cidrs` and
+  `bastion_key_name` have no default and are deliberately not in `*.tfvars`. `terraform.yml`'s plan
+  job and `deploy.yml`'s apply step pass them as `TF_VAR_bastion_allowed_ssh_cidrs` and
+  `TF_VAR_bastion_key_name` from the repository variables `BASTION_ALLOWED_SSH_CIDRS_<ENV>` (a JSON
+  list, e.g. `["203.0.113.4/32"]`) and `BASTION_KEY_NAME_<ENV>` (an existing EC2 key pair name), with
+  `<ENV>` = `DEV`, `STAGING`, or `PROD`.
+
 ## Known gaps / prerequisites
 
 Gaps 1–3 below are now closed by `infra/terraform/modules/compute` (the "future compute-tier
@@ -230,17 +276,16 @@ section is what a reader lands on when a `scripts/deploy.sh` run fails and needs
    `scripts/populate-env.sh <env>` after `terraform apply` to fill `environments/<env>.env`'s
    `ECS_CLUSTER`/`ECS_EXECUTION_ROLE_ARN`/`PRIVATE_APP_SUBNET_IDS`/`APP_SECURITY_GROUP_ID`/
    `API_TARGET_GROUP_ARN`/`REALTIME_TARGET_GROUP_ARN` lines in place — it used to be a manual
-   `terraform output` copy-paste; now it's a script.
+   `terraform output` copy-paste; now it's a script, and every deploy/rollback workflow job runs
+   it (see "Workflow inputs").
 3. ~~`infra/terraform/outputs.tf` doesn't export the two subnet/security-group values at the
    root.~~ **Resolved.** `private_app_subnet_ids` and `app_security_group_id` are now root
    outputs, which is exactly what `populate-env.sh` reads.
-4. **No task role exists for any service**, but none is referenced in `task-definition.json.tpl`
-   either — none of `apps/api`/`apps/realtime`/`apps/workers` makes an AWS SDK call from
-   application code today (secrets arrive via the execution role's injection, not app-level
-   `GetSecretValue` calls), so `taskRoleArn` is correctly omitted, not forgotten. The moment any of
-   the three starts calling AWS directly (e.g. presigned S3 URLs against `modules/storage`), it
-   needs a task role — attach `secrets_service_iam_policy_arns.<service>` to it at that point
-   (`docs/runbooks/secrets-conventions.md`). Still open; unrelated to 1–3 above.
+4. ~~No task role exists for any service.~~ **Resolved for `api` and `workers`.** Both now call
+   AWS directly (S3 for files and report artifacts), so `modules/compute` provisions
+   `compute_api_task_role_arn` and `compute_workers_task_role_arn`, which `render.sh` reads and the
+   templates set as `taskRoleArn`. `realtime` still makes no AWS SDK call and correctly has no task
+   role; give it one (and attach `secrets_service_iam_policy_arns.realtime`) if that changes.
 
 5. **No IAM role has exactly the permissions `deploy.sh`/`migrate.sh` need.**
    `modules/registry`'s `deploy_pull` role (environment-scoped via GitHub OIDC) covers only the ECR
@@ -248,7 +293,7 @@ section is what a reader lands on when a `scripts/deploy.sh` run fails and needs
    `DescribeServices`) and `iam:PassRole` half this script's own header comment lists has no
    Terraform-managed role anywhere in this repo yet. `deploy.yml` and `staging-deploy.yml` both
    work around this today by reusing `AWS_APPLY_ROLE_ARN` (the terraform-apply identity, broader
-   than either half needs) — least-privilege cleanup here is scoping `deploy_pull` up to cover the
+   than either half needs); `prod-deploy.yml` does the same — least-privilege cleanup here is scoping `deploy_pull` up to cover the
    ECS half, or a new dedicated role, not something this ticket's workflow authored.
 
 `scripts/deploy.sh` and `scripts/rollback.sh` are meant to work as written once `terraform apply`

@@ -25,6 +25,10 @@ final apiClientProvider = Provider<StudafyApiClient>((ref) {
   return createApiClient(
     baseUrl: baseUrl,
     getToken: () => session.tokenProvider,
+    onUnauthorized: () =>
+        ref.read(authNotifierProvider.notifier).handleAuthFailure(),
+    onSchoolClosed: () =>
+        ref.read(authNotifierProvider.notifier).handleSchoolClosed(),
   );
 });
 

@@ -2,12 +2,9 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Table, useToast } from "@studafy/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
-import { ExportCsvButton } from "../../../components/ExportCsvButton";
 import { ImportCsvButton } from "../../../components/ImportCsvButton";
 import { api } from "../../../lib/api";
-import { allRows } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { CriteriaTemplateModal } from "./CriteriaTemplateModal";
@@ -20,7 +17,7 @@ import {
 
 import type { CreateTemplateInput } from "./mutations";
 import type { EvaluationCriteriaTemplate } from "./queries";
-import type { ExportColumn, ImportSpec } from "../../../lib/data-transfer";
+import type { ImportSpec } from "../../../lib/data-transfer";
 import type { TFunction } from "i18next";
 
 import "./evaluations.css";
@@ -159,29 +156,6 @@ export default function CriteriaTemplatesPage() {
   const templates = templatesQuery.data ?? [];
   const queryClient = useQueryClient();
 
-  const exportColumns: ExportColumn<EvaluationCriteriaTemplate>[] = [
-    { header: t("principal.evaluations.templates.columns.title"), value: (row) => row.title },
-    {
-      header: t("principal.evaluations.templateModal.description"),
-      value: (row) => row.description,
-    },
-    {
-      header: t("principal.evaluations.templates.columns.maxScore"),
-      value: (row) => row.max_score,
-    },
-    {
-      header: t("principal.evaluations.templates.columns.sortOrder"),
-      value: (row) => row.sort_order,
-    },
-    {
-      header: t("principal.evaluations.templates.columns.status"),
-      value: (row) =>
-        row.is_active
-          ? t("principal.evaluations.templates.active")
-          : t("principal.evaluations.templates.inactive"),
-    },
-  ];
-
   function openCreate() {
     setEditing(null);
     setModalOpen(true);
@@ -194,22 +168,12 @@ export default function CriteriaTemplatesPage() {
 
   return (
     <>
-      <Link className="evaluations-detail__back" to="/portal/principal/evaluations">
-        {t("principal.evaluations.backToList")}
-      </Link>
-
       <div className="evaluations-list__header">
         <div>
           <h1>{t("principal.evaluations.templates.title")}</h1>
           <p>{t("principal.evaluations.templates.description")}</p>
         </div>
         <div className="evaluations-list__header-actions">
-          <ExportCsvButton
-            filename="criteria-templates"
-            columns={exportColumns}
-            getRows={() => Promise.resolve(allRows(templates))}
-            disabled={templatesQuery.isPending}
-          />
           <ImportCsvButton
             spec={templateImportSpec(t)}
             title={t("principal.evaluations.templates.import.title")}

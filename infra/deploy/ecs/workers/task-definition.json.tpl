@@ -15,6 +15,9 @@
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
         { "name": "SERVICE_NAME", "value": "workers" },
+        { "name": "FRONTEND_URL", "value": "${WEB_ORIGIN}" },
+        { "name": "RELEASE_VERSION", "value": "${IMAGE_TAG}" },
+        { "name": "SENTRY_ENVIRONMENT", "value": "${SENTRY_ENVIRONMENT}" },
         { "name": "METRICS_PORT", "value": "9464" },
         { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "${OTEL_COLLECTOR_ENDPOINT}" },
         { "name": "DATABASE_HOST", "value": "${PGBOUNCER_HOST}" },
@@ -34,7 +37,8 @@
         { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" },
         { "name": "STRIPE_SECRET_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:STRIPE_SECRET_KEY::" },
         { "name": "TAP_SECRET_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_SECRET_KEY::" },
-        { "name": "TAP_WEBHOOK_URL", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" }
+        { "name": "TAP_WEBHOOK_URL", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" },
+        { "name": "SENTRY_DSN", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:SENTRY_DSN::" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "bun healthcheck.ts"],

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/auth/oauth_browser.dart';
 import 'package:url_launcher_platform_interface/link.dart';
@@ -23,49 +24,130 @@ void main() {
     appLinks.close();
   });
 
-  test('returns the code from a callback that arrives after the browser opened', () async {
-    final browser = OAuthBrowser(appLinks: appLinks);
-    // A timer, not a microtask: the redirect lands well after `launchUrl` has returned, which is
-    // when an early-cancelled listener would already have missed it.
-    launcher.onLaunch = () => Timer(Duration.zero, () {
-      appLinks.emit(Uri.parse('studafy://auth/callback?code=abc&state=xyz'));
-    });
+  test(
+    'returns the code from a callback that arrives after the browser opened',
+    () async {
+      final browser = OAuthBrowser(appLinks: appLinks);
+      // A timer, not a microtask: the redirect lands well after `launchUrl` has returned, which is
+      // when an early-cancelled listener would already have missed it.
+      launcher.onLaunch = () => Timer(Duration.zero, () {
+        appLinks.emit(Uri.parse('studafy://auth/callback?code=abc&state=xyz'));
+      });
 
-    final callback = await browser
-        .authorize(authorizationUrl)
-        .timeout(const Duration(seconds: 2));
+      final callback = await browser
+          .authorize(authorizationUrl)
+          .timeout(const Duration(seconds: 2));
 
-    expect(callback.code, 'abc');
-    expect(callback.state, 'xyz');
-  });
+      expect(callback.code, 'abc');
+      expect(callback.state, 'xyz');
+    },
+  );
 
-  test('cancel ends a sign-in whose browser was closed without a callback', () async {
-    final browser = OAuthBrowser(appLinks: appLinks);
-    launcher.onLaunch = () => Timer(Duration.zero, browser.cancel);
+  test(
+    'cancel ends a sign-in whose browser was closed without a callback',
+    () async {
+      final browser = OAuthBrowser(appLinks: appLinks);
+      launcher.onLaunch = () => Timer(Duration.zero, browser.cancel);
+
+      await expectLater(
+        browser.authorize(authorizationUrl),
+        throwsA(
+          isA<OAuthCancelledException>().having(
+            (e) => e.reason,
+            'reason',
+            'cancelled',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'iOS signs in through an auth session that captures the callback itself',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final sessions = <(Uri, String)>[];
+      final browser = OAuthBrowser(
+        appLinks: appLinks,
+        webAuthSession: (url, scheme) async {
+          sessions.add((url, scheme));
+          return 'studafy://auth/callback?code=abc&state=xyz';
+        },
+      );
+
+      final callback = await browser.authorize(authorizationUrl);
+
+      expect(callback.code, 'abc');
+      expect(callback.state, 'xyz');
+      expect(sessions, [(authorizationUrl, 'studafy')]);
+      expect(launcher.modes, isEmpty);
+    },
+  );
+
+  test('iOS reports a closed sign-in sheet as cancelled', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final browser = OAuthBrowser(
+      appLinks: appLinks,
+      webAuthSession: (_, _) async => throw PlatformException(code: 'CANCELED'),
+    );
 
     await expectLater(
       browser.authorize(authorizationUrl),
-      throwsA(isA<OAuthCancelledException>().having((e) => e.reason, 'reason', 'cancelled')),
+      throwsA(
+        isA<OAuthCancelledException>().having(
+          (e) => e.reason,
+          'reason',
+          'cancelled',
+        ),
+      ),
     );
   });
 
-  test('iOS signs in inside the app and closes the sheet afterwards', () async {
+  test('iOS surfaces an IdP error from the callback', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    final browser = OAuthBrowser(appLinks: appLinks);
-    launcher.onLaunch = () => Timer(Duration.zero, browser.cancel);
+    final browser = OAuthBrowser(
+      appLinks: appLinks,
+      webAuthSession: (_, _) async =>
+          'studafy://auth/callback?error=access_denied',
+    );
 
-    await expectLater(browser.authorize(authorizationUrl), throwsA(isA<OAuthCancelledException>()));
-
-    expect(launcher.modes, [PreferredLaunchMode.inAppBrowserView]);
-    expect(launcher.closeCount, 1);
+    await expectLater(
+      browser.authorize(authorizationUrl),
+      throwsA(
+        isA<OAuthCancelledException>().having(
+          (e) => e.reason,
+          'reason',
+          'access_denied',
+        ),
+      ),
+    );
   });
+
+  test(
+    'cancel ends an iOS sign-in that is still waiting on the session',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final browser = OAuthBrowser(
+        appLinks: appLinks,
+        webAuthSession: (_, _) => Completer<String>().future,
+      );
+
+      final pending = browser.authorize(authorizationUrl);
+      browser.cancel();
+
+      await expectLater(pending, throwsA(isA<OAuthCancelledException>()));
+    },
+  );
 
   test('Android hands sign-in to the browser app', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     final browser = OAuthBrowser(appLinks: appLinks);
     launcher.onLaunch = () => Timer(Duration.zero, browser.cancel);
 
-    await expectLater(browser.authorize(authorizationUrl), throwsA(isA<OAuthCancelledException>()));
+    await expectLater(
+      browser.authorize(authorizationUrl),
+      throwsA(isA<OAuthCancelledException>()),
+    );
 
     expect(launcher.modes, [PreferredLaunchMode.externalApplication]);
     expect(launcher.closeCount, 0);

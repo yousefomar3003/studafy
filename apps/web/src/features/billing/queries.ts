@@ -17,8 +17,8 @@ export type SubscriptionPlan =
 
 // ---------------------------------------------------------------------------
 // Overview — moved here from `admin/billing-overview-query.ts` (ST-207): this feature is now the
-// canonical home for subscription state, and `SubscriptionStatusBanner`/`StorageUsageTile` on the
-// admin dashboard import this same hook rather than each dashboard re-querying it.
+// canonical home for subscription state, and `SubscriptionStatusBanner` on the admin
+// dashboard imports this same hook rather than re-querying it.
 // ---------------------------------------------------------------------------
 
 export const BILLING_OVERVIEW_QUERY_KEY = ["billing-overview"];
@@ -26,13 +26,13 @@ export const BILLING_OVERVIEW_QUERY_KEY = ["billing-overview"];
 /**
  * No realtime event is routed for billing or storage changes yet (see
  * apps/realtime/src/event-routing.ts — only grades.published is routed today), so the subscription
- * banner and storage tile poll instead, same fallback NotificationBell uses for its unread count.
+ * banner polls instead, same fallback NotificationBell uses for its unread count.
  */
 const BILLING_OVERVIEW_POLL_MS = 60_000;
 
 /**
  * Shared by every billing-overview reader (this feature's own pages, plus the admin dashboard's
- * `SubscriptionStatusBanner` and `StorageUsageTile`) — one query key lets TanStack Query dedupe the
+ * `SubscriptionStatusBanner`) — one query key lets TanStack Query dedupe the
  * request between them.
  */
 export function useBillingOverviewQuery() {
@@ -69,10 +69,9 @@ const INVOICES_PAGE_SIZE = 10;
 
 export async function fetchInvoicesPage(
   cursor: string | undefined,
-  limit: number = INVOICES_PAGE_SIZE,
 ): Promise<CursorPage<BillingInvoice>> {
   const { data } = await api.GET("/api/subscriptions/current/invoices", {
-    params: { query: { limit, startingAfter: cursor } },
+    params: { query: { limit: INVOICES_PAGE_SIZE, startingAfter: cursor } },
   });
   const invoices = (data?.invoices ?? []) as BillingInvoice[];
   const last = invoices.at(-1);
@@ -100,4 +99,44 @@ export async function fetchAiCheckoutStudent(studentId: string): Promise<AiCheck
   const { data } = await api.GET("/api/students/{studentId}", { params: { path: { studentId } } });
   if (!data) throw new Error("Student not found.");
   return data as AiCheckoutStudent;
+}
+
+// ---------------------------------------------------------------------------
+// Refund requests — the discreet "Request a refund" link on the billing pages. The school plan's
+// requests are every billing admin's to see; an AI add-on's are the ones the caller filed.
+// ---------------------------------------------------------------------------
+
+export type SubscriptionRefundRequest = components["schemas"]["SubscriptionRefundRequest"];
+export type SubscriptionRefundReason = components["schemas"]["SubscriptionRefundReason"];
+export type SubscriptionRefundScope = components["schemas"]["SubscriptionRefundScope"];
+
+export function refundRequestsQueryKey(scope: SubscriptionRefundScope) {
+  return ["refund-requests", scope] as const;
+}
+
+/** Only fetched while the refund dialog is open — the link itself costs the page nothing. */
+export function useRefundRequestsQuery(scope: SubscriptionRefundScope, enabled: boolean) {
+  return useQuery({
+    queryKey: refundRequestsQueryKey(scope),
+    queryFn: async () => {
+      const { data } =
+        scope === "school"
+          ? await api.GET("/api/subscriptions/current/refund-requests")
+          : await api.GET("/api/subscriptions/ai/refund-requests");
+      return (data?.requests ?? []) as SubscriptionRefundRequest[];
+    },
+    enabled,
+  });
+}
+
+/** The school's recent paid invoices, offered as the payment a school-plan refund is for. */
+export function useRefundableInvoicesQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: ["refund-requests", "invoices"],
+    queryFn: async () => {
+      const { items } = await fetchInvoicesPage(undefined);
+      return items.filter((invoice) => invoice.status === "paid" && invoice.amountPaid > 0);
+    },
+    enabled,
+  });
 }

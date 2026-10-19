@@ -12,7 +12,7 @@ import { integrationEnabled, runnerEnv, testDatabase } from "./helpers";
 
 import type { MigrationConfig } from "../src/config";
 
-// The seed integration test creates a disposable database, runs all 25 migrations, seeds 40+
+// The seed integration test creates a disposable database, runs every migration, seeds 40+
 // tables, and verifies index health — it needs a generous timeout budget (60 s) that conflicts
 // with the main CI suite's 10-second --timeout flag. Gating on SEED_INTEGRATION keeps it
 // skipped in the main `bun test` step so it only runs in the dedicated CI step.
@@ -28,7 +28,6 @@ function localConfig(overrides: Partial<MigrationConfig> = {}): MigrationConfig 
     url: "postgresql://studafy_test:pw@localhost:5432/postgres",
     ssl: false,
     migrationsDir: "db/migrations",
-    seedsDir: "db/seeds",
     redactions: [],
     ...overrides,
   };

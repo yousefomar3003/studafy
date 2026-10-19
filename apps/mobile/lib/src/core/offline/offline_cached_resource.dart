@@ -60,9 +60,20 @@ class OfflineCachedResource<T> {
   /// The offline-first read: yields the cached value immediately (if any) so the UI has
   /// something to show right away, then yields the outcome of [refresh] — the background refresh
   /// that reconciles the cache against the server.
-  Stream<CachedValue<T>> sync(String cacheKey, Future<T> Function() fetch) async* {
-    final cached = await peek(cacheKey);
-    if (cached != null) yield cached;
+  ///
+  /// [cacheFirst] false skips that initial cached yield and goes straight to [refresh] (which
+  /// still falls back to the cache when the network fails). For a *re*-sync of data already on
+  /// screen: the caller keeps showing what it has while the request runs, rather than briefly
+  /// swapping in the cached copy and flashing a staleness banner.
+  Stream<CachedValue<T>> sync(
+    String cacheKey,
+    Future<T> Function() fetch, {
+    bool cacheFirst = true,
+  }) async* {
+    if (cacheFirst) {
+      final cached = await peek(cacheKey);
+      if (cached != null) yield cached;
+    }
     yield await refresh(cacheKey, fetch);
   }
 }

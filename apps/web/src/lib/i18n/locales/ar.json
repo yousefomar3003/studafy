@@ -3,14 +3,19 @@
     "skipToContent": "تخطي إلى المحتوى",
     "primaryNavAriaLabel": "التنقل الرئيسي",
     "toggleNav": "تبديل التنقل",
-    "homeLink": "الصفحة الرئيسية لـ Studafy"
+    "homeLink": "الصفحة الرئيسية لـ Studafy",
+    "back": "رجوع"
   },
   "nav": {
     "ariaLabel": "البوابة",
     "home": "الرئيسية",
     "notifications": "الإشعارات",
     "admin": "الإدارة",
+    "staff": "حسابات الموظفين",
+    "members": "أعضاء المدرسة",
+    "attendance": "الحضور",
     "principal": "المدير",
+    "platform": "منصة Studafy",
     "billing": "الفوترة",
     "finance": "المالية",
     "approvals": "الموافقات",
@@ -113,15 +118,19 @@
     "previousFailed": "تعذّر إكمال طلب الحذف السابق. يرجى المحاولة مرة أخرى أو التواصل مع مدرستك.",
     "deleteButton": "حذف حسابي",
     "confirmTitle": "هل تريد حذف حسابك؟",
-    "confirmBody": "سيتم تسجيل خروجك من كل مكان فوراً. لا يمكن التراجع عن ذلك.",
+    "confirmBody": "سيتم تسجيل خروجك من كل مكان فوراً، وسيُحذف حسابك خلال 14 يومًا ما لم تسجّل الدخول وتلغِ الحذف.",
     "confirmButton": "حذف الحساب",
     "requestError": "تعذّر حذف حسابك",
     "tryAgain": "يرجى المحاولة مرة أخرى.",
-    "completedTitle": "جارٍ حذف حسابك",
-    "completedBody": "تم تسجيل خروجك من جميع الأجهزة. ستُمسح بياناتك الشخصية بحلول {{date}}.",
-    "completedAiCanceled": "لن يتجدد اشتراكك في الذكاء الاصطناعي.",
+    "completedTitle": "تمت جدولة حذف حسابك",
+    "completedBody": "تم تسجيل خروجك من جميع الأجهزة. سيُحذف حسابك في {{scheduledDate}}؛ سجّل الدخول قبل ذلك لإلغاء الحذف. ستُمسح بياناتك الشخصية بحلول {{date}}.",
     "completedRetainedIntro": "تحتفظ مدرستك بهذه السجلات فقط، كما يقتضي القانون:",
     "completedDone": "تم",
+    "pendingGateTitle": "حسابك مجدول للحذف",
+    "pendingGateBody": "سيُحذف حسابك في {{date}}. ألغِ الحذف لمتابعة استخدام Studafy.",
+    "pendingGateCancel": "إلغاء الحذف",
+    "pendingGateSignOut": "تسجيل الخروج",
+    "pendingGateFailed": "تعذّر إلغاء الحذف. حاول مرة أخرى.",
     "retained": {
       "academic_grades": "الدرجات، دون اسمك أو بيانات التواصل",
       "attendance": "الحضور، دون اسمك أو بيانات التواصل",
@@ -169,18 +178,6 @@
     "filterClearAll": "مسح الكل"
   },
   "dataTransfer": {
-    "export": {
-      "button": "تصدير CSV",
-      "empty": "لا توجد صفوف للتصدير.",
-      "done_zero": "لم يُصدَّر أي صف.",
-      "done_one": "تم تصدير صف واحد.",
-      "done_two": "تم تصدير صفين.",
-      "done_few": "تم تصدير {{count}} صفوف.",
-      "done_many": "تم تصدير {{count}} صفًا.",
-      "done_other": "تم تصدير {{count}} صف.",
-      "truncated": "اقتصر التصدير على أول {{count}} صف. ضيّق عوامل التصفية لتصدير الباقي.",
-      "failed": "فشل التصدير."
-    },
     "import": {
       "button": "استيراد CSV",
       "intro": "ارفع ملف CSV يحتوي على صف عناوين بالأعمدة أدناه (حتى {{max}} صف). نزّل القالب للبدء بالتنسيق الصحيح.",
@@ -232,5 +229,25 @@
         "tooLong": "يجب ألا يتجاوز {{field}} {{max}} حرفًا."
       }
     }
+  },
+  "home": {
+    "signedInAs": "تم تسجيل الدخول باسم",
+    "roles": {
+      "SUPER_ADMIN": "مشرف عام",
+      "ORG_ADMIN": "مسؤول المدرسة",
+      "PRINCIPAL": "المدير",
+      "FINANCE": "المالية",
+      "ATTENDANCE_OFFICER": "مسؤول الحضور",
+      "INSTRUCTOR": "معلم",
+      "SUPPORT_AGENT": "وكيل دعم",
+      "PARENT": "ولي أمر",
+      "STUDENT": "طالب",
+      "GUEST": "ضيف"
+    },
+    "summaryLabel": "الملخص",
+    "summarySentence": "{{items}}.",
+    "allClear": "لا شيء يحتاج إلى اهتمامك الآن.",
+    "unavailable": "تعذّر التحميل",
+    "shortcuts": "اختصارات"
   }
 }

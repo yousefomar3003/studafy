@@ -30,12 +30,11 @@ export interface InvoiceFilters {
 export async function fetchInvoicesPage(
   filters: InvoiceFilters,
   cursor: string | undefined,
-  limit: number = PAGE_SIZE,
 ): Promise<CursorPage<Invoice>> {
   const { data } = await api.GET("/api/finance/invoices", {
     params: {
       query: {
-        limit,
+        limit: PAGE_SIZE,
         cursor,
         status: (filters.status || undefined) as "draft" | "submitted" | "cancelled" | undefined,
         search: filters.search || undefined,
@@ -65,8 +64,7 @@ export async function fetchInvoice(invoiceId: string): Promise<InvoiceDetail> {
 
 // ---------------------------------------------------------------------------
 // Batch generation — polled from `InvoiceBatchPage`'s progress panel while the batch is
-// pending/processing, same shape as `admin/invitations/BulkInviteProgressPanel`'s poll of a
-// bulk-invite batch and its recipients.
+// pending/processing.
 // ---------------------------------------------------------------------------
 
 export function invoiceBatchQueryKey(batchId: string) {
@@ -87,13 +85,12 @@ export async function fetchInvoiceBatchItemsPage(
   batchId: string,
   cursor: string | undefined,
   status: InvoiceBatchItemStatus | "",
-  limit: number = BATCH_ITEMS_PAGE_SIZE,
 ): Promise<{ items: InvoiceBatchItem[]; next_cursor: string | null }> {
   const { data } = await api.GET("/api/finance/invoices/batches/{batchId}/items", {
     params: {
       path: { batchId },
       query: {
-        limit,
+        limit: BATCH_ITEMS_PAGE_SIZE,
         cursor,
         status: (status || undefined) as InvoiceBatchItemStatus | undefined,
       },

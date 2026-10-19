@@ -12,8 +12,8 @@
 set -euo pipefail
 
 SERVICE="${1:?usage: render.sh <api|realtime|workers|migrations> <dev|staging|prod> <template.json.tpl>}"
-ENVIRONMENT="${2:?usage: render.sh <api|realtime|workers> <dev|staging|prod> <template.json.tpl>}"
-TEMPLATE="${3:?usage: render.sh <api|realtime|workers> <dev|staging|prod> <template.json.tpl>}"
+ENVIRONMENT="${2:?usage: render.sh <api|realtime|workers|migrations> <dev|staging|prod> <template.json.tpl>}"
+TEMPLATE="${3:?usage: render.sh <api|realtime|workers|migrations> <dev|staging|prod> <template.json.tpl>}"
 
 case "$SERVICE" in
   api | realtime | workers | migrations) ;;

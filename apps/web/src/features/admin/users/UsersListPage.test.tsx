@@ -95,4 +95,20 @@ describe("UsersListPage", () => {
 
     expect(await screen.findByRole("dialog", { name: "New user" })).toBeTruthy();
   });
+
+  test("the create-user modal refuses to submit without a name", async () => {
+    renderPage(await loadUsersListPage());
+    await screen.findByText("Jamie Chen");
+
+    fireEvent.click(screen.getByRole("button", { name: "New user" }));
+    const dialog = await screen.findByRole("dialog", { name: "New user" });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /email/i }), {
+      target: { value: "new.teacher@example.edu" },
+    });
+    getMock.mockClear();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Send invite" }));
+
+    expect(await within(dialog).findByText("Name is required")).toBeTruthy();
+    expect(getMock).not.toHaveBeenCalledWith("/api/users", expect.anything());
+  });
 });

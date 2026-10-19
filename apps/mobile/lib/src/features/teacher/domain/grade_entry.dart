@@ -18,13 +18,13 @@ enum GradeSubmissionStatus {
   unknown;
 
   static GradeSubmissionStatus fromWire(String? value) => switch (value) {
-        'draft' => draft,
-        'submitted' => submitted,
-        'approved' => approved,
-        'rejected' => rejected,
-        'published' => published,
-        _ => unknown,
-      };
+    'draft' => draft,
+    'submitted' => submitted,
+    'approved' => approved,
+    'rejected' => rejected,
+    'published' => published,
+    _ => unknown,
+  };
 
   /// Cells can only be edited while the submission is still a draft — the API rejects a
   /// `bulkUpdateGrades` touching any non-draft submission with 409.
@@ -41,6 +41,92 @@ enum GradeSubmissionStatus {
   /// A rejected submission is editable again only after an admin/teacher unlock; until then it is
   /// neither a live draft nor fully locked.
   bool get isRejected => this == GradeSubmissionStatus.rejected;
+
+  /// Published grades are frozen; the teacher changes them by filing a [GradeRevision] that a
+  /// school admin or principal approves.
+  bool get isPublished => this == GradeSubmissionStatus.published;
+}
+
+/// Lifecycle of a teacher's correction to published grades.
+enum GradeRevisionStatus {
+  pending,
+  approved,
+  rejected,
+  withdrawn,
+  unknown;
+
+  static GradeRevisionStatus fromWire(String? value) => switch (value) {
+    'pending' => pending,
+    'approved' => approved,
+    'rejected' => rejected,
+    'withdrawn' => withdrawn,
+    _ => unknown,
+  };
+}
+
+/// One score change inside a [GradeRevision].
+class GradeRevisionChange {
+  const GradeRevisionChange({
+    required this.gradeId,
+    required this.previousScore,
+    required this.newScore,
+  });
+
+  final String gradeId;
+  final double? previousScore;
+  final double? newScore;
+
+  factory GradeRevisionChange.fromJson(Map<String, Object?> json) =>
+      GradeRevisionChange(
+        gradeId: json['grade_id']! as String,
+        previousScore: (json['previous_score'] as num?)?.toDouble(),
+        newScore: (json['new_score'] as num?)?.toDouble(),
+      );
+}
+
+/// A correction to a published submission, awaiting (or past) approval. The published scores are
+/// untouched — students and parents keep seeing them — until it is approved.
+class GradeRevision {
+  const GradeRevision({
+    required this.id,
+    required this.status,
+    required this.reason,
+    required this.rejectionReason,
+    required this.changes,
+  });
+
+  final String id;
+  final GradeRevisionStatus status;
+  final String reason;
+
+  /// Set only when [status] is [GradeRevisionStatus.rejected].
+  final String? rejectionReason;
+  final List<GradeRevisionChange> changes;
+
+  bool get isPending => status == GradeRevisionStatus.pending;
+  bool get isRejected => status == GradeRevisionStatus.rejected;
+
+  /// The change this revision proposes for one grade cell, if any.
+  GradeRevisionChange? changeFor(String gradeId) {
+    for (final change in changes) {
+      if (change.gradeId == gradeId) return change;
+    }
+    return null;
+  }
+
+  factory GradeRevision.fromJson(Map<String, Object?> json) => GradeRevision(
+    id: json['id']! as String,
+    status: GradeRevisionStatus.fromWire(json['status'] as String?),
+    reason: json['reason']! as String,
+    rejectionReason: json['rejection_reason'] as String?,
+    changes: ((json['changes'] as List<Object?>?) ?? const [])
+        .map(
+          (e) => GradeRevisionChange.fromJson(
+            Map<String, Object?>.from(e! as Map),
+          ),
+        )
+        .toList(growable: false),
+  );
 }
 
 /// One gradeable item ("assessment" cell) inside a student's submission.
@@ -81,25 +167,29 @@ class GradeCell {
   /// Whether [value] is a writable score for this cell (`0 <= value <= maxScore`).
   bool scoreInRange(double value) => value >= 0 && value <= maxScore;
 
-  GradeCell copyWith({double? score, bool clearScore = false, String? updatedAt}) => GradeCell(
-        id: id,
-        submissionId: submissionId,
-        label: label,
-        score: clearScore ? null : (score ?? this.score),
-        maxScore: maxScore,
-        weight: weight,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
+  GradeCell copyWith({
+    double? score,
+    bool clearScore = false,
+    String? updatedAt,
+  }) => GradeCell(
+    id: id,
+    submissionId: submissionId,
+    label: label,
+    score: clearScore ? null : (score ?? this.score),
+    maxScore: maxScore,
+    weight: weight,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 
   factory GradeCell.fromJson(Map<String, Object?> json) => GradeCell(
-        id: json['id']! as String,
-        submissionId: json['grade_submission_id']! as String,
-        label: json['label']! as String,
-        score: (json['score'] as num?)?.toDouble(),
-        maxScore: (json['max_score']! as num).toDouble(),
-        weight: (json['weight']! as num).toDouble(),
-        updatedAt: json['updated_at']! as String,
-      );
+    id: json['id']! as String,
+    submissionId: json['grade_submission_id']! as String,
+    label: json['label']! as String,
+    score: (json['score'] as num?)?.toDouble(),
+    maxScore: (json['max_score']! as num).toDouble(),
+    weight: (json['weight']! as num).toDouble(),
+    updatedAt: json['updated_at']! as String,
+  );
 }
 
 /// One student's row in a gradebook: their status plus every assessment cell they carry.
@@ -112,6 +202,7 @@ class GradeSubmission {
     required this.rejectionReason,
     required this.updatedAt,
     required this.cells,
+    this.latestRevision,
   });
 
   final String id;
@@ -127,7 +218,11 @@ class GradeSubmission {
 
   final List<GradeCell> cells;
 
-  factory GradeSubmission.fromJson(Map<String, Object?> json) => GradeSubmission(
+  /// The most recent non-withdrawn correction filed against this (published) submission.
+  final GradeRevision? latestRevision;
+
+  factory GradeSubmission.fromJson(Map<String, Object?> json) =>
+      GradeSubmission(
         id: json['id']! as String,
         gradebookId: json['gradebook_id']! as String,
         studentId: json['student_id']! as String,
@@ -135,8 +230,15 @@ class GradeSubmission {
         rejectionReason: json['rejection_reason'] as String?,
         updatedAt: json['updated_at']! as String,
         cells: ((json['grades'] as List<Object?>?) ?? const [])
-            .map((e) => GradeCell.fromJson(Map<String, Object?>.from(e! as Map)))
+            .map(
+              (e) => GradeCell.fromJson(Map<String, Object?>.from(e! as Map)),
+            )
             .toList(growable: false),
+        latestRevision: json['latest_revision'] is Map
+            ? GradeRevision.fromJson(
+                Map<String, Object?>.from(json['latest_revision']! as Map),
+              )
+            : null,
       );
 }
 
@@ -155,11 +257,11 @@ class GradebookRef {
   final String? gradingSchemeId;
 
   factory GradebookRef.fromJson(Map<String, Object?> json) => GradebookRef(
-        id: json['id']! as String,
-        classId: json['class_id']! as String,
-        status: json['status']! as String,
-        gradingSchemeId: json['grading_scheme_id'] as String?,
-      );
+    id: json['id']! as String,
+    classId: json['class_id']! as String,
+    status: json['status']! as String,
+    gradingSchemeId: json['grading_scheme_id'] as String?,
+  );
 }
 
 /// One assessment column: the distinct [label] across the gradebook, with the max score and
@@ -185,6 +287,8 @@ class StudentGradeEntry {
     required this.status,
     required this.rejectionReason,
     required this.cell,
+    this.submissionUpdatedAt = '',
+    this.latestRevision,
   });
 
   final String studentId;
@@ -193,7 +297,14 @@ class StudentGradeEntry {
   final String? rejectionReason;
   final GradeCell cell;
 
+  /// The submission row's concurrency token — what `unlock` needs.
+  final String submissionUpdatedAt;
+  final GradeRevision? latestRevision;
+
   bool get isEditable => status.isEditable;
+
+  /// A correction to this published grade is waiting for approval.
+  bool get hasPendingRevision => latestRevision?.isPending ?? false;
 }
 
 /// A read-model over the gradebook's submissions, sliced for a per-assessment entry screen.
@@ -240,6 +351,8 @@ class GradeEntryGrid {
             status: submission.status,
             rejectionReason: submission.rejectionReason,
             cell: cell,
+            submissionUpdatedAt: submission.updatedAt,
+            latestRevision: submission.latestRevision,
           ),
         );
       }

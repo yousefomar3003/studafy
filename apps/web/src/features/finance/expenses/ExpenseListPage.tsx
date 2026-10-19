@@ -1,14 +1,11 @@
 import { PERMISSIONS } from "@studafy/constants";
-import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
 import { Button, Card, DataGrid } from "@studafy/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { ExportCsvButton } from "../../../components/ExportCsvButton";
 import { ImportCsvButton } from "../../../components/ImportCsvButton";
 import { usePermissions } from "../../../lib/auth";
-import { collectOffsetPages } from "../../../lib/data-transfer";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { EXPENSE_DOCUMENT_TYPE_LABEL_KEYS, expenseStatusLabel, expenseStatusTone } from "./labels";
@@ -23,7 +20,7 @@ import {
 import "./expenses.css";
 
 import type { CreateExpenseBody, Expense, ExpenseDocumentType, ExpenseFilters } from "./queries";
-import type { ExportColumn, ImportSpec } from "../../../lib/data-transfer";
+import type { ImportSpec } from "../../../lib/data-transfer";
 import type { DataGridColumn } from "@studafy/ui";
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -119,24 +116,6 @@ export default function ExpenseListPage() {
     },
   ];
 
-  const exportColumns: ExportColumn<Expense>[] = [
-    { header: t("finance.common.date"), value: (row) => row.expense_date },
-    {
-      header: t("finance.common.type"),
-      value: (row) => t(EXPENSE_DOCUMENT_TYPE_LABEL_KEYS[row.document_type]),
-    },
-    { header: t("finance.common.category"), value: (row) => row.category },
-    { header: t("finance.common.vendor"), value: (row) => row.vendor },
-    { header: t("finance.common.amount"), value: (row) => row.amount },
-    { header: t("finance.common.currency"), value: (row) => row.currency },
-    {
-      header: t("finance.common.status"),
-      value: (row) => expenseStatusLabel(row.erpnext_status, t),
-    },
-    { header: t("finance.common.erpnextDocument"), value: (row) => row.erpnext_name },
-    { header: t("finance.common.description"), value: (row) => row.description },
-  ];
-
   // Mirrors `NewExpensePage`'s form: attachments go through the pre-signed upload flow and are not
   // importable, so imported expenses are created without one.
   const importSpec: ImportSpec<CreateExpenseBody> = {
@@ -218,15 +197,6 @@ export default function ExpenseListPage() {
           <p>{t("finance.expenses.list.intro")}</p>
         </div>
         <div className="expenses-list__header-actions">
-          <ExportCsvButton
-            filename="expenses"
-            columns={exportColumns}
-            getRows={() =>
-              collectOffsetPages((pageOffset) =>
-                fetchExpensesPage(filters, pageOffset, PAGINATION_MAX_LIMIT),
-              )
-            }
-          />
           {canCreate && (
             <ImportCsvButton
               spec={importSpec}

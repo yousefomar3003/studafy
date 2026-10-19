@@ -6,7 +6,7 @@
  * own API instance (`PORT=38080`) — so nothing needs a runtime handshake to discover where the stack
  * ended up: the config's `webServer` env block, the global setup's spawned processes, and a spec's
  * `request.get(API_BASE_URL + ...)` all read the same literal constants. Postgres/Redis reuse
- * `db/compose.yml`'s own already-fixed ports (54329/6390) rather than inventing new ones.
+ * `compose.yml` (test profile)'s own already-fixed ports (54329/6390) rather than inventing new ones.
  */
 
 export const API_PORT = 38070;

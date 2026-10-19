@@ -35,6 +35,11 @@ Widget _homeApp() {
 }
 
 Future<void> _pump(WidgetTester tester, ProviderScope scope) {
+  // A tall phone, so the lazily built list lays out every card below the date-and-children hero.
+  tester.view
+    ..physicalSize = const Size(390, 1400)
+    ..devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
   return tester.pumpWidget(wrapWithLocalization(scope));
 }
 

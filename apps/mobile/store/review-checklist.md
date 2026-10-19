@@ -36,15 +36,32 @@ Now:
   (`POST /api/account/deletion-requests`), and confirming on `/legal/delete-account/confirm` runs
   the same `POST /api/account/deletion` pipeline for every account on that address. Linked from the
   site footer and the privacy policy. See `docs/modules/account-deletion.md`.
-- The mobile app's Profile tab (`apps/mobile/lib/src/features/shell/presentation/profile_tab_screen.dart`,
-  every role) now carries a "Delete my account" action, opened in the system browser at
-  `/account/delete` — a system-browser hand-off, never an in-app webview (it's on
-  `docs/store_payment_routing.md`'s reviewed list of outbound launches).
+- **The mobile app offers in-app account deletion to every role.** The Profile tab
+  (`apps/mobile/lib/src/features/shell/presentation/profile_tab_screen.dart`) shows **"Delete my
+  account"** to every signed-in user (`delete_account_screen.dart`). To guard against accidents the
+  button enables only after the person ticks an acknowledgement, types the confirmation word and,
+  for member-ID accounts, re-enters their member ID and password; a final dialog follows. It calls
+  `POST /api/account/deletion`, which signs out everywhere and **schedules the deletion 14 days
+  out**. Signing in during those 14 days shows only "Cancel deletion" / "Sign out"
+  (`deletion_pending_screen.dart`); on the due date the worker detaches the account and files its
+  erasure (`docs/modules/account-deletion.md`). The school admin (ORG_ADMIN) additionally gets
+  **"Delete school"** (`delete_school_screen.dart`), which calls `POST /api/schools/current/closure`:
+  it archives the school and signs every member out but **keeps the school's data** — a closure, not
+  an erasure.
 
-Re-check before every submission: the Profile tab link still resolves, `/account/delete` and
-`/legal/delete-account` are still reachable, and `POST /api/account/deletion` still requires only
-authentication (a permission added here by mistake would silently break self-service deletion for
-every role at once). `POST /api/account/deletion-requests` (and `/confirm`) must stay
+**Store review.** Apple 5.1.1(v): covered by "Delete my account" in the Profile tab, for every
+role; point App Review to Profile → Account → Delete my account in the review notes, and say the
+deletion completes 14 days after the request (the app states this before and after confirming).
+Apple accepts a delay when it is disclosed, and confirmation steps that prevent accidental
+deletion; do not add steps beyond these (e.g. contacting support), which 5.1.1(v) forbids. Give the
+reviewer an email/SSO demo account, or a member-ID account whose ID and password are in the notes. Google Play:
+the in-app path covers the app requirement, and the Data safety "Delete account URL" is
+`/legal/delete-account`, which works without the app or a sign-in.
+
+Re-check before every submission: the Profile tab shows "Delete my account" for every role and "Delete school" for ORG_ADMIN only,
+`/account/delete` and `/legal/delete-account` are still reachable, and `POST /api/account/deletion`
+still requires only authentication (a permission added here by mistake would silently break
+self-service deletion for every role at once). `POST /api/account/deletion-requests` (and `/confirm`) must stay
 unauthenticated — `deletion-request-routes.test.ts` pins that — and a request must actually deliver
 the email in the target environment (SES out of sandbox, `FRONTEND_URL` set on the workers).
 

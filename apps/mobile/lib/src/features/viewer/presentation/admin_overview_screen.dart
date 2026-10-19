@@ -7,6 +7,7 @@ import 'widgets/announcements_overview_card.dart';
 import 'widgets/attendance_overview_card.dart';
 import 'widgets/discipline_overview_card.dart';
 import 'widgets/evaluations_overview_card.dart';
+import '../../../design/layout/bottom_inset_padding.dart';
 
 /// The Admin/Principal viewer summary: attendance, open discipline incidents, draft evaluations,
 /// and recent announcements. Every card owns its own provider and loading/empty/error state, the
@@ -29,7 +30,9 @@ class AdminOverviewScreen extends ConsumerWidget {
           ..invalidate(viewerRecentAnnouncementsProvider);
       },
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.space16),
+        padding: const EdgeInsets.all(
+          AppSpacing.space16,
+        ).withBottomInset(context),
         children: const [
           AttendanceOverviewCard(),
           SizedBox(height: AppSpacing.space16),

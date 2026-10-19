@@ -1,0 +1,159 @@
+{
+  "home": {
+    "title": "الحضور",
+    "description": "حضور اليوم وسجل كل صف اليومي والطلاب الذين يحتاجون متابعة. سجّل الصفوف التي لم تبدأ، وأكمل الجارية، وافتح السجل المرسل لتصحيح أي قيد.",
+    "links": {
+      "reports": "تقارير الحضور"
+    },
+    "dateLabel": "التاريخ",
+    "count": {
+      "notStarted_zero": "{{count}} لم تبدأ",
+      "notStarted_one": "{{count}} لم يبدأ",
+      "notStarted_two": "{{count}} لم يبدآ",
+      "notStarted_few": "{{count}} لم تبدأ",
+      "notStarted_many": "{{count}} لم يبدأ",
+      "notStarted_other": "{{count}} لم يبدأ",
+      "inProgress_zero": "{{count}} قيد التنفيذ",
+      "inProgress_one": "{{count}} قيد التنفيذ",
+      "inProgress_two": "{{count}} قيد التنفيذ",
+      "inProgress_few": "{{count}} قيد التنفيذ",
+      "inProgress_many": "{{count}} قيد التنفيذ",
+      "inProgress_other": "{{count}} قيد التنفيذ",
+      "submitted_zero": "{{count}} مرسلة",
+      "submitted_one": "{{count}} مرسل",
+      "submitted_two": "{{count}} مرسلان",
+      "submitted_few": "{{count}} مرسلة",
+      "submitted_many": "{{count}} مرسلًا",
+      "submitted_other": "{{count}} مرسل"
+    },
+    "tableCaption": "سجلات الحضور اليومية بتاريخ {{date}}",
+    "columns": {
+      "class": "الصف",
+      "register": "السجل",
+      "action": "الإجراء"
+    },
+    "action": {
+      "notStarted": "تسجيل الحضور",
+      "inProgress": "إكمال السجل",
+      "submitted": "عرض السجل",
+      "view": "عرض السجل"
+    },
+    "actionLabel": {
+      "notStarted": "تسجيل الحضور للصف {{class}}",
+      "inProgress": "إكمال سجل الصف {{class}}",
+      "submitted": "عرض سجل الصف {{class}}",
+      "view": "عرض سجل الصف {{class}}"
+    },
+    "error": "تعذّر تحميل الصفوف أو السجلات.",
+    "empty": "لا توجد صفوف في هذا الفصل الدراسي.",
+    "viewOnly": "الحضور للصفوف المتاحة لك. يسجّل مكتب الحضور السجلات، لذا هذا العرض للاطلاع فقط.",
+    "registersTitle": "السجلات اليومية",
+    "notTakenYet": "لم يُسجَّل بعد"
+  },
+  "state": {
+    "notStarted": "لم يبدأ",
+    "inProgress": "قيد التنفيذ",
+    "submitted": "مرسل"
+  },
+  "status": {
+    "present": "حاضر",
+    "absent": "غائب",
+    "late": "متأخر",
+    "excused": "غياب بعذر",
+    "remote": "عن بُعد"
+  },
+  "register": {
+    "back": "→ الحضور",
+    "title": "{{class}} — {{date}}",
+    "description": "يبدأ الجميع كحاضرين. غيّر حالة الغائبين أو المتأخرين أو أصحاب الأعذار، ثم أرسل السجل.",
+    "submittedDescription": "تم إرسال هذا السجل. استخدم «تصحيح» لتغيير أي قيد؛ ويُحفظ التغيير في سجلّه.",
+    "markAllPresent": "تحديد الجميع حاضرين",
+    "submitRecorded": "إرسال السجل",
+    "submit_zero": "إرسال السجل ({{count}} طالب)",
+    "submit_one": "إرسال السجل (طالب واحد)",
+    "submit_two": "إرسال السجل (طالبان)",
+    "submit_few": "إرسال السجل ({{count}} طلاب)",
+    "submit_many": "إرسال السجل ({{count}} طالبًا)",
+    "submit_other": "إرسال السجل ({{count}} طالب)",
+    "lateNeedsMinutes": "أدخل دقائق التأخير لكل طالب محدد كمتأخر.",
+    "submitted": "تم إرسال السجل.",
+    "submitFailed": "تعذّر إرسال السجل.",
+    "columns": {
+      "student": "الطالب",
+      "status": "الحالة",
+      "detail": "التفاصيل"
+    },
+    "error": "تعذّر تحميل قائمة طلاب هذا الصف.",
+    "empty": "لا يوجد طلاب مسجلون في هذا الصف.",
+    "unknownStudent": "طالب غير معروف",
+    "minutesLate": "دقائق التأخير",
+    "minutesLateInvalid": "أدخل عددًا صحيحًا من الدقائق، 1 أو أكثر.",
+    "minutesLateValue_zero": "{{count}} دقيقة تأخير",
+    "minutesLateValue_one": "دقيقة تأخير واحدة",
+    "minutesLateValue_two": "دقيقتا تأخير",
+    "minutesLateValue_few": "{{count}} دقائق تأخير",
+    "minutesLateValue_many": "{{count}} دقيقة تأخير",
+    "minutesLateValue_other": "{{count}} دقيقة تأخير",
+    "statusFor": "حضور {{student}}",
+    "alreadyRecorded": "مسجّل مسبقًا",
+    "correct": "تصحيح",
+    "correctLabel": "تصحيح قيد {{student}}",
+    "corrected": "تم تصحيح القيد.",
+    "viewOnlyDescription": "للاطلاع فقط. يسجّل مكتب الحضور السجلات.",
+    "notRecorded": "لم يُسجَّل"
+  },
+  "day": {
+    "title": "الحضور بتاريخ {{date}}",
+    "empty": "لم يُسجَّل أي حضور في هذا اليوم بعد.",
+    "error": "تعذّر تحميل حضور هذا اليوم."
+  },
+  "metrics": {
+    "rate": "نسبة الحضور"
+  },
+  "atRisk": {
+    "title": "طلاب معرضون للخطر",
+    "description": "الطلاب الذين تقل نسبة حضورهم (حاضر ومتأخر) في هذا الفصل عن حد التنبيه في المدرسة وهو {{threshold}}.",
+    "noThreshold": "لم تحدد المدرسة حدًا لتنبيه الحضور، لذا لا يُشار إلى أي طالب.",
+    "empty": "لا يوجد طلاب دون الحد في هذا الفصل.",
+    "more_zero": "لا يوجد طلاب آخرون دون الحد.",
+    "more_one": "طالب واحد آخر دون الحد؛ راجع الجدول أدناه.",
+    "more_two": "طالبان آخران دون الحد؛ راجع الجدول أدناه.",
+    "more_few": "{{count}} طلاب آخرين دون الحد؛ راجع الجدول أدناه.",
+    "more_many": "{{count}} طالبًا آخر دون الحد؛ راجع الجدول أدناه.",
+    "more_other": "{{count}} طالب آخر دون الحد؛ راجع الجدول أدناه.",
+    "caption": "الطلاب دون حد التنبيه"
+  },
+  "students": {
+    "title": "الطلاب",
+    "filterLabel": "التصفية بالاسم أو رقم القيد",
+    "columns": {
+      "student": "الطالب",
+      "admissionNumber": "رقم القيد"
+    },
+    "empty": "لم يُسجَّل حضور لأي طالب في هذا الفصل.",
+    "error": "تعذّر تحميل حضور الطلاب.",
+    "caption": "حضور الفصل لكل طالب"
+  },
+  "search": {
+    "label": "البحث عن الطلاب",
+    "placeholder": "الاسم أو رقم القيد",
+    "searching": "جارٍ البحث…",
+    "empty": "لا يوجد طلاب مطابقون.",
+    "error": "فشل البحث. حاول مرة أخرى."
+  },
+  "student": {
+    "notFound": "الطالب غير موجود",
+    "admissionNumber": "رقم القيد {{number}}",
+    "termTitle": "هذا الفصل: {{term}}",
+    "historyTitle": "سجل الحضور",
+    "historyEmpty": "لم يُسجَّل حضور لهذا الطالب في هذا الفصل.",
+    "error": "تعذّر تحميل حضور هذا الطالب.",
+    "columns": {
+      "date": "التاريخ",
+      "class": "الصف",
+      "status": "الحالة",
+      "detail": "التفاصيل"
+    },
+    "classPeriod": "{{class}} · الحصة {{period}}"
+  }
+}

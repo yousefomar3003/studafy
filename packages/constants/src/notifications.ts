@@ -48,6 +48,11 @@ export const NOTIFICATION_TYPES = {
   // and never available; the uploader is told it is not searchable and can re-ingest. Mirrored
   // in app.notification_type by 000096.
   MATERIAL_INGEST_FAILED: "MATERIAL_INGEST_FAILED",
+  // Raised by apps/api/src/modules/messaging for the other participant when a parent or teacher
+  // sends a message in a parent<->teacher thread. Metadata carries the thread's conversation_id.
+  // Optional (a recipient may disable it) and immediate-only. Mirrored in app.notification_type by
+  // migration 000126.
+  DIRECT_MESSAGE: "DIRECT_MESSAGE",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

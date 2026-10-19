@@ -33,6 +33,22 @@ void main() {
       expect(invoice.outstandingLabel, '125.000 JOD');
     });
 
+    test(
+      'a non-JOD invoice keeps its own currency (presentation.currency is not applied)',
+      () {
+        final invoice = FamilyInvoice.fromJson({
+          ...invoiceJson(),
+          'total_amount': '450.00',
+          'outstanding_amount': '450.00',
+          'outstanding_amount_minor': 45000,
+          'currency': 'AED',
+          'currency_minor_unit': 2,
+        });
+
+        expect(invoice.outstandingLabel, '450.00 AED');
+      },
+    );
+
     test('isSettled is true only once nothing is outstanding', () {
       expect(FamilyInvoice.fromJson(invoiceJson(outstandingAmountMinor: 0)).isSettled, isTrue);
       expect(FamilyInvoice.fromJson(invoiceJson(outstandingAmountMinor: 1)).isSettled, isFalse);

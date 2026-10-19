@@ -124,12 +124,6 @@ variable "monitoring_security_group_id" {
   type        = string
 }
 
-variable "metrics_port" {
-  description = "Port apps/api, apps/realtime and apps/workers each expose their Prometheus-format /metrics endpoint on (ST-259). Must match module.network's metrics_port and each service's own METRICS_PORT env var."
-  type        = number
-  default     = 9464
-}
-
 variable "grafana_port" {
   description = "Port Grafana listens on. Must match module.network's grafana_port."
   type        = number

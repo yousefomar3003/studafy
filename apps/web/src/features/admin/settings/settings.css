@@ -7,7 +7,23 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: var(--space-16);
-  align-items: start;
+  /* Stretch so every card in a row shares its height; the form below then pins each save footer
+   * to the card's bottom edge, keeping the buttons in line across the row. */
+  align-items: stretch;
+}
+
+/* The form sits between Card and its Body/Footer, so it has to carry on the Card's flex column for
+ * Body's `flex: 1` to take up the slack. */
+.settings-card__form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.settings-card__form .sf-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
 }
 
 .settings-page__error {

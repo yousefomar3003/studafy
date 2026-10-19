@@ -107,3 +107,41 @@ export async function seedLocalFixtures(sql: Sql, ctx: FullCtx): Promise<void> {
     `;
   }
 }
+
+// School calendar (migration 000121): one entry of each kind around the seed's "today", so the
+// calendar, the timetable's holiday shading and the parent/student "upcoming" lists have data.
+const SCHOOL_EVENTS: readonly {
+  kind: "holiday" | "event" | "meeting" | "exam_period";
+  title: string;
+  description: string | null;
+  startDay: number;
+  endDay: number;
+}[] = [
+  { kind: "meeting", title: "Parent-teacher evening", description: null, startDay: 3, endDay: 3 },
+  {
+    kind: "event",
+    title: "Science fair",
+    description: "Grade projects on display in the main hall; families welcome.",
+    startDay: 10,
+    endDay: 10,
+  },
+  { kind: "exam_period", title: "Mid-term exams", description: null, startDay: 21, endDay: 25 },
+  { kind: "holiday", title: "Mid-term break", description: null, startDay: 28, endDay: 32 },
+];
+
+export async function seedSchoolEvents(sql: Sql, ctx: FullCtx): Promise<void> {
+  await sql`
+    INSERT INTO app.school_events ${sql(
+      SCHOOL_EVENTS.map((event) => ({
+        id: uuid(),
+        school_id: ctx.schoolId,
+        created_by: ctx.orgAdmin.userId,
+        title: event.title,
+        description: event.description,
+        kind: event.kind,
+        starts_on: seedDate(event.startDay).toISOString().slice(0, 10),
+        ends_on: seedDate(event.endDay).toISOString().slice(0, 10),
+      })),
+    )}
+  `;
+}

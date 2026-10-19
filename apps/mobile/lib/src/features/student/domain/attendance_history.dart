@@ -101,7 +101,7 @@ class AttendanceMonth {
 
 /// Groups flat [entries] into [AttendanceMonth]s, newest month and newest day first. Pure — no
 /// clock, no I/O — so the grouping and the summary maths are unit-testable on their own, the
-/// same shape as `assembleTimetableWeek` (`timetable_week.dart`).
+/// same shape as `buildWeeklySchedule` (`timetable/domain/weekly_schedule.dart`).
 AttendanceHistory assembleAttendanceHistory({
   required List<StudentAttendanceEntry> entries,
 }) {

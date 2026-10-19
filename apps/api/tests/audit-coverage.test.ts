@@ -114,6 +114,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/schools/resend-verification",
   // School settings (ST-090). PATCH updates school_settings with full before/after audit.
   "PATCH /api/schools/current/settings",
+  // School closure by its administrator. Archives the school, revokes every session and bumps the
+  // entitlement version in one transaction; the audit rows are written from inside it — see
+  // src/modules/tenancy/closure/service.ts.
+  "POST /api/schools/current/closure",
   // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
   // audit rows are written by the auditAction middleware on the route.
   "POST /api/schools/{schoolId}/provision",
@@ -138,6 +142,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/users/{userId}",
   "PATCH /api/users/{userId}/role",
   "PATCH /api/users/{userId}/deactivate",
+  // Member password reset (000141). Audit row written from inside resetMemberPassword's transaction.
+  "POST /api/users/{userId}/password/reset",
   // Student profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards.
   // Audit rows are written from inside the service transactions.
   "POST /api/students",
@@ -237,6 +243,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
   "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+  "POST /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/revisions",
+  "PATCH /api/grades/gradebooks/{gradebookId}/revisions/{revisionId}/withdraw",
   // Learning materials (ST-106). Storage-triggered upload flow with AI visibility.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",
@@ -274,6 +282,22 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/school-events",
   "PATCH /api/school-events/{eventId}",
   "DELETE /api/school-events/{eventId}",
+  // Parent<->teacher messaging (000127). Opening a thread and sending a message each write their
+  // app.audit_logs row inside the same transaction in messaging/service.ts (a message's row records
+  // its id and length, never its body). Marking read declares the intent only: the read marker is
+  // the caller's own state and writes no audit row.
+  "POST /api/messaging/conversations",
+  "POST /api/messaging/conversations/{conversationId}/messages",
+  "POST /api/messaging/conversations/{conversationId}/read",
+  // Teacher-initiated threads (000130): same get-or-create, same audit row on insert.
+  "POST /api/messaging/teacher-conversations",
+  // Blocks (000135) and reports (000136). Each writes its app.audit_logs row inside the same
+  // transaction in messaging/service.ts / reports.ts (a block's insert and delete; a report's insert
+  // with no free text; a review's status change). An idempotent no-op block/unblock writes none.
+  "POST /api/messaging/conversations/{conversationId}/block",
+  "DELETE /api/messaging/conversations/{conversationId}/block",
+  "POST /api/messaging/conversations/{conversationId}/reports",
+  "PATCH /api/messaging/reports/{reportId}",
   // Fee schedule generation (ST-122). Per-student installments derived from a fee structure.
   // Audit row written by auditAction middleware in installments/routes.ts.
   "POST /api/finance/fee-schedules/generate",
@@ -309,10 +333,6 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
   // Approval queue (ST-115). Unified pending-approvals feed + bulk approve/reject decisions.
   "POST /api/approvals/bulk-decision",
-  // Scholarship/discount awards (ST-119 extension). Maker-checker workflow for applying
-  // scholarships/discounts to students. Audit rows written by auditAction middleware.
-  "POST /api/finance/scholarship-discounts/awards",
-  "POST /api/finance/scholarship-discounts/awards/{awardId}/confirm",
   // Refund processing (ST-124). Maker-checker workflow for ERPNext Credit Note refunds.
   // Audit rows written by auditAction middleware in routes.ts.
   "POST /api/finance/refunds/initiate",
@@ -331,14 +351,26 @@ const EXPECTED_MUTATING_ROUTES = [
   // Self-service account deletion/export. Same insert, filed by the caller about themselves —
   // see modules/privacy/routes.ts.
   "POST /api/privacy/me/dsr",
-  // Self-service account deletion. The 'delete' audit row on app.users is written inside the
-  // deletion transaction — see modules/account/account-deletion-service.ts.
+  // Self-service account deletion (000143). Scheduling and cancelling write their 'update' audit
+  // rows on app.users inside their own transactions — see
+  // modules/account/account-deletion-service.ts.
   "POST /api/account/deletion",
+  "DELETE /api/account/deletion",
   // Public account deletion (ST-302). The request writes no audit row (it is anonymous until the
-  // emailed link is used); confirm runs deleteAccount, whose 'delete' row carries
+  // emailed link is used); confirm runs scheduleAccountDeletion, whose 'update' row carries
   // source: "web_request" — see modules/account/deletion-request-service.ts.
   "POST /api/account/deletion-requests",
   "POST /api/account/deletion-requests/confirm",
+  // Public "Talk to us" sales inquiry. Writes no audit row: it is anonymous and global (there is no
+  // school to audit in). The row itself is the record; status changes made from the platform
+  // console are audited by PATCH /api/platform/inquiries/{inquiryId}.
+  "POST /api/inquiries",
+  // School sign-up applicants (Google/Microsoft-signed-in, no account yet). Write no audit row for
+  // the same reason as the inquiry above: anonymous to Studafy and global. The application row is
+  // the record; the decision is audited by the platform approve/reject routes below.
+  "POST /api/school-applications/me",
+  "POST /api/school-applications/me/proof-upload-url",
+  "POST /api/school-applications/me/sign-out",
   // Notification preferences (ST-143). Audit rows are written from inside
   // notification-preferences-service.ts's updatePreferences, alongside the preference writes — see
   // routes/notification-preferences-routes.ts.
@@ -350,6 +382,13 @@ const EXPECTED_MUTATING_ROUTES = [
   // cancellation-service.ts, alongside the cancel_at_period_end / retention_state change.
   "POST /api/subscriptions/current/cancel",
   "POST /api/subscriptions/current/cancel/reverse",
+  // Subscription refund requests. Filing one writes its app.audit_logs row inside the inserting
+  // transaction; a console approval or rejection writes one in the request's school (system actor)
+  // and one in the operator's home school -- see subscriptions/services/refund-service.ts.
+  "POST /api/subscriptions/current/refund-requests",
+  "POST /api/subscriptions/ai/refund-requests",
+  "POST /api/platform/refund-requests/{schoolId}/{requestId}/approve",
+  "POST /api/platform/refund-requests/{schoolId}/{requestId}/reject",
   // Hybrid retrieval (ST-162). POST carries the search query; the route's one write is the durable
   // per-student usage meter. auditAction("update", "ai_usage_meters") declares that intent, and like
   // the storage-upload precedent the declaration is metadata — no app.audit_logs row is written.
@@ -403,6 +442,19 @@ const EXPECTED_MUTATING_ROUTES = [
   // see modules/ai/consent/persistence.ts.
   "PUT /api/ai/consent",
   "DELETE /api/ai/consent",
+  // Studafy platform console (modules/platform/routes.ts). Each writes its audit rows from inside the
+  // service transaction: one in the affected school (system actor) and one in the operator's home
+  // school (operator as actor) -- see the header of modules/platform/service.ts.
+  "PATCH /api/platform/schools/{schoolId}/status",
+  "PUT /api/platform/schools/{schoolId}/feature-flags/{flagName}",
+  "PATCH /api/platform/plans/{planId}",
+  "PATCH /api/platform/plans/{planId}/prices/{priceId}",
+  "PATCH /api/platform/settings/{key}",
+  "PATCH /api/platform/inquiries/{inquiryId}",
+  // School application decisions: audited in the operator's home school; approval also writes
+  // system-attributed rows in the new school -- see modules/school-applications/service.ts.
+  "POST /api/platform/school-applications/{applicationId}/approve",
+  "POST /api/platform/school-applications/{applicationId}/reject",
 ];
 
 function collectSourceFiles(dir: string): string[] {
