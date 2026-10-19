@@ -29,6 +29,7 @@
     "db:migrate:status": "bun packages/db/src/cli.ts status",
     "db:migrate:validate": "bun packages/db/src/cli.ts validate",
     "db:migrate:pending": "bun packages/db/src/cli.ts pending",
+    "db:rehearse:rollback": "scripts/migration-rollback-rehearsal.sh",
     "db:attendance:partitions": "bun packages/db/src/cli.ts attendance-partitions",
     "db:audit:partitions": "bun packages/db/src/cli.ts audit-partitions",
     "db:test:rls-coverage": "bun packages/db/src/cli.ts rls-coverage",
