@@ -154,7 +154,7 @@ test("journey 2 — read a notification, then change a channel preference, keybo
   page,
 }) => {
   await stubPortalShellDefaults(page);
-  await stubAuthenticatedSession(page, ["STUDENT"]);
+  await stubAuthenticatedSession(page, ["PRINCIPAL"]);
 
   let readCalled = false;
   await page.route("**/api/notifications/n-1/read", (route) => {

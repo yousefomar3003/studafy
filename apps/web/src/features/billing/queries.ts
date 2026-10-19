@@ -8,7 +8,7 @@ export type BillingOverview = components["schemas"]["BillingOverview"];
 
 // ---------------------------------------------------------------------------
 // Overview — the school's subscription row, read by the admin dashboard's `StorageUsageTile` for
-// storage used against the plan's cap. Schools no longer pay for a plan (migration 000126), so
+// storage used against the plan's cap. Schools no longer pay for a plan (migration 000145), so
 // nothing on the web shows the plan itself.
 // ---------------------------------------------------------------------------
 

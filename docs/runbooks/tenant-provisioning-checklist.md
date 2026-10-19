@@ -17,7 +17,7 @@ This document describes the tenant provisioning pipeline that runs after a schoo
 
 3. Provisioning Pipeline (async)
    a. Local Postgres Provisioning
-      - Put the school on the free plan (active, never ends — migration 000126)
+      - Put the school on the free plan (active, never ends — migration 000145)
       - Seed notification preferences for admin user
       - Confirm ORG_ADMIN role
 

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import '../auth/school_closed_notice.dart';
+import '../auth/school_closed_error.dart';
 
 /// Supplies the bearer token for the active session, or `null` when the caller is unauthenticated.
 /// Async so the token can come from a refreshing store (see `AuthSession.tokenProvider`).

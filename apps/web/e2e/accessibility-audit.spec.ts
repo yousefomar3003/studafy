@@ -196,7 +196,7 @@ test.describe("notifications", () => {
 
   test("inbox has no critical/serious violations", async ({ page }) => {
     await stubPortalShellDefaults(page);
-    await stubAuthenticatedSession(page, ["STUDENT"]);
+    await stubAuthenticatedSession(page, ["PRINCIPAL"]);
     await stubNotifications(page);
 
     await page.goto("/portal/notifications");
@@ -206,7 +206,7 @@ test.describe("notifications", () => {
 
   test("preferences has no critical/serious violations", async ({ page }) => {
     await stubPortalShellDefaults(page);
-    await stubAuthenticatedSession(page, ["STUDENT"]);
+    await stubAuthenticatedSession(page, ["PRINCIPAL"]);
     await stubNotifications(page);
 
     await page.goto("/portal/notifications/preferences");

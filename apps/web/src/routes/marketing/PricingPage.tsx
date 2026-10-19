@@ -8,7 +8,7 @@ import { useTranslation } from "../../lib/i18n";
 const INCLUDED_FOR_EVERY_SCHOOL = ["academics", "finance", "family", "approvals"] as const;
 
 /**
- * Pricing page (`/pricing`). Studafy is free for schools (migration 000126 puts every school on the
+ * Pricing page (`/pricing`). Studafy is free for schools (migration 000145 puts every school on the
  * `free` plan), so there is no plan catalog to fetch: one free offer for schools, and the per-student
  * AI add-on, which students buy for themselves.
  */

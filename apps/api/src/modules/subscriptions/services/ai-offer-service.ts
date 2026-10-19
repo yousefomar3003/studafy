@@ -6,7 +6,7 @@ import type { Database } from "../../../db";
 import type { TenantContext } from "../../../db/tenant-tx";
 import type { SubscriptionStatus } from "@studafy/constants";
 
-/** The catalog plan the AI add-on is sold as (migration 000127). */
+/** The catalog plan the AI add-on is sold as (migration 000146). */
 export const AI_ADDON_PLAN_CODE = "ai_addon";
 
 export interface AiOfferPrice {

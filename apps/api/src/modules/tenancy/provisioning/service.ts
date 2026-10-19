@@ -15,7 +15,7 @@ import type { Logger } from "../../../logger";
 // ---------------------------------------------------------------------------
 
 /**
- * Studafy is free for schools: every school is on the `free` plan (migration 000126), active and
+ * Studafy is free for schools: every school is on the `free` plan (migration 000145), active and
  * never ending. The only paid products are per-student add-ons such as the AI add-on.
  */
 export const FREE_PLAN_CODE = "free";
