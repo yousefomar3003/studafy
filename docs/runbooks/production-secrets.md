@@ -110,6 +110,14 @@ there **and** leave `AI_LLM_API_KEY` empty — the api refuses a key while AI is
 | `VITE_API_BASE_URL`       | `https://api.studafy.com`                                                                                       |
 | `VITE_REALTIME_BASE_URL`  | the realtime WebSocket URL, once the edge routing for apps/realtime is decided (`infra/terraform/modules/edge`) |
 | `VITE_TURNSTILE_SITE_KEY` | the Turnstile widget's **Site Key** (public)                                                                    |
+| `VITE_SENTRY_DSN`         | Sentry project `studafy-web` → Client Keys (DSN); public, it can only send events                               |
+| `SENTRY_ORG`              | `studafy`                                                                                                       |
+| `SENTRY_PROJECT`          | `studafy-web`                                                                                                   |
+
+One Environment **secret** belongs with them: `SENTRY_AUTH_TOKEN`, a Sentry organization token
+(Settings → Developer Settings → Organization Tokens) that lets the release build upload source maps,
+so the website's errors show readable stack traces. Without it errors are still reported, with
+minified stacks. The tier name (`staging`, `production`) is passed to the build by `release.yml`.
 
 Unset, the bundle calls `http://localhost:3000` and renders Cloudflare's always-pass test widget —
 whose tokens the api rejects once a real `TURNSTILE_SECRET_KEY` is set, so nobody could register.

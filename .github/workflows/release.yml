@@ -107,9 +107,14 @@ jobs:
           # no other service needs these build args.
           extra_build_args=()
           if [ "$SERVICE" = "web" ]; then
+            # Same tier name the api and workers report under (their APP_ENV), so one Sentry
+            # environment filter covers every service.
+            sentry_environment="$DEPLOY_ENVIRONMENT"
+            [ "$DEPLOY_ENVIRONMENT" = "prod" ] && sentry_environment="production"
             extra_build_args=(
               --build-arg "VITE_RELEASE_VERSION=$RELEASE_TAG"
               --build-arg "VITE_SENTRY_DSN=$VITE_SENTRY_DSN"
+              --build-arg "VITE_SENTRY_ENVIRONMENT=$sentry_environment"
               --build-arg "SENTRY_ORG=$SENTRY_ORG"
               --build-arg "SENTRY_PROJECT=$SENTRY_PROJECT"
               --build-arg "VITE_API_BASE_URL=$VITE_API_BASE_URL"

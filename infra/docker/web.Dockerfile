@@ -37,6 +37,9 @@ ARG VITE_API_BASE_URL
 ARG VITE_REALTIME_BASE_URL
 ARG VITE_ENABLE_MOCK_AUTH
 ARG VITE_TURNSTILE_SITE_KEY
+# The tier Sentry files the bundle's errors under (release.yml: staging, production); unset falls
+# back to Vite's build mode.
+ARG VITE_SENTRY_ENVIRONMENT
 
 # See infra/docker/api.Dockerfile for why this is a single COPY rather than a manifest-first split.
 COPY . .
@@ -79,6 +82,7 @@ RUN --mount=type=secret,id=sentry_auth_token \
     [ -n "$VITE_REALTIME_BASE_URL" ] || unset VITE_REALTIME_BASE_URL; \
     [ -n "$VITE_ENABLE_MOCK_AUTH" ] || unset VITE_ENABLE_MOCK_AUTH; \
     [ -n "$VITE_TURNSTILE_SITE_KEY" ] || unset VITE_TURNSTILE_SITE_KEY; \
+    [ -n "$VITE_SENTRY_ENVIRONMENT" ] || unset VITE_SENTRY_ENVIRONMENT; \
     bunx turbo run build --filter=@studafy/web
 
 FROM nginx:${NGINX_VERSION} AS runtime
