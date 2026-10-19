@@ -1,9 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/config/app_environment.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../core/localization/app_locales.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
@@ -37,6 +39,7 @@ class ProfileTabScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final privacyPolicyUrl = ref.watch(privacyPolicyUrlProvider);
+    final isDev = ref.watch(appConfigProvider).environment == AppEnvironment.dev;
     final roles = ref.watch(sessionRolesProvider);
     final appRoles = roles.map(AppRole.fromClaim).toSet();
     final isStudent = appRoles.contains(AppRole.student);
@@ -115,6 +118,19 @@ class ProfileTabScreen extends ConsumerWidget {
                     if (isSchoolAdmin) ...[
                       const Divider(height: 1, indent: 68),
                       const _DeleteSchoolTile(),
+                    ],
+                    // Dev builds only: forces a native crash so Crashlytics receives a first
+                    // report. It is sent on the next launch, not at the moment of the crash.
+                    if (isDev) ...[
+                      const Divider(height: 1, indent: 68),
+                      _SettingsRow(
+                        key: const Key('profileTestCrash'),
+                        icon: Icons.bug_report_outlined,
+                        titleKey: 'shell.profile.testCrash',
+                        trailing: Icons.chevron_right,
+                        destructive: true,
+                        onTap: () => FirebaseCrashlytics.instance.crash(),
+                      ),
                     ],
                   ],
                 ),

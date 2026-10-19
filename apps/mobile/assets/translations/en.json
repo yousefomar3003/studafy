@@ -133,6 +133,7 @@
         "loadFailed": "Your school's details couldn't be loaded.",
         "retry": "Try again"
       },
+      "testCrash": "Send test crash (dev only)",
       "privacyPolicy": "Privacy policy",
       "signedIn": "Signed in to Studafy",
       "sections": {
