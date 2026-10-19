@@ -30,7 +30,6 @@
         { "name": "S3_REGION", "value": "${AWS_REGION}" },
         { "name": "S3_APP_FILES_BUCKET", "value": "${S3_APP_FILES_BUCKET}" },
         { "name": "AWS_REGION", "value": "${AWS_REGION}" },
-        { "name": "FRONTEND_URL", "value": "${WEB_ORIGIN}" },
         { "name": "CLAMAV_HOST", "value": "127.0.0.1" },
         { "name": "AI_LLM_PROVIDER", "value": "${AI_LLM_PROVIDER}" },
         { "name": "AI_LLM_BASE_URL", "value": "${AI_LLM_BASE_URL}" },

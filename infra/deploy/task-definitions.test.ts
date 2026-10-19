@@ -25,6 +25,18 @@ function values(entries: { name: string; value: string }[]): Record<string, stri
 }
 
 describe("attendance report ECS task definitions", () => {
+  test.each(["api", "workers"] as const)(
+    "%s lists every environment variable and secret once",
+    async (service) => {
+      for (const container of (await renderTemplate(service)).containerDefinitions) {
+        // Sidecars (workers' clamav) may have neither list.
+        const entries = [...(container.environment ?? []), ...(container.secrets ?? [])];
+        const names = entries.map((entry) => entry.name);
+        expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
+      }
+    },
+  );
+
   test("API renders a task role, read pool, storage, and queue configuration", async () => {
     const task = await renderTemplate("api");
     const container = task.containerDefinitions[0]!;
