@@ -266,15 +266,14 @@ describe("AttendanceOfficePage", () => {
 });
 
 describe("attendance dashboard", () => {
-  test("a teacher sees registers read-only: no taking, only viewing what exists", async () => {
+  test("a school admin sees registers read-only: no taking, only viewing what exists", async () => {
     sessions = [session("sess-3", "c3", "submitted")];
-    await renderAt("/portal/attendance", "INSTRUCTOR");
+    await renderAt("/portal/attendance", "ORG_ADMIN");
 
     const mathRow = (await screen.findByText("MATH-A")).closest("tr")!;
     expect(within(mathRow).getByText("Not taken yet")).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Take attendance/ })).toBeNull();
     expect(screen.getByRole("link", { name: "View the register for ART-C" })).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Attendance reports" })).toBeNull();
   });
 
   test("shows the day's numbers and lists students below the alert threshold", async () => {
@@ -313,10 +312,10 @@ describe("StudentAttendancePage", () => {
 });
 
 describe("RegisterPage", () => {
-  test("a teacher sees the register read-only, without taking or correcting", async () => {
+  test("a school admin sees the register read-only, without taking or correcting", async () => {
     sessions = [{ ...session("sess-1", "c1", "submitted") }];
     records = [{ id: "r1", student_id: "s1", status: "present", minutes_late: null }];
-    await renderAt(`/portal/attendance/register/c1?date=${TODAY}`, "INSTRUCTOR");
+    await renderAt(`/portal/attendance/register/c1?date=${TODAY}`, "ORG_ADMIN");
 
     await screen.findByText("Adam Saleh");
     expect(

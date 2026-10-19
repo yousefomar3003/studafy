@@ -45,7 +45,9 @@ describe("app shell", () => {
   test("renders the shared shell and marketing home at /", async () => {
     renderAt("/");
     expect(await screen.findByRole("main")).toBeTruthy();
-    expect(await screen.findByRole("heading", { name: /studafy/i, level: 1 })).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: /school operations/i, level: 1 }),
+    ).toBeTruthy();
   });
 
   test("resolves the lazy /features route", async () => {
