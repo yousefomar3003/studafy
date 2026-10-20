@@ -88,6 +88,9 @@ never counted as revenue (`payload->>'environment'`).
    3. Play Console → the app → Monetize → Monetization setup → Real-time developer notifications →
       the topic name `projects/<project>/topics/play-billing` → **Send test notification** (the API
       answers 200 `ignored`).
+   4. On the same page, set **Subscription settings → Pause** to **Disabled**. The API does not
+      handle a paused subscription (RTDN type 10 changes nothing), so a paused student would keep
+      AI until the subscription next renews or expires.
 5. **License testers.** Play Console → Settings → License testing → add the testers' Google
    accounts. Their purchases are free test purchases that renew every few minutes.
 6. Put the package name into the tier's `.env` file, the two secrets into the api app secret, and
