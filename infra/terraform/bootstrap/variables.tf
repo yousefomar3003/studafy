@@ -1,7 +1,7 @@
 variable "aws_account_id" {
   description = "AWS account that owns Studafy's shared bootstrap resources."
   type        = string
-  default     = "862910165270"
+  default     = "007924090039"
 
   validation {
     condition     = can(regex("^[0-9]{12}$", var.aws_account_id))

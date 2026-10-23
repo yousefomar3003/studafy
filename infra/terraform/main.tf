@@ -2,7 +2,7 @@ data "terraform_remote_state" "bootstrap" {
   backend = "s3"
 
   config = {
-    bucket = "studafy-tfstate-bootstrap-862910165270"
+    bucket = "studafy-tfstate-bootstrap-007924090039"
     key    = "bootstrap/terraform.tfstate"
     region = "eu-central-1"
   }
