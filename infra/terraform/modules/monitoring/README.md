@@ -257,7 +257,7 @@ ones that do not come from Prometheus**. That is the point of the bridge:
   Prometheus rules ─────────────┐
   (infra/docker/prometheus/     │
    rules/*.yml, baked into      ▼
-   the Prometheus image)   Alertmanager ──► severity route ──► on-call provider
+   the Prometheus image)   Alertmanager ──► severity route ──► SNS topic ──► email / SMS
                                 ▲
   CloudWatch alarms ─► SNS ─► alert-bridge Lambda
   (this module's alerts.tf)    (lambda/cloudwatch-alert-bridge)
@@ -270,11 +270,13 @@ three severities (`critical` / `warning` / `info`), the same receivers, the same
 same fortnightly noisy-alert review — one place to look during an incident, one place to silence
 something at 3am.
 
-**Receiver URLs are secrets and never reach a rendered config.** `alertmanager.yml` references them
-as `url_file` paths; `docker-entrypoint.sh` materialises each into a 0600 file from the task's
-injected `ALERTMANAGER_PAGE_URL` / `ALERTMANAGER_TICKET_URL` / `ALERTMANAGER_HEARTBEAT_URL`, which
-come from the `monitoring` app-secrets container. Alertmanager re-reads the file per notification,
-so a rotated URL needs no image rebuild.
+**Delivery is AWS SNS, with no secrets involved** (`notifications.tf`). Alertmanager's three
+receivers publish under its task role to the `page` (email + SMS), `ticket` (email) and `heartbeat`
+(no subscribers) topics; `docker-entrypoint.sh` substitutes their ARNs into `alertmanager.yml` at
+start. Recipients are the `alert_email_addresses` / `alert_sms_numbers` variables, so adding one is
+a tfvars change. The heartbeat topic's publish count is watched by the
+`alertmanager-heartbeat-missing` alarm, which pages directly — not through the bridge, since the
+bridge delivers into the Alertmanager it is checking.
 
 **Certificate expiry is the one thing here that needs two regions.** CloudFront only accepts ACM
 certificates issued in us-east-1, and a CloudWatch alarm can only publish to an SNS topic in its own
@@ -538,14 +540,11 @@ the honest state, not a false negative dressed up as "OK".
   (`monitoring_secret_arn`'s `GRAFANA_ADMIN_PASSWORD`). Fine for the small number of people who
   need dashboards today; fronting it with an internal ALB and real SSO is future work if that
   changes, not something this ticket's acceptance criteria ask for.
-- **It does not define the on-call rotation.** Alertmanager maps severity to one of three webhook
-  URLs; who is on call, what hours a `warning` may wake someone, and how long an unacknowledged page
-  waits before escalating all live in the on-call provider behind those URLs. That boundary is
-  partly forced — Alertmanager's time intervals _mute_ a matched route rather than diverting it, so
-  "page in hours, ticket otherwise" cannot be written as two sibling routes — and partly deliberate:
-  the provider already owns the schedule, and a second copy here would drift from it. The
-  specification the provider is configured to is
-  `docs/runbooks/on-call-rotation.md`.
+- **It does not define the on-call rotation.** Alertmanager maps severity to one of three SNS
+  topics; SNS has no schedules, acknowledgements or escalation, so who is on call is the subscriber
+  list plus `docs/runbooks/on-call-rotation.md`, followed by people. Working hours are not encoded
+  here either: Alertmanager's time intervals _mute_ a matched route rather than diverting it, so
+  "page in hours, ticket otherwise" cannot be written as two sibling routes.
 - **Alertmanager runs at `desired_count = 1`.** Its HA story is a gossip cluster needing a stable
   peer list, which Fargate does not provide; two _unclustered_ replicas would notify twice for every
   alert, which is worse than one. The `Watchdog` alert's five-minute heartbeat is the mitigation

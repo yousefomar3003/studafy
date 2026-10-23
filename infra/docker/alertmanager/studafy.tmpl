@@ -1,0 +1,20 @@
+{{/*
+  Notification text for the page and ticket SNS receivers (infra/docker/alertmanager/alertmanager.yml).
+  Every alert here carries `summary` and `runbook_url` annotations, Prometheus rules and bridged
+  CloudWatch alarms alike, so the email names the problem and links the procedure for it.
+*/}}
+
+{{ define "studafy.subject" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.severity }} {{ .CommonLabels.alertname }} ({{ .CommonLabels.service }})
+{{- end }}
+
+{{ define "studafy.message" -}}
+{{ range .Alerts -}}
+{{ .Status | toUpper }}: {{ .Labels.alertname }}{{ with .Labels.service }} on {{ . }}{{ end }}
+{{ with .Annotations.summary }}{{ . }}
+{{ end }}{{ with .Annotations.description }}{{ . }}
+{{ end }}Started: {{ .StartsAt.Format "2006-01-02 15:04 MST" }}
+{{ with .Annotations.runbook_url }}Runbook: {{ . }}
+{{ end }}
+{{ end -}}
+{{- end }}

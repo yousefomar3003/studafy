@@ -10,6 +10,16 @@
 # is the read path. Both ride on `monitoring_enabled` — this ticket depends on ST-259, so "the
 # monitoring plane exists" and "the tracing pipeline exists" are the same condition, not a second
 # toggle.
+#
+# Grafana Cloud is an optional second destination for the same sampled traces: where
+# grafana_cloud_otlp_endpoint is set, the collector also loads infra/docker/otel-collector/
+# grafana-cloud.yaml (baked into the same image) and authenticates with the instance ID plus the
+# monitoring secret container's GRAFANA_CLOUD_OTLP_TOKEN. Tempo keeps receiving everything either
+# way — nothing about the self-hosted read path changes.
+
+locals {
+  grafana_cloud_enabled = var.grafana_cloud_otlp_endpoint != null
+}
 
 resource "aws_cloudwatch_log_group" "otel_collector" {
   count = var.monitoring_enabled ? 1 : 0
@@ -27,15 +37,29 @@ resource "aws_ecs_task_definition" "otel_collector" {
   cpu                      = tostring(var.otel_collector_cpu)
   memory                   = tostring(var.otel_collector_memory)
   execution_role_arn       = var.execution_role_arn
-  # No task role: the collector's only outbound call is OTLP/HTTP to Tempo over the private Cloud
-  # Map DNS name baked into its own image (infra/docker/otel-collector/config.yaml) — no AWS API
-  # calls, so no IAM permissions needed at runtime, same as Prometheus.
+  # No task role: the collector's only outbound calls are OTLP/HTTP to Tempo over the private Cloud
+  # Map DNS name baked into its own image (infra/docker/otel-collector/config.yaml) and, where
+  # enabled, to Grafana Cloud — no AWS API calls, so no IAM permissions needed at runtime, same as
+  # Prometheus. The token is resolved by the execution role at task start, like Grafana's password.
 
   container_definitions = jsonencode([
     {
       name      = "otel-collector"
       image     = var.otel_collector_image
       essential = true
+      # Restates the upstream image's default --config so the Grafana Cloud overlay can be appended
+      # to it; with the overlay off this is exactly the image's own CMD.
+      command = concat(
+        ["--config=/etc/otelcol-contrib/config.yaml"],
+        local.grafana_cloud_enabled ? ["--config=/etc/otelcol-contrib/grafana-cloud.yaml"] : [],
+      )
+      environment = local.grafana_cloud_enabled ? [
+        { name = "GRAFANA_CLOUD_OTLP_ENDPOINT", value = var.grafana_cloud_otlp_endpoint },
+        { name = "GRAFANA_CLOUD_INSTANCE_ID", value = var.grafana_cloud_instance_id },
+      ] : []
+      secrets = local.grafana_cloud_enabled ? [
+        { name = "GRAFANA_CLOUD_OTLP_TOKEN", valueFrom = "${var.monitoring_secret_arn}:GRAFANA_CLOUD_OTLP_TOKEN::" },
+      ] : []
       portMappings = [
         { containerPort = var.otel_collector_port, protocol = "tcp", name = "otel-collector" }
       ]

@@ -395,6 +395,23 @@ variable "otel_collector_port" {
   }
 }
 
+variable "grafana_cloud_otlp_endpoint" {
+  description = "Grafana Cloud OTLP gateway base URL module.monitoring's OTel collector also forwards sampled traces to, alongside Tempo. null (default) keeps tracing self-hosted only. See modules/monitoring/variables.tf."
+  type        = string
+  default     = null
+}
+
+variable "grafana_cloud_instance_id" {
+  description = "Grafana Cloud stack's OTLP instance ID (not a secret). Required whenever grafana_cloud_otlp_endpoint is set; the token itself is the monitoring app-secret's GRAFANA_CLOUD_OTLP_TOKEN key."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = (var.grafana_cloud_otlp_endpoint == null) == (var.grafana_cloud_instance_id == null)
+    error_message = "grafana_cloud_otlp_endpoint and grafana_cloud_instance_id must be set together."
+  }
+}
+
 variable "erpnext_image_tag" {
   description = "Tag of module.registry's erpnext ECR repository to deploy for the backend/websocket/queue/scheduler roles. Bumping this and re-applying is how an ERPNext image update ships — see modules/erpnext/README.md's Known gaps for why there's no rolling-deploy script for this plane."
   type        = string
@@ -405,6 +422,18 @@ variable "prometheus_image_tag" {
   description = "Tag of module.registry's prometheus ECR repository to deploy (ST-259). Bumping this and re-applying is how a scrape-config change (infra/docker/prometheus/prometheus.yml) ships — same rolling-deploy shape as erpnext_image_tag."
   type        = string
   default     = "latest"
+}
+
+variable "alert_email_addresses" {
+  description = "Who receives alerts by email (critical and warning) through module.monitoring's SNS topics. Required wherever the monitoring plane exists (staging/prod). See modules/monitoring/variables.tf."
+  type        = list(string)
+  default     = []
+}
+
+variable "alert_sms_numbers" {
+  description = "E.164 phone numbers that receive critical alerts by SMS. Optional. See modules/monitoring/variables.tf."
+  type        = list(string)
+  default     = []
 }
 
 variable "alertmanager_image_tag" {

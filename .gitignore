@@ -53,3 +53,7 @@ apps/mobile/lib/src/core/api/generated/
 
 # macOS Finder metadata
 .DS_Store
+
+# Local production secrets file fed to TF_VAR_secrets_app_secret_values — never commit
+prod-secerts.json
+prod-secrets.json

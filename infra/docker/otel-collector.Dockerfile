@@ -17,3 +17,5 @@ ARG OTEL_COLLECTOR_VERSION=0.139.0
 FROM otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_VERSION}
 
 COPY --chmod=644 infra/docker/otel-collector/config.yaml /etc/otelcol-contrib/config.yaml
+# Only loaded where tracing.tf passes it as a second --config — see that file's own header comment.
+COPY --chmod=644 infra/docker/otel-collector/grafana-cloud.yaml /etc/otelcol-contrib/grafana-cloud.yaml

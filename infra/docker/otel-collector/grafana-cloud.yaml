@@ -1,0 +1,30 @@
+# Optional overlay on config.yaml: also forwards the tail-sampled traces to Grafana Cloud's OTLP
+# gateway, alongside the self-hosted Tempo. Baked into the image next to config.yaml but only loaded
+# when infra/terraform/modules/monitoring/tracing.tf passes it as a second --config, which it does
+# only where grafana_cloud_otlp_endpoint is set — so an environment without Grafana Cloud never sees
+# the ${env:...} references below unresolved.
+#
+# The collector deep-merges maps across --config files but replaces lists, so the traces pipeline's
+# exporters list below restates otlphttp/tempo rather than appending to it. receivers/processors are
+# inherited from config.yaml unchanged: Grafana Cloud gets exactly the traces Tempo gets, after the
+# same tail_sampling decision, never the unsampled firehose.
+
+extensions:
+  basicauth/grafana_cloud:
+    client_auth:
+      # Quoted: the instance ID is all digits, and an unquoted expansion would type it as an int.
+      username: "${env:GRAFANA_CLOUD_INSTANCE_ID}"
+      password: "${env:GRAFANA_CLOUD_OTLP_TOKEN}"
+
+exporters:
+  # The otlphttp exporter appends /v1/traces itself, so this is the gateway's /otlp base URL.
+  otlphttp/grafana_cloud:
+    endpoint: ${env:GRAFANA_CLOUD_OTLP_ENDPOINT}
+    auth:
+      authenticator: basicauth/grafana_cloud
+
+service:
+  extensions: [basicauth/grafana_cloud]
+  pipelines:
+    traces:
+      exporters: [otlphttp/tempo, otlphttp/grafana_cloud]

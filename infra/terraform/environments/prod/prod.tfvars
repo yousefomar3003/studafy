@@ -68,3 +68,7 @@ dns_ses_domain           = "send.studafy.com"
 # actually land (a shared inbox, or a DMARC report analyzer's ingestion address) before relying
 # on the "DMARC reports received" acceptance criterion.
 dns_dmarc_rua = "mailto:dmarc-reports@studafy.com"
+
+# Who receives alerts (modules/monitoring/notifications.tf): every address gets critical and warning
+# alerts by email, after clicking the confirmation link AWS sends it on first apply.
+alert_email_addresses = ["hello@studafy.com"]

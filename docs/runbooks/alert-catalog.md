@@ -50,8 +50,8 @@ reversible and leaves the history intact; deleting an alert loses both.
   Prometheus rules ─────────────┐
   (infra/docker/prometheus/     │
    rules/*.yml)                 ▼
-                          Alertmanager ──► severity route ──► on-call provider ──► human
-                                ▲            (page/ticket)
+                          Alertmanager ──► severity route ──► SNS topic ──► email / SMS
+                                ▲            (page/ticket)   (notifications.tf)
   CloudWatch alarms ─► SNS ─► bridge Lambda
   (alerts.tf)                (alert-bridge)
 ```
@@ -88,7 +88,7 @@ Alertmanager image; run it from your own machine against the forwarded port, or
 
 ## Test-firing an alert
 
-Run this drill whenever the receiver URLs are rotated, when the on-call provider's routing changes,
+Run this drill whenever an alert recipient is added or removed, when the SNS topics change,
 and as part of onboarding a new on-call engineer. It proves the whole path — not just that
 Alertmanager is up.
 
@@ -116,9 +116,10 @@ curl -sf -XPOST http://localhost:9093/api/v2/alerts \
 #    `suppressed` means an inhibit rule or a silence swallowed it and step 3 will never happen.
 amtool --alertmanager.url=http://localhost:9093 alert query --output=extended alertname=RoutingDrill
 
-# 3. Confirm it arrived at the on-call provider, at the expected urgency, for the expected person.
-#    This is the step that actually tests the acceptance criterion; the two above only prove the
-#    alert got as far as Alertmanager.
+# 3. Confirm the [FIRING] email (and SMS, if alert_sms_numbers is set) arrived for every address in
+#    alert_email_addresses. This is the step that actually tests the acceptance criterion; the two
+#    above only prove the alert got as far as Alertmanager. Nothing arriving: check the
+#    subscription is confirmed (SNS console -> topic -> Subscriptions) and the Alertmanager logs.
 
 # 4. The ticket path - note the different service value, per the warning above.
 curl -sf -XPOST http://localhost:9093/api/v2/alerts \
@@ -585,13 +586,15 @@ Otherwise restart the exporter task.
 ### Watchdog
 
 **Means.** Nothing, while it is firing. This alert always fires; it is routed to a heartbeat
-receiver and the on-call provider raises an incident when the pings **stop**.
+receiver, which publishes to an SNS topic nobody subscribes to. The CloudWatch alarm
+`<name_prefix>-alertmanager-heartbeat-missing` pages (straight to the page topic, bypassing
+Alertmanager) when those publishes **stop** for 15 minutes.
 
 **If you are reading this because the heartbeat stopped**, the alerting system itself is down and
 nothing else in this catalog can tell you so. In likelihood order: Prometheus is not running or not
 evaluating; Alertmanager is not running (it runs at `desired_count = 1` — a deliberate trade,
-documented in `alertmanager.tf`, and this heartbeat is the mitigation it rests on); the heartbeat
-receiver URL was rotated without updating the `monitoring` secret; or network egress from the
+documented in `alertmanager.tf`, and this heartbeat is the mitigation it rests on); Alertmanager
+cannot publish to SNS (its logs show the error — task role or KMS); or network egress from the
 monitoring plane is broken.
 
 **Confirm.** Port-forward and check both: `http://localhost:9090/alerts` should list `Watchdog` as
@@ -601,7 +604,7 @@ firing, and `http://localhost:9093` should show it in the heartbeat route.
 all** and watch the dashboards directly.
 
 **If you are reading this because the watchdog reached a human**, the watchdog route is
-misconfigured — it must go to the heartbeat integration and nowhere else.
+misconfigured — it must go to the heartbeat receiver and nowhere else.
 
 **Escalate.** Immediately. An alerting outage is invisible and looks exactly like a quiet night.
 

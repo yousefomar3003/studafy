@@ -217,6 +217,28 @@ variable "otel_collector_image" {
   type        = string
 }
 
+variable "grafana_cloud_otlp_endpoint" {
+  description = "Grafana Cloud OTLP gateway base URL (e.g. \"https://otlp-gateway-prod-eu-west-2.grafana.net/otlp\") the OTel collector also forwards sampled traces to, alongside Tempo. null (default) leaves the collector Tempo-only. When set, grafana_cloud_instance_id is required and monitoring_secret_arn's container must hold GRAFANA_CLOUD_OTLP_TOKEN."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.grafana_cloud_otlp_endpoint == null || can(regex("^https://", var.grafana_cloud_otlp_endpoint))
+    error_message = "grafana_cloud_otlp_endpoint must be an https:// URL."
+  }
+}
+
+variable "grafana_cloud_instance_id" {
+  description = "Grafana Cloud stack's OTLP instance ID — the basic-auth username paired with GRAFANA_CLOUD_OTLP_TOKEN. Not a secret. Required whenever grafana_cloud_otlp_endpoint is set."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.grafana_cloud_instance_id == null || can(regex("^[0-9]+$", var.grafana_cloud_instance_id))
+    error_message = "grafana_cloud_instance_id must be the numeric instance ID."
+  }
+}
+
 variable "tempo_image" {
   description = "Full image reference (registry/repo:tag) for the Tempo image this repo builds (infra/docker/tempo.Dockerfile), pushed to module.registry's \"tempo\" repository."
   type        = string
@@ -280,6 +302,28 @@ variable "alertmanager_memory" {
   description = "Fargate memory (MiB) for the Alertmanager task."
   type        = number
   default     = 512
+}
+
+variable "alert_email_addresses" {
+  description = "Who receives alerts by email: every address is subscribed to both the page (critical) and ticket (warning) SNS topics in notifications.tf. Each must click AWS's confirmation link before anything is delivered. Required (non-empty) whenever monitoring_enabled."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for email in var.alert_email_addresses : can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email))])
+    error_message = "alert_email_addresses must contain only email addresses."
+  }
+}
+
+variable "alert_sms_numbers" {
+  description = "Phone numbers (E.164, e.g. \"+9627XXXXXXXX\") that receive critical alerts by SMS from the page topic. Optional. SNS SMS starts in the account's SMS sandbox, where each number must be verified first, and some countries require a registered sender ID."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for number in var.alert_sms_numbers : can(regex("^\\+[1-9][0-9]{6,14}$", number))])
+    error_message = "alert_sms_numbers must be E.164 phone numbers, e.g. +962791234567."
+  }
 }
 
 variable "edge_certificate_arn" {

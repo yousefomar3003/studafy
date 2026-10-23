@@ -1,10 +1,9 @@
 # Alertmanager routing for the Studafy monitoring plane (ST-262).
 #
-# Baked into infra/docker/alertmanager.Dockerfile. Entirely static — unlike Loki's config
-# (infra/docker/loki/loki-config.yml.tpl) there is no envsubst pass here, because the only
-# per-environment values are the three receiver URLs and those are *secrets*. They are read from
-# files that docker-entrypoint.sh writes from the ECS task's injected secrets, via `url_file`, so
-# no rendered config anywhere on disk or in a task definition ever contains one.
+# Baked into infra/docker/alertmanager.Dockerfile. The only per-environment values are the SNS
+# region and the three receivers' topic ARNs (infra/terraform/modules/monitoring/notifications.tf),
+# written below as __PLACEHOLDER__ tokens that docker-entrypoint.sh substitutes at container start.
+# The tokens are themselves valid values, so CI's `amtool check-config` reads this file as-is.
 #
 # ## What this file decides, and what it deliberately does not
 #
@@ -14,9 +13,8 @@
 #   info     -> dropped                       Watchdog -> the heartbeat integration
 #
 # It does **not** decide who is on call, what time of day a warning is allowed to wake someone, or
-# how long an unacknowledged page waits before escalating. Those belong to the on-call provider
-# behind these webhook URLs, which is where the rotation and the schedules already live — see
-# `docs/runbooks/on-call-rotation.md`.
+# how long an unacknowledged page waits before escalating. With SNS as the transport, "who" is the
+# topic's subscriber list (notifications.tf) — see `docs/runbooks/on-call-rotation.md`.
 #
 # That division is not a simplification, it is forced by how Alertmanager works. Time intervals
 # here (`mute_time_intervals` / `active_time_intervals`) *mute a matched route*; they do not send
@@ -61,8 +59,8 @@ route:
 
   routes:
     # First, and terminal: the watchdog is not an alert about the system, it is the proof that this
-    # pipeline is alive. `repeat_interval: 5m` is the heartbeat cadence — the provider raises an
-    # incident when the pings *stop*, so this interval is the detection latency for "our alerting
+    # pipeline is alive. `repeat_interval: 5m` is the heartbeat cadence — notifications.tf's heartbeat
+    # alarm pages when the publishes *stop*, so this interval is the detection latency for "our alerting
     # broke", and `group_wait: 0s` keeps a restarted Alertmanager from adding 30s to it.
     - matchers:
         - alertname = "Watchdog"
@@ -114,29 +112,42 @@ inhibit_rules:
 
 # --- Receivers -----------------------------------------------------------------------------------
 #
-# Generic `webhook_configs`, not a vendor-specific integration block. Every mainstream on-call
-# provider (PagerDuty's Events API integration, Opsgenie, Grafana OnCall, incident.io) accepts
-# Alertmanager's own webhook payload at a per-service URL, so a generic webhook keeps the provider
-# a deployment detail — a rotated secret, not a config change and an image rebuild.
+# Each receiver publishes to its own SNS topic, authenticated by the ECS task role
+# (modules/monitoring/alertmanager.tf) through the SDK's default credential chain — no keys here.
+# Email and SMS subscriptions hang off the topics, not off this file, so adding a recipient is a
+# tfvars change, not an image rebuild.
 #
-# `url_file`, not `url`: the file is written at container start by docker-entrypoint.sh from the
-# ECS task's injected secret, and Alertmanager re-reads it on every notification. A rotated URL
-# takes effect on the next task replacement without this file changing at all.
-#
-# `send_resolved` is left at the webhook default (true) — the provider needs the resolve to close
-# the incident it opened.
+# `subject` is kept short on purpose: SNS rejects an email subject over 100 characters, and a
+# rejected publish is a page that silently never arrives. `send_resolved` is left at its default
+# (true), so a resolve arrives as its own [RESOLVED] email.
 receivers:
   - name: page
-    webhook_configs:
-      - url_file: /tmp/alertmanager-secrets/page_url
+    sns_configs:
+      - sigv4:
+          region: __SNS_REGION__
+        topic_arn: __PAGE_TOPIC_ARN__
+        subject: '{{ template "studafy.subject" . }}'
+        message: '{{ template "studafy.message" . }}'
 
   - name: ticket
-    webhook_configs:
-      - url_file: /tmp/alertmanager-secrets/ticket_url
+    sns_configs:
+      - sigv4:
+          region: __SNS_REGION__
+        topic_arn: __TICKET_TOPIC_ARN__
+        subject: '{{ template "studafy.subject" . }}'
+        message: '{{ template "studafy.message" . }}'
 
   - name: heartbeat
-    webhook_configs:
-      - url_file: /tmp/alertmanager-secrets/heartbeat_url
+    sns_configs:
+      - sigv4:
+          region: __SNS_REGION__
+        topic_arn: __HEARTBEAT_TOPIC_ARN__
+        send_resolved: false
+        subject: "Watchdog heartbeat"
+        message: "ok"
 
   # No integrations, on purpose. See the `info` route above.
   - name: drop
+
+templates:
+  - /etc/alertmanager/*.tmpl

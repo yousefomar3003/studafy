@@ -39,3 +39,7 @@ cdn_domain_name = "staging.studafy.com"
 # apps/api — module.edge's own 60s default would cut an idle-but-open WebSocket mid-session.
 # 1 hour is a starting point, not a measured value against real client heartbeat behavior.
 edge_idle_timeout = 3600
+
+# Who receives alerts (modules/monitoring/notifications.tf): every address gets critical and warning
+# alerts by email, after clicking the confirmation link AWS sends it on first apply.
+alert_email_addresses = ["hello@studafy.com"]

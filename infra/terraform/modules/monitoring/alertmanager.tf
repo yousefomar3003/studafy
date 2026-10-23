@@ -17,6 +17,48 @@ resource "aws_cloudwatch_log_group" "alertmanager" {
   retention_in_days = var.log_retention_days
 }
 
+resource "aws_iam_role" "alertmanager_task" {
+  count = var.monitoring_enabled ? 1 : 0
+
+  name        = "${var.name_prefix}-alertmanager-task"
+  description = "Runtime role for Alertmanager's SNS receivers: publish to the page/ticket/heartbeat topics, nothing else."
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
+  })
+}
+
+# Publish to exactly the three delivery topics, plus the data-key calls SNS makes against their
+# KMS key on the publisher's behalf.
+data "aws_iam_policy_document" "alertmanager_publish" {
+  count = var.monitoring_enabled ? 1 : 0
+
+  statement {
+    effect    = "Allow"
+    actions   = ["sns:Publish"]
+    resources = [for topic in aws_sns_topic.alert_delivery : topic.arn]
+  }
+
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:GenerateDataKey*", "kms:Decrypt"]
+    resources = [aws_kms_key.alert_delivery[0].arn]
+  }
+}
+
+resource "aws_iam_role_policy" "alertmanager_publish" {
+  count = var.monitoring_enabled ? 1 : 0
+
+  name   = "sns-publish"
+  role   = aws_iam_role.alertmanager_task[0].id
+  policy = data.aws_iam_policy_document.alertmanager_publish[0].json
+}
+
 resource "aws_ecs_task_definition" "alertmanager" {
   count = var.monitoring_enabled ? 1 : 0
 
@@ -26,10 +68,8 @@ resource "aws_ecs_task_definition" "alertmanager" {
   cpu                      = tostring(var.alertmanager_cpu)
   memory                   = tostring(var.alertmanager_memory)
   execution_role_arn       = var.execution_role_arn
-  # No task role, for the same reason Prometheus has none: Alertmanager makes no AWS API calls. It
-  # receives alerts over HTTP and POSTs them to the receiver URLs — the execution role's existing
-  # secrets-read grant for the "monitoring" key is what resolves those URLs, and that happens
-  # before the container starts, not from inside it.
+  # Its receivers publish to the SNS topics in notifications.tf, from inside the container.
+  task_role_arn = aws_iam_role.alertmanager_task[0].arn
 
   container_definitions = jsonencode([
     {
@@ -42,14 +82,13 @@ resource "aws_ecs_task_definition" "alertmanager" {
         # the link is only followable through the bastion port-forward — which is still more useful
         # than the container's own hostname, an ephemeral Fargate task id.
         { name = "ALERTMANAGER_EXTERNAL_URL", value = "http://alertmanager.metrics.internal:${var.alertmanager_port}" },
-      ]
-      # The three receiver URLs. docker-entrypoint.sh materialises each into a 0600 file that
-      # alertmanager.yml references as `url_file`, so no live paging URL is ever written into a
-      # rendered config — see that script's header.
-      secrets = [
-        { name = "ALERTMANAGER_PAGE_URL", valueFrom = "${var.monitoring_secret_arn}:ALERTMANAGER_PAGE_URL::" },
-        { name = "ALERTMANAGER_TICKET_URL", valueFrom = "${var.monitoring_secret_arn}:ALERTMANAGER_TICKET_URL::" },
-        { name = "ALERTMANAGER_HEARTBEAT_URL", valueFrom = "${var.monitoring_secret_arn}:ALERTMANAGER_HEARTBEAT_URL::" },
+        # The three receivers' SNS topics (notifications.tf) and their region. Not secrets — an ARN
+        # grants nothing, the topic policies do — so plain environment, rendered into
+        # alertmanager.yml by docker-entrypoint.sh.
+        { name = "ALERTMANAGER_SNS_REGION", value = var.aws_region },
+        { name = "ALERTMANAGER_PAGE_TOPIC_ARN", value = aws_sns_topic.alert_delivery["page"].arn },
+        { name = "ALERTMANAGER_TICKET_TOPIC_ARN", value = aws_sns_topic.alert_delivery["ticket"].arn },
+        { name = "ALERTMANAGER_HEARTBEAT_TOPIC_ARN", value = aws_sns_topic.alert_delivery["heartbeat"].arn },
       ]
       portMappings = [
         { containerPort = var.alertmanager_port, protocol = "tcp", name = "alertmanager" }
@@ -78,8 +117,8 @@ resource "aws_ecs_task_definition" "alertmanager" {
 # arrive twice, and the second copy would train people to ignore the first.
 #
 # The exposure is bounded by the watchdog: the `Watchdog` alert (platform.yml) heartbeats through
-# this task every five minutes, so a dead Alertmanager raises an incident at the on-call provider
-# within ~5 minutes rather than being discovered during the next real outage. That is the mitigation
+# this task every five minutes, and notifications.tf's heartbeat alarm pages within ~15 minutes of
+# it stopping, rather than a dead Alertmanager being discovered during the next real outage. That is the mitigation
 # this trade rests on — if it is ever removed, this `desired_count` has to be revisited with it.
 resource "aws_ecs_service" "alertmanager" {
   count = var.monitoring_enabled ? 1 : 0

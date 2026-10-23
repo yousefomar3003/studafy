@@ -8,9 +8,12 @@ The alerts themselves, their severities and their per-alert procedures are in
 
 ## Where the rotation actually lives
 
-**In the on-call provider, not in this repo.** `infra/docker/alertmanager/alertmanager.yml` maps
-severity to one of three webhook URLs and stops there; the schedule, the escalation timers and the
-notification rules are configured behind those URLs.
+**In the SNS subscriber list.** `infra/docker/alertmanager/alertmanager.yml` maps severity to one
+of three AWS SNS topics (`infra/terraform/modules/monitoring/notifications.tf`) and stops there:
+`critical` goes by email and SMS to `alert_email_addresses` / `alert_sms_numbers`, `warning` by
+email only. SNS has no schedules, acknowledgements or escalation timers, so until the team adopts
+an on-call provider, the rotation below is followed by people, not enforced by a tool — the
+recipients are everyone on it.
 
 That boundary is deliberate and it is also forced. Alertmanager's time intervals _mute_ a matched
 route, they do not divert it — its own reference is explicit that a muted route "acts normally
@@ -107,11 +110,8 @@ one with the evidence.
 
 ## Changing the rotation
 
-Adding or removing a person is a change in the provider _and_ a line in this file's roster
-expectations if the shape changes. Rotating the receiver URLs means updating
-`ALERTMANAGER_PAGE_URL` / `ALERTMANAGER_TICKET_URL` / `ALERTMANAGER_HEARTBEAT_URL` in the
-`monitoring` app-secrets container (`TF_VAR_secrets_app_secret_values`, see
-[`secrets-conventions.md`](secrets-conventions.md)) and replacing the Alertmanager task so it
-re-reads them — then re-running the [test-fire drill](alert-catalog.md#test-firing-an-alert) for
-every severity, because a rotated URL that was pasted wrong fails silently and looks exactly like a
-quiet week.
+Adding or removing a person is a change to `alert_email_addresses` / `alert_sms_numbers` in the
+tier's tfvars and a `terraform apply` — no image rebuild. A new address receives AWS's confirmation
+email and gets nothing until its link is clicked, so re-run the
+[test-fire drill](alert-catalog.md#test-firing-an-alert) for every severity afterwards: an
+unconfirmed subscription fails silently and looks exactly like a quiet week.

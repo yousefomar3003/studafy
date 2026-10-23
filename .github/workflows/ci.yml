@@ -749,13 +749,14 @@ jobs:
             check rules /work/rules/slo.yml /work/rules/queues.yml \
                         /work/rules/pipelines.yml /work/rules/platform.yml
       # Same idea for the routing config: does every route reference a receiver that exists, is
-      # every matcher well-formed. amtool resolves `url_file` paths lazily, at notification time,
-      # so this passes without the secret files the running task materialises.
+      # every matcher well-formed, do the notification templates parse. The __PLACEHOLDER__ topic
+      # ARNs docker-entrypoint.sh substitutes at runtime are valid strings, so the file checks as-is;
+      # mounted at /etc/alertmanager so the config's absolute `templates:` glob finds studafy.tmpl.
       - name: amtool check-config
         run: |
-          docker run --rm -v "$PWD/infra/docker/alertmanager:/work:ro" \
+          docker run --rm -v "$PWD/infra/docker/alertmanager:/etc/alertmanager:ro" \
             --entrypoint /bin/amtool prom/alertmanager:v0.28.1 \
-            check-config /work/alertmanager.yml
+            check-config /etc/alertmanager/alertmanager.yml
       # This repo's own invariants, which no upstream tool has an opinion about: a routable
       # severity and a runbook that exists, on both alerting planes. See the script's header.
       - name: Alerting invariants (severity vocabulary, runbook links)

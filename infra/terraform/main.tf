@@ -118,13 +118,11 @@ module "secrets" {
   # its Redis cache/queue DB slots (docs/runbooks/redis-conventions.md).
   # monitoring's entry (ST-259) has no shared_secret_arns: unlike api/realtime/workers, it doesn't
   # read another module's connection secret — POSTGRES_EXPORTER_DSN/MYSQLD_EXPORTER_DSN/
-  # GRAFANA_ADMIN_PASSWORD, and ST-262's ALERTMANAGER_PAGE_URL/ALERTMANAGER_TICKET_URL/
-  # ALERTMANAGER_HEARTBEAT_URL, are pre-assembled DSN/password/URL strings supplied directly via
+  # GRAFANA_ADMIN_PASSWORD are pre-assembled DSN/password strings supplied directly via
   # TF_VAR_secrets_app_secret_values (infra/terraform/README.md's existing REDIS_URL/DATABASE_URL
-  # convention), not composed from another module's own secret. The three Alertmanager URLs are the
-  # on-call provider's per-service inbound webhooks; rotating one is a secret update plus an
-  # Alertmanager task replacement, then the test-fire drill in docs/runbooks/alert-catalog.md — a
-  # URL pasted wrong fails silently and looks exactly like a quiet week.
+  # convention), not composed from another module's own secret. Alert delivery needs no secret at
+  # all: Alertmanager publishes to SNS topics under its task role (modules/monitoring/
+  # notifications.tf).
   services = merge(
     {
       api        = { shared_secret_arns = [module.pgbouncer.connection_secret_arn, module.redis.auth_secret_arn] }
@@ -398,15 +396,21 @@ module "monitoring" {
   otel_collector_port  = var.otel_collector_port
   otel_collector_image = "${module.registry.repository_urls["otel-collector"]}:${var.otel_collector_image_tag}"
   tempo_image          = "${module.registry.repository_urls["tempo"]}:${var.tempo_image_tag}"
+  # Optional second trace destination; null in every environment that doesn't set it.
+  grafana_cloud_otlp_endpoint = var.grafana_cloud_otlp_endpoint
+  grafana_cloud_instance_id   = var.grafana_cloud_instance_id
 
   # Alerting and on-call (ST-262). Alertmanager rides monitoring_enabled like everything else in
   # the plane; the certificate alarms do not, because a certificate expiring silently is worth
   # knowing about in every environment that has one — they simply notify nobody in dev, the same
   # posture every alarm in this module had before this ticket (see modules/monitoring/alerts.tf's
   # local.alarm_actions).
-  alertmanager_port    = var.alertmanager_port
-  alertmanager_image   = "${module.registry.repository_urls["alertmanager"]}:${var.alertmanager_image_tag}"
-  edge_certificate_arn = module.edge.certificate_arn
+  alertmanager_port  = var.alertmanager_port
+  alertmanager_image = "${module.registry.repository_urls["alertmanager"]}:${var.alertmanager_image_tag}"
+  # Who Alertmanager's SNS topics deliver to (modules/monitoring/notifications.tf).
+  alert_email_addresses = var.alert_email_addresses
+  alert_sms_numbers     = var.alert_sms_numbers
+  edge_certificate_arn  = module.edge.certificate_arn
   # Null in dev, where module.cdn is not instantiated at all — which drops both CDN certificate
   # alarms and the whole us-east-1 SNS topic that would carry them.
   cdn_certificate_arn = var.environment == "dev" ? null : module.cdn[0].certificate_arn

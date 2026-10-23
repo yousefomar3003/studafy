@@ -1,52 +1,41 @@
 #!/bin/sh
-# Alertmanager's three receiver URLs are secrets, so alertmanager.yml references them as
-# `url_file` paths rather than inline values and this script materialises those files from the
-# environment at container start.
+# Renders alertmanager.yml's __PLACEHOLDER__ tokens — the SNS region and the three receivers' topic
+# ARNs — from the environment, then starts Alertmanager on the rendered copy.
 #
-# Why files and not envsubst (which is how infra/docker/loki/docker-entrypoint.sh handles *its*
+# sed rather than envsubst (which is how infra/docker/loki/docker-entrypoint.sh handles *its*
 # per-environment values): the upstream prom/alertmanager image is busybox-based and has no package
 # manager, so there is no envsubst to install — the same constraint infra/docker/prometheus.Docker
-# file already notes. But the stronger reason is that it is the better shape here regardless. A
-# rendered config containing a live paging URL would sit on disk for the life of the task and show
-# up in any `cat` of the config during an incident; `url_file` keeps the secret in one 0600 file
-# that Alertmanager re-reads per notification, so a rotated URL needs no rebuild.
+# file already notes. busybox does ship sed.
 #
-# The env vars come from the ECS task definition's `secrets` block, resolved from the `monitoring`
-# app-secrets container (infra/terraform/modules/monitoring/alertmanager.tf).
+# The env vars come from the ECS task definition's `environment` block
+# (infra/terraform/modules/monitoring/alertmanager.tf). None of them is a secret: publishing is
+# authorised by the task role and the topic policies, not by knowing an ARN.
 set -eu
 
-SECRETS_DIR=/tmp/alertmanager-secrets
+RENDERED_CONFIG=/tmp/alertmanager.yml
 
-# A missing or empty URL must stop the task here, with a message naming the key, rather than at
-# Alertmanager's own config load — which would report "file is empty" against a path that says
-# nothing about which secret was not supplied. `set -u` already covers unset; this covers empty,
-# which is what a secret key present but blank in Secrets Manager actually looks like.
+# A missing value must stop the task here, with a message naming the variable, rather than as an
+# SNS publish error on the first real page — which is the worst possible moment to find out.
 require() {
   eval "value=\${$1:-}"
   if [ -z "${value}" ]; then
-    echo "alertmanager: $1 is unset or empty; supply it in the 'monitoring' app-secrets container" >&2
+    echo "alertmanager: $1 is unset or empty; it is set by modules/monitoring/alertmanager.tf" >&2
     exit 1
   fi
 }
 
-require ALERTMANAGER_PAGE_URL
-require ALERTMANAGER_TICKET_URL
-require ALERTMANAGER_HEARTBEAT_URL
+require ALERTMANAGER_SNS_REGION
+require ALERTMANAGER_PAGE_TOPIC_ARN
+require ALERTMANAGER_TICKET_TOPIC_ARN
+require ALERTMANAGER_HEARTBEAT_TOPIC_ARN
 
-mkdir -p "${SECRETS_DIR}"
-chmod 700 "${SECRETS_DIR}"
-
-# printf '%s', not echo: echo would append a newline, and Alertmanager uses the file's contents
-# verbatim as the URL — a trailing newline produces a request to a URL that does not exist, and the
-# resulting failure names neither this file nor the newline.
-write_secret() {
-  printf '%s' "$2" > "${SECRETS_DIR}/$1"
-  chmod 600 "${SECRETS_DIR}/$1"
-}
-
-write_secret page_url "${ALERTMANAGER_PAGE_URL}"
-write_secret ticket_url "${ALERTMANAGER_TICKET_URL}"
-write_secret heartbeat_url "${ALERTMANAGER_HEARTBEAT_URL}"
+# `|` as the delimiter: ARNs are full of `:` and never contain `|`.
+sed \
+  -e "s|__SNS_REGION__|${ALERTMANAGER_SNS_REGION}|g" \
+  -e "s|__PAGE_TOPIC_ARN__|${ALERTMANAGER_PAGE_TOPIC_ARN}|g" \
+  -e "s|__TICKET_TOPIC_ARN__|${ALERTMANAGER_TICKET_TOPIC_ARN}|g" \
+  -e "s|__HEARTBEAT_TOPIC_ARN__|${ALERTMANAGER_HEARTBEAT_TOPIC_ARN}|g" \
+  /etc/alertmanager/alertmanager.yml > "${RENDERED_CONFIG}"
 
 # --cluster.listen-address= (empty) disables the gossip listener. desired_count is 1
 # (modules/monitoring/alertmanager.tf) and Fargate gives each task replacement a new address, so
@@ -54,7 +43,7 @@ write_secret heartbeat_url "${ALERTMANAGER_HEARTBEAT_URL}"
 # cluster-settling failures it can never resolve. Revisit together with desired_count if this ever
 # needs high availability — see that file's own comment on the trade.
 exec /bin/alertmanager \
-  --config.file=/etc/alertmanager/alertmanager.yml \
+  --config.file="${RENDERED_CONFIG}" \
   --storage.path=/alertmanager \
   --web.listen-address=:9093 \
   --web.external-url="${ALERTMANAGER_EXTERNAL_URL:-http://alertmanager.metrics.internal:9093}" \
