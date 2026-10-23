@@ -10,6 +10,9 @@ import '../../../core/di/app_providers.dart';
 import '../../../core/localization/app_locales.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../account/presentation/notification_preferences_screen.dart';
+import '../../account/presentation/signed_in_devices_screen.dart';
+import '../../ai/store/ai_store_controller.dart';
 import '../../student/application/student_context_providers.dart';
 import '../application/shell_providers.dart';
 import '../domain/app_role.dart';
@@ -39,7 +42,8 @@ class ProfileTabScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final privacyPolicyUrl = ref.watch(privacyPolicyUrlProvider);
-    final isDev = ref.watch(appConfigProvider).environment == AppEnvironment.dev;
+    final isDev =
+        ref.watch(appConfigProvider).environment == AppEnvironment.dev;
     final roles = ref.watch(sessionRolesProvider);
     final appRoles = roles.map(AppRole.fromClaim).toSet();
     final isStudent = appRoles.contains(AppRole.student);
@@ -103,6 +107,31 @@ class ProfileTabScreen extends ConsumerWidget {
                       ),
                       const Divider(height: 1, indent: 68),
                     ],
+                    _SettingsRow(
+                      key: const Key('profileNotifications'),
+                      icon: Icons.notifications_none_outlined,
+                      titleKey: 'account.notifications.title',
+                      trailing: Icons.chevron_right,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const NotificationPreferencesScreen(),
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 68),
+                    _SettingsRow(
+                      key: const Key('profileSignedInDevices'),
+                      icon: Icons.devices_outlined,
+                      titleKey: 'account.devices.title',
+                      trailing: Icons.chevron_right,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SignedInDevicesScreen(),
+                        ),
+                      ),
+                    ),
+                    if (isStudent) const _RestorePurchasesTile(),
+                    const Divider(height: 1, indent: 68),
                     _SettingsRow(
                       key: const Key('profilePrivacyPolicy'),
                       icon: Icons.privacy_tip_outlined,
@@ -457,6 +486,45 @@ class _DeleteAccountTile extends StatelessWidget {
           builder: (_) => const DeleteAccountScreen(),
         ),
       ),
+    );
+  }
+}
+
+/// The student's "Restore purchases": asks the store to redeliver a previous AI add-on purchase.
+/// Shown only while the add-on is on offer to this student on this device (the same condition as
+/// the AI tab's offer card, which carries the same action) — otherwise there is nothing to restore.
+class _RestorePurchasesTile extends ConsumerWidget {
+  const _RestorePurchasesTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(aiStoreProvider, (previous, next) {
+      final message = switch (next.value) {
+        AiStoreActivated() => 'account.restore.done',
+        AiStoreOffering(:final messageKey?) => messageKey,
+        _ => null,
+      };
+      if (message == null || previous?.value == next.value) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message.tr())));
+    });
+    final offer = ref.watch(aiStoreProvider).value;
+    if (offer is! AiStoreOffering) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        const Divider(height: 1, indent: 68),
+        _SettingsRow(
+          key: const Key('profileRestorePurchases'),
+          icon: Icons.restore,
+          titleKey: 'aiStore.restore.action',
+          trailing: Icons.chevron_right,
+          onTap: offer.busy == AiStoreBusy.none
+              ? () => ref.read(aiStoreProvider.notifier).restore()
+              : () {},
+        ),
+      ],
     );
   }
 }

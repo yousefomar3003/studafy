@@ -29,6 +29,7 @@ import '../../../core/files/picked_file.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../student/domain/material_ready_state.dart';
 import '../../student/presentation/widgets/material_ready_state_pill.dart';
+import 'assignment_submissions_screen.dart';
 
 /// Teacher-owned content for one class: create and edit assignments, upload and edit materials.
 ///
@@ -280,6 +281,17 @@ class _AssignmentList extends StatelessWidget {
                         children: [
                           if (item.attachments.isNotEmpty)
                             Badge(label: Text('${item.attachments.length}')),
+                          IconButton(
+                            icon: const Icon(Icons.fact_check_outlined),
+                            tooltip: 'teacher.submissions.open'.tr(),
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => AssignmentSubmissionsScreen(
+                                  assignment: item,
+                                ),
+                              ),
+                            ),
+                          ),
                           IconButton(
                             icon: const Icon(Icons.edit_outlined),
                             tooltip: 'teacher.content.assignments.edit'.tr(),

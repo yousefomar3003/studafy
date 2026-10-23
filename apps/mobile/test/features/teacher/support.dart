@@ -35,6 +35,7 @@ import 'package:studafy_mobile/src/core/api/generated/models/status9.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/submission.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/submission_list.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/grade_status.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/grade_submission_body.dart';
 import 'package:studafy_mobile/src/core/api/generated/submissions/submissions_client.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/teacher_profile.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/timetable_slot.dart';
@@ -191,6 +192,9 @@ Submission submissionFixture({
   DateTime? submittedAt,
   String status = 'submitted',
   bool isLate = false,
+  String gradeStatus = 'none',
+  num? score,
+  String? feedback,
 }) => Submission.fromJson({
   'id': id,
   'school_id': 'school-1',
@@ -198,14 +202,14 @@ Submission submissionFixture({
   'student_id': studentId,
   'content': 'answer',
   'status': status,
-  'grade_status': 'none',
+  'grade_status': gradeStatus,
   'is_late': isLate,
   'attempt_number': 1,
   'submitted_at': (submittedAt ?? DateTime.parse(_t0))
       .toUtc()
       .toIso8601String(),
-  'score': null,
-  'feedback': null,
+  'score': score,
+  'feedback': feedback,
   'graded_at': null,
   'graded_by_user_id': null,
   'attachments': <Object?>[],
@@ -509,6 +513,24 @@ class FakeSubmissionsClient extends Fake implements SubmissionsClient {
   }) async {
     final rows = byAssignmentId[assignmentId] ?? const [];
     return SubmissionList(submissions: rows, total: rows.length);
+  }
+
+  @override
+  Future<Submission> getSubmission({required String submissionId}) async =>
+      byAssignmentId.values
+          .expand((rows) => rows)
+          .firstWhere((s) => s.id == submissionId);
+
+  /// Every `gradeSubmission` call, as the JSON body actually sent.
+  final List<(String, Map<String, Object?>)> gradeCalls = [];
+
+  @override
+  Future<Submission> gradeSubmission({
+    required String submissionId,
+    required GradeSubmissionBody body,
+  }) async {
+    gradeCalls.add((submissionId, body.toJson()));
+    return getSubmission(submissionId: submissionId);
   }
 }
 

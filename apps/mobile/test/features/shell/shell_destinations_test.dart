@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/features/attendance_office/presentation/registers_screen.dart';
 import 'package:studafy_mobile/src/features/messaging/presentation/parent_messages_screen.dart';
+import 'package:studafy_mobile/src/features/parent/presentation/parent_communication_screen.dart';
 import 'package:studafy_mobile/src/features/messaging/presentation/teacher_messages_screen.dart';
 import 'package:studafy_mobile/src/features/shell/domain/shell_role.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/shell_destinations.dart';
-import 'package:studafy_mobile/src/features/student/presentation/timetable_screen.dart';
+import 'package:studafy_mobile/src/features/student/presentation/assignments_screen.dart';
+import 'package:studafy_mobile/src/features/student/presentation/materials_screen.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/teacher_timetable_screen.dart';
 
 List<String> _labels(ShellRole role) => [
@@ -12,17 +14,21 @@ List<String> _labels(ShellRole role) => [
 ];
 
 void main() {
-  test('student: Home, Timetable, Courses, AI, Profile', () {
+  test('student: Home, Lessons, Work, AI, Profile', () {
     expect(_labels(ShellRole.student), [
       'shell.tabs.home',
-      'shell.tabs.timetable',
-      'shell.tabs.courses',
+      'shell.tabs.lessons',
+      'shell.tabs.work',
       'shell.tabs.ai',
       'shell.tabs.profile',
     ]);
     expect(
       shellDestinationsFor(ShellRole.student)[1].body,
-      isA<TimetableScreen>(),
+      isA<MaterialsScreen>(),
+    );
+    expect(
+      shellDestinationsFor(ShellRole.student)[2].body,
+      isA<StudentAssignmentsScreen>(),
     );
   });
 
@@ -51,18 +57,23 @@ void main() {
     },
   );
 
-  test('parent: Home, Children, Messages, Profile', () {
+  test('parent: Home, Children, News, Messages, Profile', () {
     expect(_labels(ShellRole.parent), [
       'shell.tabs.home',
       'shell.tabs.children',
+      'shell.tabs.news',
       'shell.tabs.messages',
       'shell.tabs.profile',
     ]);
     expect(
       shellDestinationsFor(ShellRole.parent)[2].body,
+      isA<ParentCommunicationScreen>(),
+    );
+    expect(
+      shellDestinationsFor(ShellRole.parent)[3].body,
       isA<ParentMessagesScreen>(),
     );
-    expect(shellDestinationsFor(ShellRole.parent)[2].decorateIcon, isNotNull);
+    expect(shellDestinationsFor(ShellRole.parent)[3].decorateIcon, isNotNull);
   });
 
   test('student and viewer get no Messages tab', () {
@@ -70,7 +81,8 @@ void main() {
     expect(_labels(ShellRole.viewer), isNot(contains('shell.tabs.messages')));
   });
 
-  test('parent and viewer get no Timetable tab', () {
+  test('student, parent and viewer get no Timetable tab', () {
+    expect(_labels(ShellRole.student), isNot(contains('shell.tabs.timetable')));
     expect(_labels(ShellRole.parent), isNot(contains('shell.tabs.timetable')));
     expect(_labels(ShellRole.viewer), [
       'shell.tabs.home',

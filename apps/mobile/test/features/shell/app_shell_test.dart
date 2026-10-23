@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/push/push_providers.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/ai_hub_screen.dart';
 import 'package:studafy_mobile/src/features/messaging/application/messaging_providers.dart';
-import 'package:studafy_mobile/src/features/student/presentation/timetable_screen.dart';
+import 'package:studafy_mobile/src/features/student/presentation/materials_screen.dart';
 import 'package:studafy_mobile/src/features/student/presentation/today_screen.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/app_shell.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/pill_navigation_bar.dart';
@@ -21,7 +21,7 @@ List<String> navLabels(WidgetTester tester) => tester
 
 void main() {
   group('lands each role in its own shell', () {
-    testWidgets('student gets Home, Timetable, Courses, AI, Profile', (
+    testWidgets('student gets Home, Lessons, Work, AI, Profile', (
       tester,
     ) async {
       await pumpAppShell(
@@ -31,8 +31,8 @@ void main() {
 
       expect(navLabels(tester), [
         'Home',
-        'Timetable',
-        'Courses',
+        'Lessons',
+        'Work',
         'AI',
         'Profile',
       ]);
@@ -66,7 +66,7 @@ void main() {
       ]);
     });
 
-    testWidgets('parent gets Home, Children, Messages, Profile', (
+    testWidgets('parent gets Home, Children, News, Messages, Profile', (
       tester,
     ) async {
       await pumpAppShell(
@@ -74,7 +74,13 @@ void main() {
         session: await fakeAuthenticatedSession(roles: const ['PARENT']),
       );
 
-      expect(navLabels(tester), ['Home', 'Children', 'Messages', 'Profile']);
+      expect(navLabels(tester), [
+        'Home',
+        'Children',
+        'News',
+        'Messages',
+        'Profile',
+      ]);
     });
 
     testWidgets('the Messages tab icon carries the unread total', (
@@ -117,10 +123,12 @@ void main() {
       expect(navLabels(tester), ['Home', 'Profile']);
       // No domain-specific tab.
       expect(find.text('Timetable'), findsNothing);
-      expect(find.text('Courses'), findsNothing);
+      expect(find.text('Lessons'), findsNothing);
+      expect(find.text('Work'), findsNothing);
       expect(find.text('AI'), findsNothing);
       expect(find.text('Classes'), findsNothing);
       expect(find.text('Children'), findsNothing);
+      expect(find.text('News'), findsNothing);
       expect(find.text('Messages'), findsNothing);
       expect(find.textContaining('View only'), findsOneWidget);
     }
@@ -176,7 +184,7 @@ void main() {
       expect(page(), 0);
       expect(navBar().selectedIndex, 0);
 
-      await tester.tap(navLabel('Timetable'));
+      await tester.tap(navLabel('Lessons'));
       await tester.pumpAndSettle();
 
       expect(page(), 1);
@@ -209,7 +217,7 @@ void main() {
     await tester.fling(pages, const Offset(-400, 0), 1000);
     await tester.pumpAndSettle();
     expect(navBar().selectedIndex, 1);
-    expect(find.byType(TimetableScreen), findsOneWidget);
+    expect(find.byType(MaterialsScreen), findsOneWidget);
 
     await tester.fling(pages, const Offset(400, 0), 1000);
     await tester.pumpAndSettle();
@@ -227,18 +235,18 @@ void main() {
 
     Finder navLabel(String text) => find.byTooltip(text);
     final aiHub = find.byType(AiHubScreen, skipOffstage: false);
-    final timetable = find.byType(TimetableScreen, skipOffstage: false);
+    final lessons = find.byType(MaterialsScreen, skipOffstage: false);
 
     // At startup only Home is built: the AI tab (whose provider calls GET /api/ai/usage) and
-    // Timetable haven't been opened, so they must not exist anywhere in the tree yet.
+    // Lessons haven't been opened, so they must not exist anywhere in the tree yet.
     expect(find.byType(TodayScreen, skipOffstage: false), findsOneWidget);
     expect(aiHub, findsNothing);
-    expect(timetable, findsNothing);
+    expect(lessons, findsNothing);
 
     await tester.tap(navLabel('AI'));
     await tester.pumpAndSettle();
     expect(aiHub, findsOneWidget);
-    expect(timetable, findsNothing);
+    expect(lessons, findsNothing);
 
     // Switching away keeps the visited tab mounted (offstage) rather than disposing it.
     await tester.tap(navLabel('Home'));

@@ -69,7 +69,10 @@
       "messages": "Messages",
       "profile": "Profile",
       "registers": "Registers",
-      "notifications": "Notifications"
+      "notifications": "Notifications",
+      "lessons": "Lessons",
+      "work": "Work",
+      "news": "News"
     },
     "profile": {
       "deleteAccount": {
@@ -196,7 +199,8 @@
       "empty": "No classes scheduled for today.",
       "unavailable": "Today's timetable isn't available yet.",
       "error": "Couldn't load today's timetable.",
-      "unknownClass": "Class"
+      "unknownClass": "Class",
+      "viewWeek": "Full week"
     },
     "assignments": {
       "title": "Due soon",
@@ -251,7 +255,8 @@
       "attempt": "Attempt {number}",
       "submittedAt": "Submitted {date}",
       "awaitingGrade": "Awaiting grade.",
-      "feedbackTitle": "Feedback"
+      "feedbackTitle": "Feedback",
+      "locked": "Your work has been marked, so it can't be changed. Ask your teacher to return it if you need to hand in again."
     },
     "submission": {
       "title": "Submit assignment",
@@ -266,7 +271,12 @@
         "attachmentsFailed": "Some files failed to upload. Retry them, then submit again.",
         "network": "Couldn't reach the server. Check your connection and try again.",
         "unknown": "Something went wrong. Please try again."
-      }
+      },
+      "takePhoto": "Take photo",
+      "sizeLimit": "Each file can be up to 10 MB.",
+      "tooLarge": "Files over 10 MB can't be handed in, so they were left out.",
+      "cameraDenied": "Camera access is off. Turn it on in Settings to take a photo.",
+      "cameraError": "The camera couldn't be opened."
     }
   },
   "grades": {
@@ -793,6 +803,18 @@
         "empty": "No new submissions.",
         "error": "Couldn't load recent submissions.",
         "late": "Late"
+      },
+      "openWork": {
+        "title": "Open work",
+        "error": "Couldn't load your open assignments.",
+        "empty": "No assignments are open right now.",
+        "due": "Due {date}",
+        "drafts": "{count} draft assignments not yet published."
+      },
+      "exams": {
+        "title": "Upcoming exams",
+        "error": "Couldn't load upcoming exams.",
+        "empty": "No exams in the next two weeks."
       }
     },
     "classes": {
@@ -1038,6 +1060,66 @@
           "major": "Major",
           "critical": "Critical"
         }
+      }
+    },
+    "submissions": {
+      "open": "Submissions",
+      "summary": "{handedIn} of {total} students have handed in.",
+      "emptyRoster": "No students are enrolled in this class yet.",
+      "loadError": "Couldn't load the submissions. Pull down to try again.",
+      "attempt": "Attempt {number}",
+      "score": "{score} / {max}",
+      "status": {
+        "notHandedIn": "Not handed in",
+        "toMark": "To mark",
+        "draft": "Draft mark",
+        "published": "Published",
+        "returned": "Returned"
+      },
+      "publishAll": {
+        "action": "Publish ready marks ({count})",
+        "title": "Publish marks?",
+        "body": "{count} draft marks will be released to the students and their parents. A published mark can only be changed with a correction.",
+        "cancel": "Cancel",
+        "confirm": "Publish",
+        "done": "{count} marks published.",
+        "failed": "Some marks couldn't be published. Check your connection and try again."
+      }
+    },
+    "marking": {
+      "loadError": "Couldn't load this submission.",
+      "answer": "Answer",
+      "noText": "No written answer.",
+      "scoreLabel": "Score",
+      "feedbackLabel": "Feedback for the student",
+      "publishedNote": "This mark is published. To change it, use a correction in the gradebook.",
+      "actions": {
+        "publish": "Publish mark",
+        "saveDraft": "Save as draft",
+        "returnToStudent": "Return for another attempt"
+      },
+      "confirm": {
+        "cancel": "Cancel",
+        "publish": {
+          "title": "Publish this mark?",
+          "body": "{name} and their parents will see the mark and your feedback.",
+          "action": "Publish"
+        },
+        "returnToStudent": {
+          "title": "Return this work?",
+          "body": "{name} can hand in again, even after the deadline. Any draft mark is cleared.",
+          "action": "Return"
+        }
+      },
+      "done": {
+        "saveDraft": "Draft mark saved. Only staff can see it.",
+        "publish": "Mark published.",
+        "returnToStudent": "Work returned to the student."
+      },
+      "errors": {
+        "score": "Enter a score from 0 to {max}.",
+        "scoreRequired": "Enter a score before publishing.",
+        "failed": "The mark couldn't be saved. Check your connection and try again."
       }
     }
   },
@@ -1484,6 +1566,70 @@
       "empty": "No students are enrolled in this class.",
       "error": "Couldn't load this register.",
       "retry": "Try again"
+    }
+  },
+  "account": {
+    "retry": "Try again",
+    "restore": {
+      "done": "Your purchase was restored."
+    },
+    "devices": {
+      "title": "Signed-in devices",
+      "intro": "These are the devices and browsers signed in to your account. Sign out of any you don't recognise.",
+      "loadError": "Couldn't load your signed-in devices.",
+      "failed": "Couldn't sign out. Check your connection and try again.",
+      "signedIn": "Signed in {when}",
+      "thisDevice": "This device",
+      "signOut": "Sign out",
+      "channel": {
+        "web": "Web browser",
+        "mobile": "Mobile app",
+        "api": "Other app"
+      },
+      "signOutOthers": {
+        "action": "Sign out of all other devices",
+        "title": "Sign out everywhere else?",
+        "body": "Every other device and browser will be signed out. You stay signed in on this device.",
+        "cancel": "Cancel",
+        "confirm": "Sign out"
+      }
+    },
+    "notifications": {
+      "title": "Notifications",
+      "intro": "Choose how each kind of notification reaches you: in the app, as a push notification, or by email.",
+      "loadError": "Couldn't load your notification settings.",
+      "saveFailed": "Couldn't save that change. Check your connection and try again.",
+      "mandatory": "Your school requires this notification.",
+      "categories": {
+        "academic": "Academic",
+        "communications": "Communications",
+        "family": "Family",
+        "teaching": "Teaching materials"
+      },
+      "channels": {
+        "inApp": "In app",
+        "push": "Push",
+        "email": "Email"
+      },
+      "types": {
+        "assignmentDueSoon": "Assignment due soon",
+        "gradePosted": "Grade published",
+        "enrollmentApproved": "Enrolment approved",
+        "coursePublished": "Course published",
+        "discussionReply": "Discussion replies",
+        "studyGroupInvite": "Study group invitations",
+        "certificateIssued": "Certificate issued",
+        "supportMessage": "Support messages",
+        "attendanceAlert": "Attendance alerts",
+        "adminAnnouncement": "School announcements",
+        "announcement": "Class announcements",
+        "materialScanQuarantined": "File blocked by the safety scan",
+        "materialScanFailed": "File safety scan failed",
+        "materialOcrLowConfidence": "File text hard to read",
+        "materialIngested": "File ready for AI",
+        "materialIngestFailed": "File couldn't be prepared for AI",
+        "directMessage": "Messages"
+      }
     }
   }
 }

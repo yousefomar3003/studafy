@@ -6,6 +6,7 @@ import '../../../core/api/generated/models/assignment.dart';
 import '../../../core/api/generated/models/assignment_status.dart';
 import '../../../core/api/generated/models/submission.dart';
 import '../../../core/api/generated/models/submission_grade_status.dart';
+import '../../../core/api/generated/models/submission_status.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/assignment_detail_providers.dart';
 import 'assignment_submission_screen.dart';
@@ -25,10 +26,15 @@ class AssignmentDetailScreen extends ConsumerWidget {
     final assignmentAsync = ref.watch(assignmentDetailProvider(assignmentId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(assignmentAsync.value?.title ?? 'assignments.detail.title'.tr())),
+      appBar: AppBar(
+        title: Text(
+          assignmentAsync.value?.title ?? 'assignments.detail.title'.tr(),
+        ),
+      ),
       body: assignmentAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(child: Text('assignments.detail.error'.tr())),
+        error: (error, stackTrace) =>
+            Center(child: Text('assignments.detail.error'.tr())),
         data: (assignment) => _AssignmentDetailBody(assignment: assignment),
       ),
     );
@@ -42,7 +48,9 @@ class _AssignmentDetailBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final submissionAsync = ref.watch(assignmentSubmissionProvider(assignment.id));
+    final submissionAsync = ref.watch(
+      assignmentSubmissionProvider(assignment.id),
+    );
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -54,7 +62,10 @@ class _AssignmentDetailBody extends ConsumerWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(AppSpacing.space16),
         children: [
-          _AssignmentSummary(assignment: assignment, submission: submissionAsync.value),
+          _AssignmentSummary(
+            assignment: assignment,
+            submission: submissionAsync.value,
+          ),
           const SizedBox(height: AppSpacing.space24),
           Text(
             'assignments.detail.submissionSection'.tr(),
@@ -66,9 +77,12 @@ class _AssignmentDetailBody extends ConsumerWidget {
               padding: EdgeInsets.symmetric(vertical: AppSpacing.space16),
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (error, stackTrace) => Text('assignments.detail.submissionError'.tr()),
-            data: (submission) =>
-                _SubmissionSection(assignment: assignment, submission: submission),
+            error: (error, stackTrace) =>
+                Text('assignments.detail.submissionError'.tr()),
+            data: (submission) => _SubmissionSection(
+              assignment: assignment,
+              submission: submission,
+            ),
           ),
         ],
       ),
@@ -77,7 +91,10 @@ class _AssignmentDetailBody extends ConsumerWidget {
 }
 
 class _AssignmentSummary extends StatelessWidget {
-  const _AssignmentSummary({required this.assignment, required this.submission});
+  const _AssignmentSummary({
+    required this.assignment,
+    required this.submission,
+  });
 
   final Assignment assignment;
   final Submission? submission;
@@ -86,15 +103,22 @@ class _AssignmentSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    final dueAt = DateFormat.MMMd(context.locale.toString()).add_jm().format(assignment.dueAt);
-    final isOverdueUnsubmitted = submission == null && DateTime.now().isAfter(assignment.dueAt);
+    final dueAt = DateFormat.MMMd(
+      context.locale.toString(),
+    ).add_jm().format(assignment.dueAt);
+    final isOverdueUnsubmitted =
+        submission == null && DateTime.now().isAfter(assignment.dueAt);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.event_outlined, size: 18, color: colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.event_outlined,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: AppSpacing.space8),
             Expanded(
               child: Text(
@@ -103,13 +127,20 @@ class _AssignmentSummary extends StatelessWidget {
               ),
             ),
             if (isOverdueUnsubmitted)
-              StatusPill(label: 'assignments.status.late'.tr(), tone: StatusPillTone.danger),
+              StatusPill(
+                label: 'assignments.status.late'.tr(),
+                tone: StatusPillTone.danger,
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.space8),
         Text(
-          'assignments.detail.maxScore'.tr(namedArgs: {'score': '${assignment.maxScore}'}),
-          style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+          'assignments.detail.maxScore'.tr(
+            namedArgs: {'score': '${assignment.maxScore}'},
+          ),
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
         ),
         if ((assignment.description ?? '').isNotEmpty) ...[
           const SizedBox(height: AppSpacing.space16),
@@ -121,7 +152,10 @@ class _AssignmentSummary extends StatelessWidget {
         ],
         if (assignment.attachments.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.space16),
-          Text('assignments.detail.attachments'.tr(), style: textTheme.titleSmall),
+          Text(
+            'assignments.detail.attachments'.tr(),
+            style: textTheme.titleSmall,
+          ),
           for (final attachment in assignment.attachments)
             AttachmentDownloadTile(
               fileName: attachment.originalFileName,
@@ -134,8 +168,17 @@ class _AssignmentSummary extends StatelessWidget {
   }
 }
 
+/// Whether [submission]'s hand-in is locked: once its mark is published, the server refuses a
+/// resubmission (`SUBMISSION_ALREADY_GRADED`) until the teacher returns it.
+bool isSubmissionLocked(Submission submission) =>
+    submission.gradeStatus == SubmissionGradeStatus.published &&
+    submission.status != SubmissionStatus.returned;
+
 class _SubmissionSection extends StatelessWidget {
-  const _SubmissionSection({required this.assignment, required this.submission});
+  const _SubmissionSection({
+    required this.assignment,
+    required this.submission,
+  });
 
   final Assignment assignment;
   final Submission? submission;
@@ -157,12 +200,18 @@ class _SubmissionSection extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline, size: 18, color: colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.info_outline,
+                size: 18,
+                color: colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: AppSpacing.space8),
               Expanded(
                 child: Text(
                   'assignments.detail.notSubmitted'.tr(),
-                  style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -183,12 +232,17 @@ class _SubmissionSection extends StatelessWidget {
         Row(
           children: [
             Text(
-              'assignments.detail.attempt'.tr(namedArgs: {'number': '${submission.attemptNumber}'}),
+              'assignments.detail.attempt'.tr(
+                namedArgs: {'number': '${submission.attemptNumber}'},
+              ),
               style: textTheme.bodyMedium,
             ),
             if (submission.isLate) ...[
               const SizedBox(width: AppSpacing.space8),
-              StatusPill(label: 'assignments.status.late'.tr(), tone: StatusPillTone.warning),
+              StatusPill(
+                label: 'assignments.status.late'.tr(),
+                tone: StatusPillTone.warning,
+              ),
             ],
           ],
         ),
@@ -202,7 +256,9 @@ class _SubmissionSection extends StatelessWidget {
                 ).add_jm().format(submission.submittedAt!),
               },
             ),
-            style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
         if ((submission.content ?? '').isNotEmpty) ...[
@@ -220,7 +276,27 @@ class _SubmissionSection extends StatelessWidget {
         ],
         const SizedBox(height: AppSpacing.space16),
         _FeedbackCard(submission: submission),
-        if (canAct) ...[
+        if (canAct && isSubmissionLocked(submission)) ...[
+          const SizedBox(height: AppSpacing.space16),
+          Row(
+            children: [
+              Icon(
+                Icons.lock_outline,
+                size: 18,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: AppSpacing.space8),
+              Expanded(
+                child: Text(
+                  'assignments.detail.locked'.tr(),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ] else if (canAct) ...[
           const SizedBox(height: AppSpacing.space16),
           OutlinedButton(
             onPressed: () => _openSubmissionScreen(context),
@@ -259,12 +335,18 @@ class _FeedbackCard extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.space16),
           child: Row(
             children: [
-              Icon(Icons.hourglass_empty, size: 18, color: colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.hourglass_empty,
+                size: 18,
+                color: colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: AppSpacing.space8),
               Expanded(
                 child: Text(
                   'assignments.detail.awaitingGrade'.tr(),
-                  style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -281,13 +363,22 @@ class _FeedbackCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.grade_outlined, size: 18, color: colorScheme.primary),
+                Icon(
+                  Icons.grade_outlined,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
                 const SizedBox(width: AppSpacing.space8),
-                Text('assignments.detail.feedbackTitle'.tr(), style: textTheme.titleSmall),
+                Text(
+                  'assignments.detail.feedbackTitle'.tr(),
+                  style: textTheme.titleSmall,
+                ),
                 const Spacer(),
                 Text(
                   '${submission.score ?? '—'}',
-                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),

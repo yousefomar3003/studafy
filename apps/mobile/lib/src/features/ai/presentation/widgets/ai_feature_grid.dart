@@ -6,6 +6,7 @@ import '../../../../core/router/route_paths.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../domain/ai_feature.dart';
 import '../../../shell/presentation/shell_tab_placeholder.dart';
+import '../../../student/presentation/materials_screen.dart';
 
 /// The subscribed-state feature hub: one tile per [AiFeature], in the same order as the backend's
 /// own `AI_FEATURES` list.
@@ -21,7 +22,10 @@ class AiFeatureGrid extends StatelessWidget {
       mainAxisSpacing: AppSpacing.space12,
       crossAxisSpacing: AppSpacing.space12,
       childAspectRatio: 1.3,
-      children: [for (final feature in AiFeature.values) _AiFeatureTile(feature: feature)],
+      children: [
+        for (final feature in AiFeature.values)
+          _AiFeatureTile(feature: feature),
+      ],
     );
   }
 }
@@ -40,15 +44,20 @@ class _AiFeatureTile extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        // Every feature but `quiz` (ST-230), `flashcards` (ST-231), and `exam` (ST-232) is still
-        // a later ticket (ST-165 and siblings already implement the API side — see
-        // apps/api/src/modules/ai/routes/*). Opening the same "coming soon" placeholder the shell
-        // already uses for an unshipped tab keeps this honest rather than pretending the tile does
-        // something it doesn't.
+        // Summaries and key concepts are per-material, so their tiles open the Lessons library,
+        // where each AI-visible material's viewer offers both. `explain` still has no mobile
+        // screen; opening the same "coming soon" placeholder the shell already uses for an
+        // unshipped tab keeps this honest rather than pretending the tile does something it doesn't.
         onTap: () => switch (feature) {
+          AiFeature.ask => GoRouter.of(context).push(RoutePaths.askAi),
           AiFeature.quiz => GoRouter.of(context).push(RoutePaths.quiz),
-          AiFeature.flashcards => GoRouter.of(context).push(RoutePaths.flashcards),
+          AiFeature.flashcards => GoRouter.of(
+            context,
+          ).push(RoutePaths.flashcards),
           AiFeature.exam => GoRouter.of(context).push(RoutePaths.examMode),
+          AiFeature.summary || AiFeature.concepts => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const MaterialsScreen()),
+          ),
           _ => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => Scaffold(

@@ -27,6 +27,7 @@ class AuthSession {
   DateTime? _accessTokenExpiresAt;
   List<String> _roles = const [];
   String? _userId;
+  String? _sessionId;
 
   String? _lastRefreshErrorCode;
 
@@ -67,6 +68,11 @@ class AuthSession {
   /// unauthenticated or the claim is missing/malformed.
   String? get userId => _userId;
 
+  /// The id of this device's own session — the `id` it has in `GET /api/auth/sessions`. Lets the
+  /// signed-in devices screen mark "this device" and keep it out of per-session sign-out. Null
+  /// when unauthenticated.
+  String? get sessionId => _sessionId;
+
   /// The problem `code` the server gave for the most recent rejected refresh (for example
   /// `SCHOOL_SUSPENDED` when the school was closed), or `null` when the last refresh succeeded, was
   /// never attempted, or failed without reaching the server. Lets the caller tell *why* a session
@@ -93,6 +99,7 @@ class AuthSession {
     if (accessToken != null && refreshToken != null && sessionId != null) {
       _accessToken = accessToken;
       _refreshToken = refreshToken;
+      _sessionId = sessionId;
 
       // Decode expiry, roles, and user id from the JWT payload.
       // Decode expiry, roles, and subject from the JWT payload.
@@ -114,6 +121,7 @@ class AuthSession {
   }) async {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
+    _sessionId = sessionId;
     _accessTokenExpiresAt = DateTime.now().add(Duration(seconds: expiresIn));
     _lastRefreshErrorCode = null;
     final payload = decodeJwtPayload(accessToken);
@@ -134,6 +142,7 @@ class AuthSession {
     _accessTokenExpiresAt = null;
     _roles = const [];
     _userId = null;
+    _sessionId = null;
     await _secureStore.clear();
   }
 

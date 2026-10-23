@@ -230,8 +230,8 @@ final teacherTodaySessionsProvider = FutureProvider<List<TeacherSession>>((
 // Grading queue — pending submissions across the teacher's assignments
 // ---------------------------------------------------------------------------
 
-/// Every published assignment across the classes the teacher leads.
-final teacherPublishedAssignmentsProvider = FutureProvider<List<Assignment>>((
+/// Every assignment across the classes the teacher leads, in any status.
+final teacherAssignmentsProvider = FutureProvider<List<Assignment>>((
   ref,
 ) async {
   final classes = await ref.watch(teacherClassesProvider.future);
@@ -243,10 +243,17 @@ final teacherPublishedAssignmentsProvider = FutureProvider<List<Assignment>>((
           api.assignments.listAssignments(classId: classInfo.id, limit: 100),
     ),
   );
-  return [
-    for (final page in pages)
-      ...page.assignments.where((a) => a.status == AssignmentStatus.published),
-  ];
+  return [for (final page in pages) ...page.assignments];
+});
+
+/// Every published assignment across the classes the teacher leads.
+final teacherPublishedAssignmentsProvider = FutureProvider<List<Assignment>>((
+  ref,
+) async {
+  final assignments = await ref.watch(teacherAssignmentsProvider.future);
+  return assignments
+      .where((a) => a.status == AssignmentStatus.published)
+      .toList();
 });
 
 /// Turned-in submissions across the teacher's published assignments that still need a mark

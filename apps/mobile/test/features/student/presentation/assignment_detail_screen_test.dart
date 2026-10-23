@@ -49,6 +49,7 @@ Submission _fakeSubmission({
   SubmissionGradeStatus gradeStatus = SubmissionGradeStatus.none,
   num? score,
   String? feedback,
+  SubmissionStatus status = SubmissionStatus.submitted,
 }) {
   final now = DateTime(2026, 1, 1);
   return Submission(
@@ -57,7 +58,7 @@ Submission _fakeSubmission({
     assignmentId: _assignmentId,
     studentId: 'student-1',
     content: 'Here is my answer.',
-    status: SubmissionStatus.submitted,
+    status: status,
     gradeStatus: gradeStatus,
     isLate: isLate,
     attemptNumber: 1,
@@ -153,7 +154,31 @@ void main() {
     expect(find.text('Feedback'), findsOneWidget);
     expect(find.text('92'), findsOneWidget);
     expect(find.text('Great work, watch your signs in question 3.'), findsOneWidget);
+    // A published mark locks the hand-in: the server refuses a resubmission until it's returned.
+    expect(find.widgetWithText(OutlinedButton, 'Resubmit'), findsNothing);
+    expect(find.textContaining("so it can't be changed"), findsOneWidget);
+  });
+
+  testWidgets('offers a resubmission again once the teacher returns the work', (tester) async {
+    await _pump(
+      tester,
+      ProviderScope(
+        overrides: [
+          assignmentDetailProvider(_assignmentId).overrideWith((ref) async => _fakeAssignment()),
+          assignmentSubmissionProvider(_assignmentId).overrideWith(
+            (ref) async => _fakeSubmission(
+              gradeStatus: SubmissionGradeStatus.published,
+              status: SubmissionStatus.returned,
+              score: 40,
+            ),
+          ),
+        ],
+        child: _screenScope(),
+      ),
+    );
+
     expect(find.widgetWithText(OutlinedButton, 'Resubmit'), findsOneWidget);
+    expect(find.textContaining("so it can't be changed"), findsNothing);
   });
 
   testWidgets('shows "awaiting grade" and a late pill for an unmarked late submission', (

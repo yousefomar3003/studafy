@@ -6,8 +6,10 @@ import '../../messaging/presentation/parent_messages_screen.dart';
 import '../../messaging/presentation/teacher_messages_screen.dart';
 import '../../messaging/presentation/widgets/unread_messages_badge.dart';
 import '../../parent/presentation/child_detail_screen.dart';
+import '../../parent/presentation/parent_communication_screen.dart';
 import '../../parent/presentation/parent_home_screen.dart';
-import '../../student/presentation/timetable_screen.dart';
+import '../../student/presentation/assignments_screen.dart';
+import '../../student/presentation/materials_screen.dart';
 import '../../student/presentation/today_screen.dart';
 import '../../teacher/presentation/teacher_class_list_screen.dart';
 import '../../teacher/presentation/teacher_home_screen.dart';
@@ -39,11 +41,16 @@ class ShellDestination {
 /// The bottom navigation destinations for [role]'s shell.
 ///
 /// Every shell gets a Home and a Profile tab; roles with a mobile-relevant collection of
-/// people/courses get one more tab for it, and the two roles that follow the school's weekly
-/// timetable (student, teacher) get a Timetable tab. The two sides of parent ↔ teacher messaging
+/// people/courses get one more tab for it, and the teacher gets a Timetable tab. The two sides of parent ↔ teacher messaging
 /// (parent, teacher) get a Messages tab, badged with the unread total. [ShellRole.viewer] gets the minimal
 /// two-tab set — no domain-specific tab — matching its zero-mutation, view-only posture; its
 /// Home tab still varies by the session's actual role, via [ViewerHomeScreen].
+///
+/// [ShellRole.student] swaps the Timetable tab for Lessons (the materials library) and Work
+/// (assignments); its weekly timetable stays one tap away from the Today timetable card.
+///
+/// [ShellRole.parent] also gets a News tab: the school's announcements and attendance alerts
+/// ([ParentCommunicationScreen]), which the home's notifications card opens too.
 ///
 /// [ShellRole.student] alone also gets an AI tab. A parent can buy and manage the same per-student
 /// add-on too (see `apps/web/src/app/routes.tsx`'s `account/ai` route comment); the parent home
@@ -70,14 +77,14 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
           body: TodayScreen(),
         ),
         ShellDestination(
-          labelKey: 'shell.tabs.timetable',
-          icon: Icons.view_week_outlined,
-          body: TimetableScreen(),
+          labelKey: 'shell.tabs.lessons',
+          icon: Icons.menu_book_outlined,
+          body: MaterialsScreen(),
         ),
         ShellDestination(
-          labelKey: 'shell.tabs.courses',
-          icon: Icons.menu_book_outlined,
-          body: ShellTabPlaceholder(titleKey: 'shell.tabs.courses'),
+          labelKey: 'shell.tabs.work',
+          icon: Icons.assignment_outlined,
+          body: StudentAssignmentsScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.ai',
@@ -122,6 +129,11 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
           labelKey: 'shell.tabs.children',
           icon: Icons.family_restroom_outlined,
           body: ChildDetailScreen(),
+        ),
+        ShellDestination(
+          labelKey: 'shell.tabs.news',
+          icon: Icons.campaign_outlined,
+          body: ParentCommunicationScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.messages',
