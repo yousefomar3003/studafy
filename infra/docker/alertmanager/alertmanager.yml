@@ -128,6 +128,18 @@ receivers:
         topic_arn: __PAGE_TOPIC_ARN__
         subject: '{{ template "studafy.subject" . }}'
         message: '{{ template "studafy.message" . }}'
+    # Pages also go to a Telegram chat, wherever alert_telegram_chat_id is set — critical only,
+    # the same promise as SMS: a warning is never allowed to buzz a phone at night. docker-entrypoint.sh
+    # deletes this block when the chat ID is unset, and otherwise writes the bot token
+    # (the monitoring secret's TELEGRAM_BOT_TOKEN key) to the file below and substitutes the chat
+    # ID. The `1` keeps this file valid for CI's `amtool check-config` as-is.
+    # telegram:begin
+    telegram_configs:
+      - bot_token_file: /tmp/telegram-bot-token
+        chat_id: 1 # __TELEGRAM_CHAT_ID__
+        parse_mode: HTML
+        message: '{{ template "studafy.telegram" . }}'
+    # telegram:end
 
   - name: ticket
     sns_configs:

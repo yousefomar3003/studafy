@@ -326,6 +326,17 @@ variable "alert_sms_numbers" {
   }
 }
 
+variable "alert_telegram_chat_id" {
+  description = "Telegram chat ID that also receives critical alerts (the page receiver), through a bot whose token is monitoring_secret_arn's TELEGRAM_BOT_TOKEN key. Not a secret. null (default) leaves pages SNS-only. The chat must have pressed Start on the bot first, or Telegram rejects every message."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.alert_telegram_chat_id == null || can(regex("^-?[0-9]+$", var.alert_telegram_chat_id))
+    error_message = "alert_telegram_chat_id must be a numeric Telegram chat ID, e.g. \"355182545\"."
+  }
+}
+
 variable "edge_certificate_arn" {
   description = "ARN of module.edge's validated ACM certificate (the public ALB's TLS certificate, in var.aws_region). Watched for expiry — see alerts.tf's own comment on why an auto-renewing certificate is still worth alerting on."
   type        = string

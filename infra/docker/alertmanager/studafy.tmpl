@@ -18,3 +18,19 @@
 {{ end }}
 {{ end -}}
 {{- end }}
+
+{{/*
+  The same content for the page receiver's Telegram integration, which sends with parse_mode HTML:
+  every interpolated value is escaped, because one stray `<` or `&` in a summary makes Telegram
+  reject the whole message — a page that silently never arrives.
+*/}}
+{{ define "studafy.telegram" -}}
+<b>[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.severity | html }} {{ .CommonLabels.alertname | html }} ({{ .CommonLabels.service | html }})</b>
+{{ range .Alerts }}
+{{ .Status | toUpper }}: {{ .Labels.alertname | html }}{{ with .Labels.service }} on {{ . | html }}{{ end }}
+{{ with .Annotations.summary }}{{ . | html }}
+{{ end }}{{ with .Annotations.description }}{{ . | html }}
+{{ end }}Started: {{ .StartsAt.Format "2006-01-02 15:04 MST" }}
+{{ with .Annotations.runbook_url }}Runbook: {{ . | html }}
+{{ end }}{{ end -}}
+{{- end }}

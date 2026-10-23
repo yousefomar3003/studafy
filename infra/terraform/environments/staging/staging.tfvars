@@ -42,4 +42,8 @@ edge_idle_timeout = 3600
 
 # Who receives alerts (modules/monitoring/notifications.tf): every address gets critical and warning
 # alerts by email, after clicking the confirmation link AWS sends it on first apply.
-alert_email_addresses = ["hello@studafy.com"]
+alert_email_addresses = ["hello@studafy.com", "studafyap@gmail.com"]
+
+# Critical alerts are also sent to this Telegram chat. The bot token is not here: it is the
+# monitoring secret's TELEGRAM_BOT_TOKEN key (TF_VAR_secrets_app_secret_values).
+alert_telegram_chat_id = "355182545"

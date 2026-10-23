@@ -76,7 +76,7 @@ resource "aws_ecs_task_definition" "alertmanager" {
       name      = "alertmanager"
       image     = var.alertmanager_image
       essential = true
-      environment = [
+      environment = concat([
         # Alertmanager puts this in the notification payloads it sends, as the base for "view in
         # Alertmanager" links. It has no public endpoint (see the module README's access model), so
         # the link is only followable through the bastion port-forward — which is still more useful
@@ -89,6 +89,15 @@ resource "aws_ecs_task_definition" "alertmanager" {
         { name = "ALERTMANAGER_PAGE_TOPIC_ARN", value = aws_sns_topic.alert_delivery["page"].arn },
         { name = "ALERTMANAGER_TICKET_TOPIC_ARN", value = aws_sns_topic.alert_delivery["ticket"].arn },
         { name = "ALERTMANAGER_HEARTBEAT_TOPIC_ARN", value = aws_sns_topic.alert_delivery["heartbeat"].arn },
+        ],
+        # Optional Telegram copy of every page; docker-entrypoint.sh drops the integration when unset.
+        var.alert_telegram_chat_id == null ? [] : [
+          { name = "ALERTMANAGER_TELEGRAM_CHAT_ID", value = var.alert_telegram_chat_id },
+      ])
+      # Only referenced when Telegram is on: ECS refuses to start a task whose valueFrom names a key
+      # the secret does not hold, and TELEGRAM_BOT_TOKEN is not one of its defaults.
+      secrets = var.alert_telegram_chat_id == null ? [] : [
+        { name = "ALERTMANAGER_TELEGRAM_BOT_TOKEN", valueFrom = "${var.monitoring_secret_arn}:TELEGRAM_BOT_TOKEN::" },
       ]
       portMappings = [
         { containerPort = var.alertmanager_port, protocol = "tcp", name = "alertmanager" }

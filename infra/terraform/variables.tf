@@ -436,6 +436,12 @@ variable "alert_sms_numbers" {
   default     = []
 }
 
+variable "alert_telegram_chat_id" {
+  description = "Telegram chat ID that also receives critical alerts. Optional; when set, the monitoring app-secret must hold TELEGRAM_BOT_TOKEN. See modules/monitoring/variables.tf."
+  type        = string
+  default     = null
+}
+
 variable "alertmanager_image_tag" {
   description = "Tag of module.registry's alertmanager ECR repository to deploy (ST-262). Bumping this and re-applying is how a routing change (infra/docker/alertmanager/alertmanager.yml) ships — same rolling-deploy shape as prometheus_image_tag. Note that an *alert rule* change ships through prometheus_image_tag instead: the rules are baked into the Prometheus image, not this one."
   type        = string

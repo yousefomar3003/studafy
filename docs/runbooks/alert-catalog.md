@@ -117,7 +117,7 @@ curl -sf -XPOST http://localhost:9093/api/v2/alerts \
 amtool --alertmanager.url=http://localhost:9093 alert query --output=extended alertname=RoutingDrill
 
 # 3. Confirm the [FIRING] email (and SMS, if alert_sms_numbers is set) arrived for every address in
-#    alert_email_addresses. This is the step that actually tests the acceptance criterion; the two
+#    alert_email_addresses, and the Telegram message if alert_telegram_chat_id is set. This is the step that actually tests the acceptance criterion; the two
 #    above only prove the alert got as far as Alertmanager. Nothing arriving: check the
 #    subscription is confirmed (SNS console -> topic -> Subscriptions) and the Alertmanager logs.
 

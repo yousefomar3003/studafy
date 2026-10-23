@@ -408,9 +408,10 @@ module "monitoring" {
   alertmanager_port  = var.alertmanager_port
   alertmanager_image = "${module.registry.repository_urls["alertmanager"]}:${var.alertmanager_image_tag}"
   # Who Alertmanager's SNS topics deliver to (modules/monitoring/notifications.tf).
-  alert_email_addresses = var.alert_email_addresses
-  alert_sms_numbers     = var.alert_sms_numbers
-  edge_certificate_arn  = module.edge.certificate_arn
+  alert_email_addresses  = var.alert_email_addresses
+  alert_sms_numbers      = var.alert_sms_numbers
+  alert_telegram_chat_id = var.alert_telegram_chat_id
+  edge_certificate_arn   = module.edge.certificate_arn
   # Null in dev, where module.cdn is not instantiated at all — which drops both CDN certificate
   # alarms and the whole us-east-1 SNS topic that would carry them.
   cdn_certificate_arn = var.environment == "dev" ? null : module.cdn[0].certificate_arn
