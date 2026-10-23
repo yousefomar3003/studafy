@@ -333,7 +333,7 @@ variable "alert_telegram_chat_id" {
 
   validation {
     condition     = var.alert_telegram_chat_id == null || can(regex("^-?[0-9]+$", var.alert_telegram_chat_id))
-    error_message = "alert_telegram_chat_id must be a numeric Telegram chat ID, e.g. \"355182545\"."
+    error_message = "alert_telegram_chat_id must be a numeric Telegram chat ID, e.g. \"5797039003\"."
   }
 }
 

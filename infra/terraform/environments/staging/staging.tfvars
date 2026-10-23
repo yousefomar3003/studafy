@@ -46,4 +46,4 @@ alert_email_addresses = ["hello@studafy.com", "studafyap@gmail.com"]
 
 # Critical alerts are also sent to this Telegram chat. The bot token is not here: it is the
 # monitoring secret's TELEGRAM_BOT_TOKEN key (TF_VAR_secrets_app_secret_values).
-alert_telegram_chat_id = "355182545"
+alert_telegram_chat_id = "5797039003"
