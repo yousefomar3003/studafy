@@ -27,6 +27,7 @@
 # APK (what a device downloads), iOS gates the .ipa. Definition + levers: docs/perf-pass-report.md.
 
 require "base64"
+require "fileutils"
 require "shellwords"
 
 skip_docs          # never let `fastlane` regenerate fastlane/README.md over the runbook
@@ -95,6 +96,54 @@ def app_store_api_key
   )
 end
 
+IOS_BUNDLE_ID = ENV["IOS_APP_IDENTIFIER"] || "com.studafy.studafyMobile"
+
+# The App Store profile `match` just installed, by the env var match itself sets.
+def match_profile_name
+  ENV.fetch("sigh_#{IOS_BUNDLE_ID}_appstore_profile-name") do
+    UI.user_error!("no match App Store profile for #{IOS_BUNDLE_ID} — run the `signing` lane first")
+  end
+end
+
+# The Xcode project ships with automatic signing and no team, so a Mac-less checkout cannot sign a
+# store build. Switch the store build configuration to the match certificate + profile on the
+# runner's working copy instead of committing a hand-edited project.pbxproj nobody could verify.
+def use_match_signing
+  update_code_signing_settings(
+    path:                   File.join(MOBILE_DIR, "ios/Runner.xcodeproj"),
+    use_automatic_signing:  false,
+    team_id:                ENV.fetch("APPLE_DEVELOPER_TEAM_ID"),
+    targets:                ["Runner"],
+    build_configurations:   ["Release-#{FLAVOR}"],
+    code_sign_identity:     "Apple Distribution",
+    profile_name:           match_profile_name,
+    bundle_identifier:      IOS_BUNDLE_ID,
+  )
+end
+
+# Manual signing needs the profile named in the export options too; `--export-method` alone makes
+# Xcode look for an automatically managed one.
+def ios_export_options_plist
+  path = File.join(MOBILE_DIR, "build/ios/ExportOptions.plist")
+  FileUtils.mkdir_p(File.dirname(path))
+  File.write(path, <<~PLIST)
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>method</key><string>app-store-connect</string>
+      <key>teamID</key><string>#{ENV.fetch("APPLE_DEVELOPER_TEAM_ID")}</string>
+      <key>signingStyle</key><string>manual</string>
+      <key>signingCertificate</key><string>Apple Distribution</string>
+      <key>provisioningProfiles</key>
+      <dict><key>#{IOS_BUNDLE_ID}</key><string>#{match_profile_name}</string></dict>
+      <key>uploadSymbols</key><true/>
+    </dict>
+    </plist>
+  PLIST
+  path
+end
+
 def build_ios_ipa
   flutter_prepare
   flutter(
@@ -102,7 +151,7 @@ def build_ios_ipa
     "--flavor", FLAVOR, "-t", ENTRYPOINT,
     "--build-name=#{pubspec_version_name}",
     "--build-number=#{resolved_build_number}",
-    "--export-method=app-store",
+    "--export-options-plist=#{ios_export_options_plist}",
   )
   ipa = Dir.glob(File.join(MOBILE_DIR, "build/ios/ipa/*.ipa")).first ||
     UI.user_error!("flutter build ipa produced no .ipa under build/ios/ipa/")
@@ -167,6 +216,7 @@ platform :ios do
   lane :signing do
     setup_ci if is_ci   # ephemeral keychain, so match can install without a login password prompt
     match(readonly: true)  # all other options come from fastlane/Matchfile
+    use_match_signing
   end
 
   desc "Mint the distribution cert + App Store profile into the match repo. One-time setup / renewal only."
