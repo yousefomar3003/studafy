@@ -8,6 +8,7 @@
 #
 # ── Lane map ────────────────────────────────────────────────────────────────────────────────────
 #   ios   signing          match (read-only) — distribution cert + App Store profile
+#   ios   create_signing   match (writes) — mint/renew that cert + profile ← one-time, by hand
 #   ios   beta             build IPA → TestFlight            ← every merge to main
 #   ios   release          build IPA → App Store review, phased release  ← mobile-v* tag
 #   android signing        materialise the upload keystore from CI secrets
@@ -166,6 +167,14 @@ platform :ios do
   lane :signing do
     setup_ci if is_ci   # ephemeral keychain, so match can install without a login password prompt
     match(readonly: true)  # all other options come from fastlane/Matchfile
+  end
+
+  desc "Mint the distribution cert + App Store profile into the match repo. One-time setup / renewal only."
+  lane :create_signing do
+    # The one deliberate non-readonly match (see fastlane/Matchfile): it creates a distribution
+    # certificate, of which Apple allows only a few per team, so no release lane ever calls it.
+    setup_ci if is_ci
+    match(readonly: false, api_key: app_store_api_key)
   end
 
   desc "Build a release IPA and upload it to TestFlight. Runs on every merge to main."
