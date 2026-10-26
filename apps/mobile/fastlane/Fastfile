@@ -165,6 +165,16 @@ def install_google_service_info
   project.save
 end
 
+# Extra `--dart-define`s for a one-off test build, from MOBILE_EXTRA_DART_DEFINES as
+# "KEY=value,KEY=value" (e.g. API_BASE_URL and SHOW_DEMO_LOGIN for a TestFlight build that talks to
+# a developer's tunnelled API). The release workflows never set it.
+def extra_dart_defines
+  ENV["MOBILE_EXTRA_DART_DEFINES"].to_s.split(",").map(&:strip).reject(&:empty?).map do |pair|
+    UI.user_error!("MOBILE_EXTRA_DART_DEFINES entry '#{pair}' is not KEY=value") unless pair.include?("=")
+    "--dart-define=#{pair}"
+  end
+end
+
 def build_ios_ipa
   install_google_service_info
   # CocoaPods (ios/Podfile), not Swift Package Manager: resolving FlutterFire's packages through
@@ -178,6 +188,7 @@ def build_ios_ipa
     "--build-name=#{pubspec_version_name}",
     "--build-number=#{resolved_build_number}",
     "--export-options-plist=#{ios_export_options_plist}",
+    *extra_dart_defines,
   )
   ipa = Dir.glob(File.join(MOBILE_DIR, "build/ios/ipa/*.ipa")).first ||
     UI.user_error!("flutter build ipa produced no .ipa under build/ios/ipa/")
