@@ -82,4 +82,10 @@ resource "aws_service_discovery_service" "this" {
   # (failure_threshold is a required-by-schema but AWS-deprecated field: it accepts no value other
   # than the default 1 and AWS ignores it entirely — set only to satisfy the provider's schema.)
   health_check_custom_config {}
+
+  # The provider (v6) never reads the empty block back, so without this every plan replaces the
+  # service and orphans the ECS tasks registered in it.
+  lifecycle {
+    ignore_changes = [health_check_custom_config]
+  }
 }

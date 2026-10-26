@@ -1,6 +1,6 @@
 output "db_instance_id" {
   description = "RDS instance identifier."
-  value       = aws_db_instance.this.id
+  value       = aws_db_instance.this.identifier
 }
 
 output "address" {

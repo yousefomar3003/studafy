@@ -122,9 +122,7 @@ resource "aws_ecs_service" "loki" {
   }
 
   service_registries {
-    registry_arn   = aws_service_discovery_service.loki.arn
-    container_name = "loki"
-    container_port = var.loki_port
+    registry_arn = aws_service_discovery_service.loki.arn
   }
 
   tags = { Name = "${var.name_prefix}-loki" }

@@ -269,9 +269,11 @@ resource "aws_cloudfront_cache_policy" "status_page" {
   default_ttl = 0
   max_ttl     = 0
 
+  # CloudFront rejects the Accept-Encoding flags on a policy with caching disabled (all TTLs 0):
+  # with nothing cached there is no cache key for them to normalize.
   parameters_in_cache_key_and_forwarded_to_origin {
-    enable_accept_encoding_gzip   = true
-    enable_accept_encoding_brotli = true
+    enable_accept_encoding_gzip   = false
+    enable_accept_encoding_brotli = false
 
     cookies_config {
       cookie_behavior = "none"

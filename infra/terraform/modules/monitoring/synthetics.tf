@@ -73,7 +73,7 @@ resource "aws_iam_role" "synthetics_probe" {
   count = var.synthetics_enabled ? 1 : 0
 
   name        = "${var.name_prefix}-synthetics-probe"
-  description = "Runtime role for the black-box synthetic probe Lambda (ST-263). Shared by both regional deployments — see this file's header for why one IAM role serves both."
+  description = "Runtime role for the black-box synthetic probe Lambda (ST-263). Shared by both regional deployments - see this file's header for why one IAM role serves both."
   # Reuses alerts.tf's shared lambda.amazonaws.com trust policy document (identical to the one the
   # realtime probe and the alert bridge each already assume) rather than declaring a third copy of
   # the same statement.

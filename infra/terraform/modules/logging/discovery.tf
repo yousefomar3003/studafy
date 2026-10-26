@@ -34,4 +34,10 @@ resource "aws_service_discovery_service" "loki" {
   # (loki.tf); there is no Route 53 health check to configure here. failure_threshold is a
   # required-by-schema field AWS has deprecated and ignores — set only to satisfy the provider.
   health_check_custom_config {}
+
+  # The provider (v6) never reads the empty block back, so without this every plan replaces the
+  # service and orphans the ECS tasks registered in it.
+  lifecycle {
+    ignore_changes = [health_check_custom_config]
+  }
 }

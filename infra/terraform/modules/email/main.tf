@@ -26,10 +26,61 @@ resource "aws_sesv2_configuration_set" "transactional" {
   }
 }
 
+# Customer-managed, not `alias/aws/sns`: that AWS-managed key's policy cannot be edited, so it grants
+# nothing to `ses.amazonaws.com` and SES refuses to create the event destination (same constraint as
+# modules/monitoring/modules/alert-topic's key, there for CloudWatch).
+resource "aws_kms_key" "email_events" {
+  count                   = var.enabled ? 1 : 0
+  description             = "Encrypts ${var.name_prefix} SES bounce/complaint events in transit through SNS."
+  enable_key_rotation     = true
+  deletion_window_in_days = 30
+  policy                  = data.aws_iam_policy_document.email_events_key[0].json
+}
+
+resource "aws_kms_alias" "email_events" {
+  count         = var.enabled ? 1 : 0
+  name          = "alias/${var.name_prefix}-email-events"
+  target_key_id = aws_kms_key.email_events[0].key_id
+}
+
+data "aws_iam_policy_document" "email_events_key" {
+  count = var.enabled ? 1 : 0
+
+  statement {
+    sid       = "AccountAdministration"
+    effect    = "Allow"
+    actions   = ["kms:*"]
+    resources = ["*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
+
+  statement {
+    sid       = "SesPublish"
+    effect    = "Allow"
+    actions   = ["kms:GenerateDataKey*", "kms:Decrypt"]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ses.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
 resource "aws_sns_topic" "email_events" {
   count             = var.enabled ? 1 : 0
   name              = "${var.name_prefix}-email-events"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = aws_kms_key.email_events[0].id
 }
 
 # SES publishes as the service principal; the source-account condition stops another account's SES

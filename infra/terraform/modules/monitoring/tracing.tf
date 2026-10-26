@@ -93,9 +93,7 @@ resource "aws_ecs_service" "otel_collector" {
   }
 
   service_registries {
-    registry_arn   = aws_service_discovery_service.this["otel-collector"].arn
-    container_name = "otel-collector"
-    container_port = var.otel_collector_port
+    registry_arn = aws_service_discovery_service.this["otel-collector"].arn
   }
 
   tags = { Name = "${var.name_prefix}-otel-collector" }
@@ -164,16 +162,11 @@ resource "aws_ecs_service" "tempo" {
     assign_public_ip = false
   }
 
-  # Two registrations, one Cloud Map service: aws_service_discovery_service supports only one
-  # container_port per service_registries block, and the collector's OTLP write and Grafana's
-  # query read both resolve "tempo.metrics.internal" — the OTLP port is the one that matters for
-  # DNS-based discovery health (see discovery.tf), so it is the one registered here. Grafana's own
-  # query traffic reaches the same task via the same DNS name on the query port directly; nothing
-  # about MULTIVALUE A-record routing is port-specific.
+  # A-record Cloud Map service (discovery.tf): ECS rejects container_name/container_port here, which
+  # only SRV records use. The collector (OTLP) and Grafana (query) both reach this task by DNS name on
+  # their own port; nothing about MULTIVALUE A-record routing is port-specific.
   service_registries {
-    registry_arn   = aws_service_discovery_service.this["tempo"].arn
-    container_name = "tempo"
-    container_port = var.otel_collector_port
+    registry_arn = aws_service_discovery_service.this["tempo"].arn
   }
 
   tags = { Name = "${var.name_prefix}-tempo" }

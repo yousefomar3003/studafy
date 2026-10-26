@@ -69,9 +69,7 @@ resource "aws_ecs_service" "prometheus" {
   }
 
   service_registries {
-    registry_arn   = aws_service_discovery_service.this["prometheus"].arn
-    container_name = "prometheus"
-    container_port = 9090
+    registry_arn = aws_service_discovery_service.this["prometheus"].arn
   }
 
   tags = { Name = "${var.name_prefix}-prometheus" }
@@ -143,9 +141,7 @@ resource "aws_ecs_service" "postgres_exporter" {
   }
 
   service_registries {
-    registry_arn   = aws_service_discovery_service.this["postgres-exporter"].arn
-    container_name = "postgres-exporter"
-    container_port = 9187
+    registry_arn = aws_service_discovery_service.this["postgres-exporter"].arn
   }
 
   tags = { Name = "${var.name_prefix}-postgres-exporter" }
@@ -214,9 +210,7 @@ resource "aws_ecs_service" "mysqld_exporter" {
   }
 
   service_registries {
-    registry_arn   = aws_service_discovery_service.this["mysqld-exporter"].arn
-    container_name = "mysqld-exporter"
-    container_port = 9104
+    registry_arn = aws_service_discovery_service.this["mysqld-exporter"].arn
   }
 
   tags = { Name = "${var.name_prefix}-mysqld-exporter" }

@@ -30,13 +30,13 @@ resource "aws_db_parameter_group" "this" {
   }
 
   parameter {
-    name         = "slow_query_log"
+    name         = "log_slow_query"
     value        = "1"
     apply_method = "immediate"
   }
 
   parameter {
-    name         = "long_query_time"
+    name         = "log_slow_query_time"
     value        = tostring(var.slow_query_log_threshold_seconds)
     apply_method = "immediate"
   }
