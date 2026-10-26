@@ -186,6 +186,10 @@ const PrincipalClassesPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/classes/PrincipalClassesPage"),
 );
+const GradesSectionsPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/sections/GradesSectionsPage"),
+);
 const PrincipalStudentsPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/students/PrincipalStudentsPage"),
@@ -325,9 +329,6 @@ const DeleteAccountInfoPage = lazyWithCatalogs(
 const ConfirmAccountDeletionPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../routes/legal/ConfirmAccountDeletionPage"),
-);
-const AiSubscriptionPurchasePage = lazy(
-  () => import("../features/billing/AiSubscriptionPurchasePage"),
 );
 const HelpHomePage = lazy(() => import("../features/help/HelpHomePage"));
 const HelpArticlePage = lazy(() => import("../features/help/HelpArticlePage"));
@@ -653,6 +654,16 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            // Grades, their per-year sections, and who is placed in each — the "Grade 10 – C" a
+            // timetable is built for. Every write behind it requires `timetable:manage`.
+            path: "principal/sections",
+            element: (
+              <RequirePermission permission={PERMISSIONS.TIMETABLE_MANAGE}>
+                <GradesSectionsPage />
+              </RequirePermission>
+            ),
+          },
+          {
             path: "principal/students",
             element: (
               <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
@@ -893,17 +904,9 @@ export const routes: RouteObject[] = [
             path: "delete",
             element: <DeleteAccountPage />,
           },
-          {
-            // A parent/student buying the per-student AI add-on (ST-208). Web only: the mobile app
-            // never links here, since the stores forbid steering to an outside purchase of a
-            // digital good (ST-304, apps/mobile/docs/store_payment_routing.md). No `RequirePermission` — same as the rest of `/account`,
-            // since STUDENT and PARENT hold no distinct permission set of their own, and the API's
-            // own tenant scoping (`GET /api/students/{studentId}`, `POST
-            // /api/subscriptions/ai/checkout`) is what actually restricts a session to its own
-            // school and, for a parent, their own linked children.
-            path: "ai",
-            element: <AiSubscriptionPurchasePage />,
-          },
+          // No `/account/ai`: buying the AI add-on on the website is switched off for now — it is
+          // sold only in the mobile app. `features/billing/AiSubscriptionPurchasePage` is kept for
+          // when it comes back (route it here and restore the tile in `AccountPage`).
         ],
       },
     ],

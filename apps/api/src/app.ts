@@ -29,6 +29,7 @@ import {
   courseRoutes,
   classRoutes,
   roomRoutes,
+  sectionRoutes,
   enrollmentRoutes,
   timetableRoutes,
   examRoutes,
@@ -905,6 +906,12 @@ export function createApp({
   if (database) {
     app.route("/", classRoutes(database));
     app.route("/", enrollmentRoutes(database));
+  }
+
+  // Grades and sections (the "Grade 10 - Section C" a timetable is built for), and placing students
+  // in a section, which enrolls them into its classes. Writes gated on TIMETABLE_MANAGE.
+  if (database) {
+    app.route("/", sectionRoutes(database));
   }
 
   // Room directory (read-only). Rooms are provisioned during school setup; this only exposes the

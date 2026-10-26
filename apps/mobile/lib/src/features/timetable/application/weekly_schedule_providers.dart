@@ -86,7 +86,8 @@ Future<void> refreshWeeklySchedule(WidgetRef ref) async {
 }
 
 /// The signed-in student's weekly schedule: the approved version's slots for the classes they
-/// are enrolled in.
+/// are enrolled in, headed by the grade section those lessons belong to
+/// ([WeeklySchedule.section], see [predominantSection]).
 final studentWeeklyScheduleProvider = Provider.autoDispose<AsyncValue<WeeklyScheduleStatus>>((ref) {
   // Stay in loading (rather than flash "unavailable") while /api/students/me resolves.
   if (ref.watch(currentStudentSelfProvider).isLoading) {
@@ -96,11 +97,38 @@ final studentWeeklyScheduleProvider = Provider.autoDispose<AsyncValue<WeeklySche
   if (classIds.isEmpty) {
     return const AsyncData<WeeklyScheduleStatus>(WeeklyScheduleUnavailable());
   }
-  return _assembleWeeklySchedule(ref, (slots) => slotsForClasses(slots, classIds));
+  return _assembleWeeklySchedule(
+    ref,
+    (slots) => slotsForClasses(slots, classIds),
+    withOwnSection: true,
+  );
 });
 
+/// Which grade section the teacher's timetable is narrowed to; null shows every section. A
+/// section that is no longer on the schedule falls back to every section (see
+/// [resolveSectionFilter]), so a stale pick never strands the teacher on an empty week.
+///
+/// Auto-disposed with the Timetable tab's shell, so the filter never outlives the session.
+class TeacherScheduleSectionFilterNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  /// Narrows to [sectionId], or shows every section when null.
+  void select(String? sectionId) => state = sectionId;
+}
+
+final teacherScheduleSectionFilterProvider =
+    NotifierProvider.autoDispose<TeacherScheduleSectionFilterNotifier, String?>(
+      TeacherScheduleSectionFilterNotifier.new,
+    );
+
 /// The signed-in teacher's weekly schedule: every approved slot they teach, whichever class it
-/// belongs to (a teacher can cover classes they do not lead).
+/// belongs to (a teacher can cover classes they do not lead), narrowed to
+/// [teacherScheduleSectionFilterProvider]'s section. [WeeklySchedule.sections] lists every
+/// section they teach, for the filter.
+///
+/// Only the teacher's own lessons: row-level security lets a teacher read just the slots of the
+/// classes they teach, so a whole section's grid (other teachers' lessons) is not reachable here.
 final teacherWeeklyScheduleProvider = Provider.autoDispose<AsyncValue<WeeklyScheduleStatus>>((ref) {
   final teacherId = ref.watch(teacherIdProvider);
   if (teacherId.hasError && !teacherId.hasValue) {
@@ -108,18 +136,28 @@ final teacherWeeklyScheduleProvider = Provider.autoDispose<AsyncValue<WeeklySche
   }
   final id = teacherId.value;
   if (id == null) return const AsyncLoading<WeeklyScheduleStatus>();
-  return _assembleWeeklySchedule(ref, (slots) => slotsForTeacher(slots, id));
+  return _assembleWeeklySchedule(
+    ref,
+    (slots) => slotsForTeacher(slots, id),
+    sectionFilter: ref.watch(teacherScheduleSectionFilterProvider),
+  );
 });
 
 /// Combines the approved version, its (filtered) slots and the school week into one status.
+///
+/// [select] narrows the version to the viewer's lessons; [sectionFilter] then narrows those to
+/// one section (ignored when it isn't among them). [withOwnSection] labels the schedule with the
+/// section most of the viewer's lessons belong to — the student's own grade section.
 ///
 /// Reads `.value` rather than `when`, so a refresh in flight keeps the previous schedule on
 /// screen. The settings are best-effort: if they can't be loaded (and nothing is cached), the
 /// schedule falls back to the API's default week rather than failing the whole screen.
 AsyncValue<WeeklyScheduleStatus> _assembleWeeklySchedule(
   Ref ref,
-  List<TimetableSlot> Function(List<TimetableSlot> slots) select,
-) {
+  List<TimetableSlot> Function(List<TimetableSlot> slots) select, {
+  bool withOwnSection = false,
+  String? sectionFilter,
+}) {
   final versionAsync = ref.watch(approvedTimetableVersionProvider);
   if (!versionAsync.hasValue) {
     return versionAsync.hasError
@@ -145,9 +183,15 @@ AsyncValue<WeeklyScheduleStatus> _assembleWeeklySchedule(
     return const AsyncLoading<WeeklyScheduleStatus>();
   }
 
+  final mine = select(slots.data);
+  final sections = scheduleSections(mine);
+  final filter = resolveSectionFilter(sections, sectionFilter);
   final schedule = buildWeeklySchedule(
     schoolDays: settings?.data.schoolDays,
-    slots: select(slots.data),
+    slots: slotsForSection(mine, filter),
+    section: withOwnSection ? predominantSection(mine) : null,
+    sections: sections,
+    sectionFilter: filter,
   );
 
   final stale = slots.isStale || (settings?.isStale ?? false);

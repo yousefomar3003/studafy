@@ -250,6 +250,7 @@ class FakeAcademicsClient extends Fake implements AcademicsClient {
     String? courseId,
     String? termId,
     String? leadTeacherId,
+    String? sectionId,
     int? limit = 20,
     int? offset = 0,
   }) async {
@@ -298,6 +299,7 @@ class FakeTimetableClient extends Fake implements TimetableClient {
   @override
   Future<TimetableSlotList> listTimetableSlots({
     required String versionId,
+    String? sectionId,
     int? limit = 20,
     int? offset = 0,
   }) async => TimetableSlotList(timetableSlots: slots, total: slots.length);

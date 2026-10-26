@@ -1,9 +1,12 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import {
@@ -160,6 +163,11 @@ export function subjectRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // Audit declarations
+  // Writes need timetable:manage (ORG_ADMIN, PRINCIPAL), like the classes built on them.
+  const manage = requirePermission(PERMISSIONS.TIMETABLE_MANAGE);
+  routes.use("/api/academics/subjects", onlyMethods(["POST"], manage));
+  routes.use("/api/academics/subjects/:subjectId", onlyMethods(["PATCH", "DELETE"], manage));
+
   routes.use("/api/academics/subjects", auditAction("insert", "subjects"));
   routes.use("/api/academics/subjects/:subjectId", auditAction("update", "subjects"));
 

@@ -3,7 +3,6 @@ import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/rea
 import { api } from "../../../lib/api";
 import {
   fetchAcademicYears,
-  fetchRooms,
   fetchSlots,
   fetchTeacherContacts,
   fetchTerms,
@@ -26,7 +25,7 @@ export const SCHOOL_EVENT_KINDS = ["holiday", "event", "meeting", "exam_period"]
 
 /**
  * Data for the principal's school-oversight pages (grades, calendar, timetable, classes, students).
- * The academic structure (years, terms, classes, timetable, teachers, rooms) is read through the
+ * The academic structure (years, terms, classes, timetable, teachers) is read through the
  * admin timetable builder's fetchers so both views share one definition of each request; this file
  * adds the reads only the principal pages need. Query keys live under "principal-school" so they
  * never collide with the admin builder's cache entries.
@@ -60,18 +59,26 @@ async function fetchClassesForTerm(termId: string): Promise<Class[]> {
   return classes;
 }
 
-/** Every course in the catalog. Courses are listed per subject, so this walks the subjects first —
- * used to resolve course codes in the classes CSV import. */
-async function fetchCourses(): Promise<Course[]> {
-  const subjectIds: string[] = [];
+export type Subject = components["schemas"]["Subject"];
+
+/** Every subject in the catalog ("Mathematics"). */
+async function fetchSubjects(): Promise<Subject[]> {
+  const subjects: Subject[] = [];
   for (let page = 0; page < MAX_CLASS_PAGES; page += 1) {
     const { data } = await api.GET("/api/academics/subjects", {
       params: { query: { limit: CLASS_PAGE_SIZE, offset: page * CLASS_PAGE_SIZE } },
     });
-    const rows = (data?.subjects ?? []) as components["schemas"]["Subject"][];
-    subjectIds.push(...rows.map((subject) => subject.id));
-    if (rows.length < CLASS_PAGE_SIZE || subjectIds.length >= (data?.total ?? 0)) break;
+    const rows = (data?.subjects ?? []) as Subject[];
+    subjects.push(...rows);
+    if (rows.length < CLASS_PAGE_SIZE || subjects.length >= (data?.total ?? 0)) break;
   }
+  return subjects;
+}
+
+/** Every course in the catalog. Courses are listed per subject, so this walks the subjects first —
+ * used to pick a class's course and to resolve course codes in the classes CSV import. */
+async function fetchCourses(): Promise<Course[]> {
+  const subjectIds = (await fetchSubjects()).map((subject) => subject.id);
   const perSubject = await Promise.all(
     subjectIds.map(async (subjectId) => {
       const courses: Course[] = [];
@@ -92,8 +99,16 @@ async function fetchCourses(): Promise<Course[]> {
   return perSubject.flat();
 }
 
+/** Query keys of the course catalog — invalidate these after creating a subject or course. */
+export const SUBJECTS_KEY = [KEY, "subjects"] as const;
+export const COURSES_KEY = [KEY, "courses"] as const;
+
+export function useSubjects(enabled = true) {
+  return useQuery({ queryKey: SUBJECTS_KEY, queryFn: fetchSubjects, enabled });
+}
+
 export function useCourses(enabled = true) {
-  return useQuery({ queryKey: [KEY, "courses"], queryFn: fetchCourses, enabled });
+  return useQuery({ queryKey: COURSES_KEY, queryFn: fetchCourses, enabled });
 }
 
 /** Prefix of every per-term class list's query key — invalidate this after creating classes. */
@@ -121,10 +136,6 @@ export function useClassesForTerm(termId: string | undefined) {
 
 export function useTeacherContacts() {
   return useQuery({ queryKey: [KEY, "teachers"], queryFn: fetchTeacherContacts });
-}
-
-export function useRooms() {
-  return useQuery({ queryKey: [KEY, "rooms"], queryFn: fetchRooms });
 }
 
 /** Terms of several years at once — the calendar shows every term overlapping its month. */
@@ -178,10 +189,13 @@ export function todayIso(now = new Date()): string {
 // Timetable
 // ---------------------------------------------------------------------------
 
+/** Prefix of every term's approved-timetable key — invalidate this when slot labels change. */
+export const APPROVED_TIMETABLE_KEY_ROOT = [KEY, "timetable"] as const;
+
 /** The term's approved timetable version (what is actually running), with its slots. */
 export function useApprovedTimetable(termId: string | undefined) {
   return useQuery({
-    queryKey: [KEY, "timetable", termId],
+    queryKey: [...APPROVED_TIMETABLE_KEY_ROOT, termId],
     enabled: termId !== undefined,
     queryFn: async () => {
       const versions = await fetchVersions(termId!);
@@ -221,11 +235,14 @@ export function studentDisplayName(student: StudentProfile): string {
   return `${student.preferred_name ?? student.first_name} ${student.last_name}`;
 }
 
+/** Prefix of every per-class enrolment count's key — invalidate this after enrolling students. */
+export const ENROLLMENT_COUNTS_KEY_ROOT = [KEY, "enrollment-count"] as const;
+
 /** Active enrolment count per class, one small request per class. */
 export function useEnrollmentCounts(classIds: readonly string[]) {
   return useQueries({
     queries: classIds.map((classId) => ({
-      queryKey: [KEY, "enrollment-count", classId],
+      queryKey: [...ENROLLMENT_COUNTS_KEY_ROOT, classId],
       queryFn: async () => {
         const { data } = await api.GET("/api/academics/classes/{classId}/enrollments", {
           params: { path: { classId }, query: { status: "active", limit: 1 } },

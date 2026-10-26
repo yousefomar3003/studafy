@@ -1,5 +1,6 @@
 // Academic structure: one active academic year with two terms, two subjects/courses, a physical and a
-// virtual room, two classes (each with a lead teacher and a room), and student enrollments. The year
+// virtual room, grades and sections (Grade 10 A-C, Grade 11 A), two classes (each with a lead
+// teacher, a room and a section), and student enrollments with each student placed in a section. The year
 // spans the current wall-clock month so that later attendance dated in July 2026 is coherent with an
 // in-progress term. Composite foreign keys require every referenced row to share the demo school_id,
 // which holds by construction here.
@@ -165,6 +166,44 @@ export async function seedAcademics(sql: Sql, ctx: SchoolCtx & PeopleCtx): Promi
     )}
   `;
 
+  // Grades and sections (000147). Science is taught to 10-A and Math to 10-B; 10-C and 11-A start
+  // empty so a demo can add classes and students to them.
+  const grade10 = uuid();
+  const grade11 = uuid();
+  await sql`
+    INSERT INTO app.grade_levels ${sql(
+      [
+        { id: grade10, school_id: schoolId, name: "Grade 10", sort_order: 10 },
+        { id: grade11, school_id: schoolId, name: "Grade 11", sort_order: 11 },
+      ],
+      "id",
+      "school_id",
+      "name",
+      "sort_order",
+    )}
+  `;
+  const sections = [
+    { id: uuid(), grade_level_id: grade10, name: "A" },
+    { id: uuid(), grade_level_id: grade10, name: "B" },
+    { id: uuid(), grade_level_id: grade10, name: "C" },
+    { id: uuid(), grade_level_id: grade11, name: "A" },
+  ];
+  await sql`
+    INSERT INTO app.sections ${sql(
+      sections.map((section) => ({
+        ...section,
+        school_id: schoolId,
+        academic_year_id: academicYearId,
+      })),
+      "id",
+      "school_id",
+      "academic_year_id",
+      "grade_level_id",
+      "name",
+    )}
+  `;
+  const [section10A, section10B] = sections;
+
   const classes: SeededClass[] = [
     {
       id: uuid(),
@@ -195,6 +234,7 @@ export async function seedAcademics(sql: Sql, ctx: SchoolCtx & PeopleCtx): Promi
         term_id: klass.termId,
         lead_teacher_id: klass.leadTeacherId,
         room_id: klass.roomId,
+        section_id: klass.code === "SCI101-A" ? section10A!.id : section10B!.id,
         code: klass.code,
         capacity: 30,
         status: "active",
@@ -206,6 +246,7 @@ export async function seedAcademics(sql: Sql, ctx: SchoolCtx & PeopleCtx): Promi
       "term_id",
       "lead_teacher_id",
       "room_id",
+      "section_id",
       "code",
       "capacity",
       "status",
@@ -240,6 +281,23 @@ export async function seedAcademics(sql: Sql, ctx: SchoolCtx & PeopleCtx): Promi
       "student_id",
       "status",
       "enrolled_at",
+    )}
+  `;
+
+  // Each student sits in the section of the class they joined first: the Science five in 10-A, the
+  // rest in 10-B (the two who also take Math keep 10-A).
+  await sql`
+    INSERT INTO app.student_sections ${sql(
+      students.map((student, index) => ({
+        school_id: schoolId,
+        student_id: student.studentId,
+        academic_year_id: academicYearId,
+        section_id: index < 5 ? section10A!.id : section10B!.id,
+      })),
+      "school_id",
+      "student_id",
+      "academic_year_id",
+      "section_id",
     )}
   `;
 

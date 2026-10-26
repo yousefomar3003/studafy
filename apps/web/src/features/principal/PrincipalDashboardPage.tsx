@@ -1,6 +1,9 @@
+import { PERMISSIONS } from "@studafy/constants";
+
 import { useApprovalQueueQuery } from "../../components/ApprovalQueueBadge";
 import { HomeHeader, useSummarySentence } from "../../components/home/HomeHeader";
 import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip";
+import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
 import {
@@ -15,17 +18,24 @@ import { OpenMessageReportsTile } from "./tiles/OpenMessageReportsTile";
 import { RecentAnnouncementsTile } from "./tiles/RecentAnnouncementsTile";
 
 import type { SummaryItem } from "../../components/home/SummaryStrip";
+import type { Permission } from "@studafy/constants";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 import "../../components/dashboard-tile.css";
 import "./principal-dashboard.css";
 
-/** Every area of the principal's work, in the order a principal reaches for them. */
-const PRINCIPAL_LINKS = [
+/** Every area of the principal's work, in the order a principal reaches for them. A link with a
+ * `permission` is shown only to sessions holding it (its route is gated on the same one). */
+const PRINCIPAL_LINKS: readonly { key: string; to: string; permission?: Permission }[] = [
   { key: "grades", to: "/portal/principal/grades" },
   { key: "calendar", to: "/portal/principal/calendar" },
   { key: "timetable", to: "/portal/principal/timetable" },
   { key: "classes", to: "/portal/principal/classes" },
+  {
+    key: "sections",
+    to: "/portal/principal/sections",
+    permission: PERMISSIONS.TIMETABLE_MANAGE,
+  },
   { key: "students", to: "/portal/principal/students" },
   { key: "attendance", to: "/portal/principal/attendance" },
   { key: "discipline", to: "/portal/principal/discipline" },
@@ -33,7 +43,7 @@ const PRINCIPAL_LINKS = [
   { key: "evaluations", to: "/portal/principal/evaluations" },
   { key: "approvals", to: "/portal/approvals" },
   { key: "announcements", to: "/portal/admin/announcements" },
-] as const;
+];
 
 const statusOf = (query: UseQueryResult) =>
   query.isPending ? "pending" : query.isError ? "error" : "ready";
@@ -48,6 +58,7 @@ const statusOf = (query: UseQueryResult) =>
 export default function PrincipalDashboardPage() {
   const { t } = useTranslation();
   const { formatNumber } = useFormatters();
+  const permissions = usePermissions();
   const approvals = useApprovalQueueQuery();
   const incidents = useOpenIncidentsPreviewQuery();
   const reports = useOpenMessageReportsPreviewQuery();
@@ -127,8 +138,11 @@ export default function PrincipalDashboardPage() {
       <SummaryStrip items={items} />
 
       <HomeShortcuts
-        links={PRINCIPAL_LINKS.map((link) => ({
-          ...link,
+        links={PRINCIPAL_LINKS.filter(
+          (link) => link.permission === undefined || permissions.has(link.permission),
+        ).map((link) => ({
+          key: link.key,
+          to: link.to,
           label: t(`principal.dashboard.links.${link.key}`),
         }))}
       />

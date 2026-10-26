@@ -187,7 +187,8 @@ void main() {
 
       expect(find.text('Science'), findsOneWidget);
       expect(find.text('Rana Haddad'), findsOneWidget);
-      expect(find.text('Room Lab 2'), findsOneWidget);
+      // The endpoint's room is not shown: lessons carry no room.
+      expect(find.textContaining('Lab 2'), findsNothing);
       // No course: falls back to the class code.
       expect(find.text('SCI-7A'), findsOneWidget);
     },

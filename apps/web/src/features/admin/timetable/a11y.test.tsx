@@ -64,7 +64,7 @@ const CLASS_A = {
   academic_year_id: "year-1",
   term_id: "term-1",
   lead_teacher_id: "teacher-1",
-  room_id: "room-1",
+  room_id: null,
   code: "MATH-101",
   capacity: 30,
   status: "active" as const,
@@ -78,7 +78,10 @@ const SLOT_A = {
   timetable_version_id: "version-1",
   class_id: "class-a",
   teacher_id: "teacher-1",
-  room_id: "room-1",
+  room_id: null,
+  section_id: null,
+  section_name: null,
+  grade_level_name: null,
   weekday: 1,
   period: 1,
   created_at: "2026-08-01T00:00:00.000Z",
@@ -106,21 +109,6 @@ const INSTRUCTOR_USER = {
   roles: ["INSTRUCTOR"],
   email_verified_at: null,
   last_login_at: null,
-  created_at: "2026-08-01T00:00:00.000Z",
-  updated_at: "2026-08-01T00:00:00.000Z",
-};
-
-const ROOM_1 = {
-  id: "room-1",
-  school_id: "school-1",
-  code: "RM-101",
-  name: "Room 101",
-  room_type: "physical" as const,
-  capacity: 30,
-  building: "Main",
-  floor: "1",
-  virtual_url: null,
-  is_active: true,
   created_at: "2026-08-01T00:00:00.000Z",
   updated_at: "2026-08-01T00:00:00.000Z",
 };
@@ -154,14 +142,17 @@ function getMockImplementation(withVersion: boolean, withSlot: boolean) {
     if (path === "/api/academics/classes") {
       return Promise.resolve<unknown>({ data: { classes: [CLASS_A], total: 1 } });
     }
+    if (path === "/api/academics/grade-levels") {
+      return Promise.resolve<unknown>({ data: { grade_levels: [], total: 0 } });
+    }
+    if (path === "/api/academics/sections") {
+      return Promise.resolve<unknown>({ data: { sections: [], total: 0 } });
+    }
     if (path === "/api/teachers") {
       return Promise.resolve<unknown>({ data: { teachers: [TEACHER_PROFILE], next_cursor: null } });
     }
     if (path === "/api/users") {
       return Promise.resolve<unknown>({ data: { users: [INSTRUCTOR_USER], next_cursor: null } });
-    }
-    if (path === "/api/academics/rooms") {
-      return Promise.resolve<unknown>({ data: { rooms: [ROOM_1], total: 1 } });
     }
     throw new Error(`Unhandled GET ${path}`);
   };

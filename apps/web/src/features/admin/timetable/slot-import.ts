@@ -1,7 +1,7 @@
 import { api } from "../../../lib/api";
 
 import type { CreateSlotBody } from "./mutations";
-import type { Class, Room, TeacherContact } from "./queries";
+import type { Class, TeacherContact } from "./queries";
 import type { ImportSpec } from "../../../lib/data-transfer";
 import type { TFunction } from "i18next";
 
@@ -11,7 +11,6 @@ export interface SlotImportContext {
   /** Classes of the version's term; a CSV class is matched by code among these. */
   classes: readonly Class[];
   teachers: readonly TeacherContact[];
-  rooms: readonly Room[];
   /** The school week (`GET /api/academics/timetable-settings`): days 1=Mon..7=Sun and periods. */
   schoolDays: readonly number[];
   periodsPerDay: number;
@@ -29,9 +28,9 @@ function findBy<T>(
 
 /**
  * CSV import of lessons into a draft timetable. References are written the way a person knows
- * them — class code, teacher employee number, room code — and resolved to ids against the lookups
- * the workspace already holds. Day and period are checked against the school week here; teacher
- * and room clashes are left to the API, which rejects the row with its own message.
+ * them — class code and teacher employee number — and resolved to ids against the lookups the
+ * workspace already holds. Day and period are checked against the school week here; teacher clashes
+ * are left to the API, which rejects the row with its own message.
  */
 export function slotImportSpec(
   t: TFunction,
@@ -66,12 +65,6 @@ export function slotImportSpec(
         required: true,
         example: context.teachers[0]?.employee_number ?? "T-001",
       },
-      {
-        key: "room",
-        label: t("adminSchool.timetable.import.fields.room"),
-        required: true,
-        example: context.rooms[0]?.code ?? "R101",
-      },
     ],
     toRecord: (values) => {
       const errors: string[] = [];
@@ -95,15 +88,12 @@ export function slotImportSpec(
       if (!teacher) {
         errors.push(t("adminSchool.timetable.import.unknownTeacher", { value: values.teacher }));
       }
-      const room = findBy(context.rooms, String(values.room), (item) => item.code);
-      if (!room) errors.push(t("adminSchool.timetable.import.unknownRoom", { value: values.room }));
-      if (errors.length > 0 || !klass || !teacher || !room) return { errors };
+      if (errors.length > 0 || !klass || !teacher) return { errors };
       return {
         weekday,
         period,
         class_id: klass.id,
         teacher_id: teacher.id,
-        room_id: room.id,
       };
     },
     create: async (body) => {

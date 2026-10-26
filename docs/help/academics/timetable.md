@@ -55,28 +55,27 @@ lessons, its column stays visible (in italics) until they are moved.
 While editing a draft:
 
 - **Add a lesson:** hover a cell and click `+`, then choose the **Class**. Its
-  usual teacher and room are filled in; change them if needed, and `Add lesson`.
+  usual teacher is filled in; change it if needed, and `Add lesson`.
 - **Drag a class:** drag a chip from the `Classes` palette onto a cell. It is
-  placed with the class's usual teacher and room.
+  placed with the class's usual teacher.
 - **Keyboard:** press Enter/Space on a class chip to pick it up, then
   Enter/Space on a cell's `+` to place it. Escape cancels the pick.
 - **Change or move a lesson:** click it to open `Edit slot`. You can change the
-  class, teacher, room, day, or period, or `Remove` the lesson.
+  class, teacher, day, or period, or `Remove` the lesson.
 
-A cell can hold several lessons at once, for classes running in parallel in
-different rooms. Lessons for the same course share a colour, and today's column
+A cell can hold several lessons at once, for classes running in parallel for
+different sections. Lessons for the same course share a colour, and today's column
 is highlighted.
 
 ## Clashes
 
-Before a lesson is saved, Studafy checks that the teacher and the room are not
-already booked at that day and period. A clash raises an alert, for example:
+Before a lesson is saved, Studafy checks that the teacher is not already booked
+at that day and period. A clash raises an alert, for example:
 
 > Teacher "Alex Davis" is already scheduled for class "MATH-A1" on Monday, period 2.
 
 The lesson it clashes with is outlined in red. Dismiss the alert, then move one
-of the two lessons or change its teacher or room. Teacher clashes are reported
-before room clashes.
+of the two lessons or change its teacher.
 
 ## Submitted timetables
 
@@ -88,7 +87,7 @@ to keep editing it.
 
 While a draft is open, `Import CSV` adds lessons from a spreadsheet. Each row
 needs `day` (1 = Monday … 7 = Sunday, one of the school days), `period`,
-`class` (class code), `teacher` (employee number) and `room` (room code).
+`class` (class code) and `teacher` (employee number).
 Download the template from the dialog to start from the right columns. Rows
 with an unknown code, a day outside the school week, or a clash are reported by
 line and skipped; the rest are added to the draft.

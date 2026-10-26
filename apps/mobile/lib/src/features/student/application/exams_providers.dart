@@ -30,8 +30,8 @@ final enrolledClassExamsProvider =
     });
 
 /// Room code by room id, indexed from the one room-directory list call the screen needs. `GET
-/// /api/academics/rooms` has no by-id form, so this fetches the (small) directory once. Mirrors
-/// `timetable_day_section.dart`'s private `_roomCodesProvider`.
+/// /api/academics/rooms` has no by-id form, so this fetches the (small) directory once. Exams
+/// keep their room; timetable lessons don't show one.
 final examRoomDirectoryProvider =
     FutureProvider.autoDispose<Map<String, String>>((ref) async {
       final academics = ref.watch(apiClientProvider).academics;

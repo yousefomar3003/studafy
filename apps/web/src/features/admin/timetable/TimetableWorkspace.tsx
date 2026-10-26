@@ -1,7 +1,7 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Modal, Select, useToast } from "@studafy/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ImportCsvButton } from "../../../components/ImportCsvButton";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
@@ -15,13 +15,14 @@ import {
 } from "./mutations";
 import {
   ACADEMIC_YEARS_KEY,
-  ROOMS_KEY,
+  GRADE_LEVELS_KEY,
   TEACHER_CONTACTS_KEY,
   TIMETABLE_SETTINGS_KEY,
   classesForTermQueryKey,
   fetchAcademicYears,
   fetchClassesForTerm,
-  fetchRooms,
+  fetchGradeLevels,
+  fetchSections,
   fetchSlots,
   fetchTeacherContacts,
   fetchTerms,
@@ -29,6 +30,7 @@ import {
   fetchVersions,
   pickLiveVersion,
   pickWorkingVersion,
+  sectionsQueryKey,
   slotsQueryKey,
   termsQueryKey,
   versionsQueryKey,
@@ -80,8 +82,9 @@ export interface TimetableWorkspaceProps {
 /**
  * The timetable screen shared by the admin console and the principal portal.
  *
- * Everyone sees the term's live timetable — the most recently approved version — narrowed to one
- * class or one teacher on demand. Managers edit it the safe way: "Edit timetable" opens a draft copy
+ * Everyone sees the term's live timetable — the most recently approved version — narrowed on demand
+ * to one grade, one of its sections (e.g. "Grade 10 – C": that section's own timetable), and/or one
+ * teacher. Managers edit it the safe way: "Edit timetable" opens a draft copy
  * (`POST …/copy`), changes there are invisible to teachers and students, and "Publish" makes the
  * draft live in one step (`POST …/publish`). "Discard" throws the draft away. A term with no
  * timetable yet starts from an empty draft. Versions someone submitted through the older two-step
@@ -96,7 +99,8 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
   const [yearId, setYearId] = useState("");
   const [termId, setTermId] = useState("");
   const [view, setView] = useState<"live" | "working">("live");
-  const [classFilter, setClassFilter] = useState(ALL);
+  const [gradeFilter, setGradeFilter] = useState(ALL);
+  const [sectionFilter, setSectionFilter] = useState(ALL);
   const [teacherFilter, setTeacherFilter] = useState(ALL);
   const [weekOpen, setWeekOpen] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -117,8 +121,13 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
     queryFn: () => fetchClassesForTerm(termId),
     enabled: termId !== "",
   });
+  const gradeLevelsQuery = useQuery({ queryKey: GRADE_LEVELS_KEY, queryFn: fetchGradeLevels });
+  const sectionsQuery = useQuery({
+    queryKey: sectionsQueryKey(yearId),
+    queryFn: () => fetchSections(yearId),
+    enabled: yearId !== "",
+  });
   const teachersQuery = useQuery({ queryKey: TEACHER_CONTACTS_KEY, queryFn: fetchTeacherContacts });
-  const roomsQuery = useQuery({ queryKey: ROOMS_KEY, queryFn: fetchRooms });
   const settingsQuery = useQuery({
     queryKey: TIMETABLE_SETTINGS_KEY,
     queryFn: fetchTimetableSettings,
@@ -164,7 +173,8 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
   // Each term opens on its live timetable with the filters cleared.
   useEffect(() => {
     setView("live");
-    setClassFilter(ALL);
+    setGradeFilter(ALL);
+    setSectionFilter(ALL);
     setTeacherFilter(ALL);
   }, [termId]);
 
@@ -172,18 +182,34 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
   const teachers = [...(teachersQuery.data ?? [])].sort((a, b) =>
     a.display_name.localeCompare(b.display_name),
   );
-  const rooms = roomsQuery.data ?? [];
   const slots = slotsQuery.data ?? [];
   const settings = settingsQuery.data ?? { school_days: [7, 1, 2, 3, 4], periods_per_day: 8 };
   const editing = shown !== undefined && shown.status === "draft" && canManage;
   const selectedTerm = termsQuery.data?.find((term) => term.id === termId);
 
+  const sections = sectionsQuery.data ?? [];
+  const gradeSections = sections.filter((section) => section.grade_level_id === gradeFilter);
+  // A slot carries its section but not the section's grade; resolve that through the year's sections.
+  const gradeOfSection = useMemo(
+    () =>
+      new Map((sectionsQuery.data ?? []).map((section) => [section.id, section.grade_level_id])),
+    [sectionsQuery.data],
+  );
+
   const isVisible = useCallback(
     (slot: TimetableSlot) =>
-      (classFilter === ALL || slot.class_id === classFilter) &&
+      (gradeFilter === ALL ||
+        (slot.section_id !== null && gradeOfSection.get(slot.section_id) === gradeFilter)) &&
+      (sectionFilter === ALL || slot.section_id === sectionFilter) &&
       (teacherFilter === ALL || slot.teacher_id === teacherFilter),
-    [classFilter, teacherFilter],
+    [gradeFilter, sectionFilter, teacherFilter, gradeOfSection],
   );
+
+  function handleGradeChange(next: string) {
+    setGradeFilter(next);
+    setSectionFilter(ALL);
+  }
+
   const visibleSlots = slots.filter(isVisible);
 
   // --- Actions ------------------------------------------------------------------------------
@@ -302,7 +328,6 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
     versionsQuery.isPending ||
     classesQuery.isPending ||
     teachersQuery.isPending ||
-    roomsQuery.isPending ||
     settingsQuery.isPending;
 
   const scheduledClassCount = new Set(visibleSlots.map((slot) => slot.class_id)).size;
@@ -441,11 +466,11 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
         slots={slots}
         classes={classes}
         teachers={teachers}
-        rooms={rooms}
         isReadOnly={!editing}
         days={settings.school_days}
         periodCount={settings.periods_per_day}
         isVisible={isVisible}
+        sectionId={sectionFilter === ALL ? undefined : sectionFilter}
       />
     );
   }
@@ -474,7 +499,6 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
                     versionId: shown.id,
                     classes,
                     teachers,
-                    rooms,
                     schoolDays: settings.school_days,
                     periodsPerDay: settings.periods_per_day,
                   })}
@@ -512,13 +536,26 @@ export function TimetableWorkspace({ title, intro, canManage, aside }: Timetable
           disabled={yearId === ""}
         />
         <Select
-          label={t("adminSchool.timetable.workspace.classFilter")}
+          label={t("adminSchool.timetable.workspace.gradeFilter")}
           options={[
-            { value: ALL, label: t("adminSchool.timetable.workspace.allClasses") },
-            ...classes.map((klass) => ({ value: klass.id, label: klass.code })),
+            { value: ALL, label: t("adminSchool.timetable.workspace.allGrades") },
+            ...(gradeLevelsQuery.data ?? []).map((grade) => ({
+              value: grade.id,
+              label: grade.name,
+            })),
           ]}
-          value={classFilter}
-          onChange={setClassFilter}
+          value={gradeFilter}
+          onChange={handleGradeChange}
+        />
+        <Select
+          label={t("adminSchool.timetable.workspace.sectionFilter")}
+          options={[
+            { value: ALL, label: t("adminSchool.timetable.workspace.allSections") },
+            ...gradeSections.map((section) => ({ value: section.id, label: section.name })),
+          ]}
+          value={sectionFilter}
+          onChange={setSectionFilter}
+          disabled={gradeFilter === ALL}
         />
         <Select
           label={t("adminSchool.timetable.workspace.teacherFilter")}

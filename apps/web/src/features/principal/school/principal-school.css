@@ -37,3 +37,35 @@
   min-inline-size: 0;
   margin-inline-start: auto;
 }
+
+/* A table cell's value with a small action beside it (e.g. a class's section and "Change"). */
+.principal-school__cell-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* A form field with a small action under it (e.g. a class's course and "Add new course"). */
+.principal-school__field-action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.principal-school__field-action > button {
+  align-self: flex-start;
+}
+
+/* A page's heading with a link to a related page beside it. */
+.principal-school__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.principal-school__header h1 {
+  margin-block-end: 0;
+}

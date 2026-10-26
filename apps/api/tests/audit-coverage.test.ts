@@ -183,6 +183,15 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",
+  // Grades & sections (000147), and placing students in a section.
+  "POST /api/academics/grade-levels",
+  "PATCH /api/academics/grade-levels/{gradeLevelId}",
+  "DELETE /api/academics/grade-levels/{gradeLevelId}",
+  "POST /api/academics/sections",
+  "PATCH /api/academics/sections/{sectionId}",
+  "DELETE /api/academics/sections/{sectionId}",
+  "POST /api/academics/sections/{sectionId}/students",
+  "DELETE /api/academics/sections/{sectionId}/students/{studentId}",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

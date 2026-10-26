@@ -4,9 +4,10 @@ import 'package:studafy_mobile/src/features/parent/domain/child_timetable.dart';
 import '../support.dart';
 
 void main() {
-  test('parses slots with optional course / teacher / room', () {
+  test('parses slots with optional course / teacher, ignoring any room', () {
     final timetable = childTimetableFixture(
       slots: [
+        // The endpoint may still send a room object or null; both parse and neither is kept.
         childTimetableSlotJson(id: 's1'),
         childTimetableSlotJson(
           id: 's2',
@@ -22,7 +23,6 @@ void main() {
     final [full, bare] = timetable.slots;
     expect(full.courseName, 'Science');
     expect(full.teacherName, 'Rana Haddad');
-    expect(full.roomName, 'Lab 2');
     expect(bare.classCode, 'SCI-7A');
     expect(bare.courseName, isNull);
     expect(bare.teacherId, isNull);
@@ -60,7 +60,7 @@ void main() {
       expect(adapted.labels['early']!.title, 'SCI-7A');
       expect(adapted.labels['late']!.title, 'Science');
       expect(adapted.labels['late']!.teacher, 'Rana Haddad');
-      expect(adapted.labels['late']!.room, 'Lab 2');
+      expect(adapted.schedule.slotsFor(7).first.roomId, isNull);
     },
   );
 }

@@ -248,17 +248,17 @@
       "title": "Edit slot",
       "description": "{{classCode}} — {{day}}, period {{period}}",
       "teacher": "Teacher",
-      "room": "Room",
       "cancel": "Cancel",
       "remove": "Remove",
       "save": "Save changes"
     },
     "unknownClass": "Unknown class",
     "unknownTeacher": "Unknown teacher",
-    "unknownRoom": "Unknown room",
+    "unknownSection": "Unknown section",
+    "sectionLabel": "{{grade}} – {{section}}",
     "conflict": {
       "teacher": "Teacher \"{{label}}\" is already scheduled for class \"{{classCode}}\" on {{day}}, period {{period}}.",
-      "room": "Room \"{{label}}\" is already scheduled for class \"{{classCode}}\" on {{day}}, period {{period}}."
+      "section": "Section \"{{label}}\" also has class \"{{classCode}}\" on {{day}}, period {{period}}. The lesson was saved — check this is intended."
     },
     "grid": {
       "dismiss": "Dismiss",
@@ -268,7 +268,8 @@
       "noClasses": "No schedulable classes in this term.",
       "caption": "Weekly timetable grid for {{name}}",
       "period": "Period",
-      "slotLabel": "{{classCode}}, {{day}} period {{period}}, taught by {{teacher}} in {{room}}. Activate to edit.",
+      "slotLabel": "{{classCode}}, {{day}} period {{period}}, taught by {{teacher}}. Activate to edit.",
+      "slotLabelSection": "{{classCode}}, {{day}} period {{period}}, section {{section}}, taught by {{teacher}}. Activate to edit.",
       "placeLabel": "Place {{code}} on {{day}} period {{period}}",
       "addLabel": "Add a lesson on {{day}} period {{period}}"
     },
@@ -323,8 +324,10 @@
       "emptyManage": "Create the timetable, add lessons, then publish it for teachers and students.",
       "emptyView": "The timetable for this term hasn't been published yet.",
       "schoolWeek": "School week",
-      "classFilter": "Class",
-      "allClasses": "All classes",
+      "gradeFilter": "Grade",
+      "allGrades": "All grades",
+      "sectionFilter": "Section",
+      "allSections": "All sections",
       "teacherFilter": "Teacher",
       "allTeachers": "All teachers",
       "summary_one": "{{count}} lesson a week · {{classes}} classes",
@@ -337,14 +340,12 @@
         "day": "Day (1 = Monday … 7 = Sunday)",
         "period": "Period",
         "class": "Class code",
-        "teacher": "Teacher employee number",
-        "room": "Room code"
+        "teacher": "Teacher employee number"
       },
       "dayNotInWeek": "Day {{value}} isn't a school day.",
       "periodRange": "Period must be between 1 and {{max}}.",
       "unknownClass": "No class with code \"{{value}}\" in this term.",
-      "unknownTeacher": "No teacher with employee number \"{{value}}\".",
-      "unknownRoom": "No room with code \"{{value}}\"."
+      "unknownTeacher": "No teacher with employee number \"{{value}}\"."
     }
   },
   "home": {

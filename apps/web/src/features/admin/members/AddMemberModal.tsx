@@ -24,7 +24,7 @@ const EMPTY: NewMemberValues = {
 
 type FieldKey = Exclude<keyof NewMemberValues, "role">;
 
-/** The fields each role must fill in; email is always optional. */
+/** The fields each role must fill in; email is optional, and not offered for students. */
 const REQUIRED: Record<MemberRole, FieldKey[]> = {
   STUDENT: ["firstName", "lastName", "admissionNumber"],
   INSTRUCTOR: ["displayName", "employeeNumber"],
@@ -162,12 +162,15 @@ export function AddMemberModal({
             {values.role === "INSTRUCTOR"
               ? field("employeeNumber", "adminPeople.members.add.employeeNumber")
               : null}
-            <Input
-              label={t("adminPeople.members.add.emailOptional")}
-              type="email"
-              value={values.email}
-              onChange={(event) => set("email", event.target.value)}
-            />
+            {/* Students sign in with their member ID only, so they get no email. */}
+            {values.role === "STUDENT" ? null : (
+              <Input
+                label={t("adminPeople.members.add.emailOptional")}
+                type="email"
+                value={values.email}
+                onChange={(event) => set("email", event.target.value)}
+              />
+            )}
           </Modal.Body>
           <Modal.Footer>
             <Button type="button" variant="tertiary" onClick={close}>

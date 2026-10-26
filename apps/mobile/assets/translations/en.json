@@ -139,6 +139,9 @@
       "testCrash": "Send test crash (dev only)",
       "privacyPolicy": "Privacy policy",
       "signedIn": "Signed in to Studafy",
+      "signInSecurity": {
+        "title": "Sign-in & security"
+      },
       "sections": {
         "preferences": "Preferences",
         "account": "Account"
@@ -323,8 +326,14 @@
     "freeDayHint": "Enjoy the free day.",
     "period": "Period {period}",
     "slot": {
-      "unknownClass": "Class",
-      "room": "Room {room}"
+      "unknownClass": "Class"
+    },
+    "section": {
+      "gradeAndSection": "{grade} · Section {section}",
+      "sectionOnly": "Section {section}",
+      "semantics": "Grade and section: {label}",
+      "filterLabel": "Filter by section",
+      "all": "All"
     }
   },
   "materials": {

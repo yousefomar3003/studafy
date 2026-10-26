@@ -21,6 +21,58 @@ final _slots = [
   scheduleSlot(weekday: 3, period: 1, classId: 'sci', teacherId: 'layla'),
 ];
 
+/// Grade 10 sections: SCI101-C (Layla) and MATH101-C (Hassan) belong to Section C; Layla also
+/// teaches SCI101-D (Section D) and an unsectioned club.
+TimetableSlot _sectioned({
+  required int weekday,
+  required int period,
+  required String classId,
+  required String teacherId,
+  String? section,
+}) {
+  return scheduleSlot(
+    weekday: weekday,
+    period: period,
+    classId: classId,
+    teacherId: teacherId,
+    sectionId: section == null ? null : 'section-$section',
+    sectionName: section,
+    gradeLevelName: section == null ? null : 'Grade 10',
+  );
+}
+
+final _sectionedSlots = [
+  _sectioned(
+    weekday: 1,
+    period: 1,
+    classId: 'sci-c',
+    teacherId: 'layla',
+    section: 'C',
+  ),
+  _sectioned(
+    weekday: 1,
+    period: 2,
+    classId: 'math-c',
+    teacherId: 'hassan',
+    section: 'C',
+  ),
+  _sectioned(
+    weekday: 2,
+    period: 1,
+    classId: 'sci-d',
+    teacherId: 'layla',
+    section: 'D',
+  ),
+  _sectioned(
+    weekday: 3,
+    period: 1,
+    classId: 'sci-c',
+    teacherId: 'layla',
+    section: 'C',
+  ),
+  _sectioned(weekday: 3, period: 4, classId: 'club', teacherId: 'layla'),
+];
+
 List<Override> _dataOverrides({
   TimetableVersion? version,
   bool noVersion = false,
@@ -162,6 +214,32 @@ void main() {
       );
     });
 
+    test('is headed by the section most of their lessons belong to', () async {
+      final container = _studentContainer(
+        classIds: const ['sci-c', 'math-c', 'sci-d'],
+        data: _dataOverrides(slots: liveValue(_sectionedSlots)),
+      );
+
+      final schedule = _ready(
+        await _settle(container, studentWeeklyScheduleProvider),
+      );
+
+      expect(schedule.section?.id, 'section-C');
+      expect(schedule.section?.sectionName, 'C');
+      expect(schedule.section?.gradeLevelName, 'Grade 10');
+      expect(schedule.lessonCount, 4);
+    });
+
+    test('has no section header when no lesson carries a section', () async {
+      final container = _studentContainer(data: _dataOverrides());
+
+      final schedule = _ready(
+        await _settle(container, studentWeeklyScheduleProvider),
+      );
+
+      expect(schedule.section, isNull);
+    });
+
     test('cached slots mark the schedule stale', () async {
       final container = _studentContainer(
         data: _dataOverrides(slots: cachedValue(_slots)),
@@ -202,5 +280,69 @@ void main() {
 
       expect(schedule.isEmpty, isTrue);
     });
+
+    test('labels the sections taught, with no own-section header', () async {
+      final container = _teacherContainer(
+        data: _dataOverrides(slots: liveValue(_sectionedSlots)),
+      );
+
+      final schedule = _ready(
+        await _settle(container, teacherWeeklyScheduleProvider),
+      );
+
+      expect(schedule.sections.map((s) => s.id), ['section-C', 'section-D']);
+      expect(schedule.sectionFilter, isNull);
+      expect(schedule.section, isNull);
+      expect(schedule.lessonCount, 4);
+    });
+
+    test('the section filter narrows the week to that section', () async {
+      final container = _teacherContainer(
+        data: _dataOverrides(slots: liveValue(_sectionedSlots)),
+      );
+      await _settle(container, teacherWeeklyScheduleProvider);
+
+      container
+          .read(teacherScheduleSectionFilterProvider.notifier)
+          .select('section-D');
+      final schedule = _ready(
+        await _settle(container, teacherWeeklyScheduleProvider),
+      );
+
+      expect(schedule.sectionFilter, 'section-D');
+      expect(schedule.lessonCount, 1);
+      expect(schedule.slotsFor(2).single.classId, 'sci-d');
+      // The choices stay the full set, so the teacher can switch back.
+      expect(schedule.sections, hasLength(2));
+
+      container
+          .read(teacherScheduleSectionFilterProvider.notifier)
+          .select(null);
+      expect(
+        _ready(await _settle(container, teacherWeeklyScheduleProvider))
+            .lessonCount,
+        4,
+      );
+    });
+
+    test(
+      'a filter for a section no longer taught shows every section',
+      () async {
+        final container = _teacherContainer(
+          data: _dataOverrides(slots: liveValue(_sectionedSlots)),
+        );
+        await _settle(container, teacherWeeklyScheduleProvider);
+
+        container
+            .read(teacherScheduleSectionFilterProvider.notifier)
+            .select('section-Z');
+        final schedule = _ready(
+          await _settle(container, teacherWeeklyScheduleProvider),
+        );
+
+        expect(schedule.sectionFilter, isNull);
+        expect(schedule.lessonCount, 4);
+      },
+    );
   });
 }

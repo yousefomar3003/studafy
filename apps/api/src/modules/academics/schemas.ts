@@ -450,7 +450,12 @@ export const classSchema = z
     academic_year_id: uuidSchema.openapi({ description: "Parent academic year." }),
     term_id: uuidSchema.openapi({ description: "Parent term." }),
     lead_teacher_id: uuidSchema.openapi({ description: "Lead teacher." }),
-    room_id: uuidSchema.openapi({ description: "Assigned room." }),
+    room_id: uuidSchema
+      .nullable()
+      .openapi({ description: "Assigned room, if any (optional since rooms left the timetable)." }),
+    section_id: uuidSchema
+      .nullable()
+      .openapi({ description: "The grade section this class is taught to, if any." }),
     code: z
       .string()
       .openapi({ description: "Short unique code within the school.", example: "CLASS-MATH-101" }),
@@ -473,7 +478,10 @@ export const createClassBodySchema = z
     academic_year_id: uuidSchema.openapi({ description: "Parent academic year." }),
     term_id: uuidSchema.openapi({ description: "Parent term." }),
     lead_teacher_id: uuidSchema.openapi({ description: "Lead teacher." }),
-    room_id: uuidSchema.openapi({ description: "Assigned room." }),
+    room_id: uuidSchema.nullable().optional().openapi({ description: "Optional room." }),
+    section_id: uuidSchema.nullable().optional().openapi({
+      description: "Grade section the class is taught to; must belong to the same academic year.",
+    }),
     code: z
       .string()
       .min(1)
@@ -495,7 +503,13 @@ export type CreateClassBody = z.infer<typeof createClassBodySchema>;
 export const updateClassBodySchema = z
   .object({
     lead_teacher_id: uuidSchema.optional().openapi({ description: "Lead teacher." }),
-    room_id: uuidSchema.optional().openapi({ description: "Assigned room." }),
+    room_id: uuidSchema
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional room, or null to clear it." }),
+    section_id: uuidSchema.nullable().optional().openapi({
+      description: "Grade section the class is taught to, or null to detach it from one.",
+    }),
     code: z.string().min(1).max(50).optional().openapi({ description: "Short unique code." }),
     capacity: z
       .number()
@@ -525,6 +539,7 @@ export const classQuerySchema = z
     course_id: uuidSchema.optional(),
     term_id: uuidSchema.optional(),
     lead_teacher_id: uuidSchema.optional(),
+    section_id: uuidSchema.optional(),
   })
   .openapi("ClassQuery");
 
@@ -543,6 +558,153 @@ export const classIdParamSchema = z
       }),
   })
   .openapi("ClassIdParam");
+
+// ---------------------------------------------------------------------------
+// Grade levels & sections
+// ---------------------------------------------------------------------------
+
+export const gradeLevelSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    name: z.string().openapi({ description: "Display name.", example: "Grade 10" }),
+    sort_order: z
+      .number()
+      .int()
+      .openapi({ description: "Position in the school's list of grades, lowest first." }),
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("GradeLevel");
+
+export type GradeLevel = z.infer<typeof gradeLevelSchema>;
+
+export const createGradeLevelBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).openapi({ example: "Grade 10" }),
+    sort_order: z.number().int().min(0).max(32767),
+  })
+  .openapi("CreateGradeLevelBody");
+
+export const updateGradeLevelBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    sort_order: z.number().int().min(0).max(32767).optional(),
+  })
+  .openapi("UpdateGradeLevelBody");
+
+export const gradeLevelListSchema = z
+  .object({
+    grade_levels: z.array(gradeLevelSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("GradeLevelList");
+
+export const gradeLevelIdParamSchema = z
+  .object({
+    gradeLevelId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "gradeLevelId", in: "path" },
+        description: "Grade level UUID.",
+      }),
+  })
+  .openapi("GradeLevelIdParam");
+
+export const sectionSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    school_id: uuidSchema.openapi({ description: "Owning school tenant." }),
+    academic_year_id: uuidSchema.openapi({ description: "Academic year the section runs in." }),
+    grade_level_id: uuidSchema.openapi({ description: "Grade the section belongs to." }),
+    grade_level_name: z.string().openapi({ description: "The grade's name.", example: "Grade 10" }),
+    name: z.string().openapi({ description: "Section name within the grade.", example: "C" }),
+    student_count: z.number().int().openapi({ description: "Students placed in this section." }),
+    created_at: dateTimeSchema,
+    updated_at: dateTimeSchema,
+  })
+  .openapi("Section");
+
+export type Section = z.infer<typeof sectionSchema>;
+
+export const createSectionBodySchema = z
+  .object({
+    academic_year_id: uuidSchema,
+    grade_level_id: uuidSchema,
+    name: z.string().trim().min(1).max(50).openapi({ example: "C" }),
+  })
+  .openapi("CreateSectionBody");
+
+export const updateSectionBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(50),
+  })
+  .openapi("UpdateSectionBody");
+
+export const sectionListSchema = z
+  .object({
+    sections: z.array(sectionSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("SectionList");
+
+export const sectionQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(100),
+    offset: z.coerce.number().int().min(0).default(0),
+    academic_year_id: uuidSchema.optional(),
+    grade_level_id: uuidSchema.optional(),
+  })
+  .openapi("SectionQuery");
+
+export const sectionIdParamSchema = z
+  .object({
+    sectionId: z
+      .string()
+      .uuid()
+      .openapi({
+        param: { name: "sectionId", in: "path" },
+        description: "Section UUID.",
+      }),
+  })
+  .openapi("SectionIdParam");
+
+export const sectionStudentSchema = z
+  .object({
+    student_id: uuidSchema,
+    section_id: uuidSchema,
+    academic_year_id: uuidSchema,
+    first_name: z.string(),
+    last_name: z.string(),
+    admission_number: z.string(),
+  })
+  .openapi("SectionStudent");
+
+export const sectionStudentListSchema = z
+  .object({
+    students: z.array(sectionStudentSchema),
+    total: z.number().int().openapi({ description: "Total matching records." }),
+  })
+  .openapi("SectionStudentList");
+
+export const placeSectionStudentBodySchema = z
+  .object({
+    student_id: uuidSchema.openapi({ description: "Student to place in the section." }),
+  })
+  .openapi("PlaceSectionStudentBody");
+
+export const sectionPlacementResultSchema = z
+  .object({
+    student: sectionStudentSchema,
+    enrolled_class_ids: z
+      .array(uuidSchema)
+      .openapi({ description: "Section classes the student was enrolled into by this call." }),
+    skipped_class_ids: z.array(uuidSchema).openapi({
+      description: "Section classes the student could not be enrolled into (class at capacity).",
+    }),
+  })
+  .openapi("SectionPlacementResult");
 
 // ---------------------------------------------------------------------------
 // Rooms
@@ -752,7 +914,20 @@ export const timetableSlotSchema = z
     timetable_version_id: uuidSchema.openapi({ description: "Parent timetable version." }),
     class_id: uuidSchema.openapi({ description: "Scheduled class." }),
     teacher_id: uuidSchema.openapi({ description: "Assigned teacher." }),
-    room_id: uuidSchema.openapi({ description: "Assigned room." }),
+    room_id: uuidSchema
+      .nullable()
+      .openapi({ description: "Assigned room, if any (optional since rooms left the timetable)." }),
+    section_id: uuidSchema
+      .nullable()
+      .openapi({ description: "The class's grade section, or null when it has none." }),
+    section_name: z
+      .string()
+      .nullable()
+      .openapi({ description: "The section's name.", example: "C" }),
+    grade_level_name: z
+      .string()
+      .nullable()
+      .openapi({ description: "The section's grade name.", example: "Grade 10" }),
     weekday: z
       .number()
       .int()
@@ -775,7 +950,7 @@ export const createTimetableSlotBodySchema = z
   .object({
     class_id: uuidSchema.openapi({ description: "Class to schedule." }),
     teacher_id: uuidSchema.openapi({ description: "Teacher to assign." }),
-    room_id: uuidSchema.openapi({ description: "Room to assign." }),
+    room_id: uuidSchema.nullable().optional().openapi({ description: "Optional room." }),
     weekday: z
       .number()
       .int()
@@ -796,7 +971,10 @@ export const updateTimetableSlotBodySchema = z
   .object({
     class_id: uuidSchema.optional().openapi({ description: "Class to schedule." }),
     teacher_id: uuidSchema.optional().openapi({ description: "Teacher to assign." }),
-    room_id: uuidSchema.optional().openapi({ description: "Room to assign." }),
+    room_id: uuidSchema
+      .nullable()
+      .optional()
+      .openapi({ description: "Optional room, or null to clear it." }),
     weekday: z
       .number()
       .int()
@@ -821,6 +999,9 @@ export const timetableSlotQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().min(0).default(0),
+    section_id: uuidSchema.optional().openapi({
+      description: "Only slots of classes taught to this grade section.",
+    }),
   })
   .openapi("TimetableSlotQuery");
 

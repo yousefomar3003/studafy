@@ -15,7 +15,8 @@ import type { ComponentType } from "react";
  * the pick-then-place keyboard path (native HTML5 drag events aren't simulable in happy-dom, so this
  * exercises the keyboard-equivalent path — see `TimetableGrid.tsx`'s doc comment for why both funnel
  * through the same `assignSlot`), add a lesson from an empty cell, see a conflict render, publish;
- * then edit a live timetable through a draft copy and discard it; and change the school week.
+ * then edit a live timetable through a draft copy and discard it; change the school week; and narrow
+ * the grid to a grade and one of its sections, where a section double-booking is flagged.
  */
 
 const YEAR = {
@@ -51,7 +52,8 @@ const CLASS_A = {
   academic_year_id: "year-1",
   term_id: "term-1",
   lead_teacher_id: "teacher-1",
-  room_id: "room-1",
+  room_id: null,
+  section_id: "sec-10c",
   code: "MATH-101",
   capacity: 30,
   status: "active" as const,
@@ -62,9 +64,50 @@ const CLASS_A = {
 const CLASS_B = {
   ...CLASS_A,
   id: "class-b",
-  room_id: "room-2",
+  section_id: "sec-11a",
   code: "SCI-201",
 };
+
+/** Same section as MATH-101 but another teacher, so placing both at once is only a section
+ * double-booking, not a teacher clash. */
+const CLASS_C = {
+  ...CLASS_A,
+  id: "class-c",
+  lead_teacher_id: "teacher-2",
+  code: "ENG-101",
+};
+
+const CLASSES = [CLASS_A, CLASS_B, CLASS_C];
+
+const GRADE_10 = {
+  id: "grade-10",
+  school_id: "school-1",
+  name: "Grade 10",
+  sort_order: 10,
+  created_at: "2026-08-01T00:00:00.000Z",
+  updated_at: "2026-08-01T00:00:00.000Z",
+};
+const GRADE_11 = { ...GRADE_10, id: "grade-11", name: "Grade 11", sort_order: 11 };
+
+const SECTION_10C = {
+  id: "sec-10c",
+  school_id: "school-1",
+  academic_year_id: "year-1",
+  grade_level_id: "grade-10",
+  grade_level_name: "Grade 10",
+  name: "C",
+  student_count: 0,
+  created_at: "2026-08-01T00:00:00.000Z",
+  updated_at: "2026-08-01T00:00:00.000Z",
+};
+const SECTION_11A = {
+  ...SECTION_10C,
+  id: "sec-11a",
+  grade_level_id: "grade-11",
+  grade_level_name: "Grade 11",
+  name: "A",
+};
+const SECTIONS = [SECTION_10C, SECTION_11A];
 
 const TEACHER_PROFILE = {
   id: "teacher-1",
@@ -90,23 +133,6 @@ const INSTRUCTOR_USER = {
   created_at: "2026-08-01T00:00:00.000Z",
   updated_at: "2026-08-01T00:00:00.000Z",
 };
-
-const ROOM_1 = {
-  id: "room-1",
-  school_id: "school-1",
-  code: "RM-101",
-  name: "Room 101",
-  room_type: "physical" as const,
-  capacity: 30,
-  building: "Main",
-  floor: "1",
-  virtual_url: null,
-  is_active: true,
-  created_at: "2026-08-01T00:00:00.000Z",
-  updated_at: "2026-08-01T00:00:00.000Z",
-};
-
-const ROOM_2 = { ...ROOM_1, id: "room-2", code: "RM-102", name: "Room 102" };
 
 interface State {
   versions: Record<string, unknown>[];
@@ -143,11 +169,18 @@ function version(overrides: Record<string, unknown>) {
   };
 }
 
+/** A slot as the API returns it: carrying its class's section and that section's grade. */
 function slot(versionId: string, index: number, body: Record<string, unknown>) {
+  const sectionId = CLASSES.find((klass) => klass.id === body.class_id)?.section_id ?? null;
+  const section = SECTIONS.find((candidate) => candidate.id === sectionId);
   return {
     id: `${versionId}-slot-${index}`,
     school_id: "school-1",
     timetable_version_id: versionId,
+    room_id: null,
+    section_id: section?.id ?? null,
+    section_name: section?.name ?? null,
+    grade_level_name: section?.grade_level_name ?? null,
     created_at: "2026-08-16T00:00:00.000Z",
     updated_at: "2026-08-16T00:00:00.000Z",
     ...body,
@@ -177,16 +210,19 @@ function getMockImplementation(
     return Promise.resolve<unknown>({ data: state.settings });
   }
   if (path === "/api/academics/classes") {
-    return Promise.resolve<unknown>({ data: { classes: [CLASS_A, CLASS_B], total: 2 } });
+    return Promise.resolve<unknown>({ data: { classes: CLASSES, total: CLASSES.length } });
+  }
+  if (path === "/api/academics/grade-levels") {
+    return Promise.resolve<unknown>({ data: { grade_levels: [GRADE_10, GRADE_11], total: 2 } });
+  }
+  if (path === "/api/academics/sections") {
+    return Promise.resolve<unknown>({ data: { sections: SECTIONS, total: SECTIONS.length } });
   }
   if (path === "/api/teachers") {
     return Promise.resolve<unknown>({ data: { teachers: [TEACHER_PROFILE], next_cursor: null } });
   }
   if (path === "/api/users") {
     return Promise.resolve<unknown>({ data: { users: [INSTRUCTOR_USER], next_cursor: null } });
-  }
-  if (path === "/api/academics/rooms") {
-    return Promise.resolve<unknown>({ data: { rooms: [ROOM_1, ROOM_2], total: 2 } });
   }
   throw new Error(`Unhandled GET ${path}`);
 }
@@ -324,7 +360,6 @@ function seedLiveTimetable() {
     slot("live-1", 1, {
       class_id: "class-a",
       teacher_id: "teacher-1",
-      room_id: "room-1",
       weekday: 7,
       period: 1,
     }),
@@ -380,8 +415,14 @@ describe("TimetableBuilderPage", () => {
     const dialog = await screen.findByRole("dialog", { name: "Add lesson" });
     fireEvent.click(within(dialog).getByRole("combobox", { name: /^Class/ }));
     fireEvent.click(screen.getByRole("option", { name: "SCI-201" }));
+    // Lessons are scheduled per class and section only — there's no room to pick.
+    expect(within(dialog).queryByRole("combobox", { name: /^Room/ })).toBeNull();
     fireEvent.click(within(dialog).getByRole("button", { name: "Add lesson" }));
     await screen.findByRole("button", { name: /SCI-201, Monday period 2/ });
+    expect(postMock).toHaveBeenCalledWith("/api/academics/timetable-versions/{versionId}/slots", {
+      params: { path: { versionId: "draft-1" } },
+      body: { class_id: "class-b", teacher_id: "teacher-1", weekday: 1, period: 2 },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
     await screen.findByText(/Teachers and students are following this timetable/);
@@ -485,5 +526,76 @@ describe("TimetableBuilderPage", () => {
         .map((cell) => cell.textContent);
       expect(headers).toEqual(["Period", "Mon", "Tue", "Wed", "Thu", "Fri", "Sun"]);
     });
+  });
+  test("narrows the grid to a grade and section, and flags a section double-booking", async () => {
+    // A draft with MATH-101 (Grade 10 – C) on Sunday period 1 and SCI-201 (Grade 11 – A) on Monday.
+    state.versions = [version({ id: "draft-1" })];
+    state.slots.set("draft-1", [
+      slot("draft-1", 1, {
+        class_id: "class-a",
+        teacher_id: "teacher-1",
+        weekday: 7,
+        period: 1,
+      }),
+      slot("draft-1", 2, {
+        class_id: "class-b",
+        teacher_id: "teacher-1",
+        weekday: 1,
+        period: 1,
+      }),
+    ]);
+    const Page = await loadPage();
+    await renderAs(Page, "ORG_ADMIN");
+
+    // Unfiltered, each lesson names its section; the section filter waits for a grade.
+    await screen.findByRole("button", { name: /MATH-101, Sunday period 1, section 10-C/ });
+    expect(
+      screen.getByRole("button", { name: /SCI-201, Monday period 1, section 11-A/ }),
+    ).toBeTruthy();
+    const sectionSelect = screen.getByRole("combobox", { name: /^Section/ });
+    expect((sectionSelect as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("combobox", { name: /^Grade/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "Grade 10" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /SCI-201, Monday period 1/ })).toBeNull(),
+    );
+    expect(screen.getByRole("button", { name: /MATH-101, Sunday period 1/ })).toBeTruthy();
+
+    // A section: its lessons only, its classes only in the palette, no redundant section labels.
+    fireEvent.click(screen.getByRole("combobox", { name: /^Section/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "C" }));
+    const lesson = await screen.findByRole("button", { name: /MATH-101, Sunday period 1/ });
+    expect(lesson.getAttribute("aria-label")).not.toContain("section");
+    expect(screen.queryByRole("button", { name: "SCI-201" })).toBeNull();
+    expect(screen.getByRole("button", { name: "ENG-101" })).toBeTruthy();
+
+    // ENG-101 has its own teacher, so it places — and the section clash is flagged.
+    fireEvent.click(screen.getByRole("button", { name: "ENG-101" }));
+    fireEvent.click(screen.getByRole("button", { name: "Place ENG-101 on Sunday period 1" }));
+    await waitFor(() =>
+      expect(postMock).toHaveBeenCalledWith("/api/academics/timetable-versions/{versionId}/slots", {
+        params: { path: { versionId: "draft-1" } },
+        body: {
+          class_id: "class-c",
+          teacher_id: "teacher-2",
+          weekday: 7,
+          period: 1,
+        },
+      }),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(
+      (await screen.findByText(/Section "Grade 10 – C" also has class "MATH-101"/)).textContent,
+    ).toContain("Sunday, period 1");
+
+    // A section with a single class preselects it in the add-lesson form.
+    fireEvent.click(screen.getByRole("combobox", { name: /^Grade/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "Grade 11" }));
+    fireEvent.click(screen.getByRole("combobox", { name: /^Section/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "A" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add a lesson on Tuesday period 2" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add lesson" });
+    expect(within(dialog).getByRole("combobox", { name: /^Class/ }).textContent).toBe("SCI-201");
   });
 });

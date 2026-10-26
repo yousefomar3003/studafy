@@ -84,6 +84,12 @@ school_id`) locks and reads the parent version and the referenced class, then re
 slot may legitimately use a substitute teacher or an overflow room for one period; `class_id` still
 ties the slot back to the enrollment/capacity model in `000009`.
 
+Since `000147`/`000148` a timetable is built per grade section: a class may carry a `section_id`
+(`app.sections`, one per grade per academic year), a section's timetable is the slots of its
+classes, and `room_id` is optional on both `app.classes` and `app.timetable_slots` (the UI no longer
+asks for one). Existing room values are kept; `ex_timetable_slots_room_weekday_period` never fires
+for a NULL room.
+
 ## Overlap: why `EXCLUDE`, not `UNIQUE`
 
 `timetable_slots` has no period-duration column — `period` is a single discrete slot number, not a

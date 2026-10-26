@@ -361,4 +361,48 @@ describeDb("timetable HTTP", () => {
       expect(response.status).toBe(400);
     }
   });
+
+  test("only timetable managers add or change classes, subjects and courses", async () => {
+    const fixture = await createFullTenant(database!.sql);
+    const classBody = (code: string) => ({
+      course_id: fixture.course.id,
+      academic_year_id: fixture.academicYear.id,
+      term_id: fixture.term.id,
+      lead_teacher_id: fixture.teachers[0]!.id,
+      code,
+    });
+
+    for (const role of ["INSTRUCTOR", "STUDENT", "PARENT"] as const) {
+      const actor = actorOf(fixture, role);
+      expect(
+        (await request(actor, "POST", "/api/academics/classes", classBody(`NO-${role}`))).status,
+      ).toBe(403);
+      expect(
+        (await request(actor, "PATCH", `/api/academics/classes/${fixture.cls.id}`, { capacity: 5 }))
+          .status,
+      ).toBe(403);
+      expect(
+        (
+          await request(actor, "POST", "/api/academics/subjects", {
+            code: `S-${role}`,
+            name: "Nope",
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await request(actor, "POST", `/api/academics/subjects/${fixture.subject.id}/courses`, {
+            code: `C-${role}`,
+            name: "Nope",
+          })
+        ).status,
+      ).toBe(403);
+    }
+
+    // A class needs no room since 000148.
+    const admin = actorOf(fixture, "ORG_ADMIN");
+    const created = await request(admin, "POST", "/api/academics/classes", classBody("NEW-10A"));
+    expect(created.status).toBe(201);
+    expect(((await created.json()) as { room_id: string | null }).room_id).toBeNull();
+  });
 });

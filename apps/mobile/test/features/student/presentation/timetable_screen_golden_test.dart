@@ -48,9 +48,6 @@ Future<void> _pumpGolden(WidgetTester tester, Locale locale) async {
                   ? (code: 'SCI101-A', courseName: 'Integrated Science')
                   : (code: 'MATH101-A', courseName: 'Algebra Foundations'),
             ),
-            scheduleRoomCodesProvider.overrideWith(
-              (ref) async => {'room-1': 'R101'},
-            ),
           ],
           child: Builder(
             builder: (context) {

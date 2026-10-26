@@ -47,7 +47,6 @@ export function useCreateMember() {
             admission_number: values.admissionNumber.trim(),
             // Added by the school to sign in straight away, so already enrolled.
             status: "enrolled",
-            email,
           },
         });
         userId = data!.user_id;

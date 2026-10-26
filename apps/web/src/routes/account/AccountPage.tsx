@@ -12,11 +12,6 @@ export default function AccountPage() {
       <p>{t("onboarding.account.description")}</p>
       <ul className="link-tiles">
         <li>
-          <Link to="/account/ai" className="link-tiles__item">
-            {t("onboarding.account.aiLink")}
-          </Link>
-        </li>
-        <li>
           <Link to="/account/sessions" className="link-tiles__item">
             {t("onboarding.account.sessionsLink")}
           </Link>

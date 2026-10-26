@@ -129,7 +129,7 @@
     "timetable": {
       "title": "Timetable periods",
       "needsAcademicYear": "Create an academic year first — a timetable belongs to a term.",
-      "description": "Reserve the weekly structure now — period start and end times can be finalized once you add classes, teachers, and rooms.",
+      "description": "Reserve the weekly structure now — period start and end times can be finalized once you add classes and teachers.",
       "name": "Timetable name",
       "defaultName": "Draft Timetable",
       "periodsPerDay": "Periods per day",

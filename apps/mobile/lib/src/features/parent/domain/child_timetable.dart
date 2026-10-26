@@ -4,8 +4,9 @@ import '../../timetable/domain/weekly_schedule.dart';
 
 /// One lesson of a linked child's weekly timetable, with every display label already resolved
 /// server-side (`GET /api/reports/children/{studentId}/timetable`) — a parent session cannot
-/// resolve class / course / room / teacher names through the academics endpoints the student
-/// and teacher schedules use.
+/// resolve class / course / teacher names through the academics endpoints the student
+/// and teacher schedules use. The endpoint may still send a `room` (object or null); it is
+/// ignored, since lessons no longer show a room.
 class ChildTimetableSlot {
   const ChildTimetableSlot({
     required this.id,
@@ -16,15 +17,12 @@ class ChildTimetableSlot {
     this.courseName,
     this.teacherId,
     this.teacherName,
-    this.roomId,
-    this.roomName,
   });
 
   factory ChildTimetableSlot.fromJson(Map<String, Object?> json) {
     final klass = _mapOrNull(json['class'])!;
     final course = _mapOrNull(json['course']);
     final teacher = _mapOrNull(json['teacher']);
-    final room = _mapOrNull(json['room']);
     return ChildTimetableSlot(
       id: json['id']! as String,
       weekday: (json['weekday']! as num).toInt(),
@@ -34,8 +32,6 @@ class ChildTimetableSlot {
       courseName: course?['name'] as String?,
       teacherId: teacher?['id'] as String?,
       teacherName: teacher?['name'] as String?,
-      roomId: room?['id'] as String?,
-      roomName: room?['name'] as String?,
     );
   }
 
@@ -47,8 +43,6 @@ class ChildTimetableSlot {
   final String? courseName;
   final String? teacherId;
   final String? teacherName;
-  final String? roomId;
-  final String? roomName;
 }
 
 /// A linked child's approved weekly timetable for the current term.
@@ -90,7 +84,7 @@ class ChildTimetable {
 
 /// [timetable] adapted to the shared weekly-schedule model, so the parent view renders through
 /// the same `WeeklyScheduleView` as the student and teacher schedules. The slots become
-/// [TimetableSlot]s (missing teacher / room ids as empty strings — nothing looks them up, since
+/// [TimetableSlot]s (a missing teacher id as an empty string, no room — nothing looks them up, since
 /// [ChildWeeklySchedule.labels] carries every name the lesson cards show).
 ChildWeeklySchedule childWeeklySchedule(ChildTimetable timetable) {
   final epoch = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
@@ -102,7 +96,11 @@ ChildWeeklySchedule childWeeklySchedule(ChildTimetable timetable) {
         timetableVersionId: timetable.timetableVersionId ?? '',
         classId: slot.classId,
         teacherId: slot.teacherId ?? '',
-        roomId: slot.roomId ?? '',
+        roomId: null,
+        // The child-timetable endpoint (`reports/child-timetable.ts`) doesn't carry sections.
+        sectionId: null,
+        sectionName: null,
+        gradeLevelName: null,
         weekday: slot.weekday,
         period: slot.period,
         createdAt: epoch,
@@ -116,7 +114,6 @@ ChildWeeklySchedule childWeeklySchedule(ChildTimetable timetable) {
         slot.id: (
           title: slot.courseName ?? slot.classCode,
           classCode: slot.classCode,
-          room: slot.roomName,
           teacher: slot.teacherName,
         ),
     },

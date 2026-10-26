@@ -14,6 +14,7 @@ import 'package:studafy_mobile/src/features/timetable/application/weekly_schedul
 import 'package:studafy_mobile/src/features/timetable/domain/weekly_schedule.dart';
 import 'package:studafy_mobile/src/features/timetable/presentation/weekly_schedule_view.dart';
 import 'package:studafy_mobile/src/features/timetable/presentation/widgets/lesson_card.dart';
+import 'package:studafy_mobile/src/features/timetable/presentation/widgets/schedule_section.dart';
 import 'package:studafy_mobile/src/features/timetable/presentation/widgets/timetable_placeholders.dart';
 
 import '../../../support/ensure_date_formatting.dart';
@@ -27,14 +28,49 @@ final _slots = [
   scheduleSlot(weekday: 3, period: 1, classId: 'sci'),
 ];
 
+/// The same week with grade sections: Science is Grade 10 Section C, Algebra Section D.
+final _sectionedSlots = [
+  scheduleSlot(
+    weekday: 1,
+    period: 2,
+    classId: 'math',
+    roomId: 'room-2',
+    sectionId: 'sec-d',
+    sectionName: 'D',
+    gradeLevelName: 'Grade 10',
+  ),
+  for (final weekday in [1, 3])
+    scheduleSlot(
+      weekday: weekday,
+      period: 1,
+      classId: 'sci',
+      sectionId: 'sec-c',
+      sectionName: 'C',
+      gradeLevelName: 'Grade 10',
+    ),
+];
+
+/// A section label as rendered: each name in a first-strong isolate (see `schedule_section.dart`).
+String _sectionLabel(String grade, String section, {String word = 'Section'}) =>
+    '\u2068$grade\u2069 · $word \u2068$section\u2069';
+
+/// Builds the schedule the way the providers do: the student's own section as the header, every
+/// section as the teacher's filter choices.
 AsyncValue<WeeklyScheduleStatus> _ready({
   List<TimetableSlot>? slots,
   bool stale = false,
   List<int> schoolDays = const [7, 1, 2, 3, 4],
+  String? sectionFilter,
 }) {
+  final all = slots ?? _slots;
+  final sections = scheduleSections(all);
+  final filter = resolveSectionFilter(sections, sectionFilter);
   final schedule = buildWeeklySchedule(
     schoolDays: schoolDays,
-    slots: slots ?? _slots,
+    slots: slotsForSection(all, filter),
+    section: predominantSection(all),
+    sections: sections,
+    sectionFilter: filter,
   );
   return AsyncData(
     WeeklyScheduleReady(stale ? cachedValue(schedule) : liveValue(schedule)),
@@ -64,9 +100,6 @@ Future<ProviderContainer> _pump(
           'sci' => (code: 'SCI101-A', courseName: 'Integrated Science'),
           _ => (code: 'MATH101-A', courseName: 'Algebra Foundations'),
         },
-      ),
-      scheduleRoomCodesProvider.overrideWith(
-        (ref) async => {'room-1': 'R101', 'room-2': 'VR01'},
       ),
       timetableTeacherNameProvider.overrideWith(
         (ref, teacherId) => 'Layla Nasser',
@@ -145,8 +178,8 @@ void main() {
         expect(cards.map((card) => card.slot.period), [1, 2]);
         expect(find.text('Integrated Science'), findsOneWidget);
         expect(find.text('Algebra Foundations'), findsOneWidget);
-        expect(find.text('Room R101'), findsOneWidget);
-        expect(find.text('Room VR01'), findsOneWidget);
+        // Lessons carry no room, even when the slot still has a room id.
+        expect(find.textContaining('Room'), findsNothing);
         expect(find.text('Layla Nasser'), findsNWidgets(2));
         expect(find.text('3 lessons a week'), findsOneWidget);
 
@@ -167,6 +200,124 @@ void main() {
       expect(find.text('SCI101-A'), findsOneWidget);
       expect(find.text('MATH101-A'), findsOneWidget);
       expect(find.text('Layla Nasser'), findsNothing);
+    });
+
+    testWidgets('a student\'s timetable is headed by their grade section', (
+      tester,
+    ) async {
+      await _pump(tester, status: _ready(slots: _sectionedSlots));
+
+      expect(find.text(_sectionLabel('Grade 10', 'C')), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          'Grade and section: ${_sectionLabel('Grade 10', 'C')}',
+        ),
+        findsOneWidget,
+      );
+      // The header names the section; the student's cards don't repeat it, nor offer a filter.
+      expect(find.text(_sectionLabel('Grade 10', 'D')), findsNothing);
+      expect(find.byType(ChoiceChip), findsNothing);
+    });
+
+    testWidgets('no section header when the lessons carry no section', (
+      tester,
+    ) async {
+      await _pump(tester, status: _ready());
+
+      expect(find.byType(ScheduleSectionHeader), findsNothing);
+    });
+
+    testWidgets('a teacher\'s lessons are each labelled with their section', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        status: _ready(slots: _sectionedSlots),
+        audience: ScheduleAudience.teacher,
+      );
+
+      expect(find.byType(ScheduleSectionHeader), findsNothing);
+      final cards = find.byType(LessonCard);
+      expect(
+        find.descendant(
+          of: cards,
+          matching: find.text(_sectionLabel('Grade 10', 'C')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cards,
+          matching: find.text(_sectionLabel('Grade 10', 'D')),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'a teacher of several sections can filter the week by section',
+      (tester) async {
+        final container = await _pump(
+          tester,
+          status: _ready(slots: _sectionedSlots),
+          audience: ScheduleAudience.teacher,
+        );
+        container.listen(teacherScheduleSectionFilterProvider, (_, _) {});
+
+        final chips = tester.widgetList<ChoiceChip>(find.byType(ChoiceChip));
+        expect(chips, hasLength(3));
+        expect(chips.first.selected, isTrue);
+        final all = find.widgetWithText(ChoiceChip, 'All');
+        final sectionD = find.widgetWithText(
+          ChoiceChip,
+          _sectionLabel('Grade 10', 'D'),
+        );
+        expect(all, findsOneWidget);
+        expect(sectionD, findsOneWidget);
+
+        await tester.tap(sectionD);
+        await tester.pumpAndSettle();
+        expect(container.read(teacherScheduleSectionFilterProvider), 'sec-d');
+
+        await tester.tap(all);
+        await tester.pumpAndSettle();
+        expect(container.read(teacherScheduleSectionFilterProvider), isNull);
+      },
+    );
+
+    testWidgets('a filtered schedule marks its section chip selected', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        status: _ready(slots: _sectionedSlots, sectionFilter: 'sec-d'),
+        audience: ScheduleAudience.teacher,
+      );
+
+      final selected = tester
+          .widgetList<ChoiceChip>(find.byType(ChoiceChip))
+          .where((chip) => chip.selected);
+      expect(
+        (selected.single.label as Text).data,
+        _sectionLabel('Grade 10', 'D'),
+      );
+      expect(find.byType(LessonCard), findsOneWidget);
+      expect(find.text('Algebra Foundations'), findsOneWidget);
+    });
+
+    testWidgets('no section filter for a teacher of a single section', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        status: _ready(
+          slots: _sectionedSlots.where((s) => s.classId == 'sci').toList(),
+        ),
+        audience: ScheduleAudience.teacher,
+      );
+
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.text(_sectionLabel('Grade 10', 'C')), findsOneWidget);
     });
 
     testWidgets(
@@ -278,8 +429,52 @@ void main() {
       );
 
       expect(find.text('الجدول الأسبوعي'), findsOneWidget);
-      expect(find.text('قاعة R101'), findsOneWidget);
+      expect(find.textContaining('قاعة'), findsNothing);
       expect(find.byType(LessonCard), findsNWidgets(2));
+    });
+
+    testWidgets('the section header and filter read in Arabic', (tester) async {
+      await _pump(tester, status: _ready(slots: _sectionedSlots));
+      await _switchToArabic(tester);
+
+      expect(
+        find.text(_sectionLabel('Grade 10', 'C', word: 'الشعبة')),
+        findsOneWidget,
+      );
+      // RTL: the header's icon leads from the right.
+      final header = find.byType(ScheduleSectionHeader);
+      expect(
+        tester
+            .getTopRight(
+              find.descendant(of: header, matching: find.byType(Icon)),
+            )
+            .dx,
+        greaterThan(
+          tester
+              .getTopRight(
+                find.descendant(of: header, matching: find.byType(Text)),
+              )
+              .dx,
+        ),
+      );
+    });
+
+    testWidgets('a teacher\'s section chips are in Arabic', (tester) async {
+      await _pump(
+        tester,
+        status: _ready(slots: _sectionedSlots),
+        audience: ScheduleAudience.teacher,
+      );
+      await _switchToArabic(tester);
+
+      expect(find.widgetWithText(ChoiceChip, 'الكل'), findsOneWidget);
+      expect(
+        find.widgetWithText(
+          ChoiceChip,
+          _sectionLabel('Grade 10', 'D', word: 'الشعبة'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('swiping right moves to the next school day', (tester) async {

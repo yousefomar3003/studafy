@@ -175,6 +175,11 @@
   font-size: var(--font-size-sm);
 }
 
+.timetable-grid__conflict[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
 .timetable-grid__palette {
   display: flex;
   flex-direction: column;
@@ -337,7 +342,7 @@
   display: grid;
   grid-template-columns: 1fr auto;
   grid-template-areas:
-    "class room"
+    "class section"
     "teacher teacher";
   gap: 2px var(--space-8);
   align-items: baseline;
@@ -374,6 +379,11 @@
   outline-offset: 1px;
 }
 
+.timetable-grid__slot[data-conflict="warning"] {
+  outline: var(--focus-ring-width) solid var(--color-warning);
+  outline-offset: 1px;
+}
+
 .timetable-grid__slot-class {
   grid-area: class;
   font-size: var(--font-size-sm);
@@ -381,14 +391,12 @@
   overflow-wrap: anywhere;
 }
 
-.timetable-grid__slot-room {
-  grid-area: room;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-sm);
-  background-color: color-mix(in srgb, var(--color-background) 70%, transparent);
+/* The lesson's grade section ("10-C"), shown while the grid isn't already filtered to one. */
+.timetable-grid__slot-section {
+  grid-area: section;
   color: var(--color-muted-foreground);
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 

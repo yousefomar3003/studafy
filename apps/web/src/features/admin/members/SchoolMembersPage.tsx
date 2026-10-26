@@ -75,11 +75,16 @@ export default function SchoolMembersPage() {
       header: t("adminPeople.members.columns.name"),
       renderCell: (user) => user.display_name ?? "—",
     },
-    {
-      id: "email",
-      header: t("adminPeople.members.columns.email"),
-      renderCell: (user) => user.email ?? "—",
-    },
+    // Students sign in with their member ID only, so their list has no email column.
+    ...(role === "STUDENT"
+      ? []
+      : [
+          {
+            id: "email",
+            header: t("adminPeople.members.columns.email"),
+            renderCell: (user: MemberListItem) => user.email ?? "—",
+          },
+        ]),
     {
       id: "status",
       header: t("adminPeople.members.columns.status"),

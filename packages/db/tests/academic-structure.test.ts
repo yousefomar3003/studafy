@@ -282,12 +282,16 @@ integrationTest(
         FROM pg_constraint WHERE connamespace='app'::regnamespace AND contype='f'
           AND conrelid::regclass::text = ANY(${ACADEMIC_TABLES.map((name) => `app.${name}`) as unknown as string[]})
       `;
-      expect(foreignKeys).toHaveLength(16);
+      // 16 from 000009, plus fk_classes_section (000147).
+      expect(foreignKeys).toHaveLength(17);
       expect(
         foreignKeys.every((fk) => fk.definition.includes("ON UPDATE RESTRICT ON DELETE RESTRICT")),
       ).toBe(true);
       expect(foreignKeys.find((fk) => fk.name === "fk_classes_term")!.definition).toContain(
         "FOREIGN KEY (term_id, academic_year_id, school_id)",
+      );
+      expect(foreignKeys.find((fk) => fk.name === "fk_classes_section")!.definition).toContain(
+        "FOREIGN KEY (section_id, academic_year_id, school_id)",
       );
 
       const triggerFunctions = await database.sql<
@@ -474,6 +478,7 @@ integrationTest(
         "idx_classes_school_course_id",
         "idx_classes_school_lead_teacher_id",
         "idx_classes_school_room_id",
+        "idx_classes_school_section_id",
         "idx_classes_school_term_id",
         "idx_courses_school_subject_id",
         "idx_enrollments_school_student_class",

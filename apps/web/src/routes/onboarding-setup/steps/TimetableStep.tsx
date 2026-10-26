@@ -28,10 +28,10 @@ export interface TimetableStepProps {
 
 /**
  * Step 4: creates a draft timetable version (`POST /api/academics/timetable-versions`) for the
- * term. The backend only schedules class/teacher/room slots on top of a version — there's no
+ * term. The backend only schedules class/teacher slots on top of a version — there's no
  * clock-time "Period 1 = 08:00-08:45" table — so the period count and weekday coverage collected
  * here describe the *intended* weekly structure and are kept in the wizard's own progress only.
- * Actual period times get set once classes, teachers, and rooms exist to schedule.
+ * Actual period times get set once classes and teachers exist to schedule.
  */
 export function TimetableStep({
   yearId,

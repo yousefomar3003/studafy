@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 
 import { useTranslation } from "../../../lib/i18n";
 
-import { findLocalConflict } from "./conflicts";
+import { findLocalConflict, findSectionClash } from "./conflicts";
 import { WEEKDAYS } from "./constants";
 import { useCreateSlot } from "./mutations";
+import { compactSectionLabel } from "./queries";
 import { SlotModal } from "./SlotModal";
 
-import type { Class, Room, TeacherContact, TimetableSlot, TimetableVersion } from "./queries";
+import type { Class, TeacherContact, TimetableSlot, TimetableVersion } from "./queries";
 import type { SlotModalTarget } from "./SlotModal";
 import type { DragEvent, KeyboardEvent } from "react";
 
@@ -19,19 +20,23 @@ export interface TimetableGridProps {
   slots: readonly TimetableSlot[];
   classes: readonly Class[];
   teachers: readonly TeacherContact[];
-  rooms: readonly Room[];
   isReadOnly: boolean;
   /** The school's teaching days in display order (1=Mon..7=Sun). */
   days: readonly number[];
   /** Periods per teaching day. */
   periodCount: number;
-  /** Narrows which slots render (class/teacher filter). Omitted shows them all. */
+  /** Narrows which slots render (grade/section/teacher filter). Omitted shows them all. */
   isVisible?: (slot: TimetableSlot) => boolean;
+  /** The section the view is filtered to: the palette and lesson form offer only its classes, and
+   * lessons drop their (then redundant) section label. */
+  sectionId?: string;
 }
 
 interface ConflictState {
   message: string;
   existingSlotId?: string;
+  /** A section double-booking: the lesson was placed, so this only asks for a second look. */
+  warning?: boolean;
 }
 
 /** Number of lesson colours in timetable.css (`[data-tone="0".."7"]`). */
@@ -49,14 +54,15 @@ function isoWeekday(date: Date): number {
 /**
  * Weekly timetable grid: the school's teaching days across, its periods down. A weekday/period cell
  * is one school-wide time slot, not a single class's seat — several classes legitimately run at once
- * (different teacher, different room), so each cell holds a *list* of lessons. What the `EXCLUDE`
- * constraints (and this component's own `findLocalConflict` pre-check) forbid is a given *teacher* or
- * *room* appearing twice at the same weekday/period, searched across the whole version.
+ * (different teacher, different section), so each cell holds a *list* of lessons. What the `EXCLUDE`
+ * constraint (and this component's own `findLocalConflict` pre-check) forbids is a given *teacher*
+ * appearing twice at the same weekday/period, searched across the whole version. A grade
+ * *section* booked twice at once is allowed but flagged with a warning (see `findSectionClash`).
  *
  * Editing: every empty slot of a cell offers "+", which opens the lesson form for that day and
  * period; clicking a lesson opens the same form to change or remove it. Classes also live in a
  * palette — drag one onto a cell (pointer), or pick it with Enter/Space and then activate a cell
- * (keyboard) — which places it straight away with the class's usual teacher and room.
+ * (keyboard) — which places it straight away with the class's usual teacher.
  *
  * A day that isn't in the school week but still has lessons (the week was changed after they were
  * scheduled) keeps its column, so no lesson is ever hidden by the settings.
@@ -66,11 +72,11 @@ export function TimetableGrid({
   slots,
   classes,
   teachers,
-  rooms,
   isReadOnly,
   days,
   periodCount,
   isVisible,
+  sectionId,
 }: TimetableGridProps) {
   const { t } = useTranslation();
   const { show } = useToast();
@@ -82,7 +88,6 @@ export function TimetableGrid({
 
   const classById = useMemo(() => new Map(classes.map((klass) => [klass.id, klass])), [classes]);
   const teacherById = useMemo(() => new Map(teachers.map((t) => [t.id, t])), [teachers]);
-  const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
 
   // One colour per course, so every section of the same subject reads alike across the week.
   // Assigned by sorted course id rather than hashed, so a small school never gets two courses
@@ -92,6 +97,11 @@ export function TimetableGrid({
     const toneByCourse = new Map(courseIds.map((id, index) => [id, index % TONE_COUNT]));
     return new Map(classes.map((klass) => [klass.id, toneByCourse.get(klass.course_id) ?? 0]));
   }, [classes]);
+
+  const offeredClasses = useMemo(
+    () => (sectionId ? classes.filter((klass) => klass.section_id === sectionId) : classes),
+    [classes, sectionId],
+  );
 
   const visibleSlots = useMemo(
     () => (isVisible ? slots.filter(isVisible) : slots),
@@ -138,11 +148,11 @@ export function TimetableGrid({
   function teacherName(teacherId: string): string {
     return teacherById.get(teacherId)?.display_name ?? t("adminSchool.timetable.unknownTeacher");
   }
-  function roomCode(roomId: string): string {
-    return roomById.get(roomId)?.code ?? t("adminSchool.timetable.unknownRoom");
-  }
 
-  const pickedClass = pickedClassId ? (classById.get(pickedClassId) ?? null) : null;
+  // A pick lapses when a section filter change takes the class out of the palette.
+  const pickedClass = pickedClassId
+    ? (offeredClasses.find((klass) => klass.id === pickedClassId) ?? null)
+    : null;
 
   function assignSlot(classId: string, weekday: number, period: number) {
     const klass = classById.get(classId);
@@ -150,11 +160,10 @@ export function TimetableGrid({
 
     const candidate = {
       teacher_id: klass.lead_teacher_id,
-      room_id: klass.room_id,
       weekday,
       period,
     };
-    const localConflict = findLocalConflict(slots, candidate, classCode, teacherName, roomCode, t);
+    const localConflict = findLocalConflict(slots, candidate, classCode, teacherName, t);
     if (localConflict) {
       setConflict({
         message: localConflict.message,
@@ -162,6 +171,12 @@ export function TimetableGrid({
       });
       return;
     }
+    const sectionClash = findSectionClash(
+      slots,
+      { section_id: klass.section_id, weekday, period },
+      classCode,
+      t,
+    );
 
     createSlot.mutate(
       {
@@ -169,7 +184,16 @@ export function TimetableGrid({
         body: { class_id: classId, ...candidate },
       },
       {
-        onSuccess: () => setConflict(null),
+        onSuccess: () =>
+          setConflict(
+            sectionClash
+              ? {
+                  message: sectionClash.message,
+                  existingSlotId: sectionClash.existingSlot.id,
+                  warning: true,
+                }
+              : null,
+          ),
         onError: (err) => {
           if (err instanceof ApiError && err.detail) {
             setConflict({ message: err.detail });
@@ -207,7 +231,11 @@ export function TimetableGrid({
       data-editing={!isReadOnly || undefined}
     >
       {conflict ? (
-        <div className="timetable-grid__conflict" role="alert">
+        <div
+          className="timetable-grid__conflict"
+          role={conflict.warning ? "status" : "alert"}
+          data-tone={conflict.warning ? "warning" : undefined}
+        >
           <span>{conflict.message}</span>
           <Button variant="tertiary" onClick={() => setConflict(null)}>
             {t("adminSchool.timetable.grid.dismiss")}
@@ -229,7 +257,7 @@ export function TimetableGrid({
             </p>
           </div>
           <ul className="timetable-grid__palette-list">
-            {classes.map((klass) => (
+            {offeredClasses.map((klass) => (
               <li key={klass.id}>
                 <button
                   type="button"
@@ -249,7 +277,7 @@ export function TimetableGrid({
                 </button>
               </li>
             ))}
-            {classes.length === 0 ? (
+            {offeredClasses.length === 0 ? (
               <li className="timetable-grid__palette-empty">
                 {t("adminSchool.timetable.grid.noClasses")}
               </li>
@@ -299,34 +327,50 @@ export function TimetableGrid({
                   return (
                     <td key={day.value} data-today={day.value === today || undefined}>
                       <div className="timetable-grid__cell">
-                        {cellSlots.map((slot) => (
-                          <button
-                            key={slot.id}
-                            type="button"
-                            className="timetable-grid__slot"
-                            data-tone={toneByClassId.get(slot.class_id) ?? 0}
-                            data-conflict={conflict?.existingSlotId === slot.id || undefined}
-                            disabled={isReadOnly}
-                            onClick={() => setModalTarget({ kind: "edit", slot })}
-                            aria-label={t("adminSchool.timetable.grid.slotLabel", {
-                              classCode: classCode(slot.class_id),
-                              day: dayLabel,
-                              period,
-                              teacher: teacherName(slot.teacher_id),
-                              room: roomCode(slot.room_id),
-                            })}
-                          >
-                            <span className="timetable-grid__slot-class">
-                              {classCode(slot.class_id)}
-                            </span>
-                            <span className="timetable-grid__slot-meta">
-                              {teacherName(slot.teacher_id)}
-                            </span>
-                            <span className="timetable-grid__slot-room">
-                              {roomCode(slot.room_id)}
-                            </span>
-                          </button>
-                        ))}
+                        {cellSlots.map((slot) => {
+                          const section = sectionId
+                            ? null
+                            : compactSectionLabel(slot.grade_level_name, slot.section_name);
+                          const labelParams = {
+                            classCode: classCode(slot.class_id),
+                            day: dayLabel,
+                            period,
+                            teacher: teacherName(slot.teacher_id),
+                            section,
+                          };
+                          return (
+                            <button
+                              key={slot.id}
+                              type="button"
+                              className="timetable-grid__slot"
+                              data-tone={toneByClassId.get(slot.class_id) ?? 0}
+                              data-conflict={
+                                conflict?.existingSlotId === slot.id
+                                  ? conflict.warning
+                                    ? "warning"
+                                    : true
+                                  : undefined
+                              }
+                              disabled={isReadOnly}
+                              onClick={() => setModalTarget({ kind: "edit", slot })}
+                              aria-label={
+                                section
+                                  ? t("adminSchool.timetable.grid.slotLabelSection", labelParams)
+                                  : t("adminSchool.timetable.grid.slotLabel", labelParams)
+                              }
+                            >
+                              <span className="timetable-grid__slot-class">
+                                {classCode(slot.class_id)}
+                              </span>
+                              <span className="timetable-grid__slot-meta">
+                                {teacherName(slot.teacher_id)}
+                              </span>
+                              {section ? (
+                                <span className="timetable-grid__slot-section">{section}</span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
 
                         {!isReadOnly ? (
                           <button
@@ -336,10 +380,16 @@ export function TimetableGrid({
                             onDragOver={onDragOverCell}
                             onDrop={(event) => onDropCell(event, day.value, period)}
                             onClick={() => {
-                              if (pickedClassId) {
-                                assignSlot(pickedClassId, day.value, period);
+                              if (pickedClass) {
+                                assignSlot(pickedClass.id, day.value, period);
                               } else {
-                                setModalTarget({ kind: "add", weekday: day.value, period });
+                                setModalTarget({
+                                  kind: "add",
+                                  weekday: day.value,
+                                  period,
+                                  klass:
+                                    offeredClasses.length === 1 ? offeredClasses[0] : undefined,
+                                });
                               }
                             }}
                             aria-label={
@@ -372,14 +422,16 @@ export function TimetableGrid({
         target={modalTarget}
         versionId={version.id}
         onClose={() => setModalTarget(null)}
-        classes={classes}
+        classes={offeredClasses}
         teachers={teachers}
-        rooms={rooms}
         allSlots={slots}
         days={displayDays.map((day) => day.value)}
         periodCount={rowCount}
         classCode={classCode}
         onConflict={(message, existingSlotId) => setConflict({ message, existingSlotId })}
+        onSectionClash={(message, existingSlotId) =>
+          setConflict({ message, existingSlotId, warning: true })
+        }
       />
     </div>
   );

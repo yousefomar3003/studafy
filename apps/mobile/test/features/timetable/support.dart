@@ -6,12 +6,16 @@ import 'package:studafy_mobile/src/core/offline/cached_value.dart';
 /// Monday 2026-08-24 — a fixed "now" so day pre-selection doesn't depend on when the test runs.
 final scheduleMonday = DateTime(2026, 8, 24, 9);
 
+/// A lesson in section [sectionId] — "Section [sectionName]" of [gradeLevelName] — when given.
 TimetableSlot scheduleSlot({
   required int weekday,
   required int period,
   String classId = 'class-1',
   String teacherId = 'teacher-1',
-  String roomId = 'room-1',
+  String? roomId,
+  String? sectionId,
+  String? sectionName,
+  String? gradeLevelName,
 }) {
   final at = DateTime(2026, 1, 1);
   return TimetableSlot(
@@ -21,6 +25,9 @@ TimetableSlot scheduleSlot({
     classId: classId,
     teacherId: teacherId,
     roomId: roomId,
+    sectionId: sectionId,
+    sectionName: sectionName,
+    gradeLevelName: gradeLevelName,
     weekday: weekday,
     period: period,
     createdAt: at,

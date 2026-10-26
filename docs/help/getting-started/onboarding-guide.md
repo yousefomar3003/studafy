@@ -99,7 +99,7 @@ is required). Saving also records the scheme type on your school settings.
 ![Timetable periods step](/help-media/screenshots/onboarding-timetable.webp)
 
 "Reserve the weekly structure now — period start and end times can be finalized
-once you add classes, teachers, and rooms."
+once you add classes and teachers."
 
 Fields:
 
@@ -110,7 +110,7 @@ Fields:
 | **School days**     | At least one day from Mon–Sun.                               | Mon–Fri           |
 
 At this stage the wizard only reserves the structure — it creates a draft
-timetable version for the term. Clock times, teachers, rooms, and slot
+timetable version for the term. Clock times, teachers, and slot
 placement are finalised later in the Timetable builder.
 
 ## Step 5: Student import
@@ -134,7 +134,7 @@ students later from Admin → Students.
 When every step is passed you see the completion screen. `Go to dashboard`
 opens the portal. From there you can:
 
-- Build clock times and assign teachers/rooms in the Timetable builder.
+- Build clock times and assign teachers in the Timetable builder.
 - Import more students from Admin → Students.
 - Change school defaults from Admin → Settings.
 

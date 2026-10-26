@@ -49,7 +49,7 @@ const CLASS_A = {
   academic_year_id: "year-1",
   term_id: "term-1",
   lead_teacher_id: "teacher-1",
-  room_id: "room-1",
+  room_id: null,
   code: "MATH-101",
   capacity: 30,
   status: "active",
@@ -57,7 +57,7 @@ const CLASS_A = {
   updated_at: NOW,
 };
 
-const CLASS_B = { ...CLASS_A, id: "class-b", room_id: "room-2", code: "SCI-201" };
+const CLASS_B = { ...CLASS_A, id: "class-b", code: "SCI-201" };
 
 const TEACHER_PROFILE = {
   id: "teacher-1",
@@ -83,23 +83,6 @@ const INSTRUCTOR_USER = {
   created_at: NOW,
   updated_at: NOW,
 };
-
-const ROOM_1 = {
-  id: "room-1",
-  school_id: "school-1",
-  code: "RM-101",
-  name: "Room 101",
-  room_type: "physical",
-  capacity: 30,
-  building: "Main",
-  floor: "1",
-  virtual_url: null,
-  is_active: true,
-  created_at: NOW,
-  updated_at: NOW,
-};
-
-const ROOM_2 = { ...ROOM_1, id: "room-2", code: "RM-102", name: "Room 102" };
 
 function fakeAccessToken(roles: string[]): string {
   const segment = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -158,11 +141,6 @@ async function stubTimetableBackend(page: Page): Promise<State> {
   await page.route("**/api/users*", async (route) => {
     if (!pathIs(route.request().url(), "/api/users")) return route.fallback();
     return fulfillJson(route, 200, { users: [INSTRUCTOR_USER], next_cursor: null });
-  });
-
-  await page.route("**/api/academics/rooms*", async (route) => {
-    if (!pathIs(route.request().url(), "/api/academics/rooms")) return route.fallback();
-    return fulfillJson(route, 200, { rooms: [ROOM_1, ROOM_2], total: 2 });
   });
 
   await page.route("**/api/academics/timetable-versions*", async (route) => {

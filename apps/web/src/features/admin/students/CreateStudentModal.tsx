@@ -16,7 +16,6 @@ const EMPTY_VALUES = {
   last_name: "",
   middle_name: "",
   preferred_name: "",
-  email: "",
   admission_number: "",
   admission_date: "",
   date_of_birth: "",
@@ -29,7 +28,7 @@ export interface CreateStudentModalProps {
 }
 
 /** `POST /api/students` — creates the student profile and its linked user account (STUDENT role) in
- * one call. Guardian links are added afterward from the profile page, not here, to keep this form to
+ * one call. No email: students sign in with their member ID and the starting password. Guardian links are added afterward from the profile page, not here, to keep this form to
  * the fields every new student needs. */
 export function CreateStudentModal({ open, onClose }: CreateStudentModalProps) {
   const { t } = useTranslation();
@@ -123,15 +122,6 @@ export function CreateStudentModal({ open, onClose }: CreateStudentModalProps) {
             onChange={(e) => setField("preferred_name", e.target.value)}
             error={errors.preferred_name && t(errors.preferred_name)}
             helperText={t("adminPeople.students.create.preferredNameHelper")}
-          />
-          <Input
-            label={t("adminPeople.students.form.email")}
-            type="email"
-            value={values.email}
-            onChange={(e) => setField("email", e.target.value)}
-            error={errors.email && t(errors.email)}
-            required
-            helperText={t("adminPeople.students.create.emailHelper")}
           />
           <Input
             label={t("adminPeople.students.form.dateOfBirth")}

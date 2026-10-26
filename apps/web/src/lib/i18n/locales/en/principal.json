@@ -11,6 +11,7 @@
       "calendar": "School calendar →",
       "timetable": "Timetable →",
       "classes": "Classes →",
+      "sections": "Grades & sections →",
       "students": "Students →",
       "attendance": "Attendance →",
       "discipline": "Discipline →",
@@ -680,16 +681,17 @@
   },
   "classes": {
     "title": "Classes",
-    "description": "Every class running this term, with its lead teacher, room, and how full it is.",
+    "description": "Every class running this term, with its lead teacher, grade section, and how full it is.",
     "caption": "Classes this term",
     "error": "Unable to load classes.",
     "ofCapacity": "{{enrolled}} of {{capacity}}",
     "columns": {
       "class": "Class",
       "teacher": "Lead teacher",
-      "room": "Room",
+      "section": "Section",
       "enrolled": "Enrolled",
-      "status": "Status"
+      "status": "Status",
+      "actions": "Actions"
     },
     "status": {
       "planned": "Planned",
@@ -698,6 +700,12 @@
       "cancelled": "Cancelled"
     },
     "capacity": "Capacity",
+    "section": {
+      "label": "Grade section",
+      "none": "No section",
+      "noSections": "This year has no sections yet. Add them on the Grades & sections page.",
+      "helper": "The class's lessons appear on this section's timetable, and students placed in it are enrolled in the class."
+    },
     "import": {
       "title": "Import classes",
       "fields": {
@@ -705,7 +713,6 @@
         "course": "Course code",
         "term": "Term (code or name; blank = selected term)",
         "teacher": "Lead teacher employee number",
-        "room": "Room code",
         "capacity": "Capacity",
         "status": "Status"
       },
@@ -713,9 +720,172 @@
       "unknownTerm": "No term \"{{value}}\" in the selected year.",
       "noTerm": "No term is selected; add a term to the row.",
       "unknownTeacher": "No teacher with employee number \"{{value}}\".",
-      "unknownRoom": "No room with code \"{{value}}\".",
       "capacityMin": "Capacity must be at least 1."
+    },
+    "add": "Add class",
+    "edit": "Edit",
+    "editLabel": "Edit {{code}}",
+    "sectionsLink": "Grades & sections",
+    "form": {
+      "addTitle": "Add a class",
+      "editTitle": "Edit {{code}}",
+      "editDescription": "A class's course, academic year and term can't be changed once it exists.",
+      "course": "Course",
+      "coursePlaceholder": "Choose a course",
+      "noCourses": "No courses yet — add one",
+      "courseOption": "{{code}} – {{name}}",
+      "addCourse": "Add new course",
+      "year": "Academic year",
+      "term": "Term",
+      "teacher": "Lead teacher",
+      "teacherPlaceholder": "Choose a teacher",
+      "code": "Class code",
+      "codePlaceholder": "e.g. MATH101-A",
+      "capacityHelper": "Leave blank for no limit.",
+      "capacityInvalid": "Capacity must be a whole number of at least 1.",
+      "status": "Status",
+      "add": "Add class",
+      "save": "Save changes",
+      "created": "Class added",
+      "updated": "Class saved",
+      "saveFailed": "Couldn't save the class",
+      "duplicateCode": "A class with the code \"{{code}}\" already exists. Choose another code.",
+      "sectionNotInYear": "That section isn't part of this class's academic year. Choose a section of the same year."
+    },
+    "courseModal": {
+      "title": "Add a course",
+      "description": "Courses belong to a subject. Pick an existing subject or create a new one.",
+      "subject": "Subject",
+      "subjectPlaceholder": "Choose a subject",
+      "subjectOption": "{{name}} ({{code}})",
+      "newSubject": "New subject…",
+      "subjectName": "Subject name",
+      "subjectNamePlaceholder": "e.g. Mathematics",
+      "subjectCode": "Subject code",
+      "subjectCodePlaceholder": "e.g. MATH",
+      "courseName": "Course name",
+      "courseNamePlaceholder": "e.g. Algebra I",
+      "courseCode": "Course code",
+      "courseCodePlaceholder": "e.g. MATH101",
+      "add": "Add course",
+      "created": "Course added",
+      "saveFailed": "Couldn't add the course",
+      "duplicateCode": "That code is already in use. Choose another code."
+    },
+    "delete": {
+      "action": "Delete",
+      "label": "Delete {{code}}",
+      "title": "Delete {{code}}?",
+      "description": "A class with enrolled students is cancelled instead of deleted, so its records are kept. A class with no enrolments is removed.",
+      "confirm": "Delete",
+      "deleted": "Class removed",
+      "failed": "Couldn't delete the class"
     }
+  },
+  "sections": {
+    "title": "Grades & sections",
+    "description": "Set up the school's grades and, for each academic year, the sections of every grade and the students in them. Each section gets its own timetable.",
+    "sectionLabel": "{{grade}} – {{section}}",
+    "edit": "Edit",
+    "columns": {
+      "actions": "Actions"
+    },
+    "grades": {
+      "heading": "Grades",
+      "add": "Add grade",
+      "caption": "The school's grades",
+      "columns": {
+        "name": "Grade",
+        "order": "Order",
+        "sections": "Sections this year"
+      },
+      "error": "Unable to load grades.",
+      "empty": "No grades yet. Add the first one, e.g. \"Grade 10\".",
+      "editLabel": "Edit {{name}}",
+      "deleteLabel": "Delete {{name}}"
+    },
+    "sectionList": {
+      "heading": "Sections",
+      "add": "Add section",
+      "caption": "Sections in the selected year",
+      "columns": {
+        "grade": "Grade",
+        "section": "Section",
+        "students": "Students"
+      },
+      "error": "Unable to load sections.",
+      "empty": "No sections in this year yet.",
+      "students": "Students",
+      "studentsLabel": "Students of {{section}}",
+      "rename": "Rename",
+      "renameLabel": "Rename {{section}}",
+      "deleteLabel": "Delete {{section}}"
+    },
+    "delete": {
+      "action": "Delete",
+      "confirm": "Delete",
+      "deleted": "Deleted",
+      "failed": "Couldn't delete",
+      "gradeTitle": "Delete {{name}}?",
+      "gradeDescription": "Only a grade with no sections in any year can be deleted.",
+      "sectionTitle": "Delete {{section}}?",
+      "sectionDescription": "Only a section with no classes and no students can be deleted.",
+      "gradeHasSections": "This grade still has sections (in this or another year). Delete them first.",
+      "sectionInUse": "This section still has classes or students. Move them out first."
+    },
+    "gradeModal": {
+      "addTitle": "Add grade",
+      "editTitle": "Edit grade",
+      "name": "Name",
+      "namePlaceholder": "e.g. Grade 10",
+      "sortOrder": "Order",
+      "sortOrderHelper": "Grades are listed from the lowest number up.",
+      "sortOrderInvalid": "Enter a whole number from 0 to 32767.",
+      "add": "Add grade",
+      "save": "Save changes",
+      "created": "Grade added",
+      "updated": "Grade saved",
+      "saveFailed": "Couldn't save the grade"
+    },
+    "sectionModal": {
+      "addTitle": "Add section",
+      "editTitle": "Rename section",
+      "grade": "Grade",
+      "gradePlaceholder": "Choose a grade",
+      "name": "Section name",
+      "namePlaceholder": "e.g. C",
+      "add": "Add section",
+      "save": "Save changes",
+      "created": "Section added",
+      "updated": "Section saved",
+      "saveFailed": "Couldn't save the section"
+    },
+    "students": {
+      "title": "Students of {{section}}",
+      "description": "Adding a student moves them out of any other section this year and enrols them in this section's classes.",
+      "search": "Find a student",
+      "searchPlaceholder": "Name or admission number",
+      "searchResults": "Matching students",
+      "add": "Add",
+      "addLabel": "Add {{name}}",
+      "alreadyPlaced": "In this section",
+      "noMatches": "No students match.",
+      "rosterHeading_one": "{{count}} student",
+      "rosterHeading_other": "{{count}} students",
+      "loadError": "Unable to load the students.",
+      "empty": "No students in this section yet.",
+      "remove": "Remove",
+      "removeLabel": "Remove {{name}}",
+      "removed": "{{name}} removed from the section",
+      "removeFailed": "Couldn't remove the student",
+      "added": "{{name}} added to the section",
+      "addFailed": "Couldn't add the student",
+      "skipped_one": "Not enrolled in {{count}} class because it is full: {{classes}}.",
+      "skipped_other": "Not enrolled in {{count}} classes because they are full: {{classes}}.",
+      "unknownClass": "a class",
+      "done": "Done"
+    },
+    "classesLink": "Classes"
   },
   "students": {
     "title": "Students",

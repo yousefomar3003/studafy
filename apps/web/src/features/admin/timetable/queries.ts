@@ -7,8 +7,9 @@ export type Term = components["schemas"]["Term"];
 export type TimetableVersion = components["schemas"]["TimetableVersion"];
 export type TimetableSlot = components["schemas"]["TimetableSlot"];
 export type Class = components["schemas"]["Class"];
-export type Room = components["schemas"]["Room"];
 export type TimetableSettings = components["schemas"]["TimetableSettings"];
+export type GradeLevel = components["schemas"]["GradeLevel"];
+export type Section = components["schemas"]["Section"];
 
 /** A teacher, joined with the display name their linked user account carries — `TeacherProfile`
  * itself has no name, only an employee number (see `fetchTeacherContacts` below). */
@@ -37,8 +38,13 @@ export function classesForTermQueryKey(termId: string) {
   return ["timetable", "classes", termId] as const;
 }
 export const TEACHER_CONTACTS_KEY = ["timetable", "teacher-contacts"] as const;
-export const ROOMS_KEY = ["timetable", "rooms"] as const;
 export const TIMETABLE_SETTINGS_KEY = ["timetable", "settings"] as const;
+export const GRADE_LEVELS_KEY = ["timetable", "grade-levels"] as const;
+/** Prefix of every per-year section list's key — invalidate this after changing sections. */
+export const SECTIONS_KEY_ROOT = ["timetable", "sections"] as const;
+export function sectionsQueryKey(yearId: string) {
+  return [...SECTIONS_KEY_ROOT, yearId] as const;
+}
 
 // ---------------------------------------------------------------------------
 // Pagination fan-outs
@@ -167,6 +173,40 @@ export async function fetchSlots(versionId: string): Promise<TimetableSlot[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Grades & sections
+// ---------------------------------------------------------------------------
+
+/** The school's grades, in their configured order (the API sorts by `sort_order`, then name). */
+export async function fetchGradeLevels(): Promise<GradeLevel[]> {
+  const { data } = await api.GET("/api/academics/grade-levels");
+  return (data?.grade_levels ?? []) as GradeLevel[];
+}
+
+/** Every section of one academic year, ordered by grade then name. */
+export async function fetchSections(yearId: string): Promise<Section[]> {
+  return fetchAllOffsetPages(async (limit, offset) => {
+    const { data } = await api.GET("/api/academics/sections", {
+      params: { query: { academic_year_id: yearId, limit, offset } },
+    });
+    return { rows: (data?.sections ?? []) as Section[], total: data?.total ?? 0 };
+  });
+}
+
+/**
+ * Short "10-C" form of a section for tight spots such as a timetable cell: the grade's number when
+ * its name has one ("Grade 10" → "10"), else the whole grade name. `null` when there's no section.
+ */
+export function compactSectionLabel(
+  gradeLevelName: string | null,
+  sectionName: string | null,
+): string | null {
+  if (!sectionName) return null;
+  if (!gradeLevelName) return sectionName;
+  const number = gradeLevelName.match(/\d+/g)?.at(-1);
+  return `${number ?? gradeLevelName.trim()}-${sectionName}`;
+}
+
+// ---------------------------------------------------------------------------
 // Classes eligible for a term
 // ---------------------------------------------------------------------------
 
@@ -187,7 +227,7 @@ export async function fetchClassesForTerm(termId: string): Promise<Class[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Teachers (name-resolved) & rooms
+// Teachers (name-resolved)
 // ---------------------------------------------------------------------------
 
 /** `TeacherProfile` (from `GET /api/teachers`) carries only an employee number, no name — the name
@@ -225,16 +265,5 @@ export async function fetchTeacherContacts(): Promise<TeacherContact[]> {
       employee_number: teacher.employee_number,
       display_name: user?.display_name ?? user?.email ?? teacher.employee_number,
     };
-  });
-}
-
-/** All rooms, active or not — a deactivated room already referenced by an existing slot still needs
- * to resolve to a real name, not just an ID. The room picker itself filters to `is_active` rooms. */
-export async function fetchRooms(): Promise<Room[]> {
-  return fetchAllOffsetPages(async (limit, offset) => {
-    const { data } = await api.GET("/api/academics/rooms", {
-      params: { query: { limit, offset } },
-    });
-    return { rows: (data?.rooms ?? []) as Room[], total: data?.total ?? 0 };
   });
 }

@@ -4,36 +4,40 @@ import { useEffect, useState } from "react";
 
 import { useTranslation } from "../../../lib/i18n";
 
-import { findLocalConflict } from "./conflicts";
+import { findLocalConflict, findSectionClash } from "./conflicts";
 import { weekdayLabel } from "./constants";
 import { useCreateSlot, useDeleteSlot, useUpdateSlot } from "./mutations";
 
-import type { Class, Room, TeacherContact, TimetableSlot } from "./queries";
+import type { Class, TeacherContact, TimetableSlot } from "./queries";
 import type { SelectOption } from "@studafy/ui";
 
-/** What the modal is acting on: an existing lesson, or an empty cell to add one to. */
+/** What the modal is acting on: an existing lesson, or an empty cell to add one to — optionally with
+ * a class already chosen (the only class the current section filter offers). */
 export type SlotModalTarget =
-  { kind: "edit"; slot: TimetableSlot } | { kind: "add"; weekday: number; period: number };
+  | { kind: "edit"; slot: TimetableSlot }
+  | { kind: "add"; weekday: number; period: number; klass?: Class };
 
 export interface SlotModalProps {
   target: SlotModalTarget | null;
   versionId: string;
   onClose: () => void;
+  /** Classes the picker offers — the section filter's classes when one is set. */
   classes: readonly Class[];
   teachers: readonly TeacherContact[];
-  rooms: readonly Room[];
   allSlots: readonly TimetableSlot[];
   /** Weekdays offered in the day picker, in display order. */
   days: readonly number[];
   periodCount: number;
   classCode: (classId: string) => string;
   onConflict: (message: string, existingSlotId?: string) => void;
+  /** A saved lesson double-books its grade section (see `findSectionClash`). */
+  onSectionClash: (message: string, existingSlotId: string) => void;
 }
 
 /**
- * Adds a lesson to a cell, or edits one in place — class, teacher, room, and day/period, so moving a
+ * Adds a lesson to a cell, or edits one in place — class, teacher, and day/period, so moving a
  * lesson is a single save rather than remove-and-replace. Every save runs the same local clash check
- * as drag-and-drop before it reaches the server, whose `EXCLUDE` constraints remain the backstop.
+ * as drag-and-drop before it reaches the server, whose `EXCLUDE` constraint remains the backstop.
  */
 export function SlotModal({
   target,
@@ -41,12 +45,12 @@ export function SlotModal({
   onClose,
   classes,
   teachers,
-  rooms,
   allSlots,
   days,
   periodCount,
   classCode,
   onConflict,
+  onSectionClash,
 }: SlotModalProps) {
   const { t } = useTranslation();
   const { show } = useToast();
@@ -56,7 +60,6 @@ export function SlotModal({
 
   const [classId, setClassId] = useState("");
   const [teacherId, setTeacherId] = useState("");
-  const [roomId, setRoomId] = useState("");
   const [weekday, setWeekday] = useState("");
   const [period, setPeriod] = useState("");
 
@@ -65,13 +68,11 @@ export function SlotModal({
     if (target.kind === "edit") {
       setClassId(target.slot.class_id);
       setTeacherId(target.slot.teacher_id);
-      setRoomId(target.slot.room_id);
       setWeekday(String(target.slot.weekday));
       setPeriod(String(target.slot.period));
     } else {
-      setClassId("");
-      setTeacherId("");
-      setRoomId("");
+      setClassId(target.klass?.id ?? "");
+      setTeacherId(target.klass?.lead_teacher_id ?? "");
       setWeekday(String(target.weekday));
       setPeriod(String(target.period));
     }
@@ -83,18 +84,17 @@ export function SlotModal({
 
   const editing = target.kind === "edit" ? target.slot : null;
 
-  /** Picking a class pre-fills its usual teacher and room; both stay editable. */
+  /** Picking a class pre-fills its usual teacher; it stays editable. */
   function handleClassChange(nextClassId: string) {
     setClassId(nextClassId);
     const klass = classes.find((candidate) => candidate.id === nextClassId);
     if (klass) {
       setTeacherId(klass.lead_teacher_id);
-      setRoomId(klass.room_id);
     }
   }
 
-  // A lesson's current class or room stays selectable even if it has since left the schedulable list
-  // or been deactivated — dropping it here would silently blank the field.
+  // A lesson's current class stays selectable even if it has since left the schedulable list —
+  // dropping it here would silently blank the field.
   const classOptions: SelectOption<string>[] = classes.map((klass) => ({
     value: klass.id,
     label: klass.code,
@@ -106,9 +106,6 @@ export function SlotModal({
     value: teacher.id,
     label: teacher.display_name,
   }));
-  const roomOptions: SelectOption<string>[] = rooms
-    .filter((room) => room.is_active || room.id === editing?.room_id)
-    .map((room) => ({ value: room.id, label: `${room.code} — ${room.name}` }));
   const dayOptions: SelectOption<string>[] = days.map((day) => ({
     value: String(day),
     label: weekdayLabel(day, t),
@@ -118,7 +115,7 @@ export function SlotModal({
     label: t("adminSchool.timetable.slotModal.periodOption", { period: index + 1 }),
   }));
 
-  const complete = classId !== "" && teacherId !== "" && roomId !== "";
+  const complete = classId !== "" && teacherId !== "";
   const saving = createSlot.isPending || updateSlot.isPending;
 
   function handleError(err: unknown, fallbackKey: string) {
@@ -138,7 +135,6 @@ export function SlotModal({
     if (!target || !complete) return;
     const candidate = {
       teacher_id: teacherId,
-      room_id: roomId,
       weekday: Number(weekday),
       period: Number(period),
     };
@@ -150,7 +146,6 @@ export function SlotModal({
       (id) =>
         teachers.find((teacher) => teacher.id === id)?.display_name ??
         t("adminSchool.timetable.unknownTeacher"),
-      (id) => rooms.find((r) => r.id === id)?.code ?? t("adminSchool.timetable.unknownRoom"),
       t,
     );
     if (conflict) {
@@ -159,12 +154,33 @@ export function SlotModal({
       return;
     }
 
+    // A lesson kept on its own class keeps that class's section even if the class has since left
+    // the offered list.
+    const sectionId =
+      classes.find((klass) => klass.id === classId)?.section_id ??
+      (editing && editing.class_id === classId ? editing.section_id : null);
+    const sectionClash = findSectionClash(
+      allSlots,
+      {
+        section_id: sectionId,
+        weekday: candidate.weekday,
+        period: candidate.period,
+        excludeSlotId: editing?.id,
+      },
+      classCode,
+      t,
+    );
+    const warnSectionClash = () => {
+      if (sectionClash) onSectionClash(sectionClash.message, sectionClash.existingSlot.id);
+    };
+
     if (editing) {
       updateSlot.mutate(
         { slotId: editing.id, versionId, body: { class_id: classId, ...candidate } },
         {
           onSuccess: () => {
             show({ variant: "success", title: t("adminSchool.timetable.toast.slotUpdated") });
+            warnSectionClash();
             onClose();
           },
           onError: (err) => handleError(err, "adminSchool.timetable.toast.slotUpdateFailed"),
@@ -176,6 +192,7 @@ export function SlotModal({
         {
           onSuccess: () => {
             show({ variant: "success", title: t("adminSchool.timetable.toast.slotAdded") });
+            warnSectionClash();
             onClose();
           },
           onError: (err) => handleError(err, "adminSchool.timetable.toast.placeFailed"),
@@ -236,13 +253,6 @@ export function SlotModal({
             options={teacherOptions}
             value={teacherId}
             onChange={setTeacherId}
-            required
-          />
-          <Select
-            label={t("adminSchool.timetable.editModal.room")}
-            options={roomOptions}
-            value={roomId}
-            onChange={setRoomId}
             required
           />
           <div className="timetable-slot-form__when">

@@ -26,6 +26,10 @@ const ROUTES: RouteObject[] = [
           { path: "finance" },
           { path: "finance/adjustments/refunds" },
           { path: "finance/adjustments/refunds/new" },
+          { path: "finance/invoices" },
+          { path: "finance/invoices/batches/new" },
+          { path: "finance/invoices/batches/:batchId" },
+          { path: "finance/invoices/:invoiceId" },
           { path: "notifications" },
           { path: "notifications/preferences" },
         ],
@@ -44,6 +48,11 @@ describe("portalParentPath", () => {
     // `/portal/finance/adjustments` has no page, so it is skipped.
     ["/portal/finance/adjustments/refunds", "/portal/finance"],
     ["/portal/notifications/preferences/", "/portal/notifications"],
+    // `/portal/finance/invoices/batches` only matches the `:invoiceId` page, which is not this
+    // path's parent: the static "batches" segment has no page of its own.
+    ["/portal/finance/invoices/batches/new", "/portal/finance/invoices"],
+    ["/portal/finance/invoices/batches/b-1", "/portal/finance/invoices"],
+    ["/portal/finance/invoices/inv-1", "/portal/finance/invoices"],
   ])("%s goes back to %s", (path, parent) => {
     expect(portalParentPath(ROUTES, path)).toBe(parent);
   });

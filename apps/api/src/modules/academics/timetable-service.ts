@@ -34,7 +34,10 @@ export interface TimetableSlotRow {
   timetable_version_id: string;
   class_id: string;
   teacher_id: string;
-  room_id: string;
+  room_id: string | null;
+  section_id: string | null;
+  section_name: string | null;
+  grade_level_name: string | null;
   weekday: number;
   period: number;
   created_at: Date;
@@ -51,6 +54,7 @@ export interface ListVersionsParams {
 export interface ListSlotsParams {
   limit: number;
   offset: number;
+  section_id?: string;
 }
 
 export interface CreateVersionParams {
@@ -70,7 +74,7 @@ export interface RejectVersionParams {
 export interface CreateSlotParams {
   class_id: string;
   teacher_id: string;
-  room_id: string;
+  room_id?: string | null;
   weekday: number;
   period: number;
 }
@@ -78,7 +82,7 @@ export interface CreateSlotParams {
 export interface UpdateSlotParams {
   class_id?: string;
   teacher_id?: string;
-  room_id?: string;
+  room_id?: string | null;
   weekday?: number;
   period?: number;
 }
@@ -133,16 +137,16 @@ async function resolveSlotNames(
   schoolId: string,
   classId: string,
   teacherId: string,
-  roomId: string,
-): Promise<{ classCode: string; teacherName: string; roomName: string }> {
-  const [row] = await tx<{ class_code: string; teacher_name: string; room_name: string }[]>`
+  roomId: string | null,
+): Promise<{ classCode: string; teacherName: string; roomName: string | null }> {
+  const [row] = await tx<{ class_code: string; teacher_name: string; room_name: string | null }[]>`
     SELECT cl.code AS class_code,
            COALESCE(u.display_name, u.email) AS teacher_name,
            r.name AS room_name
     FROM app.classes cl
     JOIN app.teachers t ON t.id = ${teacherId} AND t.school_id = ${schoolId}
     JOIN app.users u ON u.id = t.user_id AND u.school_id = ${schoolId}
-    JOIN app.rooms r ON r.id = ${roomId} AND r.school_id = ${schoolId}
+    LEFT JOIN app.rooms r ON r.id = ${roomId} AND r.school_id = ${schoolId}
     WHERE cl.id = ${classId} AND cl.school_id = ${schoolId}
   `;
   if (!row) {
@@ -159,6 +163,8 @@ async function findConflict(
   params: CreateSlotParams | UpdateSlotParams,
 ): Promise<ConflictDetail | null> {
   const isTeacher = constraint.includes("teacher");
+  // A lesson without a room (000148) cannot clash on room.
+  if (!isTeacher && !params.room_id) return null;
 
   const weekday = params.weekday!;
   const period = params.period!;
@@ -832,26 +838,45 @@ export async function copyTimetableVersion(
 // Slot queries
 // ---------------------------------------------------------------------------
 
+// A slot carries its class's grade section, so a timetable can be filtered to "Grade 10 - C" and a
+// student's or teacher's app can label each lesson without a lookup per class. LEFT JOINs: a class
+// need not have a section.
+const slotColumns = (tx: TransactionSql) => tx`
+  ts.id, ts.school_id, ts.timetable_version_id, ts.class_id, ts.teacher_id, ts.room_id,
+  cl.section_id, sec.name AS section_name, gl.name AS grade_level_name,
+  ts.weekday, ts.period, ts.created_at, ts.updated_at
+`;
+
+const slotFrom = (tx: TransactionSql) => tx`
+  FROM app.timetable_slots AS ts
+  LEFT JOIN app.classes AS cl ON cl.id = ts.class_id AND cl.school_id = ts.school_id
+  LEFT JOIN app.sections AS sec ON sec.id = cl.section_id AND sec.school_id = cl.school_id
+  LEFT JOIN app.grade_levels AS gl ON gl.id = sec.grade_level_id AND gl.school_id = sec.school_id
+`;
+
 export async function listTimetableSlots(
   tx: TransactionSql,
   schoolId: string,
   versionId: string,
   params: ListSlotsParams,
 ): Promise<{ rows: TimetableSlotRow[]; total: number }> {
+  const sectionFilter = params.section_id ? tx` AND cl.section_id = ${params.section_id}` : tx``;
+
   const [rows, countResult] = await Promise.all([
     tx<TimetableSlotRow[]>`
-      SELECT id, school_id, timetable_version_id, class_id, teacher_id, room_id,
-             weekday, period, created_at, updated_at
-      FROM app.timetable_slots
-      WHERE school_id = ${schoolId} AND timetable_version_id = ${versionId}
-      ORDER BY weekday ASC, period ASC
+      SELECT ${slotColumns(tx)}
+      ${slotFrom(tx)}
+      WHERE ts.school_id = ${schoolId} AND ts.timetable_version_id = ${versionId}
+        ${sectionFilter}
+      ORDER BY ts.weekday ASC, ts.period ASC
       LIMIT ${params.limit}
       OFFSET ${params.offset}
     `,
     tx<{ count: string }[]>`
       SELECT count(*)::int AS count
-      FROM app.timetable_slots
-      WHERE school_id = ${schoolId} AND timetable_version_id = ${versionId}
+      ${slotFrom(tx)}
+      WHERE ts.school_id = ${schoolId} AND ts.timetable_version_id = ${versionId}
+        ${sectionFilter}
     `,
   ]);
 
@@ -864,10 +889,9 @@ export async function getTimetableSlot(
   slotId: string,
 ): Promise<TimetableSlotRow | undefined> {
   const [row] = await tx<TimetableSlotRow[]>`
-    SELECT id, school_id, timetable_version_id, class_id, teacher_id, room_id,
-           weekday, period, created_at, updated_at
-    FROM app.timetable_slots
-    WHERE id = ${slotId} AND school_id = ${schoolId}
+    SELECT ${slotColumns(tx)}
+    ${slotFrom(tx)}
+    WHERE ts.id = ${slotId} AND ts.school_id = ${schoolId}
   `;
   return row;
 }
@@ -903,29 +927,31 @@ export async function createTimetableSlot(
   `;
   if (!teacher) throw new HTTPException(404, { message: "Teacher not found" });
 
-  const [room] = await tx<{ id: string }[]>`
-    SELECT id FROM app.rooms
-    WHERE id = ${params.room_id} AND school_id = ${schoolId}
-  `;
-  if (!room) throw new HTTPException(404, { message: "Room not found" });
+  // Rooms are optional (000148); one is only checked when given.
+  if (params.room_id) {
+    const [room] = await tx<{ id: string }[]>`
+      SELECT id FROM app.rooms
+      WHERE id = ${params.room_id} AND school_id = ${schoolId}
+    `;
+    if (!room) throw new HTTPException(404, { message: "Room not found" });
+  }
 
   const names = await resolveSlotNames(
     tx,
     schoolId,
     params.class_id,
     params.teacher_id,
-    params.room_id,
+    params.room_id ?? null,
   );
 
   try {
-    const [row] = await tx<TimetableSlotRow[]>`
+    const [row] = await tx<{ id: string }[]>`
       INSERT INTO app.timetable_slots
         (school_id, timetable_version_id, class_id, teacher_id, room_id, weekday, period)
       VALUES
-        (${schoolId}, ${versionId}, ${params.class_id}, ${params.teacher_id}, ${params.room_id},
+        (${schoolId}, ${versionId}, ${params.class_id}, ${params.teacher_id}, ${params.room_id ?? null},
          ${params.weekday}::smallint, ${params.period}::smallint)
-      RETURNING id, school_id, timetable_version_id, class_id, teacher_id, room_id,
-                weekday, period, created_at, updated_at
+      RETURNING id
     `;
 
     await emitAuditLog(tx, {
@@ -935,13 +961,13 @@ export async function createTimetableSlot(
       newValues: {
         class_id: params.class_id,
         teacher_id: params.teacher_id,
-        room_id: params.room_id,
+        room_id: params.room_id ?? null,
         weekday: params.weekday,
         period: params.period,
       },
     });
 
-    return row!;
+    return (await getTimetableSlot(tx, schoolId, row!.id))!;
   } catch (error) {
     if (isPgExclusionViolation(error)) {
       const msg = (error as Error).message;
@@ -1008,23 +1034,22 @@ export async function updateTimetableSlot(
   const mergedParams: UpdateSlotParams = {
     class_id: params.class_id ?? existing.class_id,
     teacher_id: params.teacher_id ?? existing.teacher_id,
-    room_id: params.room_id ?? existing.room_id,
+    room_id: params.room_id !== undefined ? params.room_id : existing.room_id,
     weekday: params.weekday ?? existing.weekday,
     period: params.period ?? existing.period,
   };
 
   try {
-    const [row] = await tx<TimetableSlotRow[]>`
+    const [row] = await tx<{ id: string }[]>`
       UPDATE app.timetable_slots
       SET class_id = ${mergedParams.class_id!},
           teacher_id = ${mergedParams.teacher_id!},
-          room_id = ${mergedParams.room_id!},
+          room_id = ${mergedParams.room_id ?? null},
           weekday = ${mergedParams.weekday!}::smallint,
           period = ${mergedParams.period!}::smallint,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ${slotId} AND school_id = ${schoolId}
-      RETURNING id, school_id, timetable_version_id, class_id, teacher_id, room_id,
-                weekday, period, created_at, updated_at
+      RETURNING id
     `;
 
     if (!row) {
@@ -1051,7 +1076,7 @@ export async function updateTimetableSlot(
       },
     });
 
-    return row;
+    return (await getTimetableSlot(tx, schoolId, slotId))!;
   } catch (error) {
     if (isPgExclusionViolation(error)) {
       const msg = (error as Error).message;
@@ -1074,7 +1099,7 @@ export async function updateTimetableSlot(
             schoolId,
             mergedParams.class_id!,
             mergedParams.teacher_id!,
-            mergedParams.room_id!,
+            mergedParams.room_id ?? null,
           );
           throwConflictError(conflict, schoolId, names.classCode);
         }

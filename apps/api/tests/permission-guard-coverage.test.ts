@@ -132,6 +132,15 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",
+  // Grades & sections (000147). Every write guarded by requirePermission(TIMETABLE_MANAGE).
+  "POST /api/academics/grade-levels",
+  "PATCH /api/academics/grade-levels/{gradeLevelId}",
+  "DELETE /api/academics/grade-levels/{gradeLevelId}",
+  "POST /api/academics/sections",
+  "PATCH /api/academics/sections/{sectionId}",
+  "DELETE /api/academics/sections/{sectionId}",
+  "POST /api/academics/sections/{sectionId}/students",
+  "DELETE /api/academics/sections/{sectionId}/students/{studentId}",
   // Timetable (ST-101). Every write guarded by requirePermission(TIMETABLE_MANAGE), method-scoped
   // with onlyMethods() where a path also serves reads.
   "POST /api/academics/timetable-versions",
@@ -455,19 +464,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/academics/years/{yearId}/terms",
   "PATCH /api/academics/terms/{termId}",
   "DELETE /api/academics/terms/{termId}",
-  // Subjects & courses (ST-099) — tenant-scoped school-level catalog data protected by
-  // requireAuth; no cross-user row-level permission to check.
-  "POST /api/academics/subjects",
-  "PATCH /api/academics/subjects/{subjectId}",
-  "DELETE /api/academics/subjects/{subjectId}",
-  "POST /api/academics/subjects/{subjectId}/courses",
-  "PATCH /api/academics/courses/{courseId}",
-  "DELETE /api/academics/courses/{courseId}",
-  // Classes & enrollments (ST-100) — tenant-scoped school-level catalog data protected by
-  // requireAuth; no cross-user row-level permission to check.
-  "POST /api/academics/classes",
-  "PATCH /api/academics/classes/{classId}",
-  "DELETE /api/academics/classes/{classId}",
+  // Subjects, courses and classes are guarded by TIMETABLE_MANAGE (000147 follow-up). Enrollments
+  // (ST-100) remain tenant-scoped requireAuth only.
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",

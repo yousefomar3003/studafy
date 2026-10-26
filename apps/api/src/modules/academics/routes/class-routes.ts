@@ -1,9 +1,12 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { createClass, deleteClass, getClass, listClasses, updateClass } from "../class-service";
@@ -153,6 +156,12 @@ export function classRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // Audit declarations
+  // Writes need timetable:manage (ORG_ADMIN, PRINCIPAL): classes are the timetable's building
+  // blocks. Reads stay open to school members, scoped by RLS.
+  const manage = requirePermission(PERMISSIONS.TIMETABLE_MANAGE);
+  routes.use("/api/academics/classes", onlyMethods(["POST"], manage));
+  routes.use("/api/academics/classes/:classId", onlyMethods(["PATCH", "DELETE"], manage));
+
   routes.use("/api/academics/classes", auditAction("insert", "classes"));
   routes.use("/api/academics/classes/:classId", auditAction("update", "classes"));
 

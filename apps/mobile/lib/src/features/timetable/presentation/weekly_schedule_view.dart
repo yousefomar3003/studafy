@@ -11,6 +11,7 @@ import '../../shell/application/shell_providers.dart';
 import '../application/weekly_schedule_providers.dart';
 import '../domain/weekly_schedule.dart';
 import 'widgets/lesson_card.dart';
+import 'widgets/schedule_section.dart';
 import 'widgets/timetable_placeholders.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 
@@ -26,10 +27,18 @@ const _timetableTabKey = 'shell.tabs.timetable';
 /// every time the Timetable tab is selected again — an admin's re-approval shows up the next
 /// time the tab is opened — as well as on pull-to-refresh.
 class WeeklyScheduleTab extends ConsumerWidget {
-  const WeeklyScheduleTab({required this.schedule, required this.audience, super.key});
+  const WeeklyScheduleTab({
+    required this.schedule,
+    required this.audience,
+    this.onSectionFilterChanged,
+    super.key,
+  });
 
   final ProviderListenable<AsyncValue<WeeklyScheduleStatus>> schedule;
   final ScheduleAudience audience;
+
+  /// See [WeeklyScheduleView.onSectionFilterChanged].
+  final ValueChanged<String?>? onSectionFilterChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -69,6 +78,7 @@ class WeeklyScheduleTab extends ConsumerWidget {
                 schedule: cached.data,
                 audience: audience,
                 onRefresh: onRefresh,
+                onSectionFilterChanged: onSectionFilterChanged,
               ),
             ),
           ],
@@ -81,12 +91,16 @@ class WeeklyScheduleTab extends ConsumerWidget {
 /// A fixed weekly class schedule: a row of day chips (the school's teaching days, in the school's
 /// order) over the selected day's lessons. No dates — the schedule is the same every week.
 /// Swiping the lesson list moves between days, following the reading direction.
+///
+/// A student's schedule is headed by its grade section ([WeeklySchedule.section]); a teacher's,
+/// given [onSectionFilterChanged], offers a section filter once they teach two or more sections.
 class WeeklyScheduleView extends ConsumerStatefulWidget {
   const WeeklyScheduleView({
     required this.schedule,
     required this.audience,
     required this.onRefresh,
     this.lessonLabels = const {},
+    this.onSectionFilterChanged,
     super.key,
   });
 
@@ -97,6 +111,10 @@ class WeeklyScheduleView extends ConsumerStatefulWidget {
   /// Pre-resolved labels by slot id, for a source that already carries every name (see
   /// [LessonCard.labels]). Slots without an entry resolve their own.
   final Map<String, LessonLabels> lessonLabels;
+
+  /// Called with a section id (null for every section) when a section filter chip is picked.
+  /// Null hides the filter — the schedule's source can't narrow by section.
+  final ValueChanged<String?>? onSectionFilterChanged;
 
   @override
   ConsumerState<WeeklyScheduleView> createState() => _WeeklyScheduleViewState();
@@ -164,6 +182,9 @@ class _WeeklyScheduleViewState extends ConsumerState<WeeklyScheduleView> {
     final theme = Theme.of(context);
     final locale = context.locale.toString();
     final schedule = widget.schedule;
+    final section = widget.audience == ScheduleAudience.student ? schedule.section : null;
+    final onSectionFilterChanged = widget.onSectionFilterChanged;
+    final showSectionFilter = onSectionFilterChanged != null && schedule.sections.length > 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -175,25 +196,42 @@ class _WeeklyScheduleViewState extends ConsumerState<WeeklyScheduleView> {
             AppSpacing.space16,
             AppSpacing.space12,
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Text(
-                  'timetable.weeklySchedule'.tr(),
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'timetable.weeklySchedule'.tr(),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Text(
+                    'timetable.lessonsPerWeek'.plural(schedule.lessonCount),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                'timetable.lessonsPerWeek'.plural(schedule.lessonCount),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
+              if (section != null) ...[
+                const SizedBox(height: AppSpacing.space4),
+                ScheduleSectionHeader(section: section),
+              ],
             ],
           ),
         ),
+        if (showSectionFilter) ...[
+          ScheduleSectionFilter(
+            sections: schedule.sections,
+            selected: schedule.sectionFilter,
+            onSelected: onSectionFilterChanged,
+          ),
+          const SizedBox(height: AppSpacing.space8),
+        ],
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),

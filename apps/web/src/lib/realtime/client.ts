@@ -130,8 +130,10 @@ export class RealtimeClient {
 
   constructor(options: RealtimeClientOptions) {
     this.options = options;
-    this.setTimer = options.setTimeoutFn ?? globalThis.setTimeout;
-    this.clearTimer = options.clearTimeoutFn ?? globalThis.clearTimeout;
+    // Bound: browsers throw "Illegal invocation" when the timer functions are called as a method of
+    // anything but the global object, which `this.setTimer(...)` would otherwise do.
+    this.setTimer = options.setTimeoutFn ?? globalThis.setTimeout.bind(globalThis);
+    this.clearTimer = options.clearTimeoutFn ?? globalThis.clearTimeout.bind(globalThis);
     this.random = options.random ?? Math.random;
     this.backoffOptions = options.backoff ?? DEFAULT_BACKOFF;
     this.maxConnectFailures = options.maxConnectFailures ?? DEFAULT_MAX_CONNECT_FAILURES;

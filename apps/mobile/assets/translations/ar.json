@@ -139,6 +139,9 @@
       "testCrash": "إرسال عطل تجريبي (للتطوير فقط)",
       "privacyPolicy": "سياسة الخصوصية",
       "signedIn": "تم تسجيل الدخول إلى ستودافي",
+      "signInSecurity": {
+        "title": "تسجيل الدخول والأمان"
+      },
       "sections": {
         "preferences": "التفضيلات",
         "account": "الحساب"
@@ -326,8 +329,14 @@
     "freeDayHint": "استمتع بيومك.",
     "period": "الحصة {period}",
     "slot": {
-      "unknownClass": "الصف",
-      "room": "قاعة {room}"
+      "unknownClass": "الصف"
+    },
+    "section": {
+      "gradeAndSection": "{grade} · الشعبة {section}",
+      "sectionOnly": "الشعبة {section}",
+      "semantics": "الصف والشعبة: {label}",
+      "filterLabel": "تصفية حسب الشعبة",
+      "all": "الكل"
     }
   },
   "materials": {

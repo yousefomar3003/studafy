@@ -56,11 +56,6 @@ export const createStudentSchema = z.object({
     .max(200, "adminPeople.validation.maxLength200"),
   middle_name: optionalTrimmed(200, "adminPeople.validation.maxLength200"),
   preferred_name: optionalTrimmed(200, "adminPeople.validation.maxLength200"),
-  email: z
-    .string()
-    .trim()
-    .min(1, "adminPeople.validation.emailRequired")
-    .email("adminPeople.validation.emailInvalid"),
   admission_number: z
     .string()
     .trim()

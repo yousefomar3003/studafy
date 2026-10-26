@@ -252,17 +252,17 @@
       "title": "تعديل الحصة",
       "description": "{{classCode}} — {{day}}، الحصة {{period}}",
       "teacher": "المعلم",
-      "room": "القاعة",
       "cancel": "إلغاء",
       "remove": "إزالة",
       "save": "حفظ التغييرات"
     },
     "unknownClass": "صف غير معروف",
     "unknownTeacher": "معلم غير معروف",
-    "unknownRoom": "قاعة غير معروفة",
+    "unknownSection": "شعبة غير معروفة",
+    "sectionLabel": "{{grade}} – {{section}}",
     "conflict": {
       "teacher": "المعلم \"{{label}}\" مُجدوَل بالفعل للصف \"{{classCode}}\" يوم {{day}}، الحصة {{period}}.",
-      "room": "القاعة \"{{label}}\" مُجدوَلة بالفعل للصف \"{{classCode}}\" يوم {{day}}، الحصة {{period}}."
+      "section": "الشعبة \"{{label}}\" لديها أيضًا الصف \"{{classCode}}\" يوم {{day}}، الحصة {{period}}. حُفظت الحصة — تأكّد من أن ذلك مقصود."
     },
     "grid": {
       "dismiss": "إغلاق",
@@ -272,7 +272,8 @@
       "noClasses": "لا توجد صفوف قابلة للجدولة في هذا الفصل الدراسي.",
       "caption": "الجدول الأسبوعي لـ {{name}}",
       "period": "الحصة",
-      "slotLabel": "{{classCode}}، {{day}} الحصة {{period}}، يدرّسها {{teacher}} في {{room}}. فعّلها للتعديل.",
+      "slotLabel": "{{classCode}}، {{day}} الحصة {{period}}، يدرّسها {{teacher}}. فعّلها للتعديل.",
+      "slotLabelSection": "{{classCode}}، {{day}} الحصة {{period}}، الشعبة {{section}}، يدرّسها {{teacher}}. فعّلها للتعديل.",
       "placeLabel": "ضع {{code}} يوم {{day}} الحصة {{period}}",
       "addLabel": "إضافة حصة يوم {{day}} الحصة {{period}}"
     },
@@ -327,8 +328,10 @@
       "emptyManage": "أنشئ الجدول وأضف الحصص، ثم انشره للمعلمين والطلاب.",
       "emptyView": "لم يُنشر جدول هذا الفصل الدراسي بعد.",
       "schoolWeek": "أيام الدراسة",
-      "classFilter": "الصف",
-      "allClasses": "كل الصفوف",
+      "gradeFilter": "الصف",
+      "allGrades": "كل الصفوف",
+      "sectionFilter": "الشعبة",
+      "allSections": "كل الشعب",
       "teacherFilter": "المعلم",
       "allTeachers": "كل المعلمين",
       "summary_zero": "لا توجد حصص أسبوعيًا · {{classes}} صف",
@@ -345,14 +348,12 @@
         "day": "اليوم (1 = الاثنين … 7 = الأحد)",
         "period": "الحصة",
         "class": "رمز الصف",
-        "teacher": "الرقم الوظيفي للمعلم",
-        "room": "رمز القاعة"
+        "teacher": "الرقم الوظيفي للمعلم"
       },
       "dayNotInWeek": "اليوم {{value}} ليس يومًا دراسيًا.",
       "periodRange": "يجب أن تكون الحصة بين 1 و{{max}}.",
       "unknownClass": "لا يوجد صف بالرمز \"{{value}}\" في هذا الفصل الدراسي.",
-      "unknownTeacher": "لا يوجد معلم بالرقم الوظيفي \"{{value}}\".",
-      "unknownRoom": "لا توجد قاعة بالرمز \"{{value}}\"."
+      "unknownTeacher": "لا يوجد معلم بالرقم الوظيفي \"{{value}}\"."
     }
   },
   "home": {

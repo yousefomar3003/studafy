@@ -355,7 +355,7 @@ FamilyStudentFinance financeSection({
     );
 
 /// One slot of `GET /api/reports/children/{id}/timetable`. [courseName] null means the class has
-/// no course; teacher / room are omitted when their names are null.
+/// no course; teacher / room are omitted when their names are null (the app ignores the room).
 Map<String, Object?> childTimetableSlotJson({
   String id = 'slot-1',
   int weekday = DateTime.sunday,

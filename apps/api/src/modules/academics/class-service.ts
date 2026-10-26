@@ -4,6 +4,8 @@ import { HTTPException } from "hono/http-exception";
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
+import { enrollSectionStudents } from "./section-service";
+
 import type { ClassStatus } from "./schemas";
 import type { TransactionSql } from "postgres";
 
@@ -18,7 +20,8 @@ export interface ClassRow {
   academic_year_id: string;
   term_id: string;
   lead_teacher_id: string;
-  room_id: string;
+  room_id: string | null;
+  section_id: string | null;
   code: string;
   capacity: number | null;
   status: ClassStatus;
@@ -33,6 +36,7 @@ export interface ListClassesParams {
   course_id?: string;
   term_id?: string;
   lead_teacher_id?: string;
+  section_id?: string;
 }
 
 export interface CreateClassParams {
@@ -40,7 +44,8 @@ export interface CreateClassParams {
   academic_year_id: string;
   term_id: string;
   lead_teacher_id: string;
-  room_id: string;
+  room_id?: string | null;
+  section_id?: string | null;
   code: string;
   capacity?: number | null;
   status?: string;
@@ -48,7 +53,8 @@ export interface CreateClassParams {
 
 export interface UpdateClassParams {
   lead_teacher_id?: string;
-  room_id?: string;
+  room_id?: string | null;
+  section_id?: string | null;
   code?: string;
   capacity?: number | null;
   status?: string;
@@ -57,6 +63,23 @@ export interface UpdateClassParams {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// A class can only be taught to a section of its own academic year (fk_classes_section enforces the
+// same; checking first answers 404 instead of a foreign-key violation).
+async function assertSectionInYear(
+  tx: TransactionSql,
+  schoolId: string,
+  sectionId: string,
+  academicYearId: string,
+): Promise<void> {
+  const [section] = await tx<{ id: string }[]>`
+    SELECT id FROM app.sections
+    WHERE id = ${sectionId} AND school_id = ${schoolId} AND academic_year_id = ${academicYearId}
+  `;
+  if (!section) {
+    throw new HTTPException(404, { message: "Section not found in this academic year" });
+  }
+}
 
 async function countActiveEnrollments(
   tx: TransactionSql,
@@ -89,11 +112,12 @@ export async function listClasses(
   const teacherFilter = params.lead_teacher_id
     ? tx` AND cl.lead_teacher_id = ${params.lead_teacher_id}`
     : tx``;
+  const sectionFilter = params.section_id ? tx` AND cl.section_id = ${params.section_id}` : tx``;
 
   const [rows, countResult] = await Promise.all([
     tx<ClassRow[]>`
       SELECT cl.id, cl.school_id, cl.course_id, cl.academic_year_id, cl.term_id,
-             cl.lead_teacher_id, cl.room_id, cl.code, cl.capacity, cl.status,
+             cl.lead_teacher_id, cl.room_id, cl.section_id, cl.code, cl.capacity, cl.status,
              cl.created_at, cl.updated_at
       FROM app.classes AS cl
       WHERE cl.school_id = ${schoolId}
@@ -101,6 +125,7 @@ export async function listClasses(
         ${courseFilter}
         ${termFilter}
         ${teacherFilter}
+        ${sectionFilter}
       ORDER BY cl.code ASC
       LIMIT ${params.limit}
       OFFSET ${params.offset}
@@ -113,6 +138,7 @@ export async function listClasses(
         ${courseFilter}
         ${termFilter}
         ${teacherFilter}
+        ${sectionFilter}
     `,
   ]);
 
@@ -126,7 +152,7 @@ export async function getClass(
 ): Promise<ClassRow | undefined> {
   const [row] = await tx<ClassRow[]>`
     SELECT id, school_id, course_id, academic_year_id, term_id,
-           lead_teacher_id, room_id, code, capacity, status,
+           lead_teacher_id, room_id, section_id, code, capacity, status,
            created_at, updated_at
     FROM app.classes
     WHERE id = ${classId} AND school_id = ${schoolId}
@@ -172,31 +198,39 @@ export async function createClass(
     throw new HTTPException(404, { message: "Teacher not found" });
   }
 
-  const [room] = await tx<{ id: string }[]>`
-    SELECT id FROM app.rooms
-    WHERE id = ${params.room_id} AND school_id = ${schoolId}
-  `;
-  if (!room) {
-    throw new HTTPException(404, { message: "Room not found" });
+  // Rooms are optional (000148); one is only checked when given.
+  if (params.room_id) {
+    const [room] = await tx<{ id: string }[]>`
+      SELECT id FROM app.rooms
+      WHERE id = ${params.room_id} AND school_id = ${schoolId}
+    `;
+    if (!room) {
+      throw new HTTPException(404, { message: "Room not found" });
+    }
+  }
+
+  if (params.section_id) {
+    await assertSectionInYear(tx, schoolId, params.section_id, params.academic_year_id);
   }
 
   const [row] = await tx<ClassRow[]>`
     INSERT INTO app.classes (
       school_id, course_id, academic_year_id, term_id,
-      lead_teacher_id, room_id, code, capacity, status
+      lead_teacher_id, room_id, section_id, code, capacity, status
     ) VALUES (
       ${schoolId},
       ${params.course_id},
       ${params.academic_year_id},
       ${params.term_id},
       ${params.lead_teacher_id},
-      ${params.room_id},
+      ${params.room_id ?? null},
+      ${params.section_id ?? null},
       ${params.code},
       ${params.capacity ?? null},
       ${params.status ?? "planned"}::app.class_status
     )
     RETURNING id, school_id, course_id, academic_year_id, term_id,
-              lead_teacher_id, room_id, code, capacity, status,
+              lead_teacher_id, room_id, section_id, code, capacity, status,
               created_at, updated_at
   `;
 
@@ -204,8 +238,12 @@ export async function createClass(
     action: "insert",
     targetTable: "classes",
     targetId: row!.id,
-    newValues: { code: params.code, course_id: params.course_id },
+    newValues: { code: params.code, course_id: params.course_id, section_id: row!.section_id },
   });
+
+  if (row!.section_id) {
+    await enrollSectionStudents(tx, schoolId, row!.section_id, [row!.id]);
+  }
 
   return row!;
 }
@@ -241,6 +279,10 @@ export async function updateClass(
     }
   }
 
+  if (params.section_id) {
+    await assertSectionInYear(tx, schoolId, params.section_id, existing.academic_year_id);
+  }
+
   if (params.capacity !== undefined && params.capacity !== null) {
     const enrolled = await countActiveEnrollments(tx, schoolId, classId);
     if (enrolled > params.capacity) {
@@ -253,11 +295,20 @@ export async function updateClass(
   }
 
   const capacityExplicit = Object.prototype.hasOwnProperty.call(params, "capacity");
+  const sectionExplicit = Object.prototype.hasOwnProperty.call(params, "section_id");
+  const roomExplicit = Object.prototype.hasOwnProperty.call(params, "room_id");
 
   const [row] = await tx<ClassRow[]>`
     UPDATE app.classes
     SET lead_teacher_id = COALESCE(${params.lead_teacher_id ?? null}, lead_teacher_id),
-        room_id = COALESCE(${params.room_id ?? null}, room_id),
+        room_id = CASE
+          WHEN ${roomExplicit} THEN ${params.room_id ?? null}::uuid
+          ELSE room_id
+        END,
+        section_id = CASE
+          WHEN ${sectionExplicit} THEN ${params.section_id ?? null}::uuid
+          ELSE section_id
+        END,
         code = COALESCE(${params.code ?? null}, code),
         capacity = CASE
           WHEN ${capacityExplicit} THEN ${params.capacity ?? null}::int
@@ -267,7 +318,7 @@ export async function updateClass(
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${classId} AND school_id = ${schoolId}
     RETURNING id, school_id, course_id, academic_year_id, term_id,
-              lead_teacher_id, room_id, code, capacity, status,
+              lead_teacher_id, room_id, section_id, code, capacity, status,
               created_at, updated_at
   `;
 
@@ -279,9 +330,19 @@ export async function updateClass(
     action: "update",
     targetTable: "classes",
     targetId: classId,
-    oldValues: { capacity: existing.capacity, status: existing.status },
+    oldValues: {
+      capacity: existing.capacity,
+      status: existing.status,
+      section_id: existing.section_id,
+    },
     newValues: { ...params },
   });
+
+  // Moving a class to a section enrolls that section's students. Students already enrolled stay,
+  // whichever section they came from: un-enrolling is a deliberate act, not a side effect.
+  if (row.section_id && row.section_id !== existing.section_id) {
+    await enrollSectionStudents(tx, schoolId, row.section_id, [row.id]);
+  }
 
   return row;
 }
