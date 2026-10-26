@@ -48,8 +48,20 @@ three; it goes in `apps/mobile/android/app/google-services.json`. Without it the
 The file is gitignored because the repository is public. Each developer downloads it; CI writes it
 from the **`GOOGLE_SERVICES_JSON`** repository secret (the file's contents) in every Android build job
 of `mobile-release.yml` and `mobile-integration.yml`, and fails with a clear error when the secret is
-missing. iOS needs `GoogleService-Info.plist` and an APNs key from an Apple Developer account; not set
-up yet.
+missing.
+
+iOS (set up 2026-10-26):
+
+- Firebase iOS app `com.studafy.studafyMobile` → **GoogleService-Info.plist**, also gitignored. CI
+  writes it from the **`GOOGLE_SERVICE_INFO_PLIST`** secret and adds it to the Runner target on the
+  runner's copy (`install_google_service_info` in `fastlane/Fastfile`); a store build fails without it.
+  To build on a Mac, download it into `apps/mobile/ios/Runner/` and add it to the Runner target once.
+- An **APNs auth key** (Apple Developer → Keys, "Studafy Push", Sandbox & Production, team scoped)
+  uploaded to Firebase → Project settings → **Cloud Messaging** → Apple app configuration, with its
+  Key ID and the team ID. One key serves every app in the team; it does not expire.
+- The app declares push in `ios/Runner/Runner.entitlements` (`aps-environment` development, for
+  Debug/Profile) and `RunnerRelease.entitlements` (production, for Release), plus the
+  `remote-notification` background mode in `Info.plist`.
 
 ## Dry run, on purpose only
 

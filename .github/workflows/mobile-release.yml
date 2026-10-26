@@ -133,11 +133,13 @@ jobs:
           APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: |
           missing=()
           [ -n "$APP_STORE_CONNECT_KEY_CONTENT" ] || missing+=("APP_STORE_CONNECT_KEY_CONTENT")
           [ -n "$MATCH_GIT_URL" ] || missing+=("MATCH_GIT_URL")
           [ -n "$MATCH_PASSWORD" ] || missing+=("MATCH_PASSWORD")
+          [ -n "$GOOGLE_SERVICE_INFO_PLIST" ] || missing+=("GOOGLE_SERVICE_INFO_PLIST")
           if [ ${#missing[@]} -ne 0 ]; then
             echo "::error::mobile release needs these repository secrets: ${missing[*]} — see docs/runbooks/mobile-release.md#secrets"
             exit 1
@@ -174,6 +176,7 @@ jobs:
           APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: |
           export MOBILE_BUILD_NUMBER="$(git rev-list --count HEAD)"
           bundle exec fastlane ios beta
@@ -270,11 +273,13 @@ jobs:
           APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: |
           missing=()
           [ -n "$APP_STORE_CONNECT_KEY_CONTENT" ] || missing+=("APP_STORE_CONNECT_KEY_CONTENT")
           [ -n "$MATCH_GIT_URL" ] || missing+=("MATCH_GIT_URL")
           [ -n "$MATCH_PASSWORD" ] || missing+=("MATCH_PASSWORD")
+          [ -n "$GOOGLE_SERVICE_INFO_PLIST" ] || missing+=("GOOGLE_SERVICE_INFO_PLIST")
           if [ ${#missing[@]} -ne 0 ]; then
             echo "::error::mobile release needs these repository secrets: ${missing[*]} — see docs/runbooks/mobile-release.md#secrets"
             exit 1
@@ -312,6 +317,7 @@ jobs:
           APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: |
           export MOBILE_BUILD_NUMBER="$(git rev-list --count HEAD)"
           bundle exec fastlane ios release

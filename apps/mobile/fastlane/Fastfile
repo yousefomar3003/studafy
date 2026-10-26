@@ -144,7 +144,29 @@ def ios_export_options_plist
   path
 end
 
+# GoogleService-Info.plist is gitignored (public repository), so a store build writes it from the
+# GOOGLE_SERVICE_INFO_PLIST secret and adds it to the Runner target's resources on this working
+# copy — the project has no reference to it, and without one the file never reaches the app
+# bundle. Missing is fatal: AppDelegate would quietly skip Firebase, and a store build without it
+# ships with no push and no crash reporting.
+def install_google_service_info
+  content = ENV["GOOGLE_SERVICE_INFO_PLIST"].to_s
+  UI.user_error!("GOOGLE_SERVICE_INFO_PLIST is not set — see docs/runbooks/fcm-setup.md") if content.strip.empty?
+  File.write(File.join(MOBILE_DIR, "ios/Runner/GoogleService-Info.plist"), content)
+
+  require "xcodeproj"
+  project = Xcodeproj::Project.open(File.join(MOBILE_DIR, "ios/Runner.xcodeproj"))
+  target = project.targets.find { |t| t.name == "Runner" } || UI.user_error!("no Runner target")
+  resources = target.resources_build_phase
+  return if resources.files_references.any? { |ref| ref.path.to_s.end_with?("GoogleService-Info.plist") }
+
+  group = project.main_group.find_subpath("Runner", false) || UI.user_error!("no Runner group")
+  resources.add_file_reference(group.new_reference("GoogleService-Info.plist"))
+  project.save
+end
+
 def build_ios_ipa
+  install_google_service_info
   # CocoaPods (ios/Podfile), not Swift Package Manager: resolving FlutterFire's packages through
   # SPM hung for 80+ minutes on a CI runner fetching the github.com/firebase/flutterfire repo.
   # Set before `pub get`, which is when Flutter wires plugins into the Xcode project.
