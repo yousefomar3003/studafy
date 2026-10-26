@@ -10,7 +10,7 @@ import { fetchArAgingReport } from "./queries";
 import { ReportTable } from "./ReportTable";
 import { StudentPickerField } from "./StudentPickerField";
 
-import type { StudentProfile } from "../fees/queries";
+import type { StudentIdentity } from "../students/FinanceStudentPicker";
 import type { FormEvent } from "react";
 
 /** Accounts Receivable Summary, aged into 30/60/90-day buckets. No required filters — an empty run
@@ -19,7 +19,7 @@ export default function ArAgingReportPanel() {
   const { t } = useTranslation();
   const reportLabel = t(REPORT_TYPE_LABEL_KEYS.ar_aging);
   const [reportDate, setReportDate] = useState("");
-  const [student, setStudent] = useState<StudentProfile | null>(null);
+  const [student, setStudent] = useState<StudentIdentity | null>(null);
   const [runId, setRunId] = useState(0);
 
   const query = useQuery({

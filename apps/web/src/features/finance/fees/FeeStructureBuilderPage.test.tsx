@@ -50,6 +50,31 @@ function getMockImplementation(
       data: { fee_structures: state.feeStructures, total: state.feeStructures.length },
     });
   }
+  if (path === "/api/finance/students") {
+    return Promise.resolve<unknown>({
+      data: { students: [{ id: "student-1", name: "Lina Haddad", admission_number: "A-100" }] },
+    });
+  }
+  if (path === "/api/finance/scholarship-awards") {
+    return Promise.resolve<unknown>({
+      data: {
+        awards: [
+          {
+            id: "award-1",
+            scholarship_name: "Merit",
+            scholarship_is_active: true,
+            discount_type: "percentage",
+            percentage: "25.00",
+            amount: null,
+            currency: null,
+            fee_category: "Tuition",
+            status: "approved",
+          },
+        ],
+        total: 1,
+      },
+    });
+  }
   throw new Error(`Unhandled GET ${path}`);
 }
 
@@ -79,9 +104,12 @@ function postMockImplementation(path: string, init?: { body?: Record<string, unk
 const getMock = mock(getMockImplementation);
 const postMock = mock(postMockImplementation);
 const patchMock = mock((_path: string, _init?: unknown) => Promise.resolve<unknown>({ data: {} }));
+const putMock = mock((_path: string, _init?: unknown) =>
+  Promise.resolve<unknown>({ data: { students: [] } }),
+);
 
 mock.module("../../../lib/api", () => ({
-  api: { GET: getMock, POST: postMock, PATCH: patchMock },
+  api: { GET: getMock, POST: postMock, PATCH: patchMock, PUT: putMock },
 }));
 
 const loadPage = async (): Promise<ComponentType> =>
@@ -188,5 +216,39 @@ describe("FeeStructureBuilderPage", () => {
     expect(postMock.mock.calls.some(([path]) => path === "/api/finance/fee-structures")).toBe(
       false,
     );
+  });
+
+  test("picking a student names the structure, previews their scholarships, and saves them", async () => {
+    await renderAsFinance(await loadPage());
+    await screen.findByText("No fee structures yet for this filter.");
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Student (optional)" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Lina Haddad" }));
+
+    // The structure is named after its student.
+    expect((screen.getByLabelText("Title", { exact: false }) as HTMLInputElement).value).toBe(
+      "Lina Haddad",
+    );
+
+    fireEvent.change(screen.getByLabelText("Fee category", { exact: false }), {
+      target: { value: "Tuition" },
+    });
+    fireEvent.change(screen.getByLabelText("Amount", { exact: false }), {
+      target: { value: "1000" },
+    });
+
+    // Their 25% Tuition scholarship comes off the preview.
+    const discountRow = (await screen.findByText("Scholarships (Merit)")).closest("tr");
+    expect(discountRow?.textContent).toContain("250.000 JOD");
+    const studentTotal = screen.getByText("Total for Lina Haddad").closest("tr");
+    expect(studentTotal?.textContent).toContain("750.000 JOD");
+
+    fireEvent.click(screen.getByRole("button", { name: "Create fee structure" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    expect(putMock).toHaveBeenCalledWith("/api/finance/fee-structures/{feeStructureId}/students", {
+      params: { path: { feeStructureId: "FS-2026-0001" } },
+      body: { student_ids: ["student-1"] },
+    });
   });
 });

@@ -4,7 +4,6 @@ import type { components } from "@studafy/api-client";
 
 export type FeeStructure = components["schemas"]["FeeStructure"];
 export type AcademicYear = components["schemas"]["AcademicYear"];
-export type StudentProfile = components["schemas"]["StudentProfile"];
 export type CreateFeeStructureBody = components["schemas"]["CreateFeeStructureBody"];
 export type UpdateFeeStructureBody = components["schemas"]["UpdateFeeStructureBody"];
 
@@ -40,10 +39,6 @@ export function feeStructuresQueryKey(academicYearId: string) {
   return ["finance", "fee-structures", academicYearId] as const;
 }
 export const ACADEMIC_YEARS_KEY = ["finance", "fee-structures", "academic-years"] as const;
-export function studentSearchQueryKey(search: string) {
-  return ["finance", "fee-structures", "student-search", search] as const;
-}
-
 // ---------------------------------------------------------------------------
 // Fee structures
 // ---------------------------------------------------------------------------
@@ -78,25 +73,4 @@ export async function fetchAcademicYears(): Promise<AcademicYear[]> {
     });
     return { rows: (data?.academic_years ?? []) as AcademicYear[], total: data?.total ?? 0 };
   });
-}
-
-// ---------------------------------------------------------------------------
-// Student search — backs the finance reports' student picker, same search-as-you-type shape as
-// `admin/audit/ActorFilterField`'s actor picker (there is no combobox primitive in `@studafy/ui`).
-// ---------------------------------------------------------------------------
-
-const STUDENT_SEARCH_LIMIT = 10;
-
-export async function searchStudents(search: string): Promise<StudentProfile[]> {
-  if (!search.trim()) return [];
-  const { data } = await api.GET("/api/students", {
-    params: { query: { search: search.trim(), limit: STUDENT_SEARCH_LIMIT } },
-  });
-  return (data?.students ?? []) as StudentProfile[];
-}
-
-export function studentDisplayName(student: StudentProfile): string {
-  return (
-    [student.first_name, student.last_name].filter(Boolean).join(" ") || student.admission_number
-  );
 }

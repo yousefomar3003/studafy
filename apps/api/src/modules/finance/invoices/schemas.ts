@@ -135,6 +135,20 @@ export const createInvoiceBatchBodySchema = z
     target_class_ids: z.array(uuidSchema).min(1).max(500).optional().openapi({
       description: "Limit to these classes; omitted = every student. Capped at 5,000 students.",
     }),
+    target_student_ids: z
+      .array(uuidSchema)
+      .min(1)
+      .max(500)
+      .optional()
+      .openapi({
+        description:
+          "Bill exactly these students instead (each must be enrolled); not combinable with " +
+          "`target_class_ids`.",
+      }),
+  })
+  .refine((body) => !(body.target_class_ids && body.target_student_ids), {
+    message: "Target classes or students, not both",
+    path: ["target_student_ids"],
   })
   .openapi("CreateInvoiceBatchBody");
 

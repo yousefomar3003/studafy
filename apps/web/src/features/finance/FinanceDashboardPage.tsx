@@ -33,8 +33,9 @@ import "./finance-dashboard.css";
  *
  * Day-to-day finance work belongs to the FINANCE role, so only it gets the full set of management
  * links. Everyone else who reaches this page (school and super admins) gets a read-only overview:
- * the tiles, the reports, and refunds, the last kept because approving a refund is the admin's
- * second sign-off (`billing:refund`, which FINANCE does not hold). This is a UX split, not an
+ * the tiles, the reports, refunds and scholarships, the last two kept because approving a refund or
+ * a scholarship award is the admin's sign-off (`billing:refund`, `billing:approveScholarship`, which
+ * FINANCE does not hold). This is a UX split, not an
  * authorization boundary — both roles hold the same `billing:*` permissions and the API is unchanged.
  */
 const FINANCE_LINKS = [
@@ -42,6 +43,7 @@ const FINANCE_LINKS = [
   { key: "invoices", to: "/portal/finance/invoices", managementOnly: true },
   { key: "payments", to: "/portal/finance/payments", managementOnly: true },
   { key: "refunds", to: "/portal/finance/adjustments/refunds", managementOnly: false },
+  { key: "scholarships", to: "/portal/finance/scholarships", managementOnly: false },
   { key: "reports", to: "/portal/finance/reports", managementOnly: false },
   { key: "expenses", to: "/portal/finance/expenses", managementOnly: true },
 ] as const;

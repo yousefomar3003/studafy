@@ -81,6 +81,16 @@ const getMock = mock((path: string) => {
   if (path === "/api/finance/invoices/batches/{batchId}/items") {
     return Promise.resolve({ data: ITEMS_RESPONSE });
   }
+  if (path === "/api/finance/students") {
+    return Promise.resolve({
+      data: {
+        students: [
+          { id: "student-1", name: "Layla Haddad", admission_number: "ADM-001" },
+          { id: "student-2", name: "Omar Saleh", admission_number: "ADM-002" },
+        ],
+      },
+    });
+  }
   return Promise.resolve({ data: undefined });
 });
 
@@ -95,12 +105,12 @@ mock.module("../../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }
 
 const loadPage = async (): Promise<ComponentType> => (await import("./InvoiceBatchPage")).default;
 
-function renderPage(Page: ComponentType) {
+function renderPage(Page: ComponentType, url = "/portal/finance/invoices/batches/new") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[url]}>
           <Page />
         </MemoryRouter>
       </ToastProvider>
@@ -145,5 +155,33 @@ describe("InvoiceBatchPage", () => {
     await screen.findByText("Layla Haddad");
     await screen.findByText("ACC-SINV-2026-00001");
     expect(screen.getByRole("button", { name: "Start another batch" })).toBeTruthy();
+  });
+
+  test("bills hand-picked students, with the structure preselected from the builder's link", async () => {
+    renderPage(await loadPage(), "/portal/finance/invoices/batches/new?feeStructure=FS-2026-0001");
+
+    // Preselected: the select already shows the structure.
+    expect((await screen.findByRole("combobox", { name: "Fee structure" })).textContent).toContain(
+      "Grade 5 Fees (1000.000 JOD)",
+    );
+    fireEvent.change(screen.getByLabelText("Period title"), { target: { value: "Term 2" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Specific students" }));
+
+    // Open the list and pick two students; typing a name narrows the list.
+    const field = screen.getByRole("combobox", { name: "Students to bill" });
+    fireEvent.click(field);
+    fireEvent.click(await screen.findByRole("option", { name: "Layla Haddad" }));
+    fireEvent.change(field, { target: { value: "Omar" } });
+    fireEvent.click(await screen.findByRole("option", { name: "Omar Saleh" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Start batch" }));
+
+    await screen.findByText(/Completed/);
+    const [, init] = postMock.mock.calls[0] as [string, { body: Record<string, unknown> }];
+    expect(init.body).toMatchObject({
+      fee_structure_erpnext_name: "FS-2026-0001",
+      period_title: "Term 2",
+      target_student_ids: ["student-1", "student-2"],
+    });
   });
 });

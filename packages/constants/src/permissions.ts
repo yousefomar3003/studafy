@@ -89,6 +89,9 @@ export const PERMISSIONS = {
   BILLING_UPDATE: "billing:update",
   BILLING_REFUND: "billing:refund",
   BILLING_VIEW_INVOICES: "billing:viewInvoices",
+  // Approving, rejecting and revoking a student's scholarship award. Finance requests an award with
+  // `billing:update`; only school leadership (ORG_ADMIN) decides it, the same split as refunds.
+  BILLING_APPROVE_SCHOLARSHIP: "billing:approveScholarship",
 
   REPORT_READ: "report:read",
   REPORT_EXPORT: "report:export",

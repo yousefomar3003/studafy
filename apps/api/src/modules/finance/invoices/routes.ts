@@ -8,6 +8,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission, requirePermissionIn } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { resolveBillableStudentIds, withStudentIdentityTx } from "../students/service";
 
 import {
   createInvoiceBatchBodySchema,
@@ -263,12 +264,22 @@ export function financeInvoiceRoutes(
     const log = c.get("log");
     const body = c.req.valid("json");
 
+    // Resolved outside the user's transaction: a FINANCE user cannot see app.students under its
+    // role-scope policy, so resolving there billed nobody ("No students matched").
+    const studentIds = await withStudentIdentityTx(database, auth.schoolId, (tx) =>
+      resolveBillableStudentIds(tx, auth.schoolId, {
+        classIds: body.target_class_ids,
+        studentIds: body.target_student_ids,
+      }),
+    );
+
     const batch = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const created = await createInvoiceBatch(tx, auth.schoolId, auth.userId, {
         fee_structure_erpnext_name: body.fee_structure_erpnext_name,
         period_title: body.period_title,
         due_date: body.due_date,
         target_class_ids: body.target_class_ids,
+        student_ids: studentIds,
       });
 
       await emitAuditLog(tx, {

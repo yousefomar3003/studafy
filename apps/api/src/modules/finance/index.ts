@@ -1,4 +1,5 @@
 export { feeStructureRoutes } from "./fee-structures/routes";
+export { feeStructureStudentRoutes } from "./fee-structures/student-routes";
 export { financeInvoiceRoutes } from "./invoices/routes";
 export { expenseRoutes } from "./expenses/routes";
 export { paymentRoutes } from "./payments/routes";
@@ -6,6 +7,8 @@ export { onlineFeePaymentRoutes } from "./online-payments/routes";
 export { settleOnlineFeePayment } from "./online-payments/service";
 export { paymentWebhookRoutes } from "./webhooks/payment-confirmed";
 export { refundRoutes } from "./refunds/routes";
+export { scholarshipRoutes } from "./scholarships/routes";
+export { financeStudentRoutes } from "./students/routes";
 export { refundWebhookRoutes } from "./webhooks/refund-processed";
 export { installmentRoutes } from "./installments/routes";
 export { reconciliationRoutes } from "./jobs/reconciliation.routes";

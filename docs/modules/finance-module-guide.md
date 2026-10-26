@@ -233,10 +233,27 @@ the daily reconciliation all work. What each school's site needs is set up by
   Schedule, Fee Structure) posts submitted documents to `POST /erpnext/webhooks`, with the school id
   stamped into the body and signed with `ERPNEXT_WEBHOOK_SECRET` (Frappe's base64
   `X-Frappe-Webhook-Signature`; the API also accepts the hex `X-ERPNext-Signature`).
-- **Scholarship Award.** Neither ERPNext nor Education defines the doctype the scholarships module
-  records confirmed awards in, so each site gets it as a custom doctype.
 - **Reconciliation.** `POST /api/finance/reconciliation/run` is called daily at 02:30 UTC by the
   workers (`queues/billing/finance-reconciliation.ts`) with `RECONCILIATION_API_KEY`.
+
+### Scholarships
+
+Scholarships are Studafy's own data (000149: `app.scholarships`, `app.scholarship_awards`), not an
+ERPNext doctype; the earlier design that recorded confirmed awards in a custom "Scholarship Award"
+doctype (000066) is retired and its tables are no longer read. Finance (`billing:update`) creates
+scholarships and requests awards under `/api/finance/scholarships` and
+`/api/finance/scholarship-awards`; only the school admin (`billing:approveScholarship`, ORG_ADMIN)
+approves, rejects or revokes them.
+
+ERPNext sees a scholarship only as the Sales Invoice's own discount: when the billing worker generates
+an invoice it totals the student's approved awards of active scholarships
+(`queues/billing/scholarship-discount.ts`) and posts that as `discount_amount` with
+`apply_discount_on: "Net Total"`, so ERPNext's grand total, ledger and outstanding amount include it.
+Approving or revoking an award never touches an issued invoice.
+
+FINANCE holds no `student:read`, and `app.students`' role-scope policy hides every student from it,
+so award reads and the student picker run through `withStudentIdentityTx`: `studafy_admin` with tenant
+isolation armed, selecting identity columns (name, admission number) only.
 
 ### Expenses
 

@@ -44,3 +44,29 @@ export function useUpdateFeeStructure() {
     onSuccess: () => invalidateFeeStructureLists(queryClient),
   });
 }
+
+/** Replaces the students a structure is for (Studafy's own list, editable even once submitted). */
+export function useSaveFeeStructureStudents() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      feeStructureId,
+      studentIds,
+    }: {
+      feeStructureId: string;
+      studentIds: string[];
+    }) => {
+      const { data } = await api.PUT("/api/finance/fee-structures/{feeStructureId}/students", {
+        params: { path: { feeStructureId } },
+        body: { student_ids: studentIds },
+      });
+      if (!data) throw new Error("Saving the structure's students returned no data.");
+      return data.students;
+    },
+    onSuccess: (_students, { feeStructureId }) =>
+      queryClient.invalidateQueries({
+        queryKey: ["finance", "fee-structures", feeStructureId, "students"],
+      }),
+  });
+}

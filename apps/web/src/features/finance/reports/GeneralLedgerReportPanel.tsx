@@ -10,7 +10,7 @@ import { fetchGeneralLedgerReport } from "./queries";
 import { ReportTable } from "./ReportTable";
 import { StudentPickerField } from "./StudentPickerField";
 
-import type { StudentProfile } from "../fees/queries";
+import type { StudentIdentity } from "../students/FinanceStudentPicker";
 import type { FormEvent } from "react";
 
 /** ERPNext's General Ledger, filtered to a date range that's required (there is no useful "every
@@ -23,7 +23,7 @@ export default function GeneralLedgerReportPanel() {
   const [account, setAccount] = useState("");
   const [voucherNo, setVoucherNo] = useState("");
   const [voucherType, setVoucherType] = useState("");
-  const [student, setStudent] = useState<StudentProfile | null>(null);
+  const [student, setStudent] = useState<StudentIdentity | null>(null);
   const [runId, setRunId] = useState(0);
 
   const canRun = fromDate !== "" && toDate !== "";

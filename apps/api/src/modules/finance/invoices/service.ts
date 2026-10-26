@@ -99,6 +99,8 @@ export interface CreateInvoiceBatchParams {
   period_title: string;
   due_date?: string;
   target_class_ids?: string[];
+  /** Already resolved by the caller with `resolveBillableStudentIds` (finance/students/service.ts). */
+  student_ids: string[];
 }
 
 const MAX_BATCH_TARGET_STUDENTS = 5000;
@@ -302,37 +304,6 @@ export async function getInvoiceDetail(
 // Batch generation
 // ---------------------------------------------------------------------------
 
-/**
- * Resolve the target student ids for a batch, without the broken `class_id`/`grade_id` filter the
- * worker's old inline query assumed existed on `app.students` (it never did — class membership
- * lives in `app.enrollments`; see migration 000009). Only actively `enrolled` students, and only
- * students actively enrolled in one of the given classes when `classIds` is provided.
- */
-async function resolveTargetStudentIds(
-  tx: TransactionSql,
-  schoolId: string,
-  classIds: string[] | undefined,
-): Promise<string[]> {
-  if (classIds && classIds.length > 0) {
-    const rows = await tx<{ id: string }[]>`
-      SELECT DISTINCT s.id
-      FROM app.students s
-      JOIN app.enrollments e
-        ON e.student_id = s.id AND e.school_id = s.school_id AND e.status = 'active'
-      WHERE s.school_id = ${schoolId}::uuid
-        AND s.status = 'enrolled'
-        AND e.class_id = ANY(${classIds}::uuid[])
-    `;
-    return rows.map((r) => r.id);
-  }
-
-  const rows = await tx<{ id: string }[]>`
-    SELECT id FROM app.students
-    WHERE school_id = ${schoolId}::uuid AND status = 'enrolled'
-  `;
-  return rows.map((r) => r.id);
-}
-
 function parseBatchRow(row: Record<string, unknown>): InvoiceBatchRow {
   return {
     id: row.id as string,
@@ -368,7 +339,7 @@ const BATCH_COLUMNS = `
 `;
 
 /**
- * Create a batch generation run: resolves the target students, inserts the `invoice_batches`
+ * Create a batch generation run for the already-resolved target students: inserts the `invoice_batches`
  * header, one `invoice_batch_target_classes` row per targeted class (if any), and one `pending`
  * `invoice_batch_items` row per student, then returns the batch. Does not enqueue the worker job —
  * the route does that after this transaction commits, so a job is never dispatched for a batch
@@ -380,7 +351,7 @@ export async function createInvoiceBatch(
   userId: string,
   params: CreateInvoiceBatchParams,
 ): Promise<InvoiceBatchRow> {
-  const studentIds = await resolveTargetStudentIds(tx, schoolId, params.target_class_ids);
+  const studentIds = params.student_ids;
 
   if (studentIds.length === 0) {
     throw new CodedHttpException(

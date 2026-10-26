@@ -1,11 +1,14 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Card, DataGrid, Select, useToast } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
+import { api } from "../../../lib/api";
 import { useTranslation } from "../../../lib/i18n";
 import { fetchActiveClasses } from "../../admin/announcements/queries";
 import { fetchFeeStructures } from "../fees/queries";
+import { FinanceStudentPicker } from "../students/FinanceStudentPicker";
 
 import {
   invoiceBatchItemStatusLabel,
@@ -20,6 +23,7 @@ import "./invoices.css";
 import type { InvoiceBatch, InvoiceBatchItem, InvoiceBatchItemStatus } from "./queries";
 import type { ClassOption } from "../../admin/announcements/queries";
 import type { FeeStructure } from "../fees/queries";
+import type { StudentIdentity } from "../students/FinanceStudentPicker";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 import type { TFunction } from "i18next";
 import type { FormEvent } from "react";
@@ -32,7 +36,9 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  * Batch invoice generation (`/portal/finance/invoices/batches/new`), gated by `billing:update` —
  * the write gate `POST /api/finance/invoices/batches` itself requires. A small state machine keyed
  * on whether a batch has been created yet: the form (fee structure, period, due date, target), then
- * the progress panel once `useCreateInvoiceBatch` returns a batch id.
+ * the progress panel once `useCreateInvoiceBatch` returns a batch id. The target is every enrolled
+ * student, chosen classes, or hand-picked students. `?feeStructure=<erpnext name>` preselects the
+ * structure, which is how the fee structure builder's "Bill students" link opens it.
  */
 export default function InvoiceBatchPage() {
   const { t } = useTranslation();
@@ -63,6 +69,7 @@ function BatchForm({ onCreated }: BatchFormProps) {
   const { t } = useTranslation();
   const { show } = useToast();
   const createBatch = useCreateInvoiceBatch();
+  const [searchParams] = useSearchParams();
 
   const feeStructuresQuery = useQuery({
     queryKey: ["finance", "fee-structures", "all"],
@@ -73,11 +80,33 @@ function BatchForm({ onCreated }: BatchFormProps) {
     queryFn: fetchActiveClasses,
   });
 
-  const [feeStructureErpnextName, setFeeStructureErpnextName] = useState("");
+  const [feeStructureErpnextName, setFeeStructureErpnextName] = useState(
+    searchParams.get("feeStructure") ?? "",
+  );
   const [periodTitle, setPeriodTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [targetMode, setTargetMode] = useState<"all" | "classes">("all");
+  const [targetMode, setTargetMode] = useState<"all" | "classes" | "students">("all");
   const [selectedClassIds, setSelectedClassIds] = useState<Set<string>>(new Set());
+  const [selectedStudents, setSelectedStudents] = useState<StudentIdentity[]>([]);
+
+  // A structure tied to particular students (its "Students" in the fee structure builder) bills
+  // exactly them by default; finance can still switch the target.
+  const assignedStudents = useQuery({
+    queryKey: ["finance", "fee-structures", feeStructureErpnextName, "students"],
+    queryFn: async () => {
+      const { data } = await api.GET("/api/finance/fee-structures/{feeStructureId}/students", {
+        params: { path: { feeStructureId: feeStructureErpnextName } },
+      });
+      return (data?.students ?? []) as StudentIdentity[];
+    },
+    enabled: feeStructureErpnextName !== "",
+  });
+  useEffect(() => {
+    if (assignedStudents.data && assignedStudents.data.length > 0) {
+      setTargetMode("students");
+      setSelectedStudents(assignedStudents.data);
+    }
+  }, [assignedStudents.data]);
 
   // Only a submitted structure has confirmed components ERPNext will actually invoice against — a
   // draft is still editable and a cancelled one is dead, matching `feeStructureStatusTone`'s own
@@ -110,7 +139,9 @@ function BatchForm({ onCreated }: BatchFormProps) {
   const canSubmit =
     feeStructureErpnextName !== "" &&
     periodTitle.trim() !== "" &&
-    (targetMode === "all" || selectedClassIds.size > 0);
+    (targetMode === "all" ||
+      (targetMode === "classes" && selectedClassIds.size > 0) ||
+      (targetMode === "students" && selectedStudents.length > 0));
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -122,6 +153,8 @@ function BatchForm({ onCreated }: BatchFormProps) {
         period_title: periodTitle.trim(),
         due_date: dueDate || undefined,
         target_class_ids: targetMode === "classes" ? Array.from(selectedClassIds) : undefined,
+        target_student_ids:
+          targetMode === "students" ? selectedStudents.map((student) => student.id) : undefined,
       },
       {
         onSuccess: (batch) => onCreated(batch.id),
@@ -192,6 +225,15 @@ function BatchForm({ onCreated }: BatchFormProps) {
               />
               {t("finance.invoices.batch.targetClasses")}
             </label>
+            <label className="invoices-batch__target-option">
+              <input
+                type="radio"
+                name="invoice-batch-target-mode"
+                checked={targetMode === "students"}
+                onChange={() => setTargetMode("students")}
+              />
+              {t("finance.invoices.batch.targetStudents")}
+            </label>
 
             {targetMode === "classes" ? (
               <div
@@ -216,6 +258,15 @@ function BatchForm({ onCreated }: BatchFormProps) {
                   ))
                 )}
               </div>
+            ) : null}
+
+            {targetMode === "students" ? (
+              <FinanceStudentPicker
+                multiple
+                label={t("finance.invoices.batch.students")}
+                selected={selectedStudents}
+                onChange={setSelectedStudents}
+              />
             ) : null}
           </fieldset>
 

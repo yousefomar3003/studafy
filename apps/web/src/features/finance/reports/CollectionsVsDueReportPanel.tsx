@@ -10,7 +10,7 @@ import { fetchCollectionsVsDueReport } from "./queries";
 import { ReportTable } from "./ReportTable";
 import { StudentPickerField } from "./StudentPickerField";
 
-import type { StudentProfile } from "../fees/queries";
+import type { StudentIdentity } from "../students/FinanceStudentPicker";
 import type { FormEvent } from "react";
 
 /** ERPNext's "Accounts Receivable" report by payment term, with future payments visible — what's
@@ -20,7 +20,7 @@ export default function CollectionsVsDueReportPanel() {
   const { t } = useTranslation();
   const reportLabel = t(REPORT_TYPE_LABEL_KEYS.collections_vs_due);
   const [reportDate, setReportDate] = useState("");
-  const [student, setStudent] = useState<StudentProfile | null>(null);
+  const [student, setStudent] = useState<StudentIdentity | null>(null);
   const [runId, setRunId] = useState(0);
 
   const query = useQuery({

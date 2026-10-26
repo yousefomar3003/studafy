@@ -92,6 +92,112 @@
       "reject": "Reject",
       "rejectedToast": "Refund rejected",
       "rejectError": "Couldn't reject refund"
+    },
+    "scholarships": {
+      "title": "Scholarships",
+      "description": "Define scholarships and request them for students. The school admin approves each award before it discounts the student's invoices.",
+      "newScholarship": "New scholarship",
+      "awardStudent": "Award to a student",
+      "awardsHeading": "Awards",
+      "awardsCaption": "Scholarship awards",
+      "awardsEmpty": "No awards to show.",
+      "catalogHeading": "Scholarships",
+      "catalogCaption": "The school's scholarships",
+      "catalogEmpty": "No scholarships yet.",
+      "loadError": "Couldn't load scholarships. Try again.",
+      "discountOnAll": "{{value}} off all fees",
+      "discountOnCategory": "{{value}} off {{category}}",
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "activatedToast": "Scholarship activated",
+      "deactivatedToast": "Scholarship deactivated",
+      "approve": "Approve",
+      "reject": "Reject",
+      "revoke": "Revoke",
+      "status": {
+        "pending_approval": "Awaiting approval",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "revoked": "Revoked"
+      },
+      "columns": {
+        "student": "Student",
+        "scholarship": "Scholarship",
+        "discount": "Discount",
+        "requested": "Requested",
+        "notes": "Notes",
+        "name": "Name",
+        "students": "Students"
+      },
+      "form": {
+        "title": "New scholarship",
+        "description": "A percentage or fixed amount off a student's fees. It can't be changed once created, only deactivated.",
+        "name": "Name",
+        "nameRequired": "Enter a name.",
+        "type": "Type",
+        "typePercentage": "Percentage",
+        "typeFixed": "Fixed amount",
+        "percentage": "Percentage off",
+        "amount": "Amount off",
+        "valueInvalid": "Enter a number greater than zero.",
+        "percentageTooHigh": "A percentage can't be more than 100.",
+        "currency": "Currency",
+        "selectCurrency": "Select a currency",
+        "currencyRequired": "Select a currency.",
+        "feeCategory": "Fee category (optional)",
+        "feeCategoryHelper": "Only discount this fee category, exactly as named in the fee structure. Leave empty to discount all fees.",
+        "students": "Students (optional)",
+        "studentsHelper": "Pick from the list or type a name. Each student you pick is sent to the school admin for approval.",
+        "awardsRequested_one": "Sent {{count}} student to the school admin for approval.",
+        "awardsRequested_other": "Sent {{count}} students to the school admin for approval.",
+        "awardsFailed_one": "Couldn't request the scholarship for {{count}} student. Award it from the list instead.",
+        "awardsFailed_other": "Couldn't request the scholarship for {{count}} students. Award them from the list instead.",
+        "submit": "Create scholarship",
+        "createdToast": "Scholarship created",
+        "createError": "Couldn't create the scholarship"
+      },
+      "award": {
+        "title": "Award a scholarship",
+        "description": "The school admin approves the award before it discounts the student's invoices.",
+        "scholarship": "Scholarship",
+        "selectScholarship": "Select a scholarship",
+        "scholarshipRequired": "Select a scholarship.",
+        "student": "Student",
+        "studentHelper": "Pick from the list or type a name.",
+        "studentRequired": "Select a student.",
+        "notes": "Why the student qualifies (optional)",
+        "submit": "Request approval",
+        "requestedToast": "Sent to the school admin for approval",
+        "requestError": "Couldn't request the award"
+      },
+      "decide": {
+        "notes": "Notes (optional)",
+        "reason": "Reason",
+        "reasonRequired": "Enter a reason. Finance will see it.",
+        "approve": {
+          "title": "Approve this scholarship?",
+          "description": "{{student}} gets {{scholarship}} on invoices generated from now on. Invoices already issued don't change.",
+          "confirm": "Approve",
+          "toast": "Scholarship approved",
+          "error": "Couldn't approve the award"
+        },
+        "reject": {
+          "title": "Reject this request?",
+          "description": "{{student}} won't get {{scholarship}}.",
+          "confirm": "Reject",
+          "toast": "Request rejected",
+          "error": "Couldn't reject the award"
+        },
+        "revoke": {
+          "title": "Revoke this scholarship?",
+          "description": "{{student}}'s invoices generated from now on won't include {{scholarship}}. Invoices already issued keep their discount.",
+          "confirm": "Revoke",
+          "toast": "Scholarship revoked",
+          "error": "Couldn't revoke the award"
+        }
+      }
     }
   },
   "reports": {
@@ -155,10 +261,7 @@
     "studentPicker": {
       "student": "Student",
       "studentOptional": "Student (optional)",
-      "clear": "Clear",
-      "placeholder": "Search by name or admission number",
-      "helper": "Leave blank to run the report for every student.",
-      "noMatches": "No students match."
+      "helper": "Leave blank to run the report for every student."
     },
     "familyPicker": {
       "family": "Family",

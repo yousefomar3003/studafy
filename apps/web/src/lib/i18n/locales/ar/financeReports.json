@@ -92,6 +92,120 @@
       "reject": "رفض",
       "rejectedToast": "تم رفض الاسترداد",
       "rejectError": "تعذّر رفض الاسترداد"
+    },
+    "scholarships": {
+      "title": "المنح الدراسية",
+      "description": "عرّف المنح الدراسية واطلبها للطلاب. يوافق مدير المدرسة على كل منحة قبل أن تُخصم من فواتير الطالب.",
+      "newScholarship": "منحة جديدة",
+      "awardStudent": "منح طالب",
+      "awardsHeading": "المنح الممنوحة",
+      "awardsCaption": "المنح الممنوحة للطلاب",
+      "awardsEmpty": "لا توجد منح لعرضها.",
+      "catalogHeading": "المنح الدراسية",
+      "catalogCaption": "المنح الدراسية في المدرسة",
+      "catalogEmpty": "لا توجد منح دراسية بعد.",
+      "loadError": "تعذّر تحميل المنح الدراسية. حاول مرة أخرى.",
+      "discountOnAll": "خصم {{value}} على جميع الرسوم",
+      "discountOnCategory": "خصم {{value}} على {{category}}",
+      "active": "نشطة",
+      "inactive": "غير نشطة",
+      "activate": "تفعيل",
+      "deactivate": "إيقاف",
+      "activatedToast": "تم تفعيل المنحة",
+      "deactivatedToast": "تم إيقاف المنحة",
+      "approve": "موافقة",
+      "reject": "رفض",
+      "revoke": "إلغاء",
+      "status": {
+        "pending_approval": "بانتظار الموافقة",
+        "approved": "موافق عليها",
+        "rejected": "مرفوضة",
+        "revoked": "ملغاة"
+      },
+      "columns": {
+        "student": "الطالب",
+        "scholarship": "المنحة",
+        "discount": "الخصم",
+        "requested": "تاريخ الطلب",
+        "notes": "ملاحظات",
+        "name": "الاسم",
+        "students": "الطلاب"
+      },
+      "form": {
+        "title": "منحة جديدة",
+        "description": "نسبة مئوية أو مبلغ ثابت يُخصم من رسوم الطالب. لا يمكن تعديلها بعد إنشائها، بل إيقافها فقط.",
+        "name": "الاسم",
+        "nameRequired": "أدخل اسمًا.",
+        "type": "النوع",
+        "typePercentage": "نسبة مئوية",
+        "typeFixed": "مبلغ ثابت",
+        "percentage": "نسبة الخصم",
+        "amount": "مبلغ الخصم",
+        "valueInvalid": "أدخل رقمًا أكبر من صفر.",
+        "percentageTooHigh": "لا يمكن أن تتجاوز النسبة 100.",
+        "currency": "العملة",
+        "selectCurrency": "اختر عملة",
+        "currencyRequired": "اختر عملة.",
+        "feeCategory": "فئة الرسوم (اختياري)",
+        "feeCategoryHelper": "اخصم من هذه الفئة فقط، بالاسم نفسه الوارد في هيكل الرسوم. اتركه فارغًا للخصم من جميع الرسوم.",
+        "students": "الطلاب (اختياري)",
+        "studentsHelper": "اختر من القائمة أو اكتب اسمًا. يُرسل كل طالب تختاره إلى مدير المدرسة للموافقة.",
+        "awardsRequested_zero": "لم يُرسل أي طالب للموافقة.",
+        "awardsRequested_one": "أُرسل طالب واحد إلى مدير المدرسة للموافقة.",
+        "awardsRequested_two": "أُرسل طالبان إلى مدير المدرسة للموافقة.",
+        "awardsRequested_few": "أُرسل {{count}} طلاب إلى مدير المدرسة للموافقة.",
+        "awardsRequested_many": "أُرسل {{count}} طالبًا إلى مدير المدرسة للموافقة.",
+        "awardsRequested_other": "أُرسل {{count}} طالب إلى مدير المدرسة للموافقة.",
+        "awardsFailed_zero": "تم طلب المنحة لجميع الطلاب.",
+        "awardsFailed_one": "تعذّر طلب المنحة لطالب واحد. امنحها من القائمة بدلًا من ذلك.",
+        "awardsFailed_two": "تعذّر طلب المنحة لطالبين. امنحها من القائمة بدلًا من ذلك.",
+        "awardsFailed_few": "تعذّر طلب المنحة لـ {{count}} طلاب. امنحها من القائمة بدلًا من ذلك.",
+        "awardsFailed_many": "تعذّر طلب المنحة لـ {{count}} طالبًا. امنحها من القائمة بدلًا من ذلك.",
+        "awardsFailed_other": "تعذّر طلب المنحة لـ {{count}} طالب. امنحها من القائمة بدلًا من ذلك.",
+        "submit": "إنشاء المنحة",
+        "createdToast": "تم إنشاء المنحة",
+        "createError": "تعذّر إنشاء المنحة"
+      },
+      "award": {
+        "title": "منح منحة دراسية",
+        "description": "يوافق مدير المدرسة على المنحة قبل أن تُخصم من فواتير الطالب.",
+        "scholarship": "المنحة",
+        "selectScholarship": "اختر منحة",
+        "scholarshipRequired": "اختر منحة.",
+        "student": "الطالب",
+        "studentHelper": "اختر من القائمة أو اكتب اسمًا.",
+        "studentRequired": "اختر طالبًا.",
+        "notes": "سبب استحقاق الطالب (اختياري)",
+        "submit": "طلب الموافقة",
+        "requestedToast": "أُرسل الطلب إلى مدير المدرسة للموافقة",
+        "requestError": "تعذّر طلب المنحة"
+      },
+      "decide": {
+        "notes": "ملاحظات (اختياري)",
+        "reason": "السبب",
+        "reasonRequired": "أدخل السبب. سيطّلع عليه قسم المالية.",
+        "approve": {
+          "title": "الموافقة على هذه المنحة؟",
+          "description": "سيحصل {{student}} على {{scholarship}} في الفواتير التي تُصدر من الآن. لا تتغير الفواتير الصادرة سابقًا.",
+          "confirm": "موافقة",
+          "toast": "تمت الموافقة على المنحة",
+          "error": "تعذّرت الموافقة على المنحة"
+        },
+        "reject": {
+          "title": "رفض هذا الطلب؟",
+          "description": "لن يحصل {{student}} على {{scholarship}}.",
+          "confirm": "رفض",
+          "toast": "تم رفض الطلب",
+          "error": "تعذّر رفض المنحة"
+        },
+        "revoke": {
+          "title": "إلغاء هذه المنحة؟",
+          "description": "لن تتضمن فواتير {{student}} التي تُصدر من الآن {{scholarship}}. تحتفظ الفواتير الصادرة سابقًا بخصمها.",
+          "confirm": "إلغاء المنحة",
+          "toast": "تم إلغاء المنحة",
+          "error": "تعذّر إلغاء المنحة"
+        }
+      }
     }
   },
   "reports": {
@@ -155,10 +269,7 @@
     "studentPicker": {
       "student": "الطالب",
       "studentOptional": "الطالب (اختياري)",
-      "clear": "مسح",
-      "placeholder": "ابحث بالاسم أو رقم القيد",
-      "helper": "اتركه فارغًا لتشغيل التقرير لجميع الطلاب.",
-      "noMatches": "لا يوجد طلاب مطابقون."
+      "helper": "اتركه فارغًا لتشغيل التقرير لجميع الطلاب."
     },
     "familyPicker": {
       "family": "الأسرة",

@@ -290,6 +290,10 @@ const NewRefundPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/adjustments/NewRefundPage"),
 );
+const ScholarshipsPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/adjustments/ScholarshipsPage"),
+);
 const ReportsCenterPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/reports/ReportsCenterPage"),
@@ -830,6 +834,17 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
                 <NewRefundPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:read`, matching the scholarship API's read routes. Requesting an award
+            // needs `billing:update` and deciding one `billing:approveScholarship` (ORG_ADMIN) — both
+            // enforced by the API and reflected by `ScholarshipsPage`'s own controls.
+            path: "finance/scholarships",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <ScholarshipsPage />
               </RequirePermission>
             ),
           },

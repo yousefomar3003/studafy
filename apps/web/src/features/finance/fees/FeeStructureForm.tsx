@@ -1,16 +1,25 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Input, Select, useToast } from "@studafy/ui";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
+import { api } from "../../../lib/api";
 import { useTranslation } from "../../../lib/i18n";
+import { FinanceStudentPicker } from "../students/FinanceStudentPicker";
 
 import { FeeComponentsEditor } from "./FeeComponentsEditor";
 import { InvoicePreviewPanel } from "./InvoicePreviewPanel";
 import { feeStructureStatusLabel, feeStructureStatusTone } from "./labels";
-import { useCreateFeeStructure, useUpdateFeeStructure } from "./mutations";
+import {
+  useCreateFeeStructure,
+  useSaveFeeStructureStudents,
+  useUpdateFeeStructure,
+} from "./mutations";
 
 import type { FeeComponentDraft } from "./preview";
 import type { AcademicYear, FeeStructure } from "./queries";
+import type { StudentIdentity } from "../students/FinanceStudentPicker";
 import type { SelectOption } from "@studafy/ui";
 import type { FormEvent } from "react";
 
@@ -78,12 +87,18 @@ export interface FeeStructureFormProps {
  * there is nothing to pre-fill the composition editor with. Leaving it empty and omitting
  * `components` from the PATCH keeps the existing components untouched; adding rows here replaces the
  * full set, same as ERPNext's own PUT semantics.
+ *
+ * **Student** is who the structure is for, picked from the school's list — Studafy's own record
+ * (000150), not ERPNext's, so it stays editable after the structure is submitted. Picking one names
+ * the structure after them, the preview shows their invoice, and generating invoices for the
+ * structure preselects them. It is saved right after the structure itself.
  */
 export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructureFormProps) {
   const { t } = useTranslation();
   const { show } = useToast();
   const createFeeStructure = useCreateFeeStructure();
   const updateFeeStructure = useUpdateFeeStructure();
+  const saveStudents = useSaveFeeStructureStudents();
 
   const [title, setTitle] = useState("");
   const [academicYearId, setAcademicYearId] = useState("");
@@ -92,6 +107,19 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
   const [components, setComponents] = useState<FeeComponentDraft[]>([emptyComponent()]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState<string | undefined>(undefined);
+  const [students, setStudents] = useState<StudentIdentity[]>([]);
+  const [studentsChanged, setStudentsChanged] = useState(false);
+
+  const savedStudents = useQuery({
+    queryKey: ["finance", "fee-structures", editing?.erpnext_name, "students"],
+    queryFn: async () => {
+      const { data } = await api.GET("/api/finance/fee-structures/{feeStructureId}/students", {
+        params: { path: { feeStructureId: editing!.erpnext_name } },
+      });
+      return (data?.students ?? []) as StudentIdentity[];
+    },
+    enabled: editing !== null,
+  });
 
   const isReadOnly = editing !== null && editing.erpnext_status !== "draft";
 
@@ -113,6 +141,43 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
     }
   }, [editing]);
 
+  useEffect(() => {
+    setStudents(editing ? (savedStudents.data ?? []) : []);
+    setStudentsChanged(false);
+  }, [editing, savedStudents.data]);
+
+  /** A structure is named after its student: the title follows the pick until finance edits it. */
+  function changeStudents(next: StudentIdentity[]) {
+    const previousName = students[0]?.name ?? "";
+    if (!isReadOnly && (title.trim() === "" || title === previousName)) {
+      setTitle(next[0]?.name ?? "");
+    }
+    setStudents(next);
+    setStudentsChanged(true);
+  }
+
+  /** Saves the student list for `feeStructureId` when it was changed, then reports success. */
+  function finishSave(feeStructureId: string, successTitle: string) {
+    const done = () => {
+      show({ variant: "success", title: successTitle });
+      setStudentsChanged(false);
+      onSaved();
+    };
+    if (!studentsChanged) return done();
+    saveStudents.mutate(
+      { feeStructureId, studentIds: students.map((student) => student.id) },
+      {
+        onSuccess: done,
+        onError: (err) =>
+          show({
+            variant: "error",
+            title: t("finance.fees.form.studentsSaveError"),
+            description: err instanceof ApiError ? (err.detail ?? err.title) : undefined,
+          }),
+      },
+    );
+  }
+
   const yearOptions: SelectOption<string>[] = [
     { value: "", label: t("finance.fees.form.noYear") },
     ...academicYears.map((year) => ({
@@ -126,7 +191,8 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
   ];
   const selectedYear = academicYears.find((year) => year.id === academicYearId);
 
-  const isPending = createFeeStructure.isPending || updateFeeStructure.isPending;
+  const isPending =
+    createFeeStructure.isPending || updateFeeStructure.isPending || saveStudents.isPending;
 
   function translateRowErrors(
     rowErrors: FieldErrors["components"],
@@ -180,13 +246,11 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
           },
         },
         {
-          onSuccess: () => {
-            show({
-              variant: "success",
-              title: t("finance.fees.form.updated", { title: title.trim() }),
-            });
-            onSaved();
-          },
+          onSuccess: () =>
+            finishSave(
+              editing.erpnext_name,
+              t("finance.fees.form.updated", { title: title.trim() }),
+            ),
           onError,
         },
       );
@@ -202,13 +266,11 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
         components: trimmedComponents,
       },
       {
-        onSuccess: (structure) => {
-          show({
-            variant: "success",
-            title: t("finance.fees.form.created", { title: structure.title }),
-          });
-          onSaved();
-        },
+        onSuccess: (structure) =>
+          finishSave(
+            structure.erpnext_name,
+            t("finance.fees.form.created", { title: structure.title }),
+          ),
         onError,
       },
     );
@@ -234,6 +296,17 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
             status: feeStructureStatusLabel(editing!.erpnext_status, t).toLowerCase(),
           })}
         </p>
+      ) : null}
+
+      {/* Only a submitted structure can be invoiced (see InvoiceBatchPage's structure filter). */}
+      {editing?.erpnext_status === "submitted" ? (
+        <Link
+          to={`/portal/finance/invoices/batches/new?feeStructure=${encodeURIComponent(editing.erpnext_name)}`}
+        >
+          <Button type="button" variant="secondary">
+            {t("finance.fees.form.billStudents")}
+          </Button>
+        </Link>
       ) : null}
 
       <form
@@ -277,6 +350,26 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
           placeholder={t("finance.fees.form.programPlaceholder")}
           helperText={t("finance.fees.form.programHelper")}
         />
+
+        <FinanceStudentPicker
+          label={t("finance.fees.form.students")}
+          helperText={t("finance.fees.form.studentsHelper")}
+          selected={students}
+          onChange={changeStudents}
+        />
+        {isReadOnly && editing ? (
+          <div className="fee-builder__form-actions">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!studentsChanged}
+              loading={saveStudents.isPending}
+              onClick={() => finishSave(editing.erpnext_name, t("finance.fees.form.studentsSaved"))}
+            >
+              {t("finance.fees.form.saveStudents")}
+            </Button>
+          </div>
+        ) : null}
 
         <Input
           label={t("finance.common.currency")}
@@ -333,7 +426,11 @@ export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructu
         ) : null}
       </form>
 
-      <InvoicePreviewPanel components={components} currency={currency} />
+      <InvoicePreviewPanel
+        components={components}
+        currency={currency}
+        student={students[0] ?? null}
+      />
     </div>
   );
 }

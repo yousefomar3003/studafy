@@ -6,7 +6,7 @@
     "allStatuses": "All statuses",
     "status": "Status",
     "student": "Student",
-    "admissionNumber": "Admission #",
+    "admissionNumber": "Student ID",
     "total": "Total",
     "outstanding": "Outstanding",
     "amount": "Amount",
@@ -53,6 +53,7 @@
       "invoices": "Invoices →",
       "payments": "Payments →",
       "refunds": "Refunds →",
+      "scholarships": "Scholarships →",
       "reports": "Reports →",
       "expenses": "Expenses →"
     }
@@ -153,6 +154,8 @@
       "target": "Target students",
       "targetAll": "Every enrolled student in the school",
       "targetClasses": "Students actively enrolled in specific classes",
+      "targetStudents": "Specific students",
+      "students": "Students to bill",
       "classes": "Classes",
       "loadingClasses": "Loading classes…",
       "noClasses": "No active classes.",
@@ -247,10 +250,16 @@
       "program": "Program (ERPNext, grade/year grouping)",
       "programPlaceholder": "Grade 5",
       "programHelper": "The ERPNext Program document name this structure applies to.",
+      "students": "Student (optional)",
+      "studentsHelper": "Who this fee structure is for. Pick from the list or type a name; the title becomes the student's name. Leave empty for a whole grade or program.",
+      "saveStudents": "Save students",
+      "studentsSaved": "Students saved",
+      "studentsSaveError": "The structure was saved, but its students weren't",
       "componentsNote": "Component breakdown isn't returned by the list API, so it starts empty here. Leave it empty to keep the existing components unchanged, or add the full replacement set below — saving replaces all components at once, it doesn't merge.",
       "changeComponents": "Change components",
       "saveChanges": "Save changes",
-      "create": "Create fee structure"
+      "create": "Create fee structure",
+      "billStudents": "Bill students with this structure"
     },
     "components": {
       "legend": "Fee components",
@@ -267,7 +276,12 @@
       "title": "Invoice preview",
       "note": "Estimated from the components below, computed the same way invoice generation computes a real one. ERPNext's own total is authoritative once an invoice actually exists.",
       "empty": "Add at least one component to see a preview.",
-      "caption": "Estimated invoice line items"
+      "caption": "Estimated invoice line items",
+      "student": "Preview for a student (optional)",
+      "studentHelper": "Pick a student to see their invoice with their approved scholarships.",
+      "scholarships": "Scholarships ({{names}})",
+      "noScholarships": "No approved scholarships",
+      "studentTotal": "Total for {{name}}"
     }
   },
   "expenses": {
@@ -349,5 +363,15 @@
       "overdue_one": "{{count}} installment is overdue",
       "overdue_other": "{{count}} installments are overdue"
     }
+  },
+  "studentPicker": {
+    "placeholder": "Pick a student or type a name",
+    "helper": "Open the list and pick a student, or type a name to narrow it.",
+    "noMatches": "No students match.",
+    "change": "Change",
+    "selected": "{{count}} students selected",
+    "remove": "Remove {{name}}",
+    "loading": "Loading students…",
+    "showList": "Show students"
   }
 }

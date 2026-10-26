@@ -273,6 +273,7 @@ const EXPECTED_MUTATING_ROUTES = [
   // resulting fee_structure_cache projection with its before/after amounts.
   "POST /api/finance/fee-structures",
   "PATCH /api/finance/fee-structures/{feeStructureId}",
+  "PUT /api/finance/fee-structures/{feeStructureId}/students",
   "POST /api/finance/expenses",
   "PATCH /api/finance/expenses/{expenseId}",
   "POST /api/finance/expenses/upload-url",
@@ -347,6 +348,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/refunds/initiate",
   "POST /api/finance/refunds/{refundId}/approve",
   "POST /api/finance/refunds/{refundId}/reject",
+  // Scholarships: finance requests an award, the school admin decides it (finance/scholarships).
+  "POST /api/finance/scholarships",
+  "PATCH /api/finance/scholarships/{scholarshipId}",
+  "POST /api/finance/scholarship-awards",
+  "POST /api/finance/scholarship-awards/{awardId}/approve",
+  "POST /api/finance/scholarship-awards/{awardId}/reject",
+  "POST /api/finance/scholarship-awards/{awardId}/revoke",
   // In-app inbox (ST-142). Personal per-user read state: RLS already fences every row to
   // user_id = app.current_user_id(), so the mutation is self-service on the caller's own rows.
   // Audit rows are written from inside the service transactions alongside the read-state change

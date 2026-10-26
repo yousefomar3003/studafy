@@ -5,6 +5,7 @@ import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { resolveSchoolCredentials } from "./credential-resolver";
 import { ErpNextClient, ErpNextError } from "./erpnext-client";
+import { scholarshipDiscountMinor, type ApprovedScholarship } from "./scholarship-discount";
 
 import type { GenerateBatchInvoicesJobData, GenerateInvoiceJobData } from "./schemas";
 import type { JSONValue, Sql, TransactionSql } from "postgres";
@@ -210,6 +211,36 @@ async function projectToCache(
   return cached!;
 }
 
+async function approvedScholarships(
+  tx: TransactionSql,
+  schoolId: string,
+  studentId: string,
+): Promise<ApprovedScholarship[]> {
+  const rows = await tx<
+    {
+      discount_type: "percentage" | "fixed";
+      percentage: string | null;
+      amount_minor: string | null;
+      currency_code: string | null;
+      fee_category: string | null;
+    }[]
+  >`
+    SELECT sc.discount_type, sc.percentage::text AS percentage, sc.amount_minor::text AS amount_minor,
+           c.code AS currency_code, sc.fee_category
+    FROM app.scholarship_awards AS a
+    JOIN app.scholarships AS sc ON sc.id = a.scholarship_id AND sc.school_id = a.school_id
+    LEFT JOIN app.currencies AS c ON c.id = sc.currency_id
+    WHERE a.school_id = ${schoolId}::uuid
+      AND a.student_id = ${studentId}::uuid
+      AND a.status = 'approved'
+      AND sc.is_active
+  `;
+  return rows.map((row) => ({
+    ...row,
+    amount_minor: row.amount_minor === null ? null : BigInt(row.amount_minor),
+  }));
+}
+
 export async function generateInvoice(
   tx: TransactionSql,
   schoolId: string,
@@ -277,10 +308,6 @@ export async function generateInvoice(
     description: c.description ?? undefined,
   }));
 
-  // Scholarships and discounts are switched off: an invoice is the fee structure's full amount.
-  // The award tables (app.award_cache, app.scholarship_discount_cache) are kept with their rows but
-  // no longer read here, so awards confirmed before the feature was removed no longer discount new
-  // invoices. Invoices already issued are unaffected.
   const payload: Record<string, unknown> = {
     customer: customerId,
     currency: currencyCode,
@@ -288,6 +315,27 @@ export async function generateInvoice(
     posting_date: new Date().toISOString().slice(0, 10),
     custom_school_id: schoolId,
   };
+
+  // The student's approved scholarships (000149) become the invoice's own discount, so ERPNext's
+  // grand total, ledger and outstanding amount include it. Only awards approved by the school admin
+  // of scholarships still active count; the 000066 award_cache rows from the retired ERPNext design
+  // are not read.
+  const scholarships = await approvedScholarships(tx, schoolId, params.studentId);
+  if (scholarships.length > 0) {
+    const currency = await getCurrencyRef(tx, currencyCode);
+    const discountMinor = scholarshipDiscountMinor(
+      components.map((c) => ({
+        fee_category: c.fee_category,
+        amount_minor: toMinorUnits(c.amount, currency.minorUnit),
+      })),
+      scholarships,
+      currency.code,
+    );
+    if (discountMinor > 0n) {
+      payload.apply_discount_on = "Net Total";
+      payload.discount_amount = Number(discountMinor) / 10 ** currency.minorUnit;
+    }
+  }
   if (params.dueDate) {
     payload.due_date = params.dueDate;
   }

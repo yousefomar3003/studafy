@@ -100,6 +100,7 @@ import {
   expenseRoutes,
   familyFinancialViewRoutes,
   feeStructureRoutes,
+  feeStructureStudentRoutes,
   financeInvoiceRoutes,
   financeReportRoutes,
   installmentRoutes,
@@ -108,6 +109,8 @@ import {
   paymentWebhookRoutes,
   reconciliationRoutes,
   refundRoutes,
+  scholarshipRoutes,
+  financeStudentRoutes,
   refundWebhookRoutes,
   settleOnlineFeePayment,
   TenantErpNextFactory,
@@ -560,10 +563,15 @@ export function createApp({
   // a school without ERPNext configured still gets an (empty) household view instead of a 404.
   if (database) {
     app.route("/", familyFinancialViewRoutes(database, process.env.PAYMENT_REDIRECT_BASE_URL));
+    // Scholarships live in Studafy's own tables; ERPNext only sees them as an invoice's discount,
+    // applied by the billing worker, so they need no ERPNext client here.
+    app.route("/", scholarshipRoutes(database));
+    app.route("/", financeStudentRoutes(database));
   }
 
   if (database && erpnextFactory) {
     app.route("/", feeStructureRoutes(database, erpnextFactory));
+    app.route("/", feeStructureStudentRoutes(database));
     app.route("/", financeInvoiceRoutes(database, redis ?? null));
     app.route("/", financeReportRoutes(database, erpnextFactory, redis ?? null, storage));
     app.route("/", expenseRoutes(database, erpnextFactory, storage));

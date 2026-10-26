@@ -1,6 +1,6 @@
 ---
 title: "Finance workflows"
-description: "The end-to-end billing cycle: fee structures, invoice batches, payments, refunds, expenses, and reports."
+description: "The end-to-end billing cycle: fee structures, invoice batches, payments, refunds, scholarships, expenses, and reports."
 keywords:
   [
     "finance",
@@ -10,6 +10,8 @@ keywords:
     "batch",
     "payment",
     "refund",
+    "scholarship",
+    "discount",
     "expense",
     "reports",
     "reconciliation",
@@ -35,14 +37,21 @@ amount, optional description) for a program and academic year.
 1. `New fee structure` (or pick an existing structure to edit it).
 2. Give it a **Title**, **Academic year**, **Program** (the ERPNext program
    grouping, e.g. "Grade 5"), and a 3-letter **Currency** code.
+   For a structure that belongs to one student, pick the **Student**: open the
+   list and choose them, or type a name to narrow it. The title becomes the
+   student's name (you can still change it). Leave it empty for a whole grade
+   or program. You can change the student even after the structure is
+   submitted.
 3. Add components with `Add component`. The **Invoice preview** panel shows
-   the invoice the structure produces. Scholarships and discounts are not
-   available at the moment, so every student is invoiced the full amount.
+   the invoice the structure produces; for a structure with a student, their
+   approved scholarships are taken off, with the student's own total.
 4. `Create fee structure` (or `Save changes`).
 
 A new structure is created `Draft` in ERPNext. Once it is `Submitted` or
 `Cancelled` it is immutable — create a new structure instead of editing.
-Invoice generation only offers submitted structures.
+Invoice generation only offers submitted structures. A submitted structure has a
+`Bill students with this structure` button that opens Generate invoices with it
+already selected, and with its student preselected.
 
 ## 2. Generate invoices
 
@@ -50,8 +59,10 @@ Finance → Invoices → `Generate invoices`.
 
 1. Pick a `Submitted` fee structure. The option shows its total and currency.
 2. Enter a **Period title** (e.g. "Spring 2026 Term 1") and optionally a due date.
-3. Choose the target: every enrolled student in the school, or students in
-   specific active classes.
+3. Choose the target: every enrolled student in the school, students in
+   specific active classes, or **Specific students**. For specific students,
+   open the list and pick each one (type a name to narrow it); remove a pick
+   with its `×`.
 4. `Start batch`.
 
 The batch runs in the background — you can leave the page. The progress panel
@@ -98,7 +109,35 @@ approval rights must approve it before ERPNext issues the credit note. Track
 the request through `Approved`, `Submitted to ERPNext`, `Completed`, and the
 failure states `Rejected` and `Failed` on the refunds list.
 
-## 5. Expenses
+## 5. Scholarships
+
+A scholarship takes a percentage (for example 10%) or a fixed amount (for
+example 150 JOD) off a student's fees: every fee, or one fee category such as
+Tuition.
+
+### Create a scholarship
+
+Finance → Scholarships → `New scholarship`. Give it a **Name**, pick
+**Percentage** or **Fixed amount**, enter the value (and **Currency** for a
+fixed amount), and optionally a **Fee category**, spelled exactly as in the fee
+structure. A scholarship can't be edited once created; deactivate it and create
+a new one instead.
+
+### Award it to a student
+
+Finance → Scholarships → `Award to a student`. Pick the scholarship, pick the
+student from the list (type a name to narrow it), add why they qualify, then
+`Request approval`. You can also pick students straight away in
+`New scholarship`; each one is sent for approval when the scholarship is
+created.
+
+The award is created **Awaiting approval**. Only the school admin can approve
+or reject it (a rejection needs a reason, which finance sees), and can later
+revoke an approved award. Once approved, the discount appears on the student's
+invoices generated from then on; invoices already issued don't change. Several
+scholarships add up, but never take an invoice below zero.
+
+## 6. Expenses
 
 Finance → Expenses → `Record an expense`.
 
@@ -111,7 +150,7 @@ Finance → Expenses → `Record an expense`.
 
 Expenses post to ERPNext directly on submit.
 
-## 6. Reports and reconciliation
+## 7. Reports and reconciliation
 
 Finance → Reports. Four report types, each with its own filters, preview, and
 download:
