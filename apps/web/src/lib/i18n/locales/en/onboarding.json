@@ -353,8 +353,6 @@
       "studentCount": "Number of students",
       "optional": "Optional",
       "applicantName": "Your full name",
-      "jobTitle": "Your role",
-      "jobTitleHelper": "For example owner, principal or director (optional)",
       "phone": "Phone number",
       "proof": "Proof document",
       "proofHelper": "A PDF or photo (JPG, PNG or WebP), up to 10 MB.",

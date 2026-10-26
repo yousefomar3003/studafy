@@ -357,8 +357,6 @@
       "studentCount": "عدد الطلاب",
       "optional": "اختياري",
       "applicantName": "اسمك الكامل",
-      "jobTitle": "منصبك",
-      "jobTitleHelper": "مثل المالك أو المدير أو مدير المدرسة (اختياري)",
       "phone": "رقم الهاتف",
       "proof": "مستند الإثبات",
       "proofHelper": "ملف PDF أو صورة (JPG أو PNG أو WebP) بحجم أقصى 10 ميغابايت.",

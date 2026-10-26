@@ -23,7 +23,6 @@ export const PROOF_MAX_SIZE_BYTES = 10 * 1024 * 1024;
 
 export const applicationFormSchema = z.object({
   applicant_name: requiredText(200),
-  applicant_job_title: optionalText(120),
   applicant_phone: z
     .string()
     .trim()
@@ -58,7 +57,6 @@ export type ApplicationForm = z.infer<typeof applicationFormSchema>;
 
 export const EMPTY_APPLICATION_FORM: ApplicationForm = {
   applicant_name: "",
-  applicant_job_title: "",
   applicant_phone: "",
   school_name: "",
   school_email: "",

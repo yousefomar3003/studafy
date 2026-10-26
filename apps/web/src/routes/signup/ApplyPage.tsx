@@ -213,7 +213,6 @@ function ApplicationFormView({ me }: { me: ApplicantMe }) {
       await applicantApi.POST("/api/school-applications/me", {
         body: {
           applicant_name: form.applicant_name,
-          applicant_job_title: form.applicant_job_title || undefined,
           applicant_phone: form.applicant_phone,
           school_name: form.school_name,
           school_email: form.school_email || undefined,
@@ -363,22 +362,15 @@ function ApplicationFormView({ me }: { me: ApplicantMe }) {
             required
           />
           <Input
-            label={t("onboarding.signup.fields.jobTitle")}
-            value={values.applicant_job_title}
-            onChange={(e) => setField("applicant_job_title", e.target.value)}
-            helperText={t("onboarding.signup.fields.jobTitleHelper")}
-            error={err("applicant_job_title")}
+            label={t("onboarding.signup.fields.phone")}
+            type="tel"
+            autoComplete="tel"
+            value={values.applicant_phone}
+            onChange={(e) => setField("applicant_phone", e.target.value)}
+            error={err("applicant_phone")}
+            required
           />
         </div>
-        <Input
-          label={t("onboarding.signup.fields.phone")}
-          type="tel"
-          autoComplete="tel"
-          value={values.applicant_phone}
-          onChange={(e) => setField("applicant_phone", e.target.value)}
-          error={err("applicant_phone")}
-          required
-        />
       </fieldset>
 
       <fieldset className="apply__fieldset">
