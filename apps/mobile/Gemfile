@@ -9,3 +9,6 @@
 source "https://rubygems.org"
 
 gem "fastlane", "2.228.0"
+# `flutter build ipa` runs inside `bundle exec fastlane`, where the runner image's own CocoaPods
+# (installed under a different Ruby) reports itself broken and pod install is skipped.
+gem "cocoapods", "1.16.2"
