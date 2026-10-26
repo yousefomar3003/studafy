@@ -19,8 +19,6 @@ build to TestFlight or Play. Concretely still missing:
 - An App Store Connect app record and a Play Console app entry with the `internal` and `production`
   tracks created, and the first build uploaded **manually** on each side (both stores refuse an
   API upload for a track that has never had a build).
-- The one-time iOS Xcode wiring in [iOS signing](#ios-signing) — the same class of "needs a human
-  with Xcode once" gap `.github/workflows/mobile-integration.yml` already carries for its iOS leg.
 - A committed `apps/mobile/Gemfile.lock` — generated the first time `bundle install` runs (CI does
   this via `bundler-cache`); commit it once it exists.
 
@@ -95,23 +93,28 @@ committed; the workflow writes the file-shaped ones (`fastlane/play-store-key.js
 
 Managed with [`match`](https://docs.fastlane.tools/actions/match/) (`fastlane/Matchfile`): the App
 Store distribution certificate and provisioning profile live encrypted in a dedicated git repo, and
-every runner fetches them **read-only** (`readonly(true)`). Only a deliberate local run mints or
-renews them:
+every runner fetches them **read-only** (`readonly(true)`). Only a deliberate run of the
+`create_signing` lane mints or renews them (Apple allows only a few distribution certificates per
+team, so no release lane calls it):
 
 ```bash
 cd apps/mobile
-bundle exec fastlane match appstore          # first-time setup / renewal — NOT readonly
+bundle exec fastlane ios create_signing      # first-time setup / renewal — NOT readonly
 ```
 
-One-time Xcode wiring, needed before `ios beta` / `ios release` can succeed and not attempted blind
-here (no Xcode in this environment to verify a `project.pbxproj` edit — same reason
-`mobile-integration.yml`'s iOS leg is a documented manual step):
+No Xcode wiring is committed: the project keeps automatic signing, and the `signing` lane switches
+the `Release-prod` configuration to manual signing with the match profile on the runner's working
+copy (`update_code_signing_settings`), then exports with explicit manual-signing options. Verified
+end to end on 2026-10-26 (first build uploaded to TestFlight from a `macos-26` runner).
 
-1. Set the `prod` scheme's Release build config to **manual** signing.
-2. Point it at the `match AppStore com.studafy.studafyMobile` profile and the matching distribution
-   certificate.
-3. Confirm `flutter build ipa --flavor prod --export-method app-store` produces a signed IPA under
-   `build/ios/ipa/`.
+Two build-environment requirements, both learned on that first run:
+
+- **macOS 26 runners** (`runs-on: macos-26`), for Xcode 26 — App Store Connect rejects uploads built
+  with an older SDK.
+- **CocoaPods, not Swift Package Manager**: `build_ios_ipa` runs
+  `flutter config --no-enable-swift-package-manager` first, because resolving FlutterFire through
+  SPM hung for 80+ minutes cloning github.com/firebase/flutterfire. CocoaPods is a Gemfile gem
+  because the runner's own copy reports itself broken under `bundle exec`.
 
 ## Android signing
 

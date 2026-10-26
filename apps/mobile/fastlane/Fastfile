@@ -145,6 +145,10 @@ def ios_export_options_plist
 end
 
 def build_ios_ipa
+  # CocoaPods (ios/Podfile), not Swift Package Manager: resolving FlutterFire's packages through
+  # SPM hung for 80+ minutes on a CI runner fetching the github.com/firebase/flutterfire repo.
+  # Set before `pub get`, which is when Flutter wires plugins into the Xcode project.
+  flutter("config", "--no-enable-swift-package-manager")
   flutter_prepare
   flutter(
     "build", "ipa", "--release",
