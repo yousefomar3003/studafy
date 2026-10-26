@@ -29,7 +29,8 @@ import '../../../design/layout/bottom_inset_padding.dart';
 /// The privacy policy (`/privacy`) opens in the system browser, never an in-app webview (see
 /// `docs/store_payment_routing.md` for the reviewed list of outbound launches), for every role.
 ///
-/// Every role gets "Delete my account" ([DeleteAccountScreen]), the in-app deletion App Store
+/// "Sign-in & security" ([SignInSecurityScreen]) groups changing the password, signed-in devices
+/// and, for every role, "Delete my account" ([DeleteAccountScreen]), the in-app deletion App Store
 /// Guideline 5.1.1(v) and Google Play require. The school admin (ORG_ADMIN) additionally gets
 /// "Delete school" ([DeleteSchoolScreen]): it closes the whole school — every member is signed out
 /// and can no longer sign in, and the school's data is kept. See
@@ -93,20 +94,18 @@ class ProfileTabScreen extends ConsumerWidget {
                 clipBehavior: Clip.antiAlias,
                 child: Column(
                   children: [
-                    if (canChangeMemberPassword(roles)) ...[
-                      _SettingsRow(
-                        key: const Key('profileChangePassword'),
-                        icon: Icons.lock_outline,
-                        titleKey: 'shell.profile.changePassword.title',
-                        trailing: Icons.chevron_right,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const ChangePasswordScreen(),
-                          ),
+                    _SettingsRow(
+                      key: const Key('profileSignInSecurity'),
+                      icon: Icons.shield_outlined,
+                      titleKey: 'shell.profile.signInSecurity.title',
+                      trailing: Icons.chevron_right,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SignInSecurityScreen(),
                         ),
                       ),
-                      const Divider(height: 1, indent: 68),
-                    ],
+                    ),
+                    const Divider(height: 1, indent: 68),
                     _SettingsRow(
                       key: const Key('profileNotifications'),
                       icon: Icons.notifications_none_outlined,
@@ -115,18 +114,6 @@ class ProfileTabScreen extends ConsumerWidget {
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => const NotificationPreferencesScreen(),
-                        ),
-                      ),
-                    ),
-                    const Divider(height: 1, indent: 68),
-                    _SettingsRow(
-                      key: const Key('profileSignedInDevices'),
-                      icon: Icons.devices_outlined,
-                      titleKey: 'account.devices.title',
-                      trailing: Icons.chevron_right,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SignedInDevicesScreen(),
                         ),
                       ),
                     ),
@@ -142,8 +129,6 @@ class ProfileTabScreen extends ConsumerWidget {
                         mode: LaunchMode.externalApplication,
                       ),
                     ),
-                    const Divider(height: 1, indent: 68),
-                    const _DeleteAccountTile(),
                     if (isSchoolAdmin) ...[
                       const Divider(height: 1, indent: 68),
                       const _DeleteSchoolTile(),
@@ -468,7 +453,65 @@ class _LanguageSetting extends StatelessWidget {
   }
 }
 
-/// Every role's "Delete my account" entry point.
+/// Sign-in & security, opened from the Profile tab's Account card: the member's password (for
+/// member-password accounts), the devices signed in to this account, and "Delete my account".
+class SignInSecurityScreen extends ConsumerWidget {
+  const SignInSecurityScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final roles = ref.watch(sessionRolesProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: Text('shell.profile.signInSecurity.title'.tr())),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  if (canChangeMemberPassword(roles)) ...[
+                    _SettingsRow(
+                      key: const Key('profileChangePassword'),
+                      icon: Icons.lock_outline,
+                      titleKey: 'shell.profile.changePassword.title',
+                      trailing: Icons.chevron_right,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ChangePasswordScreen(),
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 68),
+                  ],
+                  _SettingsRow(
+                    key: const Key('profileSignedInDevices'),
+                    icon: Icons.devices_outlined,
+                    titleKey: 'account.devices.title',
+                    trailing: Icons.chevron_right,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SignedInDevicesScreen(),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1, indent: 68),
+                  const _DeleteAccountTile(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Every role's "Delete my account" entry point, inside [SignInSecurityScreen].
 class _DeleteAccountTile extends StatelessWidget {
   const _DeleteAccountTile();
 

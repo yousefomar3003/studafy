@@ -24,7 +24,7 @@ import '../../support/pump_studafy_app.dart';
 const _schoolName = 'Al Noor Academy';
 
 /// "Delete school" on the Profile tab: only the school admin (ORG_ADMIN) gets it — every role,
-/// the admin included, also gets "Delete my account" — and its confirmation screen closes the school only after the
+/// the admin included, also gets "Delete my account" under Profile → Sign-in & security — and its confirmation screen closes the school only after the
 /// admin types the school's name, then signs this device out with the closed-school notice.
 void main() {
   group('the Profile tab offers account deletion to every role', () {
@@ -47,9 +47,11 @@ void main() {
         await _openProfile(tester);
 
         expect(find.byKey(const Key('profileDeleteSchool')), findsNothing);
-        expect(find.byKey(const Key('profileDeleteAccount')), findsOneWidget);
         expect(find.text('Delete school'), findsNothing);
         expect(find.byKey(const Key('profilePrivacyPolicy')), findsOneWidget);
+        expect(find.byKey(const Key('profileDeleteAccount')), findsNothing);
+        await _openSignInSecurity(tester);
+        expect(find.byKey(const Key('profileDeleteAccount')), findsOneWidget);
       });
     }
 
@@ -64,8 +66,9 @@ void main() {
 
       expect(find.byKey(const Key('profileDeleteSchool')), findsOneWidget);
       expect(find.text('Delete school'), findsOneWidget);
-      expect(find.byKey(const Key('profileDeleteAccount')), findsOneWidget);
       expect(find.byKey(const Key('profilePrivacyPolicy')), findsOneWidget);
+      await _openSignInSecurity(tester);
+      expect(find.byKey(const Key('profileDeleteAccount')), findsOneWidget);
     });
   });
 
@@ -238,6 +241,14 @@ DioException _apiError(int status, String code) {
     response: response,
     error: ApiException.fromResponse(response),
   );
+}
+
+/// From the Profile tab, opens Sign-in & security, where "Delete my account" lives.
+Future<void> _openSignInSecurity(WidgetTester tester) async {
+  await tester.ensureVisible(find.byKey(const Key('profileSignInSecurity')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('profileSignInSecurity')));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _openProfile(WidgetTester tester) async {

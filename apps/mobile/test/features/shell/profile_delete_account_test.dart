@@ -11,6 +11,7 @@ import 'package:studafy_mobile/src/features/shell/application/shell_providers.da
 import 'package:studafy_mobile/src/features/shell/presentation/delete_account_screen.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/deletion_pending_screen.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/pill_navigation_bar.dart';
+import 'package:studafy_mobile/src/features/shell/presentation/profile_tab_screen.dart';
 
 import '../../support/pump_app_shell.dart';
 import '../../support/pump_studafy_app.dart';
@@ -206,9 +207,13 @@ Future<ProviderContainer> _pumpOnDeleteAccount(
     ),
   );
   await tester.pumpAndSettle();
+  // "Delete my account" lives under Profile -> Sign-in & security.
   // The floating nav bar overlaps the bottom of the short test viewport.
-  await tester.ensureVisible(find.byKey(const Key('profileDeleteAccount')));
+  await tester.ensureVisible(find.byKey(const Key('profileSignInSecurity')));
   await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('profileSignInSecurity')));
+  await tester.pumpAndSettle();
+  expect(find.byType(SignInSecurityScreen), findsOneWidget);
   await tester.tap(find.byKey(const Key('profileDeleteAccount')));
   await tester.pumpAndSettle();
   expect(find.byType(DeleteAccountScreen), findsOneWidget);

@@ -37,8 +37,8 @@ Now:
   the same `POST /api/account/deletion` pipeline for every account on that address. Linked from the
   site footer and the privacy policy. See `docs/modules/account-deletion.md`.
 - **The mobile app offers in-app account deletion to every role.** The Profile tab
-  (`apps/mobile/lib/src/features/shell/presentation/profile_tab_screen.dart`) shows **"Delete my
-  account"** to every signed-in user (`delete_account_screen.dart`). To guard against accidents the
+  (`apps/mobile/lib/src/features/shell/presentation/profile_tab_screen.dart`) opens **Sign-in &
+  security**, which shows **"Delete my account"** to every signed-in user (`delete_account_screen.dart`). To guard against accidents the
   button enables only after the person ticks an acknowledgement, types the confirmation word and,
   for member-ID accounts, re-enters their member ID and password; a final dialog follows. It calls
   `POST /api/account/deletion`, which signs out everywhere and **schedules the deletion 14 days
@@ -49,8 +49,8 @@ Now:
   it archives the school and signs every member out but **keeps the school's data** — a closure, not
   an erasure.
 
-**Store review.** Apple 5.1.1(v): covered by "Delete my account" in the Profile tab, for every
-role; point App Review to Profile → Account → Delete my account in the review notes, and say the
+**Store review.** Apple 5.1.1(v): covered by "Delete my account" under Profile → Sign-in & security, for every
+role; point App Review to Profile → Account → Sign-in & security → Delete my account in the review notes, and say the
 deletion completes 14 days after the request (the app states this before and after confirming).
 Apple accepts a delay when it is disclosed, and confirmation steps that prevent accidental
 deletion; do not add steps beyond these (e.g. contacting support), which 5.1.1(v) forbids. Give the
@@ -58,7 +58,7 @@ reviewer an email/SSO demo account, or a member-ID account whose ID and password
 the in-app path covers the app requirement, and the Data safety "Delete account URL" is
 `/legal/delete-account`, which works without the app or a sign-in.
 
-Re-check before every submission: the Profile tab shows "Delete my account" for every role and "Delete school" for ORG_ADMIN only,
+Re-check before every submission: Profile → Sign-in & security shows "Delete my account" for every role and "Delete school" for ORG_ADMIN only,
 `/account/delete` and `/legal/delete-account` are still reachable, and `POST /api/account/deletion`
 still requires only authentication (a permission added here by mistake would silently break
 self-service deletion for every role at once). `POST /api/account/deletion-requests` (and `/confirm`) must stay

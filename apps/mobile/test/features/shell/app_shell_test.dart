@@ -40,11 +40,12 @@ void main() {
       // The Profile tab's account actions. The shell keeps every visited tab's *state* alive, but a
       // non-selected tab's content is still offstage — `find.text()` defaults to
       // `skipOffstage: true`, so this needs an actual tab switch first, same as the "tapping a
-      // destination switches..." test below. Every role gets "Delete my account"; only the school admin
+      // destination switches..." test below. Every role gets "Sign-in & security" (which holds "Delete
+      // my account"); only the school admin
       // also gets "Delete school"; see ProfileTabScreen's doc comment and profile_delete_school_test.dart.
       await tester.tap(find.byTooltip('Profile'));
       await tester.pumpAndSettle();
-      expect(find.text('Delete my account'), findsOneWidget);
+      expect(find.text('Sign-in & security'), findsOneWidget);
       expect(find.text('Delete school'), findsNothing);
       expect(find.text('Privacy policy'), findsOneWidget);
     });

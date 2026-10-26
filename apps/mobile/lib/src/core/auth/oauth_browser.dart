@@ -52,8 +52,9 @@ class OAuthBrowser {
       );
 
   /// Whether sign-in runs in an `ASWebAuthenticationSession` (iOS) rather than
-  /// the browser app plus a deep link (Android).
-  @visibleForTesting
+  /// the browser app plus a deep link (Android). The session reports its own
+  /// dismissal, so only the Android flow needs the caller to detect an
+  /// abandoned sign-in.
   static bool get usesWebAuthSession =>
       defaultTargetPlatform == TargetPlatform.iOS;
 

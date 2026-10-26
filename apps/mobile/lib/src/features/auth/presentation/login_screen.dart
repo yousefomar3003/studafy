@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/auth/auth_notifier.dart';
 import '../../../core/auth/auth_state.dart';
+import '../../../core/auth/oauth_browser.dart';
 import '../../../core/auth/school_closed_notice.dart';
 import '../../../core/config/app_environment.dart';
 import '../../../core/di/app_providers.dart';
@@ -75,7 +76,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// wait forever. Back in the app with sign-in still pending, give a late redirect a moment to
   /// land, then abandon it — the screen returns to the form with the "failed" snackbar. A no-op
   /// once the callback has arrived (the token exchange is no longer cancellable).
+  ///
+  /// Not on iOS: the `ASWebAuthenticationSession` sheet itself sends the app through inactive and
+  /// back to resumed while it is still open, so this would cancel a sign-in in progress. The
+  /// session reports its own dismissal there.
   void _onResume() {
+    if (OAuthBrowser.usesWebAuthSession) return;
     _abandonedSignInTimer?.cancel();
     _abandonedSignInTimer = Timer(const Duration(seconds: 2), () {
       if (mounted && ref.read(authNotifierProvider) == AuthStatus.loading) {
