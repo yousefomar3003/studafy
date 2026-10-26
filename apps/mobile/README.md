@@ -53,6 +53,9 @@ Override any flavor at build or run time with `API_BASE_URL` / `REALTIME_BASE_UR
 flutter run --flavor dev -t lib/main_dev.dart --dart-define=API_BASE_URL=http://localhost:3000 --dart-define=REALTIME_BASE_URL=ws://localhost:3001
 ```
 
+On a physical device (same Wi-Fi as the Mac), `bun run dev:device` points the dev flavor at the Mac's
+LAN IP (`ipconfig getifaddr en0`). Set `API_HOST=<ip>` to use a different host.
+
 ## Folder Structure
 
 ```text
