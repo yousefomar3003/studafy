@@ -13,6 +13,22 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Paid features and school licensing (see
+  [`docs/billing/feature-licensing.md`](../billing/feature-licensing.md)):
+  - `GET /api/me/features`: the caller's paid features with their verdicts.
+  - School licenses and seats: `/api/school/license` (overview, seats, eligible people, change
+    requests) and the super admin's `/api/platform/schools/{schoolId}/licenses` console.
+  - License billing: the school's quotes, invoices, receipts and payments under
+    `/api/school/license/{quotes,invoices,payments,receipts}`; the super admin's price settings,
+    bank details, calculator (`POST /api/platform/licenses/quote`), cross-school invoices, pending
+    receipts and finance totals under `/api/platform/licenses/*`, and quotes, invoices, payments and
+    receipts under `/api/platform/schools/{schoolId}/license-*`.
+  - AI routes answer `429 FEATURE_LIMIT_REACHED` when a tier's monthly unit limit is used up.
+- Finance family accounts (`/api/finance/families`, payments, profile, reminders, statements),
+  payment receipts (`GET /api/finance/payments/{paymentId}/receipt`), reminders and the sibling
+  discount (`/api/finance/sibling-discount`).
+- Year-scoped academic grading under `/api/grading/*`: scales, programs, subject configs, teacher
+  assignments, mark sheets and marks, results preview and finalization, certificates.
 - Public account deletion without the app or a session (ST-302; see
   [`docs/modules/account-deletion.md`](../modules/account-deletion.md#web-deletion-flow-no-sign-in)).
   Both unauthenticated (`security: []`), CSRF-exempt and `auth-strict` rate-limited:
