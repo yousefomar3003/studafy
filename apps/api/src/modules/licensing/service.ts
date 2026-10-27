@@ -646,6 +646,11 @@ interface CandidateRow {
   eligible: boolean;
   seated: boolean;
   personal: boolean;
+  /** The person's active seat of the audience on this license, if any. */
+  seat_id: string | null;
+  assigned_at: Date | null;
+  /** When their latest live personal subscription of the audience ends, if they have one. */
+  personal_ends_at: Date | null;
 }
 
 function escapeLike(value: string): string {
@@ -726,6 +731,10 @@ async function candidates(
     userIds?: readonly string[];
     search?: string;
     onlyAssignable?: boolean;
+    /** Only people holding a seat ("seated") or not ("unseated"). */
+    seat?: "seated" | "unseated";
+    /** Only people with a live personal subscription of the audience. */
+    onlyPersonal?: boolean;
     limit?: number;
     offset?: number;
   },
@@ -783,45 +792,54 @@ async function candidates(
 
   const rows = await tx<(CandidateRow & { total: string })[]>`
     WITH p AS (${people}),
-    marked AS (
+    found AS (
       SELECT
         p.user_id::text AS user_id,
         p.student_id::text AS student_id,
         p.name,
         p.email,
         app.license_seat_eligible(${audience}, p.user_id, p.student_id) AS eligible,
-        EXISTS (
-          SELECT 1 FROM app.license_seats AS ls
-          WHERE ls.school_id = current_setting('app.school_id')::uuid
-            AND ls.license_id = ${licenseId}::uuid
-            AND ls.audience = ${audience}
-            AND ls.user_id = p.user_id
-            AND ls.unassigned_at IS NULL
-        ) AS seated,
-        (
-          EXISTS (
-            SELECT 1 FROM app.user_subscriptions AS us
+        seat.id::text AS seat_id,
+        seat.assigned_at,
+        -- GREATEST skips NULLs: the later of the two kinds of personal subscription.
+        GREATEST(
+          (
+            SELECT max(us.current_period_end) FROM app.user_subscriptions AS us
             JOIN app.plans AS pl ON pl.id = us.plan_id
             WHERE us.school_id = current_setting('app.school_id')::uuid
               AND us.user_id = p.user_id
               AND pl.audience = ${audience}
               AND us.status::text = ANY(${live})
               AND us.current_period_end > CURRENT_TIMESTAMP
-          )
-          OR (p.student_id IS NOT NULL AND EXISTS (
-            SELECT 1 FROM app.ai_subscriptions AS ai
+          ),
+          CASE WHEN p.student_id IS NOT NULL THEN (
+            SELECT max(ai.current_period_end) FROM app.ai_subscriptions AS ai
             WHERE ai.school_id = current_setting('app.school_id')::uuid
               AND ai.student_id = p.student_id
               AND ai.status::text = ANY(${live})
               AND ai.current_period_end > CURRENT_TIMESTAMP
-          ))
-        ) AS personal
+          ) END
+        ) AS personal_ends_at
       FROM p
+      LEFT JOIN LATERAL (
+        SELECT ls.id, ls.assigned_at FROM app.license_seats AS ls
+        WHERE ls.school_id = current_setting('app.school_id')::uuid
+          AND ls.license_id = ${licenseId}::uuid
+          AND ls.audience = ${audience}
+          AND ls.user_id = p.user_id
+          AND ls.unassigned_at IS NULL
+      ) AS seat ON true
       WHERE true ${byIds} ${search}
+    ),
+    marked AS (
+      SELECT *, seat_id IS NOT NULL AS seated, personal_ends_at IS NOT NULL AS personal FROM found
     )
     SELECT *, count(*) OVER ()::text AS total
     FROM marked
-    ${input.onlyAssignable ? tx`WHERE eligible AND NOT seated` : tx``}
+    WHERE true
+      ${input.onlyAssignable ? tx`AND eligible AND NOT seated` : tx``}
+      ${input.seat === "seated" ? tx`AND seated` : input.seat === "unseated" ? tx`AND NOT seated` : tx``}
+      ${input.onlyPersonal ? tx`AND personal` : tx``}
     ORDER BY lower(name), email, user_id
     ${input.limit !== undefined ? tx`LIMIT ${input.limit} OFFSET ${input.offset ?? 0}` : tx``}
   `;
@@ -859,6 +877,51 @@ export async function listEligible(
       name: row.name,
       email: row.email,
       hasPersonalSubscription: row.personal,
+    })),
+    total,
+  };
+}
+
+export interface LicensePerson extends EligiblePerson {
+  /** Whether they may hold a seat of the audience (enrolled, active, linked...). */
+  eligible: boolean;
+  /** Their seat on this license, if they hold one. */
+  seatId: string | null;
+  assignedAt: string | null;
+  /** When their personal subscription ends, if they have a live one. */
+  personalSubscriptionEndsAt: string | null;
+}
+
+/**
+ * Everyone of an audience in scope with their seat status on the license: who holds a seat, who
+ * could get one, who cannot, and who pays personally (with when that ends) -- the school's seat
+ * screen.
+ */
+export async function listPeople(
+  tx: TransactionSql,
+  license: LicenseRecord,
+  input: {
+    audience: Audience;
+    scope?: SeatScope;
+    search?: string;
+    seat?: "seated" | "unseated";
+    onlyPersonal?: boolean;
+    limit: number;
+    offset: number;
+  },
+): Promise<{ people: LicensePerson[]; total: number }> {
+  const { rows, total } = await candidates(tx, { licenseId: license.id, ...input });
+  return {
+    people: rows.map((row) => ({
+      userId: row.user_id,
+      studentId: row.student_id,
+      name: row.name,
+      email: row.email,
+      eligible: row.eligible,
+      seatId: row.seat_id,
+      assignedAt: row.assigned_at?.toISOString() ?? null,
+      hasPersonalSubscription: row.personal,
+      personalSubscriptionEndsAt: row.personal_ends_at?.toISOString() ?? null,
     })),
     total,
   };
@@ -1168,6 +1231,95 @@ export interface FeatureUsageView {
   used: number;
 }
 
+export interface OfferedTierFeature {
+  key: FeatureKey;
+  name: string;
+  unit: FeatureUsageUnit | null;
+  /** The tier's monthly limit (the code's default where the tier states none); null is unlimited. */
+  monthlyLimit: number | null;
+  status: "active" | "paused";
+}
+
+export interface OfferedTier {
+  id: string;
+  code: string;
+  displayName: string;
+  description: string | null;
+  audience: Audience;
+  rank: number;
+  isActive: boolean;
+  includesAllFeatures: boolean;
+  features: OfferedTierFeature[];
+}
+
+/**
+ * What each tier gives, for the school: every active tier, and any retired one its license still
+ * uses, with the features it includes and their monthly limits. A tier with `includes_all_features`
+ * lists every feature of its audience. Prices are not here -- a school sees prices on its quotes --
+ * and hidden features are not listed.
+ */
+export async function listOfferedTiers(
+  tx: TransactionSql,
+  license: LicenseRecord | null,
+): Promise<OfferedTier[]> {
+  const current = license
+    ? AUDIENCES.map((a) => planIdFor(license, a)).filter((id): id is string => id !== null)
+    : [];
+  const [plans, included, settings] = await Promise.all([
+    tx<
+      {
+        id: string;
+        code: string;
+        display_name: string;
+        description: string | null;
+        audience: Audience;
+        rank: number;
+        is_active: boolean;
+        includes_all_features: boolean;
+      }[]
+    >`
+      SELECT id::text AS id, code, display_name, description, audience, rank, is_active,
+             includes_all_features
+      FROM app.plans
+      WHERE audience IS NOT NULL AND (is_active OR id = ANY(${current}::uuid[]))
+      ORDER BY audience, rank, display_name
+    `,
+    tx<{ plan_id: string; feature_key: FeatureKey; monthly_limit: number | null }[]>`
+      SELECT plan_id::text AS plan_id, feature_key, monthly_limit FROM app.plan_features
+    `,
+    tx<{ key: FeatureKey; display_name: string; status: "active" | "paused" | "hidden" }[]>`
+      SELECT key, display_name, status FROM app.features
+    `,
+  ]);
+
+  return plans.map((plan) => ({
+    id: plan.id,
+    code: plan.code,
+    displayName: plan.display_name,
+    description: plan.description,
+    audience: plan.audience,
+    rank: plan.rank,
+    isActive: plan.is_active,
+    includesAllFeatures: plan.includes_all_features,
+    features: FEATURE_KEYS.flatMap((key): OfferedTierFeature[] => {
+      const feature = FEATURES[key];
+      const setting = settings.find((row) => row.key === key);
+      if (feature.audience !== plan.audience || !setting || setting.status === "hidden") return [];
+      const row = included.find((r) => r.plan_id === plan.id && r.feature_key === key);
+      if (!row && !plan.includes_all_features) return [];
+      return [
+        {
+          key,
+          name: setting.display_name,
+          unit: feature.unit,
+          monthlyLimit: row ? row.monthly_limit : feature.defaultMonthlyLimit,
+          status: setting.status,
+        },
+      ];
+    }),
+  }));
+}
+
 /** This month's units per feature, summed over the license's current seat holders. */
 export async function licenseUsage(
   tx: TransactionSql,
@@ -1199,6 +1351,10 @@ export interface ChangeRequestInput {
   teacherSeats?: number | null;
   parentSeats?: number | null;
   includeFamilyPlus?: boolean | null;
+  /** The tier wanted per audience (session 5); omitted or null is "no change". */
+  studentPlanId?: string | null;
+  teacherPlanId?: string | null;
+  parentPlanId?: string | null;
   note: string;
 }
 
@@ -1209,6 +1365,9 @@ export interface ChangeRequestView {
   teacherSeats: number | null;
   parentSeats: number | null;
   includeFamilyPlus: boolean | null;
+  studentTier: TierRef | null;
+  teacherTier: TierRef | null;
+  parentTier: TierRef | null;
   note: string;
   status: "open" | "resolved" | "declined";
   requestedBy: string;
@@ -1224,6 +1383,9 @@ interface ChangeRequestRow {
   teacher_seats: number | null;
   parent_seats: number | null;
   include_family_plus: boolean | null;
+  student_plan_id: string | null;
+  teacher_plan_id: string | null;
+  parent_plan_id: string | null;
   note: string;
   status: ChangeRequestView["status"];
   requested_by: string;
@@ -1232,7 +1394,33 @@ interface ChangeRequestRow {
   resolution_note: string | null;
 }
 
-function toChangeRequestView(row: ChangeRequestRow): ChangeRequestView {
+/** The requested tiers' names, in one read for every row. */
+async function toChangeRequestViews(
+  tx: TransactionSql,
+  rows: readonly ChangeRequestRow[],
+): Promise<ChangeRequestView[]> {
+  const ids = [
+    ...new Set(
+      rows.flatMap((row) => [row.student_plan_id, row.teacher_plan_id, row.parent_plan_id]),
+    ),
+  ].filter((id): id is string => id !== null);
+  const plans =
+    ids.length === 0
+      ? []
+      : await tx<{ id: string; code: string; display_name: string }[]>`
+          SELECT id::text AS id, code, display_name FROM app.plans WHERE id = ANY(${ids}::uuid[])
+        `;
+  const tier = (id: string | null): TierRef | null => {
+    const plan = plans.find((p) => p.id === id);
+    return plan ? { id: plan.id, code: plan.code, displayName: plan.display_name } : null;
+  };
+  return rows.map((row) => toChangeRequestView(row, tier));
+}
+
+function toChangeRequestView(
+  row: ChangeRequestRow,
+  tier: (id: string | null) => TierRef | null,
+): ChangeRequestView {
   return {
     id: row.id,
     licenseId: row.license_id,
@@ -1240,6 +1428,9 @@ function toChangeRequestView(row: ChangeRequestRow): ChangeRequestView {
     teacherSeats: row.teacher_seats,
     parentSeats: row.parent_seats,
     includeFamilyPlus: row.include_family_plus,
+    studentTier: tier(row.student_plan_id),
+    teacherTier: tier(row.teacher_plan_id),
+    parentTier: tier(row.parent_plan_id),
     note: row.note,
     status: row.status,
     requestedBy: row.requested_by,
@@ -1251,11 +1442,16 @@ function toChangeRequestView(row: ChangeRequestRow): ChangeRequestView {
 
 const CHANGE_REQUEST_COLUMNS = (tx: TransactionSql) => tx`
   id::text AS id, license_id::text AS license_id, student_seats, teacher_seats, parent_seats,
-  include_family_plus, note, status, requested_by::text AS requested_by, created_at, resolved_at,
-  resolution_note
+  include_family_plus, student_plan_id::text AS student_plan_id,
+  teacher_plan_id::text AS teacher_plan_id, parent_plan_id::text AS parent_plan_id, note, status,
+  requested_by::text AS requested_by, created_at, resolved_at, resolution_note
 `;
 
-/** A school asks the super admin for different seats; the license itself is unchanged. */
+/**
+ * A school asks the super admin for different seats or tiers; the license itself is unchanged. A
+ * requested tier must be an active tier of its audience (the trigger checks the audience; retired
+ * tiers are not on offer).
+ */
 export async function createChangeRequest(
   tx: TransactionSql,
   schoolId: string,
@@ -1263,13 +1459,32 @@ export async function createChangeRequest(
   actor: LicenseActor,
 ): Promise<ChangeRequestView> {
   const license = await currentLicense(tx);
+  const wanted = {
+    student: input.studentPlanId ?? null,
+    teacher: input.teacherPlanId ?? null,
+    parent: input.parentPlanId ?? null,
+  };
+  const planIds = Object.values(wanted).filter((id): id is string => id !== null);
+  if (planIds.length > 0) {
+    const offered = await tx<{ id: string; audience: Audience }[]>`
+      SELECT id::text AS id, audience FROM app.plans
+      WHERE id = ANY(${planIds}::uuid[]) AND is_active AND audience IS NOT NULL
+    `;
+    const valid = AUDIENCES.every(
+      (audience) =>
+        wanted[audience] === null ||
+        offered.some((plan) => plan.id === wanted[audience] && plan.audience === audience),
+    );
+    if (!valid) throw licenseError(422, ERROR_CODES.LICENSE_TIER_INVALID, actor.locale);
+  }
   const [row] = await tx<ChangeRequestRow[]>`
     INSERT INTO app.license_change_requests (
-      school_id, license_id, student_seats, teacher_seats, parent_seats, include_family_plus, note,
-      requested_by
+      school_id, license_id, student_seats, teacher_seats, parent_seats, include_family_plus,
+      student_plan_id, teacher_plan_id, parent_plan_id, note, requested_by
     ) VALUES (
       ${schoolId}::uuid, ${license?.id ?? null}::uuid, ${input.studentSeats ?? null},
       ${input.teacherSeats ?? null}, ${input.parentSeats ?? null}, ${input.includeFamilyPlus ?? null},
+      ${wanted.student}::uuid, ${wanted.teacher}::uuid, ${wanted.parent}::uuid,
       ${input.note.trim()}, ${actor.userId}::uuid
     )
     RETURNING ${CHANGE_REQUEST_COLUMNS(tx)}
@@ -1284,10 +1499,13 @@ export async function createChangeRequest(
       teacher_seats: row!.teacher_seats,
       parent_seats: row!.parent_seats,
       include_family_plus: row!.include_family_plus,
+      student_plan_id: row!.student_plan_id,
+      teacher_plan_id: row!.teacher_plan_id,
+      parent_plan_id: row!.parent_plan_id,
       note: row!.note,
     },
   });
-  return toChangeRequestView(row!);
+  return (await toChangeRequestViews(tx, [row!]))[0]!;
 }
 
 export async function listChangeRequests(
@@ -1302,7 +1520,7 @@ export async function listChangeRequests(
     ORDER BY created_at DESC
     LIMIT 200
   `;
-  return rows.map(toChangeRequestView);
+  return toChangeRequestViews(tx, rows);
 }
 
 /** The super admin closes a request (after changing the license, or not). */
@@ -1331,7 +1549,7 @@ export async function resolveChangeRequest(
     oldValues: { status: "open" },
     newValues: { status: input.status, resolution_note: row.resolution_note },
   });
-  return toChangeRequestView(row);
+  return (await toChangeRequestViews(tx, [row]))[0]!;
 }
 
 // ---------------------------------------------------------------------------------------------------

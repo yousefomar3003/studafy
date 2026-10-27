@@ -9,9 +9,17 @@ import { AppProviders, createInertRealtimeSocket } from "./providers";
 import { routes } from "./routes";
 
 // These tests assert routing, not data. Stub the API client so the /portal page's health query
-// resolves in-memory instead of reaching for a server that is not running under the test.
+// resolves in-memory instead of reaching for a server that is not running under the test. The
+// license pages read typed lists, so they get empty ones of the right shape.
+const EMPTY_RESPONSES: Record<string, unknown> = {
+  "/api/school/license": { license: null, usage: [], openChangeRequests: [] },
+  "/api/school/license/tiers": { tiers: [] },
+  "/api/school/license/invoices": { invoices: [], status: "all" },
+};
 mock.module("../lib/api", () => ({
-  api: { GET: () => Promise.resolve({ data: { status: "ok" } }) },
+  api: {
+    GET: (path: string) => Promise.resolve({ data: EMPTY_RESPONSES[path] ?? { status: "ok" } }),
+  },
 }));
 
 afterEach(cleanup);
@@ -161,5 +169,45 @@ describe("app shell for a session holding approval:review", () => {
 
     const nav = await screen.findByRole("navigation", { name: "Portal" });
     expect(within(nav).getByRole("link", { name: "Approvals" })).toBeTruthy();
+  });
+});
+
+describe("the school license area", () => {
+  test("a session without license:read is redirected off /portal/license with a notice", async () => {
+    renderAt("/portal/license/seats");
+
+    expect(
+      await screen.findByRole("heading", { name: /portal/i, level: 1 }, { timeout: 5000 }),
+    ).toBeTruthy();
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    const nav = await screen.findByRole("navigation", { name: "Portal" });
+    expect(within(nav).queryByRole("link", { name: "License" })).toBeNull();
+  });
+
+  test("a principal reaches /portal/license, and the sidebar shows License", async () => {
+    const principalStore = createSessionStore({
+      refreshClient: {
+        refresh: async () => ({
+          accessToken: fakeJwt({ roles: ["PRINCIPAL"] }),
+          expiresAt: Date.now() + 3_600_000,
+          sessionId: "principal-session",
+        }),
+        logout: async () => undefined,
+      },
+    });
+    await principalStore.restore();
+
+    const router = createMemoryRouter(routes, { initialEntries: ["/portal/license"] });
+    render(
+      <AppProviders sessionStore={principalStore} realtimeSocketFactory={createInertRealtimeSocket}>
+        <RouterProvider router={router} />
+      </AppProviders>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "License", level: 1 }, { timeout: 5000 }),
+    ).toBeTruthy();
+    const nav = await screen.findByRole("navigation", { name: "Portal" });
+    expect(within(nav).getByRole("link", { name: "License" })).toBeTruthy();
   });
 });

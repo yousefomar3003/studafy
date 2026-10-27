@@ -167,6 +167,23 @@ void main() {
       expect(controller.retryableQuestion, isNull);
     });
 
+    test('feature refusals map to their own errors (limit reached, not included, expired)', () async {
+      for (final (code, status, expected) in [
+        ('FEATURE_LIMIT_REACHED', 429, AskAiSendError.featureLimitReached),
+        ('FEATURE_NOT_INCLUDED', 402, AskAiSendError.subscriptionInactive),
+        ('FEATURE_EXPIRED', 402, AskAiSendError.subscriptionInactive),
+      ]) {
+        final client = _FakeAskAiClient(
+          () => Stream<AskAiEvent>.error(ApiException(status: status, title: code, code: code)),
+        );
+        final controller = _controllerFor(client);
+
+        await controller.send('question');
+
+        expect(controller.state.sendError, expected, reason: code);
+      }
+    });
+
     test('a connectivity failure keeps the question for retry', () async {
       final client = _FakeAskAiClient(
         () => Stream<AskAiEvent>.error(

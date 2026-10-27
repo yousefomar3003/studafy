@@ -452,5 +452,36 @@
       "blockedBody": "Your school's Studafy account isn't active right now, so the AI Study Assistant can't be bought. Please contact your school.",
       "checkoutError": "Couldn't start checkout"
     }
+  },
+  "features": {
+    "providedBy": "Provided by {{school}}",
+    "providedBySchool": "Provided by your school",
+    "bothRenewal": "Your school now covers this. Your subscription won't renew after {{date}}.",
+    "bothRenewalNoDate": "Your school now covers this. Your own subscription won't renew.",
+    "appStoreSteps": "Apple doesn't let Studafy stop App Store renewals, so please turn it off yourself: on your iPhone or iPad open Settings, tap your name, then Subscriptions, choose Studafy and tap Cancel Subscription. You keep access until it ends.",
+    "limitReached": "Monthly limit reached, resets on {{date}}.",
+    "usage": "{{used}} of {{limit}} {{unit}} used this month",
+    "units": {
+      "messages": "messages",
+      "generations": "generations",
+      "pages": "pages",
+      "submissions": "submissions"
+    },
+    "askSchoolTitle": "Ask your school for a seat",
+    "askSchool": "{{school}} provides this through its Studafy license. Ask your school to give you a seat — there's nothing to buy.",
+    "askSchoolOtherTier": "Your seat from {{school}} doesn't include this. Ask your school whether it can move you to a plan that does.",
+    "askSchoolFor": "{{name}}'s school provides this: ask the school for a seat.",
+    "schoolInactiveTitle": "Your school's Studafy plan isn't active",
+    "schoolInactive": "Paid features are paused until your school renews its Studafy plan.",
+    "unavailableTitle": "Temporarily unavailable",
+    "unavailable": "Studafy has switched this off for now. Please try again later.",
+    "expired": "Your access ended on {{date}}.",
+    "errors": {
+      "notIncluded": "This isn't included in what you have now.",
+      "expired": "Your access to this has ended.",
+      "limitReached": "Monthly limit reached. It resets on the 1st of next month.",
+      "schoolInactive": "Your school's Studafy plan isn't active, so this is paused.",
+      "coveredBySchool": "The school already provides this through a seat, so there's nothing to buy."
+    }
   }
 }

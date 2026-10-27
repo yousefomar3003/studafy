@@ -251,6 +251,8 @@ class QuizController extends ChangeNotifier {
       return switch (apiError.code) {
         'AI_QUOTA_EXCEEDED' => QuizGenerateError.quotaExceeded,
         'AI_SUBSCRIPTION_INACTIVE' => QuizGenerateError.subscriptionInactive,
+        'FEATURE_NOT_INCLUDED' || 'FEATURE_EXPIRED' => QuizGenerateError.subscriptionInactive,
+        'FEATURE_LIMIT_REACHED' => QuizGenerateError.featureLimitReached,
         'AI_SCHOOL_INACTIVE' => QuizGenerateError.schoolInactive,
         'AI_LLM_DISABLED' => QuizGenerateError.llmDisabled,
         'RESOURCE_NOT_FOUND' => QuizGenerateError.materialNotFound,

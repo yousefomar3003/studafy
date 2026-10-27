@@ -153,7 +153,7 @@ export function useSchoolsListQuery(filters: SchoolListFilters) {
 }
 
 /** `GET /api/platform/schools/{schoolId}` — one school with flags and allowed transitions. */
-export function useSchoolDetailQuery(schoolId: string) {
+export function useSchoolDetailQuery(schoolId: string, enabled = true) {
   return useQuery({
     queryKey: schoolDetailKey(schoolId),
     queryFn: async () => {
@@ -163,6 +163,7 @@ export function useSchoolDetailQuery(schoolId: string) {
       if (!data) throw new Error("School detail returned no data.");
       return data as PlatformSchoolDetail;
     },
+    enabled,
   });
 }
 

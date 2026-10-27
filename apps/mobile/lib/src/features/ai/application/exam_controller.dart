@@ -372,6 +372,8 @@ class ExamController extends ChangeNotifier {
       return switch (apiError.code) {
         'AI_QUOTA_EXCEEDED' => ExamCreateError.quotaExceeded,
         'AI_SUBSCRIPTION_INACTIVE' => ExamCreateError.subscriptionInactive,
+        'FEATURE_NOT_INCLUDED' || 'FEATURE_EXPIRED' => ExamCreateError.subscriptionInactive,
+        'FEATURE_LIMIT_REACHED' => ExamCreateError.featureLimitReached,
         'AI_SCHOOL_INACTIVE' => ExamCreateError.schoolInactive,
         'AI_LLM_DISABLED' => ExamCreateError.llmDisabled,
         'RESOURCE_NOT_FOUND' => ExamCreateError.materialNotFound,

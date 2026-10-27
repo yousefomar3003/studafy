@@ -123,9 +123,9 @@ The super admin's calculator turns these into a quote for the school.
 | 1       | Foundation: feature list, tiers, personal subscriptions table, usage meters, resolver, `requireFeature`, `GET /api/me/features`, AI routes moved | **Done** |
 | 2       | Licenses, seats and seat assignment; overlap with personal subscriptions                                                                         | **Done** |
 | 3       | Pricing calculator, quotes, invoices, bank-transfer payments, expiry and reminder jobs                                                           | **Done** |
-| 4       | Super admin web UI                                                                                                                               | Next     |
-| 5       | School admin web UI                                                                                                                              |          |
-| 6       | Web and mobile feature gating for students, teachers and parents                                                                                 |          |
+| 4       | Super admin web UI                                                                                                                               | **Done** |
+| 5       | School admin web UI                                                                                                                              | **Done** |
+| 6       | Web and mobile feature gating for students, teachers and parents                                                                                 | **Done** |
 
 ## What session 1 built
 
@@ -485,14 +485,14 @@ Nothing suspends a license automatically. Suspension stays the super admin's dec
 
 School (`license:read` to read, `license:manage` to accept and upload; ORG_ADMIN and PRINCIPAL):
 
-| Route                                                    |                                                                                                                                                                      |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/school/license/quotes`, `…/{quoteId}`          | Sent, accepted and expired quotes, with the breakdown                                                                                                                |
-| `POST /api/school/license/quotes/{quoteId}/accept`       | Accept: applies it and issues the invoice                                                                                                                            |
-| `GET /api/school/license/invoices`, `…/{invoiceId}`      | Invoices (filter `status`: all, issued, partially_paid, paid, void, unpaid, overdue); one with lines, payments, receipts, the bank details and the payment reference |
-| `POST /api/school/license/invoices/{invoiceId}/receipts` | Upload a receipt: the file goes first through `POST /api/storage/upload-url` (content class `license.receipt`: PDF, JPEG, PNG, 10 MiB), then its `storageKey` here   |
-| `GET /api/school/license/payments`                       | Payment history, voided ones included                                                                                                                                |
-| `GET /api/school/license/receipts/{receiptId}/file`      | A short-lived download URL                                                                                                                                           |
+| Route                                                    |                                                                                                                                                                                |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/school/license/quotes`, `…/{quoteId}`          | Sent, accepted and expired quotes, with the breakdown                                                                                                                          |
+| `POST /api/school/license/quotes/{quoteId}/accept`       | Accept: applies it and issues the invoice                                                                                                                                      |
+| `GET /api/school/license/invoices`, `…/{invoiceId}`      | Invoices (filter `status`: all, issued, partially_paid, paid, void, unpaid, overdue); one with lines, payments, receipts, the bank details and the payment reference           |
+| `POST /api/school/license/invoices/{invoiceId}/receipts` | Upload a receipt: the file goes first through `POST /api/storage/uploads/request-upload` (content class `license.receipt`: PDF, JPEG, PNG, 10 MiB), then its `storageKey` here |
+| `GET /api/school/license/payments`                       | Payment history, voided ones included                                                                                                                                          |
+| `GET /api/school/license/receipts/{receiptId}/file`      | A short-lived download URL                                                                                                                                                     |
 
 Super admin (`platform:read` / `platform:manage`, web channel):
 
@@ -522,14 +522,302 @@ Super admin (`platform:read` / `platform:manage`, web channel):
 Each runs school by school in its own system tenant transaction, audits with no actor, and is
 idempotent. None suspends anything.
 
-## How session 4 plugs in
+## What session 4 built
 
-- The console screens map one-to-one onto the platform routes above; the calculator route is the
-  live preview, and each seat line's `nextVolumeBracket` is the "better offer" prompt.
-- Failed renewal stops (session 2) still need a retry action.
-- Change requests (session 2) can now be answered with a `seat_increase` quote.
-- Push and email delivery of the reminders would go through the notification dispatcher; today they
-  are in-app only (see decision 9).
+The super admin's license console in the web app, under `/portal/platform`, and the console routes
+it needed beyond sessions 2 and 3.
+
+### Pages
+
+All in [`apps/web/src/features/platform/licensing`](../../apps/web/src/features/platform/licensing),
+linked from `PlatformNav`, styled with `platform.css` plus a small `licensing.css` on the same design
+tokens, and built from `@studafy/ui` components only.
+
+| Page (`/portal/platform/…`)           | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `features`                            | Every registered feature: audience, unit, default limit, how many tiers include it, status. Edit the display name and status (`paused` is the kill switch, `hidden` stops selling it).                                                                                                                                                                                                                                                      |
+| `tiers`                               | Per audience, the tiers side by side (features down, tiers across: each limit, "includes all future features", the seat price per currency, how many licenses and personal subscriptions use it). Create a tier (code, name, rank, features with monthly limits, prices) or replace one's settings; retire one with "active" off.                                                                                                           |
+| `pricing`                             | Per currency: the volume basis (per audience or the whole license), volume brackets (optionally per audience), duration discounts. The bank details printed on every invoice.                                                                                                                                                                                                                                                               |
+| `quotes`                              | The calculator: pick a school, what to price (new term, more seats, extension), the license (for a change, or a draft/awaiting-payment license to re-price in place), currency, months, start, Family+, tier and seats per audience, overlap credits on or off, an adjustment with its reason. The breakdown is priced live. Then the school's quotes.                                                                                      |
+| `licenses`                            | The seat change request inbox (open / resolved / declined; price it, resolve or decline with a note), then every school's license, filtered by status, ending within 30 days, seats nearly full (any audience at 90%+) and unpaid balance.                                                                                                                                                                                                  |
+| `payments`                            | Totals per currency (received this month, outstanding, overdue), the receipts schools uploaded waiting to be matched, and every invoice filtered by state (all, unpaid, partially paid, overdue, issued, paid, void), school and issue dates.                                                                                                                                                                                               |
+| `payments/:schoolId/:invoiceId`       | One invoice: lines with their discounts, total / paid / balance, payment reference and bank details; payments (open the file, void with a reason); the school's receipts (record a transfer from one, or match it to a recorded payment). Record a transfer (amount up to the balance, date, bank reference, note, receipt or file), activate early with a due date, void the invoice, print.                                               |
+| `schools/:schoolId` (license section) | The current license: tier and seats used / purchased per audience, Family+, dates, status, unpaid balance, this month's usage per feature. Actions from the server's `allowedTransitions` (activate, resume, suspend, cancel), activate early, extend, change seats or tiers (opens the calculator). Seats with assign / unassign on the school's behalf. The school's quotes, invoices, payments and licensing history from the audit log. |
+| `ai` (new section)                    | Paid-feature usage this month per feature and per school, next to each school's AI cost (the existing metrics) and its license payments this month and in total.                                                                                                                                                                                                                                                                            |
+
+**Data layer.** `queries.ts` and `mutations.ts` follow the platform console's React Query pattern.
+Every key sits under `["platform", "licensing"]` and every write invalidates that prefix: the figures
+are linked (a payment moves the invoice, the license, the totals and the school page), and the
+console is small enough that a full refresh is cheap. The calculator's preview is a query on
+`POST /api/platform/licenses/quote` (it saves nothing), debounced 300 ms, keeping the last breakdown
+on screen while the next one is priced.
+
+**Strings** are in a new namespace `platformLicensing` (`locales/en|ar/platformLicensing.json`,
+pseudo-locale regenerated), loaded with every console page because the nav and the school page use it.
+
+### Console routes (`modules/licensing/console-routes.ts`)
+
+The session 1–3 routes had no way to list or edit features and tiers, or to read across schools.
+Super admin only (`platform:read` / `platform:manage`, web channel), pinned in the four route gates:
+
+| Route                                                  |                                                                                                                                   |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/platform/features`                           | Every registered feature: code facts (audience, unit, default limit), the super admin's settings, and how many tiers include it   |
+| `PATCH /api/platform/features/{featureKey}`            | Display name and/or status                                                                                                        |
+| `GET`, `POST /api/platform/tiers`                      | Tiers with features, limits, monthly seat prices per currency and use; create one                                                 |
+| `PUT /api/platform/tiers/{planId}`                     | Replace a tier's settings, features and prices (code and audience are fixed; a currency left out is switched off, not deleted)    |
+| `GET /api/platform/licenses`                           | Licenses across schools with balance, days left and seat use; filters `status`, `expiringWithinDays`, `seatsNearlyFull`, `unpaid` |
+| `GET /api/platform/licenses/change-requests`           | The inbox: every school's change requests (`status`, open by default), oldest first                                               |
+| `GET /api/platform/licenses/usage`                     | This month's units per metered feature per school, and license payments received this month and in total per currency             |
+| `GET /api/platform/schools/{schoolId}/license-console` | A school's current license, this month's usage, its payments and the latest 100 licensing entries of its audit log                |
+
+Features, tiers and prices are global tables, written in a system transaction and audited once in
+the operator's home school; the feature catalog cache (30 s per process) carries the change to every
+pod. Integration-tested in `apps/api/tests/licensing/console.integration.test.ts`.
+
+### Tests
+
+| File (`apps/web/src/features/platform/licensing/`) | Covers                                                                                                                                                         |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CalculatorPage.test.tsx`                          | The priced terms, every breakdown figure, the next-bracket offer, an adjustment needing a reason, saving and sending a quote, re-pricing a draft in place      |
+| `InvoicePage.test.tsx`                             | Lines and how to pay, recording a transfer (never above the balance; in a 3-decimal currency), recording from a receipt, matching a receipt, voiding a payment |
+| `SchoolLicenseSection.test.tsx`                    | Seats used / purchased and usage, the actions per status (suspend, resume, activate, activate early, extend, change seats), assign and unassign seats          |
+| `LicensesPage.test.tsx`                            | The license list and its four filters, the change request inbox (what is asked, price it, resolve with a note, decline, switch status)                         |
+
+## How session 5 plugged in (session 4's notes)
+
+- The school admin UI reads the `/api/school/license*` routes (sessions 2 and 3). The console's
+  `format.ts` (money in minor units, percentages, the currency's decimals), the status pills, the
+  seat meter and the invoice layout are the pieces to reuse; the school's receipt upload goes through
+  `POST /api/storage/uploads/request-upload` (content class `license.receipt`).
+- Bulk seat assignment by grade, section or class (`scope` on the assign route) is the school's
+  screen; the console offers only "everyone eligible" and picked people.
+- Still open from earlier sessions: a retry action for failed renewal stops (session 2), and push or
+  email delivery of the reminders (session 3, decision 9).
+
+## What session 5 built
+
+The school's side of its license in the web app, under `/portal/license`, for the school's
+ORG_ADMINs and PRINCIPALs, and the three reads and one write it needed beyond sessions 2 and 3.
+
+### Pages
+
+All in [`apps/web/src/features/license`](../../apps/web/src/features/license). Every route is gated
+on `license:read` (`RequirePermission` in `app/routes.tsx`); every change is shown only to
+`license:manage` (`usePermissions()` in the page). Both roles hold both today, so the read-only view
+is for a future role. The area is a "License" item in the portal sidebar and a License tile on the
+admin and principal dashboards (both behind `license:read`). Styled with the principal pages'
+tokens in `license.css`, built from `@studafy/ui` components only.
+
+| Page (`/portal/license…`)    | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (overview)                   | Status, dates, Family+ included or not, balance due (over unpaid invoices); per audience the tier, seats used / purchased and **what they get** (each feature of the tier with its monthly limit); this month's usage per feature; the open change requests. "Request more seats or a different tier" opens the request form (`?request=1` opens it too).                                                                                                                                                                                                                                                 |
+| `/seats`                     | A tab per audience (Parents only with Family+). Everyone with their seat status (seat since…, no seat, can't hold a seat) and personal subscription end date; search, show (everyone / with a seat / without / paying personally), grade → section → class. A seats-left counter. Assign or unassign one person, a selection, or everyone eligible in the grade, section or class shown (or the whole school). When seats run out, the people left without one are listed by reason. The renewal stop and the reduced price for personal subscribers are explained on the page and again when confirming. |
+| `/quotes`, `/quotes/:id`     | Sent, accepted and expired quotes; one quote's full breakdown (list price, volume and duration discounts, credits, adjustment, total, price per seat before and after) and "you save". Accept a sent, unexpired quote: the license is updated, the invoice issued, and its page opens.                                                                                                                                                                                                                                                                                                                    |
+| `/invoices`, `/invoices/:id` | Invoices with due date, balance and status (filter all, unpaid, overdue, paid, void) and the payment history. One invoice: its lines, totals, the bank details and the payment reference with a copy button, upload of a transfer receipt (PDF, JPEG, PNG up to 10 MB), each receipt's status (waiting / matched), its payments, print.                                                                                                                                                                                                                                                                   |
+
+**Banners**, on every license page: the license ends within 30 days, an invoice is overdue (with a
+link to it), an audience's seats are 90% used or more (with a link to the request form).
+
+**Data layer.** `queries.ts` and `mutations.ts` follow the React Query pattern of the other
+features; every key sits under `["school-license"]` and every write invalidates it (a seat moves
+the counter, the people list and the banners; accepting a quote moves the license, the quotes and
+the invoices). The money helpers are the console's (`platform/licensing/format.ts`).
+
+**Strings** are a new namespace `schoolLicense` (`locales/en|ar/schoolLicense.json`, Arabic with
+all six plural forms, pseudo-locale regenerated), loaded with the license pages and, for the tile,
+with the two dashboards. `nav.license` is in the root catalogs.
+
+### API additions
+
+| Route / object                             |                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/school/license/people`           | Everyone of an audience on the current license with their seat (`seatId`, `assignedAt`), whether they `eligible`, and `personalSubscriptionEndsAt`; `gradeLevelId` / `sectionId` / `classId`, `search`, `show` (`all`, `seated`, `unseated`, `personal`, echoed), paged. Empty without a license.            |
+| `GET /api/school/license/tiers`            | Every active tier, and any retired tier the school's license still uses, with its features and monthly limits (an `includes_all_features` tier lists every feature of its audience at the code's default where it states none). No prices; hidden features are left out.                                     |
+| `POST /api/school/license/change-requests` | Now also takes `studentPlanId` / `teacherPlanId` / `parentPlanId`: an active tier of that audience, or null for no change (422 `LICENSE_TIER_INVALID` otherwise). Every change request now returns `studentTier` / `teacherTier` / `parentTier` (`LicenseTierRef` or null), so the console inbox shows them. |
+| Migration 000168                           | `license_change_requests.{student,teacher,parent}_plan_id` (FK to `app.plans`), with a trigger refusing a tier of another audience (`ck_license_change_requests_tier_audience`), as `school_licenses` does.                                                                                                  |
+
+The people list is the session 2 `candidates()` query (the one that fills bulk assignments)
+extended with the seat and the personal subscription's end date, so the screen and the assignment
+agree on who is in a grade, section or class and who is eligible. Both reads use `license:read`
+and are pinned in `document.test.ts` and the OpenAPI benchmark list; the clients were regenerated
+(OpenAPI, TypeScript, Dart; `flutter analyze` clean). Integration-tested in
+`apps/api/tests/licensing/school-side.integration.test.ts`.
+
+### Tests
+
+| File (`apps/web/src/…`)                          | Covers                                                                                                                                                                                                                                                                |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `features/license/SeatsPage.test.tsx`            | Seats left, the explanation and statuses; Parents only with Family+; assigning one person, a personal subscriber (confirmed), a selection, a whole grade, all eligible; seats running out (who was left out and why); unassigning; read-only without `license:manage` |
+| `features/license/InvoiceDetailPage.test.tsx`    | Lines and how to pay, copying the reference, receipt statuses, the receipt upload (request-upload → PUT → attach), refusing a wrong file type, no upload without `license:manage`                                                                                     |
+| `features/license/QuoteDetailPage.test.tsx`      | The breakdown and the saving, accepting (and landing on the invoice), no Accept on an expired or accepted quote or without `license:manage`                                                                                                                           |
+| `features/license/LicensePage.test.tsx`          | Facts, what each group gets, usage, open requests, the three banners, the request form with a tier, no form without `license:manage`                                                                                                                                  |
+| `app/router.test.tsx`, `layouts/portal/*.test.*` | `/portal/license` redirects a session without `license:read`; a principal reaches it; the sidebar item per role                                                                                                                                                       |
+
+## How session 6 plugged in (session 5's notes)
+
+- Students, teachers and parents read `GET /api/me/features` (session 1) to show, hide or upsell
+  each feature; the AI routes still answer the legacy `AI_*` codes until the minimum app version
+  reads `FEATURE_*` (session 1, decision 7).
+- `GET /api/school/license/tiers` already describes each tier's features and limits in the
+  super admin's names; the student and parent apps can reuse its shape for "what your school
+  gives you".
+- Still open: a retry action for failed renewal stops (session 2), push and email delivery of the
+  reminders (session 3, decision 9), and AI cost per feature (session 4, decision 9).
+
+## What session 6 built
+
+What a student, teacher or parent sees of a paid feature, on mobile and web, decided from one
+verdict: `GET /api/me/features`.
+
+### The states
+
+Every paid screen and entry point shows one of these, decided in one place per client
+(`apps/mobile/lib/src/core/features/feature_gate.dart`, `apps/web/src/lib/features/gate.ts`, the
+same rules, the same tests):
+
+| State                      | When                                                                                                                                       | Shows                                                                                                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Covered by a school seat   | active; every grant is `school_license`                                                                                                    | the feature, "Provided by <school>", usage against the limit; no purchase anywhere                                                                               |
+| Covered personally         | active; only `purchase` / `trial` grants                                                                                                   | the feature, usage against the limit                                                                                                                             |
+| Covered by both            | active; a seat and a personal grant                                                                                                        | "Your school now covers this. Your subscription won't renew after <date>." — and, for an App Store subscription, how to turn renewal off in Settings (text only) |
+| Limit reached              | covered, `reason: limit_reached`                                                                                                           | "Monthly limit reached, resets on <date>" (the 1st of next month, UTC)                                                                                           |
+| Ask your school for a seat | not covered, and the caller holds a seat of the audience (`schoolSeat`) or the school sells one that includes the feature (`schoolOffers`) | "Ask your school for a seat" — never a purchase button                                                                                                           |
+| Purchasable                | not covered, nothing from the school                                                                                                       | the existing paywall (mobile: App Store / Google Play offer; web: the checkout button); "Your access ended on <date>" if it expired                              |
+| School inactive            | `reason: school_inactive`                                                                                                                  | the school's plan is not active                                                                                                                                  |
+| Unavailable                | `reason: paused`, or the feature is not listed (hidden)                                                                                    | temporarily unavailable                                                                                                                                          |
+
+**A seat holder is never shown a store purchase** (App Store / Google Play rules): the gate never
+answers "purchasable" to someone with `schoolSeat`, the mobile AI tab shows the store offer only
+for "purchasable" (and nothing while the verdict is unknown), and the web checkout refuses a
+seat holder server-side (`409 AI_SUBSCRIPTION_COVERED_BY_SCHOOL`).
+
+**Refusal codes** map to friendly messages in both clients (`featureErrorMessageKey`):
+`FEATURE_NOT_INCLUDED` / `AI_SUBSCRIPTION_INACTIVE`, `FEATURE_EXPIRED`, `FEATURE_LIMIT_REACHED`
+(with the reset date where shown inline), `AI_SCHOOL_INACTIVE` / `SCHOOL_SUSPENDED`, and
+`AI_SUBSCRIPTION_COVERED_BY_SCHOOL`. The four AI controllers (Ask AI, quizzes, flashcards, exam
+mode) gained a `featureLimitReached` error and map `FEATURE_NOT_INCLUDED` / `FEATURE_EXPIRED`.
+
+### API additions
+
+| Change                                                  |                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/me/features`                                  | Now also: `schoolName`; per feature `schoolSeat` (the caller holds a seat of its audience on the license in force), `schoolOffers` (that license sells a seat of its audience whose tier includes it), `renewalStop` (`{ provider, action, status }` of the personal subscription a seat turned off, or null). |
+| `GET /api/subscriptions/ai/offer`                       | Each student now has `schoolSeat` and `schoolOffers` (for the AI tutor), so the web page never offers a seat holder the add-on.                                                                                                                                                                                |
+| `POST /api/subscriptions/ai/checkout`                   | Refuses a student holding a seat on the license in force: `409 AI_SUBSCRIPTION_COVERED_BY_SCHOOL` (new code, en/ar messages).                                                                                                                                                                                  |
+| Realtime gateway (`apps/realtime/src/event-routing.ts`) | Routes `userEntitlement.changed` to `school:{schoolId}:user:{userId}` — that person's own sockets only, never a role broadcast. Routes now receive the payload.                                                                                                                                                |
+
+The license context (school name, the tiers the license in force sells, the asked-about people's
+seats and renewal stops) is read per request by `FeatureService.licenseContext`
+(`modules/features/license-context.ts`), not cached: only the feature list and the purchase offer
+ask for it, never a gated route.
+
+### Mobile (`apps/mobile/lib/src/core/features/`)
+
+- **`myFeaturesProvider`** reads `GET /api/me/features` through `authenticatedDio` (unchanged); it
+  is rebuilt on sign-in and sign-out. `featureGateProvider(key)` gives one feature's state.
+- **`featuresAutoRefreshProvider`**, watched by the app root, re-reads it on app resume, on a
+  `userEntitlement.changed` event for this user (the app had no entitlement listener; this adds
+  one on the existing realtime client), and when the socket (re)connects (events sent while it was
+  down are not replayed). A completed store purchase invalidates it too (`AiStoreController`).
+- **`FeatureGate`** wraps every paid entry point: Ask AI (`ai_tutor`), quizzes, exam mode,
+  flashcards, summaries and key concepts (`study_tools`) — in the router and the material viewer.
+  Covered shows the screen; "purchasable" shows the existing paywall (`AiPaywall`: the not-active
+  card and the store offer); the rest show their notice.
+- **The AI tab** shows "Provided by" / the renewal notice / usage above the hub when covered, "ask
+  your school" instead of the store when the school provides it, and the store only when the gate
+  says the student may buy.
+- **Family+** (parent home, `FamilyPlusCoverageCard`): who covers it, the children at this school
+  by name, and that children at other schools need the personal Family+ or a seat from their own
+  school; the renewal notice and App Store steps when both apply; "ask your school" when the
+  school sells Family+. Nothing is sold there (Family+ has no store product).
+- Notebook and auto-grading have no screens yet; when they ship, their entry points take a
+  `FeatureGate` with their key (see "How to add a new paid feature").
+- Strings: `features.*` and `familyPlus.*` in `assets/translations/en.json` and `ar.json`.
+
+### Web (`apps/web/src/lib/features/`)
+
+- **`useFeatures()`** (`["me", "features"]`, refetched on window focus) and `useFeatureGate(key)`;
+  `featureGateState()` and `FeatureNotice` render the states above.
+- The realtime layer invalidates `["me", "features"]` and `["ai-offer"]` on
+  `userEntitlement.changed` (and, like every mapped key, on reconnect).
+- **The AI add-on page** (`/account/ai`, the one paid surface on the web): per student, "Provided by
+  <school>" for a seat holder and "ask the school" where the school sells a seat — no purchase
+  button for either; a signed-in student also sees their own coverage notice (renewal, limit); a
+  refused checkout is explained in words.
+- Strings: `site.features.*` in `locales/en|ar/site.json`; pseudo-locale regenerated.
+
+### Tests
+
+| Where                                                                               | Covers                                                                                                                                                    |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/mobile/test/core/features/feature_gate_test.dart`                             | Parsing; every gate state; reset date; refusal-code messages                                                                                              |
+| `apps/mobile/test/core/features/features_providers_test.dart`                       | The provider and gate; re-read on this user's `userEntitlement.changed` (not another's), on reconnect (real `RealtimeClient`, fake socket), on app resume |
+| `apps/mobile/test/core/features/feature_gate_view_test.dart`                        | `FeatureGate` and the banner in every state (and in Arabic); no purchase control outside the paywall                                                      |
+| `apps/mobile/test/features/ai/presentation/ai_hub_screen_test.dart`                 | Store only when purchasable; ask the school; seat holder never sees the store; unknown verdict shows no store; "Provided by" above the hub                |
+| `apps/mobile/test/features/parent/presentation/family_plus_coverage_card_test.dart` | School seat (children named, other schools not covered), personal, both, ask the school, not covered                                                      |
+| `apps/mobile/test/features/ai/application/ask_ai_controller_test.dart`              | `FEATURE_LIMIT_REACHED` / `NOT_INCLUDED` / `EXPIRED` mapping                                                                                              |
+| `apps/web/src/lib/features/gate.test.ts`, `FeatureNotice.test.tsx`                  | Every state and message, no purchase control                                                                                                              |
+| `apps/web/src/features/billing/AiSubscriptionPurchasePage.test.tsx`                 | Seat holder and "ask the school" rows have no buy button; a student covered by both; the 409 explained                                                    |
+| `apps/realtime/src/event-routing.test.ts`, `outbox-fanout.test.ts`                  | `userEntitlement.changed` reaches only that user's room                                                                                                   |
+| `apps/api/tests/licensing/feature-gating.integration.test.ts`                       | End to end, below                                                                                                                                         |
+
+### End to end
+
+`apps/api/tests/licensing/feature-gating.integration.test.ts` runs the whole API (`createApp` with
+every middleware) against a freshly migrated PostgreSQL and the local Redis (the entitlement cache
+and the AI routes are live only with Redis), driven over HTTP as the apps drive it — the school
+admin through `/api/school/license/seats`, the student and parent through `GET /api/me/features`,
+`GET /api/ai/usage` (a real `requireFeature`-gated route) and the AI offer and checkout:
+
+1. A student with a seat gets access with no purchase: before the seat, `ai_tutor` is not active
+   with `schoolOffers: true` and `/api/ai/usage` answers 402; after it, active from
+   `school_license`, "Provided by" the school's name, 200; the offer marks them `schoolSeat`.
+2. Unassigning the seat removes access immediately: the next request (no wait, the cache primed
+   beforehand) is inactive and 402; `userEntitlement.changed` events for the student are queued for
+   the realtime gateway.
+3. A personal subscriber who gets a seat keeps the best of both: a Tap AI add-on (unlimited) plus a
+   seat (300) resolves unlimited with both sources; renewal is turned off
+   (`ai_subscriptions.cancel_at_period_end = true`, `renewalStop.action = cancel_at_period_end`);
+   an App Store subscriber gets `renewalStop.action = notify_user`; a web checkout for the seat
+   holder is refused with 409.
+4. A Family+ parent with a seat at one school is covered there (`family_plus` from
+   `school_license`), and the same person's account at their other child's school is not.
+
+Run with `TEST_DATABASE_URL` and `REDIS_URL` set. The mobile and web halves are covered by their
+unit and widget tests against the same JSON; no device run was part of this session.
+
+## How to add a new paid feature
+
+Everything that decides access, sells it, licenses it and shows it is generic. A new paid feature
+is these steps, in this order, and nothing else — no migration, no billing change, no console or
+school change.
+
+1. **Register it** in `FEATURES` (`packages/constants/src/features.ts`): key, audience
+   (`student` | `teacher` | `parent`), usage unit (or `null`), default monthly limit (or `null`),
+   name key. Rebuild `@studafy/constants`. The API inserts it into `app.features` at its next boot.
+2. **Guard its routes** with `requireFeature("<key>", { meter })`
+   (`apps/api/src/modules/features/middleware.ts`): `meter` is the units one request uses; omit it
+   for a route that is checked but not counted. Routes answer `402 FEATURE_NOT_INCLUDED` /
+   `FEATURE_EXPIRED` and `429 FEATURE_LIMIT_REACHED`; the clients already word them.
+3. **Name it for people**: `features.<key>.name` strings where the clients show feature names, and
+   its unit if it is a new one (`features.units.*` on mobile, `site.features.units.*` on web).
+4. **Gate its entry points.** Mobile: add the key to `FeatureKeys` and wrap each screen or entry
+   point in `FeatureGate(featureKey: FeatureKeys.x, child: …)` — pass `whenPurchasable` only if the
+   feature is sold in the app's store; show `FeatureCoverageBanner` where usage matters. Web:
+   `useFeatureGate("<key>")` and `<FeatureNotice state={…} />`, and hide any purchase control unless
+   the state is `purchasable`.
+5. **Sell it.** In the console (`/portal/platform/tiers`) add it to the tiers that should include
+   it, at a limit; a tier with "includes all future features" already has it at the default limit.
+   Schools get it with their seats at once (the catalog cache is 30 s). Personal sale needs a store
+   or web product only if it is not part of a tier already sold personally (`ai_addon` today).
+6. **Test** the routes' gating (an integration test with a seat and without, like
+   `feature-gating.integration.test.ts`) and the entry points' states (the gate tests above cover
+   the rules; a new screen needs only "covered shows it, not covered shows the notice").
+
+Pausing a feature (`status: paused` in `/portal/platform/features`) refuses everyone at once and
+shows "temporarily unavailable" in both apps; hiding it stops selling and listing it while holders
+keep it.
 
 ## Repo rules
 
@@ -704,3 +992,113 @@ Decisions made while building the foundation, beyond the brief:
     other upload-URL routes do, for the audit coverage gate. Nullable enum properties stay inline in
     the OpenAPI schemas, and list filters echo an `all` value instead of null: a nullable reference
     to a named enum generates Dart that does not compile.
+
+## Session 4 decisions
+
+1. **Tiers get a sibling page** (`/portal/platform/tiers`) rather than extending `PlansPage`: plans
+   are what a school pays for Studafy itself (`audience` NULL); tiers are audience plans with
+   features and limits, and the comparison table needs the whole width.
+2. **The console needed routes of its own** (`console-routes.ts`, eight rows above). The feature
+   catalog and tiers had no read or write route, and every license, request and invoice route was
+   per school. Rather than have the browser walk schools, the cross-school reads walk them on the
+   server (`forEachSchool`, one system transaction, each school's scope armed in turn) and filter in
+   memory. This is fine at today's school count; paging in SQL is the step when it is not.
+3. **"Expiring"** is an active license ending within 30 days; **"seats nearly full"** is any audience
+   at 90% of its seats or more; **"unpaid"** is an open balance on any of the license's invoices.
+4. **Money on screen:** amounts stay in minor units end to end. A figure is shown with its
+   response's `minorUnit`; where the API sends none (the calculator's breakdown, receipts), the
+   currency's ISO 4217 decimals from `Intl` are used (`app.currencies` holds the ISO values). Typed
+   amounts are parsed in the currency's decimals, so KWD/BHD/OMR (3) and JPY (0) are correct.
+5. **The calculator prices live and saves only on request:** the preview route saves nothing; "Save
+   as draft quote" stores it; sending and accepting are buttons on the quote. A new term can target
+   a draft or awaiting-payment license, which accepting then rewrites in place instead of creating a
+   second license; more seats and extensions target an active or suspended one.
+6. **"Change seats or tiers"** opens the calculator: a seat increase for a license in force, a new
+   term for a draft or awaiting-payment one. On a seat increase the tiers an audience already has are
+   locked, because mid-term tier changes are not priced (session 3, decision 4); a tier change for a
+   license in force is priced as the next term.
+7. **Activate early** from the school page uses the license's oldest open invoice; from an invoice,
+   that invoice. Plain "activate" (without payment) is offered only when `allowedTransitions` has it.
+8. **Print / download is the browser's print**, with a print stylesheet that leaves only the invoice
+   (print to PDF downloads it). No server-side PDF.
+9. **AI cost is per school, not per feature.** `ai_usage_meters` records tokens per student and
+   subscription, with no feature, so the AI page shows units per feature (`feature_usage_meters`)
+   and the existing AI cost per school, next to license payments received. Cost per feature needs
+   the AI ledger to record the feature first.
+10. **A change request is answered by a quote**, not by resolving it: "Price it" opens a seat
+    increase for the request's license; resolve and decline only close the request, with an
+    optional note to the school.
+11. **Seats on the school's behalf:** the console assigns to people picked from the school's members
+    of the audience's role, or to everyone eligible; the API reports who was not assigned and why.
+    Bulk scopes by grade, section or class are left to the school's screen (session 5).
+12. **Receipt and payment files** open in a tab opened on the click and pointed at the short-lived
+    URL once it arrives, so popup blockers allow it.
+13. **The invoice list's school filter searches** the paged school list instead of listing schools.
+
+## Session 5 decisions
+
+1. **The license area is a top-level `/portal/license`**, not under `/portal/admin` or
+   `/portal/principal`: both ORG_ADMIN and PRINCIPAL hold `license:*`, and their consoles are gated on
+   other permissions. Links match by prefix, so a top-level path keeps the sidebar honest.
+2. **Three API gaps were filled** rather than worked around in the browser: a people list with seat
+   status and personal subscription end dates (the existing lists were seats only, or unseated
+   people only, with a yes/no for personal subscriptions), a tier catalog the school may read (the
+   license view names its tiers but not their features), and a tier in change requests (the request
+   had seat counts and Family+ only). The tier is a column per audience (migration 000168), not text
+   in the note, so the console can price it.
+3. **The people list reuses the bulk-assignment query**, so "everyone in Grade 7" on screen is
+   exactly who a Grade 7 assignment would fill, in the same name order.
+4. **The tier catalog has no prices**: a school sees prices on its quotes (session 3). Retired tiers
+   are listed only while the school's license uses them; hidden features are not listed.
+5. **A requested tier must be an active tier of its audience**, checked by the API (422) and, for the
+   audience, by a trigger whoever writes it.
+6. **Confirmation is asked when it matters**: one person without a personal subscription is
+   assigned at once; a personal subscriber, a selection, a whole scope and any bulk unassign are
+   confirmed, with the renewal stop and the reduced price explained and the people paying
+   personally named.
+7. **Running out of seats is shown, not prevented**: the server fills in name order until seats run
+   out and reports who was left out and why (no seats left, not eligible, already seated); the page
+   lists them and warns before a selection larger than the seats left.
+8. **Banners**: ending within 30 days (active licenses), any overdue invoice, any audience at 90% of
+   its seats — the same thresholds as the console's filters (session 4, decision 3).
+9. **The balance due** is the sum of the open (issued or partly paid) invoices' balances, linked to
+   the invoices page.
+10. **Receipt files are checked in the browser** against the `license.receipt` rules (type and
+    10 MB) before anything is uploaded; the server checks them again.
+11. **Unassigning several seats is one request per seat**, as the route frees one seat; the
+    selection is small and each request is audited on its own.
+12. **The money helpers are shared with the console** (`platform/licensing/format.ts`), so a
+    3-decimal currency is shown and parsed the same on both sides.
+
+## Session 6 decisions
+
+1. **The API carries the school context, the clients decide nothing alone**: `GET /api/me/features`
+   gained `schoolName`, per-feature `schoolSeat`, `schoolOffers` and `renewalStop`, so both apps
+   show the same answer from the same verdict and the rule lives in one tested function per client.
+2. **"Ask your school" covers two cases**: the school sells a seat whose tier includes the feature,
+   or the person already holds a seat (of that audience) whose tier does not. A seat holder is never
+   sold the feature personally, whatever their tier lacks.
+3. **Fail closed on purchases**: while the verdict is unknown (loading, offline), the mobile AI tab
+   shows the not-active notice without the store offer. A gated screen whose verdict cannot load is
+   shown anyway — the API refuses what the person does not hold, so a failed read never locks out
+   someone who has access.
+4. **The web checkout refuses a seat holder** (`409 AI_SUBSCRIPTION_COVERED_BY_SCHOOL`), so a stale
+   page or a direct call cannot buy what the school provides. The mobile store purchase is not
+   refused server-side: the store controls that flow, and the app never offers it to a seat holder.
+5. **Entitlement changes reach the apps through the realtime gateway**, as a per-user route
+   (`userEntitlement.changed` → the person's own room) rather than a role broadcast: the event names
+   one person, and only that person's sockets need it. `EventRoute` now receives the payload.
+6. **Mobile refresh triggers**: app resume, this person's `userEntitlement.changed`, a socket
+   (re)connect, a completed store purchase, and sign-in/out. Web: window focus, the same event and
+   reconnects through the existing invalidation table.
+7. **App Store renewal steps are text, not a link**: the store-compliance suite forbids new outbound
+   launches, and Settings has no stable deep link. They are shown for an App Store subscription
+   (`renewalStop.action = notify_user` or provider `app_store`) whichever device the person uses.
+8. **Family+ across schools is stated, not listed**: a parent's accounts are per school and the app
+   has one school session at a time, so the card names this school's covered children and says
+   that children at other schools need the personal Family+ or a seat from their own school. Listing
+   the other schools' children would need a cross-tenant read the data model does not offer.
+9. **Notebook and auto-grading have no entry points yet**: nothing to gate; the generic
+   `FeatureGate` and the "How to add a new paid feature" steps cover them when they ship.
+10. **The limit-reached error on a screen** carries the reset date where the screen words it
+    (mobile), and says "the 1st of next month" in the web's generic error message.

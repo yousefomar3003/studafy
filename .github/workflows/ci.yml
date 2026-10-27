@@ -655,7 +655,7 @@ jobs:
       # for the same reason as the OpenAPI one: producing the typed distribution is the whole program.
       # Median of five single-process spawns; see the test file header for why the type step is scoped
       # to the standard library rather than a full-package tsc. Needs no database.
-      - name: API client build benchmark (<3s)
+      - name: API client build benchmark (<5s)
         env:
           CLIENT_BUILD_BENCHMARK: "1"
         run: bun test tests/benchmark/client-build-benchmark.test.ts

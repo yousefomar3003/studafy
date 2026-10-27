@@ -5,6 +5,7 @@ import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/exam_controller.dart';
 import '../../domain/exam_state.dart';
 import 'exam_material_picker.dart';
+import '../../../../core/features/feature_gate.dart';
 
 /// The exam screen's landing step: pick up to [examMaxMaterials] ready materials, how many
 /// questions to generate, and the time limit, then create the session. Generation itself runs on
@@ -146,7 +147,12 @@ class _CreateErrorBanner extends StatelessWidget {
           Icon(Icons.error_outline, size: 18, color: colorScheme.onErrorContainer),
           const SizedBox(width: AppSpacing.space8),
           Expanded(
-            child: Text(_messageKeyFor(error).tr(), style: TextStyle(color: colorScheme.onErrorContainer)),
+            child: Text(
+              error == ExamCreateError.featureLimitReached
+                  ? featureLimitReachedMessage(context)
+                  : _messageKeyFor(error).tr(),
+              style: TextStyle(color: colorScheme.onErrorContainer),
+            ),
           ),
         ],
       ),
@@ -156,6 +162,7 @@ class _CreateErrorBanner extends StatelessWidget {
   String _messageKeyFor(ExamCreateError error) => switch (error) {
     ExamCreateError.quotaExceeded => 'examMode.setup.createError.quotaExceeded',
     ExamCreateError.subscriptionInactive => 'examMode.setup.createError.subscriptionInactive',
+    ExamCreateError.featureLimitReached => 'features.errors.limitReached',
     ExamCreateError.schoolInactive => 'examMode.setup.createError.schoolInactive',
     ExamCreateError.llmDisabled => 'examMode.setup.createError.llmDisabled',
     ExamCreateError.materialNotFound => 'examMode.setup.createError.materialNotFound',

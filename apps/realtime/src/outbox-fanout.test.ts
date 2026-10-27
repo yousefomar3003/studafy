@@ -32,6 +32,7 @@ function fakeRedis() {
 }
 
 const GRADES_PUBLISHED_PATTERN = "events:*:grades.published";
+const USER_ENTITLEMENT_PATTERN = "events:*:userEntitlement.changed";
 
 beforeEach(() => {
   resetMetrics();
@@ -41,7 +42,24 @@ describe("subscribeToOutboxEvents", () => {
   test("subscribes to one pattern per routed event name", () => {
     const { redis, psubscribed } = fakeRedis();
     subscribeToOutboxEvents(redis, () => undefined);
-    expect(psubscribed).toEqual([GRADES_PUBLISHED_PATTERN]);
+    expect(psubscribed).toEqual([GRADES_PUBLISHED_PATTERN, USER_ENTITLEMENT_PATTERN]);
+  });
+
+  test("delivers a userEntitlement.changed event to that user's room only", () => {
+    const { redis, emitPmessage } = fakeRedis();
+    const received: EventEnvelope[] = [];
+    subscribeToOutboxEvents(redis, (envelope) => received.push(envelope));
+
+    const payload = { schoolId: "school-1", userId: "user-9", entitlementsVersion: 4 };
+    emitPmessage(
+      USER_ENTITLEMENT_PATTERN,
+      "events:school-1:userEntitlement.changed",
+      JSON.stringify(payload),
+    );
+
+    expect(received.map((envelope) => [envelope.room, envelope.payload])).toEqual([
+      ["school:school-1:user:user-9", payload],
+    ]);
   });
 
   test("fans a routed event out to every target room with a fresh envelope per room", () => {
@@ -117,6 +135,6 @@ describe("subscribeToOutboxEvents", () => {
     emitPmessage(GRADES_PUBLISHED_PATTERN, "events:school-1:grades.published", JSON.stringify({}));
 
     expect(received).toEqual([]);
-    expect(punsubscribed).toEqual([GRADES_PUBLISHED_PATTERN]);
+    expect(punsubscribed).toEqual([GRADES_PUBLISHED_PATTERN, USER_ENTITLEMENT_PATTERN]);
   });
 });

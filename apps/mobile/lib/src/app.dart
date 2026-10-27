@@ -12,6 +12,7 @@ import 'core/localization/locale_rebuild_scope.dart';
 import 'core/monitoring/monitoring_providers.dart';
 import 'core/push/push_providers.dart';
 import 'design/theme/app_theme.dart';
+import 'core/features/features_providers.dart';
 
 class StudafyApp extends ConsumerStatefulWidget {
   const StudafyApp({super.key});
@@ -70,6 +71,8 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    // Keeps the paid-feature verdicts current: app resume, entitlement events, reconnects.
+    ref.watch(featuresAutoRefreshProvider);
     ref.listen<AuthStatus>(authStatusProvider, (_, next) {
       if (next == AuthStatus.authenticated) {
         ref.read(pushSetupProvider.notifier).initialize();

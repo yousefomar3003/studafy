@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +9,7 @@ import '../../features/ai/presentation/exam_screen.dart';
 import '../../features/ai/presentation/flashcards_screen.dart';
 import '../../features/ai/presentation/quiz_screen.dart';
 import '../../features/ai/presentation/widgets/ai_consent_gate.dart';
+import '../../features/ai/presentation/widgets/ai_paywall.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
 import '../../features/notifications/presentation/notification_destination_screen.dart';
@@ -20,6 +21,8 @@ import '../../features/student/presentation/exams_screen.dart';
 import '../auth/auth_guard.dart';
 import '../config/app_config.dart';
 import '../config/app_environment.dart';
+import '../features/my_features.dart';
+import '../features/presentation/feature_gate_view.dart';
 import '../update/forced_update_screen.dart';
 import '../update/update_providers.dart';
 import '../update/update_status.dart';
@@ -66,30 +69,32 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
       ),
 
       // The AI feature screens below send the student's inputs to the third-party model provider,
-      // so each sits behind AiConsentGate (ST-305) and is only built once consent is recorded.
+      // so each sits behind AiConsentGate (ST-305) and is only built once consent is recorded. Each
+      // is a paid feature too, gated on it by FeatureGate (docs/billing/feature-licensing.md): the
+      // AI tutor for Ask AI, study tools for quizzes, exams and flashcards.
 
       // The signed-in student's Ask AI chat.
       GoRoute(
         path: RoutePaths.askAi,
-        builder: (context, state) => const AiConsentGate(child: AskAiScreen()),
+        builder: (context, state) => _paid(FeatureKeys.aiTutor, const AskAiScreen()),
       ),
 
       // The signed-in student's quiz player.
       GoRoute(
         path: RoutePaths.quiz,
-        builder: (context, state) => const AiConsentGate(child: QuizScreen()),
+        builder: (context, state) => _paid(FeatureKeys.studyTools, const QuizScreen()),
       ),
 
       // The signed-in student's timed mock-exam experience.
       GoRoute(
         path: RoutePaths.examMode,
-        builder: (context, state) => const AiConsentGate(child: ExamScreen()),
+        builder: (context, state) => _paid(FeatureKeys.studyTools, const ExamScreen()),
       ),
 
       // The signed-in student's flashcard deck browser and spaced-repetition review flow.
       GoRoute(
         path: RoutePaths.flashcards,
-        builder: (context, state) => const AiConsentGate(child: FlashcardsScreen()),
+        builder: (context, state) => _paid(FeatureKeys.studyTools, const FlashcardsScreen()),
       ),
 
       // The signed-in student's AI usage meter.
@@ -156,3 +161,11 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
     ],
   );
 }
+
+/// A paid AI screen: gated on [featureKey] (the AI paywall where the person may buy it), then on
+/// AI data-sharing consent.
+Widget _paid(String featureKey, Widget screen) => FeatureGate(
+  featureKey: featureKey,
+  whenPurchasable: (_) => const AiPaywall(),
+  child: AiConsentGate(child: screen),
+);

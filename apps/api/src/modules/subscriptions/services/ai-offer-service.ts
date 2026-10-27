@@ -18,6 +18,8 @@ export interface AiOfferPrice {
 
 export interface AiOfferStudent {
   id: string;
+  /** The student's user id, for the route to look up their school seat. Not sent to clients. */
+  userId: string;
   name: string;
   /** Whether this student's AI add-on is live already (bought on the web or in the app). */
   active: boolean;
@@ -56,13 +58,15 @@ export async function getAiOffer(
     const students = await tx<
       {
         id: string;
+        user_id: string;
         first_name: string;
         last_name: string;
         preferred_name: string | null;
         ai_status: string | null;
       }[]
     >`
-      SELECT s.id, s.first_name, s.last_name, s.preferred_name, ai.status::text AS ai_status
+      SELECT s.id, s.user_id::text AS user_id, s.first_name, s.last_name, s.preferred_name,
+             ai.status::text AS ai_status
       FROM app.students s
       LEFT JOIN app.ai_subscriptions ai ON ai.school_id = s.school_id AND ai.student_id = s.id
       WHERE s.school_id = ${context.schoolId}::uuid
@@ -90,6 +94,7 @@ export async function getAiOffer(
         : null,
       students: students.map((s) => ({
         id: s.id,
+        userId: s.user_id,
         name: s.preferred_name?.trim() || `${s.first_name} ${s.last_name}`,
         active: s.ai_status !== null && LIVE_STATUSES.has(s.ai_status as SubscriptionStatus),
       })),

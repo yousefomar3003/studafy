@@ -18,7 +18,9 @@ import arFinance from "./ar/finance.json";
 import arFinanceReports from "./ar/financeReports.json";
 import arOnboarding from "./ar/onboarding.json";
 import arPlatform from "./ar/platform.json";
+import arPlatformLicensing from "./ar/platformLicensing.json";
 import arPrincipal from "./ar/principal.json";
+import arSchoolLicense from "./ar/schoolLicense.json";
 import arSite from "./ar/site.json";
 import ar from "./ar.json";
 import enAcademicGrading from "./en/academicGrading.json";
@@ -29,7 +31,9 @@ import enFinance from "./en/finance.json";
 import enFinanceReports from "./en/financeReports.json";
 import enOnboarding from "./en/onboarding.json";
 import enPlatform from "./en/platform.json";
+import enPlatformLicensing from "./en/platformLicensing.json";
 import enPrincipal from "./en/principal.json";
+import enSchoolLicense from "./en/schoolLicense.json";
 import enSite from "./en/site.json";
 import en from "./en.json";
 
@@ -42,6 +46,8 @@ export const enCatalog = {
   principal: enPrincipal,
   attendanceOffice: enAttendanceOffice,
   platform: enPlatform,
+  platformLicensing: enPlatformLicensing,
+  schoolLicense: enSchoolLicense,
   onboarding: enOnboarding,
   academicGrading: enAcademicGrading,
   site: enSite,
@@ -56,6 +62,8 @@ export const arCatalog = {
   principal: arPrincipal,
   attendanceOffice: arAttendanceOffice,
   platform: arPlatform,
+  platformLicensing: arPlatformLicensing,
+  schoolLicense: arSchoolLicense,
   onboarding: arOnboarding,
   academicGrading: arAcademicGrading,
   site: arSite,

@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
+import { SchoolLicenseSection } from "./licensing/SchoolLicenseSection";
 import { useChangeSchoolStatus, useSetFeatureFlag } from "./mutations";
 import { PlatformPageHeader, SchoolStatusPill } from "./PlatformNav";
 import { useSchoolDetailQuery } from "./queries";
@@ -86,6 +87,8 @@ export default function SchoolDetailPage() {
         </Card>
 
         <SchoolMembersCard school={school} />
+
+        <SchoolLicenseSection schoolId={school.id} schoolName={school.name} />
 
         <FeatureFlagsCard school={school} />
       </div>

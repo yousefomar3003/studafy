@@ -69,6 +69,16 @@ export const eligibleQuerySchema = z.object({
   offset,
 });
 
+// Named and echoed in the response, for the Dart generator (see seatStatusFilterSchema above).
+const peopleFilterSchema = z
+  .enum(["all", "seated", "unseated", "personal"])
+  .openapi("LicensePeopleFilter");
+
+export const peopleQuerySchema = eligibleQuerySchema.extend({
+  /** Holding a seat, not holding one, or paying personally; everyone by default. */
+  show: peopleFilterSchema.default("all"),
+});
+
 export const changeRequestListQuerySchema = z.object({
   status: changeRequestStatusSchema.optional(),
 });
@@ -284,11 +294,62 @@ export const eligibleListSchema = z
   .object({ people: z.array(eligiblePersonSchema), total: z.number().int().nonnegative() })
   .openapi("LicenseEligibleList");
 
+const licensePersonSchema = z
+  .object({
+    userId: uuid,
+    studentId: uuid.nullable(),
+    name: z.string(),
+    email: z.string(),
+    eligible: z.boolean(),
+    seatId: uuid.nullable(),
+    assignedAt: z.string().datetime().nullable(),
+    hasPersonalSubscription: z.boolean(),
+    personalSubscriptionEndsAt: z.string().datetime().nullable(),
+  })
+  .openapi("LicensePerson");
+
+export const peopleListSchema = z
+  .object({
+    people: z.array(licensePersonSchema),
+    total: z.number().int().nonnegative(),
+    /** The filter applied. */
+    show: peopleFilterSchema,
+  })
+  .openapi("LicensePersonList");
+
+const offeredTierFeatureSchema = z
+  .object({
+    key: z.enum(FEATURE_KEYS as [string, ...string[]]),
+    name: z.string(),
+    unit: z.enum(FEATURE_USAGE_UNITS).nullable(),
+    monthlyLimit: z.number().int().nullable(),
+    status: z.enum(["active", "paused"]),
+  })
+  .openapi("LicenseOfferedTierFeature");
+
+const offeredTierSchema = z
+  .object({
+    id: uuid,
+    code: z.string(),
+    displayName: z.string(),
+    description: z.string().nullable(),
+    audience: audienceSchema,
+    rank: z.number().int(),
+    isActive: z.boolean(),
+    includesAllFeatures: z.boolean(),
+    features: z.array(offeredTierFeatureSchema),
+  })
+  .openapi("LicenseOfferedTier");
+
+export const offeredTierListSchema = z
+  .object({ tiers: z.array(offeredTierSchema) })
+  .openapi("LicenseOfferedTierList");
+
 // ---------------------------------------------------------------------------------------------------
 // The school's view, usage and change requests
 // ---------------------------------------------------------------------------------------------------
 
-const featureUsageSchema = z
+export const featureUsageSchema = z
   .object({
     feature: z.enum(FEATURE_KEYS as [string, ...string[]]),
     unit: z.enum(FEATURE_USAGE_UNITS).nullable(),
@@ -304,6 +365,9 @@ export const changeRequestSchema = z
     teacherSeats: z.number().int().nullable(),
     parentSeats: z.number().int().nullable(),
     includeFamilyPlus: z.boolean().nullable(),
+    studentTier: tierRefSchema.nullable(),
+    teacherTier: tierRefSchema.nullable(),
+    parentTier: tierRefSchema.nullable(),
     note: z.string(),
     status: changeRequestStatusSchema,
     requestedBy: uuid,
@@ -335,6 +399,10 @@ export const createChangeRequestBodySchema = z
     teacherSeats: seatCount,
     parentSeats: seatCount,
     includeFamilyPlus: z.boolean().nullable().optional(),
+    /** The tier wanted per audience: an active tier of that audience, or null for no change. */
+    studentPlanId: uuid.nullable().optional(),
+    teacherPlanId: uuid.nullable().optional(),
+    parentPlanId: uuid.nullable().optional(),
     note: z.string().trim().min(1).max(2000),
   })
   .openapi("CreateLicenseChangeRequestBody");

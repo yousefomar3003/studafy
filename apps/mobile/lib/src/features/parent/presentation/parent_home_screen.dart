@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/features/features_providers.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/parent_providers.dart';
 import 'widgets/child_summary.dart';
 import 'widgets/child_switcher.dart';
+import 'widgets/family_plus_coverage_card.dart';
 import 'widgets/parent_notifications_card.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 
@@ -24,7 +26,8 @@ class ParentHomeScreen extends ConsumerWidget {
           ..invalidate(childComparisonProvider)
           ..invalidate(parentFamilyIdProvider)
           ..invalidate(familyFinanceProvider)
-          ..invalidate(parentNotificationsProvider);
+          ..invalidate(parentNotificationsProvider)
+          ..invalidate(myFeaturesProvider);
       },
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
@@ -32,6 +35,8 @@ class ParentHomeScreen extends ConsumerWidget {
           ChildSwitcher(),
           SizedBox(height: AppSpacing.space16),
           ChildSummary(),
+          SizedBox(height: AppSpacing.space16),
+          FamilyPlusCoverageCard(),
           SizedBox(height: AppSpacing.space16),
           ParentNotificationsCard(),
         ],

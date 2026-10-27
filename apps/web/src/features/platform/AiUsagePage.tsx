@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
+import { UsageRevenueSection } from "./licensing/UsageRevenueSection";
 import { PlatformPageHeader } from "./PlatformNav";
 import { useAiMetricsQuery } from "./queries";
 
@@ -121,6 +122,10 @@ export default function AiUsagePage() {
         getRowLabel={(row) => row.schoolName}
         loading={isPending}
         empty={isError ? t("platform.ai.loadError") : t("platform.ai.empty")}
+      />
+
+      <UsageRevenueSection
+        aiCostUsdBySchool={new Map(rows.map((row) => [row.schoolId, row.estimatedCostUsd]))}
       />
     </>
   );

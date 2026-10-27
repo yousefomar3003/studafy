@@ -12,6 +12,13 @@ describe("EVENT_QUERY_INVALIDATIONS", () => {
     expect(invalidationKeysFor("grades.published")).toEqual([["approval-queue"], ["grades"]]);
   });
 
+  test("maps userEntitlement.changed to the person's features and the AI add-on offer", () => {
+    expect(invalidationKeysFor("userEntitlement.changed")).toEqual([
+      ["me", "features"],
+      ["ai-offer"],
+    ]);
+  });
+
   test("returns an empty list for events with no mapping", () => {
     expect(invalidationKeysFor("no.such.event")).toEqual([]);
   });
@@ -26,6 +33,11 @@ describe("EVENT_QUERY_INVALIDATIONS", () => {
   });
 
   test("allInvalidationKeys flattens every mapped prefix, in map order", () => {
-    expect(allInvalidationKeys()).toEqual([["approval-queue"], ["grades"]]);
+    expect(allInvalidationKeys()).toEqual([
+      ["approval-queue"],
+      ["grades"],
+      ["me", "features"],
+      ["ai-offer"],
+    ]);
   });
 });

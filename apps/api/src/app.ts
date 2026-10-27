@@ -129,6 +129,7 @@ import { importRoutes } from "./modules/imports";
 import { inquiryRoutes } from "./modules/inquiries";
 import {
   platformLicenseBillingRoutes,
+  platformLicenseConsoleRoutes,
   platformLicenseRoutes,
   schoolLicenseBillingRoutes,
   schoolLicenseRoutes,
@@ -1090,6 +1091,9 @@ export function createApp({
     // receipts; null answers 503 on the receipt routes only.
     app.route("/", schoolLicenseBillingRoutes(licensingDeps));
     app.route("/", platformLicenseBillingRoutes(licensingDeps));
+    // Session 4: the console's feature catalog, tiers, cross-school licenses and change requests,
+    // a school's license overview, and usage next to license revenue.
+    app.route("/", platformLicenseConsoleRoutes(licensingDeps));
   }
 
   // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with

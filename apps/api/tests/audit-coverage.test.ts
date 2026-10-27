@@ -540,6 +540,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/platform/schools/{schoolId}/license-receipts/{receiptId}/match",
   "POST /api/school/license/quotes/{quoteId}/accept",
   "POST /api/school/license/invoices/{invoiceId}/receipts",
+  // The license console's catalog (session 4): features and tiers are global, audited in the
+  // operator's home school.
+  "PATCH /api/platform/features/{featureKey}",
+  "POST /api/platform/tiers",
+  "PUT /api/platform/tiers/{planId}",
 ];
 
 function collectSourceFiles(dir: string): string[] {

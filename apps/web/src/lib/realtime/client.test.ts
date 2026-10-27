@@ -237,6 +237,8 @@ describe("RealtimeClient", () => {
     expect(h.invalidateQueries.mock.calls).toEqual([
       [{ queryKey: ["approval-queue"] }],
       [{ queryKey: ["grades"] }],
+      [{ queryKey: ["me", "features"] }],
+      [{ queryKey: ["ai-offer"] }],
     ]);
   });
 

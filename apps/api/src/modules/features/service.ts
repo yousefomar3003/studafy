@@ -1,10 +1,12 @@
 import { createFeatureCatalogSource } from "./catalog";
 import { collectGrants } from "./grants";
+import { readLicenseContext } from "./license-context";
 import { resolveFeatureAccess } from "./resolve";
 import { createFeatureUsageMeter } from "./usage";
 
 import type { FeatureCatalog, FeatureCatalogSource } from "./catalog";
 import type { GrantSourceAdapter, PersonEntitlements } from "./grants";
+import type { LicenseContext } from "./license-context";
 import type { FeatureAccessMap } from "./resolve";
 import type { FeatureUsageMeter } from "./usage";
 import type { Database, DatabasePools } from "../../db/client";
@@ -50,6 +52,12 @@ export interface FeatureService {
   /** Every feature for one person, with this month's usage. */
   resolveFeatures(schoolId: string, userId: string): Promise<FeatureAccessMap>;
   catalog(): Promise<FeatureCatalog>;
+  /**
+   * The school's license as it bears on these people: the school's name, what the license in force
+   * sells, who holds a seat, whose personal renewal a seat turned off. Read per request, not cached:
+   * only the feature list and the purchase offer ask, never a gated route.
+   */
+  licenseContext(schoolId: string, userIds: readonly string[]): Promise<LicenseContext>;
   usage: FeatureUsageMeter;
 }
 
@@ -126,6 +134,7 @@ export function createFeatureService(deps: FeatureServiceDeps): FeatureService {
       return (await resolve(schoolId, { userId }, { withUsage: true })).features;
     },
     catalog: () => catalogSource.get(),
+    licenseContext: (schoolId, userIds) => readLicenseContext(database, { schoolId, userIds }),
     usage,
   };
 }

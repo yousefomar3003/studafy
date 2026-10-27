@@ -19,6 +19,10 @@ export const EVENT_QUERY_INVALIDATIONS: ReadonlyMap<string, readonly QueryKey[]>
   // A grade submission being published resolves its pending item in the approval queue and
   // changes grade visibility for the involved student/parent (the gateway's only routed event).
   ["grades.published", [["approval-queue"], ["grades"]]],
+  // A person's feature grants changed -- a seat assigned or freed, a license activated or ended
+  // (docs/billing/feature-licensing.md). Delivered to that person's own room only; it moves their
+  // feature verdicts (useFeatures) and what the AI add-on page offers them.
+  ["userEntitlement.changed", [["me", "features"], ["ai-offer"]]],
 ]);
 
 /** Query-key prefixes to invalidate for a given event name. Empty when the event maps to nothing. */

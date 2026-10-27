@@ -214,6 +214,7 @@
   "SUBSCRIPTION_NOT_FOUND": "No active subscription found for this school",
   "SUBSCRIPTION_CHECKOUT_FAILED": "Failed to create checkout session",
   "AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE": "School subscription must be active to purchase AI access",
+  "AI_SUBSCRIPTION_COVERED_BY_SCHOOL": "This student's school already provides AI access through a license seat",
   "AI_SCHOOL_INACTIVE": "AI access requires an active school subscription",
   "AI_SUBSCRIPTION_INACTIVE": "AI access is not active for this student",
   "AI_QUOTA_EXCEEDED": "The AI monthly token budget is exhausted",

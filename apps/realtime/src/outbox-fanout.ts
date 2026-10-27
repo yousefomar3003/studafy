@@ -68,7 +68,7 @@ export function subscribeToOutboxEvents(
 
     incrementReceived();
     const publishedAt = new Date().toISOString();
-    const rooms = route(schoolId);
+    const rooms = route(schoolId, payload);
     for (const room of rooms) {
       onEnvelope({ id: crypto.randomUUID(), type: eventName, room, payload, publishedAt });
     }

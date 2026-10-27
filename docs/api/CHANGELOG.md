@@ -24,6 +24,14 @@ when it required the `version-bump` label.
     receipts and finance totals under `/api/platform/licenses/*`, and quotes, invoices, payments and
     receipts under `/api/platform/schools/{schoolId}/license-*`.
   - AI routes answer `429 FEATURE_LIMIT_REACHED` when a tier's monthly unit limit is used up.
+  - The super admin's license console: `GET /api/platform/features`,
+    `PATCH /api/platform/features/{featureKey}`, `GET`/`POST /api/platform/tiers`,
+    `PUT /api/platform/tiers/{planId}`, `GET /api/platform/licenses` (across schools, with
+    expiring / nearly-full / unpaid filters), `GET /api/platform/licenses/change-requests`,
+    `GET /api/platform/licenses/usage` and `GET /api/platform/schools/{schoolId}/license-console`.
+  - The school's side: `GET /api/school/license/people` (everyone in an audience with their seat
+    and personal subscription end date) and `GET /api/school/license/tiers` (what each tier gives,
+    without prices).
 - Finance family accounts (`/api/finance/families`, payments, profile, reminders, statements),
   payment receipts (`GET /api/finance/payments/{paymentId}/receipt`), reminders and the sibling
   discount (`/api/finance/sibling-discount`).
@@ -119,6 +127,14 @@ when it required the `version-bump` label.
 
 ### Changed
 
+- `POST /api/school/license/change-requests` also takes `studentPlanId` / `teacherPlanId` /
+  `parentPlanId` (a tier wanted per audience), and every `LicenseChangeRequest` now carries
+  `studentTier` / `teacherTier` / `parentTier`.
+- `GET /api/me/features` adds `schoolName` and, per feature, `schoolSeat`, `schoolOffers` and
+  `renewalStop`.
+- `GET /api/subscriptions/ai/offer` adds `schoolSeat` and `schoolOffers` per student;
+  `POST /api/subscriptions/ai/checkout` answers `409 AI_SUBSCRIPTION_COVERED_BY_SCHOOL` for a
+  student holding a school-license seat.
 - `POST /api/account/deletion` now also emails the account a confirmation (`account.deleted`
   outbox event), and its audit entry records `source: "account_settings"` (`"web_request"` for the
   public flow above). No change to the HTTP contract. ST-302.

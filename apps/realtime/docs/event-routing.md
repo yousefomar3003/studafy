@@ -40,9 +40,10 @@ reaches the gateway at all, rather than arriving and being dropped.
 
 ## Current routes
 
-| Domain event       | Target rooms                                    | Payload (ids only)                                           |
-| ------------------ | ----------------------------------------------- | ------------------------------------------------------------ |
-| `grades.published` | `school:{schoolId}:role:STUDENT`, `role:PARENT` | `{ submissionId, gradebookId, studentId, approvedByUserId }` |
+| Domain event              | Target rooms                                         | Payload (ids only)                                           |
+| ------------------------- | ---------------------------------------------------- | ------------------------------------------------------------ |
+| `grades.published`        | `school:{schoolId}:role:STUDENT`, `role:PARENT`      | `{ submissionId, gradebookId, studentId, approvedByUserId }` |
+| `userEntitlement.changed` | `school:{schoolId}:user:{userId}` (that person only) | `{ schoolId, userId, entitlementsVersion }`                  |
 
 ## Known limitation: role-wide broadcast, not per-recipient delivery
 
