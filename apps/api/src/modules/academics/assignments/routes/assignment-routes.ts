@@ -22,6 +22,7 @@ import {
   deleteAttachment,
   listAttachmentsByAssignment,
 } from "../attachment-service";
+import { listQuestionsByAssignment, replaceQuestions } from "../question-service";
 import {
   assignmentAttachmentSchema,
   assignmentIdParamSchema,
@@ -32,6 +33,7 @@ import {
   confirmAttachmentBodySchema,
   createAssignmentBodySchema,
   createUploadUrlBodySchema,
+  replaceQuestionsBodySchema,
   updateAssignmentBodySchema,
   uploadUrlSchema,
 } from "../schemas";
@@ -41,7 +43,8 @@ import type { StorageService } from "../../../../lib/storage";
 import type { AppEnv } from "../../../../middleware/requestId";
 import type { AssignmentRow } from "../assignment-service";
 import type { AttachmentRow } from "../attachment-service";
-import type { Assignment, AssignmentAttachment } from "../schemas";
+import type { QuestionRow } from "../question-service";
+import type { Assignment, AssignmentAttachment, AssignmentQuestion } from "../schemas";
 import type { Permission } from "@studafy/constants";
 import type { Context, MiddlewareHandler } from "hono";
 import type { TransactionSql } from "postgres";
@@ -119,13 +122,41 @@ async function toAttachmentResponse(
 }
 
 /**
+ * Project a stored question onto its response shape, withholding the answer key from non-staff.
+ *
+ * THIS IS THE ANSWER-KEY BOUNDARY. `is_correct` is null unless the caller is an admin or teaches the
+ * class (viewer_is_staff, resolved in SQL by the question service). A student sees which option was
+ * correct only on their own submission, once its mark is released -- never here, where it would
+ * reach every classmate who has not answered yet.
+ */
+export function toQuestionResponse(row: QuestionRow): AssignmentQuestion {
+  return {
+    id: row.id,
+    position: row.position,
+    question_type: row.question_type,
+    prompt: row.prompt,
+    points: Number(row.points),
+    options: row.options.map((option) => ({
+      id: option.id,
+      position: option.position,
+      text: option.text,
+      is_correct: row.viewer_is_staff ? option.is_correct : null,
+    })),
+  };
+}
+
+/**
  * Project a stored assignment onto its response shape.
  *
  * max_score arrives from postgres.js as a string, because numeric is arbitrary-precision and the
  * driver will not narrow it behind your back. This is the one place it becomes a number, so the
  * lossy step is visible rather than scattered.
  */
-function toAssignmentResponse(row: AssignmentRow, attachments: AssignmentAttachment[]): Assignment {
+function toAssignmentResponse(
+  row: AssignmentRow,
+  attachments: AssignmentAttachment[],
+  questions: AssignmentQuestion[],
+): Assignment {
   return {
     id: row.id,
     school_id: row.school_id,
@@ -135,12 +166,14 @@ function toAssignmentResponse(row: AssignmentRow, attachments: AssignmentAttachm
     description: row.description,
     instructions: row.instructions,
     status: row.status,
+    kind: row.kind,
     available_from: row.available_from?.toISOString() ?? null,
     assigned_at: row.assigned_at?.toISOString() ?? null,
     due_at: row.due_at.toISOString(),
     max_score: Number(row.max_score),
     allow_late_submission: row.allow_late_submission,
     attachments,
+    questions,
     created_by_user_id: row.created_by_user_id,
     last_edited_by_user_id: row.last_edited_by_user_id,
     created_at: row.created_at.toISOString(),
@@ -148,18 +181,18 @@ function toAssignmentResponse(row: AssignmentRow, attachments: AssignmentAttachm
   };
 }
 
-/** Hydrate a page of assignments with their attachments in a single extra query. */
+/** Hydrate a page of assignments with their attachments and questions, one extra query each. */
 async function hydrate(
   tx: TransactionSql,
   schoolId: string,
   rows: AssignmentRow[],
   storage: StorageService | null,
 ): Promise<Assignment[]> {
-  const byAssignment = await listAttachmentsByAssignment(
-    tx,
-    schoolId,
-    rows.map((row) => row.id),
-  );
+  const ids = rows.map((row) => row.id);
+  const byAssignment = await listAttachmentsByAssignment(tx, schoolId, ids);
+  // Only questions assignments have any; skipping the query for an all-written page saves the trip.
+  const questionIds = rows.filter((row) => row.kind === "questions").map((row) => row.id);
+  const questionsByAssignment = await listQuestionsByAssignment(tx, schoolId, questionIds);
 
   return Promise.all(
     rows.map(async (row) =>
@@ -170,6 +203,7 @@ async function hydrate(
             toAttachmentResponse(attachment, storage),
           ),
         ),
+        (questionsByAssignment.get(row.id) ?? []).map(toQuestionResponse),
       ),
     ),
   );
@@ -279,6 +313,31 @@ const deleteAssignmentRoute = createRoute({
   },
 });
 
+const replaceQuestionsRoute = createRoute({
+  method: "put",
+  path: "/api/academics/assignments/{assignmentId}/questions",
+  tags: ["Assignments"],
+  operationId: "replaceAssignmentQuestions",
+  summary: "Replace an assignment's questions",
+  description:
+    "Replaces the complete question set of a `questions` assignment for a class the caller " +
+    "teaches, and sets `max_score` to the total of the question points. Answers 409 for a " +
+    "`written` assignment, once any student has handed in, or for an empty set on a published " +
+    "assignment.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: assignmentIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: replaceQuestionsBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "The assignment with its new questions.", schema: assignmentSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
 const createUploadUrlRoute = createRoute({
   method: "post",
   path: "/api/academics/assignments/{assignmentId}/attachments/upload-url",
@@ -382,6 +441,11 @@ export function assignmentRoutes(
       ["DELETE", PERMISSIONS.ASSIGNMENT_DELETE],
     ]),
   );
+  // Questions, like attachments, are part of the assignment and have no lifecycle of their own.
+  routes.use(
+    "/api/academics/assignments/:assignmentId/questions",
+    permissionByMethod([["PUT", PERMISSIONS.ASSIGNMENT_UPDATE]]),
+  );
   // Attaching and detaching files edits the assignment, so both are assignment:update rather than
   // a permission of their own -- an attachment has no lifecycle apart from its assignment.
   routes.use(
@@ -401,6 +465,10 @@ export function assignmentRoutes(
   // rows are written inside each service transaction by emitAuditLog.
   routes.use("/api/academics/assignments", auditAction("insert", "assignments"));
   routes.use("/api/academics/assignments/:assignmentId", auditAction("update", "assignments"));
+  routes.use(
+    "/api/academics/assignments/:assignmentId/questions",
+    auditAction("update", "assignment_questions"),
+  );
   routes.use(
     "/api/academics/assignments/:assignmentId/attachments/upload-url",
     auditAction("update", "assignments"),
@@ -445,7 +513,7 @@ export function assignmentRoutes(
 
     const assignment = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const row = await createAssignment(tx, auth.schoolId, auth.userId, body);
-      return toAssignmentResponse(row, []);
+      return toAssignmentResponse(row, [], []);
     });
 
     return c.json(assignment, 201);
@@ -507,6 +575,26 @@ export function assignmentRoutes(
     );
 
     return c.body(null, 204);
+  });
+
+  routes.openapi(replaceQuestionsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { assignmentId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const assignment = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const row = await replaceQuestions(
+        tx,
+        auth.schoolId,
+        auth.userId,
+        assignmentId,
+        body.questions,
+      );
+      const [hydrated] = await hydrate(tx, auth.schoolId, [row], storage);
+      return hydrated!;
+    });
+
+    return c.json(assignment, 200);
   });
 
   // --- Attachments ---

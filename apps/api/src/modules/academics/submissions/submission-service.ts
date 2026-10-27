@@ -4,6 +4,9 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { emit } from "../../../lib/events/emitter";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
+import { assertAnswersFitAssignment, getAssignmentKind, replaceAnswers } from "./answer-service";
+
+import type { AnswerInput } from "./answer-service";
 import type { SubmissionGradeStatus, SubmissionStatus } from "./schemas";
 import type { TransactionSql } from "postgres";
 
@@ -78,6 +81,8 @@ export interface SubmissionRow {
 
 export interface SubmitParams {
   content?: string;
+  /** Required for a `questions` assignment, refused on a `written` one. See answer-service.ts. */
+  answers?: AnswerInput[];
 }
 
 export interface ListSubmissionsParams {
@@ -440,6 +445,10 @@ export async function submitAssignment(
   assignmentId: string,
   params: SubmitParams,
 ): Promise<{ row: SubmissionRow; created: boolean }> {
+  // Checked before the write so a malformed hand-in leaves any earlier attempt untouched.
+  const kind = await getAssignmentKind(tx, schoolId, assignmentId);
+  await assertAnswersFitAssignment(tx, schoolId, assignmentId, kind, params.answers);
+
   const previous = await tx<SubmissionRow[]>`
     SELECT ${selectColumns(tx)}
     FROM app.assignment_submissions AS s
@@ -491,6 +500,10 @@ export async function submitAssignment(
 
   if (!written) {
     await diagnoseSubmitFailure(tx, schoolId, assignmentId, studentId);
+  }
+
+  if (kind === "questions") {
+    await replaceAnswers(tx, schoolId, written!.id, params.answers ?? []);
   }
 
   const row = (await loadSubmission(tx, schoolId, written!.id))!;

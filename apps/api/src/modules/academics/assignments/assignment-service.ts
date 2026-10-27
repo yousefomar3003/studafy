@@ -4,7 +4,7 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { emit } from "../../../lib/events/emitter";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
-import type { AssignmentFilterStatus, AssignmentStatus } from "./schemas";
+import type { AssignmentFilterStatus, AssignmentKind, AssignmentStatus } from "./schemas";
 import type { TransactionSql } from "postgres";
 
 /**
@@ -54,6 +54,7 @@ export interface AssignmentRow {
   description: string | null;
   instructions: string | null;
   status: AssignmentStatus;
+  kind: AssignmentKind;
   available_from: Date | null;
   assigned_at: Date | null;
   due_at: Date;
@@ -88,6 +89,8 @@ export interface CreateAssignmentParams {
   max_score: number;
   allow_late_submission: boolean;
   status: Exclude<AssignmentStatus, "archived">;
+  /** Defaults to `written`, matching the column default. */
+  kind?: AssignmentKind;
 }
 
 export interface UpdateAssignmentParams {
@@ -172,7 +175,7 @@ function visibilityPredicate(tx: TransactionSql) {
 function selectColumns(tx: TransactionSql) {
   return tx`
     a.id, a.school_id, a.class_id, co.subject_id, cl.course_id,
-    a.title, a.description, a.instructions, a.status,
+    a.title, a.description, a.instructions, a.status, a.kind,
     a.available_from, a.assigned_at, a.due_at, a.max_score, a.allow_late_submission,
     a.created_by_user_id, a.last_edited_by_user_id, a.created_at, a.updated_at
   `;
@@ -316,12 +319,14 @@ export async function getAssignment(
 /**
  * Fetch by id ignoring the read-visibility predicate, for mutation paths.
  *
+ * Exported for the question service, which edits an assignment's questions under the same rule.
+ *
  * A teacher editing their own draft must be able to load it, and a draft is invisible to the
  * student-facing predicate by design. Callers of this MUST have already passed
  * assertCanManageClass; it is named "forUpdate" rather than "unchecked" because that ordering is
  * the contract, not a suggestion. RLS still applies, so this cannot reach another school.
  */
-async function getAssignmentForUpdate(
+export async function getAssignmentForUpdate(
   tx: TransactionSql,
   schoolId: string,
   assignmentId: string,
@@ -341,6 +346,22 @@ async function getAssignmentForUpdate(
 // Mutations
 // ---------------------------------------------------------------------------
 
+/** Whether a questions assignment has anything for a student to answer. */
+async function hasQuestions(
+  tx: TransactionSql,
+  schoolId: string,
+  assignmentId: string,
+): Promise<boolean> {
+  const [row] = await tx<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1 FROM app.assignment_questions
+      WHERE school_id = ${schoolId} AND assignment_id = ${assignmentId}
+    ) AS exists
+  `;
+
+  return row?.exists ?? false;
+}
+
 /** Fields worth recording in an audit diff. Timestamps and identity columns are noise there. */
 function auditableFields(row: AssignmentRow): Record<string, unknown> {
   return {
@@ -349,6 +370,7 @@ function auditableFields(row: AssignmentRow): Record<string, unknown> {
     description: row.description,
     instructions: row.instructions,
     status: row.status,
+    kind: row.kind,
     available_from: row.available_from?.toISOString() ?? null,
     due_at: row.due_at.toISOString(),
     max_score: row.max_score,
@@ -364,6 +386,16 @@ export async function createAssignment(
 ): Promise<AssignmentRow> {
   await assertCanManageClass(tx, params.class_id);
 
+  // A new questions assignment has no questions yet, and students cannot answer an empty one. It
+  // is created as a draft, given its questions, then published -- see updateAssignment.
+  if (params.kind === "questions" && params.status !== "draft") {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.ASSIGNMENT_QUESTIONS_REQUIRED,
+      "Add at least one question before publishing this assignment",
+    );
+  }
+
   // ck_assignments_lifecycle requires assigned_at to be NULL for a draft and NOT NULL otherwise,
   // so publishing and stamping the time are the same operation, not two.
   const assignedAt = params.status === "draft" ? null : new Date().toISOString();
@@ -371,12 +403,13 @@ export async function createAssignment(
   const [inserted] = await tx<{ id: string }[]>`
     INSERT INTO app.assignments (
       school_id, class_id, created_by_user_id, last_edited_by_user_id,
-      title, description, instructions, status,
+      title, description, instructions, status, kind,
       available_from, assigned_at, due_at, max_score, allow_late_submission
     ) VALUES (
       ${schoolId}, ${params.class_id}, ${userId}, ${userId},
       ${params.title}, ${params.description ?? null}, ${params.instructions ?? null},
       ${params.status}::app.assignment_status,
+      ${params.kind ?? "written"}::app.assignment_kind,
       ${params.available_from ?? null}::timestamptz,
       ${assignedAt}::timestamptz,
       ${params.due_at}::timestamptz,
@@ -433,6 +466,18 @@ export async function updateAssignment(
       409,
       ERROR_CODES.ASSIGNMENT_INVALID_STATUS_TRANSITION,
       "An assignment cannot return to draft once it has been published",
+    );
+  }
+
+  if (
+    publishing &&
+    existing.kind === "questions" &&
+    !(await hasQuestions(tx, schoolId, assignmentId))
+  ) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.ASSIGNMENT_QUESTIONS_REQUIRED,
+      "Add at least one question before publishing this assignment",
     );
   }
 

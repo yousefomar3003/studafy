@@ -259,6 +259,11 @@ export const ERROR_CODES = {
   // Assignments — class-scope violations and lifecycle constraints.
   ASSIGNMENT_CLASS_FORBIDDEN: "ASSIGNMENT_CLASS_FORBIDDEN",
   ASSIGNMENT_INVALID_STATUS_TRANSITION: "ASSIGNMENT_INVALID_STATUS_TRANSITION",
+  // Question assignments: the question set is edited on a written assignment, is edited after a
+  // student has answered it, or is empty when the assignment is published.
+  ASSIGNMENT_KIND_MISMATCH: "ASSIGNMENT_KIND_MISMATCH",
+  ASSIGNMENT_QUESTIONS_LOCKED: "ASSIGNMENT_QUESTIONS_LOCKED",
+  ASSIGNMENT_QUESTIONS_REQUIRED: "ASSIGNMENT_QUESTIONS_REQUIRED",
 
   // Attendance — session lifecycle, timetable tie, and record management.
   ATTENDANCE_SESSION_NOT_FOUND: "ATTENDANCE_SESSION_NOT_FOUND",
@@ -320,6 +325,9 @@ export const ERROR_CODES = {
   SUBMISSION_ALREADY_GRADED: "SUBMISSION_ALREADY_GRADED",
   SUBMISSION_INVALID_STATE: "SUBMISSION_INVALID_STATE",
   SUBMISSION_SCORE_EXCEEDS_MAX: "SUBMISSION_SCORE_EXCEEDS_MAX",
+  // A question-assignment hand-in names a question or option that is not part of the assignment,
+  // answers a question twice, or a written hand-in carries answers at all.
+  SUBMISSION_INVALID_ANSWERS: "SUBMISSION_INVALID_ANSWERS",
 
   // Object storage — pre-signed URL generation and tenant-prefix enforcement.
   STORAGE_KEY_FORBIDDEN: "STORAGE_KEY_FORBIDDEN",

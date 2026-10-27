@@ -59,6 +59,24 @@ Actor columns record operational attribution: assignment/exam creators, material
 last editors, graders, and result publishers. They are not an immutable audit log; a future audit
 or outbox model is required for historical change records.
 
+## Question assignments
+
+`app.assignments.kind` (000167) is `written` (free text and attachments, marked by hand) or
+`questions`. A `questions` assignment owns ordered `app.assignment_questions` (`multiple_choice` or
+`true_false`, each with `points`) and their `app.assignment_question_options`; `is_correct` is the
+answer key, at most one per question (a partial unique index), exactly one enforced by the API.
+A student's hand-in stores one `app.submission_answers` row per question; a composite foreign key
+pins each chosen option to its own question.
+
+- The API replaces the whole question set in one write, sets `max_score` to the total points, and
+  refuses edits once any student has handed in (answers reference questions `ON DELETE RESTRICT`).
+- A `questions` assignment cannot be published without questions.
+- No automatic score is stored. It is derived on read from the answers and returned as
+  `auto_score`; the teacher releases it through the existing grading path, so it and the
+  per-answer correctness are withheld from students exactly like any unreleased mark.
+- `is_correct` is readable through RLS by anyone who can read the assignment (a row policy cannot
+  hide one column); the API withholds it from non-staff at the response projection.
+
 ## Material storage and AI behavior
 
 A material belongs to exactly one concrete class. Assignment/exam-specific attachments, reuse

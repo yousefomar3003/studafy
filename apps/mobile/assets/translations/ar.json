@@ -224,6 +224,22 @@
     }
   },
   "assignments": {
+    "questions": {
+      "points": "{points} درجة",
+      "unanswered": "لم تتم الإجابة",
+      "correct": "صحيح",
+      "incorrect": "خطأ",
+      "rightAnswer": "الإجابة الصحيحة",
+      "yourAnswer": "إجابتك",
+      "progress": "تمت الإجابة على {answered} من {total}",
+      "answerAll": "أجب على جميع الأسئلة للتسليم",
+      "count": "{count} أسئلة",
+      "start": "ابدأ الإجابة",
+      "retake": "تغيير الإجابات",
+      "errors": {
+        "invalid": "إجاباتك لا تطابق أسئلة هذا الواجب. أعد فتحه وحاول مرة أخرى."
+      }
+    },
     "list": {
       "title": "الواجبات",
       "tabs": {
@@ -788,6 +804,43 @@
     }
   },
   "teacher": {
+    "questions": {
+      "title": "الأسئلة",
+      "summary": "{count} أسئلة · {points} درجة إجمالاً",
+      "add": "إضافة سؤال",
+      "number": "السؤال {number}",
+      "moveUp": "نقل لأعلى",
+      "moveDown": "نقل لأسفل",
+      "remove": "حذف السؤال",
+      "types": {
+        "multipleChoice": "اختيار من متعدد",
+        "trueFalse": "صح / خطأ"
+      },
+      "prompt": "السؤال",
+      "points": "الدرجة",
+      "markCorrect": "اختر الإجابة الصحيحة",
+      "optionHint": "الخيار {number}",
+      "removeOption": "حذف الخيار",
+      "addOption": "إضافة خيار",
+      "true": "صح",
+      "false": "خطأ",
+      "saveAndPublish": "حفظ ونشر",
+      "saveDraft": "حفظ كمسودة",
+      "save": "حفظ الأسئلة",
+      "next": "التالي: إضافة الأسئلة",
+      "edit": "تعديل الأسئلة ({count} · {points} درجة)",
+      "kinds": {
+        "written": "كتابي",
+        "questions": "أسئلة"
+      },
+      "errors": {
+        "empty": "أضف سؤالاً واحداً على الأقل قبل النشر.",
+        "locked": "لا يمكن تعديل الأسئلة بعد أن يسلّم أحد الطلاب إجاباته.",
+        "save": "تعذّر حفظ الأسئلة. حاول مرة أخرى.",
+        "promptRequired": "اكتب السؤال.",
+        "optionRequired": "اكتب نص الخيار."
+      }
+    },
     "marks": {
       "entry": {
         "outOf": "من {max}",
@@ -1251,6 +1304,7 @@
       }
     },
     "marking": {
+      "autoScore": "التصحيح التلقائي: {score} / {max}",
       "loadError": "تعذّر تحميل هذا التسليم.",
       "answer": "الإجابة",
       "noText": "لا توجد إجابة مكتوبة.",

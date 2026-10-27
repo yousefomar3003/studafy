@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/generated/models/assignment.dart';
+import '../../../core/api/generated/models/assignment_kind.dart';
 import '../../../core/api/generated/models/assignment_status.dart';
 import '../../../core/api/generated/models/submission.dart';
 import '../../../core/api/generated/models/submission_grade_status.dart';
@@ -10,6 +11,8 @@ import '../../../core/api/generated/models/submission_status.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/assignment_detail_providers.dart';
 import 'assignment_submission_screen.dart';
+import 'question_answer_screen.dart';
+import 'widgets/answer_review.dart';
 import 'widgets/attachment_download_tile.dart';
 import 'widgets/status_pill.dart';
 
@@ -135,9 +138,15 @@ class _AssignmentSummary extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.space8),
         Text(
-          'assignments.detail.maxScore'.tr(
-            namedArgs: {'score': '${assignment.maxScore}'},
-          ),
+          [
+            'assignments.detail.maxScore'.tr(
+              namedArgs: {'score': '${assignment.maxScore}'},
+            ),
+            if (assignment.kind == AssignmentKind.questions)
+              'assignments.questions.count'.tr(
+                namedArgs: {'count': '${assignment.questions.length}'},
+              ),
+          ].join(' · '),
           style: textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
@@ -220,7 +229,12 @@ class _SubmissionSection extends StatelessWidget {
           if (canAct)
             FilledButton(
               onPressed: () => _openSubmissionScreen(context),
-              child: Text('assignments.detail.submit'.tr()),
+              child: Text(
+                (assignment.kind == AssignmentKind.questions
+                        ? 'assignments.questions.start'
+                        : 'assignments.detail.submit')
+                    .tr(),
+              ),
             ),
         ],
       );
@@ -259,6 +273,13 @@ class _SubmissionSection extends StatelessWidget {
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
+          ),
+        ],
+        if (assignment.kind == AssignmentKind.questions) ...[
+          const SizedBox(height: AppSpacing.space12),
+          AnswerReview(
+            questions: assignment.questions,
+            answers: submission.answers,
           ),
         ],
         if ((submission.content ?? '').isNotEmpty) ...[
@@ -300,7 +321,12 @@ class _SubmissionSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.space16),
           OutlinedButton(
             onPressed: () => _openSubmissionScreen(context),
-            child: Text('assignments.detail.resubmit'.tr()),
+            child: Text(
+              (assignment.kind == AssignmentKind.questions
+                      ? 'assignments.questions.retake'
+                      : 'assignments.detail.resubmit')
+                  .tr(),
+            ),
           ),
         ],
       ],
@@ -308,6 +334,20 @@ class _SubmissionSection extends StatelessWidget {
   }
 
   void _openSubmissionScreen(BuildContext context) {
+    if (assignment.kind == AssignmentKind.questions) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => QuestionAnswerScreen(
+            assignment: assignment,
+            initialAnswers: {
+              for (final answer in submission?.answers ?? const [])
+                answer.questionId: answer.optionId,
+            },
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AssignmentSubmissionScreen(

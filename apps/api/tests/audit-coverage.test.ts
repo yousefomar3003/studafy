@@ -241,6 +241,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/assignments/{assignmentId}/attachments/upload-url",
   "POST /api/academics/assignments/{assignmentId}/attachments",
   "DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  "PUT /api/academics/assignments/{assignmentId}/questions",
   // Submissions (ST-104). Same contract as the assignments routes above: every mutation writes its
   // app.audit_logs row from inside its own service transaction, so a hand-in, a grade change or a
   // superseded attempt and its record commit or roll back together — see

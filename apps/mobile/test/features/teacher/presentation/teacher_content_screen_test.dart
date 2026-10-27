@@ -280,7 +280,7 @@ void main() {
     await tester.tap(find.text('Create assignment'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), 'Essay');
-    await tester.tap(find.text('Published'));
+    await _tapVisible(tester, find.text('Published'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Draft').last);
     await tester.pumpAndSettle();

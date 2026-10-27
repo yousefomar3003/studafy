@@ -224,6 +224,22 @@
     }
   },
   "assignments": {
+    "questions": {
+      "points": "{points} pts",
+      "unanswered": "Not answered",
+      "correct": "Correct",
+      "incorrect": "Incorrect",
+      "rightAnswer": "Right answer",
+      "yourAnswer": "Your answer",
+      "progress": "{answered} of {total} answered",
+      "answerAll": "Answer every question to submit",
+      "count": "{count} questions",
+      "start": "Start answering",
+      "retake": "Change answers",
+      "errors": {
+        "invalid": "Your answers don't match this assignment's questions. Reopen it and try again."
+      }
+    },
     "list": {
       "title": "Assignments",
       "tabs": {
@@ -785,6 +801,43 @@
     }
   },
   "teacher": {
+    "questions": {
+      "title": "Questions",
+      "summary": "{count} questions · {points} points in total",
+      "add": "Add question",
+      "number": "Question {number}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove question",
+      "types": {
+        "multipleChoice": "Multiple choice",
+        "trueFalse": "True / False"
+      },
+      "prompt": "Question",
+      "points": "Points",
+      "markCorrect": "Select the correct answer",
+      "optionHint": "Option {number}",
+      "removeOption": "Remove option",
+      "addOption": "Add option",
+      "true": "True",
+      "false": "False",
+      "saveAndPublish": "Save and publish",
+      "saveDraft": "Save as draft",
+      "save": "Save questions",
+      "next": "Next: add questions",
+      "edit": "Edit questions ({count} · {points} points)",
+      "kinds": {
+        "written": "Written",
+        "questions": "Questions"
+      },
+      "errors": {
+        "empty": "Add at least one question before publishing.",
+        "locked": "Questions can't be changed after a student has submitted answers.",
+        "save": "Couldn't save the questions. Try again.",
+        "promptRequired": "Enter the question.",
+        "optionRequired": "Enter the option text."
+      }
+    },
     "marks": {
       "entry": {
         "outOf": "Out of {max}",
@@ -1248,6 +1301,7 @@
       }
     },
     "marking": {
+      "autoScore": "Automatic mark: {score} / {max}",
       "loadError": "Couldn't load this submission.",
       "answer": "Answer",
       "noText": "No written answer.",

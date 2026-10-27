@@ -111,6 +111,27 @@ export const submissionAttachmentSchema = z
 export type SubmissionAttachment = z.infer<typeof submissionAttachmentSchema>;
 
 // ---------------------------------------------------------------------------
+// Answers (questions assignments)
+// ---------------------------------------------------------------------------
+
+export const submissionAnswerSchema = z
+  .object({
+    question_id: uuidSchema.openapi({ description: "The question answered." }),
+    option_id: uuidSchema.openapi({ description: "The option the student chose." }),
+    // Withheld together with the score, by the same rule: a student learns which answers were
+    // right only when the teacher releases the mark.
+    is_correct: z.boolean().nullable().openapi({
+      description: "Whether the chosen option is correct. Null until the grade is released.",
+    }),
+    correct_option_id: uuidSchema.nullable().openapi({
+      description: "The question's correct option. Null until the grade is released.",
+    }),
+  })
+  .openapi("SubmissionAnswer");
+
+export type SubmissionAnswer = z.infer<typeof submissionAnswerSchema>;
+
+// ---------------------------------------------------------------------------
 // Submission
 // ---------------------------------------------------------------------------
 
@@ -154,6 +175,18 @@ export const submissionSchema = z
     attachments: z
       .array(submissionAttachmentSchema)
       .openapi({ description: "Files handed in, with pre-signed download URLs." }),
+    answers: z.array(submissionAnswerSchema).openapi({
+      description: "The chosen options on a `questions` assignment. Empty for a `written` one.",
+    }),
+    auto_score: z
+      .number()
+      .nullable()
+      .openapi({
+        description:
+          "Points earned by the correct answers on a `questions` assignment, computed from the " +
+          "answers. Null for a `written` assignment, and withheld (null) from students and parents " +
+          "until the grade is released. A teacher publishes it through the grade endpoint.",
+      }),
     last_edited_by_user_id: uuidSchema.openapi({ description: "Most recent editor." }),
     created_at: dateTimeSchema,
     updated_at: dateTimeSchema,
@@ -237,6 +270,22 @@ export const createSubmissionBodySchema = z
       description: "Free-text answer. Omit for an attachments-only hand-in.",
       example: "My answer to question 1 is...",
     }),
+    answers: z
+      .array(
+        z
+          .object({
+            question_id: uuidSchema.openapi({ description: "The question being answered." }),
+            option_id: uuidSchema.openapi({ description: "The chosen option of that question." }),
+          })
+          .openapi("SubmissionAnswerInput"),
+      )
+      .max(100)
+      .optional()
+      .openapi({
+        description:
+          "Required for a `questions` assignment: exactly one answer for every question. Not " +
+          "accepted on a `written` assignment. Replaces the previous attempt's answers.",
+      }),
   })
   .openapi("CreateSubmissionBody");
 
