@@ -1,5 +1,7 @@
 // Measures the ST-061 acceptance target: the codegen compiler runs, synthesizes types for every
-// route, runs TypeScript verification, and exports the package distribution in under 3 seconds.
+// route, runs TypeScript verification, and exports the package distribution in under 3 seconds on a
+// developer machine (about 1.3 s on an Apple-silicon laptop). On CI the budget is wider; see
+// TARGET_MS.
 //
 // This is an ABSOLUTE wall-clock budget, defensible for the same reasons the ST-060 generation
 // benchmark is (see apps/api/tests/benchmark/openapi-generate-benchmark.test.ts): there is no
@@ -29,7 +31,16 @@ const benchmarkTest = test.skipIf(process.env.CLIENT_BUILD_BENCHMARK !== "1");
 
 const WARMUP_ITERATIONS = 1;
 const MEASURED_ITERATIONS = 5;
-const TARGET_MS = 3_000;
+/**
+ * The CI budget. 3 s, the ticket's figure, flapped: on GitHub's shared runners the same pipeline over
+ * an unchanged spec measured a 1.7-3.3 s median from run to run (dev at 95ebda9d: 1760 ms; dev at
+ * 6bd2ac11: 3258 ms, a failure on unchanged code), while two specs 1.3% apart timed 1317 ms and
+ * 1321 ms side by side on one laptop. A budget within ~1x of the runner's own spread measures the
+ * host, not the code -- the reason openapi-generate-benchmark.test.ts gives for widening an absolute
+ * budget that flaps, as the NFR-05 probe was. 5 s keeps ~1.5x headroom over the worst run seen while
+ * still failing a real regression of the kind this guards (a heavy import, a much fatter spec).
+ */
+const TARGET_MS = 5_000;
 
 /** Routes the synthesized types must contain, so a pipeline that emitted nothing cannot pass. */
 const EXPECTED_PATHS = ['"/healthz"', '"/readyz"', '"/erpnext/webhooks"'];
