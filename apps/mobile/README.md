@@ -56,6 +56,10 @@ flutter run --flavor dev -t lib/main_dev.dart --dart-define=API_BASE_URL=http://
 On a physical device (same Wi-Fi as the Mac), `bun run dev:device` points the dev flavor at the Mac's
 LAN IP (`ipconfig getifaddr en0`). Set `API_HOST=<ip>` to use a different host.
 
+A debug build on iOS only launches while the cable (debugger) is attached. To keep the app on the
+phone and use it unplugged, run `bun run install:device` once: it installs a release build of the
+dev flavor with the same API host. The Mac's API must still be running on the same Wi-Fi.
+
 ## Folder Structure
 
 ```text
