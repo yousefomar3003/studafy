@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/auth_providers.dart';
-import '../../../core/config/app_environment.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../core/localization/app_locales.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
@@ -43,8 +42,8 @@ class ProfileTabScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final privacyPolicyUrl = ref.watch(privacyPolicyUrlProvider);
-    final isDev =
-        ref.watch(appConfigProvider).environment == AppEnvironment.dev;
+    // Opt-in only (--dart-define=SHOW_TEST_CRASH=true), so no regular build carries a crash button.
+    const showTestCrash = bool.fromEnvironment('SHOW_TEST_CRASH');
     final roles = ref.watch(sessionRolesProvider);
     final appRoles = roles.map(AppRole.fromClaim).toSet();
     final isStudent = appRoles.contains(AppRole.student);
@@ -133,9 +132,9 @@ class ProfileTabScreen extends ConsumerWidget {
                       const Divider(height: 1, indent: 68),
                       const _DeleteSchoolTile(),
                     ],
-                    // Dev builds only: forces a native crash so Crashlytics receives a first
+                    // Opt-in builds only: forces a native crash so Crashlytics receives a first
                     // report. It is sent on the next launch, not at the moment of the crash.
-                    if (isDev) ...[
+                    if (showTestCrash) ...[
                       const Divider(height: 1, indent: 68),
                       _SettingsRow(
                         key: const Key('profileTestCrash'),

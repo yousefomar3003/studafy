@@ -103,6 +103,7 @@ flutter test integration_test/ \
   --dart-define=API_BASE_URL=http://10.0.2.2:3000 \
   --dart-define=REALTIME_BASE_URL=ws://10.0.2.2:3001 \
   --dart-define=WEB_BASE_URL=http://10.0.2.2:5180 \
+  --dart-define=SHOW_DEMO_LOGIN=true \
   -d <emulator-or-simulator-id>
 ```
 

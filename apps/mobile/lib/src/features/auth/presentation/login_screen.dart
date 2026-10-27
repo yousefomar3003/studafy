@@ -11,7 +11,6 @@ import '../../../core/auth/auth_notifier.dart';
 import '../../../core/auth/auth_state.dart';
 import '../../../core/auth/oauth_browser.dart';
 import '../../../core/auth/school_closed_notice.dart';
-import '../../../core/config/app_environment.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
 import '../../../design/widgets/studafy_logo.dart';
@@ -138,17 +137,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final status = ref.watch(authNotifierProvider);
-    // Dev-flavor only (ST-247) — same posture as the web app's "Continue with Mock" button
-    // (VITE_ENABLE_MOCK_AUTH): the mock provider 404s outside dev/test regardless, this just keeps
-    // the affordance itself out of the staging/prod app bundles. Lets the Flutter integration_test
-    // suite drive the real login screen instead of reaching around it.
-    //
-    // SHOW_DEMO_LOGIN (a --dart-define) adds it to one specific TestFlight build that points at a
-    // developer's own API through a tunnel, so the team can click through on a real iPhone. It is
+    // Opt-in only, via SHOW_DEMO_LOGIN (a --dart-define) — never on by flavor, so dev builds sign
+    // in with a real member ID and password like every other build. The Flutter integration_test
+    // suite sets it to drive the real login screen instead of reaching around it (ST-247). It is
     // never set by the release lanes, and a production API rejects the mock provider anyway.
-    final showMockLogin =
-        ref.watch(appConfigProvider).environment == AppEnvironment.dev ||
-        const bool.fromEnvironment('SHOW_DEMO_LOGIN');
+    const showMockLogin = bool.fromEnvironment('SHOW_DEMO_LOGIN');
 
     ref.listen<AuthStatus>(authNotifierProvider, (prev, next) {
       // A closed school already has its own, persistent explanation on this screen.
@@ -236,7 +229,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         ),
-        // Dev builds only — see `showMockLogin` above.
+        // Opt-in builds only — see `showMockLogin` above.
         if (showMockLogin) ...[
           const SizedBox(height: AppSpacing.space12),
           TextButton.icon(
