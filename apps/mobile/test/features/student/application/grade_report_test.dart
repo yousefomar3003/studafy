@@ -103,7 +103,7 @@ CachedValue<PublishedGradeSnapshot> _cached(PublishedGradeSnapshot snapshot) {
 }
 
 void _keepAlive(ProviderContainer container) {
-  container.listen(gradeReportProvider, (_, __) {}, fireImmediately: true);
+  container.listen(gradeReportProvider, (_, _) {}, fireImmediately: true);
 }
 
 void main() {
@@ -299,7 +299,7 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
-      container.listen(deepLinkGradeTermProvider('history'), (_, __) {}, fireImmediately: true);
+      container.listen(deepLinkGradeTermProvider('history'), (_, _) {}, fireImmediately: true);
 
       await container.read(academicYearTermsProvider.future);
       await container.read(gradeSnapshotProvider('term-1').future);

@@ -100,4 +100,64 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "{senderName}: {preview}",
     [NOTIFICATION_CHANNELS.EMAIL]: '{senderName} sent you a message: "{preview}"',
   },
+  [NOTIFICATION_TYPES.FEE_INVOICE_ISSUED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "New invoice for {studentName}: {amount}",
+    [NOTIFICATION_CHANNELS.PUSH]: "Invoice for {studentName}: {amount}, due {dueDate}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "A new invoice of {amount} has been issued for {studentName}. It is due on {dueDate}.",
+  },
+  [NOTIFICATION_TYPES.FEE_PAYMENT_RECEIVED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Payment received for {studentName}: {amount}",
+    [NOTIFICATION_CHANNELS.PUSH]: "Thank you — we received {amount} for {studentName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "We received your payment of {amount} for {studentName}. Receipt number: {receiptNumber}.",
+  },
+  [NOTIFICATION_TYPES.FEE_PAYMENT_REMINDER]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Reminder: {amount} in school fees is overdue",
+    [NOTIFICATION_CHANNELS.PUSH]: "School fees reminder: {amount} overdue",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Dear {familyName}, this is a reminder that {amount} in school fees is overdue across {overdueCount} invoice(s). Please contact the school's finance office if you have already paid.",
+  },
+  [NOTIFICATION_TYPES.FEE_STATEMENT]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Your family fee statement: {outstanding} outstanding",
+    [NOTIFICATION_CHANNELS.PUSH]: "Fee statement: {outstanding} outstanding",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Dear {familyName}, here is your fee statement for {childCount} child(ren). The outstanding balance is {outstanding}. Open the Studafy app for the full detail.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_SEAT_APPLE_RENEWAL]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "{schoolName} now covers your Studafy subscription. To avoid paying twice, turn off its renewal on your iPhone: Settings > your name > Subscriptions > Studafy > Cancel Subscription. You keep access until {periodEnd}, and the school's seat continues after that.",
+    [NOTIFICATION_CHANNELS.PUSH]:
+      "{schoolName} now covers Studafy: turn off your App Store renewal",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "{schoolName} has given you a Studafy seat that covers your App Store subscription. Apple does not let us stop its renewal for you, so to avoid paying twice please turn it off: on your iPhone open Settings, tap your name, then Subscriptions, Studafy, Cancel Subscription. You keep access until {periodEnd}, and the school's seat continues after that.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_EXPIRING]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "{schoolName}'s Studafy license ends on {endsAt}, in {daysLeft} days. Renew it to keep its seats covered.",
+    [NOTIFICATION_CHANNELS.PUSH]: "{schoolName}: the Studafy license ends in {daysLeft} days",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "{schoolName}'s Studafy license ends on {endsAt}, in {daysLeft} days. When it ends, everyone holding one of its seats loses the features it covers. Contact Studafy to renew or extend it.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_INVOICE_DUE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "Invoice {invoiceNumber} for {schoolName}'s Studafy license is due today ({dueDate}). Balance: {balance}.",
+    [NOTIFICATION_CHANNELS.PUSH]: "Studafy invoice {invoiceNumber} is due today: {balance}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Invoice {invoiceNumber} for {schoolName}'s Studafy license is due today, {dueDate}, with {balance} outstanding. Please pay by bank transfer with the payment reference printed on the invoice, and upload the receipt in Studafy.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_INVOICE_OVERDUE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "Invoice {invoiceNumber} for {schoolName}'s Studafy license is overdue (due {dueDate}). Balance: {balance}.",
+    [NOTIFICATION_CHANNELS.PUSH]: "Studafy invoice {invoiceNumber} is overdue: {balance}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Invoice {invoiceNumber} for {schoolName}'s Studafy license was due on {dueDate} and {balance} is still outstanding. Please pay by bank transfer with the payment reference printed on the invoice, and upload the receipt in Studafy.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_RECEIPT_UPLOADED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "{schoolName} uploaded a transfer receipt for invoice {invoiceNumber}. Match it to a payment.",
+    [NOTIFICATION_CHANNELS.PUSH]: "{schoolName} uploaded a receipt for {invoiceNumber}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "{schoolName} uploaded a bank transfer receipt for invoice {invoiceNumber}. Record the payment and match the receipt to it in the license console.",
+  },
 } as const satisfies LocaleTemplateSet;

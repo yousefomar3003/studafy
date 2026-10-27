@@ -104,6 +104,11 @@ function resolveTarget(row: ClaimedEntitlementRow): { key: string; version: numb
     return typeof studentId === "string" ? { key: `ent:ai:${studentId}`, version } : null;
   }
 
+  if (row.event_name === DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED) {
+    const userId = row.payload.userId;
+    return typeof userId === "string" ? { key: `ent:usr:${userId}`, version } : null;
+  }
+
   return null;
 }
 

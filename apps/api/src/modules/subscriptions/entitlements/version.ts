@@ -15,8 +15,12 @@ import type { TransactionSql } from "postgres";
  * @see db/migrations/000080_create_entitlement_versions.sql
  */
 
-/** The two subject kinds `app.entitlement_subject` allows. */
-export type EntitlementSubject = "school" | "ai";
+/**
+ * The subject kinds `app.entitlement_subject` allows. `user` (000161) versions one person's feature
+ * grants -- personal subscriptions now, school-license seats from session 2 of
+ * docs/billing/feature-licensing.md -- and its subject_id is a user id.
+ */
+export type EntitlementSubject = "school" | "ai" | "user";
 
 /**
  * The version of a subject that has no row yet.
@@ -100,4 +104,35 @@ export async function readEntitlementVersion(
   `;
 
   return row ? Number(row.version) : GENESIS_ENTITLEMENTS_VERSION;
+}
+
+/**
+ * {@link bumpEntitlementVersion} for many subjects of one kind, in one statement. Returns each
+ * subject's new version. Same race-safety argument: each row's upsert takes its own tuple lock.
+ *
+ * A license change can move every seat holder of a school at once (activation, suspension, a tier
+ * change); one statement keeps that to one round trip instead of one per person.
+ */
+export async function bumpEntitlementVersions(
+  tx: TransactionSql,
+  subject: EntitlementSubject,
+  subjectIds: readonly string[],
+): Promise<Map<string, number>> {
+  const unique = [...new Set(subjectIds)];
+  if (unique.length === 0) return new Map();
+
+  const rows = await tx<{ subject_id: string; version: string }[]>`
+    INSERT INTO app.entitlement_versions (school_id, subject_type, subject_id, version)
+    SELECT current_setting('app.school_id')::uuid,
+           ${subject}::app.entitlement_subject,
+           ids.id,
+           ${GENESIS_ENTITLEMENTS_VERSION + 1}
+    FROM unnest(${unique}::uuid[]) AS ids (id)
+    ON CONFLICT ON CONSTRAINT pk_entitlement_versions
+    DO UPDATE SET version = app.entitlement_versions.version + 1,
+                  updated_at = CURRENT_TIMESTAMP
+    RETURNING subject_id::text AS subject_id, version::text AS version
+  `;
+
+  return new Map(rows.map((row) => [row.subject_id, Number(row.version)]));
 }

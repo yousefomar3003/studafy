@@ -9,6 +9,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { requireFeature } from "../../features/middleware";
 import {
   AI_LLM_RETRY_AFTER_SECONDS,
   AI_QUIZ_ANSWER_MAX_CHARS,
@@ -20,7 +21,7 @@ import {
   AI_QUIZ_OUTPUT_TOKENS_CEILING,
   AI_QUIZ_OUTPUT_TOKENS_PER_QUESTION,
 } from "../config";
-import { getAiQuota } from "../gate/entitlement-gate";
+import { AI_FEATURE_ROUTE, aiTokenBudget, getAiQuota } from "../gate/token-budget";
 import { throwLlmError } from "../llm/errors";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
 import { assertGeneratedContentSafe } from "../moderation/enforce";
@@ -347,6 +348,18 @@ export function aiQuizRoutes(deps: {
 }): OpenAPIHono<AppEnv> {
   const { database, provider, flags = null, modelOverrides = {} } = deps;
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+  // Paid-feature gate, then the AI token budget (docs/billing/feature-licensing.md). Model calls
+  // count one unit of the feature; the paths that only read or grade are checked, not counted.
+  routes.use(
+    "/api/ai/students/:studentId/quizzes",
+    requireFeature("study_tools", { ...AI_FEATURE_ROUTE, meter: 1 }),
+    aiTokenBudget(),
+  );
+  routes.use(
+    "/api/ai/students/:studentId/quizzes/:quizId/grade",
+    requireFeature("study_tools", AI_FEATURE_ROUTE),
+    aiTokenBudget(),
+  );
 
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to declare
   // its audit intent. Generation's writes are app.quizzes, app.quiz_questions, and the durable usage

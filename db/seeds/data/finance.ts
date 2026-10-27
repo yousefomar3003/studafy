@@ -110,4 +110,16 @@ export async function seedFinance(sql: Sql, ctx: FullCtx): Promise<void> {
       "erpnext_docname",
     )}
   `;
+
+  // The school admin's sibling discount (000151): the second enrolled child of a family 10% off,
+  // the third and every later one 15%. The demo has one sibling family (the Fareses), so Mira's
+  // next invoice is discounted and Adam's is not.
+  await sql`
+    INSERT INTO app.sibling_discount_settings (school_id, is_enabled, updated_by)
+    VALUES (${schoolId}::uuid, true, ${ctx.orgAdmin.userId}::uuid)
+  `;
+  await sql`
+    INSERT INTO app.sibling_discount_tiers (school_id, child_position, percentage)
+    VALUES (${schoolId}::uuid, 2, 10), (${schoolId}::uuid, 3, 15)
+  `;
 }

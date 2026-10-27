@@ -251,6 +251,28 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "the submission stays visible, the marks do not.",
     },
     {
+      name: "Academic grading",
+      description:
+        "Year-scoped academic configuration: grading scales, grade programs, subject grading rules " +
+        "set once per grade and inherited by its sections, section overrides, teacher subject " +
+        "assignments, electives and exemptions, publication and copying a previous year. Writes " +
+        "need academicConfig:manage; teaching staff read the rules they grade by.",
+    },
+    {
+      name: "Marks",
+      description:
+        "Teacher mark entry against a section's effective grading configuration, with the grading " +
+        "engine's preview per student, mark-sheet submission and leadership approval. Scoped to " +
+        "the sections and subjects a teacher teaches.",
+    },
+    {
+      name: "Results",
+      description:
+        "Result previews, finalization into immutable snapshots, authorized corrections that " +
+        "create new versions, and report cards and certificates issued from finalized results. " +
+        "Students and linked parents read only their own finalized results and certificates.",
+    },
+    {
       name: "Gradebook Configuration",
       description:
         "Gradebook configuration endpoints. Authenticated and tenant-scoped. " +
@@ -321,9 +343,25 @@ export const OPENAPI_DOCUMENT_CONFIG = {
       description:
         "AI study assistant: ask, generate, hybrid search, summaries, quizzes, flashcards, key " +
         "concepts, simplified explanations, and exam mode. Authenticated and tenant-scoped, then " +
-        "gated by the AI entitlement chain -- school subscription active, then the per-student AI " +
-        "add-on active, then quota available -- with a distinct HTTP status per stage (403, 402, " +
-        "429). Mounted only when a database, Redis, and the entitlement service are all present.",
+        "gated per route by requireFeature (ai_tutor or study_tools) -- school active, then a grant " +
+        "that includes the feature, then the feature's monthly units -- and then the monthly AI " +
+        "token budget, with a distinct HTTP status per stage (403, 402, 429). Mounted only when a " +
+        "database, Redis, and the entitlement service are all present.",
+    },
+    {
+      name: "Features",
+      description:
+        "Paid features: the caller's verdict for every feature -- active or not and why, the " +
+        "grants it comes from, and this month's usage against the limit. The same verdict " +
+        "requireFeature enforces on each feature's routes.",
+    },
+    {
+      name: "Licensing",
+      description:
+        "The school's feature license: tiers and seats per audience, this month's usage, assigning " +
+        "and unassigning seats individually or in bulk, the people who could still get one, and " +
+        "seat change requests to Studafy. license:read to read, license:manage to change (ORG_ADMIN " +
+        "and PRINCIPAL). The license itself is managed by Studafy under /api/platform.",
     },
     {
       name: "Search",

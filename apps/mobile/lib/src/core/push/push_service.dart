@@ -74,10 +74,9 @@ abstract class PushService {
 class FirebasePushService implements PushService {
   FirebasePushService({
     required Uri apiBaseUrl,
-    required TokenProvider getToken,
+    required this._getToken,
     FlutterSecureStorage? storage,
-  }) : _getToken = getToken,
-       _dio = Dio(BaseOptions(baseUrl: apiBaseUrl.toString())),
+  }) : _dio = Dio(BaseOptions(baseUrl: apiBaseUrl.toString())),
        _storage = storage ?? const FlutterSecureStorage();
 
   final TokenProvider _getToken;

@@ -8,7 +8,11 @@ import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission, requirePermissionIn } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
-import { resolveBillableStudentIds, withStudentIdentityTx } from "../students/service";
+import {
+  resolveBillableStudentIds,
+  studentFamilies,
+  withStudentIdentityTx,
+} from "../students/service";
 
 import {
   createInvoiceBatchBodySchema,
@@ -38,6 +42,7 @@ import {
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { RedisClient } from "../../../redis";
+import type { StudentFamily } from "../students/service";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -53,12 +58,36 @@ function tenantFrom(c: Context<AppEnv>): {
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
 }
 
-function toInvoiceResponse(row: InvoiceRow) {
-  return { ...row, last_synced_at: row.last_synced_at.toISOString() };
+/** The family each student belongs to, so finance can go from an invoice to its household. */
+function familiesOf(
+  database: Database,
+  schoolId: string,
+  studentIds: string[],
+): Promise<Map<string, StudentFamily>> {
+  return withStudentIdentityTx(database, schoolId, (tx) =>
+    studentFamilies(tx, schoolId, studentIds),
+  );
 }
 
-function toInvoiceDetailResponse(row: InvoiceDetail) {
-  return { ...row, last_synced_at: row.last_synced_at.toISOString() };
+function familyFields(studentId: string, families: Map<string, StudentFamily>) {
+  const family = families.get(studentId);
+  return { family_id: family?.family_id ?? null, family_name: family?.family_name ?? null };
+}
+
+function toInvoiceResponse(row: InvoiceRow, families: Map<string, StudentFamily>) {
+  return {
+    ...row,
+    ...familyFields(row.student_id, families),
+    last_synced_at: row.last_synced_at.toISOString(),
+  };
+}
+
+function toInvoiceDetailResponse(row: InvoiceDetail, families: Map<string, StudentFamily>) {
+  return {
+    ...row,
+    ...familyFields(row.student_id, families),
+    last_synced_at: row.last_synced_at.toISOString(),
+  };
 }
 
 function toBatchResponse(row: InvoiceBatchRow) {
@@ -225,8 +254,16 @@ export function financeInvoiceRoutes(
     const { rows, next_cursor } = await withTenantTx(database, tenantFrom(c), (tx) =>
       listInvoices(tx, auth.schoolId, query),
     );
+    const families = await familiesOf(
+      database,
+      auth.schoolId,
+      rows.map((row) => row.student_id),
+    );
 
-    return c.json({ invoices: rows.map(toInvoiceResponse), next_cursor }, 200);
+    return c.json(
+      { invoices: rows.map((row) => toInvoiceResponse(row, families)), next_cursor },
+      200,
+    );
   });
 
   // ST-249: registered ahead of getInvoiceRoute below, not after — Hono resolves an ambiguous path
@@ -252,8 +289,9 @@ export function financeInvoiceRoutes(
     const detail = await withTenantTx(database, tenantFrom(c), (tx) =>
       getInvoiceDetail(tx, auth.schoolId, invoiceId),
     );
+    const families = await familiesOf(database, auth.schoolId, [detail.student_id]);
 
-    return c.json(toInvoiceDetailResponse(detail), 200);
+    return c.json(toInvoiceDetailResponse(detail, families), 200);
   });
 
   // --- Batches ---

@@ -192,6 +192,34 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/academics/sections/{sectionId}",
   "POST /api/academics/sections/{sectionId}/students",
   "DELETE /api/academics/sections/{sectionId}/students/{studentId}",
+  // Academic grading (000160): configuration, marks, mark-sheet approval, finalization, corrections
+  // and certificates. Every mutation writes its app.audit_logs row inside the service transaction
+  // (modules/grading/*-service.ts), mark changes with their old and new values.
+  "POST /api/grading/years/{yearId}/status",
+  "POST /api/grading/years/{yearId}/copy",
+  "POST /api/grading/years/{yearId}/scales",
+  "PUT /api/grading/scales/{scaleId}",
+  "DELETE /api/grading/scales/{scaleId}",
+  "PUT /api/grading/years/{yearId}/programs/{gradeLevelId}",
+  "POST /api/grading/years/{yearId}/programs/{gradeLevelId}/subjects",
+  "PUT /api/grading/subject-configs/{configId}",
+  "DELETE /api/grading/subject-configs/{configId}",
+  "POST /api/grading/subject-configs/{configId}/reset",
+  "POST /api/grading/subject-configs/{configId}/keep",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/override",
+  "PUT /api/grading/sections/{sectionId}/subject-enrollments",
+  "POST /api/grading/teacher-assignments",
+  "DELETE /api/grading/teacher-assignments/{assignmentId}",
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/marks",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/assessments",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/mark-sheets/submit",
+  "POST /api/grading/mark-sheets/{sheetId}/decision",
+  "POST /api/grading/assessments/{assessmentId}/decision",
+  "POST /api/grading/sections/{sectionId}/results/finalize",
+  "POST /api/grading/finalizations/{finalizationId}/corrections",
+  "POST /api/grading/finalizations/{finalizationId}/certificates",
+  "POST /api/grading/certificates/{certificateId}/reissue",
+  "POST /api/grading/certificates/{certificateId}/revoke",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",
@@ -355,6 +383,12 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/scholarship-awards/{awardId}/approve",
   "POST /api/finance/scholarship-awards/{awardId}/reject",
   "POST /api/finance/scholarship-awards/{awardId}/revoke",
+  // Family finance (finance/family-accounts): one payment split across a family's invoices (each
+  // share audited by the payment forwarder too), and reminders and statements to its guardians.
+  "POST /api/finance/families/{familyId}/payments",
+  "POST /api/finance/families/{familyId}/reminders",
+  "POST /api/finance/families/{familyId}/statements",
+  "POST /api/finance/reminders",
   // In-app inbox (ST-142). Personal per-user read state: RLS already fences every row to
   // user_id = app.current_user_id(), so the mutation is self-service on the caller's own rows.
   // Audit rows are written from inside the service transactions alongside the read-state change
@@ -472,6 +506,39 @@ const EXPECTED_MUTATING_ROUTES = [
   // system-attributed rows in the new school -- see modules/school-applications/service.ts.
   "POST /api/platform/school-applications/{applicationId}/approve",
   "POST /api/platform/school-applications/{applicationId}/reject",
+  // School licenses (modules/licensing). Licenses, seats, overlaps and change requests are audited
+  // from inside the service transaction; a super admin's change writes the console's two rows
+  // (system actor in the school, operator in their home school) -- see modules/licensing/context.ts.
+  "POST /api/platform/schools/{schoolId}/licenses",
+  "PATCH /api/platform/schools/{schoolId}/licenses/{licenseId}",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/status",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/extend",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/seats",
+  "DELETE /api/platform/schools/{schoolId}/licenses/{licenseId}/seats/{seatId}",
+  "POST /api/platform/schools/{schoolId}/license-requests/{requestId}/resolve",
+  "POST /api/school/license/seats",
+  "DELETE /api/school/license/seats/{seatId}",
+  "POST /api/school/license/change-requests",
+  // License billing (session 3). Quotes, invoices, payments and receipts are audited from inside the
+  // service transaction (the console's two rows for a super admin); price settings and bank details
+  // in the operator's home school. The calculator and the upload URL write nothing (declared for
+  // this gate, as the other upload-url routes are).
+  "PUT /api/platform/licenses/price-settings/{currencyCode}",
+  "PUT /api/platform/licenses/bank-details",
+  "POST /api/platform/licenses/quote",
+  "POST /api/platform/schools/{schoolId}/license-quotes",
+  "PUT /api/platform/schools/{schoolId}/license-quotes/{quoteId}",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/send",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/accept",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/withdraw",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/void",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payments",
+  "POST /api/platform/schools/{schoolId}/license-payments/{paymentId}/void",
+  "POST /api/platform/schools/{schoolId}/license-payments/upload-url",
+  "POST /api/platform/schools/{schoolId}/license-receipts/{receiptId}/match",
+  "POST /api/school/license/quotes/{quoteId}/accept",
+  "POST /api/school/license/invoices/{invoiceId}/receipts",
 ];
 
 function collectSourceFiles(dir: string): string[] {

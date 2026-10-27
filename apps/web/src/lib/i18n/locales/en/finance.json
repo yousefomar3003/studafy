@@ -26,7 +26,10 @@
     "recordExpense": "Record expense",
     "defaultsToToday": "Defaults to today.",
     "checkFormAndRetry": "Please check the form and try again.",
-    "searchByStudentOrInvoice": "Search by student or invoice number"
+    "searchByStudentOrInvoice": "Search by student or invoice number",
+    "cancel": "Cancel",
+    "receiptError": "The receipt could not be opened. Try again.",
+    "family": "Family"
   },
   "docStatus": {
     "draft": "Draft",
@@ -55,7 +58,8 @@
       "refunds": "Refunds →",
       "scholarships": "Scholarships →",
       "reports": "Reports →",
-      "expenses": "Expenses →"
+      "expenses": "Expenses →",
+      "families": "Families →"
     }
   },
   "overdue": {
@@ -89,7 +93,10 @@
     "collections": {
       "title": "Collections vs due this term",
       "error": "Unable to load the collections report.",
-      "empty": "No collections summary for this term yet."
+      "empty": "No collections summary for this term yet.",
+      "invoiced": "Invoiced (open invoices)",
+      "collected": "Collected on open invoices",
+      "outstanding": "Outstanding receivables"
     },
     "overdue": {
       "title": "Overdue installments",
@@ -373,5 +380,139 @@
     "remove": "Remove {{name}}",
     "loading": "Loading students…",
     "showList": "Show students"
+  },
+  "families": {
+    "position": {
+      "eldest": "Eldest",
+      "second": "2nd child",
+      "third": "3rd child",
+      "nth": "Child {{position}}",
+      "notEnrolled": "Not enrolled"
+    },
+    "siblingDiscountBadge": "{{position}} · {{percentage}}% sibling discount",
+    "sendError": "The message could not be sent. Try again.",
+    "list": {
+      "title": "Families",
+      "intro": "Every household with its guardians, children and what it owes across all of them. Open a family to take one payment for several children, or to send a reminder or statement.",
+      "caption": "Families",
+      "empty": "No families match these filters.",
+      "loadError": "Families could not be loaded."
+    },
+    "columns": {
+      "family": "Family",
+      "children": "Children",
+      "outstanding": "Outstanding",
+      "overdue": "Overdue",
+      "lastPayment": "Last payment",
+      "lastReminder": "Last reminder"
+    },
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Family, child or guardian",
+      "balance": "Balance",
+      "allBalances": "All families",
+      "outstanding": "Owes money",
+      "overdue": "Has overdue fees",
+      "sort": "Sort by",
+      "sortName": "Name",
+      "sortOutstanding": "Largest balance first",
+      "siblingsOnly": "Only families with 2 or more children"
+    },
+    "bulk": {
+      "button": "Remind all overdue families",
+      "confirmTitle": "Remind every family with overdue fees?",
+      "confirmBody": "Each family's guardians get a notification with the amount overdue. Families reminded in the last 24 hours are skipped.",
+      "confirm": "Send reminders",
+      "sentTitle_one": "Reminder sent to {{count}} family",
+      "sentTitle_other": "Reminders sent to {{count}} families",
+      "sentDetail": "{{guardians}} guardians notified. {{skipped}} families were already reminded today.",
+      "error": "Reminders could not be sent. Try again."
+    },
+    "detail": {
+      "loadError": "This family could not be loaded.",
+      "householdError": "The children's invoices could not be loaded.",
+      "primary": "Primary contact",
+      "recordPayment": "Record family payment",
+      "sendReminder": "Send overdue reminder",
+      "sendStatement": "Send statement",
+      "lastReminded": "Last reminded on {{date}}.",
+      "acrossChildren_one": "Across {{count}} child",
+      "acrossChildren_other": "Across {{count}} children",
+      "overdueInvoices_one": "{{count}} invoice past due",
+      "overdueInvoices_other": "{{count}} invoices past due",
+      "billed": "Billed",
+      "lastPaid": "Last payment on {{date}}",
+      "noPayments": "No payments yet.",
+      "childrenHeading": "Children",
+      "messagesHeading": "Messages sent to guardians",
+      "siblingDiscount": "{{percentage}}% sibling discount on new invoices",
+      "overdueTag": "overdue",
+      "invoicesCaption": "Invoices for {{name}}",
+      "paymentsCaption": "Payments for {{name}}",
+      "noInvoices": "No invoices yet.",
+      "reminderSent_one": "Reminder sent to {{count}} guardian",
+      "reminderSent_other": "Reminder sent to {{count}} guardians",
+      "statementSent_one": "Statement sent to {{count}} guardian",
+      "statementSent_other": "Statement sent to {{count}} guardians",
+      "suppressed_one": "{{count}} guardian has turned these notifications off.",
+      "suppressed_other": "{{count}} guardians have turned these notifications off.",
+      "notSent": {
+        "nothing_overdue": "Nothing is overdue, so no reminder was sent.",
+        "recently_reminded": "This family was already reminded in the last 24 hours.",
+        "no_guardians": "This family has no active guardian to notify."
+      }
+    },
+    "messages": {
+      "kind": "Message",
+      "recipient": "Guardian",
+      "sentBy": "Sent by",
+      "automatic": "Automatic",
+      "delivered": "Delivered",
+      "turnedOff": "Turned off by guardian",
+      "caption": "Fee messages sent to this family",
+      "empty": "No fee messages have been sent yet.",
+      "kinds": {
+        "invoice_issued": "New invoice",
+        "payment_received": "Payment received",
+        "payment_reminder": "Overdue reminder",
+        "statement": "Statement"
+      }
+    },
+    "payment": {
+      "title": "Family payment — {{family}}",
+      "backToFamily": "Back to the family",
+      "nothingOwed": "This family owes nothing right now.",
+      "formLabel": "Family payment",
+      "amount": "Amount paid",
+      "owes": "The family owes {{amount}} {{currency}}.",
+      "payAll": "Pay the full balance",
+      "manual": "Choose how much goes to each invoice",
+      "manualHint": "Enter each invoice's share. The shares must add up to the amount paid.",
+      "autoHint": "The amount pays the oldest-due invoice first, then the next, across all children.",
+      "splitCaption": "How the payment is split",
+      "share": "This payment",
+      "shareFor": "Amount for {{invoice}}",
+      "exceeds": "The family owes {{amount}} {{currency}}; the amount cannot be more than that.",
+      "invalidShare": "Each share must be a positive amount.",
+      "shareTooLarge": "A share is more than its invoice owes.",
+      "unbalanced": "The shares add up to {{allocated}} {{currency}}, but the amount paid is {{amount}} {{currency}}.",
+      "submit": "Record payment",
+      "resultLabel": "Payment result",
+      "detail": "Detail",
+      "receiptsLater": "Each payment is confirmed by ERPNext within a few seconds; receipts open from here once it is.",
+      "retry": "Retry the invoices that failed",
+      "outcome": {
+        "completed": "Payment recorded against every invoice.",
+        "partial": "Some invoices were paid and some were not. Retry to pay only the rest.",
+        "failed": "The payment could not be recorded. Nothing was charged; try again."
+      },
+      "results": {
+        "recorded": "Recorded",
+        "replayed": "Already recorded",
+        "failed": "Failed",
+        "confirmed": "Confirmed",
+        "awaiting": "Awaiting ERPNext"
+      }
+    }
   }
 }

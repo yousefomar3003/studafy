@@ -335,11 +335,14 @@ integrationTest(
 integrationTest("platform settings require one typed non-secret value", async () => {
   const database = await migratedDatabase();
   try {
-    // The only seeded settings are the internal notification addresses (000125, 000139).
+    // The seeded settings: the license quote validity and invoice due days (000165) and the internal
+    // notification addresses (000125, 000139).
     const seeded = await database.sql<{ key: string }[]>`
       SELECT key FROM app.platform_settings ORDER BY key
     `;
     expect(seeded.map((row) => row.key)).toEqual([
+      "license.invoice_due_days",
+      "license.quote_validity_days",
       "onboarding.application_notification_email",
       "sales.inquiry_notification_email",
     ]);

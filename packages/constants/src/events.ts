@@ -120,6 +120,10 @@ export const DOMAIN_EVENTS = {
   // inside the webhook transaction recording the change.
   SUBSCRIPTION_STATUS_CHANGED: "subscription.statusChanged",
   AI_SUBSCRIPTION_STATUS_CHANGED: "aiSubscription.statusChanged",
+  // A person's feature grants changed (a personal subscription in app.user_subscriptions, and from
+  // session 2 a school-license seat). Raised by publishUserEntitlementChange beside the bump of
+  // that user's `user` entitlement version; the invalidator floors the `ent:usr:{userId}` entry.
+  USER_ENTITLEMENT_CHANGED: "userEntitlement.changed",
 
   // Grace-period dunning (ST-134). Raised by the billing dunning sweep, once per school subscription
   // per stage of the reminder sequence, for each recipient the reminder is addressed to (the

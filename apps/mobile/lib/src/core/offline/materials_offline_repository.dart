@@ -9,9 +9,8 @@ import '../api/fetch_all_pages.dart';
 class MaterialsOfflineRepository {
   MaterialsOfflineRepository({
     required OfflineDatabase database,
-    required AcademicsClient client,
-  }) : _client = client,
-       _cache = OfflineCachedResource<List<Material>>(
+    required this._client,
+  }) : _cache = OfflineCachedResource<List<Material>>(
          database: database,
          resource: 'materials',
          encode: (materials) =>

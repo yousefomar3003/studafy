@@ -9,7 +9,8 @@ import { requireAuth } from "../../../middleware/authContext";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
-import { getAiQuota } from "../gate/entitlement-gate";
+import { requireFeature } from "../../features/middleware";
+import { AI_FEATURE_ROUTE, aiTokenBudget, getAiQuota } from "../gate/token-budget";
 import { throwLlmError } from "../llm/errors";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
 import { recordDurableUsage, splitByTier } from "../usage/durable";
@@ -183,6 +184,13 @@ export function aiGatewayRoutes(deps: {
 }): OpenAPIHono<AppEnv> {
   const { database, provider, flags = null, modelOverrides = {} } = deps;
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+  // Paid-feature gate, then the AI token budget (docs/billing/feature-licensing.md). Model calls
+  // count one unit of the feature.
+  routes.use(
+    "/api/ai/students/:studentId/generate",
+    requireFeature("ai_tutor", { ...AI_FEATURE_ROUTE, meter: 1 }),
+    aiTokenBudget(),
+  );
 
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to declare
   // its audit intent. This POST's one write is the metered student's own usage ledger; the

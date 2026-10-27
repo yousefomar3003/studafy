@@ -1,3 +1,8 @@
+import {
+  loadSiblingDiscountRule,
+  loadSiblingStandings,
+  siblingPercentageFor,
+} from "@studafy/billing";
 import { ERROR_CODES } from "@studafy/constants";
 import { v5 as uuidv5 } from "uuid";
 
@@ -241,6 +246,26 @@ async function approvedScholarships(
   }));
 }
 
+/** The school's sibling rule for this student, shaped like a percentage scholarship; null if none. */
+async function siblingDiscount(
+  tx: TransactionSql,
+  schoolId: string,
+  studentId: string,
+): Promise<ApprovedScholarship | null> {
+  const rule = await loadSiblingDiscountRule(tx, schoolId);
+  if (!rule?.is_enabled) return null;
+  const standings = await loadSiblingStandings(tx, schoolId, [studentId]);
+  const percentage = siblingPercentageFor(rule, standings.get(studentId));
+  if (percentage === null) return null;
+  return {
+    discount_type: "percentage",
+    percentage,
+    amount_minor: null,
+    currency_code: null,
+    fee_category: rule.fee_category,
+  };
+}
+
 export async function generateInvoice(
   tx: TransactionSql,
   schoolId: string,
@@ -319,8 +344,11 @@ export async function generateInvoice(
   // The student's approved scholarships (000149) become the invoice's own discount, so ERPNext's
   // grand total, ledger and outstanding amount include it. Only awards approved by the school admin
   // of scholarships still active count; the 000066 award_cache rows from the retired ERPNext design
-  // are not read.
+  // are not read. The school's sibling rule (000151) adds one more percentage for a second or later
+  // enrolled child, on the same terms: it adds up with scholarships and the total is capped.
   const scholarships = await approvedScholarships(tx, schoolId, params.studentId);
+  const sibling = await siblingDiscount(tx, schoolId, params.studentId);
+  if (sibling) scholarships.push(sibling);
   if (scholarships.length > 0) {
     const currency = await getCurrencyRef(tx, currencyCode);
     const discountMinor = scholarshipDiscountMinor(

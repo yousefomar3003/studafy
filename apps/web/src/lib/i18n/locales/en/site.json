@@ -347,7 +347,11 @@
       "MATERIAL_OCR_LOW_CONFIDENCE": "Material text quality warning",
       "MATERIAL_INGESTED": "Material ready for AI search",
       "MATERIAL_INGEST_FAILED": "Material processing failed",
-      "DIRECT_MESSAGE": "New messages"
+      "DIRECT_MESSAGE": "New messages",
+      "FEE_INVOICE_ISSUED": "New fee invoices",
+      "FEE_PAYMENT_RECEIVED": "Fee payments received",
+      "FEE_PAYMENT_REMINDER": "Overdue fee reminders",
+      "FEE_STATEMENT": "Family fee statements"
     },
     "channels": {
       "in_app": "In-app",

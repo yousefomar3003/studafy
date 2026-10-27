@@ -186,13 +186,19 @@ def ensure_scholarship_award_doctype():
 
 
 DEMO_FAMILIES = (
-    # (customer, invoice amount, days ago issued, days until due, amount paid)
-    ("Yara Khalil", 1200, 95, 30, 1200),
-    ("Adam Fares", 1200, 95, 30, 600),
-    ("Nour Saleh", 1350, 70, 30, 0),
-    ("Zaid Mansour", 1350, 40, 30, 1350),
-    ("Yara Khalil", 450, 20, 30, 0),
-    ("Adam Fares", 450, 10, 45, 0),
+    # (customer, student name, invoice amount, days ago issued, days until due, amount paid)
+    #
+    # The customer is the student's admission number in the Studafy demo seed
+    # (db/seeds/mock-credentials.ts): Studafy names a student's ERPNext Customer after it
+    # (buildStudentCustomerId), and that is how the invoice and payment webhooks find the student.
+    # Adam and Mira Fares are siblings, so the Fares family has two children owing at once.
+    ("STU-0001", "Yara Khalil", 1200, 95, 30, 1200),
+    ("STU-0002", "Adam Fares", 1200, 95, 30, 600),
+    ("STU-0003", "Nour Saleh", 1350, 70, 30, 0),
+    ("STU-0004", "Zaid Mansour", 1350, 40, 30, 1350),
+    ("STU-0001", "Yara Khalil", 450, 20, 30, 0),
+    ("STU-0002", "Adam Fares", 450, 10, 45, 0),
+    ("STU-0009", "Mira Fares", 1080, 50, 20, 0),
 )
 
 
@@ -217,17 +223,17 @@ def load_finance_demo(company):
         ).insert(ignore_permissions=True)
 
     today = datetime.date.today()
-    for customer, amount, issued_ago, due_in, paid in DEMO_FAMILIES:
+    for customer, student_name, amount, issued_ago, due_in, paid in DEMO_FAMILIES:
         if not frappe.db.exists("Customer", customer):
             frappe.get_doc(
                 {
                     "doctype": "Customer",
-                    "customer_name": customer,
+                    "customer_name": student_name,
                     "customer_type": "Individual",
                     "customer_group": "Individual",
                     "territory": "All Territories",
                 }
-            ).insert(ignore_permissions=True)
+            ).insert(ignore_permissions=True, set_name=customer)
 
         posting = today - datetime.timedelta(days=issued_ago)
         invoice = frappe.get_doc(

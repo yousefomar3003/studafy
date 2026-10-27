@@ -13,9 +13,9 @@
  *   - the route records the query's token cost durably in `app.ai_usage_meters` for the metered
  *     student.
  *
- * The AI entitlement gate's refusal codes (403/402/429) are covered by
- * `gate/entitlement-gate.test.ts`; here the route is mounted with a ready aiQuota handle — exactly
- * what the gate attaches in production. One test mounts it without the handle to pin the wiring
+ * The access chain's refusal codes (403/402/429) are covered by `gate/token-budget.test.ts`; here
+ * the route is mounted with a ready aiQuota handle — exactly what aiTokenBudget attaches in
+ * production. One test mounts it without the handle to pin the wiring
  * invariant that the retrieval surface must never run un-metered.
  *
  * Set TEST_DATABASE_URL to run these:
@@ -40,6 +40,7 @@ import {
 import { errorHandlerMiddleware } from "../../../middleware/errorHandler";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import { aiSubscriberFeatureService } from "../../features/__tests__/fakes";
 import { createFlagsService } from "../../flags";
 import {
   createDeterministicQueryEmbedder,
@@ -55,7 +56,7 @@ import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { FlagsService } from "../../flags";
-import type { AiQuotaHandle } from "../gate/entitlement-gate";
+import type { AiQuotaHandle } from "../gate/token-budget";
 import type { TransactionSql } from "postgres";
 
 const RETRIEVAL_DIMENSIONS = 1536;
@@ -122,6 +123,7 @@ function buildRetrievalApp(
     c.set("auth", auth);
     c.set("locale", "en");
     c.set("aiQuota", handle);
+    c.set("features", aiSubscriberFeatureService());
     await next();
   });
   app.route(

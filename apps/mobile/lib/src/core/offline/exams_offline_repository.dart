@@ -14,9 +14,8 @@ import '../api/fetch_all_pages.dart';
 class ExamsOfflineRepository {
   ExamsOfflineRepository({
     required OfflineDatabase database,
-    required AcademicsClient client,
-  }) : _client = client,
-       _cache = OfflineCachedResource<List<Exam>>(
+    required this._client,
+  }) : _cache = OfflineCachedResource<List<Exam>>(
          database: database,
          resource: 'exams',
          encode: (exams) => exams.map((exam) => exam.toJson()).toList(),

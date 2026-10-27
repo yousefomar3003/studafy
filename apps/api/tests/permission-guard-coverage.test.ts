@@ -141,6 +141,34 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/academics/sections/{sectionId}",
   "POST /api/academics/sections/{sectionId}/students",
   "DELETE /api/academics/sections/{sectionId}/students/{studentId}",
+  // Academic grading (000160): configuration, marks, results and certificates; every route sits
+  // behind requirePermission (academicConfig:*, grade:*, approval:review, result:finalize,
+  // academicCertificate:issue) and the services add section/subject row scope.
+  "DELETE /api/grading/scales/{scaleId}",
+  "DELETE /api/grading/subject-configs/{configId}",
+  "DELETE /api/grading/teacher-assignments/{assignmentId}",
+  "POST /api/grading/assessments/{assessmentId}/decision",
+  "POST /api/grading/certificates/{certificateId}/reissue",
+  "POST /api/grading/certificates/{certificateId}/revoke",
+  "POST /api/grading/finalizations/{finalizationId}/certificates",
+  "POST /api/grading/finalizations/{finalizationId}/corrections",
+  "POST /api/grading/mark-sheets/{sheetId}/decision",
+  "POST /api/grading/sections/{sectionId}/results/finalize",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/assessments",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/mark-sheets/submit",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/override",
+  "POST /api/grading/subject-configs/{configId}/keep",
+  "POST /api/grading/subject-configs/{configId}/reset",
+  "POST /api/grading/teacher-assignments",
+  "POST /api/grading/years/{yearId}/copy",
+  "POST /api/grading/years/{yearId}/programs/{gradeLevelId}/subjects",
+  "POST /api/grading/years/{yearId}/scales",
+  "POST /api/grading/years/{yearId}/status",
+  "PUT /api/grading/scales/{scaleId}",
+  "PUT /api/grading/sections/{sectionId}/subject-enrollments",
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/marks",
+  "PUT /api/grading/subject-configs/{configId}",
+  "PUT /api/grading/years/{yearId}/programs/{gradeLevelId}",
   // Timetable (ST-101). Every write guarded by requirePermission(TIMETABLE_MANAGE), method-scoped
   // with onlyMethods() where a path also serves reads.
   "POST /api/academics/timetable-versions",
@@ -299,6 +327,11 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/scholarship-awards/{awardId}/approve",
   "POST /api/finance/scholarship-awards/{awardId}/reject",
   "POST /api/finance/scholarship-awards/{awardId}/revoke",
+  // Family finance (finance/family-accounts): billing:update, guarded in that module's routes.
+  "POST /api/finance/families/{familyId}/payments",
+  "POST /api/finance/families/{familyId}/reminders",
+  "POST /api/finance/families/{familyId}/statements",
+  "POST /api/finance/reminders",
   // In-app inbox (ST-142). Personal per-user read state; RLS already fences every row to the
   // authenticated user (user_id = app.current_user_id()), so the caller's identity is sufficient
   // authorization and there is no other user's row to protect. Listed here for inventory accuracy
@@ -401,6 +434,38 @@ const EXPECTED_MUTATING_ROUTES = [
   // Guarded on platform:manage in modules/school-applications/routes.ts.
   "POST /api/platform/school-applications/{applicationId}/approve",
   "POST /api/platform/school-applications/{applicationId}/reject",
+  // School licenses on the super admin's side (docs/billing/feature-licensing.md). Guarded on
+  // platform:manage for writes in modules/licensing/platform-routes.ts.
+  "POST /api/platform/schools/{schoolId}/licenses",
+  "PATCH /api/platform/schools/{schoolId}/licenses/{licenseId}",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/status",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/extend",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/seats",
+  "DELETE /api/platform/schools/{schoolId}/licenses/{licenseId}/seats/{seatId}",
+  "POST /api/platform/schools/{schoolId}/license-requests/{requestId}/resolve",
+  // The school's own seats. Guarded on license:manage (ORG_ADMIN, PRINCIPAL) in
+  // modules/licensing/school-routes.ts.
+  "POST /api/school/license/seats",
+  "DELETE /api/school/license/seats/{seatId}",
+  "POST /api/school/license/change-requests",
+  // License billing (session 3): the console's routes on platform:manage (web channel), the
+  // school's accept and receipt upload on license:manage, in modules/licensing/billing-*-routes.ts.
+  "PUT /api/platform/licenses/price-settings/{currencyCode}",
+  "PUT /api/platform/licenses/bank-details",
+  "POST /api/platform/licenses/quote",
+  "POST /api/platform/schools/{schoolId}/license-quotes",
+  "PUT /api/platform/schools/{schoolId}/license-quotes/{quoteId}",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/send",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/accept",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/withdraw",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/void",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payments",
+  "POST /api/platform/schools/{schoolId}/license-payments/{paymentId}/void",
+  "POST /api/platform/schools/{schoolId}/license-payments/upload-url",
+  "POST /api/platform/schools/{schoolId}/license-receipts/{receiptId}/match",
+  "POST /api/school/license/quotes/{quoteId}/accept",
+  "POST /api/school/license/invoices/{invoiceId}/receipts",
 ];
 
 /**

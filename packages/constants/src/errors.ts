@@ -129,6 +129,29 @@ export const ERROR_CODES = {
   GRADE_LEVEL_HAS_SECTIONS: "GRADE_LEVEL_HAS_SECTIONS",
   SECTION_IN_USE: "SECTION_IN_USE",
 
+  // Academic grading configuration, marks, results and certificates (000160).
+  // ACADEMIC_CONFIG_INVALID: a configuration fails @studafy/grading-engine validation (weights not
+  // totalling 100%, a contradictory scale...). ACADEMIC_CONFIG_LOCKED: the year's configuration is
+  // finalized or archived. ACADEMIC_CONFIG_IMPACT_UNCONFIRMED: the change touches recorded marks or
+  // assessments and must be resent with confirm_impact after the admin has reviewed the impact.
+  ACADEMIC_CONFIG_INVALID: "ACADEMIC_CONFIG_INVALID",
+  ACADEMIC_CONFIG_LOCKED: "ACADEMIC_CONFIG_LOCKED",
+  ACADEMIC_CONFIG_IMPACT_UNCONFIRMED: "ACADEMIC_CONFIG_IMPACT_UNCONFIRMED",
+  ACADEMIC_YEAR_NOT_ACTIVE: "ACADEMIC_YEAR_NOT_ACTIVE",
+  GRADE_PROGRAM_NOT_FOUND: "GRADE_PROGRAM_NOT_FOUND",
+  SUBJECT_CONFIG_NOT_FOUND: "SUBJECT_CONFIG_NOT_FOUND",
+  SUBJECT_CONFIG_DUPLICATE: "SUBJECT_CONFIG_DUPLICATE",
+  SUBJECT_CONFIG_IN_USE: "SUBJECT_CONFIG_IN_USE",
+  SECTION_OVERRIDE_HAS_MARKS: "SECTION_OVERRIDE_HAS_MARKS",
+  TEACHER_ASSIGNMENT_DUPLICATE: "TEACHER_ASSIGNMENT_DUPLICATE",
+  MARKS_LOCKED: "MARKS_LOCKED",
+  MARK_SCORE_OUT_OF_RANGE: "MARK_SCORE_OUT_OF_RANGE",
+  RESULTS_INCOMPLETE: "RESULTS_INCOMPLETE",
+  RESULTS_ALREADY_FINALIZED: "RESULTS_ALREADY_FINALIZED",
+  RESULT_FINALIZATION_NOT_FOUND: "RESULT_FINALIZATION_NOT_FOUND",
+  CERTIFICATE_BLOCKED: "CERTIFICATE_BLOCKED",
+  CERTIFICATE_NOT_FOUND: "CERTIFICATE_NOT_FOUND",
+
   // Enrollment — student-class binding.
   ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",
   ENROLLMENT_NOT_ACTIVE: "ENROLLMENT_NOT_ACTIVE",
@@ -191,6 +214,13 @@ export const ERROR_CODES = {
   // than to change anything. Never retry-with-a-new-key on this one — that is the double charge.
   PAYMENT_IN_PROGRESS: "PAYMENT_IN_PROGRESS",
   PAYMENT_IDEMPOTENCY_KEY_REQUIRED: "PAYMENT_IDEMPOTENCY_KEY_REQUIRED",
+  // One payment from a family split across its children's invoices: the split names an invoice
+  // that is not the family's, pays an invoice more than it owes, or does not add up to the amount.
+  FAMILY_PAYMENT_ALLOCATION_INVALID: "FAMILY_PAYMENT_ALLOCATION_INVALID",
+  // The family owes less than the amount paid; ERPNext would record the excess as an advance with
+  // no invoice, which is a decision for finance to make in ERPNext, not a side effect of this form.
+  FAMILY_PAYMENT_EXCEEDS_BALANCE: "FAMILY_PAYMENT_EXCEEDS_BALANCE",
+  FAMILY_NOT_FOUND: "FAMILY_NOT_FOUND",
 
   // Finance gateway — refunds (ST-124).
   REFUND_NOT_FOUND: "REFUND_NOT_FOUND",
@@ -378,6 +408,60 @@ export const ERROR_CODES = {
   AI_SUBSCRIPTION_INACTIVE: "AI_SUBSCRIPTION_INACTIVE",
   AI_QUOTA_EXCEEDED: "AI_QUOTA_EXCEEDED",
   AI_QUOTA_UNAVAILABLE: "AI_QUOTA_UNAVAILABLE",
+
+  // Paid features (requireFeature, docs/billing/feature-licensing.md). One code per reason a
+  // feature is refused, so a client can branch: FEATURE_NOT_INCLUDED -- no active grant covers the
+  // person for this feature (or the super admin paused it); offer an upgrade. FEATURE_EXPIRED -- a
+  // grant covered it and has ended; offer a renewal. FEATURE_LIMIT_REACHED -- this month's usage
+  // limit is used up; it resets on the 1st (UTC). A school that is not active keeps answering
+  // AI_SCHOOL_INACTIVE on the AI routes, as before.
+  FEATURE_NOT_INCLUDED: "FEATURE_NOT_INCLUDED",
+  FEATURE_EXPIRED: "FEATURE_EXPIRED",
+  FEATURE_LIMIT_REACHED: "FEATURE_LIMIT_REACHED",
+
+  // School feature licenses and seats (session 2 of docs/billing/feature-licensing.md).
+  // LICENSE_NONE: the school has no license it can assign seats on. LICENSE_ALREADY_ACTIVE: the
+  // school already has an active license (one at a time). LICENSE_NOT_EDITABLE: the change is not
+  // allowed in the license's status. LICENSE_TIER_INVALID: a tier is not a tier of that audience, or
+  // an audience has seats without a tier. LICENSE_AUDIENCE_NOT_LICENSED: the license sells no seats to
+  // that audience (or, for parents, does not include Family+). LICENSE_SEAT_LIMIT_REACHED: every
+  // purchased seat of that audience is assigned. LICENSE_SEATS_BELOW_ASSIGNED: a seat count cannot
+  // drop below the seats already assigned. LICENSE_SEAT_NOT_ELIGIBLE: the person is not a member of
+  // the school in that audience.
+  LICENSE_NOT_FOUND: "LICENSE_NOT_FOUND",
+  LICENSE_NONE: "LICENSE_NONE",
+  LICENSE_INVALID_TRANSITION: "LICENSE_INVALID_TRANSITION",
+  LICENSE_ALREADY_ACTIVE: "LICENSE_ALREADY_ACTIVE",
+  LICENSE_NOT_EDITABLE: "LICENSE_NOT_EDITABLE",
+  LICENSE_TIER_INVALID: "LICENSE_TIER_INVALID",
+  LICENSE_AUDIENCE_NOT_LICENSED: "LICENSE_AUDIENCE_NOT_LICENSED",
+  LICENSE_SEAT_LIMIT_REACHED: "LICENSE_SEAT_LIMIT_REACHED",
+  LICENSE_SEATS_BELOW_ASSIGNED: "LICENSE_SEATS_BELOW_ASSIGNED",
+  LICENSE_SEAT_NOT_FOUND: "LICENSE_SEAT_NOT_FOUND",
+  LICENSE_SEAT_NOT_ELIGIBLE: "LICENSE_SEAT_NOT_ELIGIBLE",
+
+  // License pricing, quotes, invoices and payments (session 3 of docs/billing/feature-licensing.md).
+  // LICENSE_PRICE_MISSING: a tier on the quote has no monthly price in its currency.
+  // LICENSE_PRICING_INVALID: the calculator refused the input (a bracket, a missing adjustment reason,
+  // a total below zero). LICENSE_QUOTE_NOT_EDITABLE: the quote's status does not allow the change.
+  // LICENSE_QUOTE_EXPIRED: it is past its valid-until date. LICENSE_QUOTE_STALE: the license or its
+  // credits changed since the quote was priced -- price a new one. LICENSE_INVOICE_NOT_PAYABLE: the
+  // invoice is paid or void. LICENSE_INVOICE_HAS_PAYMENTS: void its payments first.
+  // LICENSE_PAYMENT_EXCEEDS_BALANCE: the amount is more than the invoice's balance.
+  LICENSE_PRICE_MISSING: "LICENSE_PRICE_MISSING",
+  LICENSE_PRICING_INVALID: "LICENSE_PRICING_INVALID",
+  LICENSE_QUOTE_NOT_FOUND: "LICENSE_QUOTE_NOT_FOUND",
+  LICENSE_QUOTE_NOT_EDITABLE: "LICENSE_QUOTE_NOT_EDITABLE",
+  LICENSE_QUOTE_EXPIRED: "LICENSE_QUOTE_EXPIRED",
+  LICENSE_QUOTE_STALE: "LICENSE_QUOTE_STALE",
+  LICENSE_INVOICE_NOT_FOUND: "LICENSE_INVOICE_NOT_FOUND",
+  LICENSE_INVOICE_NOT_PAYABLE: "LICENSE_INVOICE_NOT_PAYABLE",
+  LICENSE_INVOICE_HAS_PAYMENTS: "LICENSE_INVOICE_HAS_PAYMENTS",
+  LICENSE_PAYMENT_NOT_FOUND: "LICENSE_PAYMENT_NOT_FOUND",
+  LICENSE_PAYMENT_EXCEEDS_BALANCE: "LICENSE_PAYMENT_EXCEEDS_BALANCE",
+  LICENSE_PAYMENT_VOIDED: "LICENSE_PAYMENT_VOIDED",
+  LICENSE_RECEIPT_NOT_FOUND: "LICENSE_RECEIPT_NOT_FOUND",
+  LICENSE_RECEIPT_ALREADY_MATCHED: "LICENSE_RECEIPT_ALREADY_MATCHED",
 
   // Third-party AI data-sharing consent (ST-305). AI_CONSENT_REQUIRED is the consent gate's refusal:
   // the caller has no live consent for the current disclosure, so nothing was sent to the model

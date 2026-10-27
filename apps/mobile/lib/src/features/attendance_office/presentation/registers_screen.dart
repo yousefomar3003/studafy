@@ -204,8 +204,9 @@ class _FiltersRow extends ConsumerWidget {
                 lastDate: today,
                 helpText: 'attendanceOffice.registers.date'.tr(),
               );
-              if (picked != null)
+              if (picked != null) {
                 ref.read(registerDateProvider.notifier).select(picked);
+              }
             },
           ),
         ),

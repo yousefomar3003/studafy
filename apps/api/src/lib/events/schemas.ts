@@ -340,6 +340,14 @@ export const eventPayloadSchemas = {
     status: z.enum(SUBSCRIPTION_STATUSES),
     entitlementsVersion: z.number().int().min(2),
   }),
+  // A person's feature grants changed (docs/billing/feature-licensing.md). Carries no status: the
+  // grants are many rows from several sources, and the consumer only needs the user and the version
+  // to floor `ent:usr:{userId}`.
+  [DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED]: z.object({
+    schoolId: uid,
+    userId: uid,
+    entitlementsVersion: z.number().int().min(2),
+  }),
 
   // ── Grace-period dunning (ST-134) ──────────────────────────────────
   // Raised by the billing dunning sweep once per school subscription per stage of the reminder

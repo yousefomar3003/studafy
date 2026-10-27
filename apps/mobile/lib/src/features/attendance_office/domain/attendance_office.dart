@@ -107,8 +107,9 @@ Term? pickCurrentTerm(List<Term> terms, DateTime today) {
   final ordered = [...terms]..sort((a, b) => a.startsOn.compareTo(b.startsOn));
   for (final term in ordered) {
     if (!dateOnly(term.startsOn).isAfter(day) &&
-        !dateOnly(term.endsOn).isBefore(day))
+        !dateOnly(term.endsOn).isBefore(day)) {
       return term;
+    }
   }
   for (final term in ordered) {
     if (dateOnly(term.startsOn).isAfter(day)) return term;

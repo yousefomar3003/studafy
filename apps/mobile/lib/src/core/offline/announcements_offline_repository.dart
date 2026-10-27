@@ -28,9 +28,8 @@ bool isMandatoryAnnouncement(Notification notification) =>
 class AnnouncementsOfflineRepository {
   AnnouncementsOfflineRepository({
     required OfflineDatabase database,
-    required NotificationsClient client,
-  }) : _client = client,
-       _cache = OfflineCachedResource<List<Notification>>(
+    required this._client,
+  }) : _cache = OfflineCachedResource<List<Notification>>(
          database: database,
          // Distinct from the old `announcements` resource, whose rows hold admin-history
          // `Announcement` JSON that would not decode as a `Notification`.

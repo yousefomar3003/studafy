@@ -35,6 +35,13 @@ export interface GoogleNotification {
 export interface GooglePlayStore {
   getSubscription(purchaseToken: string): Promise<StoreSubscription>;
   acknowledge(productId: string, purchaseToken: string): Promise<void>;
+  /**
+   * Stop the subscription renewing (purchases.subscriptions.cancel). The user keeps access to the
+   * end of the period they paid for; nothing is refunded. Used when a school seat covers someone who
+   * pays through Google Play (docs/billing/feature-licensing.md). The product id is read back from
+   * Play rather than stored, because the cancel endpoint is addressed by it.
+   */
+  cancel(purchaseToken: string): Promise<void>;
   /** Decode a Pub/Sub push body. Throws on anything that is not an RTDN for this package. */
   parseNotification(body: unknown): GoogleNotification;
 }
@@ -129,6 +136,14 @@ export function createGooglePlayStore(config: GooglePlayConfig): GooglePlayStore
       await request(
         "POST",
         `${base}/${encodeURIComponent(productId)}/tokens/${encodeURIComponent(purchaseToken)}:acknowledge`,
+      );
+    },
+
+    async cancel(purchaseToken) {
+      const subscription = await this.getSubscription(purchaseToken);
+      await request(
+        "POST",
+        `${base}/${encodeURIComponent(subscription.productId)}/tokens/${encodeURIComponent(purchaseToken)}:cancel`,
       );
     },
 

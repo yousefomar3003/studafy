@@ -97,5 +97,5 @@ extension AiFeatureUi on AiFeature {
     AiFeature.explain => Icons.school_outlined,
   };
 
-  String get labelKey => 'ai.hub.features.${name}.label';
+  String get labelKey => 'ai.hub.features.$name.label';
 }

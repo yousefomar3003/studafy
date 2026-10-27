@@ -151,6 +151,33 @@ describe("entitlement invalidator", () => {
     expect(await redis!.get(key)).toBe("3|");
   });
 
+  // Feature licensing (000161/000162): a person's grants, claimed through their own partial index.
+  invalidatorTest("invalidates a user's grants entry, beside the subscription events", async () => {
+    const schoolId = await seedSchool();
+    const userId = crypto.randomUUID();
+    const userKey = `ent:usr:${userId}`;
+    const schoolKey = `ent:${schoolId}`;
+    await redis!.set(userKey, `1|{"subscriptions":[]}`, "EX", 300);
+
+    const userRow = await seedOutboxRow(schoolId, DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED, {
+      schoolId,
+      userId,
+      entitlementsVersion: 2,
+    });
+    await seedOutboxRow(schoolId, DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED, {
+      schoolId,
+      subscriptionId: crypto.randomUUID(),
+      previousStatus: "active",
+      status: "canceled",
+      entitlementsVersion: 2,
+    });
+
+    expect(await processEntitlementSchool(context(), schoolId)).toBe(2);
+    expect(await redis!.get(userKey)).toBe("2|");
+    expect(await redis!.get(schoolKey)).toBe("2|");
+    expect(await readCursor(schoolId, userRow)).not.toBeNull();
+  });
+
   // The at-least-once guarantee. The mark and the invalidation share one transaction, so a Redis
   // failure must leave the row claimable rather than silently consumed.
   invalidatorTest(

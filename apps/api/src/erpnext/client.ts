@@ -301,19 +301,51 @@ export class ErpNextClient {
       const obj = data as Record<string, unknown>;
       // ERPNext error format: { "exc_type": "...", "message": "..." }
       if (typeof obj.message === "string") {
-        return obj.message;
+        return readableErpNextMessage(obj.message);
       }
+      // A JSON array of messages, each itself a JSON object ({"message": "...", "title": ...}).
       if (typeof obj._server_messages === "string") {
         try {
           const messages = JSON.parse(obj._server_messages) as string[];
-          return messages[0] ?? "ERPNext error";
+          if (messages[0] !== undefined) return readableErpNextMessage(messages[0]);
         } catch {
-          return "ERPNext error";
+          // Fall through to the exception line below.
         }
+      }
+      // "frappe.exceptions.ValidationError: Please set default Cash or Bank account in ..."
+      if (typeof obj.exception === "string") {
+        return readableErpNextMessage(obj.exception.replace(/^[\w.]+(Error|Exception): /, ""));
       }
     }
     return "ERPNext error";
   }
+}
+
+/**
+ * One ERPNext message as a person should read it. Frappe wraps each server message in a JSON object
+ * ({"message": "...", "indicator": "red"}) and puts links to its own desk in the text; neither means
+ * anything to a Studafy user, so the object is unwrapped and the markup removed.
+ */
+export function readableErpNextMessage(raw: string): string {
+  let text = raw;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof (parsed as { message?: unknown }).message === "string"
+    ) {
+      text = (parsed as { message: string }).message;
+    }
+  } catch {
+    // Not JSON: already plain text.
+  }
+  return (
+    text
+      .replace(/<[^>]*>/g, "")
+      .replace(/\s+/g, " ")
+      .trim() || "ERPNext error"
+  );
 }
 
 /**

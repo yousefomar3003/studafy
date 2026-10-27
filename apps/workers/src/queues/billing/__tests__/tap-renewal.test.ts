@@ -303,6 +303,55 @@ describe("runTapRenewals", () => {
     expect((await readState(f)).status).toBe("canceled");
   });
 
+  // A school seat covering the student turns their Tap-billed AI add-on's renewal off (000163).
+  renewalTest(
+    "an AI add-on whose renewal a school seat turned off ends instead of charging",
+    async () => {
+      const f = await seed();
+      const aiId = await db!.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+        const email = `ai-${crypto.randomUUID().slice(0, 8)}@local`;
+        const [user] = await tx<{ id: string }[]>`
+        INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+        VALUES (${f.schoolId}::uuid, ${email}, ${email}, 'Student', 'active')
+        RETURNING id
+      `;
+        const [student] = await tx<{ id: string }[]>`
+        INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status)
+        VALUES (${f.schoolId}::uuid, ${user!.id}::uuid, ${`ADM-${email}`}, 'S', 'T', 'enrolled')
+        RETURNING id
+      `;
+        const [ai] = await tx<{ id: string }[]>`
+        INSERT INTO app.ai_subscriptions (
+          school_id, student_id, status, current_period_start, current_period_end,
+          cancel_at_period_end, tap_card_id, tap_payment_agreement_id
+        ) VALUES (
+          ${f.schoolId}::uuid, ${student!.id}::uuid, 'active',
+          ${new Date(PERIOD_END.getTime() - 31 * DAY)}, ${PERIOD_END},
+          true, 'card_TS_ai', 'payment_agreement_TS_ai'
+        )
+        RETURNING id
+      `;
+        return ai!.id;
+      });
+      const { charger, charges } = fakeTap();
+
+      await runTapRenewals(db!, charger, WEBHOOK_URL, at(0.1), silentLogger);
+
+      const [ai] = await db!.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+        return tx<{ status: string }[]>`
+        SELECT status::text AS status FROM app.ai_subscriptions WHERE id = ${aiId}::uuid
+      `;
+      });
+      expect(ai!.status).toBe("canceled");
+      // The school's own subscription still renewed; the add-on was not charged.
+      expect(chargesFor(f, charges)).toHaveLength(1);
+    },
+  );
+
   renewalTest("does nothing before the period ends", async () => {
     const f = await seed();
     const { charger, charges } = fakeTap();

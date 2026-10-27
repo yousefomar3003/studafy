@@ -22,6 +22,7 @@
  */
 
 import { formatMinorUnits } from "../currency";
+import { receiptUrlFor } from "../receipts/url";
 
 import type {
   FamilyFinancialViewResponse,
@@ -32,6 +33,7 @@ import type { SupportedLocale } from "../../../middleware/locale";
 import type { TransactionSql } from "postgres";
 
 interface InvoiceCacheRow {
+  id: string;
   student_id: string;
   erpnext_docname: string;
   erpnext_status: string;
@@ -99,6 +101,7 @@ function toDate(value: unknown): Date {
 
 function parseInvoiceRow(raw: Record<string, unknown>): InvoiceCacheRow {
   return {
+    id: String(raw.id),
     student_id: String(raw.student_id),
     erpnext_docname: String(raw.erpnext_docname),
     erpnext_status: String(raw.erpnext_status),
@@ -181,6 +184,7 @@ function toInvoiceSummary(row: InvoiceCacheRow, payRedirectBaseUrl: string | und
   const minorUnit = row.currency_minor_unit;
   const hasOutstanding = row.outstanding_amount_minor > 0n;
   return {
+    id: row.id,
     erpnext_docname: row.erpnext_docname,
     erpnext_status: row.erpnext_status,
     issued_date: row.issued_date,
@@ -230,7 +234,7 @@ function toPaymentSummary(row: PaymentCacheRow) {
     payment_mode: row.payment_mode,
     status: row.status,
     erpnext_status: row.erpnext_status,
-    receipt_url: row.receipt_url,
+    receipt_url: receiptUrlFor(row),
     payment_date: row.payment_date,
     confirmed_at: row.confirmed_at ? row.confirmed_at.toISOString() : null,
     last_synced_at: row.last_synced_at.toISOString(),
@@ -305,7 +309,7 @@ export async function aggregateFamilyFinancialView(
       WHERE school_id = ${schoolId}::uuid AND id = ANY(${studentIds}::uuid[])
     `,
     tx<Record<string, unknown>[]>`
-      SELECT ic.student_id, ic.erpnext_docname, ic.erpnext_status,
+      SELECT ic.id, ic.student_id, ic.erpnext_docname, ic.erpnext_status,
              ic.issued_date::text AS issued_date, ic.due_date::text AS due_date,
              ic.total_amount_minor, ic.outstanding_amount_minor,
              ic.last_synced_at, c.code AS currency, c.minor_unit AS currency_minor_unit

@@ -50,12 +50,10 @@ const Duration examCountdownTickInterval = Duration(seconds: 1);
 /// the screen's `State` and disposed with it.
 class ExamController extends ChangeNotifier {
   ExamController({
-    required ExamClient client,
-    required ExamProgressStore progressStore,
-    required String studentId,
-  }) : _client = client,
-       _progressStore = progressStore,
-       _studentId = studentId;
+    required this._client,
+    required this._progressStore,
+    required this._studentId,
+  });
 
   final ExamClient _client;
   final ExamProgressStore _progressStore;

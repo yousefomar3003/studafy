@@ -67,8 +67,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ..invalidate(officeRosterProvider(widget.classId))
       ..invalidate(dailySessionsProvider(_scope.date));
     final sessionId = register?.session?.id;
-    if (sessionId != null)
+    if (sessionId != null) {
       ref.invalidate(officeSessionRecordsProvider(sessionId));
+    }
   }
 
   @override

@@ -1,0 +1,13 @@
+# build_runner configuration.
+#
+# json_serializable writes a `_$XToJson` for every model, including the sealed unions swagger_parser
+# generates for oneOf schemas (attendance report summary items, license seat scopes), whose `toJson`
+# never calls it. The result is an `unused_element` warning per union in code nobody edits by hand.
+# The combining builder stamps this ignore into every generated part file instead.
+targets:
+  $default:
+    builders:
+      source_gen|combining_builder:
+        options:
+          ignore_for_file:
+            - unused_element

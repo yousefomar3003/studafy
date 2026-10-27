@@ -11,8 +11,7 @@ import 'pii_scrubber.dart';
 /// `FlutterError.onError` or a zone's error handler, contexts where an escaping exception would
 /// itself go unhandled. Every fan-out point below is wrapped accordingly.
 class CompositeCrashReporter implements CrashReporter {
-  CompositeCrashReporter(this._reporters, {PiiScrubber scrubber = const PiiScrubber()})
-      : _scrubber = scrubber;
+  CompositeCrashReporter(this._reporters, {this._scrubber = const PiiScrubber()});
 
   final List<CrashReporter> _reporters;
   final PiiScrubber _scrubber;

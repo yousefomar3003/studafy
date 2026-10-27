@@ -254,23 +254,25 @@ class _ItemBodyState extends State<_ItemBody> {
         Text(item.prompt, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.space16),
         if (item.type == ExamItemType.mcq)
-          Column(
-            children: [
-              for (final option in item.options ?? const [])
-                RadioListTile<String>(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(option.text),
-                  value: option.id,
-                  groupValue: _selectedOptionId,
-                  onChanged: widget.enabled
-                      ? (value) {
-                          setState(() => _selectedOptionId = value);
-                          widget.onChanged(value!);
-                        }
-                      : null,
-                ),
-            ],
+          RadioGroup<String>(
+            groupValue: _selectedOptionId,
+            onChanged: (value) {
+              if (!widget.enabled || value == null) return;
+              setState(() => _selectedOptionId = value);
+              widget.onChanged(value);
+            },
+            child: Column(
+              children: [
+                for (final option in item.options ?? const [])
+                  RadioListTile<String>(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(option.text),
+                    value: option.id,
+                    enabled: widget.enabled,
+                  ),
+              ],
+            ),
           )
         else
           TextField(

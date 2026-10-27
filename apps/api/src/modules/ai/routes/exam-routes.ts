@@ -22,6 +22,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { requireFeature } from "../../features/middleware";
 import {
   AI_EXAM_MAX_RESERVE_TOKENS,
   AI_EXAM_OUTPUT_TOKEN_BUFFER,
@@ -40,7 +41,7 @@ import {
   submitExamAnswers,
 } from "../exam/persistence";
 import { loadExamReport } from "../exam/report";
-import { getAiQuota } from "../gate/entitlement-gate";
+import { AI_FEATURE_ROUTE, aiTokenBudget, getAiQuota } from "../gate/token-budget";
 import { AI_FEATURES, AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
 
 import type { Database } from "../../../db/client";
@@ -499,6 +500,28 @@ export function aiExamRoutes(deps: {
 }): OpenAPIHono<AppEnv> {
   const { database, redis, modelOverrides = {} } = deps;
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+  // Paid-feature gate, then the AI token budget (docs/billing/feature-licensing.md). Model calls
+  // count one unit of the feature; the paths that only read or grade are checked, not counted.
+  routes.use(
+    "/api/ai/students/:studentId/exams",
+    requireFeature("study_tools", { ...AI_FEATURE_ROUTE, meter: 1 }),
+    aiTokenBudget(),
+  );
+  routes.use(
+    "/api/ai/students/:studentId/exams/:examId",
+    requireFeature("study_tools", AI_FEATURE_ROUTE),
+    aiTokenBudget(),
+  );
+  routes.use(
+    "/api/ai/students/:studentId/exams/:examId/start",
+    requireFeature("study_tools", AI_FEATURE_ROUTE),
+    aiTokenBudget(),
+  );
+  routes.use(
+    "/api/ai/students/:studentId/exams/:examId/submit",
+    requireFeature("study_tools", AI_FEATURE_ROUTE),
+    aiTokenBudget(),
+  );
   const queue = redis
     ? new Queue(QUEUE_NAMES.AI_EXAM_GENERATION, { connection: redis as never })
     : null;

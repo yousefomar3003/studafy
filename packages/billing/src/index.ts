@@ -80,3 +80,11 @@ export type {
   SkippedStep,
   SubscriptionKind,
 } from "./state-machine";
+
+export {
+  loadSiblingDiscountRule,
+  loadSiblingStandings,
+  siblingPercentageFor,
+  tierPercentageFor,
+} from "./sibling-discount";
+export type { SiblingDiscountRule, SiblingDiscountTier, SiblingStanding } from "./sibling-discount";

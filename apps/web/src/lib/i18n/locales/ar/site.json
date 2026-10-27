@@ -351,7 +351,11 @@
       "MATERIAL_OCR_LOW_CONFIDENCE": "تحذير بشأن جودة نص المادة",
       "MATERIAL_INGESTED": "المادة جاهزة للبحث بالذكاء الاصطناعي",
       "MATERIAL_INGEST_FAILED": "فشلت معالجة المادة",
-      "DIRECT_MESSAGE": "الرسائل الجديدة"
+      "DIRECT_MESSAGE": "الرسائل الجديدة",
+      "FEE_INVOICE_ISSUED": "فواتير الرسوم الجديدة",
+      "FEE_PAYMENT_RECEIVED": "دفعات الرسوم المستلمة",
+      "FEE_PAYMENT_REMINDER": "تذكيرات الرسوم المتأخرة",
+      "FEE_STATEMENT": "كشوف حساب رسوم العائلة"
     },
     "channels": {
       "in_app": "داخل التطبيق",

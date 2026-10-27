@@ -54,6 +54,12 @@ function parseMappingRow(row: Record<string, unknown>): ErpNextIdMapping {
  * Idempotent on `(school_id, entity, studafy_id)`. The `WHERE` on the update clause suppresses a
  * write when nothing changed, so a re-sync of an unchanged document does not churn `updated_at`
  * and does not take a row lock other callers would queue behind.
+ *
+ * A document already mapped under another Studafy id keeps that mapping. The billing worker maps a
+ * generated invoice under its generation idempotency key (which is how it refuses to generate the
+ * same invoice twice), and the webhook projection later sees the same invoice under its
+ * invoice_cache id; inserting the second would violate uq_erpnext_id_mappings_school_entity_docname
+ * and fail the webhook on every redelivery, leaving the invoice a draft in Studafy for good.
  */
 export async function upsertMapping(
   tx: TransactionSql,
@@ -62,6 +68,9 @@ export async function upsertMapping(
   studafyId: string,
   erpnextDocname: string,
 ): Promise<ErpNextIdMapping> {
+  const mapped = await findByDocname(tx, schoolId, entity, erpnextDocname);
+  if (mapped && mapped.studafy_id !== studafyId) return mapped;
+
   const [row] = await tx<Record<string, unknown>[]>`
     INSERT INTO app.erpnext_id_mappings (school_id, entity, studafy_id, erpnext_docname)
     VALUES (

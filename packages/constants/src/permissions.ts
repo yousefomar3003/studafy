@@ -131,11 +131,29 @@ export const PERMISSIONS = {
   // timetable stays open to every authenticated school member -- teachers and students need it.
   TIMETABLE_MANAGE: "timetable:manage",
 
+  // Academic grading configuration (migration 000160), per academic year: grade programs, subject
+  // grading rules and their section overrides, assessments, grading scales and teacher subject
+  // assignments. Teaching staff read the rules they grade by; school leadership changes them.
+  ACADEMIC_CONFIG_READ: "academicConfig:read",
+  ACADEMIC_CONFIG_MANAGE: "academicConfig:manage",
+  // Finalizing a section's term or annual results and correcting finalized results. Leadership only.
+  RESULT_FINALIZE: "result:finalize",
+  // Issuing, reissuing and revoking school report cards and certificates from finalized results.
+  // Distinct from CERTIFICATE_*, which are course-completion certificates a teacher may issue.
+  ACADEMIC_CERTIFICATE_ISSUE: "academicCertificate:issue",
+
   // The Studafy platform console (/portal/platform): every school on the platform, their lifecycle,
   // per-school feature flags, plans and platform settings. Cross-tenant by nature, so held by
   // SUPER_ADMIN alone -- deliberately excluded from ORG_ADMIN, which runs one school, not Studafy.
   PLATFORM_READ: "platform:read",
   PLATFORM_MANAGE: "platform:manage",
+
+  // The school's own feature license (docs/billing/feature-licensing.md): reading its tiers, seats and
+  // usage, and assigning seats to the school's students, teachers and parents. The license itself --
+  // tiers, seat counts, dates, status -- is the super admin's (platform:manage); a school can only
+  // request a change.
+  LICENSE_READ: "license:read",
+  LICENSE_MANAGE: "license:manage",
 
   AUDIT_LOG_READ: "auditLog:read",
   AUDIT_LOG_EXPORT: "auditLog:export",
@@ -279,6 +297,7 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.SUBMISSION_REQUEST_RESUBMISSION,
   PERMISSIONS.GRADE_READ,
   PERMISSIONS.GRADE_UPDATE,
+  PERMISSIONS.ACADEMIC_CONFIG_READ,
   PERMISSIONS.DISCUSSION_CREATE,
   PERMISSIONS.DISCUSSION_READ,
   PERMISSIONS.DISCUSSION_UPDATE,
@@ -368,11 +387,17 @@ const GUEST_PERMISSIONS: readonly Permission[] = [PERMISSIONS.COURSE_READ, PERMI
 // migration 000120 widened to include PRINCIPAL.
 const PRINCIPAL_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW,
+  PERMISSIONS.LICENSE_READ,
+  PERMISSIONS.LICENSE_MANAGE,
   PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW,
   PERMISSIONS.MESSAGE_REPORT_REVIEW,
   PERMISSIONS.CALENDAR_EVENT_READ,
   PERMISSIONS.CALENDAR_EVENT_MANAGE,
   PERMISSIONS.TIMETABLE_MANAGE,
+  PERMISSIONS.ACADEMIC_CONFIG_READ,
+  PERMISSIONS.ACADEMIC_CONFIG_MANAGE,
+  PERMISSIONS.RESULT_FINALIZE,
+  PERMISSIONS.ACADEMIC_CERTIFICATE_ISSUE,
   PERMISSIONS.APPROVAL_REVIEW,
   PERMISSIONS.ORGANIZATION_READ,
   PERMISSIONS.USER_READ,

@@ -41,6 +41,7 @@ import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
 import { erpNextDefinitelyDidNotWrite, translateErpNextError } from "../erpnext-errors";
 import { upsertMapping } from "../id-mappings/service";
+import { receiptUrlFor } from "../receipts/url";
 
 import type { ErpNextPaymentEntry, PaymentStatus } from "./projection";
 import type { Database } from "../../../db/client";
@@ -50,6 +51,8 @@ import type { JSONValue, TransactionSql } from "postgres";
 
 const PAYMENT_ENTRY_RESOURCE = "/api/resource/Payment%20Entry";
 const SALES_INVOICE_RESOURCE = "/api/resource/Sales%20Invoice";
+const BANK_CASH_ACCOUNT_METHOD =
+  "/api/method/erpnext.accounts.doctype.sales_invoice.sales_invoice.get_bank_cash_account";
 
 export type PaymentMode = "cash" | "bank_transfer" | "card_external";
 
@@ -143,7 +146,7 @@ function parseCacheRow(row: Record<string, unknown>): PaymentRow {
     payment_mode: row.payment_mode as PaymentMode | null,
     status: row.status as PaymentStatus,
     erpnext_status: row.erpnext_status as string,
-    receipt_url: row.receipt_url as string | null,
+    receipt_url: receiptUrlFor({ id: row.id as string, status: row.status as string }),
     payment_date: row.payment_date as string,
     confirmed_at: confirmedAt ? confirmedAt.toISOString() : null,
     last_synced_at: (row.last_synced_at as Date).toISOString(),
@@ -321,30 +324,60 @@ async function reserveIdempotencyKey(
  * ERPNext's own `set_missing_values` either resolves it or refuses the document. Refusing here
  * instead would be the gateway inventing a validation rule it does not own.
  */
-async function resolveParty(
+async function resolveInvoiceParties(
   tx: TransactionSql,
   erpnext: TenantErpNext,
   schoolId: string,
   invoiceId: string,
   acceptLanguage?: string,
-): Promise<string | undefined> {
-  const [cached] = await tx<{ customer: string | null }[]>`
-    SELECT erpnext_payload->>'customer' AS customer
+): Promise<{ party: string | undefined; company: string | undefined }> {
+  const [cached] = await tx<{ customer: string | null; company: string | null }[]>`
+    SELECT erpnext_payload->>'customer' AS customer, erpnext_payload->>'company' AS company
     FROM app.invoice_cache
     WHERE school_id = ${schoolId}::uuid AND erpnext_docname = ${invoiceId}
   `;
-  if (cached?.customer) return cached.customer;
+  if (cached?.customer && cached.company) {
+    return { party: cached.customer, company: cached.company };
+  }
 
   try {
-    const response = await erpnext.get<{ data?: { customer?: string | null } }>(
-      `${SALES_INVOICE_RESOURCE}/${encodeURIComponent(invoiceId)}`,
-      { acceptLanguage },
-    );
-    return response.data.data?.customer ?? undefined;
+    const response = await erpnext.get<{
+      data?: { customer?: string | null; company?: string | null };
+    }>(`${SALES_INVOICE_RESOURCE}/${encodeURIComponent(invoiceId)}`, { acceptLanguage });
+    return {
+      party: response.data.data?.customer ?? cached?.customer ?? undefined,
+      company: response.data.data?.company ?? undefined,
+    };
   } catch {
     // A failed lookup is not a failed payment. Fall through and let ERPNext decide on the POST,
     // where the error it returns is about the payment the caller actually asked for.
-    return undefined;
+    return { party: cached?.customer ?? undefined, company: undefined };
+  }
+}
+
+/**
+ * The account the money is deposited into: the Mode of Payment's default account for the invoice's
+ * company, as ERPNext itself configures it. ERPNext's own form fills this in from the same lookup,
+ * but a Payment Entry created over REST does not, and ERPNext then refuses it ("Account Paid To"
+ * missing). Asking ERPNext keeps the chart of accounts ERPNext's; a mode with no default account is
+ * refused with ERPNext's own message, which tells finance what to set up.
+ */
+async function resolveDepositAccount(
+  erpnext: TenantErpNext,
+  mode: PaymentMode,
+  company: string | undefined,
+  acceptLanguage?: string,
+): Promise<string | undefined> {
+  if (!company) return undefined;
+  const query = new URLSearchParams({ mode_of_payment: PAYMENT_MODE_MAP[mode], company });
+  try {
+    const response = await erpnext.get<{ message?: { account?: string | null } }>(
+      `${BANK_CASH_ACCOUNT_METHOD}?${query.toString()}`,
+      { acceptLanguage },
+    );
+    return response.data.message?.account ?? undefined;
+  } catch (error) {
+    translateErpNextError(error);
   }
 }
 
@@ -353,6 +386,7 @@ export function buildPaymentEntryPayload(
   params: CreatePaymentParams,
   schoolId: string,
   party: string | undefined,
+  depositAccount?: string,
 ): Record<string, unknown> {
   const postingDate = params.posting_date ?? new Date().toISOString().slice(0, 10);
 
@@ -363,11 +397,16 @@ export function buildPaymentEntryPayload(
     ...(party ? { party } : {}),
     posting_date: postingDate,
     mode_of_payment: PAYMENT_MODE_MAP[params.payment_mode],
+    ...(depositAccount ? { paid_to: depositAccount } : {}),
     paid_amount: params.amount,
     received_amount: params.amount,
     // Both currency fields are set from one input: this gateway never converts between currencies,
-    // so a differing source/target rate is not a case it can produce.
+    // so a differing source/target rate is not a case it can produce. The rates themselves must
+    // still be sent: a Payment Entry created over REST does not run the form's rate lookup, and
+    // ERPNext refuses it with "Target Exchange Rate is mandatory" when they are missing.
     paid_from_account_currency: params.currency,
+    source_exchange_rate: 1,
+    target_exchange_rate: 1,
     ...(params.reference_no ? { reference_no: params.reference_no } : {}),
     ...(params.reference_date ? { reference_date: params.reference_date } : {}),
     ...(params.remarks ? { remarks: params.remarks } : {}),
@@ -389,9 +428,10 @@ export function buildPaymentEntryPayload(
   };
 }
 
-// No account fields are sent. ERPNext derives `paid_to` from the Mode of Payment's per-company
-// default account and `paid_from` from the customer's receivable account. Sending our own guesses
-// would put a chart-of-accounts opinion in the gateway, which is exactly what it must not hold.
+// The only account sent is `paid_to`, and it is ERPNext's own answer: the Mode of Payment's
+// per-company default (resolveDepositAccount). `paid_from` is left for ERPNext to derive from the
+// customer's receivable account. Sending our own guesses would put a chart-of-accounts opinion in
+// the gateway, which is exactly what it must not hold.
 
 // ---------------------------------------------------------------------------
 // Create
@@ -423,6 +463,7 @@ export async function createPayment(
         kind: "forward";
         erpnext: TenantErpNext;
         party: string | undefined;
+        depositAccount: string | undefined;
         currency: { id: string; code: string; minorUnit: number };
       };
 
@@ -446,7 +487,19 @@ export async function createPayment(
     // The client object outlives this transaction safely — it holds a base URL, an API key, and the
     // tenant's site host, none of which are transaction-scoped.
     const erpnext = await erpnextFactory.forSchool(tx, schoolId);
-    const party = await resolveParty(tx, erpnext, schoolId, params.invoice_id, acceptLanguage);
+    const { party, company } = await resolveInvoiceParties(
+      tx,
+      erpnext,
+      schoolId,
+      params.invoice_id,
+      acceptLanguage,
+    );
+    const depositAccount = await resolveDepositAccount(
+      erpnext,
+      params.payment_mode,
+      company,
+      acceptLanguage,
+    );
     const currency = await getCurrencyByCode(tx, params.currency);
     if (!currency) {
       throw new CodedHttpException(
@@ -455,21 +508,21 @@ export async function createPayment(
         `Unknown or inactive currency: ${params.currency}`,
       );
     }
-    return { kind: "forward", erpnext, party, currency };
+    return { kind: "forward", erpnext, party, depositAccount, currency };
   });
 
   if (prepared.kind === "replay") {
     return { row: prepared.row, replayed: true };
   }
 
-  const { erpnext, party, currency } = prepared;
+  const { erpnext, party, depositAccount, currency } = prepared;
 
   // --- Phase 2: forward to ERPNext --------------------------------------------------------------
   let doc: ErpNextPaymentEntry;
   try {
     const response = await erpnext.post<{ data: ErpNextPaymentEntry }>(
       PAYMENT_ENTRY_RESOURCE,
-      buildPaymentEntryPayload(params, schoolId, party),
+      buildPaymentEntryPayload(params, schoolId, party, depositAccount),
       { acceptLanguage },
     );
     doc = response.data.data;

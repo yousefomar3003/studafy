@@ -61,6 +61,12 @@ jobs:
       - name: Published grades probes + cache invalidation SLA (ST-116)
         run: bun test src/modules/grades/__tests__/published.test.ts --timeout 60000
         working-directory: apps/api
+      # Its own step because test:integration globs only tests/harness: the academic grading lifecycle
+      # (000160) -- inheritance, overrides, marks, approval, finalization snapshots, corrections,
+      # certificates, year copy and cross-school isolation, with hand-worked expected numbers.
+      - name: Academic grading lifecycle (000160)
+        run: bun test src/modules/grading/__tests__/grading.integration.test.ts --timeout 120000
+        working-directory: apps/api
       # Its own step rather than folded into test:integration, which globs only tests/harness. The
       # session suites need a database (test:integration's does too, but tests/auth also holds the
       # ST-070 probe-app tests, which do not and run in the main unit suite).

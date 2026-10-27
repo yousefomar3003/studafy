@@ -29,12 +29,10 @@ const int quizMaxMaterials = 5;
 /// and is read nowhere else. Created in the screen's `State` and disposed with it.
 class QuizController extends ChangeNotifier {
   QuizController({
-    required QuizClient client,
-    required QuizProgressStore progressStore,
-    required String studentId,
-  }) : _client = client,
-       _progressStore = progressStore,
-       _studentId = studentId;
+    required this._client,
+    required this._progressStore,
+    required this._studentId,
+  });
 
   final QuizClient _client;
   final QuizProgressStore _progressStore;

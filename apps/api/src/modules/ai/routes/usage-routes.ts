@@ -3,50 +3,32 @@ import { ERROR_CODES } from "@studafy/constants";
 import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { withTenantTx } from "../../../db/tenant-tx";
 import { requireAuth } from "../../../middleware/authContext";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { standardResponses } from "../../../openapi/responses";
+import { getFeatureService } from "../../features/middleware";
 import { AI_MONTHLY_TOKEN_BUDGET } from "../config";
-import { assertAiEntitled } from "../gate/entitlement-gate";
 
-import type { Database } from "../../../db/client";
-import type { AuthContext } from "../../../middleware/authContext";
 import type { SupportedLocale } from "../../../middleware/locale";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { EntitlementService } from "../../subscriptions/entitlements/service";
 import type { AiTokenMeter } from "../usage/meter";
 
 /**
  * AI quota usage endpoint (ST-155).
  *
- * Reports the authenticated caller's own AI quota for the current billing period: tokens committed,
- * tokens held by an in-flight request, the monthly budget, and what remains. It rides the same
- * decision flow as the gate -- school active, AI add-on active -- so an unentitled caller gets the
- * same 403/402 codes as any other AI surface instead of a peek at someone else's budget. Reading
+ * Reports the authenticated caller's own AI token budget for the current billing period: tokens
+ * committed, tokens held by an in-flight request, the monthly budget, and what remains. Reading
  * quota never draws on it.
  *
- * The route takes no studentId, so it looks up the caller's own `app.students` row: AI add-ons and
- * meters are keyed by the student id, which is not the user id the session carries. A caller with
- * no student record has no AI add-on and answers 402 AI_SUBSCRIPTION_INACTIVE.
+ * Entitled when the caller holds either AI feature (ai_tutor or study_tools) -- through the AI
+ * add-on or any other grant (docs/billing/feature-licensing.md). The budget's window is the grant
+ * the active feature reports, the same window aiTokenBudget meters against, so the snapshot reads
+ * the counter the AI routes write. The refusals keep the AI routes' codes: 403 AI_SCHOOL_INACTIVE,
+ * and 402 AI_SUBSCRIPTION_INACTIVE for a caller with no AI feature (or no student record -- the
+ * budget is a student's).
  */
 
-/** The student record of a signed-in user, or null for a user who is not a student. */
-export type StudentIdResolver = (auth: AuthContext, requestId?: string) => Promise<string | null>;
-
-export function databaseStudentIdResolver(database: Database): StudentIdResolver {
-  return async (auth, requestId) =>
-    withTenantTx(
-      database,
-      { schoolId: auth.schoolId, userId: auth.userId, requestId },
-      async (tx) => {
-        const [row] = await tx<{ id: string }[]>`
-          SELECT id FROM app.students WHERE user_id = ${auth.userId}::uuid LIMIT 1
-        `;
-        return row?.id ?? null;
-      },
-    );
-}
+const AI_FEATURE_KEYS = ["ai_tutor", "study_tools"] as const;
 
 const AiUsageResponseSchema = z.object({
   /** False until something has been reserved or committed this period. */
@@ -73,8 +55,8 @@ const aiUsageRoute = createRoute({
   description:
     "Returns the authenticated caller's AI token usage for the current billing period: " +
     "committed usage, tokens held by an in-flight request, the monthly budget, and what remains. " +
-    "Requires an active school subscription and AI add-on; refuses with the same codes as the AI " +
-    "gate. Reading usage does not consume quota.",
+    "Requires an active school and an AI feature (ai_tutor or study_tools); refuses with the same " +
+    "codes as the AI routes. Reading usage does not consume quota.",
   security: [{ bearerAuth: [] }],
   responses: standardResponses(
     {
@@ -88,40 +70,41 @@ const aiUsageRoute = createRoute({
 });
 
 export function aiUsageRoutes(deps: {
-  entitlements: Pick<EntitlementService, "school" | "ai">;
   meter: AiTokenMeter;
-  /** Maps the session's user to their student record (`databaseStudentIdResolver` in the app). */
-  studentIdFor: StudentIdResolver;
   monthlyTokenBudget?: number;
 }): OpenAPIHono<AppEnv> {
-  const { entitlements, meter, studentIdFor, monthlyTokenBudget = AI_MONTHLY_TOKEN_BUDGET } = deps;
+  const { meter, monthlyTokenBudget = AI_MONTHLY_TOKEN_BUDGET } = deps;
   const app = new OpenAPIHono<AppEnv>();
 
   app.openapi(aiUsageRoute, async (c) => {
     const auth = requireAuth(c);
     const locale = (c.get("locale") ?? "en") as SupportedLocale;
-    const studentId = await studentIdFor(auth, c.get("requestId"));
-    if (!studentId) {
-      throw new CodedHttpException(
-        402,
-        ERROR_CODES.AI_SUBSCRIPTION_INACTIVE,
-        getLocalizedMessage(ERROR_CODES.AI_SUBSCRIPTION_INACTIVE, locale),
-      );
+    const refuse = (
+      status: 402 | 403 | 503,
+      code: (typeof ERROR_CODES)[keyof typeof ERROR_CODES],
+    ) => new CodedHttpException(status, code, getLocalizedMessage(code, locale));
+
+    const resolved = await getFeatureService(c).resolve(auth.schoolId, { userId: auth.userId });
+    const features = AI_FEATURE_KEYS.map((key) => resolved.features[key]);
+
+    if (features.some((feature) => feature.reason === "school_inactive")) {
+      throw refuse(403, ERROR_CODES.AI_SCHOOL_INACTIVE);
     }
-    const ctx = await assertAiEntitled(
-      auth,
-      { entitlements },
-      studentId,
-      monthlyTokenBudget,
-      locale,
-    );
+
+    // The latest-ending window, as both features of one grant share one.
+    const active = features
+      .filter((feature) => feature.active)
+      .sort((a, b) => Date.parse(b.periodEnd ?? "") - Date.parse(a.periodEnd ?? ""))[0];
+    if (!resolved.studentId || !active) throw refuse(402, ERROR_CODES.AI_SUBSCRIPTION_INACTIVE);
+    if (!active.periodStart || !active.periodEnd)
+      throw refuse(503, ERROR_CODES.AI_QUOTA_UNAVAILABLE);
 
     const snapshot = await meter.snapshot({
-      schoolId: ctx.schoolId,
-      studentId: ctx.studentId,
-      periodStart: ctx.ai.currentPeriodStart,
-      periodEnd: ctx.ai.currentPeriodEnd,
-      budget: ctx.budget,
+      schoolId: auth.schoolId,
+      studentId: resolved.studentId,
+      periodStart: active.periodStart,
+      periodEnd: active.periodEnd,
+      budget: monthlyTokenBudget,
     });
 
     return c.json(snapshot, 200);

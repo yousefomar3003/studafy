@@ -8,7 +8,8 @@ export type { ReportColumn } from "../queries";
 
 export type ExportJob = components["schemas"]["FinanceExportJob"];
 export type ExportRequest = components["schemas"]["FinanceExportRequest"];
-export type Family = components["schemas"]["Family"];
+/** The two fields the family picker needs; finance reads families through the finance API. */
+export type Family = Pick<components["schemas"]["FinanceFamily"], "id" | "display_name">;
 
 /** The report center only runs/downloads the four ERPNext-backed reports the gateway serves —
  * `joinvoice_export` is a per-invoice compliance artifact with its own flow (invoice detail's
@@ -137,12 +138,20 @@ export function familySearchQueryKey(search: string) {
 
 const FAMILY_SEARCH_LIMIT = 10;
 
+/**
+ * Families matching `search` (family, child or guardian name), from the finance families endpoint.
+ * Not `/api/families`: that is the guardian-linking API, gated on `parent:link`, which FINANCE does
+ * not hold, so the picker came back empty for the very role the statement is for.
+ */
 export async function searchFamilies(search: string): Promise<Family[]> {
-  const { data } = await api.GET("/api/families", {
-    params: { query: { search, limit: FAMILY_SEARCH_LIMIT } },
+  const { data } = await api.GET("/api/finance/families", {
+    params: { query: { search: search || undefined, limit: FAMILY_SEARCH_LIMIT } },
   });
-  // `readonly Family[]` loses its array prototype through the generated response type here — the
+  // `readonly` arrays lose their array prototype through the generated response type here — the
   // same pre-existing `@studafy/api-client` typing gap `NotificationBell.tsx` documents for
   // `notifications`.
-  return (data?.families ?? []) as Family[];
+  return ((data?.families ?? []) as unknown as Family[]).map(({ id, display_name }) => ({
+    id,
+    display_name,
+  }));
 }

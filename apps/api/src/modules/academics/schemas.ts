@@ -572,6 +572,9 @@ export const gradeLevelSchema = z
       .number()
       .int()
       .openapi({ description: "Position in the school's list of grades, lowest first." }),
+    archived_at: dateTimeSchema
+      .nullable()
+      .openapi({ description: "When the grade was archived; null while it is in use." }),
     created_at: dateTimeSchema,
     updated_at: dateTimeSchema,
   })
@@ -590,6 +593,10 @@ export const updateGradeLevelBodySchema = z
   .object({
     name: z.string().trim().min(1).max(100).optional(),
     sort_order: z.number().int().min(0).max(32767).optional(),
+    archived: z
+      .boolean()
+      .optional()
+      .openapi({ description: "Archive (true) or restore (false) the grade. History is kept." }),
   })
   .openapi("UpdateGradeLevelBody");
 
@@ -621,6 +628,9 @@ export const sectionSchema = z
     grade_level_name: z.string().openapi({ description: "The grade's name.", example: "Grade 10" }),
     name: z.string().openapi({ description: "Section name within the grade.", example: "C" }),
     student_count: z.number().int().openapi({ description: "Students placed in this section." }),
+    archived_at: dateTimeSchema
+      .nullable()
+      .openapi({ description: "When the section was archived; null while it is in use." }),
     created_at: dateTimeSchema,
     updated_at: dateTimeSchema,
   })
@@ -638,7 +648,14 @@ export const createSectionBodySchema = z
 
 export const updateSectionBodySchema = z
   .object({
-    name: z.string().trim().min(1).max(50),
+    name: z.string().trim().min(1).max(50).optional(),
+    archived: z
+      .boolean()
+      .optional()
+      .openapi({ description: "Archive (true) or restore (false) the section. History is kept." }),
+  })
+  .refine((body) => body.name !== undefined || body.archived !== undefined, {
+    message: "Provide a name or an archived flag",
   })
   .openapi("UpdateSectionBody");
 

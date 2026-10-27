@@ -6,12 +6,13 @@ import {
   entitlementCacheKey,
   readEntitlementEntry,
   readEntitlementPair,
+  userEntitlementCacheKey,
   writeEntitlementEntryIfNewer,
 } from "./cache";
-import { resolveAiEntitlement, resolveSchoolEntitlement } from "./resolve";
+import { resolveAiEntitlement, resolveSchoolEntitlement, resolveUserEntitlement } from "./resolve";
 import { GENESIS_ENTITLEMENTS_VERSION } from "./version";
 
-import type { AiEntitlement, SchoolEntitlement } from "./resolve";
+import type { AiEntitlement, SchoolEntitlement, UserEntitlement } from "./resolve";
 import type { Database, DatabasePools } from "../../../db/client";
 import type { Logger } from "../../../logger";
 import type { RedisClient } from "../../../redis";
@@ -27,6 +28,8 @@ export interface EntitlementService {
   school(schoolId: string): Promise<SchoolEntitlement>;
   /** One student's AI entitlement. False whenever the school is not active. */
   ai(schoolId: string, studentId: string): Promise<AiEntitlement>;
+  /** One person's feature grants outside the AI add-on. Not AND-ed with the school here. */
+  user(schoolId: string, userId: string): Promise<UserEntitlement>;
   /**
    * The school's current entitlement version. The JWT middleware's entry point, and the reason the
    * hot path is one Redis GET: a floor marker answers this without touching Postgres at all.
@@ -121,10 +124,13 @@ export function createEntitlementService(deps: EntitlementServiceDeps): Entitlem
         // Both bodies present AND the AI verdict was computed against the school version currently in
         // force. A mismatch means the school moved since -- possibly in a way that cascaded no AI
         // rows and so emitted no AI event at all -- and the cached verdict cannot be trusted.
+        //
+        // `userId` is checked too: an entry written before feature licensing added it is a miss.
         if (
           pair.ai?.value &&
           pair.school?.value &&
-          pair.ai.value.schoolVersion === pair.school.version
+          pair.ai.value.schoolVersion === pair.school.version &&
+          pair.ai.value.userId !== undefined
         ) {
           return pair.ai.value;
         }
@@ -166,6 +172,70 @@ export function createEntitlementService(deps: EntitlementServiceDeps): Entitlem
     });
   }
 
+  /**
+   * The same shape as `ai`: both entries are read together and the user entry is only trusted
+   * against the school version in force, then both are written back from the one resolution.
+   */
+  async function user(schoolId: string, userId: string): Promise<UserEntitlement> {
+    const schoolKey = entitlementCacheKey(schoolId);
+    const userKey = userEntitlementCacheKey(userId);
+
+    if (redis) {
+      try {
+        const pair = await readEntitlementPair<SchoolEntitlement, UserEntitlement>(
+          redis,
+          schoolKey,
+          userKey,
+        );
+        // `seats` is checked too: an entry written before licenses existed is a miss.
+        if (
+          pair.ai?.value &&
+          pair.school?.value &&
+          pair.ai.value.schoolVersion === pair.school.version &&
+          pair.ai.value.seats !== undefined
+        ) {
+          return pair.ai.value;
+        }
+      } catch (err) {
+        logger.warn(
+          { err, school_id: schoolId, user_id: userId },
+          "user entitlement cache read failed; querying database",
+        );
+      }
+    }
+
+    return singleFlight(userKey, async () => {
+      const resolved = await withTenantTx(database, { schoolId }, async (tx) => ({
+        user: await resolveUserEntitlement(tx, schoolId, userId),
+        school: await resolveSchoolEntitlement(tx, schoolId),
+      }));
+
+      if (redis) {
+        try {
+          // The school entry is written from the same transaction, so a user entry's schoolVersion
+          // matches the school entry beside it -- unless the school moved between the two reads, in
+          // which case the next reader sees the mismatch and re-resolves.
+          await Promise.all([
+            writeEntitlementEntryIfNewer(
+              redis,
+              schoolKey,
+              resolved.school.version,
+              resolved.school,
+            ),
+            writeEntitlementEntryIfNewer(redis, userKey, resolved.user.version, resolved.user),
+          ]);
+        } catch (err) {
+          logger.warn(
+            { err, school_id: schoolId, user_id: userId },
+            "user entitlement cache write failed",
+          );
+        }
+      }
+
+      return resolved.user;
+    });
+  }
+
   async function currentVersion(schoolId: string): Promise<number> {
     if (redis) {
       // Deliberately not wrapped in try/catch. Unlike the read paths above -- where a Redis failure
@@ -186,5 +256,5 @@ export function createEntitlementService(deps: EntitlementServiceDeps): Entitlem
     return resolved.version ?? GENESIS_ENTITLEMENTS_VERSION;
   }
 
-  return { school, ai, currentVersion };
+  return { school, ai, user, currentVersion };
 }

@@ -48,6 +48,18 @@ const NOTIFICATION_TYPES = [
   "ANNOUNCEMENT",
   // Parent<->teacher messaging. Appended by 000126, same mechanism; sorts last, after ANNOUNCEMENT.
   "DIRECT_MESSAGE",
+  // Fee notices to guardians. Appended by 000152, same mechanism; sort last, after DIRECT_MESSAGE.
+  "FEE_INVOICE_ISSUED",
+  "FEE_PAYMENT_RECEIVED",
+  "FEE_PAYMENT_REMINDER",
+  "FEE_STATEMENT",
+  // App Store renewal instructions for a new school-seat holder. Appended by 000164; sorts last.
+  "LICENSE_SEAT_APPLE_RENEWAL",
+  // License billing reminders. Appended by 000166, in that order; sort last.
+  "LICENSE_EXPIRING",
+  "LICENSE_INVOICE_DUE",
+  "LICENSE_INVOICE_OVERDUE",
+  "LICENSE_RECEIPT_UPLOADED",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;

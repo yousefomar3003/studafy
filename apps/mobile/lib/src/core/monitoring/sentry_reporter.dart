@@ -10,8 +10,7 @@ import 'pii_scrubber.dart';
 /// Wires the app to Sentry: crash/error capture, release health (crash-free sessions), and
 /// PII-scrubbed breadcrumbs/events.
 class SentryCrashReporter implements CrashReporter {
-  SentryCrashReporter(this._config, {PiiScrubber scrubber = const PiiScrubber()})
-      : _scrubber = scrubber;
+  SentryCrashReporter(this._config, {this._scrubber = const PiiScrubber()});
 
   final MonitoringConfig _config;
   final PiiScrubber _scrubber;

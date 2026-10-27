@@ -154,15 +154,18 @@ canonical code and no upstream detail, matching the app's rule that a 5xx never 
 
 ## Error codes
 
-| Code                      | Status | Cause                                                                           |
-| ------------------------- | ------ | ------------------------------------------------------------------------------- |
-| `VALIDATION_FAILED`       | 400    | ERPNext rejected the request; its message is forwarded                          |
-| `ERPNEXT_NOT_CONFIGURED`  | 503    | No `ERPNEXT_API_URL`/`ERPNEXT_API_KEY`, or the school's site is not provisioned |
-| `ERPNEXT_UNAVAILABLE`     | 503    | Network failure or ERPNext 5xx                                                  |
-| `ERPNEXT_TIMEOUT`         | 504    | No response within the client timeout                                           |
-| `ERPNEXT_CIRCUIT_OPEN`    | 503    | Breaker open; requests paused while ERPNext recovers                            |
-| `FEE_STRUCTURE_NOT_FOUND` | 404    | No such document                                                                |
-| `RATE_LIMIT_EXCEEDED`     | 429    | ERPNext rate-limited us                                                         |
+| Code                                | Status | Cause                                                                                   |
+| ----------------------------------- | ------ | --------------------------------------------------------------------------------------- |
+| `VALIDATION_FAILED`                 | 400    | ERPNext rejected the request; its message is forwarded                                  |
+| `ERPNEXT_NOT_CONFIGURED`            | 503    | No `ERPNEXT_API_URL`/`ERPNEXT_API_KEY`, or the school's site is not provisioned         |
+| `ERPNEXT_UNAVAILABLE`               | 503    | Network failure or ERPNext 5xx                                                          |
+| `ERPNEXT_TIMEOUT`                   | 504    | No response within the client timeout                                                   |
+| `ERPNEXT_CIRCUIT_OPEN`              | 503    | Breaker open; requests paused while ERPNext recovers                                    |
+| `FEE_STRUCTURE_NOT_FOUND`           | 404    | No such document                                                                        |
+| `FAMILY_NOT_FOUND`                  | 404    | No such family in this school                                                           |
+| `FAMILY_PAYMENT_EXCEEDS_BALANCE`    | 400    | A family payment is larger than what the family owes in that currency                   |
+| `FAMILY_PAYMENT_ALLOCATION_INVALID` | 400    | A family payment split names another family's invoice, overpays one, or does not add up |
+| `RATE_LIMIT_EXCEEDED`               | 429    | ERPNext rate-limited us                                                                 |
 
 All are `application/problem+json` (RFC 9457) with `code`, `request_id`, and a localized `detail`
 in `en`/`ar`.
@@ -254,6 +257,76 @@ Approving or revoking an award never touches an issued invoice.
 FINANCE holds no `student:read`, and `app.students`' role-scope policy hides every student from it,
 so award reads and the student picker run through `withStudentIdentityTx`: `studafy_admin` with tenant
 isolation armed, selecting identity columns (name, admission number) only.
+
+### Sibling discount
+
+A school-wide rule (000151: `app.sibling_discount_settings`, `app.sibling_discount_tiers`) discounts
+a family's second and later enrolled children without an award per child. Siblings are enrolled
+students sharing a family through `app.parent_child_links`, ranked eldest first by date of birth
+(`packages/billing/src/sibling-discount.ts`, shared by the API and the workers). A tier applies from
+its child position upward until a higher tier takes over: `{2: 10%, 3: 15%}` is "second child 10%,
+third and later 15%". A child in two families takes the better position.
+
+The billing worker adds the child's tier to their approved scholarships when it generates an invoice;
+both go through `scholarshipDiscountMinor`, so they add up and are capped at the invoice subtotal.
+`GET /api/finance/sibling-discount` is `billing:read`; `PUT` is `billing:approveScholarship`, the same
+sign-off an award needs. Issued invoices never change.
+
+### Families
+
+`/api/finance/families` is the household as finance sees it (`modules/finance/family-accounts`):
+guardians, children with their sibling ranking and discount, and per-currency billed, outstanding and
+overdue totals across the children's invoices (drafts and cancelled excluded, currencies never
+summed). `.../{familyId}/profile` adds the family's message history. Both are `billing:read` and run
+through `withStudentIdentityTx`; so does the household view `GET /api/finance/families/{familyId}`
+and the family statement report when the caller is staff, which FINANCE could not open before.
+
+`POST /api/finance/families/{familyId}/payments` (`billing:update`, `Idempotency-Key` required)
+records one payment across the children's invoices: oldest due first, or a split the caller gives,
+validated against what each invoice owes. Each share is posted through `createPayment` under a key
+derived from the family key and the invoice, so a retry after a `partial` outcome pays only what is
+left. An amount above the family's balance is refused (`FAMILY_PAYMENT_EXCEEDS_BALANCE`) rather than
+becoming an unallocated advance.
+
+### Fee notices to guardians
+
+Four notification types (000152) reach a student's guardians, written straight into
+`app.notifications` like announcements and messages:
+
+| Type                   | Sent when                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `FEE_INVOICE_ISSUED`   | ERPNext's Sales Invoice webhook projects a submitted invoice that owes money      |
+| `FEE_PAYMENT_RECEIVED` | a Payment Entry is confirmed (either webhook)                                     |
+| `FEE_PAYMENT_REMINDER` | finance reminds a family, or all overdue families (`POST /api/finance/reminders`) |
+| `FEE_STATEMENT`        | finance sends a family its statement                                              |
+
+`app.finance_communications` (000153) logs every send per guardian. Its partial unique index keeps an
+automatic notice to one per document, however often ERPNext redelivers; it enforces a 24-hour
+reminder cooldown per family; and it records sends to a guardian who has turned the type off
+(`delivered = false`), so the family page can say so.
+
+### Receipts
+
+`GET /api/finance/payments/{paymentId}/receipt` renders a PDF from the payment cache
+(`modules/finance/receipts`), in the request's language. Finance staff can read any receipt, a
+guardian only their own children's; anyone else gets a 404. `receipt_url` in payment responses now
+points here (`/api/...`, relative to the API origin) once a payment is confirmed. ERPNext's own print
+view needs its PDF renderer to resolve the site's hostname from inside the container, and a parent
+cannot authenticate to ERPNext. Arabic is drawn as fontkit-shaped glyph outlines: pdf-lib can neither
+embed the WOFF font nor place the dots Noto Sans Arabic positions as separate marks.
+
+### Payments and webhooks over REST
+
+- A Payment Entry created over REST does not run ERPNext's form logic, so `buildPaymentEntryPayload`
+  sends `source_exchange_rate`/`target_exchange_rate` of 1 and `paid_to`, the deposit account ERPNext
+  itself configures for the Mode of Payment and the invoice's company (`get_bank_cash_account`). A
+  mode without a default account is refused with ERPNext's own message.
+- ERPNext lowers an invoice's outstanding amount without firing a document event when a payment is
+  submitted, so both payment webhooks re-read the settled invoices (`invoices/refresh.ts`).
+- `upsertMapping` keeps an existing mapping for a document. The billing worker maps a generated
+  invoice under its idempotency key, and the projection's second mapping used to fail the Sales
+  Invoice webhook on every redelivery.
+- Frappe's nested error messages (`_server_messages`, `exception`) are unwrapped into plain text.
 
 ### Expenses
 

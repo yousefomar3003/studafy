@@ -82,12 +82,26 @@ approved_globals(table_name) AS (
     -- School sign-up applications. Global by construction: an application exists before its school
     -- does; the school an approval provisions is provisioned_school_id, deliberately not
     -- school_id. Reachable by studafy_admin only; see db/migrations/000139 and 000142.
-    ('school_applications')
+    ('school_applications'),
+    -- Paid-feature catalog and tier contents (000161). Global for the same reason as plans and
+    -- plan_prices: the platform sells the same features and tiers to every school. Read-only to
+    -- studafy_app; written by the super admin and the boot-time feature sync as studafy_admin.
+    ('features'),
+    ('plan_features'),
+    -- License pricing and invoice numbering (000165): the platform's price list and its gapless
+    -- invoice number sequence, the same for every school. Reachable by studafy_admin only; the
+    -- numbering function is SECURITY DEFINER.
+    ('license_price_settings'),
+    ('license_price_brackets'),
+    ('license_invoice_counters')
 ),
 approved_flexible_columns(table_name, column_name) AS (
   VALUES
     ('audit_logs', 'new_values'),
     ('audit_logs', 'old_values'),
+    -- 000165: the license pricing calculator's full result, kept so the school sees exactly the offer
+    -- it was sent. What is owed is relational (license_invoice_lines).
+    ('license_quotes', 'breakdown'),
     ('billing_events', 'payload'),
     ('fee_schedule_cache', 'erpnext_payload'),
     ('fee_structure_cache', 'erpnext_payload'),
@@ -136,7 +150,15 @@ approved_flexible_columns(table_name, column_name) AS (
     -- holds it to 1..7 with 1..7 entries -- whose order is the payload, read whole with the settings
     -- row and never joined or filtered on, so a child table would add a join and an ordinal column to
     -- store what the array already guarantees.
-    ('school_settings', 'school_days')
+    ('school_settings', 'school_days'),
+    -- 000160: write-once snapshots taken when results are finalized or a certificate is issued --
+    -- the full grading configuration a result was computed with, the computed breakdown, and the
+    -- certificate exactly as rendered. They record what was true at that moment so later
+    -- configuration edits cannot rewrite history; they are never joined or filtered on. Student,
+    -- subject, finalization, status and the reported figures remain normalized, constrained columns.
+    ('student_subject_results', 'config_snapshot'),
+    ('student_subject_results', 'breakdown'),
+    ('certificates', 'content')
 ),
 relations AS (
   SELECT

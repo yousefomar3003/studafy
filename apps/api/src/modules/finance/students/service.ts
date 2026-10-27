@@ -34,6 +34,25 @@ export function withStudentIdentityTx<T>(
 }
 
 /**
+ * `withStudentIdentityTx` for a finance action that writes on a family's behalf: notifying a
+ * family's guardians writes app.notifications rows addressed to them and reads their notification
+ * preferences, both of which studafy_app may only do for the caller's own rows. The acting user and
+ * request id are set as well, so the audit trail names who sent it. Callers sit behind a
+ * `billing:update` guard and write only notices and their log.
+ */
+export function withFinanceActorTx<T>(
+  database: Database,
+  actor: { schoolId: string; userId: string; requestId?: string },
+  fn: (tx: TransactionSql) => Promise<T>,
+): Promise<T> {
+  return withSystemTx(database, async (tx) => {
+    await setTenantScope(tx, actor.schoolId, actor.requestId);
+    await tx`SELECT set_config('app.user_id', ${actor.userId}, true)`;
+    return fn(tx);
+  });
+}
+
+/**
  * The school's current students by name, for a pick-from-the-list field: every student when
  * `search` is empty, otherwise those whose name contains it. Identity columns only.
  */
@@ -108,4 +127,42 @@ export async function resolveBillableStudentIds(
     WHERE school_id = ${schoolId}::uuid AND status = 'enrolled'
   `;
   return rows.map((r) => r.id);
+}
+
+export interface StudentFamily {
+  student_name: string;
+  family_id: string | null;
+  family_name: string | null;
+}
+
+/**
+ * Each student's name and family, for labelling finance rows (payments, invoices) that carry only a
+ * student id. A student in two families is labelled with the older one. Identity columns only; run
+ * it through `withStudentIdentityTx`.
+ */
+export async function studentFamilies(
+  tx: TransactionSql,
+  schoolId: string,
+  studentIds: readonly string[],
+): Promise<Map<string, StudentFamily>> {
+  const ids = [...new Set(studentIds)];
+  if (ids.length === 0) return new Map();
+  const rows = await tx<({ student_id: string } & StudentFamily)[]>`
+    SELECT student.id AS student_id,
+           coalesce(student.preferred_name, student.first_name) || ' ' || student.last_name
+             AS student_name,
+           family.id AS family_id, family.display_name AS family_name
+    FROM app.students AS student
+    LEFT JOIN LATERAL (
+      SELECT family.id, family.display_name
+      FROM app.parent_child_links AS link
+      JOIN app.families AS family
+        ON family.id = link.family_id AND family.school_id = link.school_id
+      WHERE link.school_id = student.school_id AND link.student_id = student.id
+      ORDER BY family.created_at, family.id
+      LIMIT 1
+    ) AS family ON true
+    WHERE student.school_id = ${schoolId}::uuid AND student.id = ANY(${ids}::uuid[])
+  `;
+  return new Map(rows.map(({ student_id, ...family }) => [student_id, family]));
 }

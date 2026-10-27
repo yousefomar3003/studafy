@@ -36,6 +36,11 @@ const PRINCIPAL_LINKS: readonly { key: string; to: string; permission?: Permissi
     to: "/portal/principal/sections",
     permission: PERMISSIONS.TIMETABLE_MANAGE,
   },
+  {
+    key: "academicSetup",
+    to: "/portal/principal/academic-setup",
+    permission: PERMISSIONS.ACADEMIC_CONFIG_READ,
+  },
   { key: "students", to: "/portal/principal/students" },
   { key: "attendance", to: "/portal/principal/attendance" },
   { key: "discipline", to: "/portal/principal/discipline" },

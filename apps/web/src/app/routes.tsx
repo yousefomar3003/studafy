@@ -190,6 +190,11 @@ const GradesSectionsPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/sections/GradesSectionsPage"),
 );
+// Loads the principal catalog too: it names sections the way the grades & sections page does.
+const AcademicSetupPage = lazyWithCatalogs(
+  [...PRINCIPAL_CATALOGS, "academicGrading"],
+  () => import("../features/principal/academic-setup/AcademicSetupPage"),
+);
 const PrincipalStudentsPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/students/PrincipalStudentsPage"),
@@ -273,6 +278,18 @@ const InvoiceDetailPage = lazyWithCatalogs(
 const InvoiceBatchPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/invoices/InvoiceBatchPage"),
+);
+const FamiliesListPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/families/FamiliesListPage"),
+);
+const FamilyDetailPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/families/FamilyDetailPage"),
+);
+const RecordFamilyPaymentPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/families/RecordFamilyPaymentPage"),
 );
 const PaymentsListPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
@@ -668,6 +685,17 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            // Academic grading setup for a year: readiness, grade subjects and rules, section
+            // overrides, scales, approvals, results and certificates (sub-routes inside the page).
+            // Reading needs `academicConfig:read`; each write is gated on its own permission.
+            path: "principal/academic-setup/*",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ACADEMIC_CONFIG_READ}>
+                <AcademicSetupPage />
+              </RequirePermission>
+            ),
+          },
+          {
             path: "principal/students",
             element: (
               <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
@@ -789,6 +817,34 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_READ}>
                 <InvoiceDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:read`, matching the family finance API's read routes
+            // (apps/api/src/modules/finance/family-accounts/routes.ts).
+            path: "finance/families",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <FamiliesListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "finance/families/:familyId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <FamilyDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:update` — one family payment posts a Payment Entry per invoice to
+            // ERPNext, the same write gate `POST /api/finance/families/{familyId}/payments` requires.
+            path: "finance/families/:familyId/payments/new",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_UPDATE}>
+                <RecordFamilyPaymentPage />
               </RequirePermission>
             ),
           },

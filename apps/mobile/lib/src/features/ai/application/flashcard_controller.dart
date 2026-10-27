@@ -26,12 +26,10 @@ import 'flashcard_providers.dart';
 /// disposed with it.
 class FlashcardController extends ChangeNotifier {
   FlashcardController({
-    required FlashcardClient client,
-    required FlashcardLibraryStore libraryStore,
-    required String studentId,
-  }) : _client = client,
-       _libraryStore = libraryStore,
-       _studentId = studentId;
+    required this._client,
+    required this._libraryStore,
+    required this._studentId,
+  });
 
   final FlashcardClient _client;
   final FlashcardLibraryStore _libraryStore;

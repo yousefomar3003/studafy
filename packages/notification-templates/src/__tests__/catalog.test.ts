@@ -77,6 +77,19 @@ describe("templates — completeness", () => {
                       "pages",
                       "senderName",
                       "preview",
+                      "studentName",
+                      "amount",
+                      "receiptNumber",
+                      "familyName",
+                      "overdueCount",
+                      "outstanding",
+                      "childCount",
+                      "schoolName",
+                      "periodEnd",
+                      "endsAt",
+                      "daysLeft",
+                      "invoiceNumber",
+                      "balance",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -153,6 +166,51 @@ describe("renderNotification — snapshot tests", () => {
     [NOTIFICATION_TYPES.DIRECT_MESSAGE]: {
       senderName: "Layla Nasser",
       preview: "Adam did really well on today's lab.",
+    },
+    [NOTIFICATION_TYPES.FEE_INVOICE_ISSUED]: {
+      studentName: "Adam Fares",
+      amount: "600.000 JOD",
+      dueDate: "2026-09-01",
+    },
+    [NOTIFICATION_TYPES.FEE_PAYMENT_RECEIVED]: {
+      studentName: "Adam Fares",
+      amount: "300.000 JOD",
+      receiptNumber: "ACC-PAY-2026-00004",
+    },
+    [NOTIFICATION_TYPES.FEE_PAYMENT_REMINDER]: {
+      familyName: "Bassel Fares Family",
+      amount: "1950.000 JOD",
+      overdueCount: "2",
+    },
+    [NOTIFICATION_TYPES.FEE_STATEMENT]: {
+      familyName: "Bassel Fares Family",
+      outstanding: "1950.000 JOD",
+      childCount: "2",
+    },
+    [NOTIFICATION_TYPES.LICENSE_SEAT_APPLE_RENEWAL]: {
+      schoolName: "Amman Academy",
+      periodEnd: "2026-11-30",
+    },
+    [NOTIFICATION_TYPES.LICENSE_EXPIRING]: {
+      schoolName: "Amman Academy",
+      endsAt: "2027-08-31",
+      daysLeft: "30",
+    },
+    [NOTIFICATION_TYPES.LICENSE_INVOICE_DUE]: {
+      schoolName: "Amman Academy",
+      invoiceNumber: "LIC-2026-000042",
+      balance: "4374.00 USD",
+      dueDate: "2026-11-30",
+    },
+    [NOTIFICATION_TYPES.LICENSE_INVOICE_OVERDUE]: {
+      schoolName: "Amman Academy",
+      invoiceNumber: "LIC-2026-000042",
+      balance: "2187.00 USD",
+      dueDate: "2026-11-30",
+    },
+    [NOTIFICATION_TYPES.LICENSE_RECEIPT_UPLOADED]: {
+      schoolName: "Amman Academy",
+      invoiceNumber: "LIC-2026-000042",
     },
   } as const;
 
