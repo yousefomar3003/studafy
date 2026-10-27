@@ -635,7 +635,7 @@ with the two dashboards. `nav.license` is in the root catalogs.
 | `GET /api/school/license/people`           | Everyone of an audience on the current license with their seat (`seatId`, `assignedAt`), whether they `eligible`, and `personalSubscriptionEndsAt`; `gradeLevelId` / `sectionId` / `classId`, `search`, `show` (`all`, `seated`, `unseated`, `personal`, echoed), paged. Empty without a license.            |
 | `GET /api/school/license/tiers`            | Every active tier, and any retired tier the school's license still uses, with its features and monthly limits (an `includes_all_features` tier lists every feature of its audience at the code's default where it states none). No prices; hidden features are left out.                                     |
 | `POST /api/school/license/change-requests` | Now also takes `studentPlanId` / `teacherPlanId` / `parentPlanId`: an active tier of that audience, or null for no change (422 `LICENSE_TIER_INVALID` otherwise). Every change request now returns `studentTier` / `teacherTier` / `parentTier` (`LicenseTierRef` or null), so the console inbox shows them. |
-| Migration 000167                           | `license_change_requests.{student,teacher,parent}_plan_id` (FK to `app.plans`), with a trigger refusing a tier of another audience (`ck_license_change_requests_tier_audience`), as `school_licenses` does.                                                                                                  |
+| Migration 000168                           | `license_change_requests.{student,teacher,parent}_plan_id` (FK to `app.plans`), with a trigger refusing a tier of another audience (`ck_license_change_requests_tier_audience`), as `school_licenses` does.                                                                                                  |
 
 The people list is the session 2 `candidates()` query (the one that fills bulk assignments)
 extended with the seat and the personal subscription's end date, so the screen and the assignment
@@ -1044,7 +1044,7 @@ Decisions made while building the foundation, beyond the brief:
    status and personal subscription end dates (the existing lists were seats only, or unseated
    people only, with a yes/no for personal subscriptions), a tier catalog the school may read (the
    license view names its tiers but not their features), and a tier in change requests (the request
-   had seat counts and Family+ only). The tier is a column per audience (migration 000167), not text
+   had seat counts and Family+ only). The tier is a column per audience (migration 000168), not text
    in the note, so the console can price it.
 3. **The people list reuses the bulk-assignment query**, so "everyone in Grade 7" on screen is
    exactly who a Grade 7 assignment would fill, in the same name order.
