@@ -14,6 +14,9 @@ import {
   createChangeRequestBodySchema,
   eligibleListSchema,
   eligibleQuerySchema,
+  offeredTierListSchema,
+  peopleListSchema,
+  peopleQuerySchema,
   schoolLicenseOverviewSchema,
   schoolSeatParamsSchema,
   seatListQuerySchema,
@@ -28,6 +31,8 @@ import {
   licenseView,
   listChangeRequests,
   listEligible,
+  listOfferedTiers,
+  listPeople,
   listSeats,
   readInSchool,
   requireSchoolLicenseId,
@@ -144,15 +149,50 @@ const eligibleRoute = createRoute({
   ),
 });
 
+const peopleRoute = createRoute({
+  method: "get",
+  path: "/api/school/license/people",
+  tags: [TAG],
+  operationId: "listSchoolLicensePeople",
+  summary: "Everyone in an audience with their seat status",
+  description:
+    "The school's students, teachers or parents (optionally in a grade, section or class, or " +
+    "matching a search) on the current license: the seat each holds, whether each could get one, " +
+    "and when a personal subscription ends. `show` narrows to seated, unseated or personally " +
+    "subscribed people. Empty when the school has no license.",
+  security: [{ bearerAuth: [] }],
+  request: { query: peopleQuerySchema },
+  responses: standardResponses(
+    { 200: { description: "People and their seats", schema: peopleListSchema } },
+    [400, 401, 403],
+  ),
+});
+
+const tiersRoute = createRoute({
+  method: "get",
+  path: "/api/school/license/tiers",
+  tags: [TAG],
+  operationId: "listSchoolLicenseTiers",
+  summary: "What each tier gives",
+  description:
+    "Every tier on offer per audience, and any retired tier the school's license still uses, " +
+    "with its features and monthly limits. No prices: the school sees those on its quotes.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "Tiers", schema: offeredTierListSchema } },
+    [401, 403],
+  ),
+});
+
 const changeRequestRoute = createRoute({
   method: "post",
   path: "/api/school/license/change-requests",
   tags: [TAG],
   operationId: "requestSchoolLicenseChange",
-  summary: "Ask the super admin for different seats",
+  summary: "Ask the super admin for different seats or tiers",
   description:
-    "Records a request -- the seat totals wanted per audience and/or Family+, with a note -- for " +
-    "the super admin. The license is unchanged until the super admin changes it.",
+    "Records a request -- the seat totals and/or tier wanted per audience and/or Family+, with a " +
+    "note -- for the super admin. The license is unchanged until the super admin changes it.",
   security: [{ bearerAuth: [] }],
   request: {
     body: {
@@ -263,6 +303,34 @@ export function schoolLicenseRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> {
       });
     });
     return c.json(eligible, 200);
+  });
+
+  routes.openapi(peopleRoute, async (c) => {
+    const actor = schoolActor(c);
+    const query = c.req.valid("query");
+    const people = await readInSchool(deps, actor.schoolId, actor, async (tx) => {
+      const license = await currentLicense(tx);
+      if (!license) return { people: [], total: 0 };
+      return listPeople(tx, license, {
+        audience: query.audience,
+        scope: scopeFrom(query),
+        search: query.search,
+        seat:
+          query.show === "seated" ? "seated" : query.show === "unseated" ? "unseated" : undefined,
+        onlyPersonal: query.show === "personal",
+        limit: query.limit,
+        offset: query.offset,
+      });
+    });
+    return c.json({ ...people, show: query.show }, 200);
+  });
+
+  routes.openapi(tiersRoute, async (c) => {
+    const actor = schoolActor(c);
+    const tiers = await readInSchool(deps, actor.schoolId, actor, async (tx) =>
+      listOfferedTiers(tx, await currentLicense(tx)),
+    );
+    return c.json({ tiers }, 200);
   });
 
   routes.openapi(changeRequestRoute, async (c) => {

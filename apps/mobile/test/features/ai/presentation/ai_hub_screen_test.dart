@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:studafy_mobile/src/core/features/features_providers.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/ai/application/ai_hub_providers.dart';
 import 'package:studafy_mobile/src/features/ai/domain/ai_hub_status.dart';
@@ -15,6 +16,7 @@ import 'package:studafy_mobile/src/features/ai/presentation/widgets/ai_usage_met
 import 'package:studafy_mobile/src/features/ai/store/ai_store_controller.dart';
 import 'package:studafy_mobile/src/features/ai/store/ai_store_offer_card.dart';
 
+import '../../../core/features/feature_fixtures.dart';
 import '../../../support/wrap_with_localization.dart';
 import '../store/store_fakes.dart';
 
@@ -66,11 +68,23 @@ void main() {
 
   // Builds the whole scope rather than an overrides list: riverpod 3.3.2's barrel doesn't export
   // the `Override` type (same reasoning as `exams_screen_test.dart`).
-  ProviderScope unsubscribed({required bool sold}) => ProviderScope(
+  //
+  // [tutor] is the AI tutor's `GET /api/me/features` entry: by default nothing from the school, so
+  // the store may sell it.
+  ProviderScope unsubscribed({
+    required bool sold,
+    Map<String, dynamic>? tutor,
+    bool featuresFail = false,
+  }) => ProviderScope(
     overrides: [
       aiHubStatusProvider.overrideWith((ref) async => const AiHubUnsubscribed()),
       storeGatewayProvider.overrideWithValue(FakeGateway()),
       aiStoreBackendProvider.overrideWithValue(FakeBackend(storeSetup(purchasable: sold))),
+      myFeaturesProvider.overrideWith(
+        (ref) async => featuresFail
+            ? throw Exception('offline')
+            : featuresFrom([tutor ?? featureJson(reason: 'not_included')]),
+      ),
     ],
     child: _screenApp(),
   );
@@ -148,5 +162,78 @@ void main() {
 
     expect(find.byType(AiHubMessage), findsOneWidget);
     expect(find.text("Couldn't load your AI features."), findsOneWidget);
+  });
+
+  testWidgets('the school sells a seat with the AI tutor: ask the school, never the store', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      unsubscribed(sold: true, tutor: featureJson(reason: 'not_included', schoolOffers: true)),
+    );
+
+    expect(find.text('Ask your school for a seat'), findsOneWidget);
+    expect(find.byType(AiStoreOfferCard), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Subscribe'), findsNothing);
+    expect(find.textContaining('JOD'), findsNothing);
+  });
+
+  testWidgets('a seat holder whose tier has no AI: never the store', (tester) async {
+    await _pump(
+      tester,
+      unsubscribed(sold: true, tutor: featureJson(reason: 'not_included', schoolSeat: true)),
+    );
+
+    expect(find.byType(AiStoreOfferCard), findsNothing);
+    expect(find.text('Ask your school for a seat'), findsOneWidget);
+  });
+
+  testWidgets('while the verdict is unknown, the notice alone: never a purchase by default', (
+    tester,
+  ) async {
+    await _pump(tester, unsubscribed(sold: true, featuresFail: true));
+
+    expect(find.byType(AiNotActiveCard), findsOneWidget);
+    expect(find.byType(AiStoreOfferCard), findsNothing);
+  });
+
+  testWidgets('covered by a school seat: "Provided by" the school above the hub, nothing to buy', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      ProviderScope(
+        overrides: [
+          aiHubStatusProvider.overrideWith(
+            (ref) async => AiHubSubscribed(
+              AiUsage(
+                budget: 1000,
+                usedTokens: 200,
+                heldTokens: 0,
+                remaining: 800,
+                periodEnd: DateTime(2026, 3, 1),
+              ),
+            ),
+          ),
+          myFeaturesProvider.overrideWith(
+            (ref) async => featuresFrom([
+              featureJson(
+                active: true,
+                sources: [grant('school_license', limit: 300)],
+                limit: 300,
+                used: 12,
+                schoolSeat: true,
+              ),
+            ]),
+          ),
+        ],
+        child: _screenApp(),
+      ),
+    );
+
+    expect(find.textContaining('Provided by Alpha Academy'), findsOneWidget);
+    expect(find.textContaining('12 of 300 messages used this month'), findsOneWidget);
+    expect(find.byType(AiFeatureGrid), findsOneWidget);
+    expect(find.byType(AiStoreOfferCard), findsNothing);
   });
 }

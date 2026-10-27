@@ -387,6 +387,31 @@ export async function createAiCheckoutSession(
       );
     }
 
+    // A student holding a seat on the school's license in force is provided for by the school and
+    // is never sold a personal purchase (docs/billing/feature-licensing.md, session 6). The offer
+    // hides the button; this keeps a stale page or a direct call from buying anyway.
+    const [seat] = await tx<{ id: string }[]>`
+      SELECT ls.id
+      FROM app.license_seats ls
+      JOIN app.school_licenses l ON l.id = ls.license_id AND l.school_id = ls.school_id
+      JOIN app.students s ON s.id = ${studentId}::uuid AND s.school_id = ls.school_id
+      WHERE ls.school_id = ${schoolId}::uuid
+        AND ls.audience = 'student'
+        AND ls.user_id = s.user_id
+        AND ls.unassigned_at IS NULL
+        AND l.status = 'active'
+        AND l.starts_at <= CURRENT_TIMESTAMP
+        AND l.ends_at > CURRENT_TIMESTAMP
+      LIMIT 1
+    `;
+    if (seat) {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.AI_SUBSCRIPTION_COVERED_BY_SCHOOL,
+        "This student's school provides AI access through a license seat",
+      );
+    }
+
     const selected = await selectPaymentProviderForSchool(tx, providers, schoolId);
 
     const price = await findActivePriceById(tx, priceId);

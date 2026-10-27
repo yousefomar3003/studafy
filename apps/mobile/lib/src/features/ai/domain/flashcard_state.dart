@@ -8,6 +8,10 @@ enum FlashcardGenerateError {
   /// 429 `AI_QUOTA_EXCEEDED` — the student's monthly AI token budget is spent.
   quotaExceeded,
 
+  /// 429 `FEATURE_LIMIT_REACHED` — this month's units of the paid feature are used up (resets on
+  /// the 1st, UTC; docs/billing/feature-licensing.md).
+  featureLimitReached,
+
   /// 402 `AI_SUBSCRIPTION_INACTIVE` — the school's AI add-on isn't active.
   subscriptionInactive,
 

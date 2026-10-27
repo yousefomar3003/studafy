@@ -9,6 +9,7 @@ import '../../../core/auth/auth_providers.dart';
 import '../application/ai_hub_providers.dart';
 import 'ai_store_backend.dart';
 import 'store_gateway.dart';
+import '../../../core/features/features_providers.dart';
 
 final storeGatewayProvider = Provider<StoreGateway>((ref) => InAppPurchaseGateway());
 
@@ -173,7 +174,9 @@ class AiStoreController extends AsyncNotifier<AiStoreState> {
     await _finish(purchase);
     if (!ref.mounted) return;
     state = const AsyncData(AiStoreActivated());
-    ref.invalidate(aiHubStatusProvider);
+    ref
+      ..invalidate(aiHubStatusProvider)
+      ..invalidate(myFeaturesProvider);
   }
 
   Future<void> _finish(PurchaseDetails purchase) async {

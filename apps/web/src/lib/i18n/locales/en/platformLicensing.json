@@ -1,0 +1,562 @@
+{
+  "nav": {
+    "licenses": "Licenses",
+    "quotes": "Quotes",
+    "payments": "Payments",
+    "tiers": "Tiers",
+    "features": "Features",
+    "pricing": "Pricing"
+  },
+  "common": {
+    "actions": "Actions",
+    "confirm": "Confirm",
+    "edit": "Edit",
+    "loadError": "This could not be loaded. Try again.",
+    "no": "No",
+    "remove": "Remove",
+    "saveError": "The change was not saved.",
+    "saved": "Saved.",
+    "unlimited": "Unlimited"
+  },
+  "audience": {
+    "student": "Students",
+    "teacher": "Teachers",
+    "parent": "Parents (Family+)"
+  },
+  "unit": {
+    "messages": "messages",
+    "generations": "generations",
+    "pages": "pages",
+    "submissions": "submissions"
+  },
+  "featureStatus": {
+    "active": "Active",
+    "paused": "Paused",
+    "hidden": "Hidden"
+  },
+  "featureName": {
+    "ai_tutor": "AI tutor",
+    "study_tools": "Study tools",
+    "notebook": "Notebook",
+    "auto_grading": "Auto-grading",
+    "family_plus": "Family+"
+  },
+  "licenseStatus": {
+    "draft": "Draft",
+    "awaiting_payment": "Awaiting payment",
+    "active": "Active",
+    "suspended": "Suspended",
+    "expired": "Expired",
+    "cancelled": "Cancelled"
+  },
+  "quoteKind": {
+    "new": "New term",
+    "seat_increase": "More seats",
+    "extension": "Extension"
+  },
+  "quoteStatus": {
+    "draft": "Draft",
+    "sent": "Sent",
+    "accepted": "Accepted",
+    "expired": "Expired",
+    "withdrawn": "Withdrawn"
+  },
+  "invoiceStatus": {
+    "issued": "Issued",
+    "partially_paid": "Partially paid",
+    "paid": "Paid",
+    "void": "Void",
+    "overdue": "Overdue"
+  },
+  "invoiceFilter": {
+    "all": "All invoices",
+    "unpaid": "Unpaid",
+    "partially_paid": "Partially paid",
+    "overdue": "Overdue",
+    "issued": "Issued, nothing paid",
+    "paid": "Paid",
+    "void": "Void"
+  },
+  "features": {
+    "title": "Features",
+    "description": "Every paid feature registered in code. Audience, unit and default limit come from code; you set the name people see and whether it is on.",
+    "caption": "Registered paid features",
+    "columns": {
+      "feature": "Feature",
+      "audience": "Audience",
+      "unit": "Unit",
+      "defaultLimit": "Default monthly limit",
+      "tiers": "Tiers including it",
+      "status": "Status"
+    },
+    "noUnit": "Not counted",
+    "editNamed": "Edit {{name}}",
+    "editTitle": "Edit feature",
+    "nameLabel": "Display name",
+    "statusLabel": "Status",
+    "statusHelp": {
+      "active": "Sold and working for everyone who holds it.",
+      "paused": "Switched off for everyone, holders included (the kill switch).",
+      "hidden": "Not sold or listed, but keeps working for people who already hold it."
+    }
+  },
+  "tiers": {
+    "title": "Tiers",
+    "description": "What each tier includes, at what monthly limit, and its price per seat per month in each currency, side by side per audience.",
+    "audienceTitle": {
+      "student": "Student tiers",
+      "teacher": "Teacher tiers",
+      "parent": "Parent tiers (Family+)"
+    },
+    "create": {
+      "student": "New student tier",
+      "teacher": "New teacher tier",
+      "parent": "New parent tier"
+    },
+    "empty": "No tiers yet.",
+    "compareCaption": "{{audience}} tiers compared",
+    "columns": {
+      "feature": "Feature"
+    },
+    "rank": "Rank {{rank}}",
+    "retired": "Retired",
+    "editNamed": "Edit {{name}}",
+    "editTitle": "Edit {{name}}",
+    "notIncluded": "—",
+    "limitPerMonth": "{{limit}} {{unit}} a month",
+    "includesAll": "Includes all future features",
+    "pricePerSeat": "Price per seat per month ({{currency}})",
+    "inUse": "Licenses and subscriptions on it",
+    "codeLabel": "Code",
+    "codeHelp": "Lower-case letters, digits and underscores; it cannot change later.",
+    "nameLabel": "Name",
+    "rankLabel": "Rank",
+    "rankHelp": "Orders the tiers of an audience: 1 is the entry tier. Unique among active tiers.",
+    "includesAllLabel": "Includes all future features of this audience (at their default limits)",
+    "activeLabel": "Available (a retired tier keeps serving the people on it)",
+    "featuresHeading": "Features and monthly limits",
+    "limitLabel": "Monthly limit ({{unit}})",
+    "limitHelp": "Leave empty for unlimited.",
+    "limitError": "A whole number above zero, or empty.",
+    "pricesHeading": "Price per seat per month",
+    "currencyLabel": "Currency",
+    "amountLabel": "Amount",
+    "priceError": "A currency code and an amount like 30.00.",
+    "addPrice": "Add a currency",
+    "inUseWarning_one": "{{count}} license or subscription uses this tier: changes reach it at once.",
+    "inUseWarning_other": "{{count}} licenses and subscriptions use this tier: changes reach them at once."
+  },
+  "pricing": {
+    "title": "Pricing",
+    "description": "Volume and duration discounts per currency, and the bank details printed on every invoice. The calculator uses what is saved here.",
+    "currencyTitle": "Discounts in {{currency}}",
+    "basisLabel": "Volume discounts count",
+    "basis": {
+      "per_audience": "Each audience's own seats",
+      "overall": "The license's total seats"
+    },
+    "basisHelp": {
+      "per_audience": "500 students and 50 teachers are discounted at 500 and at 50.",
+      "overall": "500 students and 50 teachers are both discounted at 550."
+    },
+    "volumeHeading": "Volume brackets",
+    "volumeHelp": "From this many seats up, this much off. An audience with brackets of its own uses only those.",
+    "audienceLabel": "Applies to",
+    "allAudiences": "Every audience",
+    "minSeatsLabel": "From seats",
+    "percentLabel": "Discount (%)",
+    "rowError": "A whole number above zero and a discount of 0–100%.",
+    "addBracket": "Add a bracket",
+    "durationHeading": "Duration discounts",
+    "minMonthsLabel": "From months",
+    "addDuration": "Add a duration discount",
+    "save": "Save {{currency}} pricing",
+    "addCurrencyLabel": "Add discounts for another currency",
+    "addCurrency": "Add currency",
+    "bankTitle": "Bank details",
+    "bankHelp": "Printed on every license invoice with its payment reference.",
+    "bankMissing": "No bank details yet: invoices show none until you save them.",
+    "bankName": "Bank",
+    "accountName": "Account name",
+    "iban": "IBAN",
+    "swift": "SWIFT / BIC",
+    "bankCurrency": "Account currency",
+    "saveBank": "Save bank details"
+  },
+  "calculator": {
+    "title": "Calculator and quotes",
+    "description": "Price a license for a school, see exactly what it pays and saves, and send it as a quote.",
+    "schoolSearch": "School",
+    "schoolSearchHelp": "Search by name to pick a school.",
+    "schoolResults": "Matching schools",
+    "pickSchool": "Choose",
+    "schoolSelected": "Pricing for",
+    "changeSchool": "Change school",
+    "termsTitle": "Terms",
+    "kindLabel": "What to price",
+    "licenseLabel": "License",
+    "licensePlaceholder": "Choose a license",
+    "licenseOption": "{{status}}, {{from}} to {{to}}",
+    "newLicenseOption": "A new license",
+    "currencyLabel": "Currency",
+    "monthsLabel": "Months",
+    "extendMonthsLabel": "Months to add",
+    "startsLabel": "Starts on",
+    "familyPlusLabel": "Include Family+ (parent seats)",
+    "seatsHeading": "Tiers and seats",
+    "tierLabel": "{{audience}} tier",
+    "tierPlaceholder": "No tier",
+    "seatsLabel": "{{audience}} seats",
+    "seatIncreaseHelp": "Enter the new totals: only the added seats are charged, by the day, for the rest of the term, at the bracket of the new total.",
+    "adjustmentHeading": "Manual adjustment",
+    "adjustmentLabel": "Adjustment ({{currency}})",
+    "adjustmentHelp": "Negative for a discount, e.g. -250.00.",
+    "amountError": "An amount like 250.00 or -250.00.",
+    "reasonLabel": "Reason",
+    "reasonRequired": "An adjustment needs a reason.",
+    "creditsLabel": "Take off the school's open overlap credits",
+    "breakdownTitle": "Price breakdown",
+    "breakdownEmpty": "Choose tiers and seats to see the price.",
+    "priceError": "The price could not be calculated.",
+    "period": {
+      "months": "For {{months}} months",
+      "days": "For the {{days}} days left in the term"
+    },
+    "seatLine": "{{tier}}: {{seats}} {{audience}}",
+    "perSeat": "{{before}} → {{after}} per seat per month",
+    "volumeDiscount": "Volume discount ({{percent}})",
+    "durationDiscount": "Duration discount ({{percent}})",
+    "adjustmentLine": "Adjustment: {{reason}}",
+    "listTotal": "List price",
+    "creditTotal": "Overlap credits",
+    "total": "Total",
+    "youSave": "You save {{amount}} ({{percent}}) compared with list price.",
+    "seatsTotal": "{{seats}} seats priced",
+    "nextTitle": "A better offer for more seats",
+    "nextColumns": {
+      "audience": "Audience",
+      "offer": "Offer",
+      "now": "Per seat now",
+      "then": "Per seat then"
+    },
+    "nextOffer_one": "Add {{count}} seat to reach {{percent}} off",
+    "nextOffer_other": "Add {{count}} seats to reach {{percent}} off",
+    "saveTitle": "Save as a quote",
+    "notesLabel": "Notes for the school (optional)",
+    "save": "Save as draft quote",
+    "pickSchoolFirst": "Pick a school to save a quote.",
+    "saved": "Quote saved as a draft.",
+    "saveError": "The quote was not saved."
+  },
+  "quotes": {
+    "title": "Quotes",
+    "empty": "No quotes for this school yet.",
+    "columns": {
+      "created": "Created",
+      "kind": "Kind",
+      "total": "Total",
+      "validUntil": "Valid until",
+      "status": "Status"
+    },
+    "actions": {
+      "send": "Send",
+      "accept": "Mark accepted",
+      "withdraw": "Withdraw"
+    },
+    "done": {
+      "send": "Quote sent to the school.",
+      "accept": "Quote accepted and invoiced.",
+      "withdraw": "Quote withdrawn."
+    },
+    "openInvoice": "Open invoice"
+  },
+  "licenses": {
+    "title": "Licenses",
+    "description": "Every school's license: what it covers, how full it is and what is still owed.",
+    "newQuote": "New quote",
+    "listTitle": "All licenses",
+    "filters": "Filter licenses",
+    "statusFilter": "Status",
+    "allStatuses": "Every status",
+    "expiringFilter": "Ending in {{days}} days",
+    "nearlyFullFilter": "Seats nearly full",
+    "unpaidFilter": "Unpaid balance",
+    "empty": "No licenses match.",
+    "columns": {
+      "school": "School",
+      "status": "Status",
+      "period": "Period",
+      "seats": "Seats used",
+      "balance": "Unpaid"
+    },
+    "daysLeft_one": "{{count}} day left",
+    "daysLeft_other": "{{count}} days left",
+    "seatsCell": "{{audience}}: {{assigned}} / {{purchased}}"
+  },
+  "inbox": {
+    "title": "Seat change requests",
+    "filter": "Show requests",
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved",
+      "declined": "Declined"
+    },
+    "empty": {
+      "open": "No open requests.",
+      "resolved": "No resolved requests.",
+      "declined": "No declined requests."
+    },
+    "wants": {
+      "students_one": "{{count}} student seat",
+      "students_other": "{{count}} student seats",
+      "teachers_one": "{{count}} teacher seat",
+      "teachers_other": "{{count}} teacher seats",
+      "parents_one": "{{count}} parent seat",
+      "parents_other": "{{count}} parent seats",
+      "tier": "{{tier}} for {{audience}}",
+      "familyPlusOn": "Family+ on",
+      "familyPlusOff": "Family+ off"
+    },
+    "price": "Price it",
+    "resolve": "Resolve",
+    "decline": "Decline",
+    "closeTitle": {
+      "resolved": "Resolve {{school}}'s request",
+      "declined": "Decline {{school}}'s request"
+    },
+    "noteLabel": "Note for the school (optional)",
+    "noteHelp": "The license itself only changes through a quote or an edit.",
+    "done": {
+      "resolved": "Request resolved.",
+      "declined": "Request declined."
+    }
+  },
+  "payments": {
+    "title": "Payments",
+    "description": "Bank transfers against license invoices: what came in, what is owed, and receipts waiting to be matched.",
+    "totalsTitle": "Totals",
+    "noTotals": "No license invoices yet.",
+    "receivedThisMonth": "Received this month ({{currency}})",
+    "outstanding_one": "Outstanding, {{count}} invoice",
+    "outstanding_other": "Outstanding, {{count}} invoices",
+    "overdue_one": "Overdue, {{count}} invoice",
+    "overdue_other": "Overdue, {{count}} invoices",
+    "pendingCount_one": "{{formatted}} receipt waiting to be matched.",
+    "pendingCount_other": "{{formatted}} receipts waiting to be matched.",
+    "receiptsTitle": "Receipts waiting to be matched",
+    "balanceDue": "Balance due: {{amount}}",
+    "matchReceipt": "Open invoice to match",
+    "invoicesTitle": "Invoices",
+    "statusFilter": "Show",
+    "schoolSearch": "Find a school",
+    "schoolFilter": "School",
+    "allSchools": "Every school",
+    "fromFilter": "Issued from",
+    "toFilter": "Issued to",
+    "empty": "No invoices match.",
+    "columns": {
+      "number": "Invoice",
+      "school": "School",
+      "issued": "Issued",
+      "due": "Due",
+      "total": "Total",
+      "balance": "Balance",
+      "status": "Status"
+    }
+  },
+  "invoice": {
+    "title": "Invoice {{number}}",
+    "loading": "Invoice",
+    "description": "Record bank transfers, match the school's receipts, or print it.",
+    "record": "Record a transfer",
+    "activateEarly": "Activate early",
+    "print": "Print or download",
+    "voidInvoice": "Void invoice",
+    "issuedDue": "Issued {{issued}} · due {{due}}",
+    "linesCaption": "Invoice lines",
+    "columns": {
+      "description": "Description",
+      "list": "List price",
+      "discounts": "Discounts",
+      "amount": "Amount"
+    },
+    "volume": "Volume {{percent}}",
+    "duration": "Duration {{percent}}",
+    "total": "Total",
+    "paid": "Paid",
+    "balance": "Balance",
+    "howToPay": "How to pay",
+    "reference": "Payment reference (put it on the transfer)",
+    "noBankDetails": "Not set yet.",
+    "voided": "Voided: {{reason}}",
+    "paymentsTitle": "Payments",
+    "noPayments": "No payments recorded.",
+    "paymentColumns": {
+      "received": "Received",
+      "reference": "Bank reference",
+      "amount": "Amount",
+      "status": "Status"
+    },
+    "paymentRecorded": "Recorded",
+    "paymentVoided": "Voided: {{reason}}",
+    "openFile": "Open file",
+    "billedTo": "Billed to {{school}}",
+    "voidPayment": "Void",
+    "voidPaymentNamed": "Void payment {{reference}}",
+    "receiptsTitle": "Receipts from the school",
+    "noReceipts": "The school has not uploaded a receipt.",
+    "matched": "Matched",
+    "recordFromReceipt": "Record from this receipt",
+    "match": "Match to a payment",
+    "matchNamed": "Match {{file}} to a payment",
+    "recordTitle": "Record a transfer for {{number}}",
+    "balanceDue": "Balance due: {{amount}}",
+    "amountLabel": "Amount ({{currency}})",
+    "amountTooMuch": "More than the balance.",
+    "amountError": "An amount like 1250.00.",
+    "receivedLabel": "Received on",
+    "bankReferenceLabel": "Bank reference",
+    "noteLabel": "Note (optional)",
+    "receiptLabel": "The school's receipt",
+    "noReceipt": "None",
+    "fileLabel": "Attach a receipt file (PDF, JPEG or PNG, optional)",
+    "recordConfirm": "Record transfer",
+    "recorded": "Transfer recorded.",
+    "recordedActivated": "Transfer recorded: the invoice is paid and the license is active.",
+    "voidPaymentTitle": "Void payment {{reference}}",
+    "voidInvoiceTitle": "Void invoice {{number}}",
+    "reasonLabel": "Reason",
+    "voidHelp": "Nothing is deleted: the record stays with your reason, and the balance is recalculated. The license is not suspended.",
+    "voidDone": "Voided.",
+    "matchTitle": "Match {{file}}",
+    "paymentLabel": "Payment",
+    "paymentPlaceholder": "Choose a payment",
+    "paymentOption": "{{reference}} · {{amount}} · {{date}}",
+    "matchDone": "Receipt matched.",
+    "activateTitle": "Activate early: {{number}}",
+    "activateHelp": "The license starts covering its seats now; the invoice stays open with the due date below.",
+    "dueDateLabel": "Payment due by",
+    "dueDateError": "Not before the issue date.",
+    "activateConfirm": "Activate",
+    "activated": "License activated.",
+    "dueDateMoved": "Due date updated."
+  },
+  "school": {
+    "title": "License",
+    "newQuote": "New quote",
+    "noLicense": "This school has no license.",
+    "summaryTitle": "Current license",
+    "seatsCaption": "Tier and seats per audience",
+    "columns": {
+      "audience": "Audience",
+      "tier": "Tier",
+      "seats": "Seats"
+    },
+    "seatsUsed": "{{assigned}} used of {{purchased}}",
+    "familyPlus": "Family+",
+    "currency": "Currency",
+    "balance": "Unpaid balance",
+    "noBalance": "Nothing owed",
+    "usageTitle": "Usage this month",
+    "usageValue": "{{used}} {{unit}}",
+    "actionsLabel": "License actions",
+    "actions": {
+      "activate": "Activate",
+      "resume": "Resume",
+      "suspend": "Suspend",
+      "cancel": "Cancel license",
+      "activateEarly": "Activate early with a due date",
+      "extend": "Extend",
+      "changeSeats": "Change seats or tiers"
+    },
+    "confirm": {
+      "activate": "Activate this license?",
+      "resume": "Resume this license?",
+      "suspend": "Suspend this license?",
+      "cancel": "Cancel this license?"
+    },
+    "confirmHelp": {
+      "activate": "Its seats start covering people at once.",
+      "resume": "Its seats cover people again.",
+      "suspend": "Its seats stop covering people until you resume it.",
+      "cancel": "It ends for good; seats stop covering people."
+    },
+    "confirmQuestion": "This applies straight away.",
+    "done": {
+      "activate": "License activated.",
+      "resume": "License resumed.",
+      "suspend": "License suspended.",
+      "cancel": "License cancelled.",
+      "extend": "License extended."
+    },
+    "extendTitle": "Extend the license",
+    "extendHelp": "Moves the end date later without a quote. To charge for it, price an extension instead.",
+    "extendLabel": "New end date",
+    "extendError": "Later than the current end date.",
+    "invoicesTitle": "Invoices",
+    "noInvoices": "No invoices yet.",
+    "paymentsTitle": "Payments",
+    "noPayments": "No payments yet.",
+    "voided": "voided",
+    "historyTitle": "History",
+    "noHistory": "Nothing recorded yet."
+  },
+  "seats": {
+    "title": "Seats",
+    "assign": "Assign seats",
+    "noSeats": "This license sells no seats.",
+    "audienceLabel": "Audience",
+    "searchLabel": "Search seat holders",
+    "empty": "No seats assigned.",
+    "caption": "Seats at {{school}}",
+    "columns": {
+      "person": "Person",
+      "assigned": "Assigned",
+      "overlap": "Overlap credit"
+    },
+    "byPlatform": "by Studafy",
+    "overlap": "{{days}} days",
+    "unassign": "Unassign",
+    "unassignNamed": "Unassign {{name}}",
+    "unassigned": "Seat unassigned.",
+    "assignTitle": "Assign seats on the school's behalf",
+    "searchPeople": "Search people",
+    "people": "People",
+    "assignEveryone": "Everyone eligible",
+    "assignPicked_one": "Assign {{count}} person",
+    "assignPicked_other": "Assign {{count}} people",
+    "assignedCount_one": "{{count}} seat assigned ({{skipped}} not).",
+    "assignedCount_other": "{{count}} seats assigned ({{skipped}} not)."
+  },
+  "history": {
+    "byStudafy": "by Studafy",
+    "action": {
+      "insert": "created",
+      "update": "changed",
+      "delete": "deleted"
+    },
+    "table": {
+      "school_licenses": "License",
+      "license_seats": "Seat",
+      "license_seat_overlaps": "Overlap credit",
+      "license_change_requests": "Change request",
+      "license_quotes": "Quote",
+      "license_invoices": "Invoice",
+      "license_payments": "Payment",
+      "license_payment_receipts": "Receipt"
+    }
+  },
+  "usage": {
+    "title": "Paid features and license revenue",
+    "description": "Units used this month per feature and per school, next to AI cost and what the school paid for its license. AI cost is recorded per school, not per feature.",
+    "units": "{{used}} {{unit}}",
+    "empty": "No usage or license payments yet.",
+    "caption": "Usage and revenue per school",
+    "columns": {
+      "school": "School",
+      "aiCost": "AI cost (this period)",
+      "revenueMonth": "License revenue this month",
+      "revenueTotal": "License revenue, all time"
+    }
+  }
+}

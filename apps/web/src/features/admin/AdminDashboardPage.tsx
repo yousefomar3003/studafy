@@ -1,7 +1,11 @@
+import { PERMISSIONS } from "@studafy/constants";
+
 import { useApprovalQueueQuery } from "../../components/ApprovalQueueBadge";
 import { HomeHeader, useSummarySentence } from "../../components/home/HomeHeader";
 import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip";
+import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
+import { LicenseTile } from "../license/LicenseTile";
 
 import { useAttendanceTodayQuery, useUserStatusCountsQuery } from "./queries";
 import { StorageUsageTile } from "./tiles/StorageUsageTile";
@@ -34,6 +38,7 @@ const statusOf = (query: UseQueryResult) =>
 export default function AdminDashboardPage() {
   const { t } = useTranslation();
   const { formatNumber } = useFormatters();
+  const permissions = usePermissions();
   const userCounts = useUserStatusCountsQuery();
   const attendance = useAttendanceTodayQuery();
   const approvals = useApprovalQueueQuery();
@@ -129,6 +134,7 @@ export default function AdminDashboardPage() {
         </h2>
         <div className="admin-dashboard-grid">
           <StorageUsageTile />
+          {permissions.has(PERMISSIONS.LICENSE_READ) ? <LicenseTile /> : null}
         </div>
       </section>
     </>

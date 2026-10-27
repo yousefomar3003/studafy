@@ -9,6 +9,7 @@ export { platformLicenseRoutes } from "./platform-routes";
 export { schoolLicenseRoutes } from "./school-routes";
 export { platformLicenseBillingRoutes } from "./billing-platform-routes";
 export { schoolLicenseBillingRoutes } from "./billing-school-routes";
+export { platformLicenseConsoleRoutes } from "./console-routes";
 export {
   activateEarly,
   createReceipt,

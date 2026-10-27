@@ -5,6 +5,7 @@ import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/flashcard_providers.dart';
 import '../../domain/flashcard_state.dart';
 import 'flashcard_material_picker.dart';
+import '../../../../core/features/feature_gate.dart';
 
 /// The deck-generation form, opened as a modal sheet from the deck browser: pick up to
 /// [flashcardMaxMaterials] ready materials and how many cards to generate, mirroring
@@ -105,7 +106,12 @@ class _GenerateErrorBanner extends StatelessWidget {
           Icon(Icons.error_outline, size: 18, color: colorScheme.onErrorContainer),
           const SizedBox(width: AppSpacing.space8),
           Expanded(
-            child: Text(_messageKeyFor(error).tr(), style: TextStyle(color: colorScheme.onErrorContainer)),
+            child: Text(
+              error == FlashcardGenerateError.featureLimitReached
+                  ? featureLimitReachedMessage(context)
+                  : _messageKeyFor(error).tr(),
+              style: TextStyle(color: colorScheme.onErrorContainer),
+            ),
           ),
         ],
       ),
@@ -116,6 +122,7 @@ class _GenerateErrorBanner extends StatelessWidget {
     FlashcardGenerateError.quotaExceeded => 'flashcards.generate.generateError.quotaExceeded',
     FlashcardGenerateError.subscriptionInactive =>
       'flashcards.generate.generateError.subscriptionInactive',
+    FlashcardGenerateError.featureLimitReached => 'features.errors.limitReached',
     FlashcardGenerateError.schoolInactive => 'flashcards.generate.generateError.schoolInactive',
     FlashcardGenerateError.llmDisabled => 'flashcards.generate.generateError.llmDisabled',
     FlashcardGenerateError.materialNotFound => 'flashcards.generate.generateError.materialNotFound',

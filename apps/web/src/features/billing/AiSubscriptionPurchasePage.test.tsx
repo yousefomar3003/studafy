@@ -7,6 +7,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
 import { AuthProvider, createSessionStore } from "../../lib/auth";
+import { feature, features, grant } from "../../lib/test/feature-fixtures";
 
 import type { SessionTokens } from "../../lib/auth";
 import type { ComponentType } from "react";
@@ -27,11 +28,16 @@ function makeOffer(overrides: Record<string, unknown> = {}) {
 }
 
 let currentOffer: Record<string, unknown> | undefined = makeOffer();
+/** The caller's `GET /api/me/features`; undefined answers no data (the page shows no notice). */
+let currentFeatures: unknown = undefined;
 let checkoutError: ApiError | null = null;
 
 const getMock = mock((path: string) => {
   if (path === "/api/subscriptions/ai/offer") {
     return Promise.resolve({ data: currentOffer });
+  }
+  if (path === "/api/me/features") {
+    return Promise.resolve({ data: currentFeatures });
   }
   return Promise.resolve({ data: undefined });
 });
@@ -64,11 +70,11 @@ function fakeJwt(payload: unknown): string {
   return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
 }
 
-async function renderPage(Page: ComponentType, initialPath = "/account/ai") {
+async function renderPage(Page: ComponentType, initialPath = "/account/ai", role = "PARENT") {
   const store = createSessionStore({
     refreshClient: {
       refresh: async (): Promise<SessionTokens> => ({
-        accessToken: fakeJwt({ roles: ["PARENT"], sub: "user-current" }),
+        accessToken: fakeJwt({ roles: [role], sub: "user-current" }),
         expiresAt: Date.now() + 3_600_000,
         sessionId: "session-1",
       }),
@@ -97,6 +103,7 @@ afterEach(() => {
   postMock.mockClear();
   assignMock.mockClear();
   currentOffer = makeOffer();
+  currentFeatures = undefined;
   checkoutError = null;
 });
 
@@ -169,5 +176,97 @@ describe("AiSubscriptionPurchasePage", () => {
 
     expect(await screen.findByText("Checkout cancelled")).toBeTruthy();
     expect(await screen.findByRole("button", { name: "Get AI for Amina Hassan" })).toBeTruthy();
+  });
+
+  describe("what the school provides (docs/billing/feature-licensing.md, session 6)", () => {
+    const tutorFeatures = (overrides: Parameters<typeof feature>[0] = {}) =>
+      features([feature(overrides)]);
+
+    test("a child holding a school seat: provided by the school, no purchase", async () => {
+      currentFeatures = tutorFeatures();
+      currentOffer = makeOffer({
+        students: [
+          { id: AMINA, name: "Amina Hassan", active: false, schoolSeat: true, schoolOffers: true },
+          { id: OMAR, name: "Omar Hassan", active: false, schoolSeat: false, schoolOffers: false },
+        ],
+      });
+      await renderPage(await loadPage());
+
+      expect(await screen.findByText("Provided by Alpha Academy")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Get AI for Amina Hassan" })).toBeNull();
+      // The other child, whom the school does not provide for, can still be bought for.
+      expect(screen.getByRole("button", { name: "Get AI for Omar Hassan" })).toBeTruthy();
+    });
+
+    test("the school sells a seat with the AI tutor: ask the school, no purchase", async () => {
+      currentFeatures = tutorFeatures();
+      currentOffer = makeOffer({
+        students: [
+          { id: AMINA, name: "Amina Hassan", active: false, schoolSeat: false, schoolOffers: true },
+        ],
+      });
+      await renderPage(await loadPage());
+
+      expect(
+        await screen.findByText("Amina Hassan's school provides this: ask the school for a seat."),
+      ).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /Get AI/ })).toBeNull();
+    });
+
+    test("a student covered by a seat and a personal add-on: it won't renew", async () => {
+      currentFeatures = tutorFeatures({
+        active: true,
+        reason: null,
+        sources: [grant("school_license"), grant("purchase", "2026-11-20T00:00:00.000Z")],
+        schoolSeat: true,
+        renewalStop: { provider: "stripe", action: "cancel_at_period_end", status: "done" },
+      });
+      currentOffer = makeOffer({
+        students: [
+          { id: AMINA, name: "Amina Hassan", active: true, schoolSeat: true, schoolOffers: true },
+        ],
+      });
+      await renderPage(await loadPage(), "/account/ai", "STUDENT");
+
+      expect(
+        await screen.findByText(
+          "Your school now covers this. Your subscription won't renew after November 20, 2026.",
+        ),
+      ).toBeTruthy();
+      expect(screen.getAllByText("Provided by Alpha Academy").length).toBeGreaterThan(0);
+      expect(screen.queryByRole("button", { name: /Get AI/ })).toBeNull();
+    });
+
+    test("a student with nothing from the school sees no notice and can buy", async () => {
+      currentFeatures = tutorFeatures();
+      await renderPage(await loadPage(), "/account/ai", "STUDENT");
+
+      expect(await screen.findByRole("button", { name: "Get AI for Amina Hassan" })).toBeTruthy();
+      expect(screen.queryByText(/Provided by/)).toBeNull();
+      expect(screen.queryByText(/Ask your school/)).toBeNull();
+    });
+
+    test("a refused checkout for a seat holder explains it in words", async () => {
+      checkoutError = new ApiError({
+        status: 409,
+        title: "Conflict",
+        code: "AI_SUBSCRIPTION_COVERED_BY_SCHOOL",
+        detail: "This student's school provides AI access through a license seat",
+        instance: null,
+        type: null,
+        request_id: null,
+        problem: null,
+      });
+      await renderPage(await loadPage());
+
+      fireEvent.click(await screen.findByRole("button", { name: "Get AI for Amina Hassan" }));
+
+      expect(
+        await screen.findByText(
+          "The school already provides this through a seat, so there's nothing to buy.",
+        ),
+      ).toBeTruthy();
+      expect(assignMock).not.toHaveBeenCalled();
+    });
   });
 });

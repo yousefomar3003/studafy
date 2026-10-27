@@ -5,6 +5,7 @@ import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/quiz_controller.dart';
 import '../../domain/quiz_state.dart';
 import 'quiz_material_picker.dart';
+import '../../../../core/features/feature_gate.dart';
 
 /// The quiz screen's landing step: pick up to [quizMaxMaterials] ready materials and how many
 /// questions to generate, then start round 1.
@@ -97,7 +98,12 @@ class _GenerateErrorBanner extends StatelessWidget {
           Icon(Icons.error_outline, size: 18, color: colorScheme.onErrorContainer),
           const SizedBox(width: AppSpacing.space8),
           Expanded(
-            child: Text(_messageKeyFor(error).tr(), style: TextStyle(color: colorScheme.onErrorContainer)),
+            child: Text(
+              error == QuizGenerateError.featureLimitReached
+                  ? featureLimitReachedMessage(context)
+                  : _messageKeyFor(error).tr(),
+              style: TextStyle(color: colorScheme.onErrorContainer),
+            ),
           ),
         ],
       ),
@@ -107,6 +113,7 @@ class _GenerateErrorBanner extends StatelessWidget {
   String _messageKeyFor(QuizGenerateError error) => switch (error) {
     QuizGenerateError.quotaExceeded => 'quiz.setup.generateError.quotaExceeded',
     QuizGenerateError.subscriptionInactive => 'quiz.setup.generateError.subscriptionInactive',
+    QuizGenerateError.featureLimitReached => 'features.errors.limitReached',
     QuizGenerateError.schoolInactive => 'quiz.setup.generateError.schoolInactive',
     QuizGenerateError.llmDisabled => 'quiz.setup.generateError.llmDisabled',
     QuizGenerateError.materialNotFound => 'quiz.setup.generateError.materialNotFound',

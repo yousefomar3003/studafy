@@ -74,6 +74,15 @@ export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
     schoolScoped: true,
   },
   {
+    // The school's feature license -- seats, quotes, invoices (docs/billing/feature-licensing.md,
+    // session 5). Held by ORG_ADMIN and PRINCIPAL; every /portal/license route is gated on it.
+    id: "license",
+    labelKey: "nav.license",
+    to: "/portal/license",
+    requiredPermission: PERMISSIONS.LICENSE_READ,
+    schoolScoped: true,
+  },
+  {
     // The attendance office -- daily registers for every class, corrections and attendance
     // reports. Held by ATTENDANCE_OFFICER and ORG_ADMIN; gated on the same permission as every
     // /portal/attendance route.

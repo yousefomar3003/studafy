@@ -169,6 +169,8 @@ class AskAiController extends ChangeNotifier {
       return switch (error.code) {
         'AI_QUOTA_EXCEEDED' => AskAiSendError.quotaExceeded,
         'AI_SUBSCRIPTION_INACTIVE' => AskAiSendError.subscriptionInactive,
+        'FEATURE_NOT_INCLUDED' || 'FEATURE_EXPIRED' => AskAiSendError.subscriptionInactive,
+        'FEATURE_LIMIT_REACHED' => AskAiSendError.featureLimitReached,
         'AI_SCHOOL_INACTIVE' => AskAiSendError.schoolInactive,
         'AI_LLM_DISABLED' => AskAiSendError.llmDisabled,
         'AI_QUOTA_UNAVAILABLE' => AskAiSendError.temporarilyUnavailable,

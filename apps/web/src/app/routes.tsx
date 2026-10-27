@@ -25,8 +25,12 @@ const PRINCIPAL_CATALOGS: readonly CatalogArea[] = ["principal"];
 // The attendance office reuses the principal's term picker, correction modal and reports view, so it
 // loads their strings alongside its own.
 const ATTENDANCE_OFFICE_CATALOGS: readonly CatalogArea[] = ["attendanceOffice", "principal"];
-const PLATFORM_CATALOGS: readonly CatalogArea[] = ["platform"];
+// The license console (platformLicensing) is part of every console page: the nav and the school page
+// use its strings.
+const PLATFORM_CATALOGS: readonly CatalogArea[] = ["platform", "platformLicensing"];
 const FINANCE_CATALOGS: readonly CatalogArea[] = ["finance", "financeReports"];
+// The school's license pages; the admin and principal dashboards also load it for their license tile.
+const LICENSE_CATALOGS: readonly CatalogArea[] = ["schoolLicense"];
 const ONBOARDING_CATALOGS: readonly CatalogArea[] = ["onboarding"];
 
 /**
@@ -72,7 +76,7 @@ const PortalPage = lazyWithCatalogs(
   () => import("../routes/portal/PortalPage"),
 );
 const AdminDashboardPage = lazyWithCatalogs(
-  ADMIN_CATALOGS,
+  [...ADMIN_CATALOGS, ...LICENSE_CATALOGS],
   () => import("../features/admin/AdminDashboardPage"),
 );
 const UsersListPage = lazyWithCatalogs(
@@ -165,9 +169,61 @@ const PlatformRefundsPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/RefundsPage"),
 );
+const PlatformFeaturesPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/licensing/FeaturesPage"),
+);
+const PlatformTiersPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/licensing/TiersPage"),
+);
+const PlatformPricingPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/licensing/PricingSettingsPage"),
+);
+const PlatformQuotesPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/licensing/CalculatorPage"),
+);
+const PlatformLicensesPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/licensing/LicensesPage"),
+);
+const PlatformPaymentsPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/licensing/PaymentsPage"),
+);
+const PlatformInvoicePage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/licensing/InvoicePage"),
+);
 const PrincipalDashboardPage = lazyWithCatalogs(
-  PRINCIPAL_CATALOGS,
+  [...PRINCIPAL_CATALOGS, ...LICENSE_CATALOGS],
   () => import("../features/principal/PrincipalDashboardPage"),
+);
+const LicensePage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/LicensePage"),
+);
+const LicenseSeatsPage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/SeatsPage"),
+);
+const LicenseQuotesPage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/QuotesPage"),
+);
+const LicenseQuotePage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/QuoteDetailPage"),
+);
+const LicenseInvoicesPage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/InvoicesPage"),
+);
+const LicenseInvoicePage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/InvoiceDetailPage"),
 );
 const PrincipalGradesPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
@@ -467,6 +523,14 @@ export const routes: RouteObject[] = [
               ["platform/plans", <PlatformPlansPage key="plans" />],
               ["platform/settings", <PlatformSettingsPage key="settings" />],
               ["platform/users", <PlatformUserLookupPage key="users" />],
+              // The license console (docs/billing/feature-licensing.md, session 4).
+              ["platform/features", <PlatformFeaturesPage key="features" />],
+              ["platform/tiers", <PlatformTiersPage key="tiers" />],
+              ["platform/pricing", <PlatformPricingPage key="pricing" />],
+              ["platform/quotes", <PlatformQuotesPage key="quotes" />],
+              ["platform/licenses", <PlatformLicensesPage key="licenses" />],
+              ["platform/payments", <PlatformPaymentsPage key="payments" />],
+              ["platform/payments/:schoolId/:invoiceId", <PlatformInvoicePage key="invoice" />],
             ] as const
           ).map(([path, page]) => ({
             path,
@@ -748,6 +812,23 @@ export const routes: RouteObject[] = [
               </RequirePermission>
             ),
           },
+          // The school's feature license (docs/billing/feature-licensing.md, session 5): ORG_ADMIN
+          // and PRINCIPAL hold `license:read`; each page gates its changes on `license:manage`.
+          ...(
+            [
+              ["license", <LicensePage key="license" />],
+              ["license/seats", <LicenseSeatsPage key="seats" />],
+              ["license/quotes", <LicenseQuotesPage key="quotes" />],
+              ["license/quotes/:quoteId", <LicenseQuotePage key="quote" />],
+              ["license/invoices", <LicenseInvoicesPage key="invoices" />],
+              ["license/invoices/:invoiceId", <LicenseInvoicePage key="invoice" />],
+            ] as const
+          ).map(([path, page]) => ({
+            path,
+            element: (
+              <RequirePermission permission={PERMISSIONS.LICENSE_READ}>{page}</RequirePermission>
+            ),
+          })),
           {
             // No `RequirePermission` — self-service on the caller's own rows, matching the API's
             // own no-gate posture (see `notificationRoutes`'s doc comment). Every authenticated

@@ -398,6 +398,9 @@ export const ERROR_CODES = {
   SUBSCRIPTION_NOT_FOUND: "SUBSCRIPTION_NOT_FOUND",
   SUBSCRIPTION_CHECKOUT_FAILED: "SUBSCRIPTION_CHECKOUT_FAILED",
   AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE: "AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE",
+  // The student holds a school-license seat (docs/billing/feature-licensing.md, session 6): the
+  // school provides their paid features, so they are never sold a personal purchase.
+  AI_SUBSCRIPTION_COVERED_BY_SCHOOL: "AI_SUBSCRIPTION_COVERED_BY_SCHOOL",
 
   // AI quota gate (ST-155). The gate answers with one distinct code per stage of the decision flow
   // -- school active, AI add-on active, quota available -- so a client can branch on exactly why a

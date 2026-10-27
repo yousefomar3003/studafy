@@ -213,6 +213,8 @@ class FlashcardController extends ChangeNotifier {
       return switch (apiError.code) {
         'AI_QUOTA_EXCEEDED' => FlashcardGenerateError.quotaExceeded,
         'AI_SUBSCRIPTION_INACTIVE' => FlashcardGenerateError.subscriptionInactive,
+        'FEATURE_NOT_INCLUDED' || 'FEATURE_EXPIRED' => FlashcardGenerateError.subscriptionInactive,
+        'FEATURE_LIMIT_REACHED' => FlashcardGenerateError.featureLimitReached,
         'AI_SCHOOL_INACTIVE' => FlashcardGenerateError.schoolInactive,
         'AI_LLM_DISABLED' => FlashcardGenerateError.llmDisabled,
         'RESOURCE_NOT_FOUND' => FlashcardGenerateError.materialNotFound,

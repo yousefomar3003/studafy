@@ -10,6 +10,7 @@ import '../domain/ask_ai_conversation.dart';
 import 'widgets/ai_report_button.dart';
 import 'widgets/ask_ai_composer.dart';
 import 'widgets/ask_ai_turn_view.dart';
+import '../../../core/features/feature_gate.dart';
 
 /// Ask AI: a streaming chat grounded in the school's study materials. The student asks a
 /// question, the answer streams in token by token with tappable citation chips, and grounding
@@ -206,6 +207,8 @@ class _SendErrorBanner extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final message = error == AskAiSendError.questionBlocked && (guidance?.isNotEmpty ?? false)
         ? guidance!
+        : error == AskAiSendError.featureLimitReached
+        ? featureLimitReachedMessage(context)
         : _messageKeyFor(error).tr();
 
     return Material(
@@ -243,6 +246,7 @@ class _SendErrorBanner extends StatelessWidget {
   String _messageKeyFor(AskAiSendError error) => switch (error) {
     AskAiSendError.quotaExceeded => 'askAi.sendError.quotaExceeded',
     AskAiSendError.subscriptionInactive => 'askAi.sendError.subscriptionInactive',
+    AskAiSendError.featureLimitReached => 'features.errors.limitReached',
     AskAiSendError.schoolInactive => 'askAi.sendError.schoolInactive',
     AskAiSendError.llmDisabled => 'askAi.sendError.llmDisabled',
     AskAiSendError.temporarilyUnavailable => 'askAi.sendError.temporarilyUnavailable',

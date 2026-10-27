@@ -149,7 +149,9 @@ describe("the AI add-on offer", () => {
     const own = await offerFor(f, f.studentUserId);
     const parents = await offerFor(f, parent);
 
-    expect(own.students).toEqual([{ id: f.studentId, name: "Test Student", active: false }]);
+    expect(own.students).toEqual([
+      { id: f.studentId, userId: f.studentUserId, name: "Test Student", active: false },
+    ]);
     expect(parents.students).toEqual(own.students);
   });
 

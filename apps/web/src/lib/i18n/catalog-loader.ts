@@ -23,6 +23,8 @@ export type CatalogArea =
   | "principal"
   | "attendanceOffice"
   | "platform"
+  | "platformLicensing"
+  | "schoolLicense"
   | "onboarding"
   | "academicGrading";
 
@@ -50,6 +52,8 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     principal: () => import("./locales/en/principal.json"),
     attendanceOffice: () => import("./locales/en/attendanceOffice.json"),
     platform: () => import("./locales/en/platform.json"),
+    platformLicensing: () => import("./locales/en/platformLicensing.json"),
+    schoolLicense: () => import("./locales/en/schoolLicense.json"),
     onboarding: () => import("./locales/en/onboarding.json"),
     academicGrading: () => import("./locales/en/academicGrading.json"),
   },
@@ -61,6 +65,8 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     principal: () => import("./locales/ar/principal.json"),
     attendanceOffice: () => import("./locales/ar/attendanceOffice.json"),
     platform: () => import("./locales/ar/platform.json"),
+    platformLicensing: () => import("./locales/ar/platformLicensing.json"),
+    schoolLicense: () => import("./locales/ar/schoolLicense.json"),
     onboarding: () => import("./locales/ar/onboarding.json"),
     academicGrading: () => import("./locales/ar/academicGrading.json"),
   },

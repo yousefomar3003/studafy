@@ -536,7 +536,7 @@ export async function listSchoolInvoices(
  * Walk schools for the console's cross-school lists: one system transaction, each school's scope
  * armed in turn (the platform console's convention -- no policy is ever widened).
  */
-async function forEachSchool<T>(
+export async function forEachSchool<T>(
   database: Database | DatabasePools,
   schoolIds: string[] | null,
   fn: (tx: TransactionSql, school: { id: string; name: string }) => Promise<T[]>,

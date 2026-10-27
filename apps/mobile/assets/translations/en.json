@@ -1859,5 +1859,58 @@
       "serialLabel": "Serial number",
       "finalization": "Results version {version}, finalized {date}"
     }
+  },
+  "features": {
+    "askSchool": {
+      "title": "Ask your school for a seat",
+      "body": "{school} provides this through its Studafy license. Ask your school to give you a seat — there's nothing to buy.",
+      "bodyOtherTier": "Your seat from {school} doesn't include this. Ask your school whether it can move you to a plan that does."
+    },
+    "schoolInactive": {
+      "title": "Your school's Studafy plan isn't active",
+      "body": "Paid features are paused until your school renews its Studafy plan."
+    },
+    "unavailable": {
+      "title": "Temporarily unavailable",
+      "body": "Studafy has switched this off for now. Please try again later."
+    },
+    "notIncluded": {
+      "title": "Not included yet",
+      "body": "This isn't included in what you have now.",
+      "expired": "Your access ended on {date}."
+    },
+    "covered": {
+      "bySchool": "Provided by {school}",
+      "bothRenewal": "Your school now covers this. Your subscription won't renew after {date}.",
+      "bothRenewalNoDate": "Your school now covers this. Your own subscription won't renew.",
+      "appStoreSteps": "Apple doesn't let Studafy stop App Store renewals, so please turn it off yourself: on your iPhone or iPad open Settings, tap your name, then Subscriptions, choose Studafy and tap Cancel Subscription. You keep access until it ends."
+    },
+    "limit": {
+      "title": "Monthly limit reached",
+      "reached": "Monthly limit reached, resets on {date}.",
+      "usage": "{used} of {limit} {unit} used this month"
+    },
+    "units": {
+      "messages": "messages",
+      "generations": "generations",
+      "pages": "pages",
+      "submissions": "submissions"
+    },
+    "errors": {
+      "notIncluded": "This isn't included in what you have now.",
+      "expired": "Your access to this has ended.",
+      "limitReached": "Monthly limit reached, resets on {date}.",
+      "schoolInactive": "Your school's Studafy plan isn't active, so this is paused.",
+      "coveredBySchool": "Your school already provides this through a seat."
+    }
+  },
+  "familyPlus": {
+    "title": "Family+",
+    "personal": "Your Family+ covers all your children.",
+    "school": "{school} covers Family+ for your children at {school}.",
+    "schoolChildren": "{school} covers Family+ for your children at {school}: {children}.",
+    "otherSchools": "Children at other schools aren't covered by the {school} seat: they need your own Family+, or a seat from their school.",
+    "askSchool": "{school} offers Family+ through its license. Ask the school for a parent seat.",
+    "notCovered": "Family+ isn't active for your account at this school."
   }
 }

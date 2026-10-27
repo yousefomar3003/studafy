@@ -6,10 +6,20 @@ import { EVENT_ROUTES, ROUTED_EVENT_NAMES, routesFor } from "./event-routing";
 describe("routesFor", () => {
   test("grades.published routes to the student and parent rooms of the event's school", () => {
     const route = routesFor("grades.published");
-    expect(route?.("school-1")).toEqual([
+    expect(route?.("school-1", {})).toEqual([
       "school:school-1:role:STUDENT",
       "school:school-1:role:PARENT",
     ]);
+  });
+
+  test("userEntitlement.changed routes only to the affected user's own room", () => {
+    const route = routesFor("userEntitlement.changed");
+    expect(
+      route?.("school-1", { schoolId: "school-1", userId: "user-9", entitlementsVersion: 3 }),
+    ).toEqual(["school:school-1:user:user-9"]);
+    // No user id, no delivery -- never a broadcast.
+    expect(route?.("school-1", { schoolId: "school-1" })).toEqual([]);
+    expect(route?.("school-1", null)).toEqual([]);
   });
 
   test("returns undefined for an event with no route", () => {

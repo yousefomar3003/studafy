@@ -5,6 +5,7 @@ import { HomeHeader, useSummarySentence } from "../../components/home/HomeHeader
 import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip";
 import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
+import { LicenseTile } from "../license/LicenseTile";
 
 import {
   useDraftEvaluationsQuery,
@@ -170,6 +171,7 @@ export default function PrincipalDashboardPage() {
         <div className="principal-dashboard-grid">
           <AttendanceHeatMapTile />
           <RecentAnnouncementsTile />
+          {permissions.has(PERMISSIONS.LICENSE_READ) ? <LicenseTile /> : null}
         </div>
       </section>
     </>

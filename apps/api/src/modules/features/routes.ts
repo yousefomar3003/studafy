@@ -6,6 +6,7 @@ import { requireAuth } from "../../middleware/authContext";
 import { standardResponses } from "../../openapi/responses";
 
 import { defaultDisplayName } from "./catalog";
+import { schoolOffersFeature } from "./license-context";
 import { getFeatureService } from "./middleware";
 
 import type { AppEnv } from "../../middleware/requestId";
@@ -38,6 +39,20 @@ const FeatureGrantContributionSchema = z
   })
   .openapi("FeatureGrantContribution");
 
+const FeatureRenewalStopSchema = z
+  .object({
+    provider: z.string().nullable().openapi({
+      description: "app_store, google_play, tap or stripe; null when it could not be told.",
+    }),
+    action: z.enum(["cancel_at_period_end", "notify_user"]).openapi({
+      description:
+        "cancel_at_period_end: Studafy turned renewal off. notify_user: the App Store does not " +
+        "let a server do it, so the person must turn renewal off in their Apple ID settings.",
+    }),
+    status: z.string(),
+  })
+  .openapi("FeatureRenewalStop");
+
 const MyFeatureSchema = z
   .object({
     key: z.enum(FEATURE_KEYS as [string, ...string[]]),
@@ -65,11 +80,29 @@ const MyFeatureSchema = z
           "Why the feature is not active, or limit_reached when it is active and this month's " +
           "limit is used up. Null when active and within the limit.",
       }),
+    schoolSeat: z.boolean().openapi({
+      description:
+        "The caller holds a seat of this feature's audience on the school's license in force. A " +
+        "seat holder is never offered a personal purchase.",
+    }),
+    schoolOffers: z.boolean().openapi({
+      description:
+        "The school's license in force sells seats of this feature's audience whose tier " +
+        "includes it: an uncovered person should ask the school for a seat, not buy it.",
+    }),
+    renewalStop: FeatureRenewalStopSchema.nullable().openapi({
+      description:
+        "The personal subscription of this feature's audience whose renewal the caller's seat " +
+        "turned off (it runs to its period end, then the seat carries on), or null.",
+    }),
   })
   .openapi("MyFeature");
 
 const MyFeaturesResponseSchema = z
-  .object({ features: z.array(MyFeatureSchema) })
+  .object({
+    schoolName: z.string().openapi({ description: 'For "Provided by <school>".' }),
+    features: z.array(MyFeatureSchema),
+  })
   .openapi("MyFeaturesResponse");
 
 const myFeaturesRoute = createRoute({
@@ -81,7 +114,9 @@ const myFeaturesRoute = createRoute({
   description:
     "Returns every paid feature with the caller's verdict: whether it is active, why not " +
     "(school_inactive, paused, not_included, expired), the grants it comes from, and this month's " +
-    "usage against the limit. The same verdict the feature's routes enforce.",
+    "usage against the limit -- the same verdict the feature's routes enforce -- plus what the " +
+    "school's license means for it: whether the caller holds a seat, whether the school sells one " +
+    "that includes it, and a personal renewal the seat turned off.",
   security: [{ bearerAuth: [] }],
   responses: standardResponses(
     { 200: { description: "The caller's features", schema: MyFeaturesResponseSchema } },
@@ -95,10 +130,13 @@ export function featureRoutes(): OpenAPIHono<AppEnv> {
   routes.openapi(myFeaturesRoute, async (c) => {
     const auth = requireAuth(c);
     const service = getFeatureService(c);
-    const [features, catalog] = await Promise.all([
+    const [features, catalog, license] = await Promise.all([
       service.resolveFeatures(auth.schoolId, auth.userId),
       service.catalog(),
+      service.licenseContext(auth.schoolId, [auth.userId]),
     ]);
+    const seated = new Set(license.seats[auth.userId] ?? []);
+    const stops = license.renewalStops[auth.userId] ?? [];
 
     const listed = FEATURE_KEYS.filter(
       (key) => catalog.settings[key]?.status !== "hidden" || features[key].active,
@@ -122,10 +160,18 @@ export function featureRoutes(): OpenAPIHono<AppEnv> {
         used: access.used,
         periodEnd: access.periodEnd,
         reason: access.reason,
+        schoolSeat: seated.has(FEATURES[key].audience),
+        schoolOffers: schoolOffersFeature(catalog, license.offeredTiers, key),
+        renewalStop: (() => {
+          const stop = stops.find((s) => s.audience === FEATURES[key].audience);
+          return stop
+            ? { provider: stop.provider, action: stop.action, status: stop.status }
+            : null;
+        })(),
       };
     });
 
-    return c.json({ features: listed }, 200);
+    return c.json({ schoolName: license.schoolName, features: listed }, 200);
   });
 
   return routes;

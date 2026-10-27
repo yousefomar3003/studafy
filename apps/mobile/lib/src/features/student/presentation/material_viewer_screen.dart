@@ -14,6 +14,9 @@ import '../domain/material_ready_state.dart';
 import 'widgets/file_size.dart';
 import 'widgets/material_ready_state_pill.dart';
 import 'widgets/material_type_icon.dart';
+import '../../../core/features/my_features.dart';
+import '../../../core/features/presentation/feature_gate_view.dart';
+import '../../ai/presentation/widgets/ai_paywall.dart';
 
 /// One material: its ready-state gate, then either an in-app preview (PDFs and images —
 /// downloaded and cached on-device via [ensureMaterialDownloadedProvider]) or an "open in
@@ -121,7 +124,11 @@ class _MaterialReadyBody extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => AiConsentGate(child: MaterialSummaryScreen(material: material)),
+                    builder: (_) => FeatureGate(
+                      featureKey: FeatureKeys.studyTools,
+                      whenPurchasable: (_) => const AiPaywall(),
+                      child: AiConsentGate(child: MaterialSummaryScreen(material: material)),
+                    ),
                   ),
                 ),
                 icon: const Icon(Icons.auto_awesome_outlined, size: 18),
@@ -130,7 +137,11 @@ class _MaterialReadyBody extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => AiConsentGate(child: KeyConceptsScreen(material: material)),
+                    builder: (_) => FeatureGate(
+                      featureKey: FeatureKeys.studyTools,
+                      whenPurchasable: (_) => const AiPaywall(),
+                      child: AiConsentGate(child: KeyConceptsScreen(material: material)),
+                    ),
                   ),
                 ),
                 icon: const Icon(Icons.lightbulb_outline, size: 18),

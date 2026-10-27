@@ -272,6 +272,8 @@ const EXPECTED_PATHS = [
   "/api/school/license",
   "/api/school/license/change-requests",
   "/api/school/license/eligible",
+  "/api/school/license/people",
+  "/api/school/license/tiers",
   "/api/school/license/seats",
   "/api/school/license/seats/{seatId}",
   "/api/platform/schools/{schoolId}/license-requests",
@@ -463,6 +465,15 @@ const EXPECTED_PATHS = [
   "/api/school/license/quotes/{quoteId}",
   "/api/school/license/quotes/{quoteId}/accept",
   "/api/school/license/receipts/{receiptId}/file",
+  // The license console (session 4).
+  "/api/platform/features",
+  "/api/platform/features/{featureKey}",
+  "/api/platform/tiers",
+  "/api/platform/tiers/{planId}",
+  "/api/platform/licenses",
+  "/api/platform/licenses/change-requests",
+  "/api/platform/licenses/usage",
+  "/api/platform/schools/{schoolId}/license-console",
 ];
 
 const SCRIPT = path.join(import.meta.dir, "..", "..", "scripts", "generate-openapi.ts");

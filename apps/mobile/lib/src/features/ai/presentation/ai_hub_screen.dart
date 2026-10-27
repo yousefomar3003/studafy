@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/features/feature_gate.dart';
+import '../../../core/features/features_providers.dart';
+import '../../../core/features/my_features.dart';
+import '../../../core/features/presentation/feature_gate_view.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/ai_hub_providers.dart';
@@ -15,8 +19,10 @@ import 'widgets/ai_not_active_card.dart';
 import 'widgets/ai_state_page.dart';
 import 'widgets/ai_usage_meter.dart';
 
-/// The AI tab: subscribed feature hub, a "not active" notice with the App Store / Google Play
-/// offer under it ([AiStoreOfferCard]), or school-inactive messaging — see [AiHubStatus] for the
+/// The AI tab: subscribed feature hub (with who provides it -- "Provided by" the school, a personal
+/// subscription that will not renew -- and the monthly limit), a "not active" notice with the App
+/// Store / Google Play offer under it ([AiStoreOfferCard]) only where the person may buy it, "ask
+/// your school for a seat" where the school provides it, or school-inactive messaging — see [AiHubStatus] for the
 /// state each renders and `apps/mobile/docs/store_payment_routing.md` for why the add-on is sold
 /// here only through the store's own billing.
 ///
@@ -55,6 +61,7 @@ class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     final status = ref.watch(aiHubStatusProvider);
+    final tutorGate = ref.watch(featureGateProvider(FeatureKeys.aiTutor));
 
     return Scaffold(
       appBar: AppBar(
@@ -69,7 +76,10 @@ class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingOb
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(aiHubStatusProvider.future),
+        onRefresh: () {
+          ref.invalidate(myFeaturesProvider);
+          return ref.refresh(aiHubStatusProvider.future);
+        },
         child: status.when(
           // A scrollable ancestor even while loading, same as every other branch — RefreshIndicator
           // needs one to recognize the pull gesture at all, not just once content has loaded.
@@ -90,16 +100,31 @@ class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingOb
               icon: Icons.info_outline,
             ),
             AiHubSchoolInactive() => const AiStatePage(child: AiSchoolInactiveNotice()),
-            AiHubUnsubscribed() => const AiStatePage(
+            AiHubUnsubscribed() => AiStatePage(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [AiNotActiveCard(), AiStoreOfferCard()],
+                children: switch (tutorGate.value) {
+                  // The store only for someone the school does not (and would not) cover; while
+                  // that is unknown, the notice alone -- never a purchase by default.
+                  FeaturePurchasable() => const [AiNotActiveCard(), AiStoreOfferCard()],
+                  final FeatureGateState state
+                      when state is FeatureAskSchool ||
+                          state is FeatureSchoolInactive ||
+                          state is FeatureUnavailable =>
+                    [FeatureGateNotice(state: state)],
+                  _ => const [AiNotActiveCard()],
+                },
               ),
             ),
             AiHubSubscribed(:final usage) => AiStatePage(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const FeatureCoverageBanner(
+                    featureKey: FeatureKeys.aiTutor,
+                    unitKey: 'features.units.messages',
+                  ),
+                  const SizedBox(height: AppSpacing.space12),
                   AiUsageMeter(
                     usage: usage,
                     onTap: () => GoRouter.of(context).push(RoutePaths.aiUsage),

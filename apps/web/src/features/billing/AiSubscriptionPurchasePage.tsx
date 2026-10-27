@@ -4,6 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { useAuth } from "../../lib/auth";
+import {
+  FeatureNotice,
+  featureErrorMessageKey,
+  useFeatureGate,
+  useFeatures,
+} from "../../lib/features";
 import { useLocale, useTranslation } from "../../lib/i18n";
 
 import { useStartAiCheckout } from "./mutations";
@@ -49,6 +56,12 @@ function returnUrl(status: "success" | "cancelled"): string {
  * the students it can be bought for -- the user themselves as a student, or the children they are
  * linked to as a parent -- each with whether it is already active. The price shown is the catalog's;
  * the payment provider's hosted checkout confirms it before anything is charged.
+ *
+ * A student the school provides for is never offered the purchase (docs/billing/feature-licensing.md,
+ * session 6): one holding a school-license seat is shown "Provided by" the school, one whose school
+ * sells a seat that includes the AI tutor is told to ask the school for one. A student signed in
+ * themselves also sees their own coverage: a personal subscription that will not renew now the
+ * school covers them, and this month's limit.
  */
 export default function AiSubscriptionPurchasePage() {
   const { t } = useTranslation();
@@ -60,6 +73,10 @@ export default function AiSubscriptionPurchasePage() {
 
   const offer = useQuery({ queryKey: AI_OFFER_QUERY_KEY, queryFn: fetchAiOffer });
   const checkout = useStartAiCheckout();
+  const features = useFeatures();
+  const tutor = useFeatureGate("ai_tutor");
+  const isStudent = useAuth().roles.includes("STUDENT");
+  const schoolName = features.data?.schoolName ?? "";
 
   function buy(studentId: string, priceId: string) {
     checkout.mutate(
@@ -78,10 +95,11 @@ export default function AiSubscriptionPurchasePage() {
             setSchoolInactive(true);
             return;
           }
+          const friendly = error instanceof ApiError ? featureErrorMessageKey(error.code) : null;
           show({
             variant: "error",
             title: t("site.billing.ai.checkoutError"),
-            description: apiErrorMessage(error, t("site.common.tryAgain")),
+            description: friendly ? t(friendly) : apiErrorMessage(error, t("site.common.tryAgain")),
           });
         },
       },
@@ -105,6 +123,9 @@ export default function AiSubscriptionPurchasePage() {
     <>
       <h1>{t("site.billing.ai.title")}</h1>
       <p className="ai-purchase__intro">{t("site.billing.ai.intro")}</p>
+      {isStudent ? (
+        <FeatureNotice state={tutor} unitLabel={t("site.features.units.messages")} />
+      ) : null}
 
       {checkoutStatus === "cancelled" && !schoolInactive ? (
         <div className="billing-banner" data-tone="neutral" role="status">
@@ -147,10 +168,20 @@ export default function AiSubscriptionPurchasePage() {
               {offer.data.students.map((student) => (
                 <li key={student.id} className="ai-purchase__student">
                   <span>{student.name}</span>
-                  {student.active ? (
+                  {student.schoolSeat ? (
+                    <Chip>
+                      {schoolName
+                        ? t("site.features.providedBy", { school: schoolName })
+                        : t("site.features.providedBySchool")}
+                    </Chip>
+                  ) : student.active ? (
                     <span className="ai-purchase__active">
                       <Chip>{t("site.billing.ai.active")}</Chip>
                       <RefundRequestLink studentId={student.id} />
+                    </span>
+                  ) : student.schoolOffers ? (
+                    <span className="billing-overview__caption">
+                      {t("site.features.askSchoolFor", { name: student.name })}
                     </span>
                   ) : (
                     <Button
