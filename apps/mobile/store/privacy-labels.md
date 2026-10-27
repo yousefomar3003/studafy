@@ -176,6 +176,7 @@ The `sqlite3` pod that `sqlite3_flutter_libs` adds is built from the same SQLite
 | `flutter_web_auth_2` | None. Native code calls no required-reason API (checked) | None |
 | `image_picker_ios` | Own | None |
 | `in_app_purchase_storekit` | Own | None |
+| `local_auth_darwin` | Own | None |
 | `package_info_plus` | Own | None |
 | `path_provider_foundation` | No native target. Dart FFI through `objective_c`, calling only `NSFileManager` directory lookups | None needed |
 | `sentry_flutter` | None. Wrapper only (checked) | Covered by the `Sentry` pod |

@@ -109,6 +109,9 @@ flutter {
 dependencies {
     // Backports the java.time APIs flutter_local_notifications needs (compileOptions above).
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    // local_auth's biometric prompt needs an AppCompat LaunchTheme (res/values*/styles.xml), or it
+    // crashes on Android 8 and below.
+    implementation("androidx.appcompat:appcompat:1.7.0")
     // ST-247: instrumentation-runner deps for the androidTest APK integration_test builds. Pinned
     // to the same androidx.test major line Flutter's own integration_test package targets.
     androidTestImplementation("androidx.test:runner:1.6.2")

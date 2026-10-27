@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/auth/app_lock_gate.dart';
 import 'core/auth/auth_notifier.dart';
 import 'core/auth/auth_state.dart';
 import 'core/di/app_providers.dart';
@@ -92,7 +93,8 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
       locale: context.locale,
       supportedLocales: context.supportedLocales,
       localizationsDelegates: context.localizationDelegates,
-      builder: (context, child) => LocaleRebuildScope(child: child!),
+      builder: (context, child) =>
+          LocaleRebuildScope(child: AppLockGate(child: child!)),
     );
   }
 }

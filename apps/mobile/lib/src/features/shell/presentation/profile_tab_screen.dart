@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/auth/app_lock.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../core/localization/app_locales.dart';
@@ -498,6 +499,7 @@ class SignInSecurityScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  const _AppLockTile(),
                   const Divider(height: 1, indent: 68),
                   const _DeleteAccountTile(),
                 ],
@@ -506,6 +508,51 @@ class SignInSecurityScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Lock with Face ID": asks for Face ID / fingerprint / passcode whenever Studafy opens. Hidden
+/// on a device with neither biometrics nor a passcode, where there is nothing to ask for.
+class _AppLockTile extends ConsumerWidget {
+  const _AppLockTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(appLockAvailableProvider).value != true) {
+      return const SizedBox.shrink();
+    }
+    final enabled = ref.watch(appLockProvider.select((lock) => lock.enabled));
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        const Divider(height: 1, indent: 68),
+        SwitchListTile.adaptive(
+          key: const Key('profileAppLock'),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.space16,
+            vertical: AppSpacing.space4,
+          ),
+          secondary: const _IconTile(Icons.face_outlined),
+          title: Text(
+            'appLock.setting.title'.tr(),
+            style: theme.textTheme.titleSmall,
+          ),
+          subtitle: Text('appLock.setting.subtitle'.tr()),
+          value: enabled,
+          onChanged: (value) async {
+            final changed = await ref
+                .read(appLockProvider.notifier)
+                .setEnabled(value, reason: 'appLock.setting.reason'.tr());
+            if (!changed && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('appLock.setting.failed'.tr())),
+              );
+            }
+          },
+        ),
+      ],
     );
   }
 }

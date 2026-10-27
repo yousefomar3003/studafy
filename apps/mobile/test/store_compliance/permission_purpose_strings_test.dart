@@ -17,18 +17,27 @@ void main() {
     // NSPhotoLibraryUsageDescription: image_picker_ios links PHPhotoLibrary, and file_picker's
     // media picker is compiled in under Swift Package Manager.
     // NSAppleMusicUsageDescription: file_picker's audio picker, compiled in under SPM.
+    // NSFaceIDUsageDescription: local_auth, for the opt-in app lock.
     expect(_usageDescriptions(infoPlist).keys.toSet(), {
       'NSCameraUsageDescription',
       'NSPhotoLibraryUsageDescription',
       'NSAppleMusicUsageDescription',
+      'NSFaceIDUsageDescription',
     });
   });
 
   test('every iOS purpose string names the class-material upload it serves', () {
     for (final MapEntry(:key, :value) in _usageDescriptions(infoPlist).entries) {
+      if (key == 'NSFaceIDUsageDescription') continue;
       expect(value, contains('class'), reason: key);
       expect(value, contains('course material'), reason: key);
     }
+  });
+
+  test('the Face ID string says it unlocks the app and where it is turned on', () {
+    final faceId = _usageDescriptions(infoPlist)['NSFaceIDUsageDescription'];
+    expect(faceId, contains('unlock'));
+    expect(faceId, contains('Sign-in'));
   });
 
   test('Android declares no runtime permission the app does not need', () {

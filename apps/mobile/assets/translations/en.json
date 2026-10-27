@@ -1966,5 +1966,18 @@
     "otherSchools": "Children at other schools aren't covered by the {school} seat: they need your own Family+, or a seat from their school.",
     "askSchool": "{school} offers Family+ through its license. Ask the school for a parent seat.",
     "notCovered": "Family+ isn't active for your account at this school."
+  },
+  "appLock": {
+    "title": "Studafy is locked",
+    "body": "Unlock with Face ID, your fingerprint or your passcode to continue.",
+    "unlock": "Unlock",
+    "signOut": "Sign out",
+    "reason": "Unlock Studafy",
+    "setting": {
+      "title": "Lock with Face ID",
+      "subtitle": "Ask for Face ID, fingerprint or passcode when Studafy opens.",
+      "reason": "Confirm it's you to turn on the lock",
+      "failed": "Couldn't turn on the lock. Check that Face ID, fingerprint or a passcode is set up on this phone."
+    }
   }
 }

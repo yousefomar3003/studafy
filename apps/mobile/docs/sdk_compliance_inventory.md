@@ -91,6 +91,7 @@ Status values:
 | `image_picker` | 1.2.3 | Camera capture for materials | None. Uploads go to Studafy's API | Eligible |
 | `mime` | 2.0.0 | MIME detection | None | Eligible, on-device only |
 | `flutter_pdfview` | 1.4.5 | PDF rendering (`AndroidPdfViewer` / PDFKit) | None | Eligible, on-device only |
+| `local_auth` | 3.0.2 | Optional app lock: Face ID / Touch ID / fingerprint / device passcode (`androidx.biometric`, LocalAuthentication) | None. The OS only answers whether the unlock succeeded; no biometric data reaches the app | Eligible, on-device only |
 
 Dev dependencies such as `integration_test` are not in this table. Flutter leaves dev-dependency
 plugins out of release builds.
