@@ -360,6 +360,11 @@ describe("emit", () => {
           status: "canceled",
           entitlementsVersion: 2,
         },
+        [DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED]: {
+          schoolId: uid,
+          userId: uid,
+          entitlementsVersion: 2,
+        },
         [DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT]: {
           schoolId: uid,
           subscriptionId: uid,

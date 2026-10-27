@@ -171,13 +171,10 @@ class FamilyReceipt {
   final String currency;
   final ReceiptStatus status;
 
-  /// ERPNext's own link for this payment's printable receipt — an absolute URL when the payment
-  /// webhook supplied one, otherwise a bare path (`receiptUrlFor` in
-  /// `finance/payments/projection.ts`), deliberately not rooted to an origin because the
-  /// tenant's ERPNext site is chosen by the request's Host header, not a stored URL. A bare-path
-  /// receipt has nothing for this client to resolve against and surfaces through
-  /// `receiptFileProvider`'s normal error/retry state — the same gap the web app's plain
-  /// `<a href={receipt_url}>` (`PaymentsListPage.tsx`) has today.
+  /// Where this payment's PDF receipt is served: the Studafy API's own receipt endpoint
+  /// (`/api/finance/payments/{paymentId}/receipt`), a path relative to the API origin, present
+  /// once the payment is confirmed. It needs the guardian's bearer token, which is why
+  /// `receiptFileProvider` fetches it through the API's own interceptors rather than a bare client.
   final String? receiptUrl;
   final DateTime paymentDate;
 

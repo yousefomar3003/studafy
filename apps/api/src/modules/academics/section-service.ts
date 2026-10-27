@@ -17,6 +17,7 @@ export interface GradeLevelRow {
   school_id: string;
   name: string;
   sort_order: number;
+  archived_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -29,6 +30,7 @@ export interface SectionRow {
   grade_level_name: string;
   name: string;
   student_count: number;
+  archived_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -64,7 +66,7 @@ export async function listGradeLevels(
   schoolId: string,
 ): Promise<{ rows: GradeLevelRow[]; total: number }> {
   const rows = await tx<GradeLevelRow[]>`
-    SELECT id, school_id, name, sort_order, created_at, updated_at
+    SELECT id, school_id, name, sort_order, archived_at, created_at, updated_at
     FROM app.grade_levels
     WHERE school_id = ${schoolId}
     ORDER BY sort_order ASC, name ASC
@@ -80,7 +82,7 @@ export async function createGradeLevel(
   const [row] = await tx<GradeLevelRow[]>`
     INSERT INTO app.grade_levels (school_id, name, sort_order)
     VALUES (${schoolId}, ${params.name}, ${params.sort_order})
-    RETURNING id, school_id, name, sort_order, created_at, updated_at
+    RETURNING id, school_id, name, sort_order, archived_at, created_at, updated_at
   `;
 
   await emitAuditLog(tx, {
@@ -97,15 +99,20 @@ export async function updateGradeLevel(
   tx: TransactionSql,
   schoolId: string,
   gradeLevelId: string,
-  params: { name?: string; sort_order?: number },
+  params: { name?: string; sort_order?: number; archived?: boolean },
 ): Promise<GradeLevelRow> {
   const [row] = await tx<GradeLevelRow[]>`
     UPDATE app.grade_levels
     SET name = COALESCE(${params.name ?? null}, name),
         sort_order = COALESCE(${params.sort_order ?? null}::smallint, sort_order),
+        archived_at = CASE ${params.archived ?? null}::boolean
+          WHEN true THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
+          WHEN false THEN NULL
+          ELSE archived_at
+        END,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${gradeLevelId} AND school_id = ${schoolId}
-    RETURNING id, school_id, name, sort_order, created_at, updated_at
+    RETURNING id, school_id, name, sort_order, archived_at, created_at, updated_at
   `;
   if (!row) {
     throw new HTTPException(404, { message: "Grade level not found" });
@@ -160,7 +167,7 @@ const sectionColumns = (tx: TransactionSql) => tx`
     SELECT count(*)::int FROM app.student_sections AS ss
     WHERE ss.section_id = s.id AND ss.school_id = s.school_id
   ) AS student_count,
-  s.created_at, s.updated_at
+  s.archived_at, s.created_at, s.updated_at
 `;
 
 export async function listSections(
@@ -265,11 +272,17 @@ export async function updateSection(
   tx: TransactionSql,
   schoolId: string,
   sectionId: string,
-  params: { name: string },
+  params: { name?: string; archived?: boolean },
 ): Promise<SectionRow> {
   const updated = await tx`
     UPDATE app.sections
-    SET name = ${params.name}, updated_at = CURRENT_TIMESTAMP
+    SET name = COALESCE(${params.name ?? null}, name),
+        archived_at = CASE ${params.archived ?? null}::boolean
+          WHEN true THEN COALESCE(archived_at, CURRENT_TIMESTAMP)
+          WHEN false THEN NULL
+          ELSE archived_at
+        END,
+        updated_at = CURRENT_TIMESTAMP
     WHERE id = ${sectionId} AND school_id = ${schoolId}
     RETURNING id
   `;

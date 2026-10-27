@@ -1,6 +1,6 @@
 import { api } from "../../../lib/api";
 
-import type { Payment } from "../queries";
+import type { Payment, PaymentListItem } from "../queries";
 import type { components } from "@studafy/api-client";
 
 export type { Payment } from "../queries";
@@ -23,7 +23,7 @@ export interface PaymentFilters {
 }
 
 export interface PaymentsPage {
-  items: Payment[];
+  items: PaymentListItem[];
   total: number;
 }
 
@@ -50,7 +50,7 @@ export async function fetchPaymentsPage(
   // same pre-existing `@studafy/api-client` typing gap `NotificationBell.tsx` documents for
   // `notifications`.
   return {
-    items: (data?.payments ?? []) as Payment[],
+    items: (data?.payments ?? []) as PaymentListItem[],
     total: data?.total ?? 0,
   };
 }

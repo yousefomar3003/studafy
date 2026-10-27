@@ -7,6 +7,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { fetchInvoice, invoiceQueryKey } from "../invoices/queries";
 import { PAYMENT_MODE_LABEL_KEYS, PAYMENT_STATUS_LABEL_KEYS, paymentStatusTone } from "../labels";
+import { ReceiptButton } from "../ReceiptButton";
 
 import { InvoicePickerField } from "./InvoicePickerField";
 import { useCreatePayment } from "./mutations";
@@ -330,14 +331,7 @@ function PaymentSuccess({ payment: created, onReset }: PaymentSuccessProps) {
         ) : payment.status === "failed" ? (
           <p role="alert">{t("finance.payments.record.rejected")}</p>
         ) : payment.receipt_url ? (
-          <a
-            className="sf-button sf-button--primary"
-            href={payment.receipt_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {t("finance.common.openReceipt")}
-          </a>
+          <ReceiptButton paymentId={payment.id} variant="primary" />
         ) : null}
 
         <div className="payments-success__actions">

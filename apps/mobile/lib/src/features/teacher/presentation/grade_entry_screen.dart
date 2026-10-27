@@ -54,8 +54,9 @@ class _GradeEntryScreenState extends ConsumerState<GradeEntryScreen> {
   }
 
   GradeEntryController _controllerFor(String gradebookId) {
-    if (_controller != null && _controllerGradebookId == gradebookId)
+    if (_controller != null && _controllerGradebookId == gradebookId) {
       return _controller!;
+    }
     _controller?.dispose();
     _controller = GradeEntryController(
       client: ref.read(gradeEntryClientProvider),

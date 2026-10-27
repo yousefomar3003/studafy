@@ -8,6 +8,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { studentFamilies, withStudentIdentityTx } from "../students/service";
 
 import {
   createPaymentBodySchema,
@@ -180,8 +181,22 @@ export function paymentRoutes(
     const { rows, total } = await withTenantTx(database, tenantFrom(c), (tx) =>
       listPayments(tx, auth.schoolId, query),
     );
+    // The cache row carries only a student id; finance needs to see whose money it is.
+    const families = await withStudentIdentityTx(database, auth.schoolId, (tx) =>
+      studentFamilies(
+        tx,
+        auth.schoolId,
+        rows.map((row) => row.student_id),
+      ),
+    );
+    const payments = rows.map((row) => ({
+      ...row,
+      student_name: families.get(row.student_id)?.student_name ?? "",
+      family_id: families.get(row.student_id)?.family_id ?? null,
+      family_name: families.get(row.student_id)?.family_name ?? null,
+    }));
 
-    return c.json({ payments: rows, total }, 200);
+    return c.json({ payments, total }, 200);
   });
 
   routes.openapi(getRouteDef, async (c) => {

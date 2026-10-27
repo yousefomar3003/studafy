@@ -105,11 +105,13 @@ class _GradeCorrectionSheetState extends ConsumerState<GradeCorrectionSheet> {
       await call();
       if (mounted) Navigator.of(context).pop(true);
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _errorKey = _messageKeyFor(error.apiError?.code));
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _errorKey = 'teacher.grades.correction.errorGeneric');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

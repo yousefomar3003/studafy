@@ -5,12 +5,14 @@ import { Link } from "react-router-dom";
 
 import { useTranslation } from "../../../lib/i18n";
 import { PAYMENT_MODE_LABEL_KEYS, PAYMENT_STATUS_LABEL_KEYS, paymentStatusTone } from "../labels";
+import { ReceiptButton } from "../ReceiptButton";
 
 import { PAYMENTS_PAGE_SIZE, fetchPaymentsPage } from "./queries";
 
 import "./payments.css";
 
-import type { Payment, PaymentFilters, PaymentStatus } from "./queries";
+import type { PaymentFilters, PaymentStatus } from "./queries";
+import type { PaymentListItem } from "../queries";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
 const STATUS_OPTION_KEYS: { value: PaymentStatus | ""; labelKey: string }[] = [
@@ -26,8 +28,8 @@ const STATUS_OPTION_KEYS: { value: PaymentStatus | ""; labelKey: string }[] = [
  * click rather than a new lookup — issuance already happened once, from `RecordPaymentPage`'s own
  * success state.
  *
- * No student name column: `paymentSchema` carries `student_id` only, not a joined name (see
- * `RecentPaymentsFeedTile`, the only other place this list is read, which has the same gap).
+ * Each row names the student and links to their family's page, where finance sees the whole
+ * household and can take one payment across all its children's invoices.
  * Offset-paginated to match the endpoint's own `limit`/`offset` contract — see `fetchPaymentsPage`'s
  * doc comment for why this isn't `@studafy/ui`'s cursor-shaped `useCursorPagination`.
  */
@@ -57,8 +59,23 @@ export default function PaymentsListPage() {
     ({ value, labelKey }) => ({ value, label: t(labelKey) }),
   );
 
-  const columns: DataGridColumn<Payment>[] = [
+  const columns: DataGridColumn<PaymentListItem>[] = [
     { id: "payment_date", header: t("finance.common.date"), renderCell: (row) => row.payment_date },
+    {
+      id: "student",
+      header: t("finance.common.student"),
+      renderCell: (row) => row.student_name || "—",
+    },
+    {
+      id: "family",
+      header: t("finance.common.family"),
+      renderCell: (row) =>
+        row.family_id ? (
+          <Link to={`/portal/finance/families/${row.family_id}`}>{row.family_name}</Link>
+        ) : (
+          "—"
+        ),
+    },
     {
       id: "invoice",
       header: t("finance.common.invoice"),
@@ -87,14 +104,7 @@ export default function PaymentsListPage() {
     {
       id: "receipt",
       header: t("finance.payments.list.receipt"),
-      renderCell: (row) =>
-        row.receipt_url ? (
-          <a href={row.receipt_url} target="_blank" rel="noopener noreferrer">
-            {t("finance.common.openReceipt")}
-          </a>
-        ) : (
-          "—"
-        ),
+      renderCell: (row) => (row.receipt_url ? <ReceiptButton paymentId={row.id} /> : "—"),
     },
   ];
 

@@ -232,11 +232,13 @@ async function loadDueSubscriptions(
       id: string;
       student_id: string;
       current_period_end: Date;
+      cancel_at_period_end: boolean;
       tap_card_id: string;
       tap_payment_agreement_id: string;
     }[]
   >`
-    SELECT id, student_id, current_period_end, tap_card_id, tap_payment_agreement_id
+    SELECT id, student_id, current_period_end, cancel_at_period_end, tap_card_id,
+           tap_payment_agreement_id
     FROM app.ai_subscriptions
     WHERE school_id = ${schoolId}::uuid
       AND status IN ('active', 'past_due')
@@ -260,7 +262,8 @@ async function loadDueSubscriptions(
       id: row.id,
       studentId: row.student_id,
       currentPeriodEnd: row.current_period_end,
-      cancelAtPeriodEnd: false,
+      // Set when a school seat covers the student (000163): the add-on ends instead of renewing.
+      cancelAtPeriodEnd: row.cancel_at_period_end,
       tapCardId: row.tap_card_id,
       tapPaymentAgreementId: row.tap_payment_agreement_id,
     })),

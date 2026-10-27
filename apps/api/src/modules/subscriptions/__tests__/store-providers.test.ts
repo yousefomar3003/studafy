@@ -166,6 +166,23 @@ describe("Google Play", () => {
     });
   });
 
+  test("cancels renewal against the v1 endpoint, addressed by the product Play reports", async () => {
+    const { store, calls } = playServing(purchase);
+
+    await store.cancel("tok");
+
+    expect(calls).toEqual([
+      {
+        method: "GET",
+        url: `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE}/purchases/subscriptionsv2/tokens/tok`,
+      },
+      {
+        method: "POST",
+        url: `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE}/purchases/subscriptions/studafy_ai_monthly/tokens/tok:cancel`,
+      },
+    ]);
+  });
+
   function push(payload: unknown, messageId = "msg-1") {
     return {
       message: {

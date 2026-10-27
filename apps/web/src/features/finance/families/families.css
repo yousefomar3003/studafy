@@ -1,0 +1,209 @@
+/**
+ * Family finance screens (list, family page, family payment). Loaded only when
+ * `/portal/finance/families*` is, matching the rest of the app (see `payments/payments.css`'s doc
+ * comment for why each feature owns its own stylesheet rather than importing a sibling's).
+ */
+
+/* --- Badge — the same pill as `payments/payments.css`'s status pill, duplicated for the same
+   lazy-loading reason documented there. --- */
+
+.families-badge {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface);
+  white-space: nowrap;
+}
+
+.families-badge[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.families-badge[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.families-badge[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+/* --- Header, toolbar, pagination --- */
+
+.families-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.families-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.families-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.families-pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+/* --- Cells --- */
+
+.families-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.families-cell__muted {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.families-children {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.families-children li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.families-money {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.families-overdue {
+  color: var(--color-danger-subtle-foreground);
+  font-weight: var(--font-weight-medium);
+}
+
+/* --- Family page --- */
+
+.families-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.families-detail h1,
+.families-detail h2 {
+  margin: 0;
+}
+
+.families-guardians {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.families-guardians li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.families-child__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-8);
+}
+
+.families-child__title h3 {
+  margin: 0;
+}
+
+.families-child .sf-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* --- Family payment --- */
+
+.families-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.families-form__amount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-8);
+  max-width: 480px;
+}
+
+.families-form__amount > :first-child {
+  flex: 1 1 240px;
+}
+
+.families-form__problem {
+  margin: 0;
+  color: var(--color-danger-subtle-foreground);
+}
+
+.families-share {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.families-share__input {
+  width: 8rem;
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font: inherit;
+  text-align: end;
+}
+
+.families-share__input:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.families-outcome {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.families-outcome[data-outcome="partial"],
+.families-outcome[data-outcome="failed"] {
+  color: var(--color-danger-subtle-foreground);
+}

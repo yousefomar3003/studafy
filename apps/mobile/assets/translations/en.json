@@ -785,6 +785,158 @@
     }
   },
   "teacher": {
+    "marks": {
+      "entry": {
+        "outOf": "Out of {max}",
+        "score": "Score",
+        "errorRange": "Enter 0–{max}",
+        "errorNumber": "Enter a number",
+        "missing": "Missing",
+        "retake": "Retake (attempt 2)",
+        "addRetake": "Add retake",
+        "statusMenu": "Mark status",
+        "markStatus": {
+          "graded": "Score",
+          "absent": "Absent",
+          "excused": "Excused",
+          "notApplicable": "Not applicable"
+        },
+        "clear": "Clear mark",
+        "cleared": "Will be cleared",
+        "unsaved": "Unsaved changes: {count}",
+        "fixErrors": "Fix the highlighted marks before saving.",
+        "allSaved": "All marks saved",
+        "save": "Save",
+        "saved": "Marks saved.",
+        "exempt": "Exempt from this subject",
+        "discardTitle": "Discard unsaved marks?",
+        "discardBody": "Your changes to this assessment haven't been saved.",
+        "discard": "Discard",
+        "keepEditing": "Keep editing"
+      },
+      "open": "Marks",
+      "openSubtitle": "Record marks by section and subject, then submit them for approval.",
+      "retry": "Try again",
+      "list": {
+        "title": "Marks",
+        "empty": "You aren't assigned to grade any subject this year.",
+        "error": "Couldn't load your subjects.",
+        "sectionLine": "{grade} · {section}",
+        "statusCount": "{status}: {count}"
+      },
+      "status": {
+        "draft": "Draft",
+        "submitted": "Awaiting approval",
+        "approved": "Approved",
+        "returned": "Returned",
+        "unknown": "Locked"
+      },
+      "period": {
+        "annual": "Annual"
+      },
+      "sheet": {
+        "error": "Couldn't load this mark sheet.",
+        "noPeriods": "No assessments are set up for this subject yet.",
+        "returned": "Returned by the reviewer: {reason}",
+        "returnedNoReason": "Returned by the reviewer. Correct the marks and submit again.",
+        "lockedSubmitted": "Submitted for approval. Marks for this period are read-only until they are approved or returned.",
+        "lockedApproved": "Approved. Marks for this period are locked; an administrator must reopen them before any change.",
+        "lockedUnknown": "Marks for this period are locked.",
+        "yearNotActive": "The grading year isn't active, so marks are read-only.",
+        "submittedOn": "Submitted {date}",
+        "decidedOn": "Reviewed {date}",
+        "submit": "Submit for approval",
+        "missingSummary": "Students with missing marks: {count}",
+        "allComplete": "Every student has a mark for each required assessment.",
+        "assessments": "Assessments",
+        "students": "Students",
+        "uncategorized": "Other",
+        "categoryWeight": "{name} · {weight}%",
+        "assessmentMeta": "Out of {max} · weight {weight}",
+        "recorded": "{count}/{total} recorded",
+        "missingCount": "Missing: {count}",
+        "optional": "Optional",
+        "proposed": "Awaiting approval",
+        "rejected": "Rejected",
+        "proposedHint": "Marks can be entered once this assessment is approved.",
+        "addAssessment": "Add assessment",
+        "noAssessmentsInPeriod": "No assessments in this period yet."
+      },
+      "preview": {
+        "subjectResult": "Subject result so far",
+        "provisional": "Provisional: {percentage}%",
+        "provisionalHint": "Not final — marks are still missing",
+        "noMarks": "No marks yet",
+        "passed": "Pass",
+        "failed": "Fail",
+        "incomplete": "Incomplete",
+        "exempt": "Exempt",
+        "missingInPeriod": "Missing marks: {count}"
+      },
+      "rules": {
+        "title": "Grading rules",
+        "method": "Method",
+        "methodWeighted": "Weighted categories",
+        "methodTotal": "Total points",
+        "maxMarks": "Maximum mark",
+        "passMark": "Pass mark",
+        "finalExamPass": "Final exam pass mark",
+        "percentValue": "{value}%",
+        "rounding": "Decimal places",
+        "missingPolicy": "Missing mark",
+        "absentPolicy": "Absence",
+        "policyIncomplete": "Result stays incomplete",
+        "policyZero": "Counts as zero",
+        "retakePolicy": "Retakes",
+        "retakeNone": "Not allowed",
+        "retakeReplace": "Retake replaces the first mark",
+        "retakeHighest": "The higher attempt counts",
+        "retakeCapped": "Retake counts, up to a cap",
+        "termWeights": "Term weights",
+        "categoryWeights": "Category weights",
+        "noWeight": "—",
+        "weightsInvalid": "These weights don't add up to 100%. Ask your school admin to correct the configuration.",
+        "instructions": "Instructions"
+      },
+      "errors": {
+        "locked": "These marks are locked — the period was submitted or the results are finalized.",
+        "outOfRange": "A mark is outside the allowed range.",
+        "conflict": "Someone else changed these marks. Reload to see the latest.",
+        "yearNotActive": "The grading year isn't active.",
+        "forbidden": "You're not allowed to grade this subject.",
+        "generic": "Something went wrong. Try again.",
+        "reload": "Reload"
+      },
+      "submit": {
+        "title": "Submit {period} for approval?",
+        "body": "Marks for this period will be locked until a reviewer approves or returns them.",
+        "confirm": "Submit",
+        "success": "Submitted for approval.",
+        "approved": "Submitted and approved.",
+        "incompleteTitle": "Marks are missing",
+        "incompleteBody": "Every student needs a mark for each required assessment before this period can be submitted:",
+        "ok": "OK"
+      },
+      "student": {
+        "periodMarks": "Marks in this period",
+        "byTerm": "By term",
+        "notRecorded": "Not recorded"
+      },
+      "addAssessment": {
+        "title": "Add assessment",
+        "name": "Name",
+        "nameRequired": "Enter a name.",
+        "category": "Category",
+        "maxMarks": "Maximum mark",
+        "weight": "Weight",
+        "positive": "Enter a number above 0.",
+        "mandatory": "Required for every student",
+        "submit": "Add",
+        "added": "Assessment added.",
+        "proposed": "Sent for approval. It can be marked once approved.",
+        "noCategory": "This period has no category that accepts new assessments."
+      }
+    },
     "home": {
       "attendance": {
         "take": "Take attendance",
@@ -1639,6 +1791,73 @@
         "materialIngestFailed": "File couldn't be prepared for AI",
         "directMessage": "Messages"
       }
+    }
+  },
+  "academicResults": {
+    "title": "Results",
+    "entry": "Official results",
+    "entrySubtitle": "Finalized results, certificates and report cards",
+    "error": "Couldn't load results.",
+    "unavailable": "Results aren't available for this account.",
+    "empty": "No finalized results yet. They appear here once the school finalizes them.",
+    "retry": "Try again",
+    "annual": "Annual result",
+    "sectionLine": "{grade} · {section}",
+    "finalizedOn": "Finalized {date}",
+    "version": "Corrected version {version}",
+    "average": "Average",
+    "total": "Total",
+    "grade": "Grade",
+    "failed": "Subjects failed",
+    "status": {
+      "promoted": "Promoted",
+      "supplementary": "Supplementary exams",
+      "retained": "Retained",
+      "incomplete": "Incomplete"
+    },
+    "subjects": "Subjects",
+    "subjectCol": "Subject",
+    "marksCol": "Marks",
+    "percentCol": "%",
+    "gradeCol": "Grade",
+    "pass": "Pass",
+    "fail": "Fail",
+    "exempt": "Exempt",
+    "subjectIncomplete": "Incomplete",
+    "byTerm": "By term",
+    "certificates": "Certificates and report cards",
+    "certificatesEmpty": "No certificates or report cards issued yet.",
+    "certificatesError": "Couldn't load certificates.",
+    "kind": {
+      "annualCertificate": "Certificate",
+      "termReport": "Report card"
+    },
+    "certStatus": {
+      "issued": "Issued",
+      "superseded": "Superseded",
+      "revoked": "Revoked"
+    },
+    "serial": "Serial no. {serial}",
+    "issuedOn": "Issued {date}",
+    "certificate": {
+      "error": "Couldn't load this document.",
+      "supersededBanner": "This document was replaced by a newer version and is no longer valid.",
+      "revokedBanner": "This document was revoked and is no longer valid.",
+      "revokedOn": "Revoked {date}",
+      "reason": "Reason: {reason}",
+      "needsReissue": "Results were corrected after this was issued. The school will issue an updated version.",
+      "reissueOf": "Reissue of {serial}",
+      "school": "School",
+      "year": "Academic year",
+      "term": "Term",
+      "student": "Student",
+      "admission": "Admission no.",
+      "section": "Grade and section",
+      "overall": "Overall result",
+      "issuedBy": "Issued by",
+      "issueDate": "Issue date",
+      "serialLabel": "Serial number",
+      "finalization": "Results version {version}, finalized {date}"
     }
   }
 }

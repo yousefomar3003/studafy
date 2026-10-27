@@ -238,21 +238,26 @@ class _McqInput extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final options = question.options ?? const [];
 
-    return Column(
-      children: [
-        for (final option in options)
-          RadioListTile<String>(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(option.text),
-            value: option.id,
-            groupValue: selectedOptionId,
-            onChanged: enabled ? (value) => onSelect(value!) : null,
-            secondary: result == null
-                ? null
-                : _optionOutcomeIcon(option.id, result!, colorScheme),
-          ),
-      ],
+    return RadioGroup<String>(
+      groupValue: selectedOptionId,
+      onChanged: (value) {
+        if (enabled && value != null) onSelect(value);
+      },
+      child: Column(
+        children: [
+          for (final option in options)
+            RadioListTile<String>(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(option.text),
+              value: option.id,
+              enabled: enabled,
+              secondary: result == null
+                  ? null
+                  : _optionOutcomeIcon(option.id, result!, colorScheme),
+            ),
+        ],
+      ),
     );
   }
 

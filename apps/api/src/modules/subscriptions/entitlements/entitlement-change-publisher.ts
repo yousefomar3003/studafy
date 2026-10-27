@@ -2,9 +2,10 @@ import { DOMAIN_EVENTS } from "@studafy/constants";
 
 import { emit } from "../../../lib/events/emitter";
 
-import { bumpEntitlementVersion } from "./version";
+import { bumpEntitlementVersion, bumpEntitlementVersions } from "./version";
 
 import type { EntitlementChangePublisher } from "@studafy/billing";
+import type { TransactionSql } from "postgres";
 
 /**
  * The API's entitlement change publisher, passed to the shared billing core (ST-133).
@@ -70,3 +71,55 @@ export const publishEntitlementChange: EntitlementChangePublisher = async (tx, c
     entitlementsVersion,
   });
 };
+
+/**
+ * A person's feature grants changed (docs/billing/feature-licensing.md): a personal subscription
+ * in app.user_subscriptions was written, or a license seat was assigned, unassigned, or its license
+ * changed.
+ *
+ * The same two writes as above, inside the caller's transaction: bump the user's version, emit the
+ * event carrying it. The API subscriber and the workers invalidator then floor `ent:usr:{userId}`,
+ * so the next feature check re-resolves. Every writer of a grant must call this in the transaction
+ * that writes the grant; a write that skips it is served stale for up to the cache TTL.
+ *
+ * Must run with `app.school_id` armed, like `bumpEntitlementVersion`.
+ */
+export async function publishUserEntitlementChange(
+  tx: TransactionSql,
+  change: { schoolId: string; userId: string },
+): Promise<number> {
+  const entitlementsVersion = await bumpEntitlementVersion(tx, "user", change.userId);
+
+  await emit(tx, DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED, {
+    schoolId: change.schoolId,
+    userId: change.userId,
+    entitlementsVersion,
+  });
+
+  return entitlementsVersion;
+}
+
+/**
+ * {@link publishUserEntitlementChange} for many people at once: one version bump statement, then one
+ * event per person (each validated, as every outbox event is). Used for license-wide changes, which
+ * move every seat holder of the license.
+ *
+ * @returns each person's new version, for a caller that also invalidates the cache directly once the
+ * transaction commits.
+ */
+export async function publishUserEntitlementChanges(
+  tx: TransactionSql,
+  change: { schoolId: string; userIds: readonly string[] },
+): Promise<Map<string, number>> {
+  const versions = await bumpEntitlementVersions(tx, "user", change.userIds);
+
+  for (const [userId, entitlementsVersion] of versions) {
+    await emit(tx, DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED, {
+      schoolId: change.schoolId,
+      userId,
+      entitlementsVersion,
+    });
+  }
+
+  return versions;
+}

@@ -6,7 +6,8 @@ import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
-import { getAiQuota } from "../gate/entitlement-gate";
+import { requireFeature } from "../../features/middleware";
+import { AI_FEATURE_ROUTE, aiTokenBudget, getAiQuota } from "../gate/token-budget";
 import { estimateQueryTokens } from "../retrieval/embeddings";
 import {
   createDeterministicCrossEncoderReranker,
@@ -176,6 +177,13 @@ export function aiRetrievalRoutes(deps: {
   // _decision_ to apply it is the flag's job, not construction's.
   const reranker: CrossEncoderReranker = createDeterministicCrossEncoderReranker();
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+  // Paid-feature gate, then the AI token budget (docs/billing/feature-licensing.md). A search is
+  // the tutor's retrieval step, not a message: checked, not counted.
+  routes.use(
+    "/api/ai/students/:studentId/search",
+    requireFeature("ai_tutor", AI_FEATURE_ROUTE),
+    aiTokenBudget(),
+  );
 
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to declare
   // its audit intent. This POST's one write is the metered student's own usage ledger; the

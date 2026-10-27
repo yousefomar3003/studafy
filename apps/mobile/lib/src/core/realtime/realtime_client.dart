@@ -81,16 +81,14 @@ class RealtimeClient {
     required this.baseUrl,
     required this.getToken,
     RealtimeSocketFactory? socketFactory,
-    RealtimeBackoff backoff = const RealtimeBackoff(),
+    this._backoff = const RealtimeBackoff(),
     Timer Function(Duration, void Function())? createTimer,
     double Function()? random,
-    int maxConnectFailures = _defaultMaxConnectFailures,
+    this._maxConnectFailures = _defaultMaxConnectFailures,
     AppLifecycleObserverFactory? lifecycleObserverFactory,
   }) : _socketFactory = socketFactory ?? createWebSocketChannelSocket,
-       _backoff = backoff,
        _createTimer = createTimer ?? Timer.new,
-       _random = random ?? Random().nextDouble,
-       _maxConnectFailures = maxConnectFailures {
+       _random = random ?? Random().nextDouble {
     _lifecycleObserver =
         (lifecycleObserverFactory ?? _createAppLifecycleListener)(
           onResume: _handleForeground,

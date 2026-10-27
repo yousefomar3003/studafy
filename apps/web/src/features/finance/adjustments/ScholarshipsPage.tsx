@@ -17,6 +17,7 @@ import {
   SCHOLARSHIPS_KEY,
   useSetScholarshipActive,
 } from "./scholarships-api";
+import { SiblingDiscountPanel } from "./SiblingDiscountPanel";
 
 import "./adjustments.css";
 
@@ -239,6 +240,8 @@ export default function ScholarshipsPage() {
           </div>
         ) : null}
       </div>
+
+      <SiblingDiscountPanel />
 
       <h2>{t("financeReports.adjustments.scholarships.awardsHeading")}</h2>
       <div className="adjustments-list__toolbar">

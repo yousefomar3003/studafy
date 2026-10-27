@@ -61,6 +61,15 @@ export default function InvoiceDetailPage() {
           <h1>{t("finance.invoices.detail.title", { number: invoice.erpnext_docname })}</h1>
           <p>
             {invoice.student_name} &middot; {invoice.admission_number}
+            {invoice.family_id ? (
+              <>
+                {" "}
+                &middot;{" "}
+                <Link to={`/portal/finance/families/${invoice.family_id}`}>
+                  {invoice.family_name}
+                </Link>
+              </>
+            ) : null}
           </p>
         </div>
         <div className="invoices-detail__header-actions invoices-detail__no-print">

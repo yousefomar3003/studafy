@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { errorHandlerMiddleware } from "../../../middleware/errorHandler";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import { aiSubscriberFeatureService } from "../../features/__tests__/fakes";
 import { LlmProviderError } from "../llm/provider";
 import { createDeterministicQueryEmbedder } from "../retrieval/embeddings";
 
@@ -16,7 +17,7 @@ import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { FlagsService } from "../../flags";
-import type { AiQuotaHandle } from "../gate/entitlement-gate";
+import type { AiQuotaHandle } from "../gate/token-budget";
 import type { LlmProvider, LlmStreamEvent } from "../llm/provider";
 import type { TransactionSql } from "postgres";
 
@@ -200,6 +201,7 @@ function buildAskApp(
     c.set("auth", auth);
     c.set("locale", "en");
     c.set("aiQuota", quota);
+    c.set("features", aiSubscriberFeatureService());
     await next();
   });
   app.route(

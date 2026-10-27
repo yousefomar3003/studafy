@@ -48,6 +48,7 @@ const store: StoreBilling = {
       throw new Error("must not be reached");
     },
     acknowledge: async () => undefined,
+    cancel: async () => undefined,
     parseNotification: () => {
       throw new StoreVerificationError("not a push");
     },

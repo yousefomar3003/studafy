@@ -7,6 +7,7 @@ import { hasPermission } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { familyCustomers } from "../reports/service";
+import { withStudentIdentityTx } from "../students/service";
 
 import { familyFinancialViewParamSchema, familyFinancialViewResponseSchema } from "./schemas";
 import { aggregateFamilyFinancialView } from "./service";
@@ -15,6 +16,7 @@ import type { Database } from "../../../db/client";
 import type { SupportedLocale } from "../../../middleware/locale";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { Context } from "hono";
+import type { TransactionSql } from "postgres";
 
 function tenantFrom(c: Context<AppEnv>) {
   const auth = requireAuth(c);
@@ -64,7 +66,14 @@ export function familyFinancialViewRoutes(
     const { familyId } = c.req.valid("param");
     const locale = c.get("locale") as SupportedLocale;
     const canViewAll = hasPermission(auth.roles, PERMISSIONS.REPORT_VIEW_FINANCIAL);
-    const view = await withTenantTx(database, tenantFrom(c), async (tx) => {
+    // Finance staff read any family, but cannot see app.students under their role-scope policy, so
+    // their read runs with the identity-only access every finance student lookup uses. A parent's
+    // read stays on their own tenant transaction, where RLS limits them to their own children.
+    const inTx = <T>(fn: (tx: TransactionSql) => Promise<T>) =>
+      canViewAll
+        ? withStudentIdentityTx(database, auth.schoolId, fn)
+        : withTenantTx(database, tenantFrom(c), fn);
+    const view = await inTx(async (tx) => {
       const family = await familyCustomers(tx, auth.schoolId, familyId, auth.userId, canViewAll);
       return aggregateFamilyFinancialView(
         tx,

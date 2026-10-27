@@ -788,6 +788,158 @@
     }
   },
   "teacher": {
+    "marks": {
+      "entry": {
+        "outOf": "من {max}",
+        "score": "الدرجة",
+        "errorRange": "أدخل قيمة من 0 إلى {max}",
+        "errorNumber": "أدخل رقمًا",
+        "missing": "ناقصة",
+        "retake": "إعادة (المحاولة الثانية)",
+        "addRetake": "إضافة إعادة",
+        "statusMenu": "حالة الدرجة",
+        "markStatus": {
+          "graded": "درجة",
+          "absent": "غائب",
+          "excused": "معذور",
+          "notApplicable": "لا ينطبق"
+        },
+        "clear": "مسح الدرجة",
+        "cleared": "ستُمسح",
+        "unsaved": "تغييرات غير محفوظة: {count}",
+        "fixErrors": "صحّح الدرجات المظلّلة قبل الحفظ.",
+        "allSaved": "حُفظت جميع الدرجات",
+        "save": "حفظ",
+        "saved": "حُفظت الدرجات.",
+        "exempt": "معفى من هذه المادة",
+        "discardTitle": "تجاهل الدرجات غير المحفوظة؟",
+        "discardBody": "لم تُحفظ تغييراتك على هذا التقييم.",
+        "discard": "تجاهل",
+        "keepEditing": "متابعة التعديل"
+      },
+      "open": "رصد الدرجات",
+      "openSubtitle": "ارصد الدرجات حسب الشعبة والمادة، ثم أرسلها للاعتماد.",
+      "retry": "إعادة المحاولة",
+      "list": {
+        "title": "رصد الدرجات",
+        "empty": "لم تُكلَّف برصد درجات أي مادة هذا العام.",
+        "error": "تعذّر تحميل موادك.",
+        "sectionLine": "{grade} · {section}",
+        "statusCount": "{status}: {count}"
+      },
+      "status": {
+        "draft": "مسوّدة",
+        "submitted": "بانتظار الاعتماد",
+        "approved": "معتمدة",
+        "returned": "مُعادة",
+        "unknown": "مقفلة"
+      },
+      "period": {
+        "annual": "سنوي"
+      },
+      "sheet": {
+        "error": "تعذّر تحميل كشف الدرجات هذا.",
+        "noPeriods": "لم تُعدّ أي تقييمات لهذه المادة بعد.",
+        "returned": "أعادها المراجع: {reason}",
+        "returnedNoReason": "أعادها المراجع. صحّح الدرجات ثم أرسلها مجددًا.",
+        "lockedSubmitted": "أُرسلت للاعتماد. درجات هذه الفترة للقراءة فقط إلى أن تُعتمد أو تُعاد.",
+        "lockedApproved": "معتمدة. درجات هذه الفترة مقفلة، ولا يمكن تعديلها إلا بعد أن يعيد المسؤول فتحها.",
+        "lockedUnknown": "درجات هذه الفترة مقفلة.",
+        "yearNotActive": "العام الدراسي للتقييم غير مفعّل، لذا فالدرجات للقراءة فقط.",
+        "submittedOn": "أُرسلت في {date}",
+        "decidedOn": "رُوجعت في {date}",
+        "submit": "إرسال للاعتماد",
+        "missingSummary": "طلاب لديهم درجات ناقصة: {count}",
+        "allComplete": "لكل طالب درجة في كل تقييم إلزامي.",
+        "assessments": "التقييمات",
+        "students": "الطلاب",
+        "uncategorized": "أخرى",
+        "categoryWeight": "{name} · {weight}%",
+        "assessmentMeta": "من {max} · الوزن {weight}",
+        "recorded": "رُصد {count} من {total}",
+        "missingCount": "ناقصة: {count}",
+        "optional": "اختياري",
+        "proposed": "بانتظار الاعتماد",
+        "rejected": "مرفوض",
+        "proposedHint": "يمكن رصد الدرجات بعد اعتماد هذا التقييم.",
+        "addAssessment": "إضافة تقييم",
+        "noAssessmentsInPeriod": "لا توجد تقييمات في هذه الفترة بعد."
+      },
+      "preview": {
+        "subjectResult": "نتيجة المادة حتى الآن",
+        "provisional": "مؤقتة: {percentage}%",
+        "provisionalHint": "ليست نهائية — ما زالت هناك درجات ناقصة",
+        "noMarks": "لا توجد درجات بعد",
+        "passed": "ناجح",
+        "failed": "راسب",
+        "incomplete": "غير مكتملة",
+        "exempt": "معفى",
+        "missingInPeriod": "درجات ناقصة: {count}"
+      },
+      "rules": {
+        "title": "قواعد التقييم",
+        "method": "طريقة الحساب",
+        "methodWeighted": "فئات موزونة",
+        "methodTotal": "مجموع النقاط",
+        "maxMarks": "الدرجة العظمى",
+        "passMark": "درجة النجاح",
+        "finalExamPass": "درجة النجاح في الامتحان النهائي",
+        "percentValue": "{value}%",
+        "rounding": "المنازل العشرية",
+        "missingPolicy": "الدرجة غير المرصودة",
+        "absentPolicy": "الغياب",
+        "policyIncomplete": "تبقى النتيجة غير مكتملة",
+        "policyZero": "تُحتسب صفرًا",
+        "retakePolicy": "إعادة التقييم",
+        "retakeNone": "غير مسموحة",
+        "retakeReplace": "تحلّ درجة الإعادة محل الدرجة الأولى",
+        "retakeHighest": "تُحتسب الدرجة الأعلى من المحاولتين",
+        "retakeCapped": "تُحتسب درجة الإعادة بحدّ أقصى",
+        "termWeights": "أوزان الفصول",
+        "categoryWeights": "أوزان الفئات",
+        "noWeight": "—",
+        "weightsInvalid": "مجموع هذه الأوزان لا يساوي 100%. اطلب من مسؤول المدرسة تصحيح الإعدادات.",
+        "instructions": "التعليمات"
+      },
+      "errors": {
+        "locked": "هذه الدرجات مقفلة — فقد أُرسلت الفترة للاعتماد أو اعتُمدت النتائج نهائيًا.",
+        "outOfRange": "إحدى الدرجات خارج النطاق المسموح.",
+        "conflict": "عدّل شخص آخر هذه الدرجات. أعد التحميل لعرض أحدث نسخة.",
+        "yearNotActive": "العام الدراسي للتقييم غير مفعّل.",
+        "forbidden": "لا تملك صلاحية رصد درجات هذه المادة.",
+        "generic": "حدث خطأ ما. حاول مرة أخرى.",
+        "reload": "إعادة التحميل"
+      },
+      "submit": {
+        "title": "إرسال درجات {period} للاعتماد؟",
+        "body": "ستُقفل درجات هذه الفترة إلى أن يعتمدها المراجع أو يعيدها.",
+        "confirm": "إرسال",
+        "success": "أُرسلت للاعتماد.",
+        "approved": "أُرسلت واعتُمدت.",
+        "incompleteTitle": "توجد درجات ناقصة",
+        "incompleteBody": "يجب أن يكون لكل طالب درجة في كل تقييم إلزامي قبل إرسال هذه الفترة:",
+        "ok": "حسنًا"
+      },
+      "student": {
+        "periodMarks": "الدرجات في هذه الفترة",
+        "byTerm": "حسب الفصل",
+        "notRecorded": "غير مرصودة"
+      },
+      "addAssessment": {
+        "title": "إضافة تقييم",
+        "name": "الاسم",
+        "nameRequired": "أدخل اسمًا.",
+        "category": "الفئة",
+        "maxMarks": "الدرجة العظمى",
+        "weight": "الوزن",
+        "positive": "أدخل رقمًا أكبر من 0.",
+        "mandatory": "إلزامي لجميع الطلاب",
+        "submit": "إضافة",
+        "added": "أُضيف التقييم.",
+        "proposed": "أُرسل للاعتماد، ويمكن رصد درجاته بعد اعتماده.",
+        "noCategory": "لا توجد في هذه الفترة فئة تقبل تقييمات جديدة."
+      }
+    },
     "home": {
       "attendance": {
         "take": "أخذ الحضور",
@@ -1642,6 +1794,73 @@
         "materialIngestFailed": "تعذّر تجهيز الملف للذكاء الاصطناعي",
         "directMessage": "الرسائل"
       }
+    }
+  },
+  "academicResults": {
+    "title": "النتائج",
+    "entry": "النتائج الرسمية",
+    "entrySubtitle": "النتائج المعتمدة والشهادات وبطاقات التقارير",
+    "error": "تعذّر تحميل النتائج.",
+    "unavailable": "النتائج غير متاحة لهذا الحساب.",
+    "empty": "لا توجد نتائج معتمدة بعد. ستظهر هنا بعد أن تعتمدها المدرسة.",
+    "retry": "إعادة المحاولة",
+    "annual": "النتيجة السنوية",
+    "sectionLine": "{grade} · {section}",
+    "finalizedOn": "اعتُمدت في {date}",
+    "version": "النسخة المصحّحة {version}",
+    "average": "المعدل",
+    "total": "المجموع",
+    "grade": "التقدير",
+    "failed": "مواد الرسوب",
+    "status": {
+      "promoted": "ناجح ومنقول",
+      "supplementary": "دور ثانٍ",
+      "retained": "باقٍ للإعادة",
+      "incomplete": "غير مكتملة"
+    },
+    "subjects": "المواد",
+    "subjectCol": "المادة",
+    "marksCol": "الدرجة",
+    "percentCol": "%",
+    "gradeCol": "التقدير",
+    "pass": "ناجح",
+    "fail": "راسب",
+    "exempt": "معفى",
+    "subjectIncomplete": "غير مكتملة",
+    "byTerm": "حسب الفصل",
+    "certificates": "الشهادات وبطاقات التقارير",
+    "certificatesEmpty": "لم تصدر أي شهادات أو بطاقات تقارير بعد.",
+    "certificatesError": "تعذّر تحميل الشهادات.",
+    "kind": {
+      "annualCertificate": "شهادة",
+      "termReport": "بطاقة تقرير"
+    },
+    "certStatus": {
+      "issued": "صادرة",
+      "superseded": "مُستبدَلة",
+      "revoked": "ملغاة"
+    },
+    "serial": "الرقم التسلسلي {serial}",
+    "issuedOn": "صدرت في {date}",
+    "certificate": {
+      "error": "تعذّر تحميل هذه الوثيقة.",
+      "supersededBanner": "استُبدلت هذه الوثيقة بنسخة أحدث ولم تعد سارية.",
+      "revokedBanner": "أُلغيت هذه الوثيقة ولم تعد سارية.",
+      "revokedOn": "أُلغيت في {date}",
+      "reason": "السبب: {reason}",
+      "needsReissue": "صُحّحت النتائج بعد إصدار هذه الوثيقة، وستُصدر المدرسة نسخة محدّثة.",
+      "reissueOf": "إعادة إصدار للوثيقة {serial}",
+      "school": "المدرسة",
+      "year": "العام الدراسي",
+      "term": "الفصل",
+      "student": "الطالب",
+      "admission": "رقم القيد",
+      "section": "الصف والشعبة",
+      "overall": "النتيجة العامة",
+      "issuedBy": "أصدرها",
+      "issueDate": "تاريخ الإصدار",
+      "serialLabel": "الرقم التسلسلي",
+      "finalization": "نسخة النتائج {version}، اعتُمدت في {date}"
     }
   }
 }

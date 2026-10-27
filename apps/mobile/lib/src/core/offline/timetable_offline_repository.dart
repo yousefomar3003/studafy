@@ -11,9 +11,8 @@ import 'offline_database.dart';
 class TimetableOfflineRepository {
   TimetableOfflineRepository({
     required OfflineDatabase database,
-    required TimetableClient client,
-  }) : _client = client,
-       _slotsCache = OfflineCachedResource<List<TimetableSlot>>(
+    required this._client,
+  }) : _slotsCache = OfflineCachedResource<List<TimetableSlot>>(
          database: database,
          resource: 'timetable_slots',
          encode: (slots) => slots.map((slot) => slot.toJson()).toList(),

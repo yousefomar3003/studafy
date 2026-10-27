@@ -64,6 +64,14 @@ describe("agingBuckets", () => {
     expect(agingBuckets(positional).map((bucket) => bucket.total)).toEqual([125, 50, 0, 0]);
   });
 
+  test("does not count ERPNext's appended total row a second time", () => {
+    const withTotalRow = report({
+      columns: arAgingReport.columns,
+      rows: [...arAgingReport.rows, ["", 125, 50, 0, 0]],
+    });
+    expect(agingBuckets(withTotalRow).map((bucket) => bucket.total)).toEqual([125, 50, 0, 0]);
+  });
+
   test("ignores non-currency and non-range columns", () => {
     const withExtras = report({
       columns: [
@@ -201,6 +209,29 @@ describe("reportSummaryCards", () => {
       { label: "Collected", display: "500.000" },
       { label: "", display: "42.000" },
     ]);
+  });
+
+  test("falls back to ERPNext's own total row when the report has no summary", () => {
+    const columns = ["voucher_no", "invoiced", "paid", "outstanding", "currency"].map(
+      (fieldname) => ({ fieldname, fieldtype: "Data", label: fieldname }),
+    );
+    const receivables = report({
+      columns,
+      rows: [
+        { voucher_no: "SINV-1", invoiced: 3000, paid: 200, outstanding: 2800, currency: "JOD" },
+        ["", 3330, 260, 3070, "JOD"],
+      ],
+    });
+
+    expect(reportSummaryCards(receivables)).toEqual([
+      { label: "", labelKey: "finance.tiles.collections.invoiced", display: "3330.000 JOD" },
+      { label: "", labelKey: "finance.tiles.collections.collected", display: "260.000 JOD" },
+      { label: "", labelKey: "finance.tiles.collections.outstanding", display: "3070.000 JOD" },
+    ]);
+  });
+
+  test("shows nothing when there is neither a summary nor a total row", () => {
+    expect(reportSummaryCards(report({ rows: [{ voucher_no: "SINV-1" }] }))).toEqual([]);
   });
 });
 

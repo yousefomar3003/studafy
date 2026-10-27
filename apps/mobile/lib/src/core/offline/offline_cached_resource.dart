@@ -11,14 +11,11 @@ import 'offline_database.dart';
 /// this policy themselves.
 class OfflineCachedResource<T> {
   OfflineCachedResource({
-    required OfflineDatabase database,
-    required String resource,
-    required Object? Function(T value) encode,
-    required T Function(Object? json) decode,
-  }) : _database = database,
-       _resource = resource,
-       _encode = encode,
-       _decode = decode;
+    required this._database,
+    required this._resource,
+    required this._encode,
+    required this._decode,
+  });
 
   final OfflineDatabase _database;
   final String _resource;

@@ -147,8 +147,9 @@ export const paymentSchema = z
       .nullable()
       .openapi({
         description:
-          "ERPNext-generated receipt link, available once confirmed. Never a signed or " +
-          "credential-bearing URL.",
+          "Path of the payment's PDF receipt on this API (`GET " +
+          "/api/finance/payments/{paymentId}/receipt`), present once the payment is confirmed. " +
+          "Relative to the API origin and fetched with the caller's own bearer token.",
       }),
     payment_date: z.string().openapi({ description: "ERPNext posting date (YYYY-MM-DD)." }),
     confirmed_at: dateTimeSchema
@@ -158,9 +159,19 @@ export const paymentSchema = z
   })
   .openapi("Payment");
 
+export const paymentListItemSchema = paymentSchema
+  .extend({
+    student_name: z.string(),
+    family_id: uuidSchema.nullable().openapi({
+      description: "The student's family, for finance's family view; null when none is linked.",
+    }),
+    family_name: z.string().nullable(),
+  })
+  .openapi("PaymentListItem");
+
 export const paymentListSchema = z
   .object({
-    payments: z.array(paymentSchema),
+    payments: z.array(paymentListItemSchema),
     total: z.number().int(),
   })
   .openapi("PaymentList");

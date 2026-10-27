@@ -25,17 +25,20 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 
-import { withTenantTx } from "../../../db/tenant-tx";
+import { setTenantScope, withSystemTx, withTenantTx } from "../../../db/tenant-tx";
 import { verifyWebhookSignature, webhookSignatureFrom } from "../../../erpnext/signature";
 import { auditAction, emitAuditLog } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { notifyPaymentReceived } from "../communications/service";
+import { refreshInvoicesSettledBy } from "../invoices/refresh";
 import { projectPaymentEntry } from "../payments/projection";
 import { paymentConfirmedWebhookSchema, webhookAcceptedSchema } from "../payments/schemas";
 
 import type { Database } from "../../../db/client";
 import type { Logger } from "../../../logger";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { TenantErpNextFactory } from "../client/tenant-client";
 import type { ErpNextPaymentEntry } from "../payments/projection";
 
 const WEBHOOK_PATH = "/api/finance/webhooks/erpnext/payment-confirmed";
@@ -84,7 +87,11 @@ const paymentConfirmedRoute = createRoute({
  * OpenAPI definitions while still serving its traffic, which would erase this endpoint from the
  * published document with no error anywhere.
  */
-export function paymentWebhookRoutes(database: Database, logger: Logger): OpenAPIHono<AppEnv> {
+export function paymentWebhookRoutes(
+  database: Database,
+  logger: Logger,
+  erpnextFactory: TenantErpNextFactory | null,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use(WEBHOOK_PATH, auditAction("update", "payment_cache"));
@@ -139,6 +146,7 @@ export function paymentWebhookRoutes(database: Database, logger: Logger): OpenAP
       throw new HTTPException(400, { message: "Webhook payload is missing school_id" });
     }
 
+    let confirmed = false;
     try {
       await withTenantTx(database, { schoolId, requestId: c.get("requestId") }, async (tx) => {
         const dedup = await tx<{ id: string }[]>`
@@ -154,6 +162,7 @@ export function paymentWebhookRoutes(database: Database, logger: Logger): OpenAP
 
         const projected = await projectPaymentEntry(tx, schoolId, doc, logger);
         if (!projected) return;
+        confirmed = projected.status === "confirmed";
 
         await emitAuditLog(tx, {
           action: "update",
@@ -178,6 +187,26 @@ export function paymentWebhookRoutes(database: Database, logger: Logger): OpenAP
       // the line above, correlated by request_id. A 500 is correct here: ERPNext *should* retry a
       // failure that was ours.
       throw new HTTPException(500, { message: "Payment webhook ingestion failed" });
+    }
+
+    // After the commit, and best-effort: the payment is recorded whatever happens here. The paid
+    // invoices' balances are re-read from ERPNext (see refreshInvoicesSettledBy), then the student's
+    // guardians are told; app.finance_communications keeps that to one notice per guardian.
+    if (confirmed) {
+      if (erpnextFactory) {
+        await refreshInvoicesSettledBy(database, erpnextFactory, schoolId, doc, logger);
+      }
+      const docname = doc.name?.trim();
+      if (docname) {
+        try {
+          await withSystemTx(database, async (tx) => {
+            await setTenantScope(tx, schoolId);
+            await notifyPaymentReceived(tx, schoolId, docname);
+          });
+        } catch (err) {
+          logger.error({ err, school_id: schoolId, erpnext_docname: docname }, "fee notice failed");
+        }
+      }
     }
 
     return c.json({ ok: true } as const, 200);

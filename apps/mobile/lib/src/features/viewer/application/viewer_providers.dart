@@ -5,9 +5,9 @@ import '../../../core/api/auth_interceptor.dart';
 import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/api/generated/models/attendance_report_metrics.dart';
 import '../../../core/api/generated/models/group_by.dart';
-import '../../../core/api/generated/models/status15.dart';
-import '../../../core/api/generated/models/status17.dart';
+import '../../../core/api/generated/models/status16.dart';
 import '../../../core/api/generated/models/status18.dart';
+import '../../../core/api/generated/models/status19.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../core/offline/announcements_offline_repository.dart';
@@ -49,9 +49,9 @@ final viewerAttendanceOverviewProvider =
 /// `OPEN_DISCIPLINE_STATUSES` in `apps/web/src/features/principal/queries.ts`. `resolved` and
 /// `closed` are done; everything else still needs attention.
 const _openDisciplineStatuses = [
-  Status17.reported,
-  Status17.underReview,
-  Status17.escalated,
+  Status18.reported,
+  Status18.underReview,
+  Status18.escalated,
 ];
 
 /// Count of open discipline incidents, school-wide. One `limit: 1` request per status just to
@@ -71,7 +71,7 @@ final viewerDraftEvaluationsCountProvider = FutureProvider<int>((ref) async {
   final list = await ref
       .watch(apiClientProvider)
       .evaluations
-      .listEvaluations(status: Status18.draft, limit: 1, offset: 0);
+      .listEvaluations(status: Status19.draft, limit: 1, offset: 0);
   return list.total;
 });
 
@@ -99,7 +99,7 @@ final viewerRecentAnnouncementsProvider =
 
       if (ref.watch(viewerRoleProvider) == ViewerRole.admin) {
         final list = await api.announcements.listAnnouncements(
-          status: Status15.published,
+          status: Status16.published,
           limit: _viewerAnnouncementsLimit,
         );
         return [

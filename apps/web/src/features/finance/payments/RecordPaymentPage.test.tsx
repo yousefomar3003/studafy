@@ -1,6 +1,6 @@
 import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
@@ -52,7 +52,7 @@ const CONFIRMED_PAYMENT = {
   ...CREATED_PAYMENT,
   status: "confirmed",
   erpnext_status: "Submitted",
-  receipt_url: "https://erpnext.example.com/receipts/payment-1",
+  receipt_url: "/api/finance/payments/payment-1/receipt",
   confirmed_at: "2026-08-21T00:01:00.000Z",
 };
 
@@ -62,6 +62,9 @@ const getMock = mock((path: string) => {
   }
   if (path === "/api/finance/payments/{paymentId}") {
     return Promise.resolve({ data: CONFIRMED_PAYMENT });
+  }
+  if (path === "/api/finance/payments/{paymentId}/receipt") {
+    return Promise.resolve({ data: new Blob(["%PDF-"], { type: "application/pdf" }) });
   }
   return Promise.resolve({ data: undefined });
 });
@@ -146,8 +149,24 @@ describe("RecordPaymentPage", () => {
     });
     expect(init.params.header["idempotency-key"]).toBeTruthy();
 
-    const receiptLink = await screen.findByRole("link", { name: "Open receipt" });
-    expect(receiptLink.getAttribute("href")).toBe("https://erpnext.example.com/receipts/payment-1");
+    // The receipt sits behind the API's bearer auth, so it is fetched, not linked: the button opens
+    // a tab inside the click and loads the PDF into it.
+    const tab = { location: { href: "" }, close: mock(() => undefined) };
+    const openSpy = mock(() => tab);
+    const originalOpen = window.open;
+    window.open = openSpy as unknown as typeof window.open;
+    try {
+      fireEvent.click(await screen.findByRole("button", { name: "Open receipt" }));
+      await waitFor(() => expect(tab.location.href).toStartWith("blob:"));
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      const receiptCall = getMock.mock.calls.find(
+        ([path]) => path === "/api/finance/payments/{paymentId}/receipt",
+      ) as unknown as [string, { params: { path: { paymentId: string } }; parseAs: string }];
+      expect(receiptCall[1].params.path.paymentId).toBe("payment-1");
+      expect(receiptCall[1].parseAs).toBe("blob");
+    } finally {
+      window.open = originalOpen;
+    }
   });
 
   test("double-clicking submit records the payment exactly once", async () => {

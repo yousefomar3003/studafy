@@ -42,6 +42,7 @@ const FINANCE_LINKS = [
   { key: "fees", to: "/portal/finance/fees", managementOnly: true },
   { key: "invoices", to: "/portal/finance/invoices", managementOnly: true },
   { key: "payments", to: "/portal/finance/payments", managementOnly: true },
+  { key: "families", to: "/portal/finance/families", managementOnly: false },
   { key: "refunds", to: "/portal/finance/adjustments/refunds", managementOnly: false },
   { key: "scholarships", to: "/portal/finance/scholarships", managementOnly: false },
   { key: "reports", to: "/portal/finance/reports", managementOnly: false },
@@ -71,7 +72,7 @@ export default function FinanceDashboardPage() {
     status === "ready" && cards.length > 0
       ? cards.map((card, index) => ({
           key: `collections-${index}`,
-          label: card.label || "—",
+          label: card.labelKey ? t(card.labelKey) : card.label || "—",
           value: card.display,
           hint: t("finance.home.stats.thisTerm"),
           to: "/portal/finance/reports",

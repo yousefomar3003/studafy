@@ -94,10 +94,10 @@ class _CellDraft {
 /// re-resolves the world without discarding un-flushed keystrokes.
 class GradeEntryController extends ChangeNotifier {
   GradeEntryController({
-    required GradeEntryClient client,
+    required this._client,
     required this.gradebookId,
     this.debounce = const Duration(milliseconds: 1200),
-  }) : _client = client;
+  });
 
   final GradeEntryClient _client;
   final String gradebookId;

@@ -11,6 +11,8 @@ import { COST_METRIC_NAMESPACE, runCostReport } from "./cost-report";
 import { runDunningSweep } from "./dunning-sweep";
 import { runFinanceReconciliation } from "./finance-reconciliation";
 import { generateInvoice, generateBatchInvoices } from "./invoice.service";
+import { runLicenseLifecycle } from "./license-lifecycle";
+import { runLicenseReminders } from "./license-reminders";
 import {
   generateInvoiceSchema,
   generateBatchInvoicesSchema,
@@ -21,6 +23,7 @@ import { runStorageQuotaReconciliation } from "./storage-quota-reconciliation";
 import { createStorageQuotaS3 } from "./storage-quota-s3";
 import { StripeSeatSubscriptionProvider } from "./stripe-seat-provider";
 import { runTapRenewals } from "./tap-renewal";
+import { runUsagePeriodStart } from "./usage-period-start";
 
 import type {
   BillingJobData,
@@ -131,7 +134,33 @@ export async function processBillingJob(
     return processCostReport(databaseUrl, mode);
   }
 
+  // School license jobs (session 3 of docs/billing/feature-licensing.md). No payload, their own
+  // postgres connection, one system tenant transaction per school -- the dunning sweep's shape.
+  if (
+    job.name === JOB_NAMES.RUN_LICENSE_LIFECYCLE ||
+    job.name === JOB_NAMES.RUN_LICENSE_REMINDERS ||
+    job.name === JOB_NAMES.RUN_USAGE_PERIOD_START
+  ) {
+    return processLicenseJob(job.name, databaseUrl);
+  }
+
   return { processed: false, reason: "unknown billing job" };
+}
+
+async function processLicenseJob(name: string, databaseUrl: string): Promise<unknown> {
+  const sql = postgres(databaseUrl, { max: 2 });
+  try {
+    const now = new Date();
+    if (name === JOB_NAMES.RUN_LICENSE_LIFECYCLE) {
+      return await runLicenseLifecycle(sql, now, workerLogger);
+    }
+    if (name === JOB_NAMES.RUN_LICENSE_REMINDERS) {
+      return await runLicenseReminders(sql, now, workerLogger);
+    }
+    return await runUsagePeriodStart(sql, now, workerLogger);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }
 
 async function processTapRenewals(databaseUrl: string): Promise<unknown> {

@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { errorHandlerMiddleware } from "../../../middleware/errorHandler";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import { aiSubscriberFeatureService } from "../../features/__tests__/fakes";
 import { AI_LLM_DEFAULT_SMALL_MODEL } from "../config";
 import { LlmProviderError } from "../llm/provider";
 
@@ -15,7 +16,7 @@ import type { Database } from "../../../db/client";
 import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { AiQuotaHandle } from "../gate/entitlement-gate";
+import type { AiQuotaHandle } from "../gate/token-budget";
 import type { LlmGenerateInput, LlmGeneration, LlmProvider } from "../llm/provider";
 
 const SCHOOL_ID = "00000000-0000-4000-8000-000000000001";
@@ -246,6 +247,7 @@ function buildFlashcardApp(
     c.set("auth", auth);
     c.set("locale", "en");
     c.set("aiQuota", over.handle ?? quotaHandle());
+    c.set("features", aiSubscriberFeatureService());
     await next();
   });
   app.route(

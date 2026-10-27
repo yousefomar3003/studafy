@@ -53,6 +53,29 @@ export const NOTIFICATION_TYPES = {
   // Optional (a recipient may disable it) and immediate-only. Mirrored in app.notification_type by
   // migration 000126.
   DIRECT_MESSAGE: "DIRECT_MESSAGE",
+  // Fee notices to a student's guardians, written by apps/api/src/modules/finance/communications.
+  // The first two are automatic (from ERPNext's invoice and payment webhooks), the last two are sent
+  // by finance from a family's page. Every one is optional and immediate-only, and
+  // app.finance_communications (000153) keeps each to a single send. Mirrored in
+  // app.notification_type by migration 000152.
+  FEE_INVOICE_ISSUED: "FEE_INVOICE_ISSUED",
+  FEE_PAYMENT_RECEIVED: "FEE_PAYMENT_RECEIVED",
+  FEE_PAYMENT_REMINDER: "FEE_PAYMENT_REMINDER",
+  FEE_STATEMENT: "FEE_STATEMENT",
+  // A student, teacher or parent with an App Store subscription received a school seat that covers
+  // it. Apple renewals cannot be stopped from our server, so this tells them how to turn renewal off
+  // themselves (docs/billing/feature-licensing.md). Optional and immediate-only. Written by
+  // apps/api/src/modules/licensing; mirrored in app.notification_type by migration 000164.
+  LICENSE_SEAT_APPLE_RENEWAL: "LICENSE_SEAT_APPLE_RENEWAL",
+  // License billing reminders (session 3), written in-app by the workers' license reminder job to the
+  // super admins and the school's admins and principals: a license ending in 30 and in 7 days, an
+  // invoice due today, an invoice overdue; and to the super admins, a transfer receipt the school
+  // uploaded. Optional and immediate-only; app.license_reminders keeps each to one send. Mirrored in
+  // app.notification_type by migration 000166.
+  LICENSE_EXPIRING: "LICENSE_EXPIRING",
+  LICENSE_INVOICE_DUE: "LICENSE_INVOICE_DUE",
+  LICENSE_INVOICE_OVERDUE: "LICENSE_INVOICE_OVERDUE",
+  LICENSE_RECEIPT_UPLOADED: "LICENSE_RECEIPT_UPLOADED",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

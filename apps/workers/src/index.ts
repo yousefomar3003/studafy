@@ -15,6 +15,7 @@ import {
   scheduleCostReportJobs,
   scheduleDunningJob,
   scheduleTapRenewalJob,
+  scheduleLicenseJobs,
   scheduleSeatReconciliationJob,
   scheduleStorageQuotaReconciliationJob,
   scheduleFinanceReconciliationJob,
@@ -183,6 +184,12 @@ void scheduleDunningJob(dunningRedis).then(() => dunningRedis.disconnect());
 // the dunning sweep so tonight's exhausted renewals are already in grace when it runs.
 const tapRenewalRedis = createRedisConnection(env);
 void scheduleTapRenewalJob(tapRenewalRedis).then(() => tapRenewalRedis.disconnect());
+
+// School license schedulers (docs/billing/feature-licensing.md, session 3): idempotently register the
+// hourly lifecycle run (:05; expire licenses and quotes, mark invoices overdue), the hourly reminders
+// (:20, after it) and the monthly usage-period start (00:05 on the 1st) on the billing queue.
+const licenseJobsRedis = createRedisConnection(env);
+void scheduleLicenseJobs(licenseJobsRedis).then(() => licenseJobsRedis.disconnect());
 
 // Seat-reconciliation scheduler (ST-136): idempotently register the daily 05:00 seat sweep on the
 // billing queue, an hour after the dunning sweep so a school suspended overnight is no longer

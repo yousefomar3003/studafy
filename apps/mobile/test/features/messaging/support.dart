@@ -301,8 +301,9 @@ class FakeMessagingClient extends Fake implements MessagingClient {
       ],
     );
     final stored = messages[conversationId] ??= [];
-    if (!stored.any((existing) => existing.id == message.id))
+    if (!stored.any((existing) => existing.id == message.id)) {
       stored.add(message);
+    }
     return message;
   }
 

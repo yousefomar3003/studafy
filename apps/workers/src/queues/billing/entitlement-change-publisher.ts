@@ -61,7 +61,7 @@ export const publishEntitlementChange: EntitlementChangePublisher = async (tx, c
  */
 async function bumpVersion(
   tx: TransactionSql,
-  subject: "school" | "ai",
+  subject: "school" | "ai" | "user",
   subjectId: string,
 ): Promise<number> {
   const [row] = await tx<{ version: string }[]>`
@@ -86,7 +86,31 @@ async function bumpVersion(
 }
 
 /**
- * The two payload shapes, spelled out rather than widened to `Record<string, unknown>` — `tx.json`
+ * A person's grants changed (a school license expired under their seat): bump each person's `user`
+ * version and write `userEntitlement.changed` for them, in the caller's transaction. Mirrors
+ * `publishUserEntitlementChanges` in apps/api's entitlement-change-publisher.ts, payload included
+ * (`eventPayloadSchemas[DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED]`).
+ */
+export async function publishUserEntitlementChanges(
+  tx: TransactionSql,
+  schoolId: string,
+  userIds: readonly string[],
+): Promise<Map<string, number>> {
+  const versions = new Map<string, number>();
+  for (const userId of new Set(userIds)) {
+    const entitlementsVersion = await bumpVersion(tx, "user", userId);
+    await insertOutboxRow(tx, schoolId, DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED, {
+      schoolId,
+      userId,
+      entitlementsVersion,
+    });
+    versions.set(userId, entitlementsVersion);
+  }
+  return versions;
+}
+
+/**
+ * The payload shapes, spelled out rather than widened to `Record<string, unknown>` — `tx.json`
  * only accepts a structurally JSON-serializable type, and that check is worth keeping.
  */
 type EntitlementEventPayload =
@@ -104,7 +128,8 @@ type EntitlementEventPayload =
       previousStatus: string;
       status: string;
       entitlementsVersion: number;
-    };
+    }
+  | { schoolId: string; userId: string; entitlementsVersion: number };
 
 async function insertOutboxRow(
   tx: TransactionSql,

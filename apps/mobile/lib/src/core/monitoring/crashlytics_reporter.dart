@@ -12,7 +12,7 @@ import 'pii_scrubber.dart';
 /// free-text fields this class controls directly ([addBreadcrumb]'s message, [recordError]'s
 /// reason).
 class FirebaseCrashlyticsReporter implements CrashReporter {
-  FirebaseCrashlyticsReporter({PiiScrubber scrubber = const PiiScrubber()}) : _scrubber = scrubber;
+  FirebaseCrashlyticsReporter({this._scrubber = const PiiScrubber()});
 
   final PiiScrubber _scrubber;
 

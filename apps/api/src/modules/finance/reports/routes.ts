@@ -11,6 +11,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { hasPermission, requirePermission } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
+import { withStudentIdentityTx } from "../students/service";
 
 import {
   arAgingQuerySchema,
@@ -49,6 +50,7 @@ import type { AppEnv } from "../../../middleware/requestId";
 import type { RedisClient } from "../../../redis";
 import type { TenantErpNextFactory } from "../client/tenant-client";
 import type { Context } from "hono";
+import type { TransactionSql } from "postgres";
 
 function tenantFrom(c: Context<AppEnv>) {
   const auth = requireAuth(c);
@@ -321,7 +323,14 @@ export function financeReportRoutes(
     const query = c.req.valid("query");
     const locale = c.get("locale") as SupportedLocale;
     const canViewAll = hasPermission(auth.roles, PERMISSIONS.REPORT_VIEW_FINANCIAL);
-    const result = await withTenantTx(database, tenantFrom(c), async (tx) => {
+    // Finance staff cannot see app.students under their role-scope policy, and resolving the
+    // family's members needs it: their read runs with the identity-only access every finance
+    // student lookup uses (see family/routes.ts). A parent stays on their own tenant transaction.
+    const inTx = <T>(fn: (tx: TransactionSql) => Promise<T>) =>
+      canViewAll
+        ? withStudentIdentityTx(database, auth.schoolId, fn)
+        : withTenantTx(database, tenantFrom(c), fn);
+    const result = await inTx(async (tx) => {
       const family = await familyCustomers(tx, auth.schoolId, familyId, auth.userId, canViewAll);
       // Resolve the site first: it activates a school whose site is newly ready, which
       // is what records the company id buildFilters reads.

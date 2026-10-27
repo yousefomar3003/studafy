@@ -92,6 +92,7 @@ const FREE_TEXT_ENDPOINTS = [
   "/api/families?search=",
   "/api/invitations?search=",
   "/api/finance/invoices?search=",
+  "/api/finance/families?search=",
 ];
 
 const ENUM_FILTER_ENDPOINTS = [
@@ -100,6 +101,7 @@ const ENUM_FILTER_ENDPOINTS = [
   "/api/students?status=",
   "/api/invitations?status=",
   "/api/finance/invoices?status=",
+  "/api/finance/families?balance=",
 ];
 
 interface Canaries {

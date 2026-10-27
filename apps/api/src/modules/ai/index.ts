@@ -4,8 +4,9 @@
  * `/api/ai/*`, plus the grounded Ask AI stream (ST-165), the cached study-material summarizer, and
  * the quiz generator and grader (ST-167).
  *
- * The gate enforces school active -> AI add-on active -> quota available with distinct HTTP codes
- * (403 / 402 / 429); the meter is the atomic Redis ledger that backs the quota decision; the usage
+ * Access is requireFeature("ai_tutor" | "study_tools") on each route (modules/features), then the
+ * monthly token budget (gate/token-budget.ts) with distinct HTTP codes (403 / 402 / 429); the meter
+ * is the atomic Redis ledger that backs the quota decision; the usage
  * route reports the remaining budget; the retrieval route fuses the ANN and keyword legs and, when
  * the re-ranker is wired in, cuts the fused top-20 to a re-scored top-6; the gateway routes a
  * feature to a small/large model tier, calls the Anthropic provider, and commits the provider-
@@ -27,18 +28,16 @@ export {
   AI_MONTHLY_TOKEN_BUDGET,
 } from "./config";
 export {
-  aiEntitlementGate,
-  assertAiEntitled,
+  AI_FEATURE_ROUTE,
+  AI_REFUSAL_CODES,
+  aiStudentSubject,
+  aiTokenBudget,
   getAiQuota,
-  type AiEntitlementContext,
-  type AiQuotaGateOptions,
+  provideAiTokenBudget,
   type AiQuotaHandle,
-} from "./gate/entitlement-gate";
-export {
-  aiUsageRoutes,
-  databaseStudentIdResolver,
-  type StudentIdResolver,
-} from "./routes/usage-routes";
+  type AiTokenBudgetConfig,
+} from "./gate/token-budget";
+export { aiUsageRoutes } from "./routes/usage-routes";
 export { aiConsentGate } from "./gate/consent-gate";
 export { aiConsentRoutes } from "./routes/consent-routes";
 export {

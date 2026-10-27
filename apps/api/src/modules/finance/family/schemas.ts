@@ -36,6 +36,7 @@ const currencyTotalSchema = z
 
 const invoiceSummarySchema = z
   .object({
+    id: uuidSchema.openapi({ description: "The invoice's Studafy id (app.invoice_cache)." }),
     erpnext_docname: z.string().openapi({ description: "ERPNext Sales Invoice document name." }),
     erpnext_status: z.string().openapi({ description: "ERPNext's own docstatus, as a word." }),
     issued_date: dateSchema,
@@ -90,7 +91,14 @@ const paymentSummarySchema = z
     payment_mode: z.enum(["cash", "bank_transfer", "card_external"]).nullable(),
     status: z.enum(["pending", "confirmed", "failed"]),
     erpnext_status: z.string(),
-    receipt_url: z.string().nullable(),
+    receipt_url: z
+      .string()
+      .nullable()
+      .openapi({
+        description:
+          "Path of the PDF receipt on this API, present once confirmed. Relative to the API origin " +
+          "and fetched with the caller's bearer token.",
+      }),
     payment_date: dateSchema,
     confirmed_at: dateTimeSchema.nullable(),
     last_synced_at: dateTimeSchema,

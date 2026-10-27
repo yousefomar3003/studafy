@@ -26,25 +26,27 @@ code no longer matches must be superseded before the code, not after.
 
 ## Index
 
-| ADR                                               | Decision                                                                                        | Topic area           |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------- |
-| [ADR-000](0000-monorepo-tooling-choice.md)        | Bun workspaces + Turborepo for dependency management and task orchestration                     | Monorepo tooling     |
-| [ADR-001](0001-shared-lint-format-config.md)      | Shared lint/format config as a root-inherited package                                           | Developer experience |
-| [ADR-002](0002-fixed-roles-authorization.md)      | Fixed compile-time roles and a `resource:action` permission matrix in `@studafy/constants`      | Authorization        |
-| [ADR-003](0003-git-hooks-conventional-commits.md) | Lefthook + commitlint for Conventional Commits                                                  | Developer experience |
-| [ADR-004](0004-infrastructure-as-code.md)         | Infrastructure as Code with Terraform                                                           | Infrastructure       |
-| [ADR-005](0005-erpnext-education-plane.md)        | ERPNext + Frappe Education as the ERPNext staging plane                                         | Integration          |
-| [ADR-006](0006-identity-tokens-and-tenant-rls.md) | Identity tables, hash-only token storage, and the first tenant RLS application                  | Identity / tenancy   |
-| [ADR-007](0007-ocr-engine.md)                     | tesseract.js in-process for OCR in the AI-ingestion pipeline                                    | AI ingestion         |
-| [ADR-008](0008-tenancy-model.md)                  | One school per row (`school_id` FK), global-vs-tenant invariant, transaction-local tenant GUC   | Tenancy model        |
-| [ADR-009](0009-rest-and-openapi.md)               | REST + OpenAPI 3.1 generated from zod-openapi route schemas, generated clients                  | API contract         |
-| [ADR-010](0010-runtime-choice.md)                 | Bun as the single runtime, installer, test runner, and bundler                                  | Runtime              |
-| [ADR-011](0011-pgvector.md)                       | Embeddings in PostgreSQL (`vector` ext.), one global HNSW graph, iterative-scan retrieval       | AI retrieval         |
-| [ADR-012](0012-transactional-outbox.md)           | `app.outbox_events` — one outbox, exactly-once claim, at-least-once delivery                    | Async reliability    |
-| [ADR-013](0013-payment-abstraction.md)            | `PaymentProviderPort` + one `StripeAdapter`, provider-neutral webhooks                          | Payments             |
-| [ADR-014](0014-jwt-strategy.md)                   | RS256 access JWTs, in-process rotated `KeyStore`, `jti` denylist, entitlement-version staleness | Authentication       |
-| [ADR-015](0015-rls-conventions.md)                | `apply_tenant_isolation` helper, FORCE RLS, no BYPASSRLS, fail-closed GUC                       | Row-level security   |
-| [ADR-016](0016-channel-policy.md)                 | `AUTH_CHANNELS` (web/mobile/api) fixed at login, `requireChannel` guard                         | Channel policy       |
+| ADR                                                   | Decision                                                                                               | Topic area           |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------- |
+| [ADR-000](0000-monorepo-tooling-choice.md)            | Bun workspaces + Turborepo for dependency management and task orchestration                            | Monorepo tooling     |
+| [ADR-001](0001-shared-lint-format-config.md)          | Shared lint/format config as a root-inherited package                                                  | Developer experience |
+| [ADR-002](0002-fixed-roles-authorization.md)          | Fixed compile-time roles and a `resource:action` permission matrix in `@studafy/constants`             | Authorization        |
+| [ADR-003](0003-git-hooks-conventional-commits.md)     | Lefthook + commitlint for Conventional Commits                                                         | Developer experience |
+| [ADR-004](0004-infrastructure-as-code.md)             | Infrastructure as Code with Terraform                                                                  | Infrastructure       |
+| [ADR-005](0005-erpnext-education-plane.md)            | ERPNext + Frappe Education as the ERPNext staging plane                                                | Integration          |
+| [ADR-006](0006-identity-tokens-and-tenant-rls.md)     | Identity tables, hash-only token storage, and the first tenant RLS application                         | Identity / tenancy   |
+| [ADR-007](0007-ocr-engine.md)                         | tesseract.js in-process for OCR in the AI-ingestion pipeline                                           | AI ingestion         |
+| [ADR-008](0008-tenancy-model.md)                      | One school per row (`school_id` FK), global-vs-tenant invariant, transaction-local tenant GUC          | Tenancy model        |
+| [ADR-009](0009-rest-and-openapi.md)                   | REST + OpenAPI 3.1 generated from zod-openapi route schemas, generated clients                         | API contract         |
+| [ADR-010](0010-runtime-choice.md)                     | Bun as the single runtime, installer, test runner, and bundler                                         | Runtime              |
+| [ADR-011](0011-pgvector.md)                           | Embeddings in PostgreSQL (`vector` ext.), one global HNSW graph, iterative-scan retrieval              | AI retrieval         |
+| [ADR-012](0012-transactional-outbox.md)               | `app.outbox_events` — one outbox, exactly-once claim, at-least-once delivery                           | Async reliability    |
+| [ADR-013](0013-payment-abstraction.md)                | `PaymentProviderPort` + one `StripeAdapter`, provider-neutral webhooks                                 | Payments             |
+| [ADR-014](0014-jwt-strategy.md)                       | RS256 access JWTs, in-process rotated `KeyStore`, `jti` denylist, entitlement-version staleness        | Authentication       |
+| [ADR-015](0015-rls-conventions.md)                    | `apply_tenant_isolation` helper, FORCE RLS, no BYPASSRLS, fail-closed GUC                              | Row-level security   |
+| [ADR-016](0016-channel-policy.md)                     | `AUTH_CHANNELS` (web/mobile/api) fixed at login, `requireChannel` guard                                | Channel policy       |
+| [ADR-017](0017-year-scoped-grading-with-snapshots.md) | Grade-level subject defaults with section overrides, one grading engine, immutable result snapshots    | Academic grading     |
+| [ADR-018](0018-feature-licensing.md)                  | Paid features as code-registered keys, granted through tiers and resolved per person, `requireFeature` | Billing / licensing  |
 
 ## Platform decision coverage
 
@@ -60,6 +62,8 @@ The platform's core decision set maps to this index as follows:
 8. RLS conventions → ADR-0015 (+ ADR-0006)
 9. Monorepo tooling → ADR-0000 (+ ADR-0010)
 10. Channel policy → ADR-0016 (+ SAD_13)
+11. Academic grading → ADR-0017
+12. Paid features and licensing → ADR-0018 (+ ADR-0014, [billing/feature-licensing.md](../billing/feature-licensing.md))
 
 ## Review
 

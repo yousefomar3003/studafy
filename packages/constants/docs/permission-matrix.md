@@ -87,8 +87,14 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `message:send`                   | ✅          | ✅        |           |                    |         | ✅         |         | ✅     |       |               |
 | `messageReport:review`           | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `timetable:manage`               | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
+| `academicConfig:read`            | ✅          | ✅        | ✅        |                    |         | ✅         |         |        |       |               |
+| `academicConfig:manage`          | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
+| `result:finalize`                | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
+| `academicCertificate:issue`      | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `platform:read`                  | ✅          |           |           |                    |         |            |         |        |       |               |
 | `platform:manage`                | ✅          |           |           |                    |         |            |         |        |       |               |
+| `license:read`                   | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
+| `license:manage`                 | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `auditLog:read`                  | ✅          | ✅        |           |                    | ✅      |            |         |        |       | ✅            |
 | `auditLog:export`                | ✅          | ✅        |           |                    | ✅      |            |         |        |       |               |
 | `privacy:manageDsr`              | ✅          | ✅        |           |                    |         |            |         |        |       |               |

@@ -5,32 +5,27 @@ import { describe, expect, test } from "bun:test";
 
 import { errorHandlerMiddleware } from "../../../middleware/errorHandler";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import {
+  aiEntitlement,
+  fakeEntitlements,
+  fakeFeatureService,
+  PERIOD_END,
+  PERIOD_START,
+  SCHOOL_ID,
+  schoolEntitlement,
+  silentLogger,
+  STUDENT_ID,
+  USER_ID,
+  userEntitlement,
+} from "../../features/__tests__/fakes";
+import { provideFeatures } from "../../features/middleware";
 
 import { aiUsageRoutes } from "./usage-routes";
 
-import type { StudentIdResolver } from "./usage-routes";
-import type { Logger } from "../../../logger";
 import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { SchoolEntitlement, AiEntitlement } from "../../subscriptions/entitlements/resolve";
-import type { AiUsageSnapshot, AiTokenMeter } from "../usage/meter";
-
-const SCHOOL_ID = "00000000-0000-4000-8000-000000000001";
-const STUDENT_ID = "00000000-0000-4000-8000-000000000002";
-const USER_ID = "00000000-0000-4000-8000-000000000003";
-const PERIOD_START = "2026-08-01T00:00:00.000Z";
-const PERIOD_END = "2026-08-31T23:59:59.000Z";
-
-const silentLogger: Logger = {
-  level: "info",
-  trace: () => undefined,
-  debug: () => undefined,
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined,
-  fatal: () => undefined,
-  child: () => silentLogger,
-};
+import type { FakeEntitlements } from "../../features/__tests__/fakes";
+import type { AiSnapshotInput, AiUsageSnapshot, AiTokenMeter } from "../usage/meter";
 
 const auth: AuthContext = {
   userId: USER_ID,
@@ -42,50 +37,15 @@ const auth: AuthContext = {
   subscriptionStatus: "active",
 };
 
-function schoolEntitlement(active: boolean): SchoolEntitlement {
-  return {
-    schoolId: SCHOOL_ID,
-    version: 1,
-    subscriptionId: "sub-1",
-    status: active ? "active" : "closed",
-    active,
-    planCode: "growth",
-    quotas: { studentCap: 50 },
-    currentPeriodEnd: PERIOD_END,
-  };
-}
-
-function aiEntitlement(active: boolean, hasPeriod = true): AiEntitlement {
-  return {
-    schoolId: SCHOOL_ID,
-    studentId: STUDENT_ID,
-    version: 1,
-    schoolVersion: 1,
-    status: active ? "active" : null,
-    active,
-    currentPeriodStart: hasPeriod ? PERIOD_START : null,
-    currentPeriodEnd: hasPeriod ? PERIOD_END : null,
-  };
-}
-
-function fakeEntitlements(school: SchoolEntitlement, ai: AiEntitlement) {
-  const aiCalls: string[] = [];
-  return {
-    aiCalls,
-    school: async () => school,
-    ai: async (_schoolId: string, studentId: string) => {
-      aiCalls.push(studentId);
-      return ai;
-    },
-  };
-}
-
-function snapshotMeter(snapshot: AiUsageSnapshot): AiTokenMeter {
+function snapshotMeter(snapshot: AiUsageSnapshot, seen: AiSnapshotInput[] = []): AiTokenMeter {
   return {
     reserve: async () => ({ ok: true, reservationId: "res-1", reservedTokens: 1, remaining: 0 }),
     commit: async () => ({ settled: true, remaining: 0 }),
     release: async () => ({ settled: true, remaining: 0 }),
-    snapshot: async () => snapshot,
+    snapshot: async (input) => {
+      seen.push(input);
+      return snapshot;
+    },
   };
 }
 
@@ -99,11 +59,7 @@ const SNAPSHOT: AiUsageSnapshot = {
   periodEnd: PERIOD_END,
 };
 
-function buildUsageApp(
-  entitlements: ReturnType<typeof fakeEntitlements>,
-  meter: AiTokenMeter,
-  studentIdFor: StudentIdResolver = async () => STUDENT_ID,
-): OpenAPIHono<AppEnv> {
+function buildUsageApp(entitlements: FakeEntitlements, meter: AiTokenMeter): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 
   app.use("*", async (c, next) => {
@@ -111,16 +67,18 @@ function buildUsageApp(
     c.set("locale", "en");
     await next();
   });
-  app.route("/", aiUsageRoutes({ entitlements, meter, studentIdFor }));
+  app.use("/api/*", provideFeatures(fakeFeatureService({ entitlements })));
+  app.route("/", aiUsageRoutes({ meter }));
   app.onError(errorHandlerMiddleware(silentLogger));
   return app;
 }
 
 describe("GET /api/ai/usage", () => {
-  test("returns the remaining-budget snapshot", async () => {
+  test("returns the remaining-budget snapshot for the add-on's window", async () => {
+    const seen: AiSnapshotInput[] = [];
     const app = buildUsageApp(
-      fakeEntitlements(schoolEntitlement(true), aiEntitlement(true)),
-      snapshotMeter(SNAPSHOT),
+      fakeEntitlements({ school: schoolEntitlement(true), ai: aiEntitlement("active") }),
+      snapshotMeter(SNAPSHOT, seen),
     );
 
     const res = await app.request("/api/ai/usage");
@@ -128,38 +86,46 @@ describe("GET /api/ai/usage", () => {
 
     expect(res.status).toBe(200);
     expect(body).toEqual(SNAPSHOT);
+    expect(seen).toEqual([
+      {
+        schoolId: SCHOOL_ID,
+        studentId: STUDENT_ID,
+        periodStart: PERIOD_START,
+        periodEnd: PERIOD_END,
+        budget: 1_000_000,
+      },
+    ]);
   });
 
   test("checks the add-on of the caller's student record, not their user id", async () => {
-    const entitlements = fakeEntitlements(schoolEntitlement(true), aiEntitlement(true));
-    const resolved: string[] = [];
-    const app = buildUsageApp(entitlements, snapshotMeter(SNAPSHOT), async (who) => {
-      resolved.push(who.userId);
-      return STUDENT_ID;
-    });
+    const entitlements = fakeEntitlements({ ai: aiEntitlement("active") });
+    const app = buildUsageApp(entitlements, snapshotMeter(SNAPSHOT));
 
     const res = await app.request("/api/ai/usage");
 
     expect(res.status).toBe(200);
-    expect(resolved).toEqual([USER_ID]);
-    expect(entitlements.aiCalls).toEqual([STUDENT_ID]);
+    expect(entitlements.calls.user).toEqual([USER_ID]);
+    expect(entitlements.calls.ai).toEqual([STUDENT_ID]);
   });
 
   test("answers 402 AI_SUBSCRIPTION_INACTIVE to a caller with no student record", async () => {
-    const entitlements = fakeEntitlements(schoolEntitlement(true), aiEntitlement(true));
-    const app = buildUsageApp(entitlements, snapshotMeter(SNAPSHOT), async () => null);
+    const entitlements = fakeEntitlements({
+      ai: aiEntitlement("active"),
+      user: userEntitlement({ studentId: null }),
+    });
+    const app = buildUsageApp(entitlements, snapshotMeter(SNAPSHOT));
 
     const res = await app.request("/api/ai/usage");
     const body = (await res.json()) as { code: string };
 
     expect(res.status).toBe(402);
     expect(body.code).toBe(ERROR_CODES.AI_SUBSCRIPTION_INACTIVE);
-    expect(entitlements.aiCalls).toEqual([]);
+    expect(entitlements.calls.ai).toEqual([]);
   });
 
   test("refuses an inactive school with 403 AI_SCHOOL_INACTIVE", async () => {
     const app = buildUsageApp(
-      fakeEntitlements(schoolEntitlement(false), aiEntitlement(true)),
+      fakeEntitlements({ school: schoolEntitlement(false), ai: aiEntitlement("active") }),
       snapshotMeter(SNAPSHOT),
     );
 
@@ -172,7 +138,7 @@ describe("GET /api/ai/usage", () => {
 
   test("refuses an inactive AI add-on with 402 AI_SUBSCRIPTION_INACTIVE", async () => {
     const app = buildUsageApp(
-      fakeEntitlements(schoolEntitlement(true), aiEntitlement(false)),
+      fakeEntitlements({ ai: aiEntitlement("canceled") }),
       snapshotMeter(SNAPSHOT),
     );
 
@@ -181,18 +147,5 @@ describe("GET /api/ai/usage", () => {
 
     expect(res.status).toBe(402);
     expect(body.code).toBe(ERROR_CODES.AI_SUBSCRIPTION_INACTIVE);
-  });
-
-  test("refuses a period-less verdict with 503 AI_QUOTA_UNAVAILABLE", async () => {
-    const app = buildUsageApp(
-      fakeEntitlements(schoolEntitlement(true), aiEntitlement(true, false)),
-      snapshotMeter(SNAPSHOT),
-    );
-
-    const res = await app.request("/api/ai/usage");
-    const body = (await res.json()) as { code: string };
-
-    expect(res.status).toBe(503);
-    expect(body.code).toBe(ERROR_CODES.AI_QUOTA_UNAVAILABLE);
   });
 });

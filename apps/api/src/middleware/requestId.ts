@@ -4,7 +4,9 @@ import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
 
 import type { AuthContext } from "./authContext";
 import type { Logger } from "../logger";
-import type { AiEntitlementContext, AiQuotaHandle } from "../modules/ai/gate/entitlement-gate";
+import type { AiQuotaHandle, AiTokenBudgetConfig } from "../modules/ai/gate/token-budget";
+import type { FeatureGateContext } from "../modules/features/middleware";
+import type { FeatureService } from "../modules/features/service";
 import type { MiddlewareHandler } from "hono";
 
 /**
@@ -100,17 +102,21 @@ export interface AppVariables {
   log: Logger;
   locale: string;
   auth?: AuthContext;
+  /** The feature service, set by provideFeatures for requireFeature and GET /api/me/features. */
+  features?: FeatureService;
   /**
-   * The resolved AI entitlement verdict and budget, set by aiEntitlementGate (ST-155) for every
-   * `/api/ai/*` request that passes its gates.
+   * The paid-feature verdict, set by requireFeature for a request it admitted. Read with
+   * getFeatureGate(c).
    */
-  aiEntitlement?: AiEntitlementContext;
+  featureGate?: FeatureGateContext;
   /**
-   * The live quota reservation, set by aiEntitlementGate for requests that consume quota. AI route
-   * handlers commit their actual usage through this handle; the gate releases it if they never
-   * settle. Read with getAiQuota(c).
+   * The live AI token reservation, set by aiTokenBudget for requests that consume quota. AI route
+   * handlers commit their actual usage through this handle; the budget middleware releases it if
+   * they never settle. Read with getAiQuota(c).
    */
   aiQuota?: AiQuotaHandle;
+  /** The AI token budget's meter and hold sizing, set by provideAiTokenBudget on /api/ai/*. */
+  aiTokenBudget?: AiTokenBudgetConfig;
 }
 
 export interface AppEnv {

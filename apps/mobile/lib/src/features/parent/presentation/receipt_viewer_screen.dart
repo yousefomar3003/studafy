@@ -65,7 +65,8 @@ class _ReceiptPdf extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fileAsync = ref.watch(receiptFileProvider(receiptUrl));
+    final request = (receiptUrl: receiptUrl, languageCode: context.locale.languageCode);
+    final fileAsync = ref.watch(receiptFileProvider(request));
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -86,7 +87,7 @@ class _ReceiptPdf extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.space12),
               OutlinedButton(
-                onPressed: () => ref.invalidate(receiptFileProvider(receiptUrl)),
+                onPressed: () => ref.invalidate(receiptFileProvider(request)),
                 child: Text('parent.childDetail.finance.receipts.viewer.retry'.tr()),
               ),
             ],

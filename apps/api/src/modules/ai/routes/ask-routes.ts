@@ -10,6 +10,7 @@ import { requireAuth } from "../../../middleware/authContext";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
+import { requireFeature } from "../../features/middleware";
 import { resolveCitations, type Citation } from "../ask/citations";
 import { loadRecentTurns, persistAskMessage, resolveConversation } from "../ask/persistence";
 import { assembleGeneralPrompt, assembleGroundedPrompt, toGroundedSources } from "../ask/prompt";
@@ -20,7 +21,7 @@ import {
   AI_ASK_SOURCE_LIMIT,
   AI_EXPLAIN_LEVELS,
 } from "../config";
-import { getAiQuota } from "../gate/entitlement-gate";
+import { AI_FEATURE_ROUTE, aiTokenBudget, getAiQuota } from "../gate/token-budget";
 import { LlmProviderError } from "../llm/provider";
 import { AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
 import { recordBlockedContent } from "../moderation/enforce";
@@ -349,6 +350,13 @@ export function aiAskRoutes(deps: {
 }): OpenAPIHono<AppEnv> {
   const { database, provider, flags = null, embedder, modelOverrides = {} } = deps;
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+  // Paid-feature gate, then the AI token budget (docs/billing/feature-licensing.md). Model calls
+  // count one unit of the feature.
+  routes.use(
+    "/api/ai/students/:studentId/ask",
+    requireFeature("ai_tutor", { ...AI_FEATURE_ROUTE, meter: 1 }),
+    aiTokenBudget(),
+  );
 
   // The audit-coverage gate (tests/audit-coverage.test.ts) requires every mutating route to
   // declare its audit intent. This POST's writes are the conversation/message/citation rows; the

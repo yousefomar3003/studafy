@@ -5,7 +5,8 @@ import type { RedisClient } from "../../../redis";
  *
  * ## Keys
  *
- * `ent:{schoolId}` and `ent:ai:{studentId}`, exactly as the ticket specifies.
+ * `ent:{schoolId}` and `ent:ai:{studentId}`, exactly as the ticket specifies, and `ent:usr:{userId}`
+ * for a person's feature grants (000161).
  *
  * Deliberately not built on the helpers in src/cache.ts, and for the same reason
  * modules/auth/denylist.ts is not: `cacheKey()` hard-codes a `sch:{schoolId}:` prefix and returns a
@@ -50,6 +51,15 @@ export function entitlementCacheKey(schoolId: string): string {
 
 export function aiEntitlementCacheKey(studentId: string): string {
   return `ent:ai:${studentId}`;
+}
+
+/**
+ * One person's feature grants (docs/billing/feature-licensing.md). Validated against the school
+ * entry's version exactly like the AI entry, for the same reason: a school change that touches no
+ * grant row still changes the effective answer.
+ */
+export function userEntitlementCacheKey(userId: string): string {
+  return `ent:usr:${userId}`;
 }
 
 /**

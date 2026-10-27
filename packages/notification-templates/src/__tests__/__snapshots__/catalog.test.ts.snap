@@ -104,6 +104,66 @@ exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / push 
 
 exports[`renderNotification — snapshot tests en MATERIAL_INGEST_FAILED / email renders correctly 1`] = `"Your file "lab-manual.pdf" could not be processed and is not searchable. You can try again from the material page."`;
 
+exports[`renderNotification — snapshot tests en DIRECT_MESSAGE / in_app renders correctly 1`] = `"New message from Layla Nasser"`;
+
+exports[`renderNotification — snapshot tests en DIRECT_MESSAGE / push renders correctly 1`] = `"Layla Nasser: Adam did really well on today's lab."`;
+
+exports[`renderNotification — snapshot tests en DIRECT_MESSAGE / email renders correctly 1`] = `"Layla Nasser sent you a message: "Adam did really well on today's lab.""`;
+
+exports[`renderNotification — snapshot tests en FEE_INVOICE_ISSUED / in_app renders correctly 1`] = `"New invoice for Adam Fares: 600.000 JOD"`;
+
+exports[`renderNotification — snapshot tests en FEE_INVOICE_ISSUED / push renders correctly 1`] = `"Invoice for Adam Fares: 600.000 JOD, due 2026-09-01"`;
+
+exports[`renderNotification — snapshot tests en FEE_INVOICE_ISSUED / email renders correctly 1`] = `"A new invoice of 600.000 JOD has been issued for Adam Fares. It is due on 2026-09-01."`;
+
+exports[`renderNotification — snapshot tests en FEE_PAYMENT_RECEIVED / in_app renders correctly 1`] = `"Payment received for Adam Fares: 300.000 JOD"`;
+
+exports[`renderNotification — snapshot tests en FEE_PAYMENT_RECEIVED / push renders correctly 1`] = `"Thank you — we received 300.000 JOD for Adam Fares"`;
+
+exports[`renderNotification — snapshot tests en FEE_PAYMENT_RECEIVED / email renders correctly 1`] = `"We received your payment of 300.000 JOD for Adam Fares. Receipt number: ACC-PAY-2026-00004."`;
+
+exports[`renderNotification — snapshot tests en FEE_PAYMENT_REMINDER / in_app renders correctly 1`] = `"Reminder: 1950.000 JOD in school fees is overdue"`;
+
+exports[`renderNotification — snapshot tests en FEE_PAYMENT_REMINDER / push renders correctly 1`] = `"School fees reminder: 1950.000 JOD overdue"`;
+
+exports[`renderNotification — snapshot tests en FEE_PAYMENT_REMINDER / email renders correctly 1`] = `"Dear Bassel Fares Family, this is a reminder that 1950.000 JOD in school fees is overdue across 2 invoice(s). Please contact the school's finance office if you have already paid."`;
+
+exports[`renderNotification — snapshot tests en FEE_STATEMENT / in_app renders correctly 1`] = `"Your family fee statement: 1950.000 JOD outstanding"`;
+
+exports[`renderNotification — snapshot tests en FEE_STATEMENT / push renders correctly 1`] = `"Fee statement: 1950.000 JOD outstanding"`;
+
+exports[`renderNotification — snapshot tests en FEE_STATEMENT / email renders correctly 1`] = `"Dear Bassel Fares Family, here is your fee statement for 2 child(ren). The outstanding balance is 1950.000 JOD. Open the Studafy app for the full detail."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_SEAT_APPLE_RENEWAL / in_app renders correctly 1`] = `"Amman Academy now covers your Studafy subscription. To avoid paying twice, turn off its renewal on your iPhone: Settings > your name > Subscriptions > Studafy > Cancel Subscription. You keep access until 2026-11-30, and the school's seat continues after that."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_SEAT_APPLE_RENEWAL / push renders correctly 1`] = `"Amman Academy now covers Studafy: turn off your App Store renewal"`;
+
+exports[`renderNotification — snapshot tests en LICENSE_SEAT_APPLE_RENEWAL / email renders correctly 1`] = `"Amman Academy has given you a Studafy seat that covers your App Store subscription. Apple does not let us stop its renewal for you, so to avoid paying twice please turn it off: on your iPhone open Settings, tap your name, then Subscriptions, Studafy, Cancel Subscription. You keep access until 2026-11-30, and the school's seat continues after that."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_EXPIRING / in_app renders correctly 1`] = `"Amman Academy's Studafy license ends on 2027-08-31, in 30 days. Renew it to keep its seats covered."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_EXPIRING / push renders correctly 1`] = `"Amman Academy: the Studafy license ends in 30 days"`;
+
+exports[`renderNotification — snapshot tests en LICENSE_EXPIRING / email renders correctly 1`] = `"Amman Academy's Studafy license ends on 2027-08-31, in 30 days. When it ends, everyone holding one of its seats loses the features it covers. Contact Studafy to renew or extend it."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_INVOICE_DUE / in_app renders correctly 1`] = `"Invoice LIC-2026-000042 for Amman Academy's Studafy license is due today (2026-11-30). Balance: 4374.00 USD."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_INVOICE_DUE / push renders correctly 1`] = `"Studafy invoice LIC-2026-000042 is due today: 4374.00 USD"`;
+
+exports[`renderNotification — snapshot tests en LICENSE_INVOICE_DUE / email renders correctly 1`] = `"Invoice LIC-2026-000042 for Amman Academy's Studafy license is due today, 2026-11-30, with 4374.00 USD outstanding. Please pay by bank transfer with the payment reference printed on the invoice, and upload the receipt in Studafy."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_INVOICE_OVERDUE / in_app renders correctly 1`] = `"Invoice LIC-2026-000042 for Amman Academy's Studafy license is overdue (due 2026-11-30). Balance: 2187.00 USD."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_INVOICE_OVERDUE / push renders correctly 1`] = `"Studafy invoice LIC-2026-000042 is overdue: 2187.00 USD"`;
+
+exports[`renderNotification — snapshot tests en LICENSE_INVOICE_OVERDUE / email renders correctly 1`] = `"Invoice LIC-2026-000042 for Amman Academy's Studafy license was due on 2026-11-30 and 2187.00 USD is still outstanding. Please pay by bank transfer with the payment reference printed on the invoice, and upload the receipt in Studafy."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_RECEIPT_UPLOADED / in_app renders correctly 1`] = `"Amman Academy uploaded a transfer receipt for invoice LIC-2026-000042. Match it to a payment."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_RECEIPT_UPLOADED / push renders correctly 1`] = `"Amman Academy uploaded a receipt for LIC-2026-000042"`;
+
+exports[`renderNotification — snapshot tests en LICENSE_RECEIPT_UPLOADED / email renders correctly 1`] = `"Amman Academy uploaded a bank transfer receipt for invoice LIC-2026-000042. Record the payment and match the receipt to it in the license console."`;
+
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / in_app renders correctly 1`] = `"موعد تسليم Homework 5 هو 2026-08-15"`;
 
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / push renders correctly 1`] = `"Algebra II — Homework 5 مستحق في 2026-08-15"`;
@@ -208,14 +268,62 @@ exports[`renderNotification — snapshot tests ar MATERIAL_INGEST_FAILED / push 
 
 exports[`renderNotification — snapshot tests ar MATERIAL_INGEST_FAILED / email renders correctly 1`] = `"تعذرت معالجة ملف "lab-manual.pdf" وهو غير قابل للبحث. يمكنك المحاولة مرة أخرى من صفحة الملف."`;
 
-exports[`renderNotification — snapshot tests en DIRECT_MESSAGE / in_app renders correctly 1`] = `"New message from Layla Nasser"`;
-
-exports[`renderNotification — snapshot tests en DIRECT_MESSAGE / push renders correctly 1`] = `"Layla Nasser: Adam did really well on today's lab."`;
-
-exports[`renderNotification — snapshot tests en DIRECT_MESSAGE / email renders correctly 1`] = `"Layla Nasser sent you a message: "Adam did really well on today's lab.""`;
-
 exports[`renderNotification — snapshot tests ar DIRECT_MESSAGE / in_app renders correctly 1`] = `"رسالة جديدة من Layla Nasser"`;
 
 exports[`renderNotification — snapshot tests ar DIRECT_MESSAGE / push renders correctly 1`] = `"Layla Nasser: Adam did really well on today's lab."`;
 
 exports[`renderNotification — snapshot tests ar DIRECT_MESSAGE / email renders correctly 1`] = `"أرسل لك Layla Nasser رسالة: "Adam did really well on today's lab.""`;
+
+exports[`renderNotification — snapshot tests ar FEE_INVOICE_ISSUED / in_app renders correctly 1`] = `"فاتورة جديدة لـ Adam Fares: 600.000 JOD"`;
+
+exports[`renderNotification — snapshot tests ar FEE_INVOICE_ISSUED / push renders correctly 1`] = `"فاتورة لـ Adam Fares: 600.000 JOD، تستحق في 2026-09-01"`;
+
+exports[`renderNotification — snapshot tests ar FEE_INVOICE_ISSUED / email renders correctly 1`] = `"صدرت فاتورة جديدة بقيمة 600.000 JOD لـ Adam Fares، وتستحق في 2026-09-01."`;
+
+exports[`renderNotification — snapshot tests ar FEE_PAYMENT_RECEIVED / in_app renders correctly 1`] = `"تم استلام دفعة لـ Adam Fares: 300.000 JOD"`;
+
+exports[`renderNotification — snapshot tests ar FEE_PAYMENT_RECEIVED / push renders correctly 1`] = `"شكرًا لك — استلمنا 300.000 JOD عن Adam Fares"`;
+
+exports[`renderNotification — snapshot tests ar FEE_PAYMENT_RECEIVED / email renders correctly 1`] = `"استلمنا دفعتك بقيمة 300.000 JOD عن Adam Fares. رقم الإيصال: ACC-PAY-2026-00004."`;
+
+exports[`renderNotification — snapshot tests ar FEE_PAYMENT_REMINDER / in_app renders correctly 1`] = `"تذكير: رسوم مدرسية متأخرة بقيمة 1950.000 JOD"`;
+
+exports[`renderNotification — snapshot tests ar FEE_PAYMENT_REMINDER / push renders correctly 1`] = `"تذكير بالرسوم المدرسية: 1950.000 JOD متأخرة"`;
+
+exports[`renderNotification — snapshot tests ar FEE_PAYMENT_REMINDER / email renders correctly 1`] = `"عائلة Bassel Fares Family الكريمة، نذكّركم بأن رسومًا مدرسية بقيمة 1950.000 JOD متأخرة في 2 فاتورة. يرجى التواصل مع القسم المالي في المدرسة إذا كنتم قد دفعتم بالفعل."`;
+
+exports[`renderNotification — snapshot tests ar FEE_STATEMENT / in_app renders correctly 1`] = `"كشف حساب الرسوم لعائلتكم: 1950.000 JOD مستحقة"`;
+
+exports[`renderNotification — snapshot tests ar FEE_STATEMENT / push renders correctly 1`] = `"كشف حساب الرسوم: 1950.000 JOD مستحقة"`;
+
+exports[`renderNotification — snapshot tests ar FEE_STATEMENT / email renders correctly 1`] = `"عائلة Bassel Fares Family الكريمة، إليكم كشف حساب الرسوم لعدد 2 من الأبناء. الرصيد المستحق 1950.000 JOD. افتحوا تطبيق Studafy للاطلاع على التفاصيل."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_SEAT_APPLE_RENEWAL / in_app renders correctly 1`] = `"أصبحت Amman Academy تغطي اشتراكك في Studafy. لتجنّب الدفع مرتين، أوقف التجديد من جهاز iPhone: الإعدادات > اسمك > الاشتراكات > Studafy > إلغاء الاشتراك. يبقى وصولك حتى 2026-11-30، ويستمر مقعد المدرسة بعد ذلك."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_SEAT_APPLE_RENEWAL / push renders correctly 1`] = `"أصبحت Amman Academy تغطي Studafy: أوقف تجديد اشتراك App Store"`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_SEAT_APPLE_RENEWAL / email renders correctly 1`] = `"منحتك Amman Academy مقعداً في Studafy يغطي اشتراكك في App Store. لا تسمح Apple لنا بإيقاف تجديده نيابةً عنك، لذا لتجنّب الدفع مرتين يُرجى إيقافه: افتح الإعدادات في جهاز iPhone، ثم اضغط على اسمك، ثم الاشتراكات، ثم Studafy، ثم إلغاء الاشتراك. يبقى وصولك حتى 2026-11-30، ويستمر مقعد المدرسة بعد ذلك."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_EXPIRING / in_app renders correctly 1`] = `"ينتهي ترخيص Studafy الخاص بـ Amman Academy في 2027-08-31، بعد 30 يوماً. جدّدوه لتبقى مقاعده مغطاة."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_EXPIRING / push renders correctly 1`] = `"Amman Academy: ينتهي ترخيص Studafy بعد 30 يوماً"`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_EXPIRING / email renders correctly 1`] = `"ينتهي ترخيص Studafy الخاص بـ Amman Academy في 2027-08-31، بعد 30 يوماً. عند انتهائه يفقد كل من يشغل أحد مقاعده الميزات التي يغطيها. تواصلوا مع Studafy لتجديده أو تمديده."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_INVOICE_DUE / in_app renders correctly 1`] = `"تستحق اليوم (2026-11-30) الفاتورة LIC-2026-000042 لترخيص Studafy الخاص بـ Amman Academy. الرصيد: 4374.00 USD."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_INVOICE_DUE / push renders correctly 1`] = `"تستحق اليوم فاتورة Studafy رقم LIC-2026-000042: 4374.00 USD"`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_INVOICE_DUE / email renders correctly 1`] = `"تستحق اليوم، 2026-11-30، الفاتورة LIC-2026-000042 لترخيص Studafy الخاص بـ Amman Academy، والمبلغ المستحق 4374.00 USD. يُرجى الدفع بتحويل بنكي مع ذكر مرجع الدفع المطبوع على الفاتورة، ورفع الإيصال في Studafy."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_INVOICE_OVERDUE / in_app renders correctly 1`] = `"تأخّر سداد الفاتورة LIC-2026-000042 لترخيص Studafy الخاص بـ Amman Academy (كانت مستحقة في 2026-11-30). الرصيد: 2187.00 USD."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_INVOICE_OVERDUE / push renders correctly 1`] = `"تأخّر سداد فاتورة Studafy رقم LIC-2026-000042: 2187.00 USD"`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_INVOICE_OVERDUE / email renders correctly 1`] = `"كانت الفاتورة LIC-2026-000042 لترخيص Studafy الخاص بـ Amman Academy مستحقة في 2026-11-30 وما زال 2187.00 USD غير مسدد. يُرجى الدفع بتحويل بنكي مع ذكر مرجع الدفع المطبوع على الفاتورة، ورفع الإيصال في Studafy."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_RECEIPT_UPLOADED / in_app renders correctly 1`] = `"رفعت Amman Academy إيصال تحويل للفاتورة LIC-2026-000042. طابقه مع دفعة."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_RECEIPT_UPLOADED / push renders correctly 1`] = `"رفعت Amman Academy إيصالاً للفاتورة LIC-2026-000042"`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_RECEIPT_UPLOADED / email renders correctly 1`] = `"رفعت Amman Academy إيصال تحويل بنكي للفاتورة LIC-2026-000042. سجّل الدفعة وطابق الإيصال معها في لوحة التراخيص."`;

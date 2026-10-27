@@ -28,8 +28,9 @@ ShellRole resolveShellRole(List<String> roleClaims) {
   final roles = roleClaims.map(AppRole.fromClaim).whereType<AppRole>().toSet();
 
   if (roles.any(_adminTypeRoles.contains)) return ShellRole.viewer;
-  if (roles.contains(AppRole.attendanceOfficer))
+  if (roles.contains(AppRole.attendanceOfficer)) {
     return ShellRole.attendanceOfficer;
+  }
   if (roles.contains(AppRole.instructor)) return ShellRole.teacher;
   if (roles.contains(AppRole.student)) return ShellRole.student;
   if (roles.contains(AppRole.parent)) return ShellRole.parent;

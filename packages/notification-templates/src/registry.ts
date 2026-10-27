@@ -186,4 +186,96 @@ export const NOTIFICATION_CATALOG = {
       route: "/messages/{conversationId}",
     },
   },
+  // Fee notices to guardians (000152), written by apps/api/src/modules/finance/communications. The
+  // parent app shows fees on its home screen, per child, so every one routes there.
+  [NOTIFICATION_TYPES.FEE_INVOICE_ISSUED]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
+  [NOTIFICATION_TYPES.FEE_PAYMENT_RECEIVED]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
+  [NOTIFICATION_TYPES.FEE_PAYMENT_REMINDER]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
+  [NOTIFICATION_TYPES.FEE_STATEMENT]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
+  [NOTIFICATION_TYPES.LICENSE_SEAT_APPLE_RENEWAL]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
+  [NOTIFICATION_TYPES.LICENSE_EXPIRING]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
+  [NOTIFICATION_TYPES.LICENSE_INVOICE_DUE]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
+  [NOTIFICATION_TYPES.LICENSE_INVOICE_OVERDUE]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
+  [NOTIFICATION_TYPES.LICENSE_RECEIPT_UPLOADED]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
 } as const satisfies NotificationCatalog;

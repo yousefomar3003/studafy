@@ -23,7 +23,8 @@ export type CatalogArea =
   | "principal"
   | "attendanceOffice"
   | "platform"
-  | "onboarding";
+  | "onboarding"
+  | "academicGrading";
 
 type Catalog = Record<string, unknown>;
 type CatalogModule = Promise<{ default: Catalog }>;
@@ -50,6 +51,7 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     attendanceOffice: () => import("./locales/en/attendanceOffice.json"),
     platform: () => import("./locales/en/platform.json"),
     onboarding: () => import("./locales/en/onboarding.json"),
+    academicGrading: () => import("./locales/en/academicGrading.json"),
   },
   ar: {
     adminPeople: () => import("./locales/ar/adminPeople.json"),
@@ -60,6 +62,7 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     attendanceOffice: () => import("./locales/ar/attendanceOffice.json"),
     platform: () => import("./locales/ar/platform.json"),
     onboarding: () => import("./locales/ar/onboarding.json"),
+    academicGrading: () => import("./locales/ar/academicGrading.json"),
   },
 };
 

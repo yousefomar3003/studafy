@@ -25,6 +25,14 @@ export const ENTITLEMENT_EVENT_NAMES = [
   DOMAIN_EVENTS.AI_SUBSCRIPTION_STATUS_CHANGED,
 ] as const;
 
+/**
+ * The user-grant event (000161), claimed by a query of its own because it has an index of its own:
+ * `idx_outbox_events_school_user_entitlement_pending` (000162). A sibling index rather than a third
+ * name in the 000080 index, so adding it did not rebuild that one. The claim below repeats its
+ * predicate verbatim for the same planner reason.
+ */
+export const USER_ENTITLEMENT_EVENT_NAME = DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED;
+
 export interface ClaimedEntitlementRow {
   id: string;
   school_id: string;
@@ -32,6 +40,7 @@ export interface ClaimedEntitlementRow {
   payload: {
     schoolId?: unknown;
     studentId?: unknown;
+    userId?: unknown;
     entitlementsVersion?: unknown;
   };
 }
@@ -43,7 +52,7 @@ export async function claimEntitlementRows(
   // The WHERE clause repeats the partial index predicate verbatim, including both event names.
   // Postgres only uses a partial index when it can prove the query implies the predicate, so
   // dropping either half here would silently fall back to a sequential scan of the outbox.
-  return await tx<ClaimedEntitlementRow[]>`
+  const subscriptionRows = await tx<ClaimedEntitlementRow[]>`
     SELECT id::text AS id, school_id::text AS school_id, event_name, payload
     FROM app.outbox_events
     WHERE entitlement_applied_at IS NULL
@@ -52,6 +61,23 @@ export async function claimEntitlementRows(
     FOR UPDATE SKIP LOCKED
     LIMIT ${limit}
   `;
+
+  const remaining = limit - subscriptionRows.length;
+  if (remaining <= 0) return subscriptionRows;
+
+  const userRows = await tx<ClaimedEntitlementRow[]>`
+    SELECT id::text AS id, school_id::text AS school_id, event_name, payload
+    FROM app.outbox_events
+    WHERE entitlement_applied_at IS NULL
+      AND event_name = ${USER_ENTITLEMENT_EVENT_NAME}
+    ORDER BY id
+    FOR UPDATE SKIP LOCKED
+    LIMIT ${remaining}
+  `;
+
+  // Applying invalidations out of id order across the two kinds is safe: each targets its own key,
+  // and every write is version-guarded.
+  return [...subscriptionRows, ...userRows];
 }
 
 /** Mark the claimed rows consumed, in the same transaction that claimed them. */

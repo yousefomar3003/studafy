@@ -38,6 +38,15 @@ export {
   type FeatureFlagDefinition,
   type FlagName,
 } from "./feature-flags";
+export {
+  FEATURE_AUDIENCES,
+  FEATURE_KEY_PATTERN,
+  FEATURE_KEYS,
+  FEATURE_USAGE_UNITS,
+  FEATURES,
+  isFeatureKey,
+} from "./features";
+export type { FeatureAudience, FeatureDefinition, FeatureKey, FeatureUsageUnit } from "./features";
 export { PAYMENT_PURPOSES } from "./payment-purposes";
 export type { PaymentPurpose } from "./payment-purposes";
 export { SUBSCRIPTION_STATUSES } from "./subscription-status";

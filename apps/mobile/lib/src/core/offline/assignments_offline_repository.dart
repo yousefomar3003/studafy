@@ -13,9 +13,8 @@ import 'offline_database.dart';
 class AssignmentsOfflineRepository {
   AssignmentsOfflineRepository({
     required OfflineDatabase database,
-    required AssignmentsClient client,
-  }) : _client = client,
-       _cache = OfflineCachedResource<List<Assignment>>(
+    required this._client,
+  }) : _cache = OfflineCachedResource<List<Assignment>>(
          database: database,
          resource: 'assignments_due_soon',
          encode: (assignments) => assignments.map((assignment) => assignment.toJson()).toList(),

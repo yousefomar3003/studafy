@@ -179,8 +179,8 @@ const updateSectionRoute = createRoute({
   path: "/api/academics/sections/{sectionId}",
   tags: ["Academics"],
   operationId: "updateSection",
-  summary: "Rename a section",
-  description: "Renames a section within its grade.",
+  summary: "Rename or archive a section",
+  description: "Renames a section within its grade, or archives or restores it.",
   security: [{ bearerAuth: [] }],
   request: {
     params: sectionIdParamSchema,

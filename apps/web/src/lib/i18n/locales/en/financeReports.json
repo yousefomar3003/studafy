@@ -198,6 +198,40 @@
           "error": "Couldn't revoke the award"
         }
       }
+    },
+    "siblingDiscount": {
+      "title": "Sibling discount",
+      "description": "An automatic discount for a family's second and later enrolled children, eldest first by date of birth. It is applied to every new invoice, on top of any approved scholarship; invoices already issued do not change.",
+      "edit": "Edit rule",
+      "setUp": "Set up sibling discount",
+      "loadError": "The sibling discount rule could not be loaded.",
+      "on": "On",
+      "off": "Off",
+      "tiers": "Discount by child",
+      "noTiers": "No tiers set.",
+      "tier": "{{position}}: {{percentage}}%",
+      "tierAndLater": "{{position}} and later: {{percentage}}%",
+      "appliesTo": "Applies to",
+      "allFees": "All fees",
+      "reach": "Children discounted now",
+      "children_one": "{{count}} child",
+      "children_other": "{{count}} children",
+      "updated": "Last changed",
+      "adminOnly": "Only the school admin can change this rule.",
+      "formTitle": "Sibling discount",
+      "formDescription": "Each tier applies from that child onward, until a higher tier takes over.",
+      "enable": "Apply the sibling discount to new invoices",
+      "fromChild": "From child number",
+      "percentage": "Discount",
+      "removeTier": "Remove",
+      "addTier": "Add tier",
+      "tierHint": "For example: from child 2, 10% and from child 3, 15% means the second child gets 10% and every child after that 15%.",
+      "feeCategory": "Only this fee category (optional)",
+      "feeCategoryHint": "Leave empty to discount every fee, or name one category, such as Tuition Fee.",
+      "invalid": "Each tier needs a child number from 2 to 20, used once, and a discount between 0.01% and 100%. An enabled rule needs at least one tier.",
+      "saved": "Sibling discount saved",
+      "saveError": "The rule could not be saved. Try again.",
+      "save": "Save rule"
     }
   },
   "reports": {

@@ -6,6 +6,7 @@ import '../../../core/offline/staleness_banner.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/grade_providers.dart';
 import '../domain/grade_report.dart';
+import 'academic_results_screen.dart';
 import 'widgets/grade_term_selector.dart';
 import 'widgets/grade_trend_card.dart';
 import 'widgets/grades_placeholders.dart';
@@ -66,7 +67,22 @@ class _GradesScreenState extends ConsumerState<GradesScreen> {
     final status = ref.watch(gradeReportProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text('grades.title'.tr())),
+      appBar: AppBar(
+        title: Text('grades.title'.tr()),
+        actions: [
+          // Official (finalized) results, certificates and report cards — distinct from the
+          // published running grades this screen shows.
+          IconButton(
+            icon: const Icon(Icons.workspace_premium_outlined),
+            tooltip: 'academicResults.entry'.tr(),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AcademicResultsScreen(),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           const GradeTermSelector(),

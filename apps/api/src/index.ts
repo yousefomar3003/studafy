@@ -22,6 +22,7 @@ import {
   type LlmProvider,
 } from "./modules/ai";
 import { KeyStore } from "./modules/auth";
+import { syncFeatureCatalog } from "./modules/features";
 import { createFlagsService } from "./modules/flags";
 import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
 import { resolveMobileReleaseConfig } from "./modules/mobile";
@@ -101,6 +102,20 @@ const entitlementInvalidationSubscriber = redis
       return null;
     })
   : null;
+
+// Paid features (docs/billing/feature-licensing.md): insert any feature key new to the code list
+// into app.features, leaving the super admin's settings alone. A failure is logged, not fatal: every
+// existing feature already has its row, and only a feature added in this deploy is affected -- its
+// metered routes fail on the usage meter's foreign key until a later boot's sync succeeds.
+if (database) {
+  await syncFeatureCatalog(database)
+    .then((inserted) => {
+      if (inserted.length > 0) logger.info({ features: inserted }, "registered new paid features");
+    })
+    .catch((err: unknown) => {
+      logger.error({ err }, "paid feature catalog sync failed");
+    });
+}
 
 // Persists CORS/CSRF rejections off the request path. Returns a no-op sink when no database is
 // configured, so nothing downstream has to branch on that.

@@ -117,6 +117,16 @@ export const JOB_NAMES = {
   // installment_cache against ERPNext (POST /api/finance/reconciliation/run, X-Api-Key) -- the API owns
   // the per-school ERPNext clients, so the worker only triggers it. Carries no payload.
   RUN_FINANCE_RECONCILIATION: "run-finance-reconciliation",
+  // School license lifecycle (session 3 of docs/billing/feature-licensing.md). Scheduled hourly:
+  // expires licenses past their end date, expires quotes past their valid-until date, and marks
+  // invoices overdue. Never suspends: suspension is the super admin's decision. Carries no payload.
+  RUN_LICENSE_LIFECYCLE: "run-license-lifecycle",
+  // License billing reminders, after the lifecycle run: licenses ending in 30 and 7 days, invoices
+  // due and overdue, receipts uploaded. In-app notifications, each sent once. Carries no payload.
+  RUN_LICENSE_REMINDERS: "run-license-reminders",
+  // The 1st of each month (UTC): opens the month's feature usage meters, at zero, for every seat
+  // holder of an active license. Carries no payload.
+  RUN_USAGE_PERIOD_START: "run-usage-period-start",
   // Malware scan of a confirmed material. Carries the material id, its permanent storage
   // key, and the user to notify if the verdict is not clean. One job per confirm, at most once:
   // the worker claims the material by its 'scanning' status and flips it to a terminal state.

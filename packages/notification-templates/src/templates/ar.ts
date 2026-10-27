@@ -95,4 +95,63 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "{senderName}: {preview}",
     [NOTIFICATION_CHANNELS.EMAIL]: 'أرسل لك {senderName} رسالة: "{preview}"',
   },
+  [NOTIFICATION_TYPES.FEE_INVOICE_ISSUED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "فاتورة جديدة لـ {studentName}: {amount}",
+    [NOTIFICATION_CHANNELS.PUSH]: "فاتورة لـ {studentName}: {amount}، تستحق في {dueDate}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "صدرت فاتورة جديدة بقيمة {amount} لـ {studentName}، وتستحق في {dueDate}.",
+  },
+  [NOTIFICATION_TYPES.FEE_PAYMENT_RECEIVED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تم استلام دفعة لـ {studentName}: {amount}",
+    [NOTIFICATION_CHANNELS.PUSH]: "شكرًا لك — استلمنا {amount} عن {studentName}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "استلمنا دفعتك بقيمة {amount} عن {studentName}. رقم الإيصال: {receiptNumber}.",
+  },
+  [NOTIFICATION_TYPES.FEE_PAYMENT_REMINDER]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تذكير: رسوم مدرسية متأخرة بقيمة {amount}",
+    [NOTIFICATION_CHANNELS.PUSH]: "تذكير بالرسوم المدرسية: {amount} متأخرة",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "عائلة {familyName} الكريمة، نذكّركم بأن رسومًا مدرسية بقيمة {amount} متأخرة في {overdueCount} فاتورة. يرجى التواصل مع القسم المالي في المدرسة إذا كنتم قد دفعتم بالفعل.",
+  },
+  [NOTIFICATION_TYPES.FEE_STATEMENT]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "كشف حساب الرسوم لعائلتكم: {outstanding} مستحقة",
+    [NOTIFICATION_CHANNELS.PUSH]: "كشف حساب الرسوم: {outstanding} مستحقة",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "عائلة {familyName} الكريمة، إليكم كشف حساب الرسوم لعدد {childCount} من الأبناء. الرصيد المستحق {outstanding}. افتحوا تطبيق Studafy للاطلاع على التفاصيل.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_SEAT_APPLE_RENEWAL]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "أصبحت {schoolName} تغطي اشتراكك في Studafy. لتجنّب الدفع مرتين، أوقف التجديد من جهاز iPhone: الإعدادات > اسمك > الاشتراكات > Studafy > إلغاء الاشتراك. يبقى وصولك حتى {periodEnd}، ويستمر مقعد المدرسة بعد ذلك.",
+    [NOTIFICATION_CHANNELS.PUSH]: "أصبحت {schoolName} تغطي Studafy: أوقف تجديد اشتراك App Store",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "منحتك {schoolName} مقعداً في Studafy يغطي اشتراكك في App Store. لا تسمح Apple لنا بإيقاف تجديده نيابةً عنك، لذا لتجنّب الدفع مرتين يُرجى إيقافه: افتح الإعدادات في جهاز iPhone، ثم اضغط على اسمك، ثم الاشتراكات، ثم Studafy، ثم إلغاء الاشتراك. يبقى وصولك حتى {periodEnd}، ويستمر مقعد المدرسة بعد ذلك.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_EXPIRING]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "ينتهي ترخيص Studafy الخاص بـ {schoolName} في {endsAt}، بعد {daysLeft} يوماً. جدّدوه لتبقى مقاعده مغطاة.",
+    [NOTIFICATION_CHANNELS.PUSH]: "{schoolName}: ينتهي ترخيص Studafy بعد {daysLeft} يوماً",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "ينتهي ترخيص Studafy الخاص بـ {schoolName} في {endsAt}، بعد {daysLeft} يوماً. عند انتهائه يفقد كل من يشغل أحد مقاعده الميزات التي يغطيها. تواصلوا مع Studafy لتجديده أو تمديده.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_INVOICE_DUE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "تستحق اليوم ({dueDate}) الفاتورة {invoiceNumber} لترخيص Studafy الخاص بـ {schoolName}. الرصيد: {balance}.",
+    [NOTIFICATION_CHANNELS.PUSH]: "تستحق اليوم فاتورة Studafy رقم {invoiceNumber}: {balance}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "تستحق اليوم، {dueDate}، الفاتورة {invoiceNumber} لترخيص Studafy الخاص بـ {schoolName}، والمبلغ المستحق {balance}. يُرجى الدفع بتحويل بنكي مع ذكر مرجع الدفع المطبوع على الفاتورة، ورفع الإيصال في Studafy.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_INVOICE_OVERDUE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "تأخّر سداد الفاتورة {invoiceNumber} لترخيص Studafy الخاص بـ {schoolName} (كانت مستحقة في {dueDate}). الرصيد: {balance}.",
+    [NOTIFICATION_CHANNELS.PUSH]: "تأخّر سداد فاتورة Studafy رقم {invoiceNumber}: {balance}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "كانت الفاتورة {invoiceNumber} لترخيص Studafy الخاص بـ {schoolName} مستحقة في {dueDate} وما زال {balance} غير مسدد. يُرجى الدفع بتحويل بنكي مع ذكر مرجع الدفع المطبوع على الفاتورة، ورفع الإيصال في Studafy.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_RECEIPT_UPLOADED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "رفعت {schoolName} إيصال تحويل للفاتورة {invoiceNumber}. طابقه مع دفعة.",
+    [NOTIFICATION_CHANNELS.PUSH]: "رفعت {schoolName} إيصالاً للفاتورة {invoiceNumber}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "رفعت {schoolName} إيصال تحويل بنكي للفاتورة {invoiceNumber}. سجّل الدفعة وطابق الإيصال معها في لوحة التراخيص.",
+  },
 } as const satisfies LocaleTemplateSet;

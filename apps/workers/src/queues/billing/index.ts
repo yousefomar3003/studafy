@@ -7,6 +7,18 @@ export {
 } from "./billing-event.service";
 export { scheduleDunningJob, DUNNING_CRON_PATTERN } from "./dunning-scheduler";
 export { scheduleTapRenewalJob, TAP_RENEWAL_CRON_PATTERN } from "./tap-renewal-scheduler";
+export {
+  scheduleLicenseJobs,
+  LICENSE_LIFECYCLE_CRON_PATTERN,
+  LICENSE_REMINDERS_CRON_PATTERN,
+  USAGE_PERIOD_START_CRON_PATTERN,
+} from "./license-schedulers";
+export { runLicenseLifecycle } from "./license-lifecycle";
+export type { LicenseLifecycleResult } from "./license-lifecycle";
+export { runLicenseReminders } from "./license-reminders";
+export type { LicenseRemindersResult } from "./license-reminders";
+export { runUsagePeriodStart } from "./usage-period-start";
+export type { UsagePeriodStartResult } from "./usage-period-start";
 export { runTapRenewals, TAP_RENEWAL_MAX_ATTEMPTS, TAP_RENEWAL_RETRY_DAYS } from "./tap-renewal";
 export type { TapRenewalCharger, TapRenewalResult } from "./tap-renewal";
 export { runDunningSweep } from "./dunning-sweep";

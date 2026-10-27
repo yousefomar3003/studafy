@@ -54,7 +54,7 @@ const CONFIRMED_PAYMENT = {
   ...PENDING_PAYMENT,
   status: "confirmed",
   erpnext_status: "Submitted",
-  receipt_url: "https://erpnext.example.com/receipts/payment-1",
+  receipt_url: "/api/finance/payments/payment-1/receipt",
   confirmed_at: "2026-08-21T00:01:00.000Z",
 };
 
@@ -155,7 +155,7 @@ describe("payment screens accessibility", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Cash" }));
     fireEvent.click(screen.getByRole("button", { name: "Record payment" }));
 
-    await screen.findByRole("link", { name: "Open receipt" });
+    await screen.findByRole("button", { name: "Open receipt" });
 
     await expectNoA11yViolations(container);
   });

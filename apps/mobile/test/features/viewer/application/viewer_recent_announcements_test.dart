@@ -9,7 +9,7 @@ import 'package:studafy_mobile/src/core/api/generated/models/announcement_status
 import 'package:studafy_mobile/src/core/api/generated/models/notification.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/notification_list.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/notification_notification_type.dart';
-import 'package:studafy_mobile/src/core/api/generated/models/status15.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/status16.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/unread_only.dart';
 import 'package:studafy_mobile/src/core/api/generated/notifications/notifications_client.dart';
 import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
@@ -22,7 +22,7 @@ class _FakeAnnouncementsClient extends Fake implements AnnouncementsClient {
   @override
   Future<AnnouncementList> listAnnouncements({
     String? cursor,
-    Status15? status,
+    Status16? status,
     int? limit = 20,
   }) async {
     calls++;

@@ -2,10 +2,15 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { ERPNEXT_DOC_EVENT_MAP } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
-import { withTenantTx } from "../db/tenant-tx";
+import { setTenantScope, withSystemTx, withTenantTx } from "../db/tenant-tx";
 import { auditAction, emitAuditLog } from "../middleware/auditEmitter";
+import {
+  notifyInvoiceIssued,
+  notifyPaymentReceived,
+} from "../modules/finance/communications/service";
 import { projectFeeScheduleEntry } from "../modules/finance/fee-schedules/projection";
 import { projectInvoiceEntry } from "../modules/finance/invoices/projection";
+import { refreshInvoicesSettledBy } from "../modules/finance/invoices/refresh";
 import { projectPaymentEntry } from "../modules/finance/payments/projection";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
@@ -15,6 +20,7 @@ import { verifyWebhookSignature, webhookSignatureFrom } from "./signature";
 import type { Database } from "../db";
 import type { Logger } from "../logger";
 import type { AppEnv } from "../middleware/requestId";
+import type { TenantErpNextFactory } from "../modules/finance/client/tenant-client";
 import type { ErpNextFeeSchedule } from "../modules/finance/fee-schedules/projection";
 import type { ErpNextSalesInvoice } from "../modules/finance/invoices/projection";
 import type { ErpNextPaymentEntry } from "../modules/finance/payments/projection";
@@ -93,6 +99,39 @@ async function projectToCache(
   }
 }
 
+/**
+ * Tell the student's guardians about a newly issued invoice or a confirmed payment, once the
+ * projection above has put the document in the finance cache. Best-effort and self-contained: a
+ * failure here is logged and swallowed, because the event is already deduplicated, and answering
+ * ERPNext with an error would only make it redeliver an event this endpoint will then skip.
+ * app.finance_communications keeps each notice to one send per guardian.
+ */
+async function notifyGuardians(
+  db: Database,
+  schoolId: string,
+  eventName: string,
+  data: Record<string, unknown>,
+  logger: Logger,
+): Promise<void> {
+  const docname = typeof data.name === "string" ? data.name.trim() : "";
+  if (!docname) return;
+  try {
+    if (eventName === "erpnext.invoiceSubmitted") {
+      await withSystemTx(db, async (tx) => {
+        await setTenantScope(tx, schoolId);
+        await notifyInvoiceIssued(tx, schoolId, docname);
+      });
+    } else if (eventName === "erpnext.paymentReceived") {
+      await withSystemTx(db, async (tx) => {
+        await setTenantScope(tx, schoolId);
+        await notifyPaymentReceived(tx, schoolId, docname);
+      });
+    }
+  } catch (err) {
+    logger.error({ err, school_id: schoolId, erpnext_docname: docname }, "fee notice failed");
+  }
+}
+
 const webhookRoute = createRoute({
   method: "post",
   path: "/erpnext/webhooks",
@@ -156,7 +195,11 @@ const webhookRoute = createRoute({
  * OpenAPI definitions while still serving its traffic, so a plain Hono here would erase this
  * endpoint from the document with no error.
  */
-export function erpNextWebhookRoutes(db: Database, logger: Logger): OpenAPIHono<AppEnv> {
+export function erpNextWebhookRoutes(
+  db: Database,
+  logger: Logger,
+  erpnextFactory: TenantErpNextFactory | null,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   /**
@@ -255,6 +298,16 @@ export function erpNextWebhookRoutes(db: Database, logger: Logger): OpenAPIHono<
       });
 
       await projectToCache(db, schoolId, eventName, body.data as Record<string, unknown>, logger);
+      if (eventName === "erpnext.paymentReceived" && erpnextFactory) {
+        await refreshInvoicesSettledBy(
+          db,
+          erpnextFactory,
+          schoolId,
+          body.data as ErpNextPaymentEntry,
+          logger,
+        );
+      }
+      await notifyGuardians(db, schoolId, eventName, body.data as Record<string, unknown>, logger);
     } catch (err) {
       logger.error({ err, event_id: body.event_id }, "webhook ingestion failed");
       // Detail is withheld from the client by the 5xx arm of errorHandlerMiddleware; the cause is

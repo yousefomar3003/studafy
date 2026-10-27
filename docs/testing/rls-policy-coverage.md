@@ -21,9 +21,13 @@ complete state dump, run `db/policies/rls-coverage-diagnostics.sql` with `psql`.
 ## Classification and RLS rules
 
 Every `app` table must either contain `school_id` or appear in the reviewed global allowlist:
-`approved_globals` in `db/policies/rls-coverage.ts` (12 tables today: `countries`, `currencies`,
+`approved_globals` in `db/policies/rls-coverage.ts` (17 tables today: `countries`, `currencies`,
 `schools`, `plans`, `plan_prices`, `platform_settings`, `billing_events`, `security_events`,
-`email_events`, `email_suppressions`, `sales_inquiries`, `school_applications`). `public.schema_migrations` is outside the application schema and therefore outside
+`email_events`, `email_suppressions`, `sales_inquiries`, `school_applications`, `features`,
+`plan_features`, `license_price_settings`, `license_price_brackets`, `license_invoice_counters`;
+`features` and `plan_features` are the paid-feature catalog and tier contents from migration 000161,
+global like `plans`; the last three are the license price list and the invoice number sequence from
+000165, admin-only). `public.schema_migrations` is outside the application schema and therefore outside
 this audit. A new global table fails until its scope is documented and reviewed.
 
 Every tenant relation must have:
@@ -60,11 +64,16 @@ not hiding relationships. The exact reviewed payload exceptions are:
 - `fee_schedule_cache.erpnext_payload`, `invoice_cache.erpnext_payload`, and
   `payment_cache.erpnext_payload`;
 - `finance_sync_outbox.payload`;
-- `notifications.metadata`; and
-- `outbox_events.payload`.
+- `notifications.metadata`;
+- `outbox_events.payload`;
+- `student_subject_results.config_snapshot`, `student_subject_results.breakdown` and
+  `certificates.content` (000160, write-once snapshots of finalized results and issued
+  certificates); and
+- `license_quotes.breakdown` (000165, the pricing calculator's result as sent to the school; the
+  invoice lines it becomes are relational).
 
-These hold polymorphic audit state, internal event envelopes, or external/flexible provider
-payloads. Tenant identity and relational routing remain normal constrained columns. Adding another
+These hold polymorphic audit state, internal event envelopes, external/flexible provider
+payloads, or immutable point-in-time snapshots. Tenant identity and relational routing remain normal constrained columns. Adding another
 exception requires data-model documentation and an explicit audit allowlist change.
 
 ## Performance methodology

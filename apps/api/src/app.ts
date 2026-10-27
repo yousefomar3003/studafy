@@ -45,7 +45,6 @@ import {
   aiConceptsRoutes,
   aiConsentGate,
   aiConsentRoutes,
-  aiEntitlementGate,
   aiExamRoutes,
   aiExplainRoutes,
   aiFlashcardRoutes,
@@ -57,12 +56,12 @@ import {
   aiRetrievalRoutes,
   aiSummaryRoutes,
   aiUsageRoutes,
-  databaseStudentIdResolver,
   createAiTokenMeter,
   createConceptsCache,
   createDeterministicQueryEmbedder,
   createSummaryCache,
   isAiModelCallPath,
+  provideAiTokenBudget,
 } from "./modules/ai";
 import { announcementRoutes } from "./modules/announcements";
 import {
@@ -95,9 +94,11 @@ import {
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
+import { createFeatureService, featureRoutes, provideFeatures } from "./modules/features";
 import {
   EnvCredentialResolver,
   expenseRoutes,
+  familyAccountRoutes,
   familyFinancialViewRoutes,
   feeStructureRoutes,
   feeStructureStudentRoutes,
@@ -106,10 +107,12 @@ import {
   installmentRoutes,
   onlineFeePaymentRoutes,
   paymentRoutes,
+  receiptRoutes,
   paymentWebhookRoutes,
   reconciliationRoutes,
   refundRoutes,
   scholarshipRoutes,
+  siblingDiscountRoutes,
   financeStudentRoutes,
   refundWebhookRoutes,
   settleOnlineFeePayment,
@@ -121,8 +124,15 @@ import {
   gradeEntryRoutes,
   publishedGradeRoutes,
 } from "./modules/grades";
+import { gradingConfigRoutes, gradingMarksRoutes, gradingResultsRoutes } from "./modules/grading";
 import { importRoutes } from "./modules/imports";
 import { inquiryRoutes } from "./modules/inquiries";
+import {
+  platformLicenseBillingRoutes,
+  platformLicenseRoutes,
+  schoolLicenseBillingRoutes,
+  schoolLicenseRoutes,
+} from "./modules/licensing";
 import { messagingRoutes } from "./modules/messaging";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
@@ -433,6 +443,15 @@ export function createApp({
     ? createEntitlementService({ database, redis: redis ?? null, logger })
     : null;
 
+  // Paid features (docs/billing/feature-licensing.md). Resolves through the entitlement service
+  // above, so a grant change propagates on the same versioned cache. Put on every /api request so
+  // any route can guard itself with requireFeature("<key>") and nothing else.
+  const featureService =
+    database && entitlements ? createFeatureService({ database, entitlements, logger }) : null;
+  if (featureService) {
+    app.use("/api/*", provideFeatures(featureService));
+  }
+
   if (keyStore) {
     app.use(
       "/api/*",
@@ -488,10 +507,29 @@ export function createApp({
   // authenticates by HMAC over the raw body, so it must sit outside the bearer-token chain. It gets
   // its own URL rather than sharing the generic one because payment confirmation carries an SLA the
   // rest of the ingest does not, and a single-purpose path can be monitored and alerted on its own.
-  // Both share one projection (modules/finance/payments/projection.ts) and one dedup table.
+  // Both share one projection (modules/finance/payments/projection.ts) and one dedup table, and both
+  // re-read the invoices a payment settles, which is why the ERPNext client is built here.
+  //
+  // Finance gateway (ST-119). A pass-through to each school's ERPNext site: ERPNext owns fee
+  // validation, currency rules and totals, and this only routes, crosswalks ids, and maintains the
+  // read model. The Host header selects the tenant's Frappe site, so the client is built per
+  // school rather than shared. Idempotency on /api/finance/* is already wired above. Built outside
+  // the finance block further down because the billing webhook also records settled online fee
+  // payments in ERPNext.
+  const erpnextFactory = database
+    ? new TenantErpNextFactory({
+        resolver: new EnvCredentialResolver({
+          baseUrl: process.env.ERPNEXT_API_URL,
+          apiKey: process.env.ERPNEXT_API_KEY,
+        }),
+        logger,
+        redis,
+      })
+    : null;
+
   if (database) {
-    app.route("/", erpNextWebhookRoutes(database, logger));
-    app.route("/", paymentWebhookRoutes(database, logger));
+    app.route("/", erpNextWebhookRoutes(database, logger, erpnextFactory));
+    app.route("/", paymentWebhookRoutes(database, logger, erpnextFactory));
     app.route("/", refundWebhookRoutes(database, logger));
   }
 
@@ -542,22 +580,6 @@ export function createApp({
   // pick between them by the school's region (ST-298); each provider's webhook has its own path.
   const paymentProviders = { stripe: stripeProvider, tap: tapProvider, tapCountries };
 
-  // Finance gateway (ST-119). A pass-through to each school's ERPNext site: ERPNext owns fee
-  // validation, currency rules and totals, and this only routes, crosswalks ids, and maintains the
-  // read model. The Host header selects the tenant's Frappe site, so the client is built per
-  // school rather than shared. Idempotency on /api/finance/* is already wired above. Built outside
-  // the block below because the billing webhook also records settled online fee payments in ERPNext.
-  const erpnextFactory = database
-    ? new TenantErpNextFactory({
-        resolver: new EnvCredentialResolver({
-          baseUrl: process.env.ERPNEXT_API_URL,
-          apiKey: process.env.ERPNEXT_API_KEY,
-        }),
-        logger,
-        redis,
-      })
-    : null;
-
   // Family financial view (ST-127). Reads only the local finance read models (invoice, installment,
   // and payment caches) and never calls ERPNext, so it is mounted whenever there is a database —
   // a school without ERPNext configured still gets an (empty) household view instead of a 404.
@@ -566,7 +588,11 @@ export function createApp({
     // Scholarships live in Studafy's own tables; ERPNext only sees them as an invoice's discount,
     // applied by the billing worker, so they need no ERPNext client here.
     app.route("/", scholarshipRoutes(database));
+    // The sibling rule is Studafy's own, applied by the billing worker like a scholarship.
+    app.route("/", siblingDiscountRoutes(database));
     app.route("/", financeStudentRoutes(database));
+    // Receipts are rendered from the payment cache, so they need no ERPNext client either.
+    app.route("/", receiptRoutes(database));
   }
 
   if (database && erpnextFactory) {
@@ -576,6 +602,9 @@ export function createApp({
     app.route("/", financeReportRoutes(database, erpnextFactory, redis ?? null, storage));
     app.route("/", expenseRoutes(database, erpnextFactory, storage));
     app.route("/", paymentRoutes(database, erpnextFactory));
+    // Families as finance sees them: balances across children, one payment split across their
+    // invoices (through the payment forwarder above), reminders and statements to guardians.
+    app.route("/", familyAccountRoutes(database, erpnextFactory));
     // Online fee collection (ST-298): hosted payment for an outstanding invoice, settled by the
     // provider webhook below and recorded in ERPNext through the payment forwarder above.
     app.route("/", onlineFeePaymentRoutes(database, paymentProviders));
@@ -956,6 +985,17 @@ export function createApp({
     app.route("/", examRoutes(database));
   }
 
+  // Academic grading (000160). Year-scoped grade defaults with section overrides, structured
+  // assessments and marks, finalized result snapshots, report cards and certificates. Every
+  // calculation goes through @studafy/grading-engine. Gated per route on academicConfig:*,
+  // grade:*, approval:review, result:finalize and academicCertificate:issue, and per row on the
+  // section and subject a teacher teaches.
+  if (database) {
+    app.route("/", gradingConfigRoutes(database));
+    app.route("/", gradingMarksRoutes(database));
+    app.route("/", gradingResultsRoutes(database));
+  }
+
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and
   // versioned grading schemes per term. Gated on GRADE_READ/GRADE_UPDATE permissions
   // and class-level teacher authorization.
@@ -1023,6 +1063,33 @@ export function createApp({
   // Apple exists and stores tokens (see modules/account/apple-token-revoker.ts).
   if (database) {
     app.route("/", accountRoutes(database, redis ?? null, jtiDenylist));
+  }
+
+  // The caller's paid features (GET /api/me/features), for the web and mobile apps. Authentication
+  // only -- the caller is always the subject.
+  if (featureService) {
+    app.route("/", featureRoutes());
+  }
+
+  // School feature licenses and seats (docs/billing/feature-licensing.md, session 2): the school's
+  // seat management (/api/school/license, license:read/manage) and the super admin's license console
+  // (/api/platform/schools/{schoolId}/licenses, platform:read/manage). A seat given to someone who
+  // pays personally stops that renewal through the provider: Stripe, and Google Play when the store
+  // is configured.
+  if (database) {
+    const licensingDeps = {
+      database,
+      redis: redis ?? null,
+      providers: { stripe: stripeProvider, googlePlay: storeBilling?.google ?? null },
+      logger,
+      storage,
+    };
+    app.route("/", schoolLicenseRoutes(licensingDeps));
+    app.route("/", platformLicenseRoutes(licensingDeps));
+    // Session 3: pricing, quotes, invoices and bank-transfer payments. `storage` carries transfer
+    // receipts; null answers 503 on the receipt routes only.
+    app.route("/", schoolLicenseBillingRoutes(licensingDeps));
+    app.route("/", platformLicenseBillingRoutes(licensingDeps));
   }
 
   // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with
@@ -1143,20 +1210,20 @@ export function createApp({
     app.route("/", refundAdminRoutes(database, paymentProviders));
   }
 
-  // AI entitlement & quota gate (ST-155). Mounted only when both a database (to resolve
-  // entitlements) and Redis (to meter the monthly token budget) are present. The gate deliberately
-  // does not fail open like rate limiting: an admitted request it could not meter would spend
-  // unbilled budget, so the whole surface is absent rather than un-metered. Routes under /api/ai/*
-  // that predate this gate are likewise absent until both dependencies exist.
-  if (database && redis && entitlements) {
+  // AI access and token budget. Each AI route guards itself with requireFeature("ai_tutor" |
+  // "study_tools") (docs/billing/feature-licensing.md), which replaced the ST-155 entitlement gate,
+  // then aiTokenBudget(), which keeps that gate's monthly token budget. Mounted only when both a
+  // database (to resolve features) and Redis (to meter the token budget) are present. The budget
+  // deliberately does not fail open like rate limiting: an admitted request it could not meter
+  // would spend unbilled budget, so the whole surface is absent rather than un-metered.
+  if (database && redis && entitlements && featureService) {
     const aiMeter = createAiTokenMeter({ redis });
     // Third-party data-sharing consent (ST-305). Registered first so a route that would send user
     // data to the model provider is refused before quota is reserved or a prompt is built.
     app.use("/api/ai/*", aiConsentGate({ database }));
     app.use(
       "/api/ai/*",
-      aiEntitlementGate({
-        entitlements,
+      provideAiTokenBudget({
         meter: aiMeter,
         // The LLM gateway (ST-164) can generate up to 16,384 output tokens, which no default-size
         // hold can cover, so the generate path resolves the worst-case hold (AI_LLM_MAX_RESERVE_TOKENS).
@@ -1190,16 +1257,9 @@ export function createApp({
         },
       }),
     );
-    app.route(
-      "/",
-      aiUsageRoutes({
-        entitlements,
-        meter: aiMeter,
-        studentIdFor: databaseStudentIdResolver(database),
-      }),
-    );
-    // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Passed through by
-    // both gates -- it never reaches the provider, and withdrawal must work without an add-on.
+    app.route("/", aiUsageRoutes({ meter: aiMeter }));
+    // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Not behind
+    // requireFeature -- it never reaches the provider, and withdrawal must work without an add-on.
     app.route("/", aiConsentRoutes({ database }));
     // Hybrid retrieval (ST-162). Mounted under the same gate so a search reserves and commits the
     // caller's AI quota, and only when the gate's dependencies (a database for entitlements, Redis
@@ -1331,16 +1391,16 @@ export function createApp({
       }),
     );
     // AI content reporting and the moderation queue (ST-306). Students report any AI output; the
-    // school's moderators work the queue. Neither calls the model or spends quota: the gate passes
-    // both through (entitlement-gate.ts's defaultReserveQuota), so reporting stays available after
-    // an add-on lapses and admins without one can moderate. The report route reads summaries from
+    // school's moderators work the queue. Neither calls the model or spends quota, so neither is
+    // behind requireFeature or the token budget: reporting stays available after an add-on lapses
+    // and admins without one can moderate. The report route reads summaries from
     // the same Redis cache the summarizer writes -- it is the only place a summary's text exists.
     app.route("/", aiReportRoutes({ database, summaryCache: createSummaryCache(redis) }));
     app.route("/", aiModerationRoutes({ database }));
     // AI metrics dashboard (ST-155). Cross-tenant per-tenant usage and cost metrics for the
     // platform team. SUPER_ADMIN only, no quota consumption — the route reads the durable ledger
-    // via withSystemTx (same cross-tenant mechanism as the webhook processor). Mounted outside
-    // the gate's quota reservation via the reserveQuota skip in entitlement-gate.ts.
+    // via withSystemTx (same cross-tenant mechanism as the webhook processor). Not behind
+    // requireFeature or the token budget.
     app.route("/", aiMetricsRoutes({ database }));
   }
 

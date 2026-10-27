@@ -124,6 +124,18 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
       gatewayConfirm: false,
     },
   ],
+  // A bank transfer receipt for a license invoice (docs/billing/feature-licensing.md, session 3).
+  // Uploaded by the school (license:manage) and confirmed by the licensing module inside the write
+  // that records it; the super admin's own uploads go through the license console's upload route.
+  [
+    "license.receipt",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.LICENSE_MANAGE,
+      gatewayConfirm: false,
+    },
+  ],
   [
     "user.avatar",
     {

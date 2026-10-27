@@ -108,6 +108,9 @@ function fakeStores(
       acknowledge: async (_productId, token) => {
         acknowledged.push(token);
       },
+      cancel: async () => {
+        throw new Error("store purchase processing never cancels");
+      },
       parseNotification: () => {
         if (!answers.googleNotification) throw new StoreVerificationError("not a push");
         return answers.googleNotification;

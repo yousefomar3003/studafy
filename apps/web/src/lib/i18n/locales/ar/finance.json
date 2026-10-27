@@ -26,7 +26,10 @@
     "recordExpense": "تسجيل مصروف",
     "defaultsToToday": "القيمة الافتراضية هي تاريخ اليوم.",
     "checkFormAndRetry": "يرجى التحقق من النموذج والمحاولة مرة أخرى.",
-    "searchByStudentOrInvoice": "ابحث باسم الطالب أو رقم الفاتورة"
+    "searchByStudentOrInvoice": "ابحث باسم الطالب أو رقم الفاتورة",
+    "cancel": "إلغاء",
+    "receiptError": "تعذّر فتح الإيصال. حاول مرة أخرى.",
+    "family": "العائلة"
   },
   "docStatus": {
     "draft": "مسودة",
@@ -55,7 +58,8 @@
       "refunds": "المبالغ المستردة ←",
       "scholarships": "المنح الدراسية ←",
       "reports": "التقارير ←",
-      "expenses": "المصروفات ←"
+      "expenses": "المصروفات ←",
+      "families": "العائلات ←"
     }
   },
   "overdue": {
@@ -89,7 +93,10 @@
     "collections": {
       "title": "المحصَّل مقابل المستحق لهذا الفصل",
       "error": "تعذّر تحميل تقرير التحصيل.",
-      "empty": "لا يوجد ملخص تحصيل لهذا الفصل بعد."
+      "empty": "لا يوجد ملخص تحصيل لهذا الفصل بعد.",
+      "invoiced": "المفوتر (الفواتير المفتوحة)",
+      "collected": "المحصّل من الفواتير المفتوحة",
+      "outstanding": "الذمم المستحقة"
     },
     "overdue": {
       "title": "الأقساط المتأخرة",
@@ -381,5 +388,163 @@
     "remove": "إزالة {{name}}",
     "loading": "جارٍ تحميل الطلاب…",
     "showList": "عرض الطلاب"
+  },
+  "families": {
+    "position": {
+      "eldest": "الأكبر",
+      "second": "الابن الثاني",
+      "third": "الابن الثالث",
+      "nth": "الابن رقم {{position}}",
+      "notEnrolled": "غير مسجّل"
+    },
+    "siblingDiscountBadge": "{{position}} · خصم إخوة {{percentage}}%",
+    "sendError": "تعذّر إرسال الرسالة. حاول مرة أخرى.",
+    "list": {
+      "title": "العائلات",
+      "intro": "كل عائلة مع أولياء أمورها وأبنائها وما عليها من مستحقات لهم جميعًا. افتح العائلة لتسجيل دفعة واحدة عن عدة أبناء، أو لإرسال تذكير أو كشف حساب.",
+      "caption": "العائلات",
+      "empty": "لا توجد عائلات تطابق هذه المرشحات.",
+      "loadError": "تعذّر تحميل العائلات."
+    },
+    "columns": {
+      "family": "العائلة",
+      "children": "الأبناء",
+      "outstanding": "المستحق",
+      "overdue": "المتأخر",
+      "lastPayment": "آخر دفعة",
+      "lastReminder": "آخر تذكير"
+    },
+    "filters": {
+      "search": "بحث",
+      "searchPlaceholder": "العائلة أو الابن أو ولي الأمر",
+      "balance": "الرصيد",
+      "allBalances": "كل العائلات",
+      "outstanding": "عليها مستحقات",
+      "overdue": "عليها رسوم متأخرة",
+      "sort": "الترتيب حسب",
+      "sortName": "الاسم",
+      "sortOutstanding": "الأعلى رصيدًا أولًا",
+      "siblingsOnly": "العائلات التي لديها ابنان أو أكثر فقط"
+    },
+    "bulk": {
+      "button": "تذكير كل العائلات المتأخرة",
+      "confirmTitle": "إرسال تذكير لكل عائلة عليها رسوم متأخرة؟",
+      "confirmBody": "يتلقى أولياء أمور كل عائلة إشعارًا بالمبلغ المتأخر. تُستثنى العائلات التي ذُكّرت خلال آخر 24 ساعة.",
+      "confirm": "إرسال التذكيرات",
+      "sentTitle_zero": "لم يُرسل أي تذكير",
+      "sentTitle_one": "أُرسل التذكير إلى عائلة واحدة",
+      "sentTitle_two": "أُرسل التذكير إلى عائلتين",
+      "sentTitle_few": "أُرسل التذكير إلى {{count}} عائلات",
+      "sentTitle_many": "أُرسل التذكير إلى {{count}} عائلة",
+      "sentTitle_other": "أُرسل التذكير إلى {{count}} عائلة",
+      "sentDetail": "تم إشعار {{guardians}} من أولياء الأمور. {{skipped}} عائلة ذُكّرت اليوم مسبقًا.",
+      "error": "تعذّر إرسال التذكيرات. حاول مرة أخرى."
+    },
+    "detail": {
+      "loadError": "تعذّر تحميل هذه العائلة.",
+      "householdError": "تعذّر تحميل فواتير الأبناء.",
+      "primary": "جهة الاتصال الأساسية",
+      "recordPayment": "تسجيل دفعة العائلة",
+      "sendReminder": "إرسال تذكير بالمتأخرات",
+      "sendStatement": "إرسال كشف الحساب",
+      "lastReminded": "آخر تذكير بتاريخ {{date}}.",
+      "acrossChildren_zero": "لا يوجد أبناء",
+      "acrossChildren_one": "لابن واحد",
+      "acrossChildren_two": "لابنين",
+      "acrossChildren_few": "لـ {{count}} أبناء",
+      "acrossChildren_many": "لـ {{count}} ابنًا",
+      "acrossChildren_other": "لـ {{count}} ابن",
+      "overdueInvoices_zero": "لا توجد فواتير متأخرة",
+      "overdueInvoices_one": "فاتورة واحدة متأخرة",
+      "overdueInvoices_two": "فاتورتان متأخرتان",
+      "overdueInvoices_few": "{{count}} فواتير متأخرة",
+      "overdueInvoices_many": "{{count}} فاتورة متأخرة",
+      "overdueInvoices_other": "{{count}} فاتورة متأخرة",
+      "billed": "إجمالي الفواتير",
+      "lastPaid": "آخر دفعة بتاريخ {{date}}",
+      "noPayments": "لا توجد دفعات بعد.",
+      "childrenHeading": "الأبناء",
+      "messagesHeading": "الرسائل المرسلة إلى أولياء الأمور",
+      "siblingDiscount": "خصم إخوة {{percentage}}% على الفواتير الجديدة",
+      "overdueTag": "متأخرة",
+      "invoicesCaption": "فواتير {{name}}",
+      "paymentsCaption": "دفعات {{name}}",
+      "noInvoices": "لا توجد فواتير بعد.",
+      "reminderSent_zero": "لم يُرسل التذكير لأي ولي أمر",
+      "reminderSent_one": "أُرسل التذكير إلى ولي أمر واحد",
+      "reminderSent_two": "أُرسل التذكير إلى وليّي أمر",
+      "reminderSent_few": "أُرسل التذكير إلى {{count}} من أولياء الأمور",
+      "reminderSent_many": "أُرسل التذكير إلى {{count}} من أولياء الأمور",
+      "reminderSent_other": "أُرسل التذكير إلى {{count}} من أولياء الأمور",
+      "statementSent_zero": "لم يُرسل كشف الحساب لأي ولي أمر",
+      "statementSent_one": "أُرسل كشف الحساب إلى ولي أمر واحد",
+      "statementSent_two": "أُرسل كشف الحساب إلى وليّي أمر",
+      "statementSent_few": "أُرسل كشف الحساب إلى {{count}} من أولياء الأمور",
+      "statementSent_many": "أُرسل كشف الحساب إلى {{count}} من أولياء الأمور",
+      "statementSent_other": "أُرسل كشف الحساب إلى {{count}} من أولياء الأمور",
+      "suppressed_zero": "لم يوقف أي ولي أمر هذه الإشعارات.",
+      "suppressed_one": "ولي أمر واحد أوقف هذه الإشعارات.",
+      "suppressed_two": "وليّا أمر أوقفا هذه الإشعارات.",
+      "suppressed_few": "{{count}} من أولياء الأمور أوقفوا هذه الإشعارات.",
+      "suppressed_many": "{{count}} من أولياء الأمور أوقفوا هذه الإشعارات.",
+      "suppressed_other": "{{count}} من أولياء الأمور أوقفوا هذه الإشعارات.",
+      "notSent": {
+        "nothing_overdue": "لا توجد متأخرات، لذلك لم يُرسل أي تذكير.",
+        "recently_reminded": "ذُكّرت هذه العائلة خلال آخر 24 ساعة.",
+        "no_guardians": "لا يوجد ولي أمر نشط مرتبط بهذه العائلة."
+      }
+    },
+    "messages": {
+      "kind": "الرسالة",
+      "recipient": "ولي الأمر",
+      "sentBy": "أرسلها",
+      "automatic": "تلقائي",
+      "delivered": "تم التسليم",
+      "turnedOff": "أوقفها ولي الأمر",
+      "caption": "رسائل الرسوم المرسلة إلى هذه العائلة",
+      "empty": "لم تُرسل أي رسائل رسوم بعد.",
+      "kinds": {
+        "invoice_issued": "فاتورة جديدة",
+        "payment_received": "استلام دفعة",
+        "payment_reminder": "تذكير بالمتأخرات",
+        "statement": "كشف حساب"
+      }
+    },
+    "payment": {
+      "title": "دفعة العائلة — {{family}}",
+      "backToFamily": "العودة إلى العائلة",
+      "nothingOwed": "لا توجد مستحقات على هذه العائلة حاليًا.",
+      "formLabel": "دفعة العائلة",
+      "amount": "المبلغ المدفوع",
+      "owes": "على العائلة {{amount}} {{currency}}.",
+      "payAll": "دفع الرصيد بالكامل",
+      "manual": "تحديد المبلغ لكل فاتورة",
+      "manualHint": "أدخل حصة كل فاتورة. يجب أن يساوي مجموع الحصص المبلغ المدفوع.",
+      "autoHint": "يُسدَّد المبلغ للفاتورة الأقدم استحقاقًا أولًا ثم التي تليها، لجميع الأبناء.",
+      "splitCaption": "توزيع الدفعة",
+      "share": "هذه الدفعة",
+      "shareFor": "المبلغ للفاتورة {{invoice}}",
+      "exceeds": "على العائلة {{amount}} {{currency}}، ولا يمكن أن يتجاوز المبلغ ذلك.",
+      "invalidShare": "يجب أن تكون كل حصة مبلغًا موجبًا.",
+      "shareTooLarge": "إحدى الحصص أكبر من المستحق على فاتورتها.",
+      "unbalanced": "مجموع الحصص {{allocated}} {{currency}}، بينما المبلغ المدفوع {{amount}} {{currency}}.",
+      "submit": "تسجيل الدفعة",
+      "resultLabel": "نتيجة الدفعة",
+      "detail": "التفاصيل",
+      "receiptsLater": "يؤكد ERPNext كل دفعة خلال ثوانٍ، وتُفتح الإيصالات من هنا بعد التأكيد.",
+      "retry": "إعادة المحاولة للفواتير التي فشلت",
+      "outcome": {
+        "completed": "سُجّلت الدفعة على جميع الفواتير.",
+        "partial": "سُدّدت بعض الفواتير ولم تُسدَّد أخرى. أعد المحاولة لتسديد الباقي فقط.",
+        "failed": "تعذّر تسجيل الدفعة ولم يُخصم أي مبلغ؛ حاول مرة أخرى."
+      },
+      "results": {
+        "recorded": "سُجّلت",
+        "replayed": "مسجّلة مسبقًا",
+        "failed": "فشلت",
+        "confirmed": "مؤكدة",
+        "awaiting": "بانتظار ERPNext"
+      }
+    }
   }
 }

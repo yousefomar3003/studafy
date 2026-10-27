@@ -78,6 +78,16 @@ export default function InvoiceListPage() {
       renderCell: (row) => row.admission_number,
     },
     {
+      id: "family",
+      header: t("finance.common.family"),
+      renderCell: (row) =>
+        row.family_id ? (
+          <Link to={`/portal/finance/families/${row.family_id}`}>{row.family_name}</Link>
+        ) : (
+          "—"
+        ),
+    },
+    {
       id: "status",
       header: t("finance.common.status"),
       renderCell: (row) => (

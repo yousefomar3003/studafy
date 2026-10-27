@@ -76,7 +76,10 @@ class _ChildDetail extends ConsumerWidget {
           Expanded(
             child: TabBarView(
               children: [
-                ChildGradesView(studentId: child.studentId),
+                ChildGradesView(
+                  studentId: child.studentId,
+                  studentName: child.studentName,
+                ),
                 ChildAttendanceView(studentId: child.studentId),
                 ChildTimetableView(studentId: child.studentId),
                 ChildAssignmentsView(studentId: child.studentId),

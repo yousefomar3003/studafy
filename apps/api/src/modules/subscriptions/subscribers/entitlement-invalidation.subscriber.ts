@@ -5,6 +5,7 @@ import {
   aiEntitlementCacheKey,
   entitlementCacheKey,
   invalidateEntitlementEntry,
+  userEntitlementCacheKey,
 } from "../entitlements/cache";
 
 import type { Logger } from "../../../logger";
@@ -30,6 +31,8 @@ import type { RedisClient } from "../../../redis";
 
 const SUBSCRIPTION_CHANNEL = `events:*:${DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED}`;
 const AI_CHANNEL = `events:*:${DOMAIN_EVENTS.AI_SUBSCRIPTION_STATUS_CHANGED}`;
+const USER_CHANNEL = `events:*:${DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED}`;
+const CHANNELS = [SUBSCRIPTION_CHANNEL, AI_CHANNEL, USER_CHANNEL] as const;
 
 export interface EntitlementInvalidationSubscriber {
   close(): Promise<void>;
@@ -44,7 +47,7 @@ export async function startEntitlementInvalidationSubscriber(options: {
   const log = logger.child({ component: "entitlement-invalidation-subscriber" });
 
   const onMessage = (pattern: string, channel: string, raw: string): void => {
-    if (pattern !== SUBSCRIPTION_CHANNEL && pattern !== AI_CHANNEL) return;
+    if (!(CHANNELS as readonly string[]).includes(pattern)) return;
 
     void (async () => {
       const segments = channel.split(":");
@@ -102,6 +105,26 @@ export async function startEntitlementInvalidationSubscriber(options: {
           { student_id: parsed.data.studentId, version: parsed.data.entitlementsVersion, moved },
           "invalidated ai entitlement",
         );
+        return;
+      }
+
+      if (eventName === DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED) {
+        const parsed =
+          eventPayloadSchemas[DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED].safeParse(decoded);
+        if (!parsed.success) {
+          log.warn({ channel, issues: parsed.error.issues }, "ignored invalid user payload");
+          return;
+        }
+
+        const moved = await invalidateEntitlementEntry(
+          redis,
+          userEntitlementCacheKey(parsed.data.userId),
+          parsed.data.entitlementsVersion,
+        );
+        log.info(
+          { user_id: parsed.data.userId, version: parsed.data.entitlementsVersion, moved },
+          "invalidated user entitlement",
+        );
       }
     })().catch((err) => {
       log.error({ err, channel }, "entitlement cache invalidation failed");
@@ -109,8 +132,8 @@ export async function startEntitlementInvalidationSubscriber(options: {
   };
 
   subscriber.on("pmessage", onMessage);
-  await subscriber.psubscribe(SUBSCRIPTION_CHANNEL, AI_CHANNEL);
-  log.info({ patterns: [SUBSCRIPTION_CHANNEL, AI_CHANNEL] }, "subscribed");
+  await subscriber.psubscribe(...CHANNELS);
+  log.info({ patterns: CHANNELS }, "subscribed");
 
   let closed = false;
   return {
@@ -119,7 +142,7 @@ export async function startEntitlementInvalidationSubscriber(options: {
       closed = true;
       subscriber.off("pmessage", onMessage);
       try {
-        await subscriber.punsubscribe(SUBSCRIPTION_CHANNEL, AI_CHANNEL);
+        await subscriber.punsubscribe(...CHANNELS);
       } finally {
         await subscriber.quit();
       }

@@ -72,6 +72,10 @@ export const invoiceSchema = z
     student_id: uuidSchema,
     student_name: z.string(),
     admission_number: z.string(),
+    family_id: uuidSchema.nullable().openapi({
+      description: "The student's family, for finance's family view; null when none is linked.",
+    }),
+    family_name: z.string().nullable(),
     erpnext_docname: z.string().openapi({ description: "The invoice number." }),
     erpnext_status: z.string(),
     // Strings, not numbers: minor units at the currency's own precision — see

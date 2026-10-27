@@ -89,6 +89,24 @@ describeDb("erpnext id mappings", () => {
     expect(count!.n).toBe(1);
   });
 
+  test("a document already mapped under another local id keeps its mapping", async () => {
+    // The billing worker maps a generated invoice under its idempotency key; the webhook projection
+    // later sees the same invoice under its invoice_cache id and must not fail on it.
+    const school = await createSchool(db.sql);
+    const generationKey = crypto.randomUUID();
+    const cacheId = crypto.randomUUID();
+
+    const first = await withTx(school.id, (tx) =>
+      upsertMapping(tx, school.id, "invoice", generationKey, "SINV-2026-0009"),
+    );
+    const second = await withTx(school.id, (tx) =>
+      upsertMapping(tx, school.id, "invoice", cacheId, "SINV-2026-0009"),
+    );
+
+    expect(second.id).toBe(first.id);
+    expect(second.studafy_id).toBe(generationKey);
+  });
+
   test("re-pointing a local id at a renamed ERPNext document updates in place", async () => {
     const school = await createSchool(db.sql);
     const localId = crypto.randomUUID();

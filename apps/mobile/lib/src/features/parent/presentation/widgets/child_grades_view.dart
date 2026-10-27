@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/generated/models/grade_trend_point.dart';
 import '../../../../core/api/generated/models/published_term_summary.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../student/presentation/academic_results_screen.dart';
 import '../../../student/presentation/widgets/subject_grades_card.dart';
 import '../../application/child_detail_providers.dart';
 import '../../domain/child_subject_grades.dart';
@@ -16,9 +17,12 @@ import '../../../../design/layout/bottom_inset_padding.dart';
 /// child sees on their own grades screen, so the numbers match exactly (acceptance criterion
 /// "data parity with the child's own student views").
 class ChildGradesView extends ConsumerWidget {
-  const ChildGradesView({required this.studentId, super.key});
+  const ChildGradesView({required this.studentId, this.studentName, super.key});
 
   final String studentId;
+
+  /// The child's name, for the official-results screen's header.
+  final String? studentName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,6 +42,8 @@ class ChildGradesView extends ConsumerWidget {
             padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
+              _OfficialResultsTile(studentId: studentId, studentName: studentName),
+              const SizedBox(height: AppSpacing.space16),
               _TermSummaryCard(summary: data.grade.termSummary),
               const SizedBox(height: AppSpacing.space16),
               if (_TrendCard.hasTrend(data.gradeTrend)) ...[
@@ -54,6 +60,36 @@ class ChildGradesView extends ConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Opens the child's official (finalized) results, certificates and report cards — the same
+/// [AcademicResultsScreen] the child sees from their own grades screen.
+class _OfficialResultsTile extends StatelessWidget {
+  const _OfficialResultsTile({required this.studentId, this.studentName});
+
+  final String studentId;
+  final String? studentName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: const Icon(Icons.workspace_premium_outlined),
+        title: Text('academicResults.entry'.tr()),
+        subtitle: Text('academicResults.entrySubtitle'.tr()),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => AcademicResultsScreen(
+              studentId: studentId,
+              studentName: studentName,
+            ),
+          ),
+        ),
       ),
     );
   }

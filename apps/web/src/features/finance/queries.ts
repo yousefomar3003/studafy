@@ -26,6 +26,8 @@ export interface FinanceReportResponse {
 }
 
 export type Payment = components["schemas"]["Payment"];
+/** A payment as `GET /api/finance/payments` lists it: with its student's name and family. */
+export type PaymentListItem = components["schemas"]["PaymentListItem"];
 
 /** Local calendar date as YYYY-MM-DD, matching `AttendanceHeatMapTile`'s `dateString` helper. */
 export function todayIsoDate(): string {
@@ -123,6 +125,18 @@ const AGING_BUCKET_PATTERN = /^range\d+$/i;
 /** One bucket per matching column, summed across every party row. Studafy never computes aging
  * itself (see docs/modules/finance-reports-definitions.md) — this only totals what ERPNext already
  * returned, using ERPNext's own column labels. */
+/**
+ * The report's data rows, without the total row ERPNext appends. ERPNext adds that row positionally
+ * (an array) after rows it returns by fieldname (dicts); summing it with the rows it totals would
+ * count every amount twice. A report whose rows are all positional is returned whole, since its
+ * total row cannot be told apart by shape.
+ */
+function dataRows(report: FinanceReportResponse): unknown[] {
+  const last = report.rows.at(-1);
+  const keyed = report.rows.slice(0, -1).some((row) => isRecord(row) && !Array.isArray(row));
+  return Array.isArray(last) && keyed ? report.rows.slice(0, -1) : report.rows;
+}
+
 export function agingBuckets(report: FinanceReportResponse): AgingBucket[] {
   return indexedColumns(report)
     .filter(
@@ -134,7 +148,7 @@ export function agingBuckets(report: FinanceReportResponse): AgingBucket[] {
     .map((entry) => ({
       fieldname: entry.column.fieldname as string,
       label: entry.column.label ?? (entry.column.fieldname as string),
-      total: report.rows.reduce<number>(
+      total: dataRows(report).reduce<number>(
         (sum, row) => sum + toFiniteNumber(cellValue(row, entry)),
         0,
       ),
@@ -236,6 +250,8 @@ export function overdueInstallments(
 
 export interface ReportSummaryCard {
   label: string;
+  /** Set instead of `label` when the card is labelled by this app rather than by ERPNext. */
+  labelKey?: string;
   display: string;
 }
 
@@ -243,11 +259,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
 }
 
-/** ERPNext's own `report_summary` cards, verbatim. Studafy does not compute collections or due
- * totals (see docs/modules/finance-reports-definitions.md) — these cards are the only source for
- * "collections vs due this term," so the tile renders them as-is rather than deriving its own. */
+/** The totals the Accounts Receivable report's own total row carries, and how this app names them. */
+const TOTAL_ROW_CARDS = [
+  { fieldname: "invoiced", labelKey: "finance.tiles.collections.invoiced" },
+  { fieldname: "paid", labelKey: "finance.tiles.collections.collected" },
+  { fieldname: "outstanding", labelKey: "finance.tiles.collections.outstanding" },
+] as const;
+
+/**
+ * ERPNext's own `report_summary` cards, verbatim. Studafy does not compute collections or due totals
+ * (see docs/modules/finance-reports-definitions.md), so the tile renders ERPNext's figures as-is.
+ *
+ * ERPNext's Accounts Receivable report returns no `report_summary` at all; its totals live in the
+ * positional total row it appends after the data rows. When there are no summary cards, that row's
+ * invoiced, paid and outstanding figures are shown instead: still ERPNext's arithmetic, only placed
+ * on cards, so the tile is never empty when the report has data.
+ */
 export function reportSummaryCards(report: FinanceReportResponse): ReportSummaryCard[] {
-  return report.report_summary.filter(isRecord).map((entry) => {
+  const cards = report.report_summary.filter(isRecord).map((entry) => {
     const label = typeof entry.label === "string" ? entry.label : "";
     const value = entry.value;
     const display =
@@ -257,6 +286,25 @@ export function reportSummaryCards(report: FinanceReportResponse): ReportSummary
           ? value
           : "—";
     return { label, display };
+  });
+  return cards.length > 0 ? cards : totalRowCards(report);
+}
+
+function totalRowCards(report: FinanceReportResponse): ReportSummaryCard[] {
+  // ERPNext appends its total row positionally (an array) after the dict-shaped data rows.
+  const totalRow = report.rows.at(-1);
+  if (!Array.isArray(totalRow) || report.rows.length < 2) return [];
+  const columns = indexedColumns(report);
+  const currencyColumn = findColumn(columns, ["currency"]);
+  const currency = String(
+    (currencyColumn && cellValue(totalRow, currencyColumn)) || report.presentation.currency,
+  );
+  return TOTAL_ROW_CARDS.flatMap(({ fieldname, labelKey }) => {
+    const column = findColumn(columns, [fieldname]);
+    if (!column) return [];
+    const value = cellValue(totalRow, column);
+    if (typeof value !== "number") return [];
+    return [{ label: "", labelKey, display: `${formatAmount(value, report)} ${currency}` }];
   });
 }
 
@@ -276,7 +324,10 @@ export async function fetchCollectionsVsDueReport(): Promise<FinanceReportRespon
 
 const RECENT_PAYMENTS_LIMIT = 10;
 
-export async function fetchRecentPayments(): Promise<{ payments: Payment[]; total: number }> {
+export async function fetchRecentPayments(): Promise<{
+  payments: PaymentListItem[];
+  total: number;
+}> {
   const { data } = await api.GET("/api/finance/payments", {
     params: { query: { limit: RECENT_PAYMENTS_LIMIT, offset: 0 } },
   });
@@ -284,7 +335,7 @@ export async function fetchRecentPayments(): Promise<{ payments: Payment[]; tota
   // same pre-existing `@studafy/api-client` typing gap `NotificationBell.tsx` documents for
   // `notifications`. The annotation restores it without widening to `any`.
   return {
-    payments: (data?.payments ?? []) as Payment[],
+    payments: (data?.payments ?? []) as PaymentListItem[],
     total: data?.total ?? 0,
   };
 }

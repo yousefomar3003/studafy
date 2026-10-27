@@ -8,9 +8,8 @@ import 'offline_database.dart';
 class PublishedGradesOfflineRepository {
   PublishedGradesOfflineRepository({
     required OfflineDatabase database,
-    required PublishedGradesClient client,
-  }) : _client = client,
-       _cache = OfflineCachedResource<PublishedGradeSnapshot>(
+    required this._client,
+  }) : _cache = OfflineCachedResource<PublishedGradeSnapshot>(
          database: database,
          resource: 'published_grades',
          encode: (snapshot) => snapshot.toJson(),
