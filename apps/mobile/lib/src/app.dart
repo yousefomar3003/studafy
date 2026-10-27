@@ -80,7 +80,8 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
       debugShowCheckedModeBanner: false,
       title: 'Studafy',
       theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      // Always light, whatever the device's appearance setting.
+      themeMode: ThemeMode.light,
       routerConfig: router,
       // Setting `locale` to an Arabic value is the entire RTL switch: `WidgetsApp` resolves
       // `Directionality` from the active locale via `GlobalWidgetsLocalizations`, so the tree
