@@ -59,6 +59,8 @@ LAN IP (`ipconfig getifaddr en0`). Set `API_HOST=<ip>` to use a different host.
 A debug build on iOS only launches while the cable (debugger) is attached. To keep the app on the
 phone and use it unplugged, run `bun run install:device` once: it installs a release build of the
 dev flavor with the same API host. The Mac's API must still be running on the same Wi-Fi.
+For a demo, run `bun run demo:device` instead: the same build plus the "Continue with Mock" button,
+which signs in as any seeded demo persona (see `docs/database/seeding_guide.md`).
 
 ## Folder Structure
 
