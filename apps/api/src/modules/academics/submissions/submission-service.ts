@@ -4,7 +4,13 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { emit } from "../../../lib/events/emitter";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
-import { assertAnswersFitAssignment, getAssignmentKind, replaceAnswers } from "./answer-service";
+import {
+  assertAnswersFitAssignment,
+  autoScore,
+  getAssignmentKind,
+  listAnswersBySubmission,
+  replaceAnswers,
+} from "./answer-service";
 
 import type { AnswerInput } from "./answer-service";
 import type { SubmissionGradeStatus, SubmissionStatus } from "./schemas";
@@ -491,6 +497,7 @@ export async function submitAssignment(
       feedback = NULL,
       graded_at = NULL,
       graded_by_user_id = NULL,
+      auto_graded = false,
       last_edited_by_user_id = ${userId},
       updated_at = CURRENT_TIMESTAMP
     WHERE app.assignment_submissions.grade_status <> 'published'
@@ -504,6 +511,7 @@ export async function submitAssignment(
 
   if (kind === "questions") {
     await replaceAnswers(tx, schoolId, written!.id, params.answers ?? []);
+    await releaseAutomaticMark(tx, schoolId, written!.id);
   }
 
   const row = (await loadSubmission(tx, schoolId, written!.id))!;
@@ -526,7 +534,48 @@ export async function submitAssignment(
     });
   }
 
+  // A questions hand-in is released as it lands, so it is announced as graded at the same moment.
+  if (kind === "questions") {
+    await emit(tx, DOMAIN_EVENTS.SUBMISSION_GRADED, {
+      submissionId: row.id,
+      assignmentId: row.assignment_id,
+      studentId: row.student_id,
+    });
+  }
+
   return { row, created: written!.created };
+}
+
+/**
+ * Mark a questions hand-in from its answers and release the mark (000169).
+ *
+ * The teacher chose the correct option for every question when they wrote the set, so the mark is
+ * final the moment the student hands in: score is the points of the correctly answered questions,
+ * published at once with auto_graded = true and no human grader. A teacher can still re-mark it
+ * through gradeSubmission, which takes the grade over. Released, the row also closes the hand-in
+ * window: submitAssignment's ON CONFLICT refuses to overwrite a published grade, so a student
+ * cannot retake the quiz for a better mark unless the teacher returns it.
+ */
+async function releaseAutomaticMark(
+  tx: TransactionSql,
+  schoolId: string,
+  submissionId: string,
+): Promise<void> {
+  const answers = (await listAnswersBySubmission(tx, schoolId, [submissionId])).get(submissionId);
+  const score = autoScore(answers ?? []);
+
+  await tx`
+    UPDATE app.assignment_submissions
+    SET score = ${score},
+        feedback = NULL,
+        grade_status = 'published',
+        status = 'graded',
+        graded_at = CURRENT_TIMESTAMP,
+        graded_by_user_id = NULL,
+        auto_graded = true,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE school_id = ${schoolId} AND id = ${submissionId}
+  `;
 }
 
 // ---------------------------------------------------------------------------
@@ -587,6 +636,7 @@ export async function gradeSubmission(
           feedback = NULL,
           graded_at = NULL,
           graded_by_user_id = NULL,
+          auto_graded = false,
           last_edited_by_user_id = ${userId},
           updated_at = CURRENT_TIMESTAMP
       WHERE school_id = ${schoolId} AND id = ${submissionId}
@@ -634,6 +684,7 @@ export async function gradeSubmission(
         feedback = ${mergedFeedback},
         graded_at = CURRENT_TIMESTAMP,
         graded_by_user_id = ${userId},
+        auto_graded = false,
         grade_status = ${nextGradeStatus}::app.submission_grade_status,
         status = ${nextStatus}::app.assignment_submission_status,
         last_edited_by_user_id = ${userId},

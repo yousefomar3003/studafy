@@ -36,8 +36,13 @@ Map<String, Object?> _question(String id, int position, List<String> options) =>
 
 /// A published questions assignment as a student receives it: no answer key.
 Assignment _quiz() => Assignment.fromJson({
-  ...assignmentFixture(id: 'quiz-1', classId: 'class-1', title: 'Cells quiz').toJson(),
+  ...assignmentFixture(
+    id: 'quiz-1',
+    classId: 'class-1',
+    title: 'Cells quiz',
+  ).toJson(),
   'kind': 'questions',
+  'max_score': 2,
   'questions': [
     _question('q1', 1, ['Nucleus', 'Chloroplast', 'Ribosome']),
     _question('q2', 2, ['True', 'False']),
@@ -53,10 +58,14 @@ class _RecordingSubmissions extends FakeSubmissionsClient {
     required CreateSubmissionBody body,
   }) async {
     createCalls.add(body);
+    // Marked and released as it lands, as the API does for a questions hand-in.
     return submissionFixture(
       id: 'sub-1',
       assignmentId: assignmentId,
       studentId: 'student-1',
+      status: 'graded',
+      gradeStatus: 'published',
+      score: 1,
     );
   }
 }
@@ -137,6 +146,13 @@ void main() {
       [for (final a in answers) (a.questionId, a.optionId)],
       [('q1', 'q1-o1'), ('q2', 'q2-o1')],
     );
+
+    // The grade, straight away.
+    expect(find.byKey(const Key('questionResultDialog')), findsOneWidget);
+    expect(find.text('1 / 2'), findsOneWidget);
+    expect(find.text('50%'), findsOneWidget);
+
+    await _tapVisible(tester, find.byKey(const Key('questionResultDone')));
     expect(find.text('open'), findsOneWidget);
   });
 

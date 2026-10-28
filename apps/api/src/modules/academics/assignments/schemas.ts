@@ -132,14 +132,47 @@ export const assignmentQuestionOptionSchema = z
 
 export type AssignmentQuestionOption = z.infer<typeof assignmentQuestionOptionSchema>;
 
+/** The image types a question picture may be; mirrors ck_assignment_questions_image_mime_type. */
+export const QUESTION_IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
+export const QUESTION_IMAGE_CONTENT_CLASS = "assignment.question_image";
+
+export type QuestionImageContentType = (typeof QUESTION_IMAGE_CONTENT_TYPES)[number];
+
+export const assignmentQuestionImageSchema = z
+  .object({
+    content_type: z.enum(QUESTION_IMAGE_CONTENT_TYPES),
+    size_bytes: z.number().int().positive(),
+    // The storage key itself is never serialized; the pre-signed URL is the only handle.
+    download_url: z
+      .string()
+      .nullable()
+      .openapi({
+        description:
+          "Short-lived pre-signed GET URL for the picture. Null when object storage is not " +
+          "configured for this deployment. Re-fetch the assignment for a fresh one after " +
+          "`download_url_expires_at`.",
+      }),
+    download_url_expires_at: dateTimeSchema.nullable().openapi({
+      description: "When `download_url` stops working.",
+    }),
+  })
+  .openapi("AssignmentQuestionImage");
+
+export type AssignmentQuestionImage = z.infer<typeof assignmentQuestionImageSchema>;
+
 export const assignmentQuestionSchema = z
   .object({
     id: uuidSchema.openapi({ description: "Primary key." }),
     position: z.number().int().openapi({ description: "1-based display order." }),
     question_type: questionTypeSchema,
-    prompt: z
-      .string()
-      .openapi({ description: "The question.", example: "Where does photosynthesis happen?" }),
+    prompt: z.string().openapi({
+      description: 'The question. Empty ("") when the picture is the whole question.',
+      example: "Where does photosynthesis happen?",
+    }),
+    // The question's picture; absent when it has none. Optional rather than nullable: the mobile
+    // client's generator reads a nullable reference as required and would fail to parse null.
+    image: assignmentQuestionImageSchema.optional(),
     points: z.number().openapi({ description: "Points for a correct answer.", example: 2 }),
     options: z.array(assignmentQuestionOptionSchema).openapi({ description: "Options in order." }),
   })
@@ -325,9 +358,9 @@ export const updateAssignmentBodySchema = z
 
 export type UpdateAssignmentBody = z.infer<typeof updateAssignmentBodySchema>;
 
-/** Bounds on a question set. Generous for a class quiz, small enough to keep one save a bounded write. */
-const MAX_QUESTIONS = 100;
-const MAX_OPTIONS = 6;
+/** Bounds on a question set: a class quiz of up to twenty questions, each with two to four options. */
+export const MAX_QUESTIONS = 20;
+export const MAX_OPTIONS = 4;
 
 const questionOptionInputSchema = z
   .object({
@@ -336,10 +369,44 @@ const questionOptionInputSchema = z
   })
   .openapi("QuestionOptionInput");
 
+// One object with exactly one of two fields, rather than a union of two: the mobile client's
+// generator cannot type a oneOf (see apps/mobile/pubspec.yaml), and the rule is one refine.
+const questionImageInputSchema = z
+  .object({
+    upload_key: z
+      .string()
+      .min(1)
+      .max(1024)
+      .optional()
+      .openapi({
+        description:
+          "A new picture: the temp/ `storage_key` returned by POST " +
+          "/api/storage/uploads/request-upload (content_class `assignment.question_image`), after " +
+          "the client has PUT the picture to its `upload_url`. Do NOT call " +
+          "/api/storage/uploads/confirm: saving the questions confirms it.",
+      }),
+    keep_from_question_id: uuidSchema.optional().openapi({
+      description:
+        "Keep the picture already on this question of the same assignment (its id from the " +
+        "current question set). How an unchanged picture survives a save, which replaces every " +
+        "question.",
+    }),
+  })
+  .strict()
+  .refine(
+    (image) => (image.upload_key === undefined) !== (image.keep_from_question_id === undefined),
+    { message: "Set exactly one of upload_key and keep_from_question_id" },
+  )
+  .openapi("QuestionImageInput");
+
 const questionInputSchema = z
   .object({
     question_type: questionTypeSchema,
-    prompt: z.string().trim().min(1).max(2_000).openapi({ description: "The question." }),
+    prompt: z.string().trim().max(2_000).openapi({
+      description: "The question. May be empty when `image` is set: the picture is the question.",
+    }),
+    // The question's picture: a new upload, a kept one, or none.
+    image: questionImageInputSchema.nullable().optional(),
     points: z
       .number()
       .positive()
@@ -352,7 +419,7 @@ const questionInputSchema = z
       .max(MAX_OPTIONS)
       .openapi({
         description:
-          "In display order. 2-6 for `multiple_choice`, exactly 2 for `true_false`. Exactly one " +
+          "In display order. 2-4 for `multiple_choice`, exactly 2 for `true_false`. Exactly one " +
           "must be correct.",
       }),
   })
@@ -363,6 +430,10 @@ const questionInputSchema = z
   .refine((question) => question.options.filter((option) => option.is_correct).length === 1, {
     message: "Exactly one option must be marked correct",
     path: ["options"],
+  })
+  .refine((question) => question.prompt.length > 0 || Boolean(question.image), {
+    message: "A question needs text or a picture",
+    path: ["prompt"],
   })
   .openapi("QuestionInput");
 
@@ -380,10 +451,25 @@ export const replaceQuestionsBodySchema = z
       .max(MAX_QUESTIONS)
       .openapi({
         description:
-          "The complete question set, in order. Replaces whatever was there. Refused with 409 once " +
-          "any student has handed in answers.",
+          "The complete question set, in order, at most 20. Replaces whatever was there. Refused " +
+          "with 409 once any student has handed in answers.",
       }),
   })
+  .refine(
+    (body) => {
+      const images = body.questions.flatMap((question) =>
+        question.image
+          ? [
+              question.image.upload_key !== undefined
+                ? `u:${question.image.upload_key}`
+                : `k:${question.image.keep_from_question_id}`,
+            ]
+          : [],
+      );
+      return new Set(images).size === images.length;
+    },
+    { path: ["questions"], message: "Each picture can be used by only one question" },
+  )
   .openapi("ReplaceQuestionsBody");
 
 export type ReplaceQuestionsBody = z.infer<typeof replaceQuestionsBodySchema>;

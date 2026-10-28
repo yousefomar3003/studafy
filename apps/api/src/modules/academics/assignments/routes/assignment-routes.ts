@@ -9,6 +9,7 @@ import { requireAuth } from "../../../../middleware/authContext";
 import { hasPermission, requirePermission } from "../../../../middleware/authz";
 import { openApiValidationHook } from "../../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../../openapi/responses";
+import { DOWNLOAD_PRESIGN_TTL_SECONDS } from "../../../storage/download-service";
 import {
   createAssignment,
   deleteAssignment,
@@ -44,7 +45,12 @@ import type { AppEnv } from "../../../../middleware/requestId";
 import type { AssignmentRow } from "../assignment-service";
 import type { AttachmentRow } from "../attachment-service";
 import type { QuestionRow } from "../question-service";
-import type { Assignment, AssignmentAttachment, AssignmentQuestion } from "../schemas";
+import type {
+  Assignment,
+  AssignmentAttachment,
+  AssignmentQuestion,
+  AssignmentQuestionImage,
+} from "../schemas";
 import type { Permission } from "@studafy/constants";
 import type { Context, MiddlewareHandler } from "hono";
 import type { TransactionSql } from "postgres";
@@ -122,6 +128,26 @@ async function toAttachmentResponse(
 }
 
 /**
+ * A question's picture with a short-lived pre-signed GET, or null when it has none. Without object
+ * storage the picture still renders as present with a null URL, as attachments do.
+ */
+async function toQuestionImageResponse(
+  row: QuestionRow,
+  storage: StorageService | null,
+): Promise<AssignmentQuestionImage | null> {
+  if (row.image_storage_key === null || row.image_mime_type === null) return null;
+  const presigned = storage
+    ? await storage.presign(row.image_storage_key, "GET", undefined, DOWNLOAD_PRESIGN_TTL_SECONDS)
+    : null;
+  return {
+    content_type: row.image_mime_type,
+    size_bytes: Number(row.image_size_bytes),
+    download_url: presigned?.url ?? null,
+    download_url_expires_at: presigned?.expiresAt.toISOString() ?? null,
+  };
+}
+
+/**
  * Project a stored question onto its response shape, withholding the answer key from non-staff.
  *
  * THIS IS THE ANSWER-KEY BOUNDARY. `is_correct` is null unless the caller is an admin or teaches the
@@ -129,12 +155,16 @@ async function toAttachmentResponse(
  * correct only on their own submission, once its mark is released -- never here, where it would
  * reach every classmate who has not answered yet.
  */
-export function toQuestionResponse(row: QuestionRow): AssignmentQuestion {
+export function toQuestionResponse(
+  row: QuestionRow,
+  image: AssignmentQuestionImage | null = null,
+): AssignmentQuestion {
   return {
     id: row.id,
     position: row.position,
     question_type: row.question_type,
     prompt: row.prompt,
+    ...(image ? { image } : {}),
     points: Number(row.points),
     options: row.options.map((option) => ({
       id: option.id,
@@ -203,7 +233,11 @@ async function hydrate(
             toAttachmentResponse(attachment, storage),
           ),
         ),
-        (questionsByAssignment.get(row.id) ?? []).map(toQuestionResponse),
+        await Promise.all(
+          (questionsByAssignment.get(row.id) ?? []).map(async (question) =>
+            toQuestionResponse(question, await toQuestionImageResponse(question, storage)),
+          ),
+        ),
       ),
     ),
   );
@@ -589,6 +623,7 @@ export function assignmentRoutes(
         auth.userId,
         assignmentId,
         body.questions,
+        storage,
       );
       const [hydrated] = await hydrate(tx, auth.schoolId, [row], storage);
       return hydrated!;

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/api/generated/models/assignment_question.dart';
 import '../../../../core/api/generated/models/submission_answer.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
+import 'question_image.dart';
 
 /// Read-only view of a questions assignment's answers: each question with its options, the one
 /// the student chose, and — once known — which was correct.
@@ -72,7 +73,7 @@ class _QuestionReview extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '${question.position}. ${question.prompt}',
+                    questionHeading(question),
                     style: textTheme.titleSmall,
                   ),
                 ),
@@ -87,6 +88,7 @@ class _QuestionReview extends StatelessWidget {
                 ),
               ],
             ),
+            QuestionImage(question: question),
             const SizedBox(height: AppSpacing.space8),
             for (final option in question.options)
               _OptionRow(

@@ -13,10 +13,12 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/assignment_detail_providers.dart';
 import '../application/assignment_list_providers.dart';
 import '../domain/assignment_list_filter.dart';
+import 'widgets/question_image.dart';
 
 /// Answers a questions assignment: one choice per question, all required, handed in with a single
-/// `createSubmission` call. The API marks it automatically; the student sees the result once the
-/// teacher releases it. Also reached for a resubmission, pre-selecting [initialAnswers].
+/// `createSubmission` call. The API marks it and releases the grade at once, so the student sees
+/// their score as soon as they hand in ([_showResult]), then the marked answers on the assignment.
+/// Also reached for a retake the teacher allowed, pre-selecting [initialAnswers].
 class QuestionAnswerScreen extends ConsumerStatefulWidget {
   const QuestionAnswerScreen({
     required this.assignment,
@@ -48,7 +50,7 @@ class _QuestionAnswerScreenState extends ConsumerState<QuestionAnswerScreen> {
       _errorKey = null;
     });
     try {
-      await ref
+      final submission = await ref
           .read(apiClientProvider)
           .submissions
           .createSubmission(
@@ -69,7 +71,9 @@ class _QuestionAnswerScreenState extends ConsumerState<QuestionAnswerScreen> {
         ..invalidate(studentAssignmentsProvider(AssignmentListFilter.due))
         ..invalidate(studentAssignmentsProvider(AssignmentListFilter.submitted))
         ..invalidate(studentAssignmentsProvider(AssignmentListFilter.graded));
-      Navigator.of(context).pop(true);
+      setState(() => _submitting = false);
+      await _showResult(submission.score ?? submission.autoScore);
+      if (mounted) Navigator.of(context).pop(true);
     } on DioException catch (error) {
       setState(
         () => _errorKey = switch ((error.apiError?.status, error.type)) {
@@ -90,6 +94,75 @@ class _QuestionAnswerScreenState extends ConsumerState<QuestionAnswerScreen> {
       if (mounted) setState(() => _submitting = false);
     }
   }
+
+  /// The grade, the moment it is handed in. [score] is null only if the API withheld it.
+  Future<void> _showResult(num? score) {
+    final max = widget.assignment.maxScore;
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        final textTheme = Theme.of(context).textTheme;
+        final colorScheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          key: const Key('questionResultDialog'),
+          icon: Icon(
+            Icons.emoji_events_outlined,
+            color: colorScheme.primary,
+            size: 40,
+          ),
+          title: Text('assignments.questions.result.title'.tr()),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (score != null) ...[
+                Text(
+                  'assignments.questions.result.score'.tr(
+                    namedArgs: {'score': _format(score), 'max': _format(max)},
+                  ),
+                  key: const Key('questionResultScore'),
+                  style: textTheme.displaySmall?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.space8),
+                Text(
+                  'assignments.questions.result.percent'.tr(
+                    namedArgs: {
+                      'percent': max > 0
+                          ? '${(score / max * 100).round()}'
+                          : '0',
+                    },
+                  ),
+                  style: textTheme.titleMedium,
+                ),
+              ] else
+                Text('assignments.questions.result.pending'.tr()),
+              const SizedBox(height: AppSpacing.space12),
+              Text(
+                'assignments.questions.result.review'.tr(),
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              key: const Key('questionResultDone'),
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('assignments.questions.result.seeAnswers'.tr()),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  static String _format(num value) =>
+      value == value.roundToDouble() ? '${value.toInt()}' : '$value';
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +202,7 @@ class _QuestionAnswerScreenState extends ConsumerState<QuestionAnswerScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            '${question.position}. ${question.prompt}',
+                            questionHeading(question),
                             style: textTheme.titleSmall,
                           ),
                         ),
@@ -144,6 +217,7 @@ class _QuestionAnswerScreenState extends ConsumerState<QuestionAnswerScreen> {
                         ),
                       ],
                     ),
+                    QuestionImage(question: question),
                     RadioGroup<String>(
                       groupValue: _choices[question.id],
                       onChanged: (value) {

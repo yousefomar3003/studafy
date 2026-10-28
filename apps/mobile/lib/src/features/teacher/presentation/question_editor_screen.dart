@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +10,7 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/api/generated/models/assignment.dart';
 import '../../../core/api/generated/models/assignment_question_question_type.dart';
 import '../../../core/api/generated/models/assignment_status.dart';
+import '../../../core/api/generated/models/question_image_input.dart';
 import '../../../core/api/generated/models/question_input.dart';
 import '../../../core/api/generated/models/question_input_question_type.dart';
 import '../../../core/api/generated/models/question_option_input.dart';
@@ -17,12 +20,21 @@ import '../../../core/api/generated/models/update_assignment_body_status.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../messaging/application/chat_draft_controller.dart'
+    show chatImagePickerProvider;
+import '../../messaging/domain/draft_attachment.dart' show PickedImage;
+import '../data/question_image_uploader.dart';
 
 /// The most options a multiple-choice question may have; the API refuses more.
-const _maxOptions = 6;
+const _maxOptions = 4;
 
-/// Form-style editor for a `questions` assignment: multiple-choice and true/false questions, each
-/// with its points and exactly one correct option. Saving replaces the whole question set
+/// The most questions one assignment may have; the API refuses more.
+const maxQuestionsPerAssignment = 20;
+
+/// Form-style editor for a `questions` assignment: 1–20 multiple-choice (2–4 options) and
+/// true/false questions, each with text, a picture or both, its points and exactly one correct
+/// option. A new picture is staged when the form is saved ([QuestionImageUploader]); an unchanged
+/// one is kept by naming the question that has it. Saving replaces the whole question set
 /// (`PUT .../questions`), and the API sets the assignment's total to the sum of the points.
 ///
 /// A draft can be saved as-is or saved and published in one step. Once any student has handed in,
@@ -46,6 +58,8 @@ class _DraftQuestion {
     String points = '1',
     List<String> options = const ['', ''],
     this.correctIndex = 0,
+    this.keepImageFromQuestionId,
+    this.imageUrl,
   }) : prompt = TextEditingController(text: prompt),
        points = TextEditingController(text: points),
        options = [
@@ -59,6 +73,23 @@ class _DraftQuestion {
   /// Multiple-choice option texts. Unused for true/false, whose two options are fixed.
   final List<TextEditingController> options;
   int correctIndex;
+
+  /// The saved question whose picture this one keeps, while it is unchanged.
+  String? keepImageFromQuestionId;
+
+  /// The kept picture's (short-lived) URL, for the preview.
+  String? imageUrl;
+
+  /// A newly picked picture, uploaded on save. Replaces any kept one.
+  PickedImage? pickedImage;
+
+  bool get hasImage => pickedImage != null || keepImageFromQuestionId != null;
+
+  void removeImage() {
+    pickedImage = null;
+    keepImageFromQuestionId = null;
+    imageUrl = null;
+  }
 
   void dispose() {
     prompt.dispose();
@@ -95,6 +126,8 @@ class _QuestionEditorScreenState extends ConsumerState<QuestionEditorScreen> {
               ? const ['', '']
               : [for (final option in question.options) option.text],
           correctIndex: correct < 0 ? 0 : correct,
+          keepImageFromQuestionId: question.image == null ? null : question.id,
+          imageUrl: question.image?.downloadUrl,
         ),
       );
     }
@@ -113,6 +146,7 @@ class _QuestionEditorScreenState extends ConsumerState<QuestionEditorScreen> {
       points == points.roundToDouble() ? '${points.toInt()}' : '$points';
 
   void _addQuestion({bool notify = true}) {
+    if (_questions.length >= maxQuestionsPerAssignment) return;
     final question = _DraftQuestion(
       type: QuestionInputQuestionType.multipleChoice,
     );
@@ -143,30 +177,104 @@ class _QuestionEditorScreenState extends ConsumerState<QuestionEditorScreen> {
     'teacher.questions.false'.tr(),
   ];
 
-  ReplaceQuestionsBody _body() => ReplaceQuestionsBody(
-    questions: [
-      for (final question in _questions)
-        QuestionInput(
-          questionType: question.type,
-          prompt: question.prompt.text.trim(),
-          points: num.parse(question.points.text.replaceAll(',', '.')),
-          options: [
-            for (final (index, text)
-                in (question.type == QuestionInputQuestionType.trueFalse
-                        ? _trueFalseTexts
-                        : [
-                            for (final option in question.options)
-                              option.text.trim(),
-                          ])
-                    .indexed)
-              QuestionOptionInput(
-                text: text,
-                isCorrect: index == question.correctIndex,
-              ),
+  /// Picks a picture for [question] from the gallery or camera, as the teacher chooses.
+  Future<void> _pickImage(_DraftQuestion question) async {
+    final source = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const Key('questionImageGallery'),
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text('teacher.questions.image.gallery'.tr()),
+              onTap: () => Navigator.of(context).pop(true),
+            ),
+            ListTile(
+              key: const Key('questionImageCamera'),
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: Text('teacher.questions.image.camera'.tr()),
+              onTap: () => Navigator.of(context).pop(false),
+            ),
           ],
         ),
-    ],
-  );
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final picker = ref.read(chatImagePickerProvider);
+    final PickedImage? image;
+    try {
+      image = source
+          ? (await picker.pickFromGallery(limit: 1)).firstOrNull
+          : await picker.takePhoto();
+    } on PlatformException {
+      _showSnack('teacher.questions.image.permission');
+      return;
+    }
+    if (image == null || !mounted) return;
+    if (!questionImageContentTypes.contains(image.contentType)) {
+      _showSnack('teacher.questions.image.unsupported');
+      return;
+    }
+    if (image.sizeBytes <= 0 || image.sizeBytes > maxQuestionImageBytes) {
+      _showSnack('teacher.questions.image.tooLarge');
+      return;
+    }
+    setState(() {
+      question
+        ..removeImage()
+        ..pickedImage = image;
+    });
+  }
+
+  void _showSnack(String key) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(key.tr())));
+  }
+
+  QuestionImageInput? _imageInput(
+    _DraftQuestion question,
+    Map<_DraftQuestion, String> uploadKeys,
+  ) {
+    if (uploadKeys[question] case final key?) {
+      return QuestionImageInput(uploadKey: key);
+    }
+    if (question.keepImageFromQuestionId case final id?) {
+      return QuestionImageInput(keepFromQuestionId: id);
+    }
+    return null;
+  }
+
+  ReplaceQuestionsBody _body(Map<_DraftQuestion, String> uploadKeys) =>
+      ReplaceQuestionsBody(
+        questions: [
+          for (final question in _questions)
+            QuestionInput(
+              questionType: question.type,
+              prompt: question.prompt.text.trim(),
+              image: _imageInput(question, uploadKeys),
+              points: num.parse(question.points.text.replaceAll(',', '.')),
+              options: [
+                for (final (index, text)
+                    in (question.type == QuestionInputQuestionType.trueFalse
+                            ? _trueFalseTexts
+                            : [
+                                for (final option in question.options)
+                                  option.text.trim(),
+                              ])
+                        .indexed)
+                  QuestionOptionInput(
+                    text: text,
+                    isCorrect: index == question.correctIndex,
+                  ),
+              ],
+            ),
+        ],
+      );
 
   Future<void> _save({required bool publish}) async {
     if (!_formKey.currentState!.validate()) return;
@@ -179,10 +287,23 @@ class _QuestionEditorScreenState extends ConsumerState<QuestionEditorScreen> {
       _errorKey = null;
     });
     try {
+      final uploadKeys = <_DraftQuestion, String>{};
+      try {
+        for (final question in _questions) {
+          if (question.pickedImage case final image?) {
+            uploadKeys[question] = await ref
+                .read(questionImageUploaderProvider)
+                .upload(image);
+          }
+        }
+      } catch (_) {
+        setState(() => _errorKey = 'teacher.questions.errors.imageUpload');
+        return;
+      }
       final api = ref.read(apiClientProvider).assignments;
       final saved = await api.replaceAssignmentQuestions(
         assignmentId: widget.assignment.id,
-        body: _body(),
+        body: _body(uploadKeys),
       );
       if (publish) {
         // The generated body serialises every field, so carry the stored values over.
@@ -259,6 +380,8 @@ class _QuestionEditorScreenState extends ConsumerState<QuestionEditorScreen> {
                 trueFalseTexts: _trueFalseTexts,
                 enabled: !_saving,
                 onChanged: () => setState(() {}),
+                onPickImage: () => _pickImage(question),
+                onRemoveImage: () => setState(question.removeImage),
                 onRemove: _questions.length > 1
                     ? () => _removeQuestion(question)
                     : null,
@@ -271,10 +394,25 @@ class _QuestionEditorScreenState extends ConsumerState<QuestionEditorScreen> {
             ],
             OutlinedButton.icon(
               key: const Key('questionEditorAdd'),
-              onPressed: _saving ? null : _addQuestion,
+              onPressed:
+                  _saving || _questions.length >= maxQuestionsPerAssignment
+                  ? null
+                  : _addQuestion,
               icon: const Icon(Icons.add),
               label: Text('teacher.questions.add'.tr()),
             ),
+            if (_questions.length >= maxQuestionsPerAssignment) ...[
+              const SizedBox(height: AppSpacing.space8),
+              Text(
+                'teacher.questions.maxReached'.tr(
+                  namedArgs: {'max': '$maxQuestionsPerAssignment'},
+                ),
+                key: const Key('questionEditorMaxReached'),
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
             if (_errorKey case final key?) ...[
               const SizedBox(height: AppSpacing.space12),
               Text(key.tr(), style: TextStyle(color: colorScheme.error)),
@@ -317,6 +455,8 @@ class _QuestionCard extends StatelessWidget {
     required this.trueFalseTexts,
     required this.enabled,
     required this.onChanged,
+    required this.onPickImage,
+    required this.onRemoveImage,
     required this.onRemove,
     required this.onMoveUp,
     required this.onMoveDown,
@@ -328,6 +468,8 @@ class _QuestionCard extends StatelessWidget {
   final List<String> trueFalseTexts;
   final bool enabled;
   final VoidCallback onChanged;
+  final VoidCallback onPickImage;
+  final VoidCallback onRemoveImage;
   final VoidCallback? onRemove;
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
@@ -434,9 +576,22 @@ class _QuestionCard extends StatelessWidget {
                 decoration: InputDecoration(
                   labelText: 'teacher.questions.prompt'.tr(),
                 ),
-                validator: (value) => value == null || value.trim().isEmpty
+                // A picture can be the whole question.
+                validator: (value) =>
+                    !question.hasImage &&
+                        (value == null || value.trim().isEmpty)
                     ? 'teacher.questions.errors.promptRequired'.tr()
                     : null,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: AppSpacing.space8),
+              child: _QuestionImageField(
+                number: number,
+                question: question,
+                enabled: enabled,
+                onPick: onPickImage,
+                onRemove: onRemoveImage,
               ),
             ),
             Padding(
@@ -531,6 +686,99 @@ class _QuestionCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A question's picture in the editor: "Add picture" when it has none; otherwise a preview with
+/// "Replace" and "Remove".
+class _QuestionImageField extends StatelessWidget {
+  const _QuestionImageField({
+    required this.number,
+    required this.question,
+    required this.enabled,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final int number;
+  final _DraftQuestion question;
+  final bool enabled;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!question.hasImage) {
+      return Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: TextButton.icon(
+          key: Key('questionImageAdd$number'),
+          onPressed: enabled ? onPick : null,
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          label: Text('teacher.questions.image.add'.tr()),
+        ),
+      );
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final picked = question.pickedImage;
+    final url = question.imageUrl;
+    final Widget preview = picked != null
+        ? Image.file(
+            File(picked.path),
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) =>
+                const Icon(Icons.image_outlined, size: 48),
+          )
+        : url != null
+        ? Image.network(
+            url,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) =>
+                const Icon(Icons.image_outlined, size: 48),
+          )
+        : const Icon(Icons.image_outlined, size: 48);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: AppSpacing.space8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ColoredBox(
+            color: colorScheme.surfaceContainerHighest,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: Center(
+                child: Semantics(
+                  label: 'teacher.questions.image.label'.tr(
+                    namedArgs: {'number': '$number'},
+                  ),
+                  image: true,
+                  child: preview,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            TextButton.icon(
+              key: Key('questionImageReplace$number'),
+              onPressed: enabled ? onPick : null,
+              icon: const Icon(Icons.swap_horiz),
+              label: Text('teacher.questions.image.replace'.tr()),
+            ),
+            TextButton.icon(
+              key: Key('questionImageRemove$number'),
+              onPressed: enabled ? onRemove : null,
+              icon: const Icon(Icons.delete_outline),
+              label: Text('teacher.questions.image.remove'.tr()),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

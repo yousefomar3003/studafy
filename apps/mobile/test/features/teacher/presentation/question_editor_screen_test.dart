@@ -9,6 +9,10 @@ import 'package:studafy_mobile/src/core/api/generated/models/update_assignment_b
 import 'package:studafy_mobile/src/core/api/generated/models/update_assignment_body_status.dart';
 import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
+import 'package:studafy_mobile/src/features/messaging/application/chat_draft_controller.dart';
+import 'package:studafy_mobile/src/features/messaging/data/chat_image_picker.dart';
+import 'package:studafy_mobile/src/features/messaging/domain/draft_attachment.dart';
+import 'package:studafy_mobile/src/features/teacher/data/question_image_uploader.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/question_editor_screen.dart';
 
 import '../../../support/ensure_date_formatting.dart';
@@ -17,7 +21,11 @@ import '../support.dart';
 
 /// A draft questions assignment with no questions yet, as the composer creates it.
 Assignment _draftQuiz() => Assignment.fromJson({
-  ...assignmentFixture(id: 'quiz-1', classId: 'class-1', title: 'Capitals quiz').toJson(),
+  ...assignmentFixture(
+    id: 'quiz-1',
+    classId: 'class-1',
+    title: 'Capitals quiz',
+  ).toJson(),
   'kind': 'questions',
   'status': 'draft',
   'assigned_at': null,
@@ -48,8 +56,44 @@ class _QuestionsClient extends FakeAssignmentsClient {
   }
 }
 
+class _FakePicker extends ChatImagePicker {
+  _FakePicker(this.image);
+
+  final PickedImage image;
+
+  @override
+  Future<List<PickedImage>> pickFromGallery({required int limit}) async => [
+    image,
+  ];
+
+  @override
+  Future<PickedImage?> takePhoto() async => image;
+}
+
+/// Records the pictures it is asked to stage and hands back a temp/ key for each.
+class _FakeUploader extends Fake implements QuestionImageUploader {
+  final List<PickedImage> uploads = [];
+
+  @override
+  Future<String> upload(PickedImage image) async {
+    uploads.add(image);
+    return 'temp/school-1/object-${uploads.length}/${image.fileName}';
+  }
+}
+
+const _heart = PickedImage(
+  path: '/nonexistent/heart.png',
+  fileName: 'heart.png',
+  contentType: 'image/png',
+  sizeBytes: 2048,
+);
+
 /// Hosts the editor behind a route, so its pop has somewhere to return to; records the result.
-Future<List<bool?>> _pump(WidgetTester tester, _QuestionsClient client) async {
+Future<List<bool?>> _pump(
+  WidgetTester tester,
+  _QuestionsClient client, {
+  _FakeUploader? uploader,
+}) async {
   final results = <bool?>[];
   // Tall enough that the whole form is built; a ListView skips offscreen children.
   tester.view
@@ -62,6 +106,10 @@ Future<List<bool?>> _pump(WidgetTester tester, _QuestionsClient client) async {
         overrides: [
           apiClientProvider.overrideWithValue(
             FakeStudafyApiClient(assignments: client),
+          ),
+          chatImagePickerProvider.overrideWithValue(_FakePicker(_heart)),
+          questionImageUploaderProvider.overrideWithValue(
+            uploader ?? _FakeUploader(),
           ),
         ],
         child: Builder(
@@ -162,5 +210,111 @@ void main() {
 
     expect(client.replaceCalls, isEmpty);
     expect(find.text('Enter the option text.'), findsOneWidget);
+  });
+
+  testWidgets('a picture can be the whole question; it is uploaded on save', (
+    tester,
+  ) async {
+    final client = _QuestionsClient();
+    final uploader = _FakeUploader();
+    await _pump(tester, client, uploader: uploader);
+
+    await _tapVisible(tester, find.byKey(const Key('questionImageAdd1')));
+    await _tapVisible(tester, find.byKey(const Key('questionImageGallery')));
+    expect(find.byKey(const Key('questionImageRemove1')), findsOneWidget);
+
+    // No question text: the picture is the question.
+    await tester.enterText(find.byType(TextFormField).at(2), 'Heart');
+    await tester.enterText(find.byType(TextFormField).at(3), 'Lung');
+    await _tapVisible(tester, find.byKey(const Key('questionEditorSave')));
+
+    expect(uploader.uploads.single.fileName, 'heart.png');
+    final saved = client.replaceCalls.single.questions.single;
+    expect(saved.prompt, '');
+    expect(saved.image?.uploadKey, 'temp/school-1/object-1/heart.png');
+    expect(saved.image?.keepFromQuestionId, isNull);
+  });
+
+  testWidgets('keeps an unchanged picture by naming its question', (
+    tester,
+  ) async {
+    final client = _QuestionsClient();
+    final uploader = _FakeUploader();
+    final quiz = Assignment.fromJson({
+      ..._draftQuiz().toJson(),
+      'questions': [
+        {
+          'id': 'q-heart',
+          'position': 1,
+          'question_type': 'multiple_choice',
+          'prompt': 'Which organ is this?',
+          'image': {
+            'content_type': 'image/png',
+            'size_bytes': 2048,
+            'download_url': null,
+            'download_url_expires_at': null,
+          },
+          'points': 1,
+          'options': [
+            {'id': 'o1', 'position': 1, 'text': 'Heart', 'is_correct': true},
+            {'id': 'o2', 'position': 2, 'text': 'Lung', 'is_correct': false},
+          ],
+        },
+      ],
+    });
+    tester.view
+      ..physicalSize = const Size(800, 3000)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      wrapWithLocalization(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(
+              FakeStudafyApiClient(assignments: client),
+            ),
+            questionImageUploaderProvider.overrideWithValue(uploader),
+          ],
+          child: Builder(
+            builder: (context) => MaterialApp(
+              locale: context.locale,
+              supportedLocales: context.supportedLocales,
+              localizationsDelegates: context.localizationDelegates,
+              home: QuestionEditorScreen(assignment: quiz),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(tester, find.byKey(const Key('questionEditorSave')));
+
+    expect(uploader.uploads, isEmpty);
+    expect(
+      client.replaceCalls.single.questions.single.image?.keepFromQuestionId,
+      'q-heart',
+    );
+  });
+
+  testWidgets('stops at twenty questions and four options', (tester) async {
+    final client = _QuestionsClient();
+    await _pump(tester, client);
+
+    await _tapVisible(tester, find.text('Add option'));
+    await _tapVisible(tester, find.text('Add option'));
+    expect(find.text('Add option'), findsNothing);
+
+    final add = find.byKey(const Key('questionEditorAdd'));
+    final list = find.byType(Scrollable).first;
+    for (var i = 1; i < maxQuestionsPerAssignment; i++) {
+      await tester.scrollUntilVisible(add, 600, scrollable: list);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+    }
+    await tester.scrollUntilVisible(add, 600, scrollable: list);
+    expect(find.text('Question 20'), findsOneWidget);
+    expect(tester.widget<OutlinedButton>(add).onPressed, isNull);
+    expect(find.byKey(const Key('questionEditorMaxReached')), findsOneWidget);
   });
 }

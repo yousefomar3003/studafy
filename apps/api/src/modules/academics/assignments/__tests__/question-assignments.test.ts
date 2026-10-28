@@ -28,13 +28,16 @@ import {
   migrateDatabase,
   type TestDatabase,
 } from "../../../../../tests/harness";
+import { buildTempKey } from "../../../../lib/storage";
 import { autoScore, listAnswersBySubmission } from "../../submissions/answer-service";
 import { toSubmissionResponse } from "../../submissions/routes/submission-routes";
 import { gradeSubmission, submitAssignment } from "../../submissions/submission-service";
 import { createAssignment, updateAssignment } from "../assignment-service";
 import { listQuestionsByAssignment, replaceQuestions } from "../question-service";
 import { toQuestionResponse } from "../routes/assignment-routes";
+import { replaceQuestionsBodySchema } from "../schemas";
 
+import type { PresignedUrl, StorageService } from "../../../../lib/storage";
 import type { AnswerRow } from "../../submissions/answer-service";
 import type { SubmissionRow } from "../../submissions/submission-service";
 import type { QuestionRow } from "../question-service";
@@ -53,6 +56,9 @@ function questionRow(viewerIsStaff: boolean): QuestionRow {
     question_type: "multiple_choice",
     points: "2.00",
     prompt: "Where does photosynthesis happen?",
+    image_storage_key: null,
+    image_mime_type: null,
+    image_size_bytes: null,
     viewer_is_staff: viewerIsStaff,
     options: [
       {
@@ -112,6 +118,49 @@ const answers: AnswerRow[] = [
     points: "1.50",
   },
 ];
+
+describe("question set bounds", () => {
+  const question = (overrides: Partial<QuestionInput> = {}): QuestionInput => ({
+    question_type: "multiple_choice",
+    prompt: "Pick one",
+    points: 1,
+    options: [
+      { text: "A", is_correct: true },
+      { text: "B", is_correct: false },
+    ],
+    ...overrides,
+  });
+  const parse = (questions: QuestionInput[]) => replaceQuestionsBodySchema.safeParse({ questions });
+
+  test("takes up to twenty questions", () => {
+    expect(parse(Array.from({ length: 20 }, () => question())).success).toBe(true);
+    expect(parse(Array.from({ length: 21 }, () => question())).success).toBe(false);
+  });
+
+  test("takes two to four options", () => {
+    const options = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        text: `Option ${index + 1}`,
+        is_correct: index === 0,
+      }));
+    expect(parse([question({ options: options(1) })]).success).toBe(false);
+    expect(parse([question({ options: options(4) })]).success).toBe(true);
+    expect(parse([question({ options: options(5) })]).success).toBe(false);
+  });
+
+  test("a question needs text or a picture", () => {
+    expect(parse([question({ prompt: "   " })]).success).toBe(false);
+    expect(
+      parse([question({ prompt: "", image: { upload_key: "temp/school/object/cell.png" } })])
+        .success,
+    ).toBe(true);
+  });
+
+  test("one picture cannot be used by two questions", () => {
+    const image = { upload_key: "temp/school/object/cell.png" };
+    expect(parse([question({ image }), question({ image })]).success).toBe(false);
+  });
+});
 
 describe("answer key projection", () => {
   test("a student never sees which option is correct", () => {
@@ -409,7 +458,7 @@ describeDb("answering", () => {
     ).rejects.toThrow(/does not belong to its question/i);
   });
 
-  test("answers are stored and marked; a resubmission replaces them", async () => {
+  test("a hand-in is marked and its grade released at once", async () => {
     const t = await seedTenant(db.sql);
     const { assignmentId, questions } = await seedQuestionAssignment(t);
 
@@ -419,17 +468,51 @@ describeDb("answering", () => {
         answers: answersFor(questions, [0, 1]),
       }),
     );
-    const marked = await asUser(t.school.id, t.teacherA.userId, (tx) =>
+    expect(first.row.status).toBe("graded");
+    expect(first.row.grade_status).toBe("published");
+    expect(Number(first.row.score)).toBe(1.5);
+    expect(first.row.graded_by_user_id).toBeNull();
+
+    // The student sees the mark and the key straight away, with no teacher step.
+    const seen = await asUser(t.school.id, t.studentA.userId, (tx) =>
       listAnswersBySubmission(tx, t.school.id, [first.row.id]),
     );
-    expect(autoScore(marked.get(first.row.id)!)).toBe(1.5);
+    const projected = toSubmissionResponse(first.row, [], false, seen.get(first.row.id)!);
+    expect(projected.score).toBe(1.5);
+    expect(projected.answers.map((answer) => answer.is_correct)).toEqual([false, true]);
+  });
 
-    // Both right.
-    await asUser(t.school.id, t.studentA.userId, (tx) =>
+  test("a released quiz cannot be retaken until the teacher returns it", async () => {
+    const t = await seedTenant(db.sql);
+    const { assignmentId, questions } = await seedQuestionAssignment(t);
+    const first = await asUser(t.school.id, t.studentA.userId, (tx) =>
+      submitAssignment(tx, t.school.id, t.studentA.userId, t.studentA.id, assignmentId, {
+        answers: answersFor(questions, [0, 1]),
+      }),
+    );
+
+    await expect(
+      asUser(t.school.id, t.studentA.userId, (tx) =>
+        submitAssignment(tx, t.school.id, t.studentA.userId, t.studentA.id, assignmentId, {
+          answers: answersFor(questions, [1, 1]),
+        }),
+      ),
+    ).rejects.toThrow(/already been graded/i);
+
+    await asUser(t.school.id, t.teacherA.userId, (tx) =>
+      gradeSubmission(tx, t.school.id, t.teacherA.userId, first.row.id, {
+        publish: false,
+        return_to_student: true,
+      }),
+    );
+
+    // Both right, on the retake.
+    const retake = await asUser(t.school.id, t.studentA.userId, (tx) =>
       submitAssignment(tx, t.school.id, t.studentA.userId, t.studentA.id, assignmentId, {
         answers: answersFor(questions, [1, 1]),
       }),
     );
+    expect(Number(retake.row.score)).toBe(3.5);
     const remarked = await asUser(t.school.id, t.teacherA.userId, (tx) =>
       listAnswersBySubmission(tx, t.school.id, [first.row.id]),
     );
@@ -468,7 +551,7 @@ describeDb("answering", () => {
     expect(seenByClassmate.size).toBe(0);
   });
 
-  test("the teacher can publish the auto score through the ordinary grading path", async () => {
+  test("the teacher can re-mark an automatically released grade", async () => {
     const t = await seedTenant(db.sql);
     const { assignmentId, questions } = await seedQuestionAssignment(t);
     const { row } = await asUser(t.school.id, t.studentA.userId, (tx) =>
@@ -485,6 +568,7 @@ describeDb("answering", () => {
       }),
     );
     expect(graded.grade_status).toBe("published");
+    expect(graded.graded_by_user_id).toBe(t.teacherA.userId);
 
     const answersSeen = await asUser(t.school.id, t.studentA.userId, (tx) =>
       listAnswersBySubmission(tx, t.school.id, [row.id]),
@@ -492,5 +576,158 @@ describeDb("answering", () => {
     const projected = toSubmissionResponse(graded, [], false, answersSeen.get(row.id)!);
     expect(projected.auto_score).toBe(2);
     expect(projected.answers.map((answer) => answer.is_correct)).toEqual([true, false]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pictures (000169)
+// ---------------------------------------------------------------------------
+
+/** In-memory storage holding staged PNGs, mirroring the fake in submission-attachments.test.ts. */
+function fakeImageStorage(): StorageService & { objects: Map<string, number> } {
+  const objects = new Map<string, number>();
+  const base: StorageService = {
+    ttlSeconds: 900,
+    check: async () => true,
+    presign(key): PresignedUrl {
+      return {
+        url: `https://storage.example/${key}?signed`,
+        expiresAt: new Date(Date.now() + 900_000),
+      };
+    },
+    async exists(key) {
+      return objects.has(key);
+    },
+    async size(key) {
+      return objects.get(key) ?? 0;
+    },
+    async head(key) {
+      return objects.has(key)
+        ? { contentType: "image/png", sizeBytes: objects.get(key) ?? 0 }
+        : null;
+    },
+    async checksumSha256() {
+      return "abcdef";
+    },
+    async copy(source, destination) {
+      objects.set(destination, objects.get(source) ?? 0);
+    },
+    async remove(key) {
+      objects.delete(key);
+    },
+    async *list(prefix) {
+      for (const [key, sizeBytes] of objects) {
+        if (key.startsWith(prefix)) yield { key, sizeBytes };
+      }
+    },
+  };
+  return Object.assign(base, { objects });
+}
+
+describeDb("pictures", () => {
+  async function draftQuiz(t: Awaited<ReturnType<typeof seedTenant>>) {
+    return asUser(t.school.id, t.teacherA.userId, (tx) =>
+      createAssignment(tx, t.school.id, t.teacherA.userId, {
+        class_id: t.classA.id,
+        title: "Organs quiz",
+        due_at: futureIso(7),
+        max_score: 1,
+        allow_late_submission: false,
+        status: "draft",
+        kind: "questions",
+      }),
+    );
+  }
+
+  test("a staged picture is promoted, kept across a save, and can be removed", async () => {
+    const t = await seedTenant(db.sql);
+    const draft = await draftQuiz(t);
+    const storage = fakeImageStorage();
+    const tempKey = buildTempKey(t.school.id, crypto.randomUUID(), "heart.png");
+    storage.objects.set(tempKey, 2048);
+
+    const pictureOnly: QuestionInput = {
+      ...QUESTIONS[0]!,
+      prompt: "",
+      image: { upload_key: tempKey },
+    };
+    const saved = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
+      await replaceQuestions(tx, t.school.id, t.teacherA.userId, draft.id, [pictureOnly], storage);
+      return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
+    });
+    const stored = saved[0]!;
+    expect(stored.prompt).toBe("");
+    expect(stored.image_storage_key).toStartWith(`permanent/${t.school.id}/`);
+    expect(stored.image_mime_type).toBe("image/png");
+    expect(storage.objects.has(tempKey)).toBe(false);
+
+    const kept = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
+      await replaceQuestions(
+        tx,
+        t.school.id,
+        t.teacherA.userId,
+        draft.id,
+        [
+          {
+            ...pictureOnly,
+            prompt: "Which organ is this?",
+            image: { keep_from_question_id: stored.id },
+          },
+        ],
+        storage,
+      );
+      return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
+    });
+    expect(kept[0]!.image_storage_key).toBe(stored.image_storage_key);
+
+    const removed = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
+      await replaceQuestions(
+        tx,
+        t.school.id,
+        t.teacherA.userId,
+        draft.id,
+        [{ ...QUESTIONS[0]!, image: null }],
+        storage,
+      );
+      return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
+    });
+    expect(removed[0]!.image_storage_key).toBeNull();
+  });
+
+  test("a kept picture must come from this assignment", async () => {
+    const t = await seedTenant(db.sql);
+    const draft = await draftQuiz(t);
+    await expect(
+      asUser(t.school.id, t.teacherA.userId, (tx) =>
+        replaceQuestions(
+          tx,
+          t.school.id,
+          t.teacherA.userId,
+          draft.id,
+          [{ ...QUESTIONS[0]!, image: { keep_from_question_id: crypto.randomUUID() } }],
+          fakeImageStorage(),
+        ),
+      ),
+    ).rejects.toThrow(/keep_from_question_id/);
+  });
+
+  test("a staged picture from another school is refused", async () => {
+    const t = await seedTenant(db.sql);
+    const draft = await draftQuiz(t);
+    const storage = fakeImageStorage();
+    const foreignKey = buildTempKey(crypto.randomUUID(), crypto.randomUUID(), "heart.png");
+    storage.objects.set(foreignKey, 2048);
+    await expect(
+      asUser(t.school.id, t.teacherA.userId, (tx) =>
+        replaceQuestions(
+          tx,
+          t.school.id,
+          t.teacherA.userId,
+          draft.id,
+          [{ ...QUESTIONS[0]!, image: { upload_key: foreignKey } }],
+          storage,
+        ),
+      ),
+    ).rejects.toThrow();
   });
 });

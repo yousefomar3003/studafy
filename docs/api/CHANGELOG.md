@@ -124,8 +124,20 @@ when it required the `version-bump` label.
   read permission (`STUDENT_READ` / `USER_READ` / `BILLING_READ` / `MATERIAL_READ`); row-level
   security within a populated section matches that type's own list endpoint. Every call is
   recorded as a `read` audit entry against `global_search`. ST-278.
+- Pictures on questions in a `questions` assignment: `QuestionInput.image` takes either
+  `upload_key` (a picture staged through `POST /api/storage/uploads/request-upload` with the new
+  `assignment.question_image` content class, confirmed by the save) or `keep_from_question_id`
+  (keep a picture already on the set). `AssignmentQuestion.image` returns it with a short-lived
+  `download_url`, and is absent for a question with no picture. A question may now be a picture
+  with an empty `prompt`.
 
 ### Changed
+
+- `PUT /api/academics/assignments/{assignmentId}/questions` takes at most 20 questions (was 100)
+  and 2-4 options per multiple-choice question (was 2-6).
+- Handing in a `questions` assignment now marks it and releases the grade at once: the returned
+  submission is `status: graded`, `grade_status: published`, with `score` set and
+  `graded_by_user_id` null. A released quiz cannot be resubmitted until the teacher returns it.
 
 - `POST /api/school/license/change-requests` also takes `studentPlanId` / `teacherPlanId` /
   `parentPlanId` (a tier wanted per audience), and every `LicenseChangeRequest` now carries
