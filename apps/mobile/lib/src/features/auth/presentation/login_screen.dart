@@ -10,11 +10,13 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/auth/auth_notifier.dart';
 import '../../../core/auth/auth_state.dart';
 import '../../../core/auth/oauth_browser.dart';
+import '../../../core/auth/saved_account.dart';
 import '../../../core/auth/school_closed_notice.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
 import '../../../design/widgets/studafy_logo.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../shell/presentation/account_switcher.dart';
 import '../../shell/presentation/locale_toggle_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -196,6 +198,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final schoolClosed = ref.watch(schoolClosedNoticeProvider);
+    final savedAccounts = ref.watch(savedAccountsProvider);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -213,6 +216,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (schoolClosed) ...[
           const SizedBox(height: AppSpacing.space24),
           const _SchoolClosedNotice(),
+        ],
+        if (savedAccounts.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.space24),
+          _SavedAccounts(accounts: savedAccounts),
+          const SizedBox(height: AppSpacing.space24),
+          Text(
+            'auth.login.savedAccounts.orSignIn'.tr(),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
         const SizedBox(height: AppSpacing.space32),
         Card(
@@ -250,6 +265,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               foregroundColor: colorScheme.onSurfaceVariant,
             ),
             child: Text('auth.login.privacyPolicy'.tr()),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The other accounts still signed in on this phone ("Add account", or after logging out of one):
+/// one tap opens each, no password needed, and each can be removed from the phone.
+class _SavedAccounts extends ConsumerWidget {
+  const _SavedAccounts({required this.accounts});
+
+  final List<SavedAccount> accounts;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final auth = ref.read(authNotifierProvider.notifier);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'auth.login.savedAccounts.title'.tr(),
+          style: theme.textTheme.titleSmall,
+        ),
+        const SizedBox(height: AppSpacing.space8),
+        Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (final account in accounts)
+                AccountTile(
+                  key: Key('savedAccount-${account.userId}'),
+                  label: account.label,
+                  roles: account.roles,
+                  onTap: () => auth.switchTo(account.userId),
+                  trailing: IconButton(
+                    key: Key('savedAccountRemove-${account.userId}'),
+                    icon: const Icon(Icons.close),
+                    tooltip: 'auth.login.savedAccounts.remove'.tr(
+                      namedArgs: {
+                        'name': accountName(account.label, account.roles),
+                      },
+                    ),
+                    onPressed: () => auth.removeSavedAccount(account.userId),
+                  ),
+                ),
+            ],
           ),
         ),
       ],

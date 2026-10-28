@@ -37,4 +37,12 @@ class FakeSecureTokenStore extends SecureTokenStore {
     _refreshToken = null;
     _sessionId = null;
   }
+
+  String? savedAccounts;
+
+  @override
+  Future<String?> readSavedAccounts() async => savedAccounts;
+
+  @override
+  Future<void> writeSavedAccounts(String? json) async => savedAccounts = json;
 }

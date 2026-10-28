@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/auth/app_lock.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/auth/saved_account.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../core/localization/app_locales.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
@@ -16,6 +16,7 @@ import '../../ai/store/ai_store_controller.dart';
 import '../../student/application/student_context_providers.dart';
 import '../application/shell_providers.dart';
 import '../domain/app_role.dart';
+import 'account_switcher.dart';
 import 'change_password_screen.dart';
 import 'delete_account_screen.dart';
 import 'delete_school_screen.dart';
@@ -36,7 +37,12 @@ import '../../../design/layout/bottom_inset_padding.dart';
 /// and can no longer sign in, and the school's data is kept. See
 /// `apps/mobile/store/review-checklist.md` §1.
 ///
-/// Log out goes through [AuthNotifier.logout]; the router's auth guard then lands on login.
+/// "Switch account" ([showAccountSwitcher]) moves between the accounts signed in on this phone, for
+/// example a parent's accounts at two schools, or a student handing the family phone to a parent or
+/// sibling, and adds another one.
+///
+/// Log out goes through [AuthNotifier.logout]: it logs out of this account only, and the next saved
+/// account takes over; with none left, the router's auth guard lands on login.
 class ProfileTabScreen extends ConsumerWidget {
   const ProfileTabScreen({super.key});
 
@@ -62,6 +68,12 @@ class ProfileTabScreen extends ConsumerWidget {
     final displayName = studentName != null && studentName.isNotEmpty
         ? studentName
         : (accountName != null && accountName.isNotEmpty ? accountName : null);
+    // How this account is listed in the switcher, and once another account takes over.
+    final accountLabel = AccountLabel(
+      displayName: displayName,
+      schoolName: profile?.school.name,
+      memberIds: profile?.memberIds ?? const [],
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(
@@ -94,6 +106,19 @@ class ProfileTabScreen extends ConsumerWidget {
                 clipBehavior: Clip.antiAlias,
                 child: Column(
                   children: [
+                    _SettingsRow(
+                      key: const Key('profileSwitchAccount'),
+                      icon: Icons.switch_account_outlined,
+                      titleKey: 'shell.profile.switchAccount.title',
+                      trailing: Icons.chevron_right,
+                      onTap: () => showAccountSwitcher(
+                        context,
+                        ref,
+                        current: accountLabel,
+                        currentRoles: roles,
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 68),
                     _SettingsRow(
                       key: const Key('profileSignInSecurity'),
                       icon: Icons.shield_outlined,
@@ -499,7 +524,6 @@ class SignInSecurityScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  const _AppLockTile(),
                   const Divider(height: 1, indent: 68),
                   const _DeleteAccountTile(),
                 ],
@@ -508,51 +532,6 @@ class SignInSecurityScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// "Lock with Face ID": asks for Face ID / fingerprint / passcode whenever Studafy opens. Hidden
-/// on a device with neither biometrics nor a passcode, where there is nothing to ask for.
-class _AppLockTile extends ConsumerWidget {
-  const _AppLockTile();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(appLockAvailableProvider).value != true) {
-      return const SizedBox.shrink();
-    }
-    final enabled = ref.watch(appLockProvider.select((lock) => lock.enabled));
-    final theme = Theme.of(context);
-
-    return Column(
-      children: [
-        const Divider(height: 1, indent: 68),
-        SwitchListTile.adaptive(
-          key: const Key('profileAppLock'),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.space16,
-            vertical: AppSpacing.space4,
-          ),
-          secondary: const _IconTile(Icons.face_outlined),
-          title: Text(
-            'appLock.setting.title'.tr(),
-            style: theme.textTheme.titleSmall,
-          ),
-          subtitle: Text('appLock.setting.subtitle'.tr()),
-          value: enabled,
-          onChanged: (value) async {
-            final changed = await ref
-                .read(appLockProvider.notifier)
-                .setEnabled(value, reason: 'appLock.setting.reason'.tr());
-            if (!changed && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('appLock.setting.failed'.tr())),
-              );
-            }
-          },
-        ),
-      ],
     );
   }
 }
@@ -652,9 +631,10 @@ class _LogoutButton extends ConsumerWidget {
       trailing: Icons.chevron_right,
       destructive: true,
       onTap: () async {
+        final otherAccounts = ref.read(savedAccountsProvider).isNotEmpty;
         final confirmed = await showDialog<bool>(
           context: context,
-          builder: (context) => const _LogoutDialog(),
+          builder: (context) => _LogoutDialog(otherAccounts: otherAccounts),
         );
         if (confirmed ?? false) {
           await ref.read(authNotifierProvider.notifier).logout();
@@ -665,7 +645,10 @@ class _LogoutButton extends ConsumerWidget {
 }
 
 class _LogoutDialog extends StatelessWidget {
-  const _LogoutDialog();
+  const _LogoutDialog({required this.otherAccounts});
+
+  /// Other accounts are signed in on this device: only this one logs out, and the next takes over.
+  final bool otherAccounts;
 
   @override
   Widget build(BuildContext context) {
@@ -673,7 +656,12 @@ class _LogoutDialog extends StatelessWidget {
 
     return AlertDialog(
       title: Text('shell.profile.logoutDialog.title'.tr()),
-      content: Text('shell.profile.logoutDialog.body'.tr()),
+      content: Text(
+        (otherAccounts
+                ? 'shell.profile.logoutDialog.bodyOtherAccounts'
+                : 'shell.profile.logoutDialog.body')
+            .tr(),
+      ),
       actions: [
         TextButton(
           key: const Key('logoutCancel'),

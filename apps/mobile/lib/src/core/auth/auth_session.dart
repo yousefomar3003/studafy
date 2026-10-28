@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../api/api_exception.dart';
 import 'jwt_payload.dart';
 import 'oauth_client.dart';
+import 'saved_account.dart';
 import 'secure_token_store.dart';
 
 /// In-memory token state with secure storage backing.
@@ -132,6 +133,48 @@ class AuthSession {
       accessToken: accessToken,
       refreshToken: refreshToken,
       sessionId: sessionId,
+    );
+  }
+
+  /// The active session as a [SavedAccount], to set it aside before another account takes over.
+  /// Null when there is no complete session to keep.
+  SavedAccount? toSavedAccount(AccountLabel label) {
+    final userId = _userId;
+    final accessToken = _accessToken;
+    final refreshToken = _refreshToken;
+    final sessionId = _sessionId;
+    if (userId == null ||
+        accessToken == null ||
+        refreshToken == null ||
+        refreshToken.isEmpty ||
+        sessionId == null) {
+      return null;
+    }
+    return SavedAccount(
+      userId: userId,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      sessionId: sessionId,
+      roles: _roles,
+      label: label,
+    );
+  }
+
+  /// Makes a set-aside account the active session, as [restore] would on launch. Its access token
+  /// has usually expired by now; [tokenProvider] renews it on first use.
+  Future<void> activate(SavedAccount account) async {
+    _accessToken = account.accessToken;
+    _refreshToken = account.refreshToken;
+    _sessionId = account.sessionId;
+    _lastRefreshErrorCode = null;
+    final payload = decodeJwtPayload(account.accessToken);
+    _accessTokenExpiresAt = _expiryFromPayload(payload);
+    _roles = _rolesFromPayload(payload);
+    _userId = _userIdFromPayload(payload);
+    await _secureStore.save(
+      accessToken: account.accessToken,
+      refreshToken: account.refreshToken,
+      sessionId: account.sessionId,
     );
   }
 

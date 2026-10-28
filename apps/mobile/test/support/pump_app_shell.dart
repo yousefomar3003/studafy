@@ -12,6 +12,7 @@ import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/app_shell.dart';
 
+import 'fake_secure_token_store.dart';
 import 'wrap_with_localization.dart';
 
 /// Pumps [AppShell] directly against an authenticated [session] — no [GoRouter], no login
@@ -31,6 +32,8 @@ Future<void> pumpAppShell(
         ProviderScope(
           overrides: [
             authSessionProvider.overrideWithValue(session),
+            // Saved accounts (account switching) read the Keychain, which has no plugin here.
+            secureTokenStoreProvider.overrideWithValue(FakeSecureTokenStore()),
             // `shellRoleProvider` -> `authNotifierProvider` builds `authClientProvider`
             // regardless of `authSessionProvider` being overridden — it reads `appConfigProvider`
             // for its base URL since ST-247's fix to that hardcoded-localhost bug, so this needs

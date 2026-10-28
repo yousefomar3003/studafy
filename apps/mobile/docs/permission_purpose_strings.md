@@ -17,7 +17,6 @@ photos, files or notifications changes, or a new `Info.plist` key or manifest pe
 | Photo library           | `NSPhotoLibraryUsageDescription`, never shown  | None                                       | Never. Declared because linked code references the API (see below)         |
 | Music / media library   | `NSAppleMusicUsageDescription`, never shown    | None                                       | Never. Same reason                                                          |
 | Files / storage         | None needed                                    | None needed                                | n/a. The system document picker grants access to the chosen file only      |
-| Face ID / biometrics    | `NSFaceIDUsageDescription`, shown by iOS        | `USE_BIOMETRIC` (install-time, no prompt)  | User turns on **Lock with Face ID** in Sign-in & security                  |
 
 Nothing else is requested: no location, contacts, microphone, Bluetooth or tracking (ATT). `NSUserTrackingUsageDescription` must stay absent (`child_directed_sdks_test.dart`).
 
@@ -102,23 +101,6 @@ ST-308's documents said these keys "should not" be declared. That was true for a
 and it is not what CI produces. `store/privacy-labels.md` and `sdk_compliance_inventory.md` are
 corrected in this change.
 
-## Face ID / biometrics
-
-**iOS string** (`ios/Runner/Info.plist`):
-
-> Studafy uses Face ID to unlock the app when you turn on the lock in Sign-in & security.
-
-- **Where it's asked:** Profile → Sign-in & security → **Lock with Face ID** (`profile_tab_screen.dart`,
-  `_AppLockTile`). Turning it on asks for Face ID once; iOS shows its permission prompt then, the
-  first time only. The switch is hidden on a device with neither biometrics nor a passcode.
-- **What it does:** while on, a restored session opens behind a lock screen, and the app locks again
-  after a minute or more in the background (`core/auth/app_lock.dart`). The device passcode is
-  accepted as a fallback, and the lock screen offers **Sign out**. Nothing biometric reaches the
-  app: `local_auth` only reports whether the OS unlock succeeded.
-- **If declined:** iOS falls back to the device passcode, so the lock still works.
-- **Android:** `USE_BIOMETRIC` arrives from `local_auth_android`'s manifest. It is a normal,
-  install-time permission with no prompt.
-
 ## Files and storage
 
 No permission on either platform. iOS: `UIDocumentPickerViewController`. Android: the Storage
@@ -130,8 +112,7 @@ test fails if one is added.
 
 The source manifest declares `INTERNET` and `RECEIVE_BOOT_COMPLETED`. Plugins add `POST_NOTIFICATIONS`,
 `ACCESS_NETWORK_STATE`, `WAKE_LOCK`, `VIBRATE` and `com.google.android.c2dm.permission.RECEIVE` at
-merge time (`docs/sdk_compliance_inventory.md`). `local_auth_android` adds `USE_BIOMETRIC`, an install-time
-permission. Of these, only `POST_NOTIFICATIONS` is a runtime permission the user is asked about. `AD_ID` is stripped with `tools:node="remove"`.
+merge time (`docs/sdk_compliance_inventory.md`). Of these, only `POST_NOTIFICATIONS` is a runtime permission the user is asked about. `AD_ID` is stripped with `tools:node="remove"`.
 
 ## Sign-in browser (no external-browser auth)
 

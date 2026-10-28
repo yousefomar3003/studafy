@@ -71,6 +71,19 @@ class PushSetupNotifier extends Notifier<PushSetup> {
     }
   }
 
+  /// Someone signed in, or switched account. The first time this run, sets push up as
+  /// [initialize] does; after that, registers this device's token for the account now active, which
+  /// takes it from the previous one (the API's `claim_device_token`), so notifications follow the
+  /// active account.
+  Future<void> accountChanged() async {
+    if (state != PushSetup.done) return initialize();
+    try {
+      await ref.read(pushServiceProvider).registerIfAuthenticated();
+    } catch (_) {
+      // Push is best-effort, as in [initialize].
+    }
+  }
+
   /// Show the OS permission prompt, then register if granted.
   Future<void> requestPermission() async {
     if (state != PushSetup.needsPermission) return;

@@ -25,6 +25,10 @@ class SecureTokenStore {
   static const _keyRefreshToken = 'refresh_token';
   static const _keySessionId = 'session_id';
 
+  /// The other accounts signed in on this device, as JSON (`saved_account.dart`). They hold
+  /// refresh tokens, so they live here rather than in SharedPreferences.
+  static const _keySavedAccounts = 'saved_accounts';
+
   /// Plain SharedPreferences flag (not a secret) marking that this install has run before.
   static const _keyInstallMarker = 'secure_token_store.installed';
 
@@ -44,6 +48,7 @@ class SecureTokenStore {
   Future<String?> readRefreshToken() => _storage.read(key: _keyRefreshToken);
   Future<String?> readSessionId() => _storage.read(key: _keySessionId);
 
+  /// Clears the active session only; saved accounts are kept.
   Future<void> clear() async {
     await Future.wait([
       _storage.delete(key: _keyAccessToken),
@@ -51,6 +56,13 @@ class SecureTokenStore {
       _storage.delete(key: _keySessionId),
     ]);
   }
+
+  Future<String?> readSavedAccounts() => _storage.read(key: _keySavedAccounts);
+
+  /// Replaces the saved accounts; `null` removes them.
+  Future<void> writeSavedAccounts(String? json) => json == null
+      ? _storage.delete(key: _keySavedAccounts)
+      : _storage.write(key: _keySavedAccounts, value: json);
 
   /// Drops tokens left behind by a previous install. Call once at bootstrap, before reading.
   ///
@@ -60,7 +72,7 @@ class SecureTokenStore {
   Future<void> discardIfReinstalled() async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool(_keyInstallMarker) ?? false) return;
-    await clear();
+    await Future.wait([clear(), writeSavedAccounts(null)]);
     await prefs.setBool(_keyInstallMarker, true);
   }
 }

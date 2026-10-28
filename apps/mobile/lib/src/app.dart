@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'core/auth/app_lock_gate.dart';
 import 'core/auth/auth_notifier.dart';
 import 'core/auth/auth_state.dart';
 import 'core/di/app_providers.dart';
@@ -13,6 +12,8 @@ import 'core/localization/locale_rebuild_scope.dart';
 import 'core/monitoring/monitoring_providers.dart';
 import 'core/push/push_providers.dart';
 import 'design/theme/app_theme.dart';
+import 'design/widgets/keyboard_dismiss_scope.dart';
+import 'features/launch/presentation/launch_gate.dart';
 import 'core/features/features_providers.dart';
 
 class StudafyApp extends ConsumerStatefulWidget {
@@ -76,7 +77,7 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
     ref.watch(featuresAutoRefreshProvider);
     ref.listen<AuthStatus>(authStatusProvider, (_, next) {
       if (next == AuthStatus.authenticated) {
-        ref.read(pushSetupProvider.notifier).initialize();
+        ref.read(pushSetupProvider.notifier).accountChanged();
       }
     });
 
@@ -93,8 +94,9 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
       locale: context.locale,
       supportedLocales: context.supportedLocales,
       localizationsDelegates: context.localizationDelegates,
-      builder: (context, child) =>
-          LocaleRebuildScope(child: AppLockGate(child: child!)),
+      builder: (context, child) => KeyboardDismissScope(
+        child: LocaleRebuildScope(child: LaunchGate(child: child!)),
+      ),
     );
   }
 }
