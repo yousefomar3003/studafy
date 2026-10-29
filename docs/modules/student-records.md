@@ -13,7 +13,7 @@ dedupe or link people. Parent-child links are made only by staff choosing both p
 
 | Piece             | Where                                                                                                       |
 | ----------------- | ----------------------------------------------------------------------------------------------------------- |
-| Data model        | `db/migrations/000169_create_student_and_parent_records.sql`                                                |
+| Data model        | `db/migrations/000170_create_student_and_parent_records.sql`                                                |
 | Encryption design | [ADR-019](../adr/0019-sensitive-record-field-encryption.md)                                                 |
 | Shared logic      | `packages/records` (field vocabulary, value validation, masking, sealing)                                   |
 | API               | `apps/api/src/modules/records` (templates, records, documents, missing information)                         |

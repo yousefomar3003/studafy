@@ -473,7 +473,7 @@ integrationTest(
   async () => {
     const database = await migratedDatabase();
     try {
-      // 000170 (global search) adds GENERATED search_tsv / search_name columns but no index on
+      // 000171 (global search) adds GENERATED search_tsv / search_name columns but no index on
       // them: under FORCE RLS a GIN or trigram index is never used (see that migration's header).
       const expectedNonConstraintIndexes = [
         "idx_classes_school_academic_year_id",
@@ -533,7 +533,7 @@ integrationTest(
       expect(plans[2]).toContain("idx_courses_school_subject_id");
       // On this one-class, never-analyzed fixture every (school_id, ..., id) btree on app.classes is
       // a single page and estimates the same one row, so which one the planner takes for these two
-      // probes is a cost tie-break -- 000170 (two generated search columns on app.classes) has moved
+      // probes is a cost tie-break -- 000171 (two generated search columns on app.classes) has moved
       // it between the filtered column's own index and another school-leading one, with or without
       // that migration's policy rewrite. What these pin is that the scan is tenant-leading, not
       // which tied index wins.

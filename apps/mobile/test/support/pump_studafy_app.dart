@@ -73,6 +73,8 @@ Future<void> pumpStudafyApp(
               AppConfig.fromEnvironment(AppEnvironment.dev),
             ),
             authSessionProvider.overrideWithValue(session ?? fakeAuthSession()),
+            // Saved accounts (account switching) read the Keychain, which has no plugin here.
+            secureTokenStoreProvider.overrideWithValue(FakeSecureTokenStore()),
             crashReporterProvider.overrideWithValue(FakeCrashReporter()),
             // StudafyApp reads this in didChangeDependencies (_subscribeToPushTaps) regardless of
             // auth status — see fake_push_service.dart for why a real PushService can't exist here.

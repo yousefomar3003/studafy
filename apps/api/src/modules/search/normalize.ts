@@ -1,5 +1,5 @@
 /**
- * Server-side twin of `app.search_normalize` (migration 000170) and of the web palette's
+ * Server-side twin of `app.search_normalize` (migration 000171) and of the web palette's
  * apps/web/src/features/search/normalize.ts. All three must apply the same rules, or "أحمد" would
  * match in one place and not another:
  *

@@ -148,7 +148,8 @@ jobs:
             flutter test integration_test/ \
               --dart-define=API_BASE_URL=http://10.0.2.2:${{ env.API_PORT }} \
               --dart-define=REALTIME_BASE_URL=ws://10.0.2.2:${{ env.REALTIME_PORT }} \
-              --dart-define=WEB_BASE_URL=http://10.0.2.2:4174
+              --dart-define=WEB_BASE_URL=http://10.0.2.2:4174 \
+              --dart-define=SHOW_DEMO_LOGIN=true
 
       - name: Stop the API and realtime gateway
         if: always()

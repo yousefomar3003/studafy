@@ -6,11 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/api/generated/models/assignment.dart';
+import '../../../core/api/generated/models/assignment_kind.dart';
 import '../../../core/api/generated/models/submission.dart';
 import '../../../core/api/generated/models/submission_grade_status.dart';
 import '../../../core/api/generated/models/submission_status.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../student/presentation/widgets/answer_review.dart';
 import '../../student/presentation/widgets/attachment_download_tile.dart';
 import '../application/submission_review_providers.dart';
 
@@ -57,9 +59,9 @@ class _SubmissionMarkingScreenState
   void _seed(Submission submission) {
     if (_loadedId == submission.id) return;
     _loadedId = submission.id;
-    _scoreController.text = submission.score == null
-        ? ''
-        : '${submission.score}';
+    // A questions assignment is marked automatically; its score starts from that mark.
+    final score = submission.score ?? submission.autoScore;
+    _scoreController.text = score == null ? '' : '$score';
     _feedbackController.text = submission.feedback ?? '';
   }
 
@@ -219,14 +221,31 @@ class _SubmissionMarkingScreenState
           ),
         ),
         const SizedBox(height: AppSpacing.space16),
-        Text('teacher.marking.answer'.tr(), style: textTheme.titleSmall),
-        const SizedBox(height: AppSpacing.space8),
-        Text(
-          (submission.content ?? '').isEmpty
-              ? 'teacher.marking.noText'.tr()
-              : submission.content!,
-          style: textTheme.bodyMedium,
-        ),
+        if (widget.assignment.kind == AssignmentKind.questions) ...[
+          Text(
+            'teacher.marking.autoScore'.tr(
+              namedArgs: {
+                'score': '${submission.autoScore ?? 0}',
+                'max': '${widget.assignment.maxScore}',
+              },
+            ),
+            style: textTheme.titleSmall,
+          ),
+          const SizedBox(height: AppSpacing.space8),
+          AnswerReview(
+            questions: widget.assignment.questions,
+            answers: submission.answers,
+          ),
+        ] else ...[
+          Text('teacher.marking.answer'.tr(), style: textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.space8),
+          Text(
+            (submission.content ?? '').isEmpty
+                ? 'teacher.marking.noText'.tr()
+                : submission.content!,
+            style: textTheme.bodyMedium,
+          ),
+        ],
         for (final attachment in submission.attachments)
           AttachmentDownloadTile(
             fileName: attachment.originalFileName,

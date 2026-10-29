@@ -9,6 +9,7 @@ import { requireAuth } from "../../../../middleware/authContext";
 import { requirePermission } from "../../../../middleware/authz";
 import { openApiValidationHook } from "../../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../../openapi/responses";
+import { autoScore, getAssignmentKind, listAnswersBySubmission } from "../answer-service";
 import {
   assignmentIdParamSchema,
   confirmSubmissionAttachmentBodySchema,
@@ -42,6 +43,7 @@ import {
 import type { Database } from "../../../../db/client";
 import type { StorageService } from "../../../../lib/storage";
 import type { AppEnv } from "../../../../middleware/requestId";
+import type { AnswerRow } from "../answer-service";
 import type { Submission, SubmissionAttachment } from "../schemas";
 import type { SubmissionAttachmentRow } from "../submission-attachment-service";
 import type { SubmissionRow } from "../submission-service";
@@ -135,11 +137,16 @@ async function toAttachmentResponse(
  * max_score-style note: `score` arrives from postgres.js as a string, because numeric is
  * arbitrary-precision and the driver will not narrow it behind your back. This is the one place it
  * becomes a number, so the lossy step is visible rather than scattered.
+ *
+ * `answers` is null for a `written` assignment. On a `questions` one, the chosen options are always
+ * shown -- they are the student's own work, like `content` -- but whether each was correct, the
+ * correct option, and `auto_score` are part of the mark and follow `showGrade` exactly like `score`.
  */
 export function toSubmissionResponse(
   row: SubmissionRow,
   attachments: SubmissionAttachment[],
   viewerIsStaff: boolean,
+  answers: AnswerRow[] | null = null,
 ): Submission {
   const showGrade = gradeIsVisible(row, viewerIsStaff);
 
@@ -159,13 +166,20 @@ export function toSubmissionResponse(
     graded_at: showGrade ? (row.graded_at?.toISOString() ?? null) : null,
     graded_by_user_id: showGrade ? row.graded_by_user_id : null,
     attachments,
+    answers: (answers ?? []).map((answer) => ({
+      question_id: answer.question_id,
+      option_id: answer.option_id,
+      is_correct: showGrade ? answer.is_correct : null,
+      correct_option_id: showGrade ? answer.correct_option_id : null,
+    })),
+    auto_score: answers !== null && showGrade ? autoScore(answers) : null,
     last_edited_by_user_id: row.last_edited_by_user_id,
     created_at: row.created_at.toISOString(),
     updated_at: row.updated_at.toISOString(),
   };
 }
 
-/** Load attachments for a page of submissions in one query and project the whole page. */
+/** Load attachments and answers for a page of submissions and project the whole page. */
 async function hydrate(
   tx: TransactionSql,
   schoolId: string,
@@ -173,11 +187,20 @@ async function hydrate(
   storage: StorageService | null,
   viewerIsStaff: boolean,
 ): Promise<Submission[]> {
-  const bySubmission = await listAttachmentsBySubmission(
-    tx,
-    schoolId,
-    rows.map((row) => row.id),
-  );
+  const ids = rows.map((row) => row.id);
+  const bySubmission = await listAttachmentsBySubmission(tx, schoolId, ids);
+
+  // Every page is one assignment's submissions (or a single row), so this is one lookup in practice.
+  const questionAssignments = new Set<string>();
+  for (const assignmentId of new Set(rows.map((row) => row.assignment_id))) {
+    if ((await getAssignmentKind(tx, schoolId, assignmentId)) === "questions") {
+      questionAssignments.add(assignmentId);
+    }
+  }
+  const answersBySubmission =
+    questionAssignments.size > 0
+      ? await listAnswersBySubmission(tx, schoolId, ids)
+      : new Map<string, AnswerRow[]>();
 
   return Promise.all(
     rows.map(async (row) =>
@@ -189,6 +212,7 @@ async function hydrate(
           ),
         ),
         viewerIsStaff,
+        questionAssignments.has(row.assignment_id) ? (answersBySubmission.get(row.id) ?? []) : null,
       ),
     ),
   );
@@ -209,7 +233,8 @@ const createSubmissionRoute = createRoute({
     "per assignment: submitting again replaces the previous attempt atomically, increments " +
     "`attempt_number`, and clears any unpublished mark. Answers 201 on a first hand-in and 200 on " +
     "a resubmission. Work handed in after `due_at` is flagged `is_late` when the assignment " +
-    "allows late submission, and rejected with 409 when it does not.",
+    "allows late submission, and rejected with 409 when it does not. A `questions` assignment " +
+    "requires one answer per question in `answers` and rejects anything else with 400.",
   security: [{ bearerAuth: [] }],
   request: {
     params: assignmentIdParamSchema,

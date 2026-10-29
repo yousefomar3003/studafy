@@ -70,6 +70,7 @@ const EXPECTED_PATHS = [
   "/api/academics/assignments/{assignmentId}/attachments",
   "/api/academics/assignments/{assignmentId}/attachments/upload-url",
   "/api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  "/api/academics/assignments/{assignmentId}/questions",
   "/api/academics/assignments/{assignmentId}/submissions",
   "/api/academics/classes",
   "/api/academics/classes/{classId}",

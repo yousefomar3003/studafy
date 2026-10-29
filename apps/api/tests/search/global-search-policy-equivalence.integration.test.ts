@@ -1,5 +1,5 @@
 /**
- * Migration 000170 rewrote role_scope_visibility on app.students, classes, courses, subjects and
+ * Migration 000171 rewrote role_scope_visibility on app.students, classes, courses, subjects and
  * materials, hoisting `(SELECT app.current_user_is_school_admin())` (and, except on materials,
  * `(SELECT app.current_user_is_attendance_officer())`) in front of the predicate 000133 / 000037
  * left there. Its header claims the visible rows are unchanged for every caller. This proves it on
@@ -48,7 +48,7 @@ import type { TransactionSql } from "postgres";
 
 const describeDb = integrationEnabled ? describe : describe.skip;
 
-/** The policy each table had before 000170, as a WHERE clause (see the header). */
+/** The policy each table had before 000171, as a WHERE clause (see the header). */
 const ORIGINAL_PREDICATES = {
   students: "app.can_read_student_for_attendance(id)",
   classes: "app.can_read_class_for_attendance(id)",
@@ -94,7 +94,7 @@ async function idsOf(tx: TransactionSql, query: string): Promise<string[]> {
   return rows.map((row) => row.id).sort();
 }
 
-/** The live policy (000170): what studafy_app sees with the caller's GUCs. */
+/** The live policy (000171): what studafy_app sees with the caller's GUCs. */
 function visibleNow(caller: Caller, table: Table): Promise<string[]> {
   return withCaller(caller, true, (tx) => idsOf(tx, `SELECT id FROM app.${table}`));
 }
@@ -212,7 +212,7 @@ afterAll(async () => {
   await database?.cleanup();
 });
 
-describeDb("000170 role_scope_visibility rewrite: same visible rows as 000133 / 000037", () => {
+describeDb("000171 role_scope_visibility rewrite: same visible rows as 000133 / 000037", () => {
   test("the live policies are the hoisted ones this test is meant to check", async () => {
     const rows = await database!.sql<{ table: string; qual: string }[]>`
       SELECT tablename AS table, qual FROM pg_policies

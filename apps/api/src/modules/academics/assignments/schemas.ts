@@ -47,6 +47,27 @@ export const assignmentFilterStatusSchema = z.enum(["upcoming", "past_due", "sub
 
 export type AssignmentFilterStatus = z.infer<typeof assignmentFilterStatusSchema>;
 
+/**
+ * Mirrors the app.assignment_kind PostgreSQL enum (db/migrations/000167). Fixed at creation: what a
+ * hand-in consists of cannot change once students may have started one.
+ */
+export const assignmentKindSchema = z.enum(["written", "questions"]).openapi({
+  description:
+    "What a hand-in consists of. `written` = free text and file attachments, marked by the " +
+    "teacher. `questions` = answers to the assignment's multiple-choice and true/false " +
+    "questions, marked automatically and released by the teacher.",
+});
+
+export type AssignmentKind = z.infer<typeof assignmentKindSchema>;
+
+/** Mirrors the app.assignment_question_type PostgreSQL enum (db/migrations/000167). */
+export const questionTypeSchema = z.enum(["multiple_choice", "true_false"]).openapi({
+  description:
+    "`multiple_choice` = 2-6 options, one correct. `true_false` = exactly two options, one correct.",
+});
+
+export type QuestionType = z.infer<typeof questionTypeSchema>;
+
 // ---------------------------------------------------------------------------
 // Attachments
 // ---------------------------------------------------------------------------
@@ -86,6 +107,80 @@ export const assignmentAttachmentSchema = z
 export type AssignmentAttachment = z.infer<typeof assignmentAttachmentSchema>;
 
 // ---------------------------------------------------------------------------
+// Questions
+// ---------------------------------------------------------------------------
+
+export const assignmentQuestionOptionSchema = z
+  .object({
+    id: uuidSchema.openapi({
+      description: "Primary key. Sent back as `option_id` when answering.",
+    }),
+    position: z.number().int().openapi({ description: "1-based display order." }),
+    text: z.string().openapi({ description: "Option text.", example: "Chloroplast" }),
+    // The answer key. Withheld from anyone who is not staff for the assignment: a student learns
+    // which option was correct from their own submission, once its mark is released.
+    is_correct: z
+      .boolean()
+      .nullable()
+      .openapi({
+        description:
+          "Whether this is the correct option. Null for students and parents -- they see the " +
+          "correct answer on their own submission once its mark is released.",
+      }),
+  })
+  .openapi("AssignmentQuestionOption");
+
+export type AssignmentQuestionOption = z.infer<typeof assignmentQuestionOptionSchema>;
+
+/** The image types a question picture may be; mirrors ck_assignment_questions_image_mime_type. */
+export const QUESTION_IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
+export const QUESTION_IMAGE_CONTENT_CLASS = "assignment.question_image";
+
+export type QuestionImageContentType = (typeof QUESTION_IMAGE_CONTENT_TYPES)[number];
+
+export const assignmentQuestionImageSchema = z
+  .object({
+    content_type: z.enum(QUESTION_IMAGE_CONTENT_TYPES),
+    size_bytes: z.number().int().positive(),
+    // The storage key itself is never serialized; the pre-signed URL is the only handle.
+    download_url: z
+      .string()
+      .nullable()
+      .openapi({
+        description:
+          "Short-lived pre-signed GET URL for the picture. Null when object storage is not " +
+          "configured for this deployment. Re-fetch the assignment for a fresh one after " +
+          "`download_url_expires_at`.",
+      }),
+    download_url_expires_at: dateTimeSchema.nullable().openapi({
+      description: "When `download_url` stops working.",
+    }),
+  })
+  .openapi("AssignmentQuestionImage");
+
+export type AssignmentQuestionImage = z.infer<typeof assignmentQuestionImageSchema>;
+
+export const assignmentQuestionSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "Primary key." }),
+    position: z.number().int().openapi({ description: "1-based display order." }),
+    question_type: questionTypeSchema,
+    prompt: z.string().openapi({
+      description: 'The question. Empty ("") when the picture is the whole question.',
+      example: "Where does photosynthesis happen?",
+    }),
+    // The question's picture; absent when it has none. Optional rather than nullable: the mobile
+    // client's generator reads a nullable reference as required and would fail to parse null.
+    image: assignmentQuestionImageSchema.optional(),
+    points: z.number().openapi({ description: "Points for a correct answer.", example: 2 }),
+    options: z.array(assignmentQuestionOptionSchema).openapi({ description: "Options in order." }),
+  })
+  .openapi("AssignmentQuestion");
+
+export type AssignmentQuestion = z.infer<typeof assignmentQuestionSchema>;
+
+// ---------------------------------------------------------------------------
 // Assignment
 // ---------------------------------------------------------------------------
 
@@ -101,6 +196,7 @@ export const assignmentSchema = z
     description: z.string().nullable().openapi({ description: "Short summary for listings." }),
     instructions: z.string().nullable().openapi({ description: "Full instructions for students." }),
     status: assignmentStatusSchema,
+    kind: assignmentKindSchema,
     available_from: dateTimeSchema
       .nullable()
       .openapi({ description: "When students may begin. Null means immediately on publish." }),
@@ -115,6 +211,9 @@ export const assignmentSchema = z
     attachments: z
       .array(assignmentAttachmentSchema)
       .openapi({ description: "Files attached by the teacher, with pre-signed download URLs." }),
+    questions: z.array(assignmentQuestionSchema).openapi({
+      description: "The questions, in order. Always empty for a `written` assignment.",
+    }),
     created_by_user_id: uuidSchema.openapi({ description: "Teacher who created it." }),
     last_edited_by_user_id: uuidSchema.openapi({ description: "Most recent editor." }),
     created_at: dateTimeSchema,
@@ -211,7 +310,17 @@ export const createAssignmentBodySchema = z
     status: assignmentStatusSchema
       .exclude(["archived"])
       .default("draft")
-      .openapi({ description: "Create directly as `published` to skip the draft step." }),
+      .openapi({
+        description:
+          "Create directly as `published` to skip the draft step. A `questions` assignment must " +
+          "be created as a draft: it has no questions yet, and publishing one without any is " +
+          "refused.",
+      }),
+    kind: assignmentKindSchema.default("written").openapi({
+      description:
+        "Fixed at creation. For `questions`, `max_score` is replaced by the sum of the question " +
+        "points whenever the questions are saved.",
+    }),
   })
   // Mirrors ck_assignments_availability. Enforcing it here as well as in the database is what turns
   // an inverted date range into a 400 naming the field, rather than a 500 from a CHECK violation
@@ -248,6 +357,122 @@ export const updateAssignmentBodySchema = z
   .openapi("UpdateAssignmentBody");
 
 export type UpdateAssignmentBody = z.infer<typeof updateAssignmentBodySchema>;
+
+/** Bounds on a question set: a class quiz of up to twenty questions, each with two to four options. */
+export const MAX_QUESTIONS = 20;
+export const MAX_OPTIONS = 4;
+
+const questionOptionInputSchema = z
+  .object({
+    text: z.string().trim().min(1).max(500).openapi({ description: "Option text." }),
+    is_correct: z.boolean().openapi({ description: "Exactly one option per question is correct." }),
+  })
+  .openapi("QuestionOptionInput");
+
+// One object with exactly one of two fields, rather than a union of two: the mobile client's
+// generator cannot type a oneOf (see apps/mobile/pubspec.yaml), and the rule is one refine.
+const questionImageInputSchema = z
+  .object({
+    upload_key: z
+      .string()
+      .min(1)
+      .max(1024)
+      .optional()
+      .openapi({
+        description:
+          "A new picture: the temp/ `storage_key` returned by POST " +
+          "/api/storage/uploads/request-upload (content_class `assignment.question_image`), after " +
+          "the client has PUT the picture to its `upload_url`. Do NOT call " +
+          "/api/storage/uploads/confirm: saving the questions confirms it.",
+      }),
+    keep_from_question_id: uuidSchema.optional().openapi({
+      description:
+        "Keep the picture already on this question of the same assignment (its id from the " +
+        "current question set). How an unchanged picture survives a save, which replaces every " +
+        "question.",
+    }),
+  })
+  .strict()
+  .refine(
+    (image) => (image.upload_key === undefined) !== (image.keep_from_question_id === undefined),
+    { message: "Set exactly one of upload_key and keep_from_question_id" },
+  )
+  .openapi("QuestionImageInput");
+
+const questionInputSchema = z
+  .object({
+    question_type: questionTypeSchema,
+    prompt: z.string().trim().max(2_000).openapi({
+      description: "The question. May be empty when `image` is set: the picture is the question.",
+    }),
+    // The question's picture: a new upload, a kept one, or none.
+    image: questionImageInputSchema.nullable().optional(),
+    points: z
+      .number()
+      .positive()
+      .max(MAX_SCORE_CEILING)
+      .multipleOf(0.01)
+      .openapi({ description: "Points for a correct answer. Two decimal places.", example: 1 }),
+    options: z
+      .array(questionOptionInputSchema)
+      .min(2)
+      .max(MAX_OPTIONS)
+      .openapi({
+        description:
+          "In display order. 2-4 for `multiple_choice`, exactly 2 for `true_false`. Exactly one " +
+          "must be correct.",
+      }),
+  })
+  .refine((question) => question.question_type !== "true_false" || question.options.length === 2, {
+    message: "A true/false question has exactly two options",
+    path: ["options"],
+  })
+  .refine((question) => question.options.filter((option) => option.is_correct).length === 1, {
+    message: "Exactly one option must be marked correct",
+    path: ["options"],
+  })
+  .refine((question) => question.prompt.length > 0 || Boolean(question.image), {
+    message: "A question needs text or a picture",
+    path: ["prompt"],
+  })
+  .openapi("QuestionInput");
+
+export type QuestionInput = z.infer<typeof questionInputSchema>;
+
+/**
+ * Replaces the whole question set. A form editor saves the form, not a diff of it; accepting the
+ * complete list makes ordering, removal, and the "exactly one correct" rule one validated write
+ * rather than a sequence of partial ones that could each leave the set half-edited.
+ */
+export const replaceQuestionsBodySchema = z
+  .object({
+    questions: z
+      .array(questionInputSchema)
+      .max(MAX_QUESTIONS)
+      .openapi({
+        description:
+          "The complete question set, in order, at most 20. Replaces whatever was there. Refused " +
+          "with 409 once any student has handed in answers.",
+      }),
+  })
+  .refine(
+    (body) => {
+      const images = body.questions.flatMap((question) =>
+        question.image
+          ? [
+              question.image.upload_key !== undefined
+                ? `u:${question.image.upload_key}`
+                : `k:${question.image.keep_from_question_id}`,
+            ]
+          : [],
+      );
+      return new Set(images).size === images.length;
+    },
+    { path: ["questions"], message: "Each picture can be used by only one question" },
+  )
+  .openapi("ReplaceQuestionsBody");
+
+export type ReplaceQuestionsBody = z.infer<typeof replaceQuestionsBodySchema>;
 
 // ---------------------------------------------------------------------------
 // Attachment upload flow

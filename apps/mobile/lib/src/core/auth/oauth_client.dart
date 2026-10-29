@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../api/api_client.dart' show apiConnectTimeout;
 import '../api/error_mapping_interceptor.dart';
 
 /// Backend response for mobile OAuth start — PKCE params to build the
@@ -56,8 +57,15 @@ class MobileTokenResponse {
 /// OpenAPI-generated client yet and the surface is trivial.
 class MobileAuthClient {
   MobileAuthClient({required String baseUrl, Dio? dio})
-    : _dio = (dio ?? Dio(BaseOptions(baseUrl: baseUrl)))
-        ..interceptors.add(ErrorMappingInterceptor());
+    : _dio =
+          (dio ??
+                Dio(
+                  BaseOptions(
+                    baseUrl: baseUrl,
+                    connectTimeout: apiConnectTimeout,
+                  ),
+                ))
+            ..interceptors.add(ErrorMappingInterceptor());
 
   final Dio _dio;
 

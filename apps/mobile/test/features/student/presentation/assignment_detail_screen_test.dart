@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/assignment_kind.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/submission.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/submission_grade_status.dart';
@@ -37,6 +38,8 @@ Assignment _fakeAssignment({
     maxScore: 100,
     allowLateSubmission: allowLateSubmission,
     attachments: const [],
+    kind: AssignmentKind.written,
+    questions: const [],
     createdByUserId: 'teacher-1',
     lastEditedByUserId: 'teacher-1',
     createdAt: now,
@@ -68,6 +71,8 @@ Submission _fakeSubmission({
     gradedAt: gradeStatus == SubmissionGradeStatus.published ? now : null,
     gradedByUserId: gradeStatus == SubmissionGradeStatus.published ? 'teacher-1' : null,
     attachments: const [],
+    answers: const [],
+    autoScore: null,
     lastEditedByUserId: 'student-1',
     createdAt: now,
     updatedAt: now,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/assignment_kind.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/class_value.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/course.dart';
@@ -48,6 +49,8 @@ Assignment _assignment(String id, String title, int daysUntilDue) {
     maxScore: 100,
     allowLateSubmission: false,
     attachments: const [],
+    kind: AssignmentKind.written,
+    questions: const [],
     createdByUserId: 'teacher-1',
     lastEditedByUserId: 'teacher-1',
     createdAt: now,

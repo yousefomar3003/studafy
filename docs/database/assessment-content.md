@@ -59,6 +59,31 @@ Actor columns record operational attribution: assignment/exam creators, material
 last editors, graders, and result publishers. They are not an immutable audit log; a future audit
 or outbox model is required for historical change records.
 
+## Question assignments
+
+`app.assignments.kind` (000167) is `written` (free text and attachments, marked by hand) or
+`questions`. A `questions` assignment owns ordered `app.assignment_questions` (`multiple_choice` or
+`true_false`, each with `points`) and their `app.assignment_question_options`; `is_correct` is the
+answer key, at most one per question (a partial unique index), exactly one enforced by the API.
+A student's hand-in stores one `app.submission_answers` row per question; a composite foreign key
+pins each chosen option to its own question.
+
+- The API replaces the whole question set in one write, sets `max_score` to the total points, and
+  refuses edits once any student has handed in (answers reference questions `ON DELETE RESTRICT`).
+- A `questions` assignment cannot be published without questions.
+- A set holds 1-20 questions and a multiple-choice question 2-4 options (API-enforced).
+- A question can carry one picture (000169): `image_storage_key`, `image_mime_type` and
+  `image_size_bytes`, all set or all null, the key pinned to `permanent/<school_id>/`. With a
+  picture the `prompt` may be empty. Pictures are staged with the `assignment.question_image`
+  content class and promoted by the question save; an unchanged picture is carried across a save
+  by naming the question that has it.
+- The hand-in is marked and released at once (000169): the submit writes `score` from the
+  answers and publishes it with `auto_graded = true` and no `graded_by_user_id`. A teacher can
+  re-mark it (taking the grade over) or return it so the student can retake the quiz.
+  `auto_score` is still derived on read for the teacher's marking view.
+- `is_correct` is readable through RLS by anyone who can read the assignment (a row policy cannot
+  hide one column); the API withholds it from non-staff at the response projection.
+
 ## Material storage and AI behavior
 
 A material belongs to exactly one concrete class. Assignment/exam-specific attachments, reuse

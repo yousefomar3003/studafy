@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/assignment_kind.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/assignment_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/cumulative_grade_summary.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/notification.dart'
@@ -44,6 +45,8 @@ Assignment _fakeAssignment() {
     maxScore: 100,
     allowLateSubmission: false,
     attachments: const [],
+    kind: AssignmentKind.written,
+    questions: const [],
     createdByUserId: 'teacher-1',
     lastEditedByUserId: 'teacher-1',
     createdAt: now,

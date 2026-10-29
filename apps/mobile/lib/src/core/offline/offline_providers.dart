@@ -19,8 +19,8 @@ final offlineDatabaseExecutorProvider = Provider<QueryExecutor?>((ref) => null);
 /// The app-wide offline cache database. A plain (non-autoDispose) provider — same lifetime as
 /// `apiClientProvider` — so every repository below shares one connection.
 ///
-/// Wipes itself the moment a session logs out (`AuthStatus.authenticated` -> `unauthenticated`):
-/// cached school data must not survive into a different account signing in on the same device.
+/// Wipes itself the moment a session ends or the account switches (`AuthStatus.authenticated` ->
+/// anything else): cached school data must not survive into a different account on the same device.
 /// This mirrors `app_providers.dart`'s `routerProvider`, which wires its own `ref.listen` on
 /// `authStatusProvider` the same way rather than needing a separate provider to be read at boot.
 final offlineDatabaseProvider = Provider<OfflineDatabase>((ref) {
@@ -28,7 +28,7 @@ final offlineDatabaseProvider = Provider<OfflineDatabase>((ref) {
   ref.onDispose(database.close);
 
   ref.listen(authStatusProvider, (previous, next) {
-    if (previous == AuthStatus.authenticated && next == AuthStatus.unauthenticated) {
+    if (previous == AuthStatus.authenticated && next != AuthStatus.authenticated) {
       database.clearAll();
     }
   });

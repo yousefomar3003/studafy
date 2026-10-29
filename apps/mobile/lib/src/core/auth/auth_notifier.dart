@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../di/app_providers.dart';
+import '../realtime/realtime_providers.dart';
 import 'auth_session.dart';
 import 'auth_state.dart';
 import 'oauth_browser.dart';
 import 'oauth_client.dart';
+import 'saved_account.dart';
 import 'school_closed_notice.dart';
 import 'secure_token_store.dart';
 
@@ -147,14 +149,88 @@ class AuthNotifier extends Notifier<AuthStatus> {
       sessionId: tokens.sessionId,
       expiresIn: tokens.expiresIn,
     );
+    // Signing in to an account that was set aside makes it active again, not a duplicate.
+    final userId = _session.userId;
+    if (userId != null) {
+      await ref.read(savedAccountsProvider.notifier).remove(userId);
+    }
     ref.read(schoolClosedNoticeProvider.notifier).clear();
+    _onAccountChanged();
     state = AuthStatus.authenticated;
   }
 
+  /// Logs out of the active account only. When other accounts are signed in on this device, the
+  /// most recently used one takes over, as Instagram does; otherwise the app returns to login.
   Future<void> logout() async {
     await _session.logout();
+    final next = ref.read(savedAccountsProvider).firstOrNull;
+    if (next != null && await switchTo(next.userId)) return;
     state = AuthStatus.unauthenticated;
   }
+
+  /// "Add account": sets the active account aside, still signed in, and opens the login screen.
+  /// [current] is how it will be listed there and in the switcher.
+  Future<void> addAccount({required AccountLabel current}) async {
+    final active = _session.toSavedAccount(current);
+    if (active != null) {
+      await ref.read(savedAccountsProvider.notifier).put(active);
+    }
+    await _session.clear();
+    state = AuthStatus.unauthenticated;
+  }
+
+  /// Makes the saved account [userId] the active one, setting the current account (if any) aside
+  /// under [current]. Every user-scoped provider rebuilds as the status passes through
+  /// [AuthStatus.loading].
+  ///
+  /// Returns `false` when that account's session can no longer be renewed (it was signed out from
+  /// another device, or expired): it is dropped, and the app lands on login to sign in again.
+  Future<bool> switchTo(String userId, {AccountLabel? current}) async {
+    final saved = ref.read(savedAccountsProvider.notifier);
+    final target = await saved.find(userId);
+    if (target == null) return false;
+
+    if (current != null) {
+      final active = _session.toSavedAccount(current);
+      if (active != null) await saved.put(active);
+    }
+    state = AuthStatus.loading;
+    await saved.remove(userId);
+    await _session.activate(target);
+
+    // Renew now rather than on the first request, so a dead session is found here. Offline, the
+    // renewal fails without clearing the session and the account opens on its cached data.
+    if (_session.isExpiringSoon()) await _session.refresh();
+    if (!_session.isAuthenticated) {
+      if (_session.lastRefreshErrorCode == schoolClosedErrorCode) {
+        ref.read(schoolClosedNoticeProvider.notifier).show();
+      }
+      state = AuthStatus.unauthenticated;
+      return false;
+    }
+
+    ref.read(schoolClosedNoticeProvider.notifier).clear();
+    _onAccountChanged();
+    state = AuthStatus.authenticated;
+    return true;
+  }
+
+  /// Forgets a saved account and ends its session on the server (best-effort).
+  Future<void> removeSavedAccount(String userId) async {
+    final saved = ref.read(savedAccountsProvider.notifier);
+    final account = await saved.find(userId);
+    if (account == null) return;
+    await saved.remove(userId);
+    try {
+      await _authClient.logout(account.refreshToken);
+    } catch (_) {
+      // The session expires on its own; it is already gone from this device.
+    }
+  }
+
+  /// A different account is now active: the realtime connection still carries the previous
+  /// account's token and school rooms, so it starts over.
+  void _onAccountChanged() => ref.invalidate(realtimeClientProvider);
 
   /// The account was just deleted (`POST /api/account/deletion`): the server has already revoked
   /// every session, so clear this device's tokens without calling the logout endpoint.

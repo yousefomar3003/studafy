@@ -1,5 +1,5 @@
 /**
- * Global search (ST-278, extended by migration 000170): role-scoped Postgres full-text search over
+ * Global search (ST-278, extended by migration 000171): role-scoped Postgres full-text search over
  * twenty record types, grouped per type, with per-type totals for paging.
  *
  * Matching. The query is normalized and split into letter/digit tokens here (./normalize.ts, the
@@ -11,9 +11,9 @@
  * is stored as 'inv' and '0012' rather than 'inv' and the signed integer '-0012'.
  *
  * No search indexes. Under FORCE RLS PostgreSQL will not use an index for `@@` or `<%` (neither is
- * LEAKPROOF, so neither can run before the policy quals), so migration 000170 creates none: every
+ * LEAKPROOF, so neither can run before the policy quals), so migration 000171 creates none: every
  * section's scan is bounded by the tenant's school_id btree and the match is a filter over that
- * school's rows (000170, header point 4).
+ * school's rows (000171, header point 4).
  *
  * Typo fallback. A section that has a trigram `search_name` (students, users, classes, subjects,
  * families) can run again as a pg_trgm word-similarity match (`<%`) of the normalized query against
@@ -36,7 +36,7 @@
  *     To keep that predicate from running for every row in the school, those sections first ask
  *     `app.search_scoped_ids` / `app.search_scoped_fuzzy_ids` for the ids of this school's matching
  *     rows (ids only) and then read those rows as studafy_app with the same match repeated -- RLS
- *     still decides which of them come back and are counted (migration 000170, header point 6).
+ *     still decides which of them come back and are counted (migration 000171, header point 6).
  *     Each candidate is read through `CROSS JOIN LATERAL (... WHERE x.id = c.id ... OFFSET 0)`: the
  *     OFFSET 0 keeps the planner from flattening it into a hash join that scans the whole table, which
  *     on a small table (16 subjects) it otherwise prefers -- and that would evaluate the per-row

@@ -1,5 +1,5 @@
 /**
- * Global search across all twenty types -- live-PostgreSQL integration test (migration 000170).
+ * Global search across all twenty types -- live-PostgreSQL integration test (migration 000171).
  *
  * Runs the real app (real JWT verification, real tenant transactions as studafy_app) against two
  * seeded schools and asserts, per section:

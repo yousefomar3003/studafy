@@ -1,5 +1,5 @@
 /**
- * Global search query plans (migration 000170): EXPLAIN (FORMAT JSON) checks, in the style of
+ * Global search query plans (migration 000171): EXPLAIN (FORMAT JSON) checks, in the style of
  * packages/db/tests/query-plan-budget.test.ts -- each probe is the WHERE shape of a section query in
  * apps/api/src/modules/search/service.ts.
  *
@@ -7,7 +7,7 @@
  *    role has BYPASSRLS, and PostgreSQL will not make a non-LEAKPROOF qual such as `@@`
  *    (ts_match_vq) or `<%` (word_similarity_op) an index condition ahead of the policy quals. A GIN
  *    index on search_tsv or a trigram index on search_name could never be used by the API or by the
- *    candidate functions, so 000170 creates none (its header, point 4). The first block fails if one
+ *    candidate functions, so 000171 creates none (its header, point 4). The first block fails if one
  *    appears, so nobody re-adds a dead index -- with its write and disk cost -- without first
  *    showing an EXPLAIN under RLS that uses it.
  *
@@ -84,7 +84,7 @@ afterAll(async () => {
   await database?.cleanup();
 });
 
-/** Every table with a GENERATED search_tsv (000110 / 000170). */
+/** Every table with a GENERATED search_tsv (000110 / 000171). */
 const TSV_TABLES = [
   "students",
   "users",
@@ -108,7 +108,7 @@ const TSV_TABLES = [
   "notifications",
 ];
 
-/** Every table with a GENERATED search_name for the trigram fallback (000170). */
+/** Every table with a GENERATED search_name for the trigram fallback (000171). */
 const TRIGRAM_TABLES = ["students", "users", "classes", "subjects", "families"];
 
 async function asApp<T>(

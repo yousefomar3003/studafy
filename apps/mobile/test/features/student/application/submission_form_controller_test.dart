@@ -41,6 +41,8 @@ Submission _fakeSubmission({required String id, int attemptNumber = 1}) {
     gradedAt: null,
     gradedByUserId: null,
     attachments: const [],
+    answers: const [],
+    autoScore: null,
     lastEditedByUserId: 'student-1',
     createdAt: now,
     updatedAt: now,

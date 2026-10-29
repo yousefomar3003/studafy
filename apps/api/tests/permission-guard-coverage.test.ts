@@ -193,6 +193,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/assignments/{assignmentId}/attachments/upload-url",
   "POST /api/academics/assignments/{assignmentId}/attachments",
   "DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  "PUT /api/academics/assignments/{assignmentId}/questions",
   // Submissions (ST-104). Guarded per method by requirePermission() on SUBMISSION_CREATE,
   // SUBMISSION_GRADE, and SUBMISSION_UPDATE — see permissionByMethod() in the route file. Row-level
   // for the same reason the assignments routes are, and then some: a student may only act on their

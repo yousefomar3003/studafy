@@ -1,5 +1,5 @@
 /**
- * School-defined student and parent records (docs/modules/student-records.md, 000169, ADR-019):
+ * School-defined student and parent records (docs/modules/student-records.md, 000170, ADR-019):
  * the template editor, filling records in, sensitive-value masking and the audited reveal,
  * documents and their content classes, and the missing-information list -- with the permission,
  * row-scope and tenant boundaries around each. Requires a live PostgreSQL instance, gated on

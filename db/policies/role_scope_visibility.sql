@@ -11,6 +11,9 @@
 -- creates them and are NOT repeated here:
 --   app.assignment_attachments      000049  app.can_read_assignment(assignment_id)
 --   app.submission_attachments      000050  app.can_read_submission(submission_id)
+--   app.assignment_questions        000167  app.can_read_assignment(assignment_id)
+--   app.assignment_question_options 000167  app.can_read_assignment_question(question_id)
+--   app.submission_answers          000167  app.can_read_submission(submission_id)
 --   app.attendance_record_versions  000054  app.can_read_student(student_id)  (re-pointed by 000133)
 --   app.attendance_alert_logs       000056  app.can_read_student(student_id)
 --   app.student_term_summaries      000065  app.is_related_to_student(student_id)

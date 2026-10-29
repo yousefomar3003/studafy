@@ -1,13 +1,13 @@
-// Global search latency at school scale (migration 000170): one school with 5,000 students and a
+// Global search latency at school scale (migration 000171): one school with 5,000 students and a
 // proportionate amount of everything else, GET /api/search through the real app (JWT verification,
 // tenant transaction as studafy_app, RLS, audit write), p95 under 150 ms.
 //
 // Measured as two callers, because RLS makes them different workloads:
-//   - ORG_ADMIN: the role_scope_visibility checks are hoisted InitPlans (000170 point 5), so RLS is
+//   - ORG_ADMIN: the role_scope_visibility checks are hoisted InitPlans (000171 point 5), so RLS is
 //     O(1) per statement and every section matches across the whole school;
 //   - a class teacher: the per-row predicate still runs, but only for app.search_scoped_ids'
-//     candidates (000170 point 6), not for all 5,000 students.
-// There are no search indexes (000170 point 4: under FORCE RLS a GIN or trigram index is never
+//     candidates (000171 point 6), not for all 5,000 students.
+// There are no search indexes (000171 point 4: under FORCE RLS a GIN or trigram index is never
 // used, since `@@` and `<%` are not leakproof), so every number here is a school_id-bounded scan
 // with the match as a filter -- the budget has to hold without them.
 // The query mix is what a search box sees: full and partial names in Latin and Arabic, admission and

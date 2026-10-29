@@ -12,10 +12,12 @@ import 'package:mime/mime.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/api/generated/models/assignment.dart';
 import '../../../core/api/generated/models/assignment_attachment.dart';
+import '../../../core/api/generated/models/assignment_kind.dart';
 import '../../../core/api/generated/models/assignment_status.dart';
 import '../../../core/api/generated/models/confirm_attachment_body.dart';
 import '../../../core/api/generated/models/confirm_upload_body.dart';
 import '../../../core/api/generated/models/create_assignment_body.dart';
+import '../../../core/api/generated/models/create_assignment_body_kind.dart';
 import '../../../core/api/generated/models/create_assignment_body_status.dart';
 import '../../../core/api/generated/models/create_material_body.dart';
 import '../../../core/api/generated/models/create_upload_url_body.dart';
@@ -30,6 +32,7 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../student/domain/material_ready_state.dart';
 import '../../student/presentation/widgets/material_ready_state_pill.dart';
 import 'assignment_submissions_screen.dart';
+import 'question_editor_screen.dart';
 
 /// Teacher-owned content for one class: create and edit assignments, upload and edit materials.
 ///
@@ -201,6 +204,8 @@ String _errorKeyFor(DioException error, String fallbackKey) {
   return switch (apiError?.code) {
     'ASSIGNMENT_INVALID_STATUS_TRANSITION' =>
       'teacher.content.errors.statusTransition',
+    'ASSIGNMENT_QUESTIONS_REQUIRED' => 'teacher.questions.errors.empty',
+    'ASSIGNMENT_QUESTIONS_LOCKED' => 'teacher.questions.errors.locked',
     'VALIDATION_FAILED' => 'teacher.content.errors.validation',
     'AUTHZ_FORBIDDEN' => 'teacher.content.errors.forbidden',
     'RESOURCE_NOT_FOUND' ||
@@ -261,8 +266,14 @@ class _AssignmentList extends StatelessWidget {
                     const SizedBox(height: AppSpacing.space8),
                 itemBuilder: (_, index) {
                   final item = assignments[index];
+                  final isQuestions = item.kind == AssignmentKind.questions;
                   return Card(
                     child: ListTile(
+                      leading: Icon(
+                        isQuestions
+                            ? Icons.quiz_outlined
+                            : Icons.assignment_outlined,
+                      ),
                       title: Text(item.title),
                       subtitle: Text(
                         'teacher.content.assignments.subtitle'.tr(
@@ -480,10 +491,17 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
   late DateTime _dueAt;
   late bool _lateAllowed;
   late AssignmentStatus _status;
+  late CreateAssignmentBodyKind _kind;
   bool _saving = false;
   String? _errorKey;
 
   bool get _editing => widget.existing != null;
+
+  /// A questions assignment's total is the sum of its question points (set by the API), so the
+  /// form doesn't ask for one, and a new one is created as a draft: it has no questions yet.
+  bool get _isQuestions => _editing
+      ? widget.existing!.kind == AssignmentKind.questions
+      : _kind == CreateAssignmentBodyKind.questions;
 
   /// Statuses offered in the picker. A draft may stay a draft or be published; once published the
   /// assignment can only move between published and closed (archiving happens via delete).
@@ -510,6 +528,7 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
         DateTime.now().add(const Duration(days: 7));
     _lateAllowed = existing?.allowLateSubmission ?? false;
     _status = existing?.status ?? AssignmentStatus.published;
+    _kind = CreateAssignmentBodyKind.written;
   }
 
   @override
@@ -574,9 +593,13 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
           title: _title.text.trim(),
           description: description,
           dueAt: _dueAt.toUtc(),
-          maxScore: num.parse(_score.text),
+          // Replaced by the question total once questions are saved.
+          maxScore: _isQuestions ? 1 : num.parse(_score.text),
           allowLateSubmission: _lateAllowed,
-          status: CreateAssignmentBodyStatus.fromJson(_status.json!),
+          status: _isQuestions
+              ? CreateAssignmentBodyStatus.draft
+              : CreateAssignmentBodyStatus.fromJson(_status.json!),
+          kind: _kind,
         ),
       );
     }
@@ -591,7 +614,7 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
         instructions: existing.instructions,
         availableFrom: existing.availableFrom,
         dueAt: _dueAt.toUtc(),
-        maxScore: num.parse(_score.text),
+        maxScore: _isQuestions ? existing.maxScore : num.parse(_score.text),
         allowLateSubmission: _lateAllowed,
         status: UpdateAssignmentBodyStatus.fromJson(_status.json!),
       ),
@@ -634,7 +657,19 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
           body: ConfirmAttachmentBody(storageKey: upload.storageKey),
         );
       }
-      if (mounted) Navigator.of(context).pop(true);
+      if (!mounted) return;
+      if (!_editing && _isQuestions) {
+        // Straight on to writing the questions. The draft exists either way, so the list
+        // refreshes whether or not the teacher saves them now.
+        await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => QuestionEditorScreen(assignment: assignment),
+          ),
+        );
+        if (mounted) Navigator.of(context).pop(true);
+        return;
+      }
+      Navigator.of(context).pop(true);
     } on DioException catch (error) {
       setState(() => _errorKey = _errorKeyFor(error, _fallbackErrorKey));
     } catch (_) {
@@ -650,6 +685,8 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
 
   String get _submitKey => _editing
       ? 'teacher.content.assignmentForm.save'
+      : _isQuestions
+      ? 'teacher.questions.next'
       : _status == AssignmentStatus.draft
       ? 'teacher.content.assignmentForm.saveDraft'
       : 'teacher.content.assignmentForm.publish';
@@ -675,6 +712,28 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.space16),
           children: [
+            if (!_editing) ...[
+              SegmentedButton<CreateAssignmentBodyKind>(
+                key: const Key('assignmentKind'),
+                segments: [
+                  ButtonSegment(
+                    value: CreateAssignmentBodyKind.written,
+                    icon: const Icon(Icons.edit_note),
+                    label: Text('teacher.questions.kinds.written'.tr()),
+                  ),
+                  ButtonSegment(
+                    value: CreateAssignmentBodyKind.questions,
+                    icon: const Icon(Icons.quiz_outlined),
+                    label: Text('teacher.questions.kinds.questions'.tr()),
+                  ),
+                ],
+                selected: {_kind},
+                onSelectionChanged: _saving
+                    ? null
+                    : (selection) => setState(() => _kind = selection.single),
+              ),
+              const SizedBox(height: AppSpacing.space16),
+            ],
             TextFormField(
               controller: _title,
               decoration: InputDecoration(
@@ -695,41 +754,74 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
               minLines: 3,
               maxLines: 6,
             ),
-            const SizedBox(height: AppSpacing.space12),
-            TextFormField(
-              controller: _score,
-              decoration: InputDecoration(
-                labelText: 'teacher.content.assignmentForm.points'.tr(),
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              validator: (v) {
-                final points = num.tryParse(v ?? '');
-                return points == null || points <= 0
-                    ? 'teacher.content.assignmentForm.pointsInvalid'.tr()
-                    : null;
-              },
-            ),
-            const SizedBox(height: AppSpacing.space12),
-            DropdownButtonFormField<AssignmentStatus>(
-              initialValue: _status,
-              decoration: InputDecoration(
-                labelText: 'teacher.content.assignmentForm.status'.tr(),
-              ),
-              items: [
-                for (final status in _statusOptions)
-                  DropdownMenuItem(
-                    value: status,
-                    child: Text(_statusLabel(status)),
-                  ),
-              ],
-              onChanged: _saving
-                  ? null
-                  : (value) {
-                      if (value != null) setState(() => _status = value);
+            if (_isQuestions && _editing) ...[
+              const SizedBox(height: AppSpacing.space12),
+              OutlinedButton.icon(
+                key: const Key('assignmentEditQuestions'),
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        final saved = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => QuestionEditorScreen(
+                              assignment: widget.existing!,
+                            ),
+                          ),
+                        );
+                        if (saved == true && context.mounted) {
+                          Navigator.of(context).pop(true);
+                        }
+                      },
+                icon: const Icon(Icons.quiz_outlined),
+                label: Text(
+                  'teacher.questions.edit'.tr(
+                    namedArgs: {
+                      'count': '${widget.existing!.questions.length}',
+                      'points': '${widget.existing!.maxScore}',
                     },
-            ),
+                  ),
+                ),
+              ),
+            ],
+            if (!_isQuestions) ...[
+              const SizedBox(height: AppSpacing.space12),
+              TextFormField(
+                controller: _score,
+                decoration: InputDecoration(
+                  labelText: 'teacher.content.assignmentForm.points'.tr(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) {
+                  final points = num.tryParse(v ?? '');
+                  return points == null || points <= 0
+                      ? 'teacher.content.assignmentForm.pointsInvalid'.tr()
+                      : null;
+                },
+              ),
+            ],
+            if (!(_isQuestions && !_editing)) ...[
+              const SizedBox(height: AppSpacing.space12),
+              DropdownButtonFormField<AssignmentStatus>(
+                initialValue: _status,
+                decoration: InputDecoration(
+                  labelText: 'teacher.content.assignmentForm.status'.tr(),
+                ),
+                items: [
+                  for (final status in _statusOptions)
+                    DropdownMenuItem(
+                      value: status,
+                      child: Text(_statusLabel(status)),
+                    ),
+                ],
+                onChanged: _saving
+                    ? null
+                    : (value) {
+                        if (value != null) setState(() => _status = value);
+                      },
+              ),
+            ],
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text('teacher.content.assignmentForm.dueDate'.tr()),

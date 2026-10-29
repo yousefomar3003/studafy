@@ -124,6 +124,18 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
       gatewayConfirm: false,
     },
   ],
+  [
+    // The picture on a question in a questions assignment (000169). Staged through the generic
+    // request-upload route, then confirmed and promoted by the question save itself (one
+    // transaction with the question set). Mirrors ck_assignment_questions_image_mime_type.
+    "assignment.question_image",
+    {
+      allowedContentTypes: new Set(["image/jpeg", "image/png", "image/webp"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.ASSIGNMENT_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
   // A bank transfer receipt for a license invoice (docs/billing/feature-licensing.md, session 3).
   // Uploaded by the school (license:manage) and confirmed by the licensing module inside the write
   // that records it; the super admin's own uploads go through the license console's upload route.
@@ -136,7 +148,7 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
       gatewayConfirm: false,
     },
   ],
-  // The file behind a document field on a student's or parent's record (000169): a birth
+  // The file behind a document field on a student's or parent's record (000170): a birth
   // certificate, a vaccination record, a previous school's report. Uploaded by school leadership
   // only (parents enter nothing) and confirmed by the records module inside the write that attaches
   // it; mirrors ck_record_documents_mime_type. Phone photos arrive as HEIC.

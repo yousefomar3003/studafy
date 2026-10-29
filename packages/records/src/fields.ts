@@ -1,6 +1,6 @@
 /**
  * The vocabulary of school-defined student and parent records (docs/modules/student-records.md).
- * Mirrors the enums created by db/migrations/000169_create_student_and_parent_records.sql.
+ * Mirrors the enums created by db/migrations/000170_create_student_and_parent_records.sql.
  */
 
 export const RECORD_SUBJECT_KINDS = ["student", "parent"] as const;

@@ -17,7 +17,7 @@ its `RequirePermission` and every API endpoint its own guard and row-level secur
 | Full results page             | `/portal/search?q=&type=&page=` (`SearchResultsPage.tsx`)                                      |
 | Normalization (client)        | `apps/web/src/features/search/normalize.ts`                                                    |
 | Record search API             | `GET /api/search`, `apps/api/src/modules/search`                                               |
-| Search columns, normalization | `db/migrations/000110_*.sql` (first four types), `000170_extend_global_search.sql`             |
+| Search columns, normalization | `db/migrations/000110_*.sql` (first four types), `000171_extend_global_search.sql`             |
 
 ## The palette
 
@@ -124,7 +124,7 @@ two must change together.
 **Performance.** There are no search indexes. Every searched table has FORCE RLS, and PostgreSQL
 will not use an index for `@@` or the trigram `<%` ahead of the policy check, because neither
 operator is leakproof. A GIN or trigram index would never be used and would only add write and disk
-cost, so migration 000170 creates none (its header, point 4). Instead, each section's scan is
+cost, so migration 000171 creates none (its header, point 4). Instead, each section's scan is
 bounded by the tenant's `school_id` btree, and the match is a filter over that one school's rows,
 read from stored generated columns (`search_tsv`, `search_name`), so no row is re-tokenized at query
 time. For the row-scoped types (students, classes, subjects, materials), the API first asks
@@ -139,7 +139,7 @@ runs over every similar name in the school, and each of those candidates pays th
 predicate. The benchmark hits this case whenever its random class roster contains no match.
 `tests/search/global-search-plans.integration.test.ts` checks the query plans, and fails if a
 search index is added. `tests/search/global-search-policy-equivalence.integration.test.ts` checks
-that 000170's policy rewrite shows every caller the same rows as before.
+that 000171's policy rewrite shows every caller the same rows as before.
 
 ## Adding a page
 

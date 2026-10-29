@@ -4,7 +4,7 @@
  * A sensitive answer (a national ID, a medical note, a passport scan) is kept only while the school
  * has a use for it: the field's retention period in months -- the school's own, or
  * DEFAULT_SENSITIVE_RETENTION_MONTHS -- counted from when the student left (app.students.left_at,
- * maintained by 000169's trigger) or, for a parent, from when the last of their linked children
+ * maintained by 000170's trigger) or, for a parent, from when the last of their linked children
  * left. A parent with no linked child at all is never swept: staff may still be about to link them.
  * The period is read from the field's latest published version, so a school that shortens it
  * shortens it for existing answers too.

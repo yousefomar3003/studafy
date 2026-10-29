@@ -18,8 +18,7 @@ photos, files or notifications changes, or a new `Info.plist` key or manifest pe
 | Music / media library   | `NSAppleMusicUsageDescription`, never shown    | None                                       | Never. Same reason                                                          |
 | Files / storage         | None needed                                    | None needed                                | n/a. The system document picker grants access to the chosen file only      |
 
-Nothing else is requested: no location, contacts, microphone, Bluetooth, tracking (ATT) or
-biometrics. `NSUserTrackingUsageDescription` must stay absent (`child_directed_sdks_test.dart`).
+Nothing else is requested: no location, contacts, microphone, Bluetooth or tracking (ATT). `NSUserTrackingUsageDescription` must stay absent (`child_directed_sdks_test.dart`).
 
 ## Camera
 
@@ -113,8 +112,7 @@ test fails if one is added.
 
 The source manifest declares `INTERNET` and `RECEIVE_BOOT_COMPLETED`. Plugins add `POST_NOTIFICATIONS`,
 `ACCESS_NETWORK_STATE`, `WAKE_LOCK`, `VIBRATE` and `com.google.android.c2dm.permission.RECEIVE` at
-merge time (`docs/sdk_compliance_inventory.md`). Of these, only `POST_NOTIFICATIONS` is a runtime
-permission the user is asked about. `AD_ID` is stripped with `tools:node="remove"`.
+merge time (`docs/sdk_compliance_inventory.md`). Of these, only `POST_NOTIFICATIONS` is a runtime permission the user is asked about. `AD_ID` is stripped with `tools:node="remove"`.
 
 ## Sign-in browser (no external-browser auth)
 

@@ -4,6 +4,11 @@
   },
   "auth": {
     "login": {
+      "savedAccounts": {
+        "title": "Accounts on this phone",
+        "remove": "Remove {name} from this phone",
+        "orSignIn": "Or sign in to another account"
+      },
       "subtitle": "Sign in with your school account to continue.",
       "mock": "Continue with Mock",
       "mockSheetTitle": "Choose a demo persona",
@@ -139,6 +144,12 @@
       "testCrash": "Send test crash (dev only)",
       "privacyPolicy": "Privacy policy",
       "signedIn": "Signed in to Studafy",
+      "switchAccount": {
+        "title": "Switch account",
+        "subtitle": "Add your account at another school",
+        "add": "Add account",
+        "current": "Current account"
+      },
       "signInSecurity": {
         "title": "Sign-in & security"
       },
@@ -151,6 +162,7 @@
       "logoutDialog": {
         "title": "Log out?",
         "body": "You'll need to sign in again to use Studafy on this device. Data saved on this device will be removed.",
+        "bodyOtherAccounts": "You'll be logged out of this account only. Your other accounts stay signed in on this phone.",
         "confirm": "Log out",
         "cancel": "Cancel"
       },
@@ -224,6 +236,32 @@
     }
   },
   "assignments": {
+    "questions": {
+      "points": "{points} pts",
+      "unanswered": "Not answered",
+      "correct": "Correct",
+      "incorrect": "Incorrect",
+      "rightAnswer": "Right answer",
+      "yourAnswer": "Your answer",
+      "progress": "{answered} of {total} answered",
+      "answerAll": "Answer every question to submit",
+      "count": "{count} questions",
+      "start": "Start answering",
+      "retake": "Change answers",
+      "errors": {
+        "invalid": "Your answers don't match this assignment's questions. Reopen it and try again."
+      },
+      "number": "Question {number}",
+      "picture": "Picture for question {number}",
+      "result": {
+        "title": "Quiz submitted",
+        "score": "{score} / {max}",
+        "percent": "{percent}%",
+        "pending": "Your answers were handed in.",
+        "review": "Your answers are marked. See which ones were right on the next screen.",
+        "seeAnswers": "See my answers"
+      }
+    },
     "list": {
       "title": "Assignments",
       "tabs": {
@@ -785,6 +823,56 @@
     }
   },
   "teacher": {
+    "questions": {
+      "title": "Questions",
+      "summary": "{count} questions · {points} points in total",
+      "add": "Add question",
+      "number": "Question {number}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove question",
+      "types": {
+        "multipleChoice": "Multiple choice",
+        "trueFalse": "True / False"
+      },
+      "prompt": "Question",
+      "points": "Points",
+      "markCorrect": "Select the correct answer",
+      "optionHint": "Option {number}",
+      "removeOption": "Remove option",
+      "addOption": "Add option",
+      "true": "True",
+      "false": "False",
+      "saveAndPublish": "Save and publish",
+      "saveDraft": "Save as draft",
+      "save": "Save questions",
+      "next": "Next: add questions",
+      "edit": "Edit questions ({count} · {points} points)",
+      "kinds": {
+        "written": "Written",
+        "questions": "Questions"
+      },
+      "errors": {
+        "empty": "Add at least one question before publishing.",
+        "locked": "Questions can't be changed after a student has submitted answers.",
+        "save": "Couldn't save the questions. Try again.",
+        "promptRequired": "Enter the question.",
+        "optionRequired": "Enter the option text.",
+        "imageUpload": "Couldn't upload a picture. Check your connection and try again."
+      },
+      "maxReached": "An assignment can have up to {max} questions.",
+      "image": {
+        "add": "Add picture",
+        "replace": "Replace",
+        "remove": "Remove picture",
+        "gallery": "Choose from photos",
+        "camera": "Take a photo",
+        "label": "Picture for question {number}",
+        "permission": "Studafy can't open your photos or camera. Allow access in Settings.",
+        "unsupported": "Use a JPEG, PNG or WebP picture.",
+        "tooLarge": "That picture is too large. Choose one under 10 MB."
+      }
+    },
     "marks": {
       "entry": {
         "outOf": "Out of {max}",
@@ -1248,6 +1336,7 @@
       }
     },
     "marking": {
+      "autoScore": "Automatic mark: {score} / {max}",
       "loadError": "Couldn't load this submission.",
       "answer": "Answer",
       "noText": "No written answer.",
@@ -1912,5 +2001,25 @@
     "otherSchools": "Children at other schools aren't covered by the {school} seat: they need your own Family+, or a seat from their school.",
     "askSchool": "{school} offers Family+ through its license. Ask the school for a parent seat.",
     "notCovered": "Family+ isn't active for your account at this school."
+  },
+  "launch": {
+    "guide": {
+      "skip": "Skip",
+      "next": "Next",
+      "getStarted": "Get started",
+      "progress": "Page {current} of {total}",
+      "school": {
+        "title": "Your whole school day, in one place",
+        "body": "Timetable, assignments, grades and attendance — always up to date, right on your phone."
+      },
+      "updates": {
+        "title": "Never miss what matters",
+        "body": "Announcements, messages and alerts from your school arrive the moment they're sent."
+      },
+      "family": {
+        "title": "One phone for the whole family",
+        "body": "Sign in as a student, a parent or a sibling, and switch between accounts in a tap."
+      }
+    }
   }
 }

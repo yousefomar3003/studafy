@@ -22,6 +22,8 @@ export interface MaterialRow {
   storage_key: string;
   original_file_name: string;
   mime_type: string;
+  // A bigint column, which postgres.js returns as a string: every query selects it as
+  // `size_bytes::float8` so the response carries the number the OpenAPI contract promises.
   size_bytes: number;
   checksum_sha256: string | null;
   ai_visible: boolean;
@@ -72,7 +74,7 @@ export async function listMaterials(
     tx<MaterialRow[]>`
       SELECT m.id, m.school_id, m.class_id, m.uploaded_by_user_id, m.last_edited_by_user_id,
              m.title, m.description, m.storage_key, m.original_file_name, m.mime_type,
-             m.size_bytes, m.checksum_sha256, m.ai_visible, m.ingest_status, m.ingest_error,
+             m.size_bytes::float8 AS size_bytes, m.checksum_sha256, m.ai_visible, m.ingest_status, m.ingest_error,
              m.ingested_at, m.created_at, m.updated_at
       FROM app.materials AS m
       WHERE m.school_id = ${schoolId}
@@ -102,7 +104,7 @@ export async function getMaterial(
   const [row] = await tx<MaterialRow[]>`
     SELECT id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
            title, description, storage_key, original_file_name, mime_type,
-           size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
+           size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
            ingested_at, created_at, updated_at
     FROM app.materials
     WHERE id = ${materialId} AND school_id = ${schoolId}
@@ -164,7 +166,7 @@ export async function initiateUpload(
     )
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
               title, description, storage_key, original_file_name, mime_type,
-              size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
+              size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
               ingested_at, created_at, updated_at
   `;
 
@@ -221,7 +223,7 @@ export async function confirmUpload(
     WHERE id = ${materialId} AND school_id = ${schoolId}
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
               title, description, storage_key, original_file_name, mime_type,
-              size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
+              size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
               ingested_at, created_at, updated_at
   `;
 
@@ -257,7 +259,7 @@ export async function updateMaterial(
     WHERE id = ${materialId} AND school_id = ${schoolId}
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
               title, description, storage_key, original_file_name, mime_type,
-              size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
+              size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
               ingested_at, created_at, updated_at
   `;
 
@@ -348,7 +350,7 @@ export async function toggleAiVisible(
       WHERE id = ${materialId} AND school_id = ${schoolId}
       RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
                 title, description, storage_key, original_file_name, mime_type,
-                size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
+                size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
                 ingested_at, created_at, updated_at
     `;
     if (!row) throw new HTTPException(404, { message: "Material not found" });
@@ -382,7 +384,7 @@ export async function toggleAiVisible(
     WHERE id = ${materialId} AND school_id = ${schoolId}
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
               title, description, storage_key, original_file_name, mime_type,
-              size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
+              size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
               ingested_at, created_at, updated_at
   `;
   if (!row) throw new HTTPException(404, { message: "Material not found" });

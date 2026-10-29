@@ -15,6 +15,7 @@ import '../auth/auth_notifier.dart';
 import '../auth/auth_session.dart';
 import '../auth/oauth_client.dart';
 import '../auth/secure_token_store.dart';
+import '../../features/launch/application/launch_intro.dart';
 import '../di/app_providers.dart';
 import '../localization/app_locales.dart';
 import '../monitoring/composite_crash_reporter.dart';
@@ -77,6 +78,7 @@ void bootstrapApp(AppEnvironment environment) {
       await secureStore.discardIfReinstalled();
       final session = AuthSession(authClient: authClient, secureStore: secureStore);
       await session.restore();
+      final launchIntro = await resolveLaunchIntro(isAuthenticated: session.isAuthenticated);
 
       runApp(
         EasyLocalization(
@@ -89,6 +91,7 @@ void bootstrapApp(AppEnvironment environment) {
             overrides: [
               appConfigProvider.overrideWithValue(appConfig),
               authSessionProvider.overrideWithValue(session),
+              launchIntroProvider.overrideWithValue(launchIntro),
               crashReporterProvider.overrideWithValue(crashReporter!),
               realtimeTokenProvider.overrideWithValue(
                 () => session.tokenProvider,
