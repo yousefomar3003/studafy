@@ -51,5 +51,23 @@ export default defineConfig({
   },
   build: {
     sourcemap: sentryReleaseUploadEnabled ? "hidden" : false,
+    rolldownOptions: {
+      output: {
+        // Every page's first load (the marketing home and sign-in included, which carry the
+        // Lighthouse budgets in lighthouserc.json) preloads the modules below. Left to automatic
+        // splitting they arrive as a dozen tiny files -- each shared by the entry and some lazy
+        // page -- and the extra requests alone pushed LCP over budget. These groups only name
+        // modules that are already in that first load, so they merge requests without adding bytes.
+        codeSplitting: {
+          groups: [
+            { name: "react-query", test: /[\\/]@tanstack[\\/](react-query|query-core)[\\/]/ },
+            {
+              name: "app-core",
+              test: /([\\/]packages[\\/]ui[\\/]dist[\\/]internal[\\/](cx|merge-refs|ui-strings)\.js$)|([\\/]packages[\\/]constants[\\/]src[\\/](events|notifications|roles|permissions|features)\.ts$)|([\\/]src[\\/]lib[\\/](api|retry-rejected-token|config)\.ts$)|([\\/]src[\\/]lib[\\/]auth[\\/])/,
+            },
+          ],
+        },
+      },
+    },
   },
 });
